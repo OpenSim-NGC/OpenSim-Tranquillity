@@ -43,8 +43,8 @@
   <ItemGroup>
     <PackageReference Include="NUnit" Version="2.7.1" />
     <PackageReference Include="NUnitTestAdapter" Version="2.3.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.10.0" />
-    <PackageReference Include="MySql.Data" Version="8.0.25" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
+    <PackageReference Include="MySql.Data" Version="8.0.26" />
     <PackageReference Include="System.Drawing.Common" Version="5.0.2" />
   </ItemGroup>
 </Project>

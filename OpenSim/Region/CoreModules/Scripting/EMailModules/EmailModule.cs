@@ -199,8 +199,7 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
 
         private bool IsLocal(UUID objectID)
         {
-            string unused;
-            return (null != findPrim(objectID, out unused));
+            return (null != findPrim(objectID, out string unused));
         }
 
         private SceneObjectPart findPrim(UUID objectID, out string ObjectRegionName)
@@ -227,11 +226,10 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
         private bool resolveNamePositionRegionName(UUID objectID, out string ObjectName, out string ObjectAbsolutePosition, out string ObjectRegionName)
         {
             ObjectName = ObjectAbsolutePosition = ObjectRegionName = String.Empty;
-            string m_ObjectRegionName;
             int objectLocX;
             int objectLocY;
             int objectLocZ;
-            SceneObjectPart part = findPrim(objectID, out m_ObjectRegionName);
+            SceneObjectPart part = findPrim(objectID, out string m_ObjectRegionName);
             if (part != null)
             {
                 objectLocX = (int)part.AbsolutePosition.X;

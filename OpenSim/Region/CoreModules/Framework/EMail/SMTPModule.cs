@@ -61,7 +61,7 @@ namespace OpenSim.Region.CoreModules.Framework.EMail
         private string SMTP_HOSTNAME = string.Empty;
 
         // Scenes by Region Handle
-        private Dictionary<ulong, Scene> m_Scenes = new Dictionary<ulong, Scene>();
+        private readonly Dictionary<ulong, Scene> m_Scenes = new Dictionary<ulong, Scene>();
         private bool m_Enabled = false;
 
         #region ISharedRegionModule
@@ -159,94 +159,15 @@ namespace OpenSim.Region.CoreModules.Framework.EMail
 
         #endregion
 
-        /// <summary>
-        /// Send one or more formatted MimeMessages given the SMTP parameters configured
-        /// </summary>
-        /// <param name="messages"></param>
-        private void SendMessages(IList<MimeMessage> messages)
-        {
-            using (var client = new SmtpClient())
-            {
-                client.Connect(SMTP_SERVER_HOSTNAME, SMTP_SERVER_PORT, SecureSocketOptions.SslOnConnect);
-
-                if (SMTP_SERVER_LOGIN != String.Empty && SMTP_SERVER_PASSWORD != String.Empty)
-                {
-                    client.Authenticate(SMTP_SERVER_LOGIN, SMTP_SERVER_PASSWORD);
-                }
-
-                foreach (var message in messages)
-                {
-                    client.Send(message);
-                    m_log.InfoFormat("[SMTP]: Email sent to {} from {}", message.To.ToString(), message.From.ToString());
-                }
-
-                client.Disconnect(true);
-            }
-        }
-
-        /// <summary>
-        /// Format a MimeMessage using the string values provided.  Validate the from and to using a 
-        /// Regex to make sure they are a valid email address.
-        /// </summary>
-        /// <param name="from"></param>
-        /// <param name="to"></param>
-        /// <param name="subject"></param>
-        /// <param name="body"></param>
-        private MimeMessage FormatMessage(string from, string to, string subject, string body)
-        {
-            //Check if address is empty
-            if (string.IsNullOrEmpty(from) || string.IsNullOrEmpty(to) || 
-                string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(body))
-                return null;
-
-            //FIXED:Check the email is correct form in REGEX
-            var EMailpatternStrict = @"^(([^<>()[\]\\.,;:\s@\""]+"
-                + @"(\.[^<>()[\]\\.,;:\s@\""]+)*)|(\"".+\""))@"
-                + @"((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
-                + @"\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+"
-                + @"[a-zA-Z]{2,}))$";
-
-            var EMailreStrict = new Regex(EMailpatternStrict);
-
-            // Verify the from and to addresses are valid
-            if (EMailreStrict.IsMatch(from) == false)
-            {
-                m_log.Error("[SMTP]: REGEX Problem in From EMail Address: " + from);
-                return null;
-            }
-
-            if (EMailreStrict.IsMatch(to) == false)
-            {
-                m_log.Error("[SMTP]: REGEX Problem in To EMail Address: " + to);
-                return null;
-            }
-
-            var emailMessage = new MimeMessage();
-
-            emailMessage.From.Add(MailboxAddress.Parse(from));
-            emailMessage.To.Add(MailboxAddress.Parse(to));
-            emailMessage.Subject = subject;
-            emailMessage.Body = new TextPart("plain") { Text =  body };
-
-            if (string.IsNullOrEmpty(SMTP_SERVER_REPLYTO) == false)
-            {
-                emailMessage.ReplyTo.Add(MailboxAddress.Parse(SMTP_SERVER_REPLYTO));
-            }
-
-            return emailMessage;
-        }
-
         private SceneObjectPart LocateObject(UUID objectID)
         {
             lock (m_Scenes)
             {
                 foreach (var scene in m_Scenes.Values)
                 {
-                    var part = (SceneObjectPart)scene.GetSceneObjectPart(objectID);
+                    var part = scene.GetSceneObjectPart(objectID);
                     if (part != null)
-                    {
                         return part;
-                    }
                 }
             }
 
@@ -288,13 +209,80 @@ namespace OpenSim.Region.CoreModules.Framework.EMail
                 return string.Empty;
         }
 
-        public void SendMail(string from, string to, string subject, string body)
+        /// <summary>
+        /// Format a MimeMessage using the string values provided.  Validate the from and to using a 
+        /// Regex to make sure they are a valid email address.
+        /// </summary>
+        /// <param name="from"></param>
+        /// <param name="to"></param>
+        /// <param name="subject"></param>
+        /// <param name="body"></param>
+        public MimeMessage FormatMessage(string from, string to, string subject, string body)
         {
-            var message = this.FormatMessage(from, to, subject, body);
+            //Check if address is empty
+            if (string.IsNullOrEmpty(from) || string.IsNullOrEmpty(to) ||
+                string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(body))
+                return null;
 
-            if (message != null)
+            //FIXED:Check the email is correct form in REGEX
+            var EMailpatternStrict = @"^(([^<>()[\]\\.,;:\s@\""]+"
+                + @"(\.[^<>()[\]\\.,;:\s@\""]+)*)|(\"".+\""))@"
+                + @"((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+                + @"\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+"
+                + @"[a-zA-Z]{2,}))$";
+
+            var EMailreStrict = new Regex(EMailpatternStrict);
+
+            // Verify the from and to addresses are valid
+            if (EMailreStrict.IsMatch(from) == false)
             {
-                SendMessages(new List<MimeMessage>() { message });
+                m_log.Error("[SMTP]: REGEX Problem in From EMail Address: " + from);
+                return null;
+            }
+
+            if (EMailreStrict.IsMatch(to) == false)
+            {
+                m_log.Error("[SMTP]: REGEX Problem in To EMail Address: " + to);
+                return null;
+            }
+
+            var emailMessage = new MimeMessage();
+
+            emailMessage.From.Add(MailboxAddress.Parse(from));
+            emailMessage.To.Add(MailboxAddress.Parse(to));
+            emailMessage.Subject = subject;
+            emailMessage.Body = new TextPart("plain") { Text = body };
+
+            if (string.IsNullOrEmpty(SMTP_SERVER_REPLYTO) == false)
+            {
+                emailMessage.ReplyTo.Add(MailboxAddress.Parse(SMTP_SERVER_REPLYTO));
+            }
+
+            return emailMessage;
+        }
+
+        /// <summary>
+        /// Send one or more formatted MimeMessages given the SMTP parameters configured
+        /// </summary>
+        /// <param name="messages"></param>
+        public void SendMessages(IList<MimeMessage> messages)
+        {
+            using (var client = new SmtpClient())
+            {
+                client.Connect(SMTP_SERVER_HOSTNAME, SMTP_SERVER_PORT, SecureSocketOptions.SslOnConnect);
+
+                if (SMTP_SERVER_LOGIN != String.Empty && SMTP_SERVER_PASSWORD != String.Empty)
+                {
+                    client.Authenticate(SMTP_SERVER_LOGIN, SMTP_SERVER_PASSWORD);
+                }
+
+                foreach (var message in messages)
+                {
+                    client.Send(message);
+                    m_log.InfoFormat("[SMTP]: Email sent to {} from {}", message.To.ToString(), message.From.ToString());
+                }
+
+                client.Disconnect(true);
             }
         }
 

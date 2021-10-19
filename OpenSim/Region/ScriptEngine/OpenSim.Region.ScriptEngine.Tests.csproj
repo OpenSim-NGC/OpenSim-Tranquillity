@@ -146,6 +146,6 @@
   <ItemGroup>
     <PackageReference Include="NUnit" Version="2.7.1" />
     <PackageReference Include="NUnitTestAdapter" Version="2.3.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.10.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
   </ItemGroup>
 </Project>

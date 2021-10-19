@@ -26,6 +26,8 @@
  */
 
 using OpenMetaverse;
+using MimeKit;
+using System.Collections.Generic;
 
 namespace OpenSim.Region.Framework.Interfaces
 {
@@ -41,10 +43,10 @@ namespace OpenSim.Region.Framework.Interfaces
     public interface ISMTPModule
     {
         /// <summary>
-        /// Fetch the email address on record for the Agent specified by the prvovided agentID.
+        /// Fetch the email address on record for the Agent specified by the provided agentID.
         /// </summary>
         /// <param name="agentID"></param>
-        string FormatAgentAddress(UUID objectID);
+        string FormatAgentAddress(UUID agentID);
 
         /// <summary>
         /// Format an email address for the specified object id.
@@ -53,13 +55,19 @@ namespace OpenSim.Region.Framework.Interfaces
         string FormatObjectAddress(UUID objectID);
 
         /// <summary>
-        /// Send an email message using system SMTP configuration.  Validate the from and to using a 
+        /// Format a MimeMessage using system SMTP configuration.  Validate the from and to using a 
         /// Regex to make sure they are a valid email address.
         /// </summary>
         /// <param name="from">Who this message is from (an agent or object in string format)</param>
         /// <param name="to">The reciver of the message specified by a valid email address</param>
         /// <param name="subject"></param>
         /// <param name="body"></param>
-        void SendMail(string from, string to, string subject, string body);
+        MimeMessage FormatMessage(string from, string to, string subject, string body);
+
+        /// <summary>
+        /// Send one or more formatted MimeMessages given the SMTP parameters configured
+        /// </summary>
+        /// <param name="messages"></param>
+        void SendMessages(IList<MimeMessage> messages);
     }
 }
