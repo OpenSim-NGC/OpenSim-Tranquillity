@@ -41,6 +41,9 @@ namespace OpenSim.Framework
         public string HttpSSLCNCertPass = "";
         public uint httpSSLPort = 9001;
 
+        public uint HttpListenerPortMin = ConfigSettings.DefaultRegionHttpPort;
+        public uint HttpListenerPortMax = ConfigSettings.DefaultRegionHttpPort;
+
         // "Out of band" managemnt https
         public bool ssl_listener = false;
         public bool ssl_external = false;
@@ -62,6 +65,10 @@ namespace OpenSim.Framework
                 (uint) config.Configs["Network"].GetInt("http_listener_port", (int) ConfigSettings.DefaultRegionHttpPort);
             httpSSLPort =
                 (uint)config.Configs["Network"].GetInt("http_listener_sslport", ((int)ConfigSettings.DefaultRegionHttpPort+1));
+            HttpListenerPortMin =
+                (uint)config.Configs["Network"].GetInt("http_listener_port_min", (int)HttpListenerPort);
+            HttpListenerPortMax =
+                (uint)config.Configs["Network"].GetInt("http_listener_port_max", (int)HttpListenerPort);
             HttpUsesSSL = config.Configs["Network"].GetBoolean("http_listener_ssl", false);
             HttpSSLCN = config.Configs["Network"].GetString("http_listener_cn", "localhost");
             HttpSSLCertPath = config.Configs["Network"].GetString("http_listener_cert_path", HttpSSLCertPath);

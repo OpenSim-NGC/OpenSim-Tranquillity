@@ -573,6 +573,10 @@
     ;; entire simulator listens on. This port uses the TCP protocol, while
     ;; the region ports use UDP.
     ; http_listener_port = 9000
+	
+    ;; Alternatively, instead of specifying a single port, you could specify a range of ports
+    ; http_listener_port_min = 9000
+    ; http_listener_port_max = 9100
 
     ; optional main server secure http (ssl)
     ; to use ssl you need a ssl certificate in PKCS12 format that validates the ExternalHostnames 

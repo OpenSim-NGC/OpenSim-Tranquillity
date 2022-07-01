@@ -92,8 +92,11 @@ namespace OpenSim
             if(!m_networkServersInfo.HttpUsesSSL)
             {
                 m_httpServer = server;
-                server.Start();
-            }
+                server.Start(m_networkServersInfo.HttpListenerPortMin, m_networkServersInfo.HttpListenerPortMax);
+                // hack: update the config to the selected port
+                m_networkServersInfo.HttpListenerPort = server.Port;
+                Config.Configs["Network"].Set("http_listener_port", server.Port);
+                m_httpServerPort = server.Port;            }
             else
                 server.Start();
 
