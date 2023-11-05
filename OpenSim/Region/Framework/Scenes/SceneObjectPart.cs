@@ -29,9 +29,11 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Serialization;
 using log4net;
@@ -196,6 +198,10 @@ namespace OpenSim.Region.Framework.Scenes
         /// </remarks>
         public PhysicsActor PhysActor { get; set; }
 
+        [XmlIgnore]
+        private Dictionary<String, ProtectedData> LinksetData = null;
+        private static readonly object linksetDataLock = new object();
+        
         //Xantor 20080528 Sound stuff:
         //  Note: This isn't persisted in the database right now, as the fields for that aren't just there yet.
         //        Not a big problem as long as the script that sets it remains in the prim on startup.
@@ -2231,6 +2237,7 @@ namespace OpenSim.Region.Framework.Scenes
                 dupe.PhysActor.LocalID = plocalID;
 
             dupe.PseudoCRC = (int)(DateTime.UtcNow.Ticks);
+            dupe.DeserializeLinksetData(SerializeLinksetData());
 
             ParentGroup.Scene.EventManager.TriggerOnSceneObjectPartCopy(dupe, this, userExposed);
 
@@ -5808,6 +5815,237 @@ namespace OpenSim.Region.Framework.Scenes
 
             Animations = null;
             AnimationsNames = null;
+        }
+
+        public string[] FindLinksetDataKeys(string pattern, int start, int count)
+        {
+            List<string> all_keys = new List<string>(GetLinksetDataSubList(0, -1));
+            RegexOptions options = RegexOptions.CultureInvariant;
+            Regex rx = new Regex(pattern, options);
+            if (count == -1) count = all_keys.Count;
+            List<string> matches = new List<string>();
+            foreach (var str in all_keys)
+            {
+                if(rx.IsMatch(str)) matches.Add(str);
+            }
+
+            return matches.Skip(start).Take(count).ToArray();
+        }
+
+        public Byte[] SerializeLinksetData()
+        {
+            if (!IsRoot || LinksetData==null)
+                return null;
+
+            lock (linksetDataLock)
+            {
+                using (var ms = new MemoryStream())
+                {
+                    
+                    BinaryWriter bw = new BinaryWriter(ms);
+                    bw.Write(LinksetData.Count);
+                    foreach (KeyValuePair<String,ProtectedData> kvp in LinksetData)
+                    {
+                        bw.Write(kvp.Key);
+                        Byte[] prot = kvp.Value.serialize();
+                        
+                        bw.Write(prot.Length);
+                        bw.Write(prot);
+                    }
+
+                    return ms.ToArray();
+                }
+            }
+        }
+
+        public void DeserializeLinksetData(Byte[] data)
+        {
+            if (data == null) return;
+            
+            using (MemoryStream ms = new MemoryStream(data))
+            {
+                BinaryReader br = new BinaryReader(ms);
+                LinksetData = new Dictionary<string, ProtectedData>();
+
+                int count = br.ReadInt32();
+                while (count>0)
+                {
+                    LinksetData.Add(br.ReadString(), ProtectedData.deserialize(br.ReadBytes(br.ReadInt32())));
+                    count--;
+                }
+                updateLinksetDataAccounting();
+            }
+        }
+
+        /// <summary>
+        /// Adds or updates a entry to linkset data
+        /// </summary>
+        /// <returns>-1 if the password did not match
+        /// 0 if the data was successfully added or updated
+        /// 1 if the data could not be added or updated due to memory</returns>
+        public int AddOrUpdateLinksetDataKey(string key, string value, string pass)
+        {
+            lock (linksetDataLock)
+            {
+                LinksetData = LinksetData ?? new Dictionary<string, ProtectedData>();
+                ProtectedData original = LinksetData.ContainsKey(key) ? LinksetData[key] : null;
+                ProtectedData pd = null;
+                
+                if (original?.IsProtected ?? false)
+                {
+                    if (original.test(pass))
+                    {
+                        pd=new ProtectedData(value, pass);
+                        LinksetData[key] = pd;
+                    }else return -1;
+                }
+                else
+                {
+                    pd = new ProtectedData(value, "");
+                    LinksetData[key] = pd;
+                }
+    
+    
+                updateLinksetDataAccounting();
+                if (LinksetDataOverLimit)
+                {
+                    // Abort.
+                    LinksetData[key] = original;
+                    pd = null;
+                    updateLinksetDataAccounting();
+                    return 1;
+                }
+    
+                return 0;
+            }
+            
+        }
+
+        /// <summary>
+        /// Reads a value from the key value pair
+        /// </summary>
+        /// <returns>Blank if no key or pass mismatch. Value if no password or pass matches</returns>
+        public string ReadLinksetData(string name, string pass)
+        {
+            lock (linksetDataLock)
+            {
+                
+                ProtectedData original = LinksetData?[name] ?? null;
+                if (original != null)
+                {
+                    return original.testAndGetValue(pass);
+                }
+                else return "";
+            }
+        }
+
+        /// <summary>
+        /// Deletes a named key from the key value store
+        /// </summary>
+        /// <returns>0 if successful.
+        /// 1 if not due to the password.
+        /// -1 if no such key was found</returns>
+        public int DeleteLinksetDataKey(string key, string pass)
+        {
+            lock (linksetDataLock)
+            {
+                LinksetData = LinksetData ?? new Dictionary<string, ProtectedData>();
+                ProtectedData origin = LinksetData?[key] ?? null;
+                if (origin == null)
+                {
+                    return -1;
+                }
+                else
+                {
+                    if (origin.test(pass))
+                    {
+                        LinksetData?.Remove(key);
+                        updateLinksetDataAccounting();
+                        return 0;
+                    }
+                    else
+                    {
+                        return 1;
+                    }
+                }
+            }
+        }
+
+        public string[] GetLinksetDataSubList(int start, int count)
+        {
+            lock (linksetDataLock)
+            {
+                if (count == -1) count = LinksetDataKeys;
+                LinksetData = LinksetData ?? new Dictionary<string, ProtectedData>();
+                List<string> ret = new List<string>();
+                ret = LinksetData.Keys.Skip(start).Take(count).ToList();
+                return ret.ToArray();
+            }
+        }
+
+        public void ResetLinksetData()
+        {
+            lock (linksetDataLock)
+            {
+                LinksetData = LinksetData ?? new Dictionary<string, ProtectedData>();
+                LinksetData.Clear();
+            }
+
+        }
+
+        /// <summary>
+        /// Recalculates the amount of memory used by linkset data.
+        /// </summary>
+        public void updateLinksetDataAccounting()
+        {
+            lock (linksetDataLock)
+            {
+                
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    using (BinaryWriter bw = new BinaryWriter(ms))
+                    {
+                        foreach (var val in LinksetData)
+                        {
+                            bw.Write(Encoding.UTF8.GetBytes(val.Key));
+                            bw.Write(Encoding.UTF8.GetBytes(val.Value.val));
+                            
+                            // For parity, the pass adds 32 bytes regardless of the length. See LL caveats
+                            if(val.Value.IsProtected) bw.Write(new byte[32]);
+                        }
+                    }
+
+                    linksetDataBytesUsed = ms.ToArray().Length;
+                    linksetDataBytesFree = 131072 - linksetDataBytesUsed;
+                }
+            }
+        }
+
+        public int linksetDataBytesUsed;
+        public int linksetDataBytesFree = 131072; // Default
+
+        public bool HasLinksetData
+        {
+            get
+            {
+                return LinksetData?.Count > 0;
+            }
+        }
+
+        public bool LinksetDataOverLimit
+        {
+            get
+            {
+                return linksetDataBytesFree < 0;
+            }
+        }
+
+        public int LinksetDataKeys
+        {
+            get
+            {
+                return LinksetData?.Count ?? 0;
+            }
         }
 
         public bool GetOwnerName(out string FirstName, out string LastName)
