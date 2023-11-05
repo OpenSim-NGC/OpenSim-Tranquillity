@@ -5841,19 +5841,20 @@ namespace OpenSim.Region.Framework.Scenes
             {
                 using (var ms = new MemoryStream())
                 {
-                    
-                    BinaryWriter bw = new BinaryWriter(ms);
-                    bw.Write(LinksetData.Count);
-                    foreach (KeyValuePair<String,ProtectedData> kvp in LinksetData)
+                    using (BinaryWriter bw = new BinaryWriter(ms))
                     {
-                        bw.Write(kvp.Key);
-                        Byte[] prot = kvp.Value.serialize();
-                        
-                        bw.Write(prot.Length);
-                        bw.Write(prot);
-                    }
+                        bw.Write(LinksetData.Count);
+                        foreach (KeyValuePair<String, ProtectedData> kvp in LinksetData)
+                        {
+                            bw.Write(kvp.Key);
+                            Byte[] prot = kvp.Value.serialize();
 
-                    return ms.ToArray();
+                            bw.Write(prot.Length);
+                            bw.Write(prot);
+                        }
+
+                        return ms.ToArray();
+                    }
                 }
             }
         }
@@ -5864,16 +5865,18 @@ namespace OpenSim.Region.Framework.Scenes
             
             using (MemoryStream ms = new MemoryStream(data))
             {
-                BinaryReader br = new BinaryReader(ms);
-                LinksetData = new Dictionary<string, ProtectedData>();
-
-                int count = br.ReadInt32();
-                while (count>0)
+                using (BinaryReader br = new BinaryReader(ms))
                 {
-                    LinksetData.Add(br.ReadString(), ProtectedData.deserialize(br.ReadBytes(br.ReadInt32())));
-                    count--;
+                    LinksetData = new Dictionary<string, ProtectedData>();
+
+                    int count = br.ReadInt32();
+                    while (count > 0)
+                    {
+                        LinksetData.Add(br.ReadString(), ProtectedData.deserialize(br.ReadBytes(br.ReadInt32())));
+                        count--;
+                    }
+                    updateLinksetDataAccounting();
                 }
-                updateLinksetDataAccounting();
             }
         }
 
@@ -5897,7 +5900,8 @@ namespace OpenSim.Region.Framework.Scenes
                     {
                         pd=new ProtectedData(value, pass);
                         LinksetData[key] = pd;
-                    }else return -1;
+                    }
+                    else return -1;
                 }
                 else
                 {
@@ -5905,8 +5909,8 @@ namespace OpenSim.Region.Framework.Scenes
                     LinksetData[key] = pd;
                 }
     
-    
                 updateLinksetDataAccounting();
+
                 if (LinksetDataOverLimit)
                 {
                     // Abort.

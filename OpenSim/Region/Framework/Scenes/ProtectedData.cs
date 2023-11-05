@@ -53,10 +53,12 @@ namespace OpenSim.Region.Framework.Scenes
         {
             using (MemoryStream ms = new MemoryStream())
             {
-                BinaryWriter bw = new BinaryWriter(ms);
-                bw.Write(value);
-                bw.Write(pass);
-                return ms.ToArray();
+                using (BinaryWriter bw = new BinaryWriter(ms))
+                {
+                    bw.Write(value);
+                    bw.Write(pass);
+                    return ms.ToArray();
+                }
             }
         }
 

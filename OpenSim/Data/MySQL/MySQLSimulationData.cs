@@ -1203,9 +1203,11 @@ namespace OpenSim.Data.MySQL
             int pseudocrc = (int)row["pseudocrc"];
             if(pseudocrc != 0)
                 prim.PseudoCRC = pseudocrc;
-            
-            if (prim.IsRoot && (row["linksetdata"] is DBNull) == false)
+
+            if (!(row["linksetdata"] is DBNull))
+            {
                 prim.DeserializeLinksetData((byte[])row["linksetdata"]);
+            }
 
             return prim;
         }

@@ -1812,7 +1812,7 @@ namespace OpenSim.Data.SQLite
                 prim.Animations = null;
             }
 
-            if ((row["linksetdata"] is DBNull) == false)
+            if (!(row["linksetdata"] is DBNull))
             {
                 prim.DeserializeLinksetData((byte[])row["LinksetData"]);
             }
