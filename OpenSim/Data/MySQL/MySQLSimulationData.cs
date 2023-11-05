@@ -1632,6 +1632,10 @@ namespace OpenSim.Data.MySQL
             {
                 cmd.Parameters.AddWithValue("linksetdata", prim.SerializeLinksetData());
             }
+            else 
+            {
+                cmd.Parameters.AddWithValue("linksetdata", null);
+            }           
         }
 
         /// <summary>
