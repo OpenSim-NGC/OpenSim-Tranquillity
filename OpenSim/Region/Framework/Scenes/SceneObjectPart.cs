@@ -5991,6 +5991,8 @@ namespace OpenSim.Region.Framework.Scenes
             {
                 if (LinksetData == null) LinksetData = new Dictionary<string, ProtectedData>();
                 LinksetData.Clear();
+                
+                updateLinksetDataAccounting();
             }
 
         }
