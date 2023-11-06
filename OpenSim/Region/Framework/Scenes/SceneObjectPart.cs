@@ -199,7 +199,7 @@ namespace OpenSim.Region.Framework.Scenes
         public PhysicsActor PhysActor { get; set; }
 
         [XmlIgnore]
-        private Dictionary<String, ProtectedData> LinksetData = null;
+        private Dictionary<String, LinksetDataEntry> LinksetData = null;
         private static readonly object linksetDataLock = new object();
         
         //Xantor 20080528 Sound stuff:
@@ -5844,7 +5844,7 @@ namespace OpenSim.Region.Framework.Scenes
                     using (BinaryWriter bw = new BinaryWriter(ms))
                     {
                         bw.Write(LinksetData.Count);
-                        foreach (KeyValuePair<String, ProtectedData> kvp in LinksetData)
+                        foreach (KeyValuePair<String, LinksetDataEntry> kvp in LinksetData)
                         {
                             bw.Write(kvp.Key);
                             Byte[] prot = kvp.Value.serialize();
@@ -5867,12 +5867,12 @@ namespace OpenSim.Region.Framework.Scenes
             {
                 using (BinaryReader br = new BinaryReader(ms))
                 {
-                    LinksetData = new Dictionary<string, ProtectedData>();
+                    LinksetData = new Dictionary<string, LinksetDataEntry>();
 
                     int count = br.ReadInt32();
                     while (count > 0)
                     {
-                        LinksetData.Add(br.ReadString(), ProtectedData.deserialize(br.ReadBytes(br.ReadInt32())));
+                        LinksetData.Add(br.ReadString(), LinksetDataEntry.deserialize(br.ReadBytes(br.ReadInt32())));
                         count--;
                     }
                     updateLinksetDataAccounting();
@@ -5890,23 +5890,23 @@ namespace OpenSim.Region.Framework.Scenes
         {
             lock (linksetDataLock)
             {
-                if (LinksetData == null) LinksetData = new Dictionary<string, ProtectedData>();
+                if (LinksetData == null) LinksetData = new Dictionary<string, LinksetDataEntry>();
                 
-                ProtectedData original = LinksetData.ContainsKey(key) ? LinksetData[key] : null;
-                ProtectedData pd = null;
+                LinksetDataEntry original = LinksetData.ContainsKey(key) ? LinksetData[key] : null;
+                LinksetDataEntry pd = null;
                 
                 if (original?.IsProtected ?? false)
                 {
                     if (original.test(pass))
                     {
-                        pd=new ProtectedData(value, pass);
+                        pd=new LinksetDataEntry(value, pass);
                         LinksetData[key] = pd;
                     }
                     else return -1;
                 }
                 else
                 {
-                    pd = new ProtectedData(value, "");
+                    pd = new LinksetDataEntry(value, "");
                     LinksetData[key] = pd;
                 }
     
@@ -5935,7 +5935,7 @@ namespace OpenSim.Region.Framework.Scenes
             lock (linksetDataLock)
             {
                 if (LinksetData == null) return "";
-                ProtectedData orig;
+                LinksetDataEntry orig;
                 var success = LinksetData.TryGetValue(name, out orig);
                 if (!success) return "";
                 else return orig.testAndGetValue(pass);
@@ -5952,8 +5952,8 @@ namespace OpenSim.Region.Framework.Scenes
         {
             lock (linksetDataLock)
             {
-                if (LinksetData == null) LinksetData = new Dictionary<string, ProtectedData>();
-                ProtectedData origin;
+                if (LinksetData == null) LinksetData = new Dictionary<string, LinksetDataEntry>();
+                LinksetDataEntry origin;
                 var success = LinksetData.TryGetValue(key, out origin);
 
                 if (!success) return -1;
@@ -5977,7 +5977,7 @@ namespace OpenSim.Region.Framework.Scenes
             lock (linksetDataLock)
             {
                 if (count == -1) count = LinksetDataKeys;
-                if (LinksetData == null) LinksetData = new Dictionary<string, ProtectedData>();
+                if (LinksetData == null) LinksetData = new Dictionary<string, LinksetDataEntry>();
                 
                 List<string> ret = new List<string>();
                 ret = LinksetData.Keys.Skip(start).Take(count).ToList();
@@ -5989,7 +5989,7 @@ namespace OpenSim.Region.Framework.Scenes
         {
             lock (linksetDataLock)
             {
-                if (LinksetData == null) LinksetData = new Dictionary<string, ProtectedData>();
+                if (LinksetData == null) LinksetData = new Dictionary<string, LinksetDataEntry>();
                 LinksetData.Clear();
                 
                 updateLinksetDataAccounting();

@@ -4,17 +4,17 @@ using System.Text;
 
 namespace OpenSim.Region.Framework.Scenes
 {
-    public class ProtectedData
+    public class LinksetDataEntry
     {
         private string value;
         private string pass="";
 
-        public ProtectedData(string value, string pass)
+        public LinksetDataEntry(string value, string pass)
         {
             this.value = value;
             this.pass = pass;
         }
-        private ProtectedData(){}
+        private LinksetDataEntry(){}
 
         public string testAndGetValue(string pass)
         {
@@ -62,9 +62,9 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
-        public static ProtectedData deserialize(Byte[] inf)
+        public static LinksetDataEntry deserialize(Byte[] inf)
         {
-            ProtectedData pd = new ProtectedData();
+            LinksetDataEntry pd = new LinksetDataEntry();
             using (BinaryReader br = new BinaryReader(new MemoryStream(inf)))
             {
                 pd.value = br.ReadString();
