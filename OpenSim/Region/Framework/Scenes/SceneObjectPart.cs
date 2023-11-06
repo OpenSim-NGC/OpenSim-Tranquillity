@@ -5890,7 +5890,8 @@ namespace OpenSim.Region.Framework.Scenes
         {
             lock (linksetDataLock)
             {
-                LinksetData = LinksetData ?? new Dictionary<string, ProtectedData>();
+                if (LinksetData == null) LinksetData = new Dictionary<string, ProtectedData>();
+                
                 ProtectedData original = LinksetData.ContainsKey(key) ? LinksetData[key] : null;
                 ProtectedData pd = null;
                 
@@ -5933,13 +5934,11 @@ namespace OpenSim.Region.Framework.Scenes
         {
             lock (linksetDataLock)
             {
-                
-                ProtectedData original = LinksetData?[name] ?? null;
-                if (original != null)
-                {
-                    return original.testAndGetValue(pass);
-                }
-                else return "";
+                if (LinksetData == null) return "";
+                ProtectedData orig;
+                var success = LinksetData.TryGetValue(name, out orig);
+                if (!success) return "";
+                else return orig.testAndGetValue(pass);
             }
         }
 
@@ -5953,25 +5952,23 @@ namespace OpenSim.Region.Framework.Scenes
         {
             lock (linksetDataLock)
             {
-                LinksetData = LinksetData ?? new Dictionary<string, ProtectedData>();
-                ProtectedData origin = LinksetData?[key] ?? null;
-                if (origin == null)
+                if (LinksetData == null) LinksetData = new Dictionary<string, ProtectedData>();
+                ProtectedData origin;
+                var success = LinksetData.TryGetValue(key, out origin);
+
+                if (!success) return -1;
+            
+                if (origin.test(pass))
                 {
-                    return -1;
+                    LinksetData.Remove(key);
+                    updateLinksetDataAccounting();
+                    return 0;
                 }
                 else
                 {
-                    if (origin.test(pass))
-                    {
-                        LinksetData?.Remove(key);
-                        updateLinksetDataAccounting();
-                        return 0;
-                    }
-                    else
-                    {
-                        return 1;
-                    }
+                    return 1;
                 }
+                
             }
         }
 
@@ -5980,7 +5977,8 @@ namespace OpenSim.Region.Framework.Scenes
             lock (linksetDataLock)
             {
                 if (count == -1) count = LinksetDataKeys;
-                LinksetData = LinksetData ?? new Dictionary<string, ProtectedData>();
+                if (LinksetData == null) LinksetData = new Dictionary<string, ProtectedData>();
+                
                 List<string> ret = new List<string>();
                 ret = LinksetData.Keys.Skip(start).Take(count).ToList();
                 return ret.ToArray();
@@ -5991,7 +5989,7 @@ namespace OpenSim.Region.Framework.Scenes
         {
             lock (linksetDataLock)
             {
-                LinksetData = LinksetData ?? new Dictionary<string, ProtectedData>();
+                if (LinksetData == null) LinksetData = new Dictionary<string, ProtectedData>();
                 LinksetData.Clear();
             }
 
@@ -6020,19 +6018,21 @@ namespace OpenSim.Region.Framework.Scenes
                     }
 
                     linksetDataBytesUsed = ms.ToArray().Length;
-                    linksetDataBytesFree = 131072 - linksetDataBytesUsed;
+                    linksetDataBytesFree = LINKSETDATA_MAX - linksetDataBytesUsed;
                 }
             }
         }
 
+        public const int LINKSETDATA_MAX = 131072; // 128 KB
         public int linksetDataBytesUsed;
-        public int linksetDataBytesFree = 131072; // Default
+        public int linksetDataBytesFree = LINKSETDATA_MAX; // Default
 
         public bool HasLinksetData
         {
             get
             {
-                return LinksetData?.Count > 0;
+                if (LinksetData == null) return false;
+                return LinksetData.Count > 0;
             }
         }
 
@@ -6048,7 +6048,8 @@ namespace OpenSim.Region.Framework.Scenes
         {
             get
             {
-                return LinksetData?.Count ?? 0;
+                if (LinksetData == null) return 0;
+                return LinksetData.Count;
             }
         }
 
