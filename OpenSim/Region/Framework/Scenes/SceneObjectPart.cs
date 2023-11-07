@@ -6044,21 +6044,14 @@ namespace OpenSim.Region.Framework.Scenes
                 {
                     if (reg.IsMatch(kvp.Key))
                     {
-                        if (kvp.Value.IsProtected)
+                        var status = DeleteLinksetDataKey(kvp.Key, pass);
+                        if (status == 0)
                         {
-                            if (kvp.Value.test(pass))
-                            {
-                                ret.Add(kvp.Key);
-                                DeleteLinksetDataKey(kvp.Key, pass);
-                                MDR.deleted++;
-                            }
-                            else MDR.not_deleted++;
-                        }
-                        else
-                        {
-                            ret.Add(kvp.Key);
-                            DeleteLinksetDataKey(kvp.Key, "");
                             MDR.deleted++;
+                            ret.Add(kvp.Key);
+                        }else if (status == 1)
+                        {
+                            MDR.not_deleted++;
                         }
                     }
                 }

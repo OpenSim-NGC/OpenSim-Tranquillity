@@ -18871,8 +18871,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             {
                 new LSL_Integer(ScriptBaseClass.LINKSETDATA_MULTIDELETE), new LSL_String(ret.removed_keys), new LSL_String("")
             };
-
-            m_ScriptEngine.PostObjectEvent(m_host.LocalId, new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+            if (ret.deleted > 0)
+            {
+                m_ScriptEngine.PostObjectEvent(m_host.LocalId, new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+            }
             return new LSL_List(new object[]
             {
                 new LSL_Integer(ret.deleted), new LSL_Integer(ret.not_deleted)
