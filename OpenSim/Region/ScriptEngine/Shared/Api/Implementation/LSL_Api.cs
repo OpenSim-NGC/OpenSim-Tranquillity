@@ -18826,9 +18826,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 if (ret == 1)
                 {
                     return ScriptBaseClass.LINKSETDATA_EMEMORY;
-                }
-
-                return ScriptBaseClass.LINKSETDATA_NOUPDATE;
+                }else if (ret == 2)
+                    return ScriptBaseClass.LINKSETDATA_NOUPDATE;
+                else return ScriptBaseClass.LINKSETDATA_EPROTECTED;
             }
         }
 
@@ -18902,9 +18902,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             } 
             else if (ret == 1)
             {
-                return new LSL_Integer(ScriptBaseClass.LINKSETDATA_NOTFOUND);
+                return new LSL_Integer(ScriptBaseClass.LINKSETDATA_EPROTECTED);
             }
-            else
+            else if(ret == -1)
             {
                 return new LSL_Integer(ScriptBaseClass.LINKSETDATA_NOTFOUND);
             }

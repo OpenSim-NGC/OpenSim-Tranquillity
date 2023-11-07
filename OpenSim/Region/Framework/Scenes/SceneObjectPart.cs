@@ -5884,8 +5884,11 @@ namespace OpenSim.Region.Framework.Scenes
         /// Adds or updates a entry to linkset data
         /// </summary>
         /// <returns>-1 if the password did not match
+        /// -1 is the data was protected
         /// 0 if the data was successfully added or updated
-        /// 1 if the data could not be added or updated due to memory</returns>
+        /// 1 if the data could not be added or updated due to memory
+        /// 2 if the data is unchanged
+        /// </returns>
         public int AddOrUpdateLinksetDataKey(string key, string value, string pass)
         {
             lock (linksetDataLock)
@@ -5900,6 +5903,7 @@ namespace OpenSim.Region.Framework.Scenes
                 {
                     if (original.test(pass))
                     {
+                        if (original.val == value) return 2;
                         pd=new LinksetDataEntry(value, pass);
                         LinksetData[key] = pd;
                     }
@@ -5907,6 +5911,8 @@ namespace OpenSim.Region.Framework.Scenes
                 }
                 else
                 {
+                    if(original != null)
+                        if (original.val == value) return 2;
                     pd = new LinksetDataEntry(value, pass);
                     LinksetData[key] = pd;
                 }
@@ -5946,9 +5952,11 @@ namespace OpenSim.Region.Framework.Scenes
         /// <summary>
         /// Deletes a named key from the key value store
         /// </summary>
-        /// <returns>0 if successful.
+        /// <returns>
+        /// 0 if successful.
         /// 1 if not due to the password.
-        /// -1 if no such key was found</returns>
+        /// -1 if no such key was found
+        /// </returns>
         public int DeleteLinksetDataKey(string key, string pass)
         {
             lock (linksetDataLock)
