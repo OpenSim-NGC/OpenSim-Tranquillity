@@ -5891,11 +5891,12 @@ namespace OpenSim.Region.Framework.Scenes
             lock (linksetDataLock)
             {
                 if (LinksetData == null) LinksetData = new Dictionary<string, LinksetDataEntry>();
+                LinksetDataEntry original;
+                var success = LinksetData.TryGetValue(key, out original);
                 
-                LinksetDataEntry original = LinksetData.ContainsKey(key) ? LinksetData[key] : null;
                 LinksetDataEntry pd = null;
                 
-                if (original?.IsProtected ?? false)
+                if(original != null && original.IsProtected)
                 {
                     if (original.test(pass))
                     {
@@ -5906,7 +5907,7 @@ namespace OpenSim.Region.Framework.Scenes
                 }
                 else
                 {
-                    pd = new LinksetDataEntry(value, "");
+                    pd = new LinksetDataEntry(value, pass);
                     LinksetData[key] = pd;
                 }
     
