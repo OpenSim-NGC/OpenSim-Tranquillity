@@ -18904,7 +18904,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             {
                 return new LSL_Integer(ScriptBaseClass.LINKSETDATA_EPROTECTED);
             }
-            else if(ret == -1)
+            else 
             {
                 return new LSL_Integer(ScriptBaseClass.LINKSETDATA_NOTFOUND);
             }
