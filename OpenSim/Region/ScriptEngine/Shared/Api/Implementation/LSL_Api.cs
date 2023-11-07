@@ -18812,7 +18812,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             int ret = rootPrim.AddOrUpdateLinksetDataKey(name, value, pass);
             object[] parameters = new object[]
             {
-                new LSL_Integer(ScriptBaseClass.LINKSETDATA_UPDATE), name, value
+                new LSL_Integer(ScriptBaseClass.LINKSETDATA_UPDATE), name, ""
             };
 
             if (ret == 0)
