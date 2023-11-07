@@ -18,8 +18,8 @@ namespace OpenSim.Region.Framework.Scenes
 
         public string testAndGetValue(string pass)
         {
-            if (!IsProtected) return value;
-            else if (this.pass == pass) return value;
+            //if (!IsProtected) return value;
+            if (this.pass == pass) return value;
             else return "";
         }
 
@@ -44,8 +44,9 @@ namespace OpenSim.Region.Framework.Scenes
 
         public bool test(string pass)
         {
-            if (!IsProtected) return true;
-            else if (this.pass == pass) return true;
+            //if (!IsProtected) return true;
+            // A undocumented caveat for LinksetData appears to be that even for unprotected values, if a pass is provided, it is still treated as protected
+            if (this.pass == pass) return true;
             else return false;
         }
 
