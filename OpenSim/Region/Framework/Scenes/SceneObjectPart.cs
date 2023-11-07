@@ -5998,6 +5998,61 @@ namespace OpenSim.Region.Framework.Scenes
 
         }
 
+        public int LinksetDataCountMatches(string pattern)
+        {
+            lock (linksetDataLock)
+            {
+                if (LinksetData == null) return 0;                
+                
+                RegexOptions options = RegexOptions.CultureInvariant;
+                Regex reg = new Regex(pattern, options);
+
+                int ret = 0;
+                foreach (var kvp in LinksetData)
+                {
+                    if (reg.IsMatch(kvp.Key))
+                    {
+                        ret++;
+                    }
+                }
+
+                return ret;
+            }
+        }
+
+        public string[] LinksetDataMultiDelete(string pattern, string pass)
+        {
+            lock (linksetDataLock)
+            {
+                if (LinksetData == null) return null;
+                RegexOptions options = RegexOptions.CultureInvariant;
+                Regex reg = new Regex(pattern, options);
+                List<string> ret = new List<string>();
+
+                foreach (var kvp in LinksetData.ToArray())
+                {
+                    if (reg.IsMatch(kvp.Key))
+                    {
+                        if (kvp.Value.IsProtected)
+                        {
+                            if (kvp.Value.test(pass))
+                            {
+                                ret.Add(kvp.Key);
+                                DeleteLinksetDataKey(kvp.Key, pass);
+                            }
+                        }
+                        else
+                        {
+                            ret.Add(kvp.Key);
+                            DeleteLinksetDataKey(kvp.Key, "");
+                        }
+                    }
+                }
+
+                return ret.ToArray();
+            }
+        }
+
         /// <summary>
         /// Recalculates the amount of memory used by linkset data.
         /// </summary>

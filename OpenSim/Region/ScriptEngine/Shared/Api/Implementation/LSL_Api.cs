@@ -18863,6 +18863,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return llLinksetDataDeleteProtected(name, "");
         }
 
+        public LSL_List llLinksetDataDeleteFound(LSL_String pattern, LSL_String pass)
+        {
+            var root = m_host.ParentGroup.RootPart;
+            return root.LinksetDataMultiDelete(pattern, pass);
+        }
+
+        public LSL_Integer llLinksetDataCountFound(LSL_String pattern)
+        {
+            var root = m_host.ParentGroup.RootPart;
+            return root.LinksetDataCountMatches(pattern);
+        }
+
         public LSL_Integer llLinksetDataDeleteProtected(LSL_String name, LSL_String pass)
         {
             var rootPrim = m_host.ParentGroup.RootPart;

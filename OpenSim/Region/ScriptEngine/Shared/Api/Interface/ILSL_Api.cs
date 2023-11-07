@@ -502,6 +502,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
          LSL_Integer llLinksetDataCountKeys();
          LSL_Integer llLinksetDataDelete(LSL_String name);
          LSL_Integer llLinksetDataDeleteProtected(LSL_String name, LSL_String pass);
+         LSL_List llLinksetDataDeleteFound(LSL_String pattern, LSL_String pass);
+         LSL_Integer llLinksetDataCountFound(LSL_String pattern);
          LSL_List llLinksetDataFindKeys(LSL_String pattern, LSL_Integer start, LSL_Integer count);
          LSL_List llLinksetDataListKeys(LSL_Integer start, LSL_Integer count);
          LSL_String llLinksetDataRead(LSL_String name);
