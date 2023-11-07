@@ -6020,14 +6020,25 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
-        public string[] LinksetDataMultiDelete(string pattern, string pass)
+        /// <summary>
+        /// Used to pass more than one response value to the LSL multidelete linkset data call
+        /// </summary>
+        public class MultiDeleteResponse
+        {
+            public int deleted = 0;
+            public int not_deleted = 0;
+            public string removed_keys = "";
+        }
+        
+        public MultiDeleteResponse LinksetDataMultiDelete(string pattern, string pass)
         {
             lock (linksetDataLock)
             {
-                if (LinksetData == null) return null;
+                if (LinksetData == null) return new MultiDeleteResponse();
                 RegexOptions options = RegexOptions.CultureInvariant;
                 Regex reg = new Regex(pattern, options);
                 List<string> ret = new List<string>();
+                MultiDeleteResponse MDR = new MultiDeleteResponse();
 
                 foreach (var kvp in LinksetData.ToArray())
                 {
@@ -6039,17 +6050,21 @@ namespace OpenSim.Region.Framework.Scenes
                             {
                                 ret.Add(kvp.Key);
                                 DeleteLinksetDataKey(kvp.Key, pass);
+                                MDR.deleted++;
                             }
+                            else MDR.not_deleted++;
                         }
                         else
                         {
                             ret.Add(kvp.Key);
                             DeleteLinksetDataKey(kvp.Key, "");
+                            MDR.deleted++;
                         }
                     }
                 }
 
-                return ret.ToArray();
+                MDR.removed_keys = String.Join(",", ret.ToArray()); // For parity, no space.
+                return MDR;
             }
         }
 

@@ -1,4 +1,4 @@
-27e7eb35-1d51-4779-b450-18c8acdf050a
+f0eb469c-b2f3-4d64-802a-1ac709cb91e6
 <llsd><map><key>llsd-lsl-syntax-version</key><integer>2</integer>
 <key>controls</key>
 <map>
@@ -3554,7 +3554,7 @@
   <key>type</key>
   <string>integer</string>
   <key>value</key>
-  <string>5</string>
+  <string>3</string>
  </map>
 </map>
 <key>functions</key>

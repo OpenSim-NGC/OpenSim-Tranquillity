@@ -1005,6 +1005,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int LINKSETDATA_RESET = 0;
         public const int LINKSETDATA_UPDATE = 1;
         public const int LINKSETDATA_DELETE = 2;
+        public const int LINKSETDATA_MULTIDELETE = 3;
 
         public const int LINKSETDATA_OK = 0;
         public const int LINKSETDATA_EMEMORY = 1;
