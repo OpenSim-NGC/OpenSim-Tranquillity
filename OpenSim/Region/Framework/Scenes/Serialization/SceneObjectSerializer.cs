@@ -846,7 +846,9 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
             }
             catch 
             {
-                
+                m_log.DebugFormat(
+                   "[SceneObjectSerializer]: Exception while processing linksetdata for object part {0} {1}.",
+                   obj.Name, obj.UUID);
             }
         }
 

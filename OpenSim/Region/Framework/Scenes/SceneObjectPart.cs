@@ -5923,7 +5923,6 @@ namespace OpenSim.Region.Framework.Scenes
                 {
                     // Abort.
                     LinksetData[key] = original;
-                    pd = null;
                     updateLinksetDataAccounting();
                     return 1;
                 }
@@ -5985,11 +5984,13 @@ namespace OpenSim.Region.Framework.Scenes
         {
             lock (linksetDataLock)
             {
-                if (count == -1) count = LinksetDataKeys;
-                if (LinksetData == null) LinksetData = new Dictionary<string, LinksetDataEntry>();
+                if (count == -1) 
+                    count = LinksetDataKeys;
+
+                if (LinksetData == null) 
+                    LinksetData = new Dictionary<string, LinksetDataEntry>();
                 
-                List<string> ret = new List<string>();
-                ret = LinksetData.Keys.Skip(start).Take(count).ToList();
+                List<string> ret = LinksetData.Keys.Skip(start).Take(count).ToList();
                 return ret.ToArray();
             }
         }
