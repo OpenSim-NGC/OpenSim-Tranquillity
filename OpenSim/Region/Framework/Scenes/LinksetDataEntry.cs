@@ -1,75 +1,65 @@
 using System;
 using System.IO;
-using System.Text;
 
 namespace OpenSim.Region.Framework.Scenes
 {
     public class LinksetDataEntry
     {
-        private string value;
-        private string pass="";
-
         public LinksetDataEntry(string value, string pass)
         {
-            this.value = value;
-            this.pass = pass;
+            this.Value = value;
+            this.Password = pass;
         }
-        private LinksetDataEntry(){}
 
-        public string testAndGetValue(string pass)
-        {
-            //if (!IsProtected) return value;
-            if (this.pass == pass) return value;
-            else return "";
-        }
+        private LinksetDataEntry()
+        { }
 
         public bool IsProtected
         {
-            get
-            {
-                return (pass != "");
-            }
+            get { return (string.IsNullOrEmpty(this.Password) == false); }
         }
 
-        /// <summary>
-        /// This is used by the accounting calculator, you should instead use testAndGetValue
-        /// </summary>
-        public String val
-        {
-            get
-            {
-                return value;
-            }
-        }
+        public string Password { get; private set; } = string.Empty;
 
-        public bool test(string pass)
+        public string Value { get; private set; }
+
+        public bool CheckPassword(string pass)
         {
-            //if (!IsProtected) return true;
             // A undocumented caveat for LinksetData appears to be that even for unprotected values, if a pass is provided, it is still treated as protected
-            if (this.pass == pass) return true;
-            else return false;
+            if (this.Password == pass)
+                return true;
+            else
+                return false;
         }
 
-        public Byte[] serialize()
+        public string CheckPasswordAndGetValue(string pass)
+        {
+            if (string.IsNullOrEmpty(this.Password) || (this.Password == pass)) 
+                return this.Value;
+            else 
+                return string.Empty;
+        }
+
+        public Byte[] Serialize()
         {
             using (MemoryStream ms = new MemoryStream())
             {
                 using (BinaryWriter bw = new BinaryWriter(ms))
                 {
-                    bw.Write(value);
-                    bw.Write(pass);
+                    bw.Write(this.Value);
+                    bw.Write(this.Password);
                     return ms.ToArray();
                 }
             }
         }
 
-        public static LinksetDataEntry deserialize(Byte[] inf)
+        public static LinksetDataEntry Deserialize(Byte[] inf)
         {
             LinksetDataEntry pd = new LinksetDataEntry();
             using (BinaryReader br = new BinaryReader(new MemoryStream(inf)))
             {
-                pd.value = br.ReadString();
-                pd.pass = br.ReadString();
+                pd.Value = br.ReadString();
+                pd.Password = br.ReadString();
 
                 return pd;
             }

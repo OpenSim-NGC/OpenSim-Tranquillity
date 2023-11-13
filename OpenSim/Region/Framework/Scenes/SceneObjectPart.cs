@@ -5851,7 +5851,7 @@ namespace OpenSim.Region.Framework.Scenes
                         foreach (KeyValuePair<String, LinksetDataEntry> kvp in LinksetData)
                         {
                             bw.Write(kvp.Key);
-                            Byte[] prot = kvp.Value.serialize();
+                            Byte[] prot = kvp.Value.Serialize();
 
                             bw.Write(prot.Length);
                             bw.Write(prot);
@@ -5876,7 +5876,7 @@ namespace OpenSim.Region.Framework.Scenes
                     int count = br.ReadInt32();
                     while (count > 0)
                     {
-                        LinksetData.Add(br.ReadString(), LinksetDataEntry.deserialize(br.ReadBytes(br.ReadInt32())));
+                        LinksetData.Add(br.ReadString(), LinksetDataEntry.Deserialize(br.ReadBytes(br.ReadInt32())));
                         count--;
                     }
                     updateLinksetDataAccounting();
@@ -5905,9 +5905,9 @@ namespace OpenSim.Region.Framework.Scenes
                 
                 if(original != null && original.IsProtected)
                 {
-                    if (original.test(pass))
+                    if (original.CheckPassword(pass))
                     {
-                        if (original.val == value) return 2;
+                        if (original.Value == value) return 2;
                         pd=new LinksetDataEntry(value, pass);
                         LinksetData[key] = pd;
                     }
@@ -5915,8 +5915,12 @@ namespace OpenSim.Region.Framework.Scenes
                 }
                 else
                 {
-                    if(original != null)
-                        if (original.val == value) return 2;
+                    if (original != null)
+                    {
+                        if (original.Value == value) 
+                            return 2;
+                    }
+
                     pd = new LinksetDataEntry(value, pass);
                     LinksetData[key] = pd;
                 }
@@ -5948,7 +5952,7 @@ namespace OpenSim.Region.Framework.Scenes
                 LinksetDataEntry orig;
                 var success = LinksetData.TryGetValue(name, out orig);
                 if (!success) return "";
-                else return orig.testAndGetValue(pass);
+                else return orig.CheckPasswordAndGetValue(pass);
             }
         }
 
@@ -5970,7 +5974,7 @@ namespace OpenSim.Region.Framework.Scenes
 
                 if (!success) return -1;
             
-                if (origin.test(pass))
+                if (origin.CheckPassword(pass))
                 {
                     LinksetData.Remove(key);
                     updateLinksetDataAccounting();
@@ -6089,7 +6093,7 @@ namespace OpenSim.Region.Framework.Scenes
                         foreach (var val in LinksetData)
                         {
                             bw.Write(Encoding.UTF8.GetBytes(val.Key));
-                            bw.Write(Encoding.UTF8.GetBytes(val.Value.val));
+                            bw.Write(Encoding.UTF8.GetBytes(val.Value.Value));
                             
                             // For parity, the pass adds 32 bytes regardless of the length. See LL caveats
                             if(val.Value.IsProtected) bw.Write(new byte[32]);
