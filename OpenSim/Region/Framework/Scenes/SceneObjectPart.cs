@@ -5819,14 +5819,18 @@ namespace OpenSim.Region.Framework.Scenes
 
         public string[] FindLinksetDataKeys(string pattern, int start, int count)
         {
-            List<string> all_keys = new List<string>(GetLinksetDataSubList(0, -1));
+            List<string> all_keys = new List<string>(GetLinksetDataSubList(0, 0));
             RegexOptions options = RegexOptions.CultureInvariant;
             Regex rx = new Regex(pattern, options);
-            if (count == -1) count = all_keys.Count;
+
+            if (count < 1) 
+                count = all_keys.Count;
+
             List<string> matches = new List<string>();
             foreach (var str in all_keys)
             {
-                if(rx.IsMatch(str)) matches.Add(str);
+                if (rx.IsMatch(str)) 
+                    matches.Add(str);
             }
 
             return matches.Skip(start).Take(count).ToArray();
@@ -5984,7 +5988,7 @@ namespace OpenSim.Region.Framework.Scenes
         {
             lock (linksetDataLock)
             {
-                if (count == -1) 
+                if (count < 1) 
                     count = LinksetDataKeys;
 
                 if (LinksetData == null) 
