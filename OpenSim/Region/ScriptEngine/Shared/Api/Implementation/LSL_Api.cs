@@ -18801,24 +18801,27 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
       
         public LSL_Integer llLinksetDataWrite(LSL_String name, LSL_String value)
         {
-            return llLinksetDataWriteProtected(name, value, "");
+            return llLinksetDataWriteProtected(name, value, string.Empty);
         }
 
         public LSL_Integer llLinksetDataWriteProtected(LSL_String name, LSL_String value, LSL_String pass)
         {
-            if (name == "") return ScriptBaseClass.LINKSETDATA_ENOKEY;
+            if (name == "")
+                return ScriptBaseClass.LINKSETDATA_ENOKEY;
+
             var rootPrim = m_host.ParentGroup.RootPart;
             
             int ret = rootPrim.AddOrUpdateLinksetDataKey(name, value, pass);
             object[] parameters = new object[]
             {
-                new LSL_Integer(ScriptBaseClass.LINKSETDATA_UPDATE), name, ""
+                new LSL_Integer(ScriptBaseClass.LINKSETDATA_UPDATE), name, string.Empty
             };
 
             if (ret == 0)
             {
                 m_ScriptEngine.PostObjectEvent(rootPrim.LocalId,
                     new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+
                 return ScriptBaseClass.LINKSETDATA_OK;
             }
             else
@@ -18826,9 +18829,15 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 if (ret == 1)
                 {
                     return ScriptBaseClass.LINKSETDATA_EMEMORY;
-                }else if (ret == 2)
+                }
+                else if (ret == 2)
+                {
                     return ScriptBaseClass.LINKSETDATA_NOUPDATE;
-                else return ScriptBaseClass.LINKSETDATA_EPROTECTED;
+                }
+                else
+                {
+                    return ScriptBaseClass.LINKSETDATA_EPROTECTED;
+                }
             }
         }
 
@@ -18837,9 +18846,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             var rootPrim = m_host.ParentGroup.RootPart;
             
             rootPrim.ResetLinksetData();
+
             object[] parameters = new object[]
             {
-                new LSL_Integer(ScriptBaseClass.LINKSETDATA_RESET), new LSL_String(""), new LSL_String("")
+                new LSL_Integer(ScriptBaseClass.LINKSETDATA_RESET), new LSL_String(string.Empty), new LSL_String(string.Empty)
             };
             
             EventParams linksetdata_params = new EventParams("linkset_data", parameters, Array.Empty<DetectParams>());
@@ -18860,7 +18870,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_Integer llLinksetDataDelete(LSL_String name)
         {
-            return llLinksetDataDeleteProtected(name, "");
+            return llLinksetDataDeleteProtected(name, string.Empty);
         }
 
         public LSL_List llLinksetDataDeleteFound(LSL_String pattern, LSL_String pass)
@@ -18874,7 +18884,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             object[] parameters = new object[]
             {
-                new LSL_Integer(ScriptBaseClass.LINKSETDATA_MULTIDELETE), new LSL_String(removed_keys), new LSL_String("")
+                new LSL_Integer(ScriptBaseClass.LINKSETDATA_MULTIDELETE), new LSL_String(removed_keys), new LSL_String(string.Empty)
             };
 
             if (deleted > 0)
@@ -18904,7 +18914,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             {
                 parameters = new object[]
                 {
-                    new LSL_Integer(ScriptBaseClass.LINKSETDATA_OK), name, new LSL_String("")
+                    new LSL_Integer(ScriptBaseClass.LINKSETDATA_OK), name, new LSL_String(string.Empty)
                 };    
             } 
             else if (ret == 1)
@@ -18934,7 +18944,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_String llLinksetDataRead(LSL_String name)
         {
-            return llLinksetDataReadProtected(name, "");
+            return llLinksetDataReadProtected(name, string.Empty);
         }
 
         public LSL_String llLinksetDataReadProtected(LSL_String name, LSL_String pass)
