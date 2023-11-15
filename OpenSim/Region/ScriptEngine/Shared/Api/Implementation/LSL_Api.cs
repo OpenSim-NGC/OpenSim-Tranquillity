@@ -18865,19 +18865,26 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_List llLinksetDataDeleteFound(LSL_String pattern, LSL_String pass)
         {
+            int deleted = 0;
+            int not_deleted = 0;
             var root = m_host.ParentGroup.RootPart;
-            var ret = root.LinksetDataMultiDelete(pattern, pass);
+
+            var matches = root.LinksetDataMultiDelete(pattern, pass, out deleted, out not_deleted);
+            string removed_keys = String.Join(",", matches);
+
             object[] parameters = new object[]
             {
-                new LSL_Integer(ScriptBaseClass.LINKSETDATA_MULTIDELETE), new LSL_String(ret.removed_keys), new LSL_String("")
+                new LSL_Integer(ScriptBaseClass.LINKSETDATA_MULTIDELETE), new LSL_String(removed_keys), new LSL_String("")
             };
-            if (ret.deleted > 0)
+
+            if (deleted > 0)
             {
                 m_ScriptEngine.PostObjectEvent(m_host.LocalId, new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
             }
+
             return new LSL_List(new object[]
             {
-                new LSL_Integer(ret.deleted), new LSL_Integer(ret.not_deleted)
+                new LSL_Integer(deleted), new LSL_Integer(not_deleted)
             });
         }
 

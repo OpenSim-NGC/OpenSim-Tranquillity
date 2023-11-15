@@ -45,6 +45,7 @@ using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Data.Entity.ModelConfiguration.Configuration;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -5863,7 +5864,7 @@ namespace OpenSim.Region.Framework.Scenes
                 if (LinksetData == null)
                     LinksetData = new SortedList<string, LinksetDataEntry>();
 
-                LinksetDataEntry entry;
+                LinksetDataEntry entry = null;
                 if (LinksetData.TryGetValue(key, out entry) == true)
                 {
                     if (entry.CheckPassword(pass) == false)
@@ -6019,51 +6020,47 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
-        /// <summary>
-        /// Used to pass more than one response value to the LSL multidelete linkset data call
-        /// </summary>
-        public class MultiDeleteResponse
-        {
-            public int deleted = 0;
-            public int not_deleted = 0;
-            public string removed_keys = "";
-        }
-        
-        // Concerned this isnt correct.  It's deleting from the list (DeleteLinksetDataKey) while 
-        // are traversing it and taking a lock while holding it.   -MD
-        public MultiDeleteResponse LinksetDataMultiDelete(string pattern, string pass)
+        public string[] LinksetDataMultiDelete(string pattern, string pass, out int deleted, out int not_deleted)
         {
             lock (linksetDataLock)
             {
-                if (LinksetData == null)
-                    return new MultiDeleteResponse();
-                
-                Regex reg = new Regex(pattern, RegexOptions.CultureInvariant);
-                List<string> ret = new List<string>();
-                MultiDeleteResponse MDR = new MultiDeleteResponse();
+                deleted = 0;
+                not_deleted = 0;
 
-                foreach (var kvp in LinksetData.ToArray())
+                if (LinksetData == null)
+                    return new string[0];
+
+                Regex reg = new Regex(pattern, RegexOptions.CultureInvariant);
+                List<string> matches = new List<string>();
+
+                foreach (var kvp in LinksetData)
                 {
-                    if (reg.IsMatch(kvp.Key))
+                    if (reg.IsMatch(kvp.Key) && kvp.Value.CheckPassword(pass))
                     {
-                        var status = DeleteLinksetDataKey(kvp.Key, pass);
-                        if (status == 0)
-                        {
-                            MDR.deleted++;
-                            ret.Add(kvp.Key);
-                        }else if (status == 1)
-                        {
-                            MDR.not_deleted++;
-                        }
+                        matches.Add(kvp.Key);
+                        deleted += 1;
+                    }
+                    else
+                    {
+                        not_deleted += 1;
                     }
                 }
 
-                MDR.removed_keys = String.Join(",", ret.ToArray()); // For parity, no space.
+                // Now do the actual delete.
+                foreach (var match in matches)
+                {
+                    LinksetData.Remove(match);
+                }
 
-                if (ParentGroup != null)
-                    ParentGroup.HasGroupChanged = true;
+                if (deleted > 0)
+                {
+                    UpdateLinksetDataAccounting();
 
-                return MDR;
+                    if (ParentGroup != null)
+                        ParentGroup.HasGroupChanged = true;
+                }
+
+                return matches.ToArray();
             }
         }
 
