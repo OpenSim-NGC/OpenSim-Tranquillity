@@ -33,6 +33,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Serialization;
@@ -46,6 +47,7 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Data.Entity.ModelConfiguration.Configuration;
+using System.Runtime.Serialization.Json;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -5864,6 +5866,9 @@ namespace OpenSim.Region.Framework.Scenes
                 if (LinksetData == null)
                     LinksetData = new SortedList<string, LinksetDataEntry>();
 
+                if (LinksetDataOverLimit)
+                    return 1;
+
                 LinksetDataEntry entry = null;
                 if (LinksetData.TryGetValue(key, out entry) == true)
                 {
@@ -5880,23 +5885,11 @@ namespace OpenSim.Region.Framework.Scenes
 
                 UpdateLinksetDataAccounting();
 
-                // This isnt right.  
-                if (LinksetDataOverLimit)
-                {
-                    // Abort.
-                    if (entry != null)
-                        LinksetData[key] = entry;
-
-                    UpdateLinksetDataAccounting();
-                    return 1;
-                }
-
                 if (ParentGroup != null)
                     ParentGroup.HasGroupChanged = true;
 
                 return 0;
-            }
-            
+            }          
         }
 
         /// <summary>
@@ -5945,6 +5938,7 @@ namespace OpenSim.Region.Framework.Scenes
                     return 1;
 
                 LinksetData.Remove(key);
+
                 UpdateLinksetDataAccounting();
 
                 if (ParentGroup != null)
@@ -6065,41 +6059,15 @@ namespace OpenSim.Region.Framework.Scenes
         }
 
         /// <summary>
-        /// Adjust the current used space by cost which may be positive or negative.
-        /// </summary>
-        /// <param name="cost">A positive (if adding) or negative (if removing) value affecting used space.</param>
-        public void LinksetDataAccountingDelta(int cost)
-        {
-            linksetDataBytesUsed += cost;
-            linksetDataBytesFree = LINKSETDATA_MAX - linksetDataBytesUsed;
-        }
-
-        /// <summary>
         /// Recalculates the amount of memory used by linkset data.
+        /// Caller should be holding the linksetData lock
         /// </summary>
-        public void UpdateLinksetDataAccounting()
+        private void UpdateLinksetDataAccounting()
         {
-            lock (linksetDataLock)
-            {
-                using (MemoryStream ms = new MemoryStream())
-                {
-                    using (BinaryWriter bw = new BinaryWriter(ms))
-                    {
-                        foreach (var val in LinksetData)
-                        {
-                            bw.Write(Encoding.UTF8.GetBytes(val.Key));
-                            bw.Write(Encoding.UTF8.GetBytes(val.Value.Value));
-                            
-                            // For parity, the pass adds 32 bytes regardless of the length. See LL caveats
-                            if (val.Value.IsProtected) 
-                                bw.Write(new byte[32]);
-                        }
-                    }
+            int charCount = JsonSerializer.Serialize<SortedList<string,LinksetDataEntry>>(LinksetData).Length;
 
-                    linksetDataBytesUsed = ms.ToArray().Length;
-                    linksetDataBytesFree = LINKSETDATA_MAX - linksetDataBytesUsed;
-                }
-            }
+            linksetDataBytesUsed = charCount;
+            linksetDataBytesFree = LINKSETDATA_MAX - linksetDataBytesUsed;
         }
 
         public const int LINKSETDATA_MAX = 131072; // 128 KB
@@ -6134,53 +6102,26 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
-        public Byte[] SerializeLinksetData()
+        public string SerializeLinksetData()
         {
             if (!IsRoot || LinksetData == null)
                 return null;
 
             lock (linksetDataLock)
             {
-                using (var ms = new MemoryStream())
-                {
-                    using (BinaryWriter bw = new BinaryWriter(ms))
-                    {
-                        bw.Write(LinksetData.Count);
-                        foreach (KeyValuePair<String, LinksetDataEntry> kvp in LinksetData)
-                        {
-                            bw.Write(kvp.Key);
-                            Byte[] prot = kvp.Value.Serialize();
-
-                            bw.Write(prot.Length);
-                            bw.Write(prot);
-                        }
-
-                        return ms.ToArray();
-                    }
-                }
+                return JsonSerializer.Serialize<SortedList<string, LinksetDataEntry>>(LinksetData);
             }
         }
 
-        public void DeserializeLinksetData(Byte[] data)
+        public void DeserializeLinksetData(string data)
         {
             if (data == null || data.Length == 0)
                 return;
 
-            using (MemoryStream ms = new MemoryStream(data))
+            lock (linksetDataLock)
             {
-                using (BinaryReader br = new BinaryReader(ms))
-                {
-                    LinksetData = new SortedList<string, LinksetDataEntry>();
-
-                    int count = br.ReadInt32();
-                    while (count > 0)
-                    {
-                        LinksetData.Add(br.ReadString(), LinksetDataEntry.Deserialize(br.ReadBytes(br.ReadInt32())));
-                        count--;
-                    }
-
-                    UpdateLinksetDataAccounting();
-                }
+                LinksetData = JsonSerializer.Deserialize<SortedList<string, LinksetDataEntry>>(data);
+                UpdateLinksetDataAccounting();
             }
         }
 

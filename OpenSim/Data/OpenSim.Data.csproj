@@ -132,5 +132,6 @@
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="MySqlConnector" Version="2.2.6" />
     <PackageReference Include="System.Data.SQLite" Version="1.0.116" />
+    <PackageReference Include="System.Text.Json" Version="6.0.9" />
   </ItemGroup>
 </Project>

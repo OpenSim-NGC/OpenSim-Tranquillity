@@ -556,5 +556,5 @@ COMMIT;
 
 :VERSION 65         #----- add linkset data storage column
 BEGIN;
-ALTER TABLE `prims` ADD COLUMN `linksetdata` blob default NULL;
+ALTER TABLE `prims` ADD COLUMN `linksetdata` MEDIUMTEXT default NULL;
 COMMIT;

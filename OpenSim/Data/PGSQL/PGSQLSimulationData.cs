@@ -1408,7 +1408,7 @@ namespace OpenSim.Data.PGSQL
 
             if ((primRow["LinksetData"] is DBNull) == false)
             {
-                prim.DeserializeLinksetData(((byte[])primRow["linksetdata"]));
+                prim.DeserializeLinksetData(((string)primRow["linksetdata"]));
             }
 
             return prim;

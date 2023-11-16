@@ -1206,7 +1206,7 @@ namespace OpenSim.Data.MySQL
 
             if (!(row["linksetdata"] is DBNull))
             {
-                prim.DeserializeLinksetData((byte[])row["linksetdata"]);
+                prim.DeserializeLinksetData((string)row["linksetdata"]);
             }
 
             return prim;

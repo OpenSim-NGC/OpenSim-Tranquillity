@@ -1251,7 +1251,7 @@ namespace OpenSim.Data.SQLite
             createCol(prims, "pseudocrc", typeof(int));
             createCol(prims, "sopanims", typeof(byte[]));
 
-            createCol(prims, "linksetdata", typeof(byte[]));
+            createCol(prims, "linksetdata", typeof(string));
 
             // Add in contraints
             prims.PrimaryKey = new DataColumn[] { prims.Columns["UUID"] };
@@ -1814,7 +1814,7 @@ namespace OpenSim.Data.SQLite
 
             if (!(row["linksetdata"] is DBNull))
             {
-                prim.DeserializeLinksetData((byte[])row["LinksetData"]);
+                prim.DeserializeLinksetData((string)row["LinksetData"]);
             }
 
             return prim;

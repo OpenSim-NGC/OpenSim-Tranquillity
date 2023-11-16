@@ -837,12 +837,11 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
         {
             try
             {
-                string b64 = reader.ReadElementContentAsString();
-                if (string.IsNullOrEmpty(b64))
+                string data = reader.ReadElementContentAsString();
+                if (string.IsNullOrEmpty(data))
                     return;
 
-                byte[] bArr = Convert.FromBase64String(b64);
-                obj.DeserializeLinksetData(bArr);
+                obj.DeserializeLinksetData(data);
             }
             catch 
             {
@@ -1689,8 +1688,8 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
             }
             if(Math.Abs(sop.SitActiveRange) > 1e-5)
                 writer.WriteElementString("SitActRange", sop.SitActiveRange.ToString(Culture.FormatProvider));
-            
-            WriteBytes(writer, "LinksetData", sop.SerializeLinksetData());    
+
+            writer.WriteElementString("LinksetData", sop.SerializeLinksetData());  
             
             writer.WriteEndElement();
         }
