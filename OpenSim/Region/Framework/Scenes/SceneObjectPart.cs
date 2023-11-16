@@ -48,6 +48,7 @@ using PermissionMask = OpenSim.Framework.PermissionMask;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Data.Entity.ModelConfiguration.Configuration;
 using System.Runtime.Serialization.Json;
+using OpenMetaverse.Rendering;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -6027,23 +6028,22 @@ namespace OpenSim.Region.Framework.Scenes
                 Regex reg = new Regex(pattern, RegexOptions.CultureInvariant);
                 List<string> matches = new List<string>();
 
-                foreach (var kvp in LinksetData)
+                // Take a copy so we can delete as we iterate
+                foreach (var kvp in LinksetData.ToArray())
                 {
-                    if (reg.IsMatch(kvp.Key) && kvp.Value.CheckPassword(pass))
+                    if (reg.IsMatch(kvp.Key))
                     {
-                        matches.Add(kvp.Key);
-                        deleted += 1;
+                        if (kvp.Value.CheckPassword(pass))
+                        {
+                            LinksetData.Remove(kvp.Key);
+                            matches.Add(kvp.Key);
+                            deleted += 1;
+                        }
+                        else
+                        {
+                            not_deleted += 1;
+                        }
                     }
-                    else
-                    {
-                        not_deleted += 1;
-                    }
-                }
-
-                // Now do the actual delete.
-                foreach (var match in matches)
-                {
-                    LinksetData.Remove(match);
                 }
 
                 if (deleted > 0)
