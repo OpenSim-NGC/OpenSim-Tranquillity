@@ -45,6 +45,7 @@
     <Compile Include="..\Interfaces\IScriptInstance.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Remove="Api\Implementation\**" />
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="CodeTools\Compiler.cs" />
@@ -109,5 +110,11 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="log4net" Version="2.0.15" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Remove="Api\Implementation\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Api\Implementation\**" />
   </ItemGroup>
 </Project>
