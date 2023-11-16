@@ -2309,5 +2309,15 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
             return m_LSL_Functions.llLinksetDataReadProtected(name, pass);
         }
 
+        public LSL_Integer llLinksetDataCountFound(LSL_String pattern)
+        {
+            return m_LSL_Functions.llLinksetDataCountFound(pattern);
+        }
+
+        public LSL_List llLinksetDataDeleteFound(LSL_String pattern, LSL_String pass)
+        {
+            return m_LSL_Functions.llLinksetDataDeleteFound(pattern, pass);
+        }
+
     }
 }
