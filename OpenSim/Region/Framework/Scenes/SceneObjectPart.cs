@@ -6064,10 +6064,24 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         private void UpdateLinksetDataAccounting()
         {
-            int charCount = JsonSerializer.Serialize<SortedList<string,LinksetDataEntry>>(LinksetData).Length;
+            using (MemoryStream ms = new MemoryStream())
+            {
+                using (BinaryWriter bw = new BinaryWriter(ms))
+                {
+                    foreach (var entry in LinksetData)
+                    {
+                        bw.Write(Encoding.UTF8.GetBytes(entry.Key));
+                        bw.Write(Encoding.UTF8.GetBytes(entry.Value.Value));
 
-            linksetDataBytesUsed = charCount;
-            linksetDataBytesFree = LINKSETDATA_MAX - linksetDataBytesUsed;
+                        // For parity, the pass adds 32 bytes regardless of the length. See LL caveats
+                        if (entry.Value.IsProtected())
+                            bw.Write(new byte[32]);
+                    }
+                }
+
+                linksetDataBytesUsed = ms.ToArray().Length;
+                linksetDataBytesFree = LINKSETDATA_MAX - linksetDataBytesUsed;
+            }
         }
 
         public const int LINKSETDATA_MAX = 131072; // 128 KB
