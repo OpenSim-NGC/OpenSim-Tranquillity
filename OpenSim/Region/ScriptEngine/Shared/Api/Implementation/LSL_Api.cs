@@ -18801,25 +18801,32 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
       
         public LSL_Integer llLinksetDataWrite(LSL_String name, LSL_String value)
         {
-            return llLinksetDataWriteProtected(name, value, string.Empty);
+            return llLinksetDataWriteProtected(name, value, new LSL_String(string.Empty));
         }
 
         public LSL_Integer llLinksetDataWriteProtected(LSL_String name, LSL_String value, LSL_String pass)
         {
-            if (name == "")
+            if (string.IsNullOrEmpty(name))
                 return ScriptBaseClass.LINKSETDATA_ENOKEY;
 
+            // If value is empty this becomes a key delete operation
+            if (string.IsNullOrEmpty(value))
+            {
+                return llLinksetDataDeleteProtected(name, pass);
+            }
+
             var rootPrim = m_host.ParentGroup.RootPart;
-            
             int ret = rootPrim.AddOrUpdateLinksetDataKey(name, value, pass);
+
             object[] parameters = new object[]
             {
-                new LSL_Integer(ScriptBaseClass.LINKSETDATA_UPDATE), name, string.Empty
+                new LSL_Integer(ScriptBaseClass.LINKSETDATA_UPDATE), name, value
             };
 
             if (ret == 0)
             {
-                m_ScriptEngine.PostObjectEvent(rootPrim.LocalId,
+                m_ScriptEngine.PostObjectEvent(
+                    rootPrim.LocalId,
                     new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
 
                 return ScriptBaseClass.LINKSETDATA_OK;
@@ -18852,8 +18859,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 new LSL_Integer(ScriptBaseClass.LINKSETDATA_RESET), new LSL_String(string.Empty), new LSL_String(string.Empty)
             };
             
-            EventParams linksetdata_params = new EventParams("linkset_data", parameters, Array.Empty<DetectParams>());
-            m_ScriptEngine.PostObjectEvent(rootPrim.LocalId, linksetdata_params);
+            m_ScriptEngine.PostObjectEvent(
+                rootPrim.LocalId,
+                new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
         }
 
         public LSL_Integer llLinksetDataAvailable()
@@ -18870,7 +18878,36 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_Integer llLinksetDataDelete(LSL_String name)
         {
-            return llLinksetDataDeleteProtected(name, string.Empty);
+            return llLinksetDataDeleteProtected(name, new LSL_String(string.Empty));
+        }
+
+        public LSL_Integer llLinksetDataDeleteProtected(LSL_String name, LSL_String pass)
+        {
+            var rootPrim = m_host.ParentGroup.RootPart;
+            int ret = rootPrim.DeleteLinksetDataKey(name, pass);
+            object[] parameters;
+
+            if (ret == 0)
+            {
+                parameters = new object[]
+                {
+                    new LSL_Integer(ScriptBaseClass.LINKSETDATA_DELETE), name, new LSL_String(string.Empty)
+                };
+
+                m_ScriptEngine.PostObjectEvent(
+                    rootPrim.LocalId, 
+                    new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+
+                return new LSL_Integer(ScriptBaseClass.LINKSETDATA_OK);
+            }
+            else if (ret == 1)
+            {
+                return new LSL_Integer(ScriptBaseClass.LINKSETDATA_EPROTECTED);
+            }
+            else
+            {
+                return new LSL_Integer(ScriptBaseClass.LINKSETDATA_NOTFOUND);
+            }
         }
 
         public LSL_List llLinksetDataDeleteFound(LSL_String pattern, LSL_String pass)
@@ -18884,12 +18921,16 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             object[] parameters = new object[]
             {
-                new LSL_Integer(ScriptBaseClass.LINKSETDATA_MULTIDELETE), new LSL_String(removed_keys), new LSL_String(string.Empty)
+                new LSL_Integer(ScriptBaseClass.LINKSETDATA_MULTIDELETE), 
+                new LSL_String(removed_keys), 
+                new LSL_String(string.Empty)
             };
 
             if (deleted > 0)
             {
-                m_ScriptEngine.PostObjectEvent(m_host.LocalId, new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+                m_ScriptEngine.PostObjectEvent(
+                    m_host.LocalId, 
+                    new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
             }
 
             return new LSL_List(new object[]
@@ -18902,32 +18943,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         {
             var root = m_host.ParentGroup.RootPart;
             return root.LinksetDataCountMatches(pattern);
-        }
-
-        public LSL_Integer llLinksetDataDeleteProtected(LSL_String name, LSL_String pass)
-        {
-            var rootPrim = m_host.ParentGroup.RootPart;
-            int ret = rootPrim.DeleteLinksetDataKey(name, pass);
-            object[] parameters;
-
-            if (ret == 0)
-            {
-                parameters = new object[]
-                {
-                    new LSL_Integer(ScriptBaseClass.LINKSETDATA_OK), name, new LSL_String(string.Empty)
-                };    
-            } 
-            else if (ret == 1)
-            {
-                return new LSL_Integer(ScriptBaseClass.LINKSETDATA_EPROTECTED);
-            }
-            else 
-            {
-                return new LSL_Integer(ScriptBaseClass.LINKSETDATA_NOTFOUND);
-            }
-
-            m_ScriptEngine.PostObjectEvent(rootPrim.LocalId, new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
-            return new LSL_Integer(ScriptBaseClass.LINKSETDATA_OK);
         }
 
         public LSL_List llLinksetDataFindKeys(LSL_String pattern, LSL_Integer start, LSL_Integer count)
