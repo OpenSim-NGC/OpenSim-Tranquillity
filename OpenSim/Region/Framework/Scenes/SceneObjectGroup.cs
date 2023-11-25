@@ -3252,6 +3252,15 @@ namespace OpenSim.Region.Framework.Scenes
             // 'linkPart' == the root of the group being linked into this group
             SceneObjectPart linkPart = objectGroup.m_rootPart;
 
+            // Merge linksetData if there is any
+            if (linkPart.LinksetData != null)
+            {
+                if (m_rootPart.LinksetData == null)
+                    m_rootPart.LinksetData = new LinksetData();
+
+                m_rootPart.LinksetData.MergeLinksetData(linkPart.LinksetData);
+            }
+
             if (m_rootPart.PhysActor != null)
                 m_rootPart.PhysActor.Building = true;
             if (linkPart.PhysActor != null)
