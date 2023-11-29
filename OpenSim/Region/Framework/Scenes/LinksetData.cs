@@ -44,9 +44,9 @@ namespace OpenSim.Region.Framework.Scenes
                     return 1;
 
                 LinksetDataEntry entry = null;
-                if (Data.TryGetValue(key, out entry) == true)
+                if (Data.TryGetValue(key, out entry))
                 {
-                    if (entry.CheckPassword(pass) == false)
+                    if (!entry.CheckPassword(pass))
                         return -1;
 
                     if (entry.Value == value)
@@ -85,10 +85,10 @@ namespace OpenSim.Region.Framework.Scenes
                     return -1;
 
                 LinksetDataEntry entry;
-                if (Data.TryGetValue(key, out entry) == false)
+                if (!Data.TryGetValue(key, out entry))
                     return -1;
 
-                if (entry.CheckPassword(pass) == false)
+                if (!entry.CheckPassword(pass))
                     return 1;
 
                 Data.Remove(key);
@@ -234,6 +234,7 @@ namespace OpenSim.Region.Framework.Scenes
         {
             return (LinksetDataBytesFree < 0);
         }
+
         /// <summary>
         /// Merge the linksetData present in another Linkset into this one.
         /// The current root will have the new linkset for the merged sog.
@@ -242,18 +243,13 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="otherLinkset"></param>
         public void MergeLinksetData(LinksetData otherLinksetData)
         {
+            // Nothing to merge?
             if (otherLinksetData == null)
                 return;
 
             lock (linksetDataLock)
             {
-                var values = otherLinksetData.Data.ToArray();
-                
-                otherLinksetData.Data.Clear();
-                otherLinksetData.LinksetDataBytesFree = 0;
-                otherLinksetData.LinksetDataBytesUsed = LINKSETDATA_MAX;
-
-                foreach (var kvp in values)
+                foreach (var kvp in otherLinksetData.Data)
                 {
                     // If its already present skip it
                     if (Data.ContainsKey(kvp.Key))
@@ -263,10 +259,15 @@ namespace OpenSim.Region.Framework.Scenes
                     if (LinksetDataOverLimit())
                         break;
 
-                    // Do we send events?
-                    Data.Add(kvp.Key, kvp.Value);
-                    LinksetDataAccountingDelta(kvp.Value.GetCost(kvp.Key));
+                    var value = new LinksetDataEntry(kvp.Value.Value, kvp.Value.Password);
+                    Data.Add(kvp.Key, value);
+                    LinksetDataAccountingDelta(value.GetCost(kvp.Key));
                 }
+
+                // Clear the LinksetData entries from the "other" SOG
+                otherLinksetData.Data.Clear();
+                otherLinksetData.LinksetDataBytesFree = 0;
+                otherLinksetData.LinksetDataBytesUsed = LINKSETDATA_MAX;
             }
         }
 
@@ -281,12 +282,12 @@ namespace OpenSim.Region.Framework.Scenes
             lock (linksetDataLock)
             {
                 if (Data.Count <= 0)
-                {
-                    LinksetDataEntry entry;
-                    if (Data.TryGetValue(key, out entry) == true)
-                        return entry.CheckPasswordAndGetValue(pass);
-
                     return string.Empty;
+
+                LinksetDataEntry entry;
+                if (Data.TryGetValue(key, out entry))
+                {
+                    return entry.CheckPasswordAndGetValue(pass);
                 }
 
                 return string.Empty;
@@ -349,18 +350,12 @@ namespace OpenSim.Region.Framework.Scenes
         {
             // A undocumented caveat for LinksetData appears to be that even for unprotected values,
             // if a pass is provided, it is still treated as protected
-            if (this.Password == pass)
-                return true;
-            else
-                return false;
+            return this.Password == pass ? true : false;
         }
 
         public string CheckPasswordAndGetValue(string pass)
         {
-            if (string.IsNullOrEmpty(this.Password) || (this.Password == pass))
-                return this.Value;
-            else
-                return string.Empty;
+            return (string.IsNullOrEmpty(this.Password) || (this.Password == pass)) ? this.Value : string.Empty;
         }
 
         /// <summary>
@@ -376,7 +371,7 @@ namespace OpenSim.Region.Framework.Scenes
             cost += Encoding.UTF8.GetBytes(key).Length;
             cost += Encoding.UTF8.GetBytes(this.Value).Length;
 
-            if (string.IsNullOrEmpty(this.Password) == false)
+            if (!string.IsNullOrEmpty(this.Password))
             {
                 // For parity, the pass adds 32 bytes regardless of the length. See LL caveats
                 cost += Math.Max(Encoding.UTF8.GetBytes(this.Password).Length, 32);
@@ -387,7 +382,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         public bool IsProtected()
         {
-            return (string.IsNullOrEmpty(this.Password) == false);
+            return !string.IsNullOrEmpty(Password);
         }
     }
 }
