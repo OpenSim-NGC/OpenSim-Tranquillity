@@ -381,7 +381,10 @@ namespace OpenSim.Region.Framework.Scenes
         // Deep Copy of Current Entry
         public LinksetDataEntry Copy()
         {
-            return new LinksetDataEntry(String.Copy(Value), Password ?? String.Copy(Password));
+            string value = String.IsNullOrEmpty(Value) ? null : string.Copy(Value);
+            string password = String.IsNullOrEmpty(Password) ? null : string.Copy(Password);
+
+            return new LinksetDataEntry(value, password);
         }
 
         /// <summary>
