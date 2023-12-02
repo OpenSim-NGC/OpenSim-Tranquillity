@@ -2664,10 +2664,17 @@ namespace OpenSim.Region.Framework.Scenes
         public void CopyRootPart(SceneObjectPart part, UUID cAgentID, UUID cGroupID, bool userExposed)
         {
             SceneObjectPart newpart = part.Copy(m_scene.AllocateLocalId(), OwnerID, GroupID, 0, userExposed);
-//            SceneObjectPart newpart = part.Copy(part.LocalId, OwnerID, GroupID, 0, userExposed);
-//            newpart.LocalId = m_scene.AllocateLocalId();
+            //            SceneObjectPart newpart = part.Copy(part.LocalId, OwnerID, GroupID, 0, userExposed);
+            //            newpart.LocalId = m_scene.AllocateLocalId();
+
+            // If the rootpart we're copying has LinksetData do a deep copy of that to the new rootpart.
+            if (part.LinksetData != null)
+            {
+                newpart.LinksetData = part.LinksetData.Copy();
+            }
 
             SetRootPart(newpart);
+
             if (userExposed)
                 RootPart.Velocity = Vector3.Zero; // In case source is moving
         }

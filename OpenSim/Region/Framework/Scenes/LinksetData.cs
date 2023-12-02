@@ -17,14 +17,32 @@ namespace OpenSim.Region.Framework.Scenes
         {
             Data = new SortedList<string, LinksetDataEntry>();
 
-            LinksetDataBytesFree = 0;
-            LinksetDataBytesUsed = LINKSETDATA_MAX;
+            LinksetDataBytesFree = LINKSETDATA_MAX;
+            LinksetDataBytesUsed = 0;
         }
 
         public SortedList<string, LinksetDataEntry> Data { get; private set; } = null;
 
         public int LinksetDataBytesFree { get; private set; } = LINKSETDATA_MAX;
         public int LinksetDataBytesUsed { get; private set; } = 0;
+
+        // Deep Copy of Linkset Data
+        public LinksetData Copy()
+        {
+            lock (linksetDataLock)
+            {
+                var copy = new LinksetData();
+                foreach (var entry in Data)
+                {
+                    var key = String.Copy(entry.Key);
+                    var val = entry.Value.Copy();
+                    copy.Data.Add(key, val);
+                    copy.LinksetDataAccountingDelta(val.GetCost(key));
+                }
+
+                return copy;
+            }
+        }
 
         /// <summary>
         /// Adds or updates a entry to linkset data
@@ -232,7 +250,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         public bool LinksetDataOverLimit()
         {
-            return (LinksetDataBytesFree < 0);
+            return (LinksetDataBytesFree <= 0);
         }
 
         /// <summary>
@@ -259,15 +277,18 @@ namespace OpenSim.Region.Framework.Scenes
                     if (LinksetDataOverLimit())
                         break;
 
-                    var value = new LinksetDataEntry(kvp.Value.Value, kvp.Value.Password);
-                    Data.Add(kvp.Key, value);
-                    LinksetDataAccountingDelta(value.GetCost(kvp.Key));
+                    var key = string.Copy(kvp.Key);
+                    var value = kvp.Value.Copy();
+
+                    Data.Add(key, value);
+                    LinksetDataAccountingDelta(value.GetCost(key));
                 }
 
                 // Clear the LinksetData entries from the "other" SOG
                 otherLinksetData.Data.Clear();
-                otherLinksetData.LinksetDataBytesFree = 0;
-                otherLinksetData.LinksetDataBytesUsed = LINKSETDATA_MAX;
+
+                otherLinksetData.LinksetDataBytesFree = LINKSETDATA_MAX;
+                otherLinksetData.LinksetDataBytesUsed = 0;
             }
         }
 
@@ -306,8 +327,8 @@ namespace OpenSim.Region.Framework.Scenes
 
                 Data.Clear();
 
-                LinksetDataBytesFree = 0;
-                LinksetDataBytesUsed = LINKSETDATA_MAX;
+                LinksetDataBytesFree = LINKSETDATA_MAX;
+                LinksetDataBytesUsed = 0;
             }
         }
 
@@ -326,11 +347,10 @@ namespace OpenSim.Region.Framework.Scenes
         private void LinksetDataAccountingDelta(int delta)
         {
             LinksetDataBytesUsed += delta;
-
-            if (LinksetDataBytesUsed < 0)
-                LinksetDataBytesUsed = 0;
-
             LinksetDataBytesFree = LINKSETDATA_MAX - LinksetDataBytesUsed;
+
+            if (LinksetDataBytesFree < 0)
+                LinksetDataBytesFree = 0;
         }
     }
 
@@ -338,8 +358,8 @@ namespace OpenSim.Region.Framework.Scenes
     {
         public LinksetDataEntry(string value, string password)
         {
-            this.Value = value;
-            this.Password = password;
+            Value = value;
+            Password = password;
         }
 
         public string Password { get; private set; } = string.Empty;
@@ -350,12 +370,18 @@ namespace OpenSim.Region.Framework.Scenes
         {
             // A undocumented caveat for LinksetData appears to be that even for unprotected values,
             // if a pass is provided, it is still treated as protected
-            return this.Password == pass ? true : false;
+            return string.IsNullOrEmpty(Password) || (Password == pass);
         }
 
         public string CheckPasswordAndGetValue(string pass)
         {
-            return (string.IsNullOrEmpty(this.Password) || (this.Password == pass)) ? this.Value : string.Empty;
+            return CheckPassword(pass) ? Value : string.Empty;
+        }
+
+        // Deep Copy of Current Entry
+        public LinksetDataEntry Copy()
+        {
+            return new LinksetDataEntry(String.Copy(Value), Password ?? String.Copy(Password));
         }
 
         /// <summary>
