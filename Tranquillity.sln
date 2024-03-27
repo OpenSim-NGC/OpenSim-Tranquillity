@@ -5,129 +5,131 @@ VisualStudioVersion = 17.6.33815.320
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{8F448DF9-DE18-4810-8545-96DFE17D5C39}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.Tests", "Tests\OpenSim.Framework.Tests\OpenSim.Framework.Tests.csproj", "{3B850422-D5E2-4C10-BC5A-EC3C94598106}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Tests", "Tests\OpenSim.Framework.Tests\OpenSim.Framework.Tests.csproj", "{3B850422-D5E2-4C10-BC5A-EC3C94598106}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Source", "Source", "{02C09046-CFF3-40BA-9E3F-629241EB25A5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Capabilities", "Source\OpenSim.Capabilities\OpenSim.Capabilities.csproj", "{FF56527B-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Capabilities", "Source\OpenSim.Capabilities\OpenSim.Capabilities.csproj", "{FF56527B-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Capabilities.Handlers", "Source\OpenSim.Capabilities.Handlers\OpenSim.Capabilities.Handlers.csproj", "{002BDDF6-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Capabilities.Handlers", "Source\OpenSim.Capabilities.Handlers\OpenSim.Capabilities.Handlers.csproj", "{002BDDF6-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Data", "Source\OpenSim.Data\OpenSim.Data.csproj", "{7E218E2D-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data", "Source\OpenSim.Data\OpenSim.Data.csproj", "{7E218E2D-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Data.MySQL", "Source\OpenSim.Data.MySQL\OpenSim.Data.MySQL.csproj", "{1E894ECD-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.MySQL", "Source\OpenSim.Data.MySQL\OpenSim.Data.MySQL.csproj", "{1E894ECD-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework", "Source\OpenSim.Framework\OpenSim.Framework.csproj", "{BCCDBB55-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework", "Source\OpenSim.Framework\OpenSim.Framework.csproj", "{BCCDBB55-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.AssetLoader.Filesystem", "Source\OpenSim.Framework.AssetLoader.Filesystem\OpenSim.Framework.AssetLoader.Filesystem.csproj", "{384A4FAB-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.AssetLoader.Filesystem", "Source\OpenSim.Framework.AssetLoader.Filesystem\OpenSim.Framework.AssetLoader.Filesystem.csproj", "{384A4FAB-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.Console", "Source\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj", "{0ED8EBE8-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Console", "Source\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj", "{0ED8EBE8-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.Monitoring", "Source\OpenSim.Framework.Monitoring\OpenSim.Framework.Monitoring.csproj", "{69AB1BC7-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Monitoring", "Source\OpenSim.Framework.Monitoring\OpenSim.Framework.Monitoring.csproj", "{69AB1BC7-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.Serialization", "Source\OpenSim.Framework.Serialization\OpenSim.Framework.Serialization.csproj", "{BD63E665-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Serialization", "Source\OpenSim.Framework.Serialization\OpenSim.Framework.Serialization.csproj", "{BD63E665-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.Servers", "Source\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj", "{726D540D-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Servers", "Source\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj", "{726D540D-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.Servers.HttpServer", "Source\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj", "{159EC5C2-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Servers.HttpServer", "Source\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj", "{159EC5C2-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.ScriptEngine.Shared", "Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj", "{F93F91AD-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine.Shared", "Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj", "{F93F91AD-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.ScriptEngine.YEngine", "Source\OpenSim.Region.ScriptEngine.YEngine\OpenSim.Region.ScriptEngine.YEngine.csproj", "{798B4867-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine.YEngine", "Source\OpenSim.Region.ScriptEngine.YEngine\OpenSim.Region.ScriptEngine.YEngine.csproj", "{798B4867-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Server.Base", "Source\OpenSim.Server.Base\OpenSim.Server.Base.csproj", "{2E0569BB-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.Base", "Source\OpenSim.Server.Base\OpenSim.Server.Base.csproj", "{2E0569BB-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Server.Handlers", "Source\OpenSim.Server.Handlers\OpenSim.Server.Handlers.csproj", "{ED041501-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.Handlers", "Source\OpenSim.Server.Handlers\OpenSim.Server.Handlers.csproj", "{ED041501-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Server.GridServer", "Source\OpenSim.Server.GridServer\OpenSim.Server.GridServer.csproj", "{6E64F01D-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.GridServer", "Source\OpenSim.Server.GridServer\OpenSim.Server.GridServer.csproj", "{6E64F01D-0000-0000-0000-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Server.MoneyServer", "Source\OpenSim.Server.MoneyServer\OpenSim.Server.MoneyServer.csproj", "{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.MoneyServer", "Source\OpenSim.Server.MoneyServer\OpenSim.Server.MoneyServer.csproj", "{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Server.Common", "Source\OpenSim.Server.Common\OpenSim.Server.Common.csproj", "{14B10CB1-EE07-438B-B9C9-E7C241579269}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.Common", "Source\OpenSim.Server.Common\OpenSim.Server.Common.csproj", "{14B10CB1-EE07-438B-B9C9-E7C241579269}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Services", "Source\OpenSim.Services\OpenSim.Services.csproj", "{0882C4EB-72A6-468F-98A4-283E51C297C3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services", "Source\OpenSim.Services\OpenSim.Services.csproj", "{0882C4EB-72A6-468F-98A4-283E51C297C3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Services.Interfaces", "Source\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj", "{6515DCE2-15C0-4FAF-BA7C-6863B4DB696A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.Interfaces", "Source\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj", "{6515DCE2-15C0-4FAF-BA7C-6863B4DB696A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Data.Model", "Source\OpenSim.Data.Model\OpenSim.Data.Model.csproj", "{39D8B47B-C213-41C6-9E5D-D09AB7E89AB0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.Model", "Source\OpenSim.Data.Model\OpenSim.Data.Model.csproj", "{39D8B47B-C213-41C6-9E5D-D09AB7E89AB0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.Framework", "Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj", "{599EC9E3-6F33-42C0-A174-E16506F59A43}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.Framework", "Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj", "{599EC9E3-6F33-42C0-A174-E16506F59A43}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModule.SharedBase", "Source\OpenSim.Region.PhysicsModule.SharedBase\OpenSim.Region.PhysicsModule.SharedBase.csproj", "{94C6C0BC-F5BB-4696-A5C4-D5E4FDBF8EF1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.SharedBase", "Source\OpenSim.Region.PhysicsModule.SharedBase\OpenSim.Region.PhysicsModule.SharedBase.csproj", "{94C6C0BC-F5BB-4696-A5C4-D5E4FDBF8EF1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.ClientStack.LindenUDP", "Source\OpenSim.Region.ClientStack.LindenUDP\OpenSim.Region.ClientStack.LindenUDP.csproj", "{9A41B033-842D-46BA-AD13-61639EC53A86}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ClientStack.LindenUDP", "Source\OpenSim.Region.ClientStack.LindenUDP\OpenSim.Region.ClientStack.LindenUDP.csproj", "{9A41B033-842D-46BA-AD13-61639EC53A86}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.ClientStack.LindenCaps", "Source\OpenSim.Region.ClientStack.LindenCaps\OpenSim.Region.ClientStack.LindenCaps.csproj", "{5EE751AE-F13E-4B62-AD36-7FBC291D0FDA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ClientStack.LindenCaps", "Source\OpenSim.Region.ClientStack.LindenCaps\OpenSim.Region.ClientStack.LindenCaps.csproj", "{5EE751AE-F13E-4B62-AD36-7FBC291D0FDA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.CoreModules", "Source\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj", "{20619EF5-8852-4C66-9B93-3934E2211BAF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.CoreModules", "Source\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj", "{20619EF5-8852-4C66-9B93-3934E2211BAF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.OptionalModules", "Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj", "{53076375-212A-42DB-B52A-D3A65A364E87}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.OptionalModules", "Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj", "{53076375-212A-42DB-B52A-D3A65A364E87}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Server.RegionServer", "Source\OpenSim.Server.RegionServer\OpenSim.Server.RegionServer.csproj", "{D99FE8F4-C557-4522-B6B3-FA1D30154A43}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.RegionServer", "Source\OpenSim.Server.RegionServer\OpenSim.Server.RegionServer.csproj", "{D99FE8F4-C557-4522-B6B3-FA1D30154A43}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.ApplicationPlugins.LoadRegions", "Source\OpenSim.ApplicationPlugins.LoadRegions\OpenSim.ApplicationPlugins.LoadRegions.csproj", "{35E07AB7-C302-42BC-A51A-6A1377E47E57}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.ApplicationPlugins.LoadRegions", "Source\OpenSim.ApplicationPlugins.LoadRegions\OpenSim.ApplicationPlugins.LoadRegions.csproj", "{35E07AB7-C302-42BC-A51A-6A1377E47E57}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.ApplicationPlugins.RegionModulesController", "Source\OpenSim.ApplicationPlugins.RegionModulesController\OpenSim.ApplicationPlugins.RegionModulesController.csproj", "{6A84F67F-69C6-483B-873A-761BC695A786}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.ApplicationPlugins.RegionModulesController", "Source\OpenSim.ApplicationPlugins.RegionModulesController\OpenSim.ApplicationPlugins.RegionModulesController.csproj", "{6A84F67F-69C6-483B-873A-761BC695A786}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.ApplicationPlugins.RemoteController", "Source\OpenSim.ApplicationPlugins.RemoteController\OpenSim.ApplicationPlugins.RemoteController.csproj", "{05A88CFF-D58F-4F39-8076-8392739404FD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.ApplicationPlugins.RemoteController", "Source\OpenSim.ApplicationPlugins.RemoteController\OpenSim.ApplicationPlugins.RemoteController.csproj", "{05A88CFF-D58F-4F39-8076-8392739404FD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModule.BasicPhysics", "Source\OpenSim.Region.PhysicsModule.BasicPhysics\OpenSim.Region.PhysicsModule.BasicPhysics.csproj", "{7313C6C9-61DE-4084-A801-C9586FBA740D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.BasicPhysics", "Source\OpenSim.Region.PhysicsModule.BasicPhysics\OpenSim.Region.PhysicsModule.BasicPhysics.csproj", "{7313C6C9-61DE-4084-A801-C9586FBA740D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModule.BulletS", "Source\OpenSim.Region.PhysicsModule.BulletS\OpenSim.Region.PhysicsModule.BulletS.csproj", "{01384B86-2DA4-4266-99B7-4E43F0676376}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.BulletS", "Source\OpenSim.Region.PhysicsModule.BulletS\OpenSim.Region.PhysicsModule.BulletS.csproj", "{01384B86-2DA4-4266-99B7-4E43F0676376}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModule.ConvexDecompositionDotNet", "Source\OpenSim.Region.PhysicsModule.ConvexDecompositionDotNet\OpenSim.Region.PhysicsModule.ConvexDecompositionDotNet.csproj", "{F0CE96DE-1143-4551-A56A-BA619C195C12}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.ConvexDecompositionDotNet", "Source\OpenSim.Region.PhysicsModule.ConvexDecompositionDotNet\OpenSim.Region.PhysicsModule.ConvexDecompositionDotNet.csproj", "{F0CE96DE-1143-4551-A56A-BA619C195C12}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModule.Meshing", "Source\OpenSim.Region.PhysicsModule.Meshing\OpenSim.Region.PhysicsModule.Meshing.csproj", "{EB86E29E-8ADA-4895-80BA-76358F964FDD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.Meshing", "Source\OpenSim.Region.PhysicsModule.Meshing\OpenSim.Region.PhysicsModule.Meshing.csproj", "{EB86E29E-8ADA-4895-80BA-76358F964FDD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModule.POS", "Source\OpenSim.Region.PhysicsModule.POS\OpenSim.Region.PhysicsModule.POS.csproj", "{B298DB04-84B6-4112-BDFA-76C812F62CD2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.POS", "Source\OpenSim.Region.PhysicsModule.POS\OpenSim.Region.PhysicsModule.POS.csproj", "{B298DB04-84B6-4112-BDFA-76C812F62CD2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModule.ubOde", "Source\OpenSim.Region.PhysicsModule.ubOde\OpenSim.Region.PhysicsModule.ubOde.csproj", "{C655AB04-C861-4EBD-AD52-D532BC9B3677}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.ubOde", "Source\OpenSim.Region.PhysicsModule.ubOde\OpenSim.Region.PhysicsModule.ubOde.csproj", "{C655AB04-C861-4EBD-AD52-D532BC9B3677}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModule.ubOdeMeshing", "Source\OpenSim.Region.PhysicsModule.ubOdeMeshing\OpenSim.Region.PhysicsModule.ubOdeMeshing.csproj", "{A3773F06-1D60-4278-9A53-2D5C6370C69A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.ubOdeMeshing", "Source\OpenSim.Region.PhysicsModule.ubOdeMeshing\OpenSim.Region.PhysicsModule.ubOdeMeshing.csproj", "{A3773F06-1D60-4278-9A53-2D5C6370C69A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.OptionalModules.Currency", "Source\OpenSim.Region.OptionalModules.Currency\OpenSim.Region.OptionalModules.Currency.csproj", "{ACE8841A-D54C-4DA6-AB4B-6EFEAA662C47}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.OptionalModules.Currency", "Source\OpenSim.Region.OptionalModules.Currency\OpenSim.Region.OptionalModules.Currency.csproj", "{ACE8841A-D54C-4DA6-AB4B-6EFEAA662C47}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Data.MySQL.MoneyData", "Source\OpenSim.Data.MySQL.MoneyData\OpenSim.Data.MySQL.MoneyData.csproj", "{A8A7CC2D-5267-4B1B-B9BF-2FC0E3C01D09}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.MySQL.MoneyData", "Source\OpenSim.Data.MySQL.MoneyData\OpenSim.Data.MySQL.MoneyData.csproj", "{A8A7CC2D-5267-4B1B-B9BF-2FC0E3C01D09}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gloebit", "Source\Gloebit\Gloebit.csproj", "{E1C4D992-705B-4C02-B408-8A518E27F7A8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gloebit", "Source\Gloebit\Gloebit.csproj", "{E1C4D992-705B-4C02-B408-8A518E27F7A8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Capabilities.Handlers.Tests", "Tests\OpenSim.Capabilities.Handlers.Tests\OpenSim.Capabilities.Handlers.Tests.csproj", "{ED4B08CB-38CF-4AAE-B58F-6E657A1CBDFC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Capabilities.Handlers.Tests", "Tests\OpenSim.Capabilities.Handlers.Tests\OpenSim.Capabilities.Handlers.Tests.csproj", "{ED4B08CB-38CF-4AAE-B58F-6E657A1CBDFC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Tests.Clients.AssetClient", "Tests\OpenSim.Clients.Assets.Tests\OpenSim.Tests.Clients.AssetClient.csproj", "{8B1577EA-D750-4F86-BFF9-137ACC201DF9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Tests.Clients.AssetClient", "Tests\OpenSim.Clients.Assets.Tests\OpenSim.Tests.Clients.AssetClient.csproj", "{8B1577EA-D750-4F86-BFF9-137ACC201DF9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Tests.Common", "Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj", "{4B9B10D0-DF6A-4D9F-9AF4-75E723AF69A8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Tests.Common", "Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj", "{4B9B10D0-DF6A-4D9F-9AF4-75E723AF69A8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Data.Tests", "Tests\OpenSim.Data.Tests\OpenSim.Data.Tests.csproj", "{8579C7CF-F05C-42FB-8DFB-7F0E7CB122ED}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.Tests", "Tests\OpenSim.Data.Tests\OpenSim.Data.Tests.csproj", "{8579C7CF-F05C-42FB-8DFB-7F0E7CB122ED}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.Serialization.Tests", "Tests\OpenSim.Framework.Serialization.Tests\OpenSim.Framework.Serialization.Tests.csproj", "{2648CDB9-FB5B-4678-9ED5-F67A6D3E9C77}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Serialization.Tests", "Tests\OpenSim.Framework.Serialization.Tests\OpenSim.Framework.Serialization.Tests.csproj", "{2648CDB9-FB5B-4678-9ED5-F67A6D3E9C77}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.Servers.Tests", "Tests\OpenSim.Framework.Servers.Tests\OpenSim.Framework.Servers.Tests.csproj", "{621208A4-6A02-4378-A080-45C276D54963}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Servers.Tests", "Tests\OpenSim.Framework.Servers.Tests\OpenSim.Framework.Servers.Tests.csproj", "{621208A4-6A02-4378-A080-45C276D54963}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Tests.Performance", "Tests\OpenSim.Performance.Tests\OpenSim.Tests.Performance.csproj", "{59D2F1B6-817F-40A5-A911-18F7CF97AD1D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Tests.Performance", "Tests\OpenSim.Performance.Tests\OpenSim.Tests.Performance.csproj", "{59D2F1B6-817F-40A5-A911-18F7CF97AD1D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Tests.Permissions", "Tests\OpenSim.Permissions.Tests\OpenSim.Tests.Permissions.csproj", "{487F2A21-2154-4F7B-84C6-837199060A15}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Tests.Permissions", "Tests\OpenSim.Permissions.Tests\OpenSim.Tests.Permissions.csproj", "{487F2A21-2154-4F7B-84C6-837199060A15}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.ClientStack.LindenCaps.Tests", "Tests\OpenSim.Region.ClientStack.LindenCaps.Tests\OpenSim.Region.ClientStack.LindenCaps.Tests.csproj", "{9F84CB9B-0DAA-4ED5-B1E5-96CDE5DBB835}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ClientStack.LindenCaps.Tests", "Tests\OpenSim.Region.ClientStack.LindenCaps.Tests\OpenSim.Region.ClientStack.LindenCaps.Tests.csproj", "{9F84CB9B-0DAA-4ED5-B1E5-96CDE5DBB835}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.ClientStack.LindenUDP.Tests", "Tests\OpenSim.Region.ClientStack.LindenUDP.Tests\OpenSim.Region.ClientStack.LindenUDP.Tests.csproj", "{A27669E1-03A2-4AE2-98E4-7ED644FB449C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ClientStack.LindenUDP.Tests", "Tests\OpenSim.Region.ClientStack.LindenUDP.Tests\OpenSim.Region.ClientStack.LindenUDP.Tests.csproj", "{A27669E1-03A2-4AE2-98E4-7ED644FB449C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.CoreModules.Tests", "Tests\OpenSim.Region.CoreModules.Tests\OpenSim.Region.CoreModules.Tests.csproj", "{4DD026A1-E0E1-4449-BD55-19A404560013}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.CoreModules.Tests", "Tests\OpenSim.Region.CoreModules.Tests\OpenSim.Region.CoreModules.Tests.csproj", "{4DD026A1-E0E1-4449-BD55-19A404560013}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.Framework.Tests", "Tests\OpenSim.Region.Framework.Tests\OpenSim.Region.Framework.Tests.csproj", "{EE95DDC4-0360-474E-A534-16C6D5A284A6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.Framework.Tests", "Tests\OpenSim.Region.Framework.Tests\OpenSim.Region.Framework.Tests.csproj", "{EE95DDC4-0360-474E-A534-16C6D5A284A6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModule.BulletS.Tests", "Tests\OpenSim.Region.PhysicsModules.BulletS.Tests\OpenSim.Region.PhysicsModule.BulletS.Tests.csproj", "{697F2348-D44D-4D7F-9ADC-56BE8B83D561}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.BulletS.Tests", "Tests\OpenSim.Region.PhysicsModules.BulletS.Tests\OpenSim.Region.PhysicsModule.BulletS.Tests.csproj", "{697F2348-D44D-4D7F-9ADC-56BE8B83D561}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.ScriptEngine.Tests", "Tests\OpenSim.Region.ScriptEngine.Tests\OpenSim.Region.ScriptEngine.Tests.csproj", "{095BB4F2-113F-41CC-95CC-BA8BB8AE50D9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine.Tests", "Tests\OpenSim.Region.ScriptEngine.Tests\OpenSim.Region.ScriptEngine.Tests.csproj", "{095BB4F2-113F-41CC-95CC-BA8BB8AE50D9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Robust.Tests", "Tests\OpenSim.Robust.Tests\Robust.Tests.csproj", "{F81FC0C2-5968-489D-A2EE-427CA2BFF51A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Robust.Tests", "Tests\OpenSim.Robust.Tests\Robust.Tests.csproj", "{F81FC0C2-5968-489D-A2EE-427CA2BFF51A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Server.Handlers.Tests", "Tests\OpenSim.Server.Handlers.Tests\OpenSim.Server.Handlers.Tests.csproj", "{36362244-B5D1-4B98-8B5C-95B3D04F77DA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.Handlers.Tests", "Tests\OpenSim.Server.Handlers.Tests\OpenSim.Server.Handlers.Tests.csproj", "{36362244-B5D1-4B98-8B5C-95B3D04F77DA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Services.InventoryService.Tests", "Tests\OpenSim.Services.InventoryService.Tests\OpenSim.Services.InventoryService.Tests.csproj", "{C1917976-A953-49A5-A10B-1C6F6C3C9D03}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.InventoryService.Tests", "Tests\OpenSim.Services.InventoryService.Tests\OpenSim.Services.InventoryService.Tests.csproj", "{C1917976-A953-49A5-A10B-1C6F6C3C9D03}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Tests.Stress", "Tests\OpenSim.Stress.Tests\OpenSim.Tests.Stress.csproj", "{68F4BE4E-3763-4550-8A55-6B26505FF2F9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Tests.Stress", "Tests\OpenSim.Stress.Tests\OpenSim.Tests.Stress.csproj", "{68F4BE4E-3763-4550-8A55-6B26505FF2F9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Tests", "Tests\OpenSim.Tests\OpenSim.Tests.csproj", "{B2038E44-5DED-4776-BDD5-1D7915C2A80B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Tests", "Tests\OpenSim.Tests\OpenSim.Tests.csproj", "{B2038E44-5DED-4776-BDD5-1D7915C2A80B}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartThreadPool", "ThirdParty\SmartThreadPool\SmartThreadPool.csproj", "{E19ACC9A-5718-4EEF-B1F4-E2C7E705458D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -379,6 +381,10 @@ Global
 		{B2038E44-5DED-4776-BDD5-1D7915C2A80B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B2038E44-5DED-4776-BDD5-1D7915C2A80B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B2038E44-5DED-4776-BDD5-1D7915C2A80B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E19ACC9A-5718-4EEF-B1F4-E2C7E705458D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E19ACC9A-5718-4EEF-B1F4-E2C7E705458D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E19ACC9A-5718-4EEF-B1F4-E2C7E705458D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E19ACC9A-5718-4EEF-B1F4-E2C7E705458D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
