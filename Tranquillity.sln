@@ -131,6 +131,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Tests", "Tests\Open
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartThreadPool", "ThirdParty\SmartThreadPool\SmartThreadPool.csproj", "{E19ACC9A-5718-4EEF-B1F4-E2C7E705458D}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.SQLite", "Source\OpenSim.Data.SQLite\OpenSim.Data.SQLite.csproj", "{04055EFA-795E-4764-A8C8-70C0BE27E96B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -385,6 +387,10 @@ Global
 		{E19ACC9A-5718-4EEF-B1F4-E2C7E705458D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E19ACC9A-5718-4EEF-B1F4-E2C7E705458D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E19ACC9A-5718-4EEF-B1F4-E2C7E705458D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{04055EFA-795E-4764-A8C8-70C0BE27E96B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04055EFA-795E-4764-A8C8-70C0BE27E96B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04055EFA-795E-4764-A8C8-70C0BE27E96B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04055EFA-795E-4764-A8C8-70C0BE27E96B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -451,6 +457,7 @@ Global
 		{C1917976-A953-49A5-A10B-1C6F6C3C9D03} = {8F448DF9-DE18-4810-8545-96DFE17D5C39}
 		{68F4BE4E-3763-4550-8A55-6B26505FF2F9} = {8F448DF9-DE18-4810-8545-96DFE17D5C39}
 		{B2038E44-5DED-4776-BDD5-1D7915C2A80B} = {8F448DF9-DE18-4810-8545-96DFE17D5C39}
+		{04055EFA-795E-4764-A8C8-70C0BE27E96B} = {02C09046-CFF3-40BA-9E3F-629241EB25A5}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A40AD54B-8BC7-41E4-B241-19B59EA65D2A}
