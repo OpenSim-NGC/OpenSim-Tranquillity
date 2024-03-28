@@ -28,16 +28,19 @@
 using System;
 using System.Data;
 using System.Reflection;
+
 using OpenSim.Data;
 using OpenSim.Framework;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+
 using log4net;
 using Npgsql;
 
 namespace OpenSim.Data.PGSQL
 {
-    public class UserProfilesData : IProfilesData
+    public class PGSQLUserProfilesData : IProfilesData
     {
         static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -58,7 +61,7 @@ namespace OpenSim.Data.PGSQL
         #endregion Properties
 
         #region class Member Functions
-        public UserProfilesData(string connectionString)
+        public void Initialize(string connectionString, string realm)
         {
             ConnectionString = connectionString;
             Init();

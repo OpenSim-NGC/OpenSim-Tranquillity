@@ -48,7 +48,7 @@ namespace OpenSim.Data.PGSQL
         protected string m_connectionString;
         protected object m_dbLock = new object();
 
-        protected PGSqlFramework(string connectionString)
+        protected void Initialize(string connectionString)
         {
             m_connectionString = connectionString;
         }

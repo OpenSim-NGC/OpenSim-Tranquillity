@@ -42,9 +42,11 @@ namespace OpenSim.Data.PGSQL
     /// </summary>
     public class PGSQLHGTravelData : PGSQLGenericTableHandler<HGTravelingData>, IHGTravelingData
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public PGSQLHGTravelData(string connectionString, string realm) : base(connectionString, realm, "HGTravelStore") { }
+        public void Initialize(string connectionString, string realm) {
+            base.Initialize(connectionString, realm, "HGTravelStore");
+        }
 
         public HGTravelingData Get(UUID sessionID)
         {

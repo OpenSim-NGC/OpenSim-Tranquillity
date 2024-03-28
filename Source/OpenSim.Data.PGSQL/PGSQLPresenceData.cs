@@ -45,9 +45,9 @@ namespace OpenSim.Data.PGSQL
     {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public PGSQLPresenceData(string connectionString, string realm) :
-                base(connectionString, realm, "Presence")
+        public void Initialize(string connectionString, string realm)
         {
+            base.Initialize(connectionString, realm, "Presence");
         }
 
         public PresenceData Get(UUID sessionID)

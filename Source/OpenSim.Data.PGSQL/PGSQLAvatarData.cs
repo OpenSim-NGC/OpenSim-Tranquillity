@@ -46,9 +46,9 @@ namespace OpenSim.Data.PGSQL
     {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public PGSQLAvatarData(string connectionString, string realm) :
-                base(connectionString, realm, "Avatar")
+        public void Initialize(string connectionString, string realm)
         {
+            base.Initialize(connectionString, realm, "Avatar");
         }
 
         public bool Delete(UUID principalID, string name)

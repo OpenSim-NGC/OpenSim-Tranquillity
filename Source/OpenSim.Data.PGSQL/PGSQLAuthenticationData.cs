@@ -51,7 +51,7 @@ namespace OpenSim.Data.PGSQL
             get { return GetType().Assembly; }
         }
 
-        public PGSQLAuthenticationData(string connectionString, string realm)
+        public void Initialize(string connectionString, string realm)
         {
             m_Realm = realm;
             m_ConnectionString = connectionString;

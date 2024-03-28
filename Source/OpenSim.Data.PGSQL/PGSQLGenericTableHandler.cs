@@ -43,15 +43,14 @@ namespace OpenSim.Data.PGSQL
         private static readonly ILog m_log =
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        protected string m_ConnectionString;
-        protected PGSQLManager m_database; //used for parameter type translation
-        protected Dictionary<string, FieldInfo> m_Fields =
-                new Dictionary<string, FieldInfo>();
+        protected string? m_ConnectionString;
+        protected PGSQLManager? m_database; //used for parameter type translation
+        protected Dictionary<string, FieldInfo> m_Fields = new Dictionary<string, FieldInfo>();
 
         protected Dictionary<string, string> m_FieldTypes = new Dictionary<string, string>();
 
         protected List<string> m_ColumnNames = null;
-        protected string m_Realm;
+        protected string? m_Realm = null;
         protected FieldInfo m_DataField = null;
 
         protected virtual Assembly Assembly
@@ -59,10 +58,10 @@ namespace OpenSim.Data.PGSQL
             get { return GetType().Assembly; }
         }
 
-        public PGSQLGenericTableHandler(string connectionString,
-                string realm, string storeName)
-            : base(connectionString)
+        public void Initialize(string connectionString, string realm, string storeName)
         {
+            base.Initialize(connectionString);
+
             m_Realm = realm;
 
             m_ConnectionString = connectionString;

@@ -51,11 +51,7 @@ namespace OpenSim.Data.PGSQL
 
         #region Public methods
 
-        public PGSQLEstateStore()
-        {
-        }
-
-        public PGSQLEstateStore(string connectionString)
+        public void Initialize(string connectionString)
         {
             Initialise(connectionString);
         }

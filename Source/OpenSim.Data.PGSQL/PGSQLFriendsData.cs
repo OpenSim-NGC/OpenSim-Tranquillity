@@ -39,9 +39,10 @@ namespace OpenSim.Data.PGSQL
 {
     public class PGSQLFriendsData : PGSQLGenericTableHandler<FriendsData>, IFriendsData
     {
-        public PGSQLFriendsData(string connectionString, string realm)
-            : base(connectionString, realm, "FriendsStore")
+        public void Initialize(string connectionString, string realm)
         {
+            base.Initialize(connectionString, realm, "FriendsStore");
+
             using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
             {
                 conn.Open();

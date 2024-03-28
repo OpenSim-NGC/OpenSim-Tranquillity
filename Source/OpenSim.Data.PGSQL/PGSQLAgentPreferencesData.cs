@@ -35,11 +35,14 @@ using Npgsql;
 
 namespace OpenSim.Data.PGSQL
 {
-    public class PGSQLAgentPreferencesData : PGSQLGenericTableHandler<AgentPreferencesData>, IAgentPreferencesData
+    public class PGSQLAgentPreferencesData : IAgentPreferencesData
     {
-        public PGSQLAgentPreferencesData(string connectionString, string realm)
-            : base(connectionString, realm, "AgentPrefs")
-        {
+
+        protected PGSQLGenericTableHandler<AgentPreferencesData> tableHandler = null;
+
+        public void Initialize(string connectionString, string realm) {
+            tableHandler = new();
+            tableHandler.Initialize(connectionString, realm, "AgentPrefs");
         }
 
         public AgentPreferencesData GetPrefs(UUID agentID)
@@ -52,5 +55,8 @@ namespace OpenSim.Data.PGSQL
             return ret[0];
         }
 
+        public bool Store(AgentPreferencesData data) {
+            return tableHandler.Store(data);
+        }
     }
 }

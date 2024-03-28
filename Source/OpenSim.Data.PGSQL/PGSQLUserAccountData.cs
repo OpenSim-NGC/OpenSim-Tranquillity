@@ -29,12 +29,13 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
+using System.Reflection;
+
 using OpenMetaverse;
 using OpenSim.Framework;
-using System.Text;
+
 using Npgsql;
 using log4net;
-using System.Reflection;
 
 namespace OpenSim.Data.PGSQL
 {
@@ -43,9 +44,9 @@ namespace OpenSim.Data.PGSQL
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
 
-        public PGSQLUserAccountData(string connectionString, string realm) :
-            base(connectionString, realm, "UserAccount")
+        public void Initialize(string connectionString, string realm)
         {
+            base.Initialize(connectionString, realm, "UserAccount");
         }
 
         /*
