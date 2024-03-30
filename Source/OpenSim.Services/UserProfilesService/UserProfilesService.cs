@@ -29,7 +29,6 @@ using Autofac;
 
 using OpenSim.Framework;
 using OpenSim.Data;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
@@ -37,7 +36,6 @@ using OpenMetaverse.StructuredData;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Nini.Config;
 
 namespace OpenSim.Services.ProfilesService
 {

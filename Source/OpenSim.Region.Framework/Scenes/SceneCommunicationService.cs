@@ -25,20 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Net;
 using System.Reflection;
-using System.Threading;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
-using OpenMetaverse.StructuredData;
-using log4net;
 using OpenSim.Framework;
-using OpenSim.Framework.Client;
-using OpenSim.Framework.Capabilities;
-using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Services.Interfaces;
-using OSD = OpenMetaverse.StructuredData.OSD;
+
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.Framework.Scenes
@@ -50,11 +42,16 @@ namespace OpenSim.Region.Framework.Scenes
     /// </summary>
     public class SceneCommunicationService //one instance per region
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<SceneCommunicationService> _logger;
         private static readonly string LogHeader = "[SCENE COMM]";
 
         protected RegionInfo m_regionInfo;
         protected Scene m_scene;
+
+        public SceneCommunicationService(ILogger<SceneCommunicationService> logger)
+        {
+            _logger = logger;
+        }
 
         public void SetScene(Scene s)
         {
@@ -64,10 +61,9 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void InformNeighborsThatRegionisUp(INeighbourService neighbourService, RegionInfo region)
         {
-            //m_log.Info("[INTER]: " + debugRegionName + ": SceneCommunicationService: Sending InterRegion Notification that region is up " + region.RegionName);
             if (neighbourService == null)
             {
-                m_log.ErrorFormat("{0} No neighbour service provided for region {1} to inform neigbhours of status", LogHeader, m_scene.Name);
+                _logger.LogError($"{LogHeader} No neighbour service provided for region {m_scene.Name} to inform neigbhours of status");
                 return;
             }
 
@@ -105,15 +101,12 @@ namespace OpenSim.Region.Framework.Scenes
                         GridRegion neighbour = neighbourService.HelloNeighbour(regionhandle, region);
                         if (neighbour != null)
                         {
-                            m_log.DebugFormat("{0} Region {1} successfully informed neighbour {2} at {3}-{4} that it is up",
-                                LogHeader, m_scene.Name, neighbour.RegionName, rx, ry);
-
+                            _logger.LogDebug($"{LogHeader} Region {m_scene.Name} successfully informed neighbour {neighbour.RegionName} at {rx}-{ry} that it is up");
                             m_scene.EventManager.TriggerOnRegionUp(neighbour);
                         }
                         else
                         {
-                            m_log.WarnFormat("{0} Region {1} failed to inform neighbour at {2}-{3} that it is up.",
-                                LogHeader, m_scene.Name, rx, ry);
+                            _logger.LogWarning($"{LogHeader} Region {m_scene.Name} failed to inform neighbour at {rx}-{ry} that it is up.");
                         }
                     }
                 });
@@ -182,14 +175,11 @@ namespace OpenSim.Region.Framework.Scenes
                     GridRegion destination = m_scene.GridService.GetRegionByHandle(m_regionInfo.ScopeID, regionHandle);
                     if (destination == null)
                     {
-                        m_log.DebugFormat(
-                            "[SCENE COMMUNICATION SERVICE]: Sending close agent ID {0} FAIL, region with handle {1} not found", agentID, regionHandle);
+                        _logger.LogDebug($"[SCENE COMMUNICATION SERVICE]: Sending close agent ID {agentID} FAIL, region with handle {regionHandle} not found");
                         return;
                     }
 
-                    m_log.DebugFormat(
-                        "[SCENE COMMUNICATION SERVICE]: Sending close agent ID {0} to {1}", agentID, destination.RegionName);
-
+                    _logger.LogDebug($"[SCENE COMMUNICATION SERVICE]: Sending close agent ID {agentID} to {destination.RegionName}");
                     m_scene.SimulationService.CloseAgent(destination, agentID, auth_code);
                 }
             }, null, "SCOMM.SendCloseChildAgentConnections");

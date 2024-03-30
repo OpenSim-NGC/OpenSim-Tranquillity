@@ -41,7 +41,7 @@ namespace OpenSim.Server.MoneyServer
 
         bool giveMoney(UUID transactionID, string receiverID, int amount);
 
-        bool addTransaction(TransactionData transaction);
+        bool addTransaction(MoneyTransactionData transaction);
 
         bool addUser(string userID, int balance, int status, int type);
 
@@ -51,9 +51,9 @@ namespace OpenSim.Server.MoneyServer
 
         bool ValidateTransfer(string secureCode, UUID transactionID);
 
-        TransactionData FetchTransaction(UUID transactionID);
+        MoneyTransactionData FetchTransaction(UUID transactionID);
 
-        TransactionData FetchTransaction(string userID, int startTime, int endTime, int lastIndex);
+        MoneyTransactionData FetchTransaction(string userID, int startTime, int endTime, int lastIndex);
 
         int getTransactionNum(string userID, int startTime, int endTime);
 

@@ -26,12 +26,8 @@
  */
 // Ubit 2012
 
-using System;
 using System.Reflection;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
-using log4net;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -44,8 +40,6 @@ namespace OpenSim.Region.Framework.Scenes
 
     public static class CollisionSounds
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private const int MaxMaterials = 7;
         // part part
 

@@ -25,11 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Timers;
-using System.Threading;
-using OpenMetaverse.Packets;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
@@ -44,8 +39,6 @@ namespace OpenSim.Region.Framework.Scenes
     /// </remarks>
     public class SimStatsReporter
     {
-        private static readonly log4net.ILog m_log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
-
         public delegate void SendStatResult(SimStats stats);
         public event SendStatResult OnSendStatsResult;
 

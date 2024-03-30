@@ -627,7 +627,7 @@ namespace OpenSim.Server.MoneyServer
                     int time = (int)((DateTime.UtcNow.Ticks - TicksToEpoch) / 10000000);
                     try
                     {
-                        TransactionData transaction = new TransactionData();
+                        MoneyTransactionData transaction = new MoneyTransactionData();
                         transaction.TransUUID = transactionUUID;
                         transaction.Sender = senderID;
                         transaction.Receiver = receiverID;
@@ -768,7 +768,7 @@ namespace OpenSim.Server.MoneyServer
 
             try
             {
-                TransactionData transaction = new TransactionData();
+                MoneyTransactionData transaction = new MoneyTransactionData();
                 transaction.TransUUID = transactionUUID;
                 transaction.Sender = senderID;
                 transaction.Receiver = receiverID;
@@ -909,7 +909,7 @@ namespace OpenSim.Server.MoneyServer
 
             try
             {
-                TransactionData transaction = new TransactionData();
+                MoneyTransactionData transaction = new MoneyTransactionData();
                 transaction.TransUUID = transactionUUID;
                 transaction.Sender = senderID;
                 transaction.Receiver = receiverID;
@@ -1041,7 +1041,7 @@ namespace OpenSim.Server.MoneyServer
 
             try
             {
-                TransactionData transaction = new TransactionData();
+                MoneyTransactionData transaction = new MoneyTransactionData();
                 transaction.TransUUID = transactionUUID;
                 transaction.Sender = senderID;
                 transaction.Receiver = bankerID;
@@ -1159,7 +1159,7 @@ namespace OpenSim.Server.MoneyServer
                     int time = (int)((DateTime.UtcNow.Ticks - TicksToEpoch) / 10000000);
                     try
                     {
-                        TransactionData transaction = new TransactionData();
+                        MoneyTransactionData transaction = new MoneyTransactionData();
                         transaction.TransUUID = transactionUUID;
                         transaction.Sender = senderID;
                         transaction.Receiver = receiverID;
@@ -1232,7 +1232,7 @@ namespace OpenSim.Server.MoneyServer
             {
                 if (m_moneyDBService.DoTransfer(transactionUUID))
                 {
-                    TransactionData transaction = m_moneyDBService.FetchTransaction(transactionUUID);
+                    MoneyTransactionData transaction = m_moneyDBService.FetchTransaction(transactionUUID);
                     if (transaction != null && transaction.Status == (int)Status.SUCCESS_STATUS)
                     {
                         _logger.LogInformation("[MONEY RPC]: NotifyTransfer: Transaction Type = {0}", transaction.Type);
@@ -1496,7 +1496,7 @@ namespace OpenSim.Server.MoneyServer
         /// </summary>
         /// <param name="transaction"></param>
         /// <returns></returns>
-        protected bool RollBackTransaction(TransactionData transaction)
+        protected bool RollBackTransaction(MoneyTransactionData transaction)
         {
             //m_logger.LogInformation("[MONEY RPC]: RollBackTransaction:");
 
@@ -1557,7 +1557,7 @@ namespace OpenSim.Server.MoneyServer
                 return response;
             }
 
-            TransactionData transaction = m_moneyDBService.FetchTransaction(transactionUUID);
+            MoneyTransactionData transaction = m_moneyDBService.FetchTransaction(transactionUUID);
             UserInfo user = m_moneyDBService.FetchUserInfo(transaction.Sender);
 
             try
@@ -1623,7 +1623,7 @@ namespace OpenSim.Server.MoneyServer
 
                     try
                     {
-                        TransactionData transaction = m_moneyDBService.FetchTransaction(transactionUUID);
+                        MoneyTransactionData transaction = m_moneyDBService.FetchTransaction(transactionUUID);
                         if (transaction != null)
                         {
                             responseData["success"] = true;
@@ -1854,7 +1854,7 @@ namespace OpenSim.Server.MoneyServer
                     try
                     {
                         int total = m_moneyDBService.getTransactionNum(userID, startTime, endTime);
-                        TransactionData tran = null;
+                        MoneyTransactionData tran = null;
                         _logger.LogInformation("[MONEY RPC]: handleWebGetTransaction: Getting transation[{0}] for user {1}", lastIndex + 1, userID);
                         if (total > lastIndex + 2)
                         {

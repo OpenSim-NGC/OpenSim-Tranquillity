@@ -25,23 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Text;
-using System.Threading;
 using System.Timers;
 using System.Net;
 using System.Net.Security;
+using Timer = System.Timers.Timer;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
-using log4net;
+
 using OpenMetaverse;
-using OpenSim.Framework;
+
 using OpenSim.Framework.Monitoring;
 using OpenSim.Framework.Servers.HttpServer;
-using Timer=System.Timers.Timer;
-using Nini.Config;
-using System.Runtime.InteropServices;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 

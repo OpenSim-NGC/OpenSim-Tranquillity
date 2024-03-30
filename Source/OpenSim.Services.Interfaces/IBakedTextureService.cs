@@ -25,9 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using Nini.Config;
-
 namespace OpenSim.Services.Interfaces
 {
     public interface IBakedTextureService

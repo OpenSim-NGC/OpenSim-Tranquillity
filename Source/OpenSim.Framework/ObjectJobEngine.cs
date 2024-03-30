@@ -29,18 +29,14 @@
 // can have up to m_concurrency number of execution threads
 // it will hold each thread up to m_threadsHoldtime ms waiting for more work, before releasing it back to the pool.
 
-using System;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Reflection;
-using System.Threading;
-using log4net;
 
 namespace OpenSim.Framework
 {
     public class ObjectJobEngine : IDisposable
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private readonly object m_mainLock = new object();
         private readonly string m_name;
         private readonly int m_threadsHoldtime;
@@ -52,8 +48,16 @@ namespace OpenSim.Framework
         private int m_numberThreads = 0;
         private bool m_isRunning;
 
-        public ObjectJobEngine(WaitCallback callback, string name, int threadsHoldtime = 1000, int concurrency = 1)
+        private ILogger m_logger;
+        
+        public ObjectJobEngine(
+            ILogger logger, 
+            WaitCallback callback, 
+            string name, 
+            int threadsHoldtime = 1000, 
+            int concurrency = 1)
         {
+            m_logger = logger;
             m_name = name;
             m_threadsHoldtime = threadsHoldtime;
 
@@ -155,12 +159,13 @@ namespace OpenSim.Framework
 
         private void ProcessRequests(object o)
         {
-            object obj;
+            object? obj;
+
             while (m_isRunning)
             {
                 try
                 {
-                    if(!m_jobQueue.TryTake(out obj, m_threadsHoldtime, m_cancelSource.Token))
+                    if (!m_jobQueue.TryTake(out obj, m_threadsHoldtime, m_cancelSource.Token))
                     {
                         lock (m_mainLock)
                         {
@@ -178,6 +183,7 @@ namespace OpenSim.Framework
 
                 if(!m_isRunning || m_callback == null)
                     break;
+
                 try
                 {
                     m_callback.Invoke(obj);
@@ -185,11 +191,14 @@ namespace OpenSim.Framework
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[ObjectJob {0}]: Job failed, continuing.  Exception {1}", m_name, e);
+                    m_logger.LogError(e, $"[ObjectJob {m_name}]: Job failed, continuing.");
                 }
             }
+
             lock (m_mainLock)
+            {
                 --m_numberThreads;
+            }
         }
     }
 }

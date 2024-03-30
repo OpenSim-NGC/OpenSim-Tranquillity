@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
+using Microsoft.Extensions.Logging;
 using System.Text;
-using log4net;
 
 namespace OpenSim.Framework
 {
@@ -55,7 +53,7 @@ namespace OpenSim.Framework
         private bool m_flushWrite;
 
         // set externally when debugging. If let 'null', this does not write any error messages.
-        public ILog ErrorLogger = null;
+        public ILogger ErrorLogger = null;
         private string LogHeader = "[LOG WRITER]";
 
         /// <summary>
@@ -171,7 +169,7 @@ namespace OpenSim.Framework
             {
                 if (ErrorLogger != null)
                 {
-                    ErrorLogger.ErrorFormat("{0}: FAILURE WRITING TO LOGFILE: {1}", LogHeader, e);
+                    ErrorLogger.LogError(e, $"{LogHeader}: FAILURE WRITING TO LOGFILE: ");
                 }
                 Enabled = false;
             }

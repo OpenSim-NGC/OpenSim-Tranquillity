@@ -25,10 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Microsoft.Extensions.Configuration;
-using Nini.Config;
-using System;
-using System.Collections.Generic;
 using System.Xml;
 
 namespace OpenSim.Framework

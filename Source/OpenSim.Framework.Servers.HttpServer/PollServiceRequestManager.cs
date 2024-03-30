@@ -25,31 +25,26 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Threading;
-using System.Reflection;
-using log4net;
 using OpenSim.Framework.Monitoring;
-using Amib.Threading;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework.Servers.HttpServer
 {
     public class PollServiceRequestManager
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private readonly ConcurrentQueue<PollServiceHttpRequest> m_retryRequests = new();
         private readonly int m_WorkerThreadCount = 0;
         private ObjectJobEngine m_workerPool;
         private Thread m_retrysThread;
 
         private bool m_running = false;
+        private readonly ILogger m_logger;
 
-        public PollServiceRequestManager(bool performResponsesAsync, uint pWorkerThreadCount, int pTimeout)
+        public PollServiceRequestManager(ILogger logger, bool performResponsesAsync, uint pWorkerThreadCount, int pTimeout)
         {
+            m_logger = logger;
             m_WorkerThreadCount = (int)pWorkerThreadCount;
         }
 
@@ -59,7 +54,7 @@ namespace OpenSim.Framework.Servers.HttpServer
                 return;
 
             m_running = true;
-            m_workerPool = new ObjectJobEngine(PoolWorkerJob, "PollServiceWorker", 4000, m_WorkerThreadCount);
+            m_workerPool = new ObjectJobEngine(m_logger, PoolWorkerJob, "PollServiceWorker", 4000, m_WorkerThreadCount);
 
             m_retrysThread = WorkManager.StartThread(
                 CheckRetries,
@@ -173,7 +168,7 @@ namespace OpenSim.Framework.Servers.HttpServer
             }
             catch (Exception e)
             {
-                m_log.Error($"Exception in poll service thread: {e}");
+                m_logger.LogError(e, $"Exception in poll service thread");
             }
         }
     }

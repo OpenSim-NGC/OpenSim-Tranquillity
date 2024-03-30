@@ -25,14 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Net;
-using System.Reflection;
-
-using Nini.Config;
-using log4net;
 using System.Net.Http.Headers;
 using Microsoft.Extensions.Configuration;
 
@@ -40,8 +34,6 @@ namespace OpenSim.Framework.ServiceAuth
 {
     public class BasicHttpAuthentication : IServiceAuth
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         public string Name { get { return "BasicHttp"; } }
 
         private string m_Username, m_Password;

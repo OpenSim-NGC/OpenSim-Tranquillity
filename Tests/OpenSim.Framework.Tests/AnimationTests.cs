@@ -63,31 +63,31 @@ namespace OpenSim.Framework.Tests
         [Test]
         public void AnimationOSDTest()
         {
-            Assert.True(anim1.AnimID==animUUID1 && anim1.ObjectID == objUUID1 && anim1.SequenceNum ==1, "The Animation Constructor didn't set the fields correctly");
+            Assert.That(anim1.AnimID==animUUID1 && anim1.ObjectID == objUUID1 && anim1.SequenceNum ==1, "The Animation Constructor didn't set the fields correctly");
             OSD updateMessage = anim1.PackUpdateMessage();
-            Assert.True(updateMessage is OSDMap, "Packed UpdateMessage isn't an OSDMap");
+            Assert.That(updateMessage is OSDMap, "Packed UpdateMessage isn't an OSDMap");
             OSDMap updateMap = (OSDMap) updateMessage;
-            Assert.True(updateMap.ContainsKey("animation"), "Packed Message doesn't contain an animation element");
-            Assert.True(updateMap.ContainsKey("object_id"), "Packed Message doesn't contain an object_id element");
-            Assert.True(updateMap.ContainsKey("seq_num"), "Packed Message doesn't contain a seq_num element");
-            Assert.True(updateMap["animation"].AsUUID() == animUUID1);
-            Assert.True(updateMap["object_id"].AsUUID() == objUUID1);
-            Assert.True(updateMap["seq_num"].AsInteger() == 1);
+            Assert.That(updateMap.ContainsKey("animation"), "Packed Message doesn't contain an animation element");
+            Assert.That(updateMap.ContainsKey("object_id"), "Packed Message doesn't contain an object_id element");
+            Assert.That(updateMap.ContainsKey("seq_num"), "Packed Message doesn't contain a seq_num element");
+            Assert.That(updateMap["animation"].AsUUID() == animUUID1);
+            Assert.That(updateMap["object_id"].AsUUID() == objUUID1);
+            Assert.That(updateMap["seq_num"].AsInteger() == 1);
 
             Animation anim3 = new Animation(updateMap);
 
-            Assert.True(anim3.ObjectID == anim1.ObjectID && anim3.AnimID == anim1.AnimID && anim3.SequenceNum == anim1.SequenceNum, "OSDMap Constructor failed to set the properties correctly.");
+            Assert.That(anim3.ObjectID == anim1.ObjectID && anim3.AnimID == anim1.AnimID && anim3.SequenceNum == anim1.SequenceNum, "OSDMap Constructor failed to set the properties correctly.");
 
             anim3.UnpackUpdateMessage(anim2.PackUpdateMessage());
 
-            Assert.True(anim3.ObjectID == objUUID2 && anim3.AnimID == animUUID2 && anim3.SequenceNum == 1, "Animation.UnpackUpdateMessage failed to set the properties correctly.");
+            Assert.That(anim3.ObjectID == objUUID2 && anim3.AnimID == animUUID2 && anim3.SequenceNum == 1, "Animation.UnpackUpdateMessage failed to set the properties correctly.");
 
             Animation anim4 = new Animation();
             anim4.AnimID = anim2.AnimID;
             anim4.ObjectID = anim2.ObjectID;
             anim4.SequenceNum = anim2.SequenceNum;
 
-            Assert.True(anim4.ObjectID == objUUID2 && anim4.AnimID == animUUID2 && anim4.SequenceNum == 1, "void constructor and manual field population failed to set the properties correctly.");
+            Assert.That(anim4.ObjectID == objUUID2 && anim4.AnimID == animUUID2 && anim4.SequenceNum == 1, "void constructor and manual field population failed to set the properties correctly.");
         }
     }
 }

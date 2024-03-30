@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
-using System.Collections.Generic;
-using log4net;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
@@ -40,8 +38,6 @@ namespace OpenSim.Framework
     /// </summary>
     public class AgentCircuitData
     {
-        private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
-
         /// <summary>
         /// Avatar Unique Agent Identifier
         /// </summary>
@@ -173,8 +169,16 @@ namespace OpenSim.Framework
 
         public Dictionary<string, object> ServiceURLs;
 
+        private readonly ILogger? m_logger = null;
+
         public AgentCircuitData()
         {
+            m_logger = null;
+        }
+
+        public AgentCircuitData(ILogger logger)
+        {
+            m_logger = logger;
         }
 
         /// <summary>
@@ -254,7 +258,6 @@ namespace OpenSim.Framework
                 }
                 args["serviceurls"] = urls;
             }
-
 
             return args;
         }
@@ -338,7 +341,7 @@ namespace OpenSim.Framework
             if(args.TryGetValue("far", out tmpOSD))
                 startfar = (float)tmpOSD.AsReal();
 
-            //m_log.InfoFormat("[AGENTCIRCUITDATA]: agentid={0}, child={1}, startpos={2}", AgentID, child, startpos);
+            // m_logger?.LogInformation($"[AGENTCIRCUITDATA]: agentid={AgentID}, child={child}, startpos={startpos}");
 
             try
             {
@@ -353,16 +356,16 @@ namespace OpenSim.Framework
                 if (args.TryGetValue("packed_appearance", out tmpOSD) && (tmpOSD is OSDMap))
                 {
                     Appearance.Unpack((OSDMap)tmpOSD);
-//                    m_log.InfoFormat("[AGENTCIRCUITDATA] unpacked appearance");
+                    m_logger?.LogDebug($"[AGENTCIRCUITDATA] unpacked appearance");
                 }
                 else
                 {
-                    m_log.Warn("[AGENTCIRCUITDATA]: failed to find a valid packed_appearance");
+                    m_logger?.LogWarning("[AGENTCIRCUITDATA]: failed to find a valid packed_appearance");
                 }
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[AGENTCIRCUITDATA] failed to unpack appearance; {0}",e.Message);
+                m_logger?.LogError(e, $"[AGENTCIRCUITDATA] failed to unpack appearance;");
             }
 
             ServiceURLs = new Dictionary<string, object>();

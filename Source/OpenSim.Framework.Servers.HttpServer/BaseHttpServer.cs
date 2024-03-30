@@ -1980,7 +1980,7 @@ namespace OpenSim.Framework.Servers.HttpServer
                 {
                     if (runPool)
                     {
-                        m_pollServiceManager ??= new PollServiceRequestManager(performPollResponsesAsync, 2, 25000);
+                        m_pollServiceManager ??= new PollServiceRequestManager(m_logger, performPollResponsesAsync, 2, 25000);
                         m_pollServiceManager.Start();
                     }
                 }

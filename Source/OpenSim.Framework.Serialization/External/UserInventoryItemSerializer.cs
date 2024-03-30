@@ -25,16 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
 using System.Text;
 using System.Xml;
-
-using log4net;
 using OpenMetaverse;
-using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Framework.Serialization.External
@@ -44,8 +37,6 @@ namespace OpenSim.Framework.Serialization.External
     /// </summary>
     public class UserInventoryItemSerializer
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private static Dictionary<string, Action<InventoryItemBase, XmlReader>> m_InventoryItemXmlProcessors
             = new Dictionary<string, Action<InventoryItemBase, XmlReader>>();
 

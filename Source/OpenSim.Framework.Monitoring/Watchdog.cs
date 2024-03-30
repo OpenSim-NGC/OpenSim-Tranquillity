@@ -25,12 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using log4net;
-
 namespace OpenSim.Framework.Monitoring
 {
     /// <summary>
@@ -38,8 +32,6 @@ namespace OpenSim.Framework.Monitoring
     /// </summary>
     public static class Watchdog
     {
-        private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
-
         /// <summary>Timer interval in milliseconds for the watchdog timer</summary>
         public const int WATCHDOG_INTERVAL_MS = 2500;
 
@@ -143,8 +135,6 @@ namespace OpenSim.Framework.Monitoring
             get { return m_enabled; }
             set
             {
-                //                m_log.DebugFormat("[MEMORY WATCHDOG]: Setting MemoryWatchdog.Enabled to {0}", value);
-
                 if (value == m_enabled)
                     return;
 
@@ -209,13 +199,8 @@ namespace OpenSim.Framework.Monitoring
         /// </summary>
         /// <param name="info">Information about the thread.</info>
         /// <param name="info">Name of the thread.</info>
-        /// <param name="log">If true then creation of thread is logged.</param>
-        public static void AddThread(ThreadWatchdogInfo info, string name, bool log = true)
+        public static void AddThread(ThreadWatchdogInfo info, string name)
         {
-            if (log)
-                m_log.DebugFormat(
-                    "[WATCHDOG]: Started tracking thread {0}, ID {1}", name, info.Thread.ManagedThreadId);
-
             lock (m_threads)
                 m_threads.Add(info.Thread.ManagedThreadId, info);
         }
@@ -231,35 +216,28 @@ namespace OpenSim.Framework.Monitoring
         /// <summary>
         /// Stops watchdog tracking on the current thread
         /// </summary>
-        /// <param name="log">If true then normal events in thread removal are not logged.</param>
         /// <returns>
         /// True if the thread was removed from the list of tracked
         /// threads, otherwise false
         /// </returns>
-        public static bool RemoveThread(bool log = true)
+        public static bool RemoveThread( )
         {
-            return RemoveThread(Thread.CurrentThread.ManagedThreadId, log);
+            return RemoveThread(Thread.CurrentThread.ManagedThreadId);
         }
 
-        private static bool RemoveThread(int threadID, bool log = true)
+        private static bool RemoveThread(int threadID)
         {
             lock (m_threads)
             {
                 ThreadWatchdogInfo twi;
                 if (m_threads.TryGetValue(threadID, out twi))
                 {
-                    if (log)
-                        m_log.DebugFormat(
-                            "[WATCHDOG]: Removing thread {0}, ID {1}", twi.Thread.Name, twi.Thread.ManagedThreadId);
-
                     twi.Cleanup();
                     m_threads.Remove(threadID);
                     return true;
                 }
                 else
                 {
-                    m_log.WarnFormat(
-                        "[WATCHDOG]: Requested to remove thread with ID {0} but this is not being monitored", threadID);
                     return false;
                 }
             }
@@ -298,10 +276,6 @@ namespace OpenSim.Framework.Monitoring
                 {
                     threadInfo.LastTick = Environment.TickCount & Int32.MaxValue;
                     threadInfo.IsTimedOut = false;
-                }
-                else
-                {
-                    m_log.WarnFormat("[WATCHDOG]: Asked to update thread {0} which is not being monitored", threadID);
                 }
             }
             catch { }
@@ -343,11 +317,6 @@ namespace OpenSim.Framework.Monitoring
                 return;
             int now = Environment.TickCount & Int32.MaxValue;
             int msElapsed = now - LastWatchdogThreadTick;
-
-            if (msElapsed > WATCHDOG_INTERVAL_MS * 2)
-                m_log.WarnFormat(
-                    "[WATCHDOG]: {0} ms since Watchdog last ran.  Interval should be approximately {1} ms",
-                    msElapsed, WATCHDOG_INTERVAL_MS);
 
             LastWatchdogThreadTick = Environment.TickCount & Int32.MaxValue;
 

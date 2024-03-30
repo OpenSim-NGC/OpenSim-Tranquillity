@@ -25,12 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 
@@ -43,8 +40,6 @@ namespace OpenSim.Region.Framework.Scenes
     /// </summary>
     public class SceneManager
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         public event RestartSim OnRestartSim;
 
         /// <summary>

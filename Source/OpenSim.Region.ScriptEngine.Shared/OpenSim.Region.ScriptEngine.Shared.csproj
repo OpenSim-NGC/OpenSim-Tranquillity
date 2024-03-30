@@ -27,7 +27,6 @@
     <ProjectReference Include="..\..\Source\OpenSim.Services\OpenSim.Services.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
-    <ProjectReference Include="..\..\ThirdParty\SmartThreadPool\SmartThreadPool.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="8.0.0" />

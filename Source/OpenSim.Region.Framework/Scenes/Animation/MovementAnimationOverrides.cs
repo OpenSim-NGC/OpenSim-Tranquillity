@@ -25,34 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Xml;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Threading;
-using System.Timers;
-using Timer = System.Timers.Timer;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
-using log4net;
-using Nini.Config;
-using OpenSim.Framework;
-using OpenSim.Framework.Client;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.Framework.Scenes.Animation;
-using OpenSim.Region.Framework.Scenes.Types;
-using OpenSim.Region.PhysicsModule.SharedBase;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
-using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.Framework.Scenes
 {
     public class MovementAnimationOverrides
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private object MAOLock = new object();
         private Dictionary<string, UUID> m_overrides = new Dictionary<string, UUID>();
+
+        private readonly ILogger _logger;
+
+        public MovementAnimationOverrides(ILogger<MovementAnimationOverrides> logger)
+        {
+            _logger = logger;
+        }
+
         public void SetOverride(string state, UUID animID)
         {
             if (animID.IsZero())
@@ -64,7 +53,7 @@ namespace OpenSim.Region.Framework.Scenes
                 return;
             }
 
-            m_log.DebugFormat("Setting override for {0} to {1}", state, animID);
+            _logger.LogDebug($"Setting override for {state} to {animID}", state, animID);
 
             lock (MAOLock)
                 m_overrides[state] = animID;

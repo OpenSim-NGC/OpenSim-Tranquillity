@@ -25,13 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-
-using Nini.Config;
 using OpenSim.Framework;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Configuration;
 
 namespace OpenSim.Region.Framework.Interfaces
 {
@@ -45,7 +43,7 @@ namespace OpenSim.Region.Framework.Interfaces
         /// <summary>
         /// Provides access to the wind configuration, if any.
         /// </summary>
-        void WindConfig(Scene scene, IConfig windConfig);
+        void WindConfig(Scene scene, IConfigurationSection windConfig);
 
         /// <summary>
         /// Update wind.

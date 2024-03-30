@@ -25,13 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
-using System.Reflection;
+
 using System.Xml;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization.External;
@@ -45,8 +41,6 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
     /// right now - hopefully this isn't forever.
     public class SceneObjectSerializer
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private static IUserManagement m_UserManagement;
 
         /// <summary>

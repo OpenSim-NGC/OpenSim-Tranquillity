@@ -25,12 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -50,8 +46,6 @@ namespace OpenSim.Region.Framework.Scenes
     /// </remarks>
     public class UuidGatherer
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private static readonly HashSet<UUID> ToSkip = new()
         {
             new UUID("11111111-1111-0000-0000-000100bba000"),
@@ -1315,8 +1309,6 @@ namespace OpenSim.Region.Framework.Scenes
 
     public class HGUuidGatherer : UuidGatherer
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         protected string m_assetServerURL;
 
         public HGUuidGatherer(IAssetService assetService, string assetServerURL)

@@ -26,10 +26,9 @@
  */
 
 using System.Net;
-using System.Reflection;
-using log4net;
-using Microsoft.Extensions.Configuration;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using IPNetwork = LukeSkywalker.IPNetwork.IPNetwork;
 
 
@@ -37,8 +36,6 @@ namespace OpenSim.Framework
 {
     public class OutboundUrlFilter
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         public string Name { get; private set; }
 
         private List<IPNetwork> m_blacklistNetworks;
@@ -47,11 +44,15 @@ namespace OpenSim.Framework
         private List<IPNetwork> m_blacklistExceptionNetworks;
         private List<IPEndPoint> m_blacklistExceptionEndPoints;
 
+        private ILogger<OutboundUrlFilter> m_logger;
+
         public OutboundUrlFilter(
+            ILogger<OutboundUrlFilter> logger,
             string name,
             List<IPNetwork> blacklistNetworks, List<IPEndPoint> blacklistEndPoints,
             List<IPNetwork> blacklistExceptionNetworks, List<IPEndPoint> blacklistExceptionEndPoints)
         {
+            m_logger = logger;
             Name = name;
 
             m_blacklistNetworks = blacklistNetworks;
@@ -65,8 +66,9 @@ namespace OpenSim.Framework
         /// </summary>
         /// <param name="name">Name of the filter for logging purposes.</param>
         /// <param name="config">Filter configuration</param>
-        public OutboundUrlFilter(string name, IConfiguration config)
+        public OutboundUrlFilter(ILogger<OutboundUrlFilter> logger, string name, IConfiguration config)
         {
+            m_logger = logger;
             Name = name;
 
             string configBlacklist
@@ -80,10 +82,10 @@ namespace OpenSim.Framework
                 configBlacklistExceptions = networkConfig.GetValue("OutboundDisallowForUserScriptsExcept", configBlacklistExceptions);
             }
 
-            m_log.DebugFormat(
-                "[OUTBOUND URL FILTER]: OutboundDisallowForUserScripts for {0} is [{1}]", Name, configBlacklist);
-            m_log.DebugFormat(
-                "[OUTBOUND URL FILTER]: OutboundDisallowForUserScriptsExcept for {0} is [{1}]", Name, configBlacklistExceptions);
+            m_logger.LogDebug(
+                $"[OUTBOUND URL FILTER]: OutboundDisallowForUserScripts for {Name} is [{configBlacklist}]");
+            m_logger.LogDebug(
+                $"[OUTBOUND URL FILTER]: OutboundDisallowForUserScriptsExcept for {Name} is [{configBlacklistExceptions}]");
 
             OutboundUrlFilter.ParseConfigList(
                 configBlacklist, Name, out m_blacklistNetworks, out m_blacklistEndPoints);
@@ -111,8 +113,8 @@ namespace OpenSim.Framework
 
                     if (!IPNetwork.TryParse(configEntry, out network))
                     {
-                        m_log.ErrorFormat(
-                            "[OUTBOUND URL FILTER]: Entry [{0}] is invalid network for {1}", configEntry, filterName);
+//                        m_logger.LogError(
+//                            $"[OUTBOUND URL FILTER]: Entry [{configEntry}] is invalid network for {filterName}");
 
                         continue;
                     }
@@ -125,9 +127,8 @@ namespace OpenSim.Framework
 
                     if (!Uri.TryCreate("http://" + configEntry, UriKind.Absolute, out configEntryUri))
                     {
-                        m_log.ErrorFormat(
-                            "[OUTBOUND URL FILTER]: EndPoint entry [{0}] is invalid endpoint for {1}",
-                            configEntry, filterName);
+//                        m_logger.LogError(
+//                            $"[OUTBOUND URL FILTER]: EndPoint entry [{configEntry}] is invalid endpoint for {filterName}");
 
                         continue;
                     }
@@ -138,12 +139,12 @@ namespace OpenSim.Framework
                     {
                         if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                         {
-                            //                        m_log.DebugFormat("[OUTBOUND URL FILTER]: Found address [{0}] in config", addr);
+//                          m_logger.LogDebug($"[OUTBOUND URL FILTER]: Found address [{addr}] in config");
 
                             IPEndPoint configEntryEp = new IPEndPoint(addr, configEntryUri.Port);
                             endPoints.Add(configEntryEp);
 
-                            //                        m_log.DebugFormat("[OUTBOUND URL FILTER]: Added blacklist exception [{0}]", configEntryEp);
+//                         m_logger.LogDebug($"[OUTBOUND URL FILTER]: Added blacklist exception [{configEntryEp}]");
                         }
                     }
                 }

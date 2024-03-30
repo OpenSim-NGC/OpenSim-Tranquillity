@@ -24,14 +24,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using log4net;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework
 {
-
     public class BasicDOSProtector
     {
         public enum ThrottleAction
@@ -45,11 +42,19 @@ namespace OpenSim.Framework
         private readonly Dictionary<string, int> _tempBlocked;  // blocked list
         private readonly Dictionary<string, int> _sessions;
         private readonly System.Timers.Timer _forgetTimer;  // Cleanup timer
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
         private readonly System.Threading.ReaderWriterLockSlim _blockLockSlim = new System.Threading.ReaderWriterLockSlim();
         private readonly System.Threading.ReaderWriterLockSlim _sessionLockSlim = new System.Threading.ReaderWriterLockSlim();
-        public BasicDOSProtector(BasicDosProtectorOptions options)
+
+        private readonly ILogger _logger;
+
+        public BasicDOSProtector(
+            ILogger logger, 
+            BasicDosProtectorOptions options
+            )
         {
+            _logger = logger;
+
             _generalRequestTimes = new CircularBuffer<int>(options.MaxRequestsInTimeframe + 1, true);
             _generalRequestTimes.Put(0);
             _options = options;
@@ -65,27 +70,31 @@ namespace OpenSim.Framework
                 _blockLockSlim.EnterReadLock();
                 foreach (string str in _tempBlocked.Keys)
                 {
-                    if (
-                        Util.EnvironmentTickCountSubtract(Util.EnvironmentTickCount(),
-                                                          _tempBlocked[str]) > 0)
+                    if (Util.EnvironmentTickCountSubtract(Util.EnvironmentTickCount(), _tempBlocked[str]) > 0)
                         removes.Add(str);
                 }
+
                 _blockLockSlim.ExitReadLock();
+
                 lock (_deeperInspection)
                 {
                     _blockLockSlim.EnterWriteLock();
+
                     for (int i = 0; i < removes.Count; i++)
                     {
                         _tempBlocked.Remove(removes[i]);
                         _deeperInspection.Remove(removes[i]);
                         _sessions.Remove(removes[i]);
                     }
+
                     _blockLockSlim.ExitWriteLock();
                 }
+
                 foreach (string str in removes)
                 {
-                    m_log.Info($"[{_options.ReportingName}] client: {str} is no longer blocked.");
+                    _logger.LogInformation($"[{_options.ReportingName}] client: {str} is no longer blocked.");
                 }
+
                 _blockLockSlim.EnterReadLock();
                 if (_tempBlocked.Count > 0)
                     _forgetTimer.Enabled = true;
@@ -145,6 +154,7 @@ namespace OpenSim.Framework
                 _sessionLockSlim.EnterReadLock();
                 if (_sessions.ContainsKey(key))
                     sessionscount = _sessions[key];
+
                 _sessionLockSlim.ExitReadLock();
 
                 if (sessionscount > _options.MaxConcurrentSessions)
@@ -159,7 +169,10 @@ namespace OpenSim.Framework
                                              Util.EnvironmentTickCount() +
                                              (int) _options.ForgetTimeSpan.TotalMilliseconds);
                             _forgetTimer.Enabled = true;
-                            m_log.Warn($"[{_options.ReportingName}]: client: {clientstring} is blocked for {_options.ForgetTimeSpan.TotalMilliseconds}ms based on concurrency, X-ForwardedForAllowed status is {_options.AllowXForwardedFor}, endpoint:{_options.AllowXForwardedFor}");
+
+                            _logger.LogWarning(
+                                $"[{_options.ReportingName}]: client: {clientstring} is blocked for {_options.ForgetTimeSpan.TotalMilliseconds}ms " +
+                                $"based on concurrency, X-ForwardedForAllowed status is {_options.AllowXForwardedFor}, endpoint:{_options.AllowXForwardedFor}");
 
                         }
                         else
@@ -240,7 +253,10 @@ namespace OpenSim.Framework
                             _tempBlocked[clientstring] = Util.EnvironmentTickCount() + (int)_options.ForgetTimeSpan.TotalMilliseconds;
                         _blockLockSlim.ExitWriteLock();
 
-                        m_log.Warn($"[{_options.ReportingName}]: client: {clientstring} is blocked for {_options.ForgetTimeSpan.TotalMilliseconds}ms, X-ForwardedForAllowed status is {_options.AllowXForwardedFor}, endpoint:{endpoint}");
+                        _logger.LogWarning(
+                            $"[{_options.ReportingName}]: client: {clientstring} is blocked for {_options.ForgetTimeSpan.TotalMilliseconds}ms, " +
+                            $"X-ForwardedForAllowed status is {_options.AllowXForwardedFor}, endpoint:{endpoint}");
+
                         return false;
                     }
                     //else

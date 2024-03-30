@@ -25,24 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Text;
-using System.Web;
+
 using OSHttpServer;
-using log4net;
 
 namespace OpenSim.Framework.Servers.HttpServer
 {
     public class OSHttpRequest : IOSHttpRequest
     {
-        private static readonly ILog _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         protected IHttpRequest m_request = null;
         protected IHttpClientContext m_context = null;
 

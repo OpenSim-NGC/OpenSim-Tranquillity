@@ -29,24 +29,13 @@
  * https://github.com/openmetaversefoundation/simiangrid/
  */
 
-using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.IO;
-using System.Net;
-using System.Reflection;
-using System.Threading;
-
-using Nini.Config;
-using log4net;
 using OpenMetaverse;
 
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
 using OpenSim.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
-using log4net.Core;
 using Microsoft.Extensions.Logging;
 
 

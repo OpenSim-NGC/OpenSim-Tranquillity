@@ -25,13 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
-using log4net;
+
 using Microsoft.Extensions.Configuration;
-using Nini.Config;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework
 {
@@ -354,8 +352,6 @@ namespace OpenSim.Framework
 
     public class GridInfo
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private bool m_hasHGconfig;
         private OSHHTPHost m_gateKeeperURL;
         private HashSet<OSHHTPHost> m_gateKeeperAlias;
@@ -370,11 +366,14 @@ namespace OpenSim.Framework
         private string m_DestinationGuideURL = string.Empty;
         private string m_economyURL = string.Empty;
 
-        public GridInfo (IConfiguration config, string defaultURI = "")
-        {
-            string[] sections = new string[] {"Const", "Startup", "Hypergrid"};
+        private readonly ILogger<GridInfo> m_logger;
 
-            string gatekeeper = Util.GetConfigVarFromSections<string>(config, "GatekeeperURI", sections, string.Empty);
+        public GridInfo (IConfiguration config, ILogger<GridInfo> logger, string defaultURI = "")
+        {
+            m_logger = logger;
+
+            string[] sections = new string[] {"Const", "Startup", "Hypergrid"};
+            string? gatekeeper = Util.GetConfigVarFromSections<string>(config, "GatekeeperURI", sections, string.Empty);
 
             if (string.IsNullOrEmpty(gatekeeper))
             {
@@ -402,7 +401,7 @@ namespace OpenSim.Framework
 
             if (!m_gateKeeperURL.IsResolvedHost)
             {
-                m_log.Error(m_gateKeeperURL.IsValidHost ?  "Could not resolve GatekeeperURI" : "GatekeeperURI is a invalid host");
+                m_logger.LogError(m_gateKeeperURL.IsValidHost ?  "Could not resolve GatekeeperURI" : "GatekeeperURI is a invalid host");
                 throw new Exception("GatekeeperURI configuration error");
             }
 
@@ -447,7 +446,7 @@ namespace OpenSim.Framework
 
             if (!m_homeURL.IsResolvedHost)
             {
-                m_log.Error(m_homeURL.IsValidHost ?  "Could not resolve HomeURI" : "HomeURI is a invalid host");
+                m_logger.LogError(m_homeURL.IsValidHost ?  "Could not resolve HomeURI" : "HomeURI is a invalid host");
                 throw new Exception("HomeURI configuration error");
             }
 
@@ -484,7 +483,7 @@ namespace OpenSim.Framework
                 tmpuri = new OSHTTPURI(m_SearchURL.Trim(), true);
                 if (!tmpuri.IsResolvedHost)
                 {
-                    m_log.Error(tmpuri.IsValidHost ? "Could not resolve SearchServerURI" : "SearchServerURI is a invalid host");
+                    m_logger.LogError(tmpuri.IsValidHost ? "Could not resolve SearchServerURI" : "SearchServerURI is a invalid host");
                     throw new Exception("SearchServerURI configuration error");
                 }
                 m_SearchURL = tmpuri.URI;
@@ -500,7 +499,7 @@ namespace OpenSim.Framework
                 tmpuri = new OSHTTPURI(m_DestinationGuideURL.Trim(), true);
                 if (!tmpuri.IsResolvedHost)
                 {
-                    m_log.Error(tmpuri.IsValidHost ? "Could not resolve DestinationGuideURL" : "DestinationGuideURL is a invalid host");
+                    m_logger.LogError(tmpuri.IsValidHost ? "Could not resolve DestinationGuideURL" : "DestinationGuideURL is a invalid host");
                     throw new Exception("DestinationGuideURL configuration error");
                 }
                 m_DestinationGuideURL = tmpuri.URI;
@@ -512,7 +511,7 @@ namespace OpenSim.Framework
                 tmpuri = new OSHTTPURI(m_economyURL.Trim(), true);
                 if (!tmpuri.IsResolvedHost)
                 {
-                    m_log.Error(tmpuri.IsValidHost ? "Could not resolve economyURL" : "economyURL is a invalid host");
+                    m_logger.LogError(tmpuri.IsValidHost ? "Could not resolve economyURL" : "economyURL is a invalid host");
                     throw new Exception("economyURL configuration error");
                 }
                 m_economyURL = tmpuri.URI;
@@ -714,9 +713,13 @@ namespace OpenSim.Framework
             {
                 OSHHTPHost tmp = new OSHHTPHost(value, true);
                 if (tmp.IsResolvedHost)
+                {
                     m_gridUrl = tmp.URI;
+                }
                 else
-                    m_log.Error((tmp.IsValidHost ? "Could not resolve GridUrl" : "GridUrl is a invalid host ") + value ?? "");
+                {
+                    m_logger.LogError((tmp.IsValidHost ? "Could not resolve GridUrl" : "GridUrl is a invalid host ") + value ?? "");
+                }
             }
         }
 
@@ -727,9 +730,13 @@ namespace OpenSim.Framework
             {
                 OSHTTPURI tmp = new OSHTTPURI(value, true);
                 if (tmp.IsResolvedHost)
+                {
                     m_SearchURL = tmp.URI;
+                }
                 else
-                    m_log.Error((tmp.IsValidHost ? "Could not resolve SearchURL" : "SearchURL is a invalid host ") + value??"");
+                {
+                    m_logger.LogError((tmp.IsValidHost ? "Could not resolve SearchURL" : "SearchURL is a invalid host ") + value ?? "");
+                }
             }
         }
 
@@ -740,9 +747,13 @@ namespace OpenSim.Framework
             {
                 OSHTTPURI tmp = new OSHTTPURI(value, true);
                 if (tmp.IsResolvedHost)
+                {
                     m_DestinationGuideURL = tmp.URI;
+                }
                 else
-                    m_log.Error((tmp.IsValidHost ? "Could not resolve DestinationGuideURL" : "DestinationGuideURL is a invalid host ") + value ?? "");
+                {
+                    m_logger.LogError((tmp.IsValidHost ? "Could not resolve DestinationGuideURL" : "DestinationGuideURL is a invalid host ") + value ?? "");
+                }
             }
         }
 
@@ -753,9 +764,13 @@ namespace OpenSim.Framework
             {
                 OSHTTPURI tmp = new OSHTTPURI(value, true);
                 if (tmp.IsResolvedHost)
+                {
                     m_economyURL = tmp.URI;
+                }
                 else
-                    m_log.Error((tmp.IsValidHost ? "Could not resolve EconomyURL" : "EconomyURL is a invalid host ") + value ?? "");
+                {
+                    m_logger.LogError((tmp.IsValidHost ? "Could not resolve EconomyURL" : "EconomyURL is a invalid host ") + value ?? "");
+                }
             }
         }
     }

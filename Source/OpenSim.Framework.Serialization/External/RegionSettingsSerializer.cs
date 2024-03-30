@@ -25,13 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.IO;
 using System.Text;
 using System.Xml;
 using OpenMetaverse;
-using OpenSim.Framework;
-using log4net;
-using System.Reflection;
 
 namespace OpenSim.Framework.Serialization.External
 {

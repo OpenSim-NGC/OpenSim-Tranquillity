@@ -25,17 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Text;
 using System.Xml;
 using System.Xml.Schema;
 using System.Xml.Serialization;
-using log4net;
-using OpenMetaverse;
+
 using OpenMetaverse.StructuredData;
 
 namespace OpenSim.Framework
@@ -52,13 +45,12 @@ namespace OpenSim.Framework
     /// </remarks>
     public class DAMap : IXmlSerializable
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private static readonly int MIN_NAMESPACE_LENGTH = 4;
 
         private OSDMap m_map = new OSDMap();
 
         // WARNING: this is temporary for experimentation only, it will be removed!!!!
+        [Obsolete]
         public OSDMap TopLevelMap
         {
             get { return m_map; }

@@ -26,9 +26,9 @@
  */
 
 using OpenMetaverse;
-//using OpenSim.Framework.Console;
-using Nini.Config;
+
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework
 {
@@ -66,6 +66,8 @@ namespace OpenSim.Framework
         RegionStatus RegionStatus { get; set; }
 
         IConfiguration Config { get; }
+
+        ILogger Logger { get; }
 
         /// <summary>
         /// Are logins enabled on this simulator?

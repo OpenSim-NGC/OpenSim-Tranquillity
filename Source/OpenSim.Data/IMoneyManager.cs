@@ -27,7 +27,7 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Data.MySQL.MoneyData
+namespace OpenSim.Data
 {
     public interface IMoneyManager
     {
@@ -43,13 +43,13 @@ namespace OpenSim.Data.MySQL.MoneyData
 
         bool giveMoney(UUID transactionID, string receiverID, int amount);
 
-        bool addTransaction(TransactionData transaction);
+        bool addTransaction(MoneyTransactionData transaction);
 
         bool updateTransactionStatus(UUID transactionID, int status, string description);
 
-        TransactionData FetchTransaction(UUID transactionID);
+        MoneyTransactionData FetchTransaction(UUID transactionID);
 
-        TransactionData[] FetchTransaction(string userID, int startTime, int endTime, uint index, uint retNum);
+        MoneyTransactionData[] FetchTransaction(string userID, int startTime, int endTime, uint index, uint retNum);
 
         int getTransactionNum(string userID, int startTime, int endTime);
 

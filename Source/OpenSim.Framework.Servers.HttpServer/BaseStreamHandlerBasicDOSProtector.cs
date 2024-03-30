@@ -25,8 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework.Servers.HttpServer
 {
@@ -42,13 +41,13 @@ namespace OpenSim.Framework.Servers.HttpServer
         private readonly BasicDosProtectorOptions _options;
         private readonly BasicDOSProtector _dosProtector;
 
-        protected BaseStreamHandlerBasicDOSProtector(string httpMethod, string path, BasicDosProtectorOptions options) : this(httpMethod, path, null, null, options) {}
+        protected BaseStreamHandlerBasicDOSProtector(ILogger logger, string httpMethod, string path, BasicDosProtectorOptions options) : this(logger, httpMethod, path, null, null, options) {}
 
-        protected BaseStreamHandlerBasicDOSProtector(string httpMethod, string path, string name, string description, BasicDosProtectorOptions options)
+        protected BaseStreamHandlerBasicDOSProtector(ILogger logger, string httpMethod, string path, string name, string description, BasicDosProtectorOptions options)
             : base(httpMethod, path, name, description)
         {
             _options = options;
-            _dosProtector = new BasicDOSProtector(_options);
+            _dosProtector = new BasicDOSProtector(logger, _options);
         }
 
         public virtual byte[] Handle(

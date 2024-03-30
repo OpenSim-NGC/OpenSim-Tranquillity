@@ -25,22 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Net;
-using System.Reflection;
 using System.Text;
 using OSHttpServer;
-using log4net;
 using OpenMetaverse;
 
 namespace OpenSim.Framework.Servers.HttpServer
 {
     public class PollServiceHttpRequest
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         public readonly PollServiceEventArgs PollServiceArgs;
         public readonly IHttpRequest Request;
         public readonly int RequestTime;
@@ -198,14 +192,14 @@ namespace OpenSim.Framework.Servers.HttpServer
             }
             catch (Exception ex)
             {
-                if(ex is System.Net.Sockets.SocketException)
-                {
-                    // only mute connection reset by peer so we are not totally blind for now
-                    if(((System.Net.Sockets.SocketException)ex).SocketErrorCode != System.Net.Sockets.SocketError.ConnectionReset)
-                         m_log.Warn("[POLL SERVICE WORKER THREAD]: Error ", ex);
-                }
-                else
-                    m_log.Warn("[POLL SERVICE WORKER THREAD]: Error ", ex);
+                //if(ex is System.Net.Sockets.SocketException)
+                //{
+                //    // only mute connection reset by peer so we are not totally blind for now
+                //    if(((System.Net.Sockets.SocketException)ex).SocketErrorCode != System.Net.Sockets.SocketError.ConnectionReset)
+                //         m_log.Warn("[POLL SERVICE WORKER THREAD]: Error ", ex);
+                //}
+                //else
+                //    m_log.Warn("[POLL SERVICE WORKER THREAD]: Error ", ex);
             }
 
             PollServiceArgs.RequestsHandled++;

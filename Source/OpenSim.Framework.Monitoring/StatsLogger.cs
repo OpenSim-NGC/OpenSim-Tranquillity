@@ -25,13 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Text;
+using Microsoft.Extensions.Logging;
 using System.Timers;
-using log4net;
 
 namespace OpenSim.Framework.Monitoring
 {
@@ -40,11 +35,11 @@ namespace OpenSim.Framework.Monitoring
     /// </summary>
     public static class StatsLogger
     {
-        private static readonly ILog m_statsLog = LogManager.GetLogger("special.StatsLogger");
+        private const string loggerCategory = "special.StatsLogger";
 
         private static System.Timers.Timer m_loggingTimer;
         private static int m_statsLogIntervalMs = 5000;
-
+        
         public static void RegisterConsoleCommands(ICommandConsole console)
         {
             console.Commands.AddCommand(
@@ -130,8 +125,8 @@ namespace OpenSim.Framework.Monitoring
 
         private static void Log(object sender, ElapsedEventArgs e)
         {
-            foreach (string line in GetReport())
-                m_statsLog.Info(line);
+            foreach (string line in GetReport()) ;
+                //m_logger?.LogInformation(line);
 
             m_loggingTimer.Start();
         }

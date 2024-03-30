@@ -25,30 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Net;
-using System.Reflection;
-using System.Text;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
-using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
-using OpenSim.Framework.Monitoring;
-using OpenSim.Region.Framework;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.Framework.Scenes;
 
 namespace OpenSim.Region.Framework.Scenes
 {
     public class RegionStatsSimpleHandler : SimpleStreamHandler
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private string osXStatsURI = String.Empty;
         //private string osSecret = String.Empty;
         private OpenSim.Framework.RegionInfo regionInfo;

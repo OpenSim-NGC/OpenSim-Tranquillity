@@ -27,7 +27,6 @@
 
 using OpenSim.Framework;
 using OpenMetaverse;
-using log4net.Core;
 using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModule.SharedBase

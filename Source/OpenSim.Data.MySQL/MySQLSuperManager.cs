@@ -26,7 +26,7 @@
  */
 using System.Threading;
 
-namespace OpenSim.Data.MySQL.MoneyData
+namespace OpenSim.Data.MySQL
 {
     // This bit of code is from OpenSim.Data.MySQLSuperManager
     public class MySQLSuperManager

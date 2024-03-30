@@ -29,7 +29,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Source\OpenSim.Data.MySQL.MoneyData\OpenSim.Data.MySQL.MoneyData.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.OptionalModules.Currency\OpenSim.Region.OptionalModules.Currency.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
@@ -48,7 +47,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.1" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
   </ItemGroup>
 </Project>

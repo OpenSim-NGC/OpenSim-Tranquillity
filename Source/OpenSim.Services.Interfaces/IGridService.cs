@@ -25,17 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Net;
-using System.Net.Sockets;
-using System.Reflection;
 
 using OpenSim.Framework;
 using OpenMetaverse;
-
-using log4net;
 
 namespace OpenSim.Services.Interfaces
 {

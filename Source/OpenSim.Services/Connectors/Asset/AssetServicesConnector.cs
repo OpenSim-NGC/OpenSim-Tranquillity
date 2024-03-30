@@ -25,29 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System;
-using System.Threading;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
-using System.IO;
 using System.Reflection;
-using System.Timers;
-using Nini.Config;
 using OpenSim.Framework;
-using OpenSim.Framework.Monitoring;
-using OpenSim.Framework.ServiceAuth;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.Connectors
 {
     public class AssetServicesConnector : BaseServiceConnector, IAssetService
-    {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+    { 
         public readonly object ConnectorLock = new object();
+
+        private readonly ILogger _logger;
 
         protected IAssetCache m_Cache = null;
 
@@ -60,18 +51,16 @@ namespace OpenSim.Services.Connectors
 
         private Dictionary<string, List<AssetRetrievedEx>> m_AssetHandlers = new Dictionary<string, List<AssetRetrievedEx>>();
 
-        public AssetServicesConnector()
-        {
-        }
-
         public AssetServicesConnector(string serverURI)
         {
             OSHHTPHost tmp = new OSHHTPHost(serverURI, true);
             m_ServerURI = tmp.IsResolvedHost ? tmp.URI : null;
         }
 
-        public AssetServicesConnector(IConfiguration source) 
+        public AssetServicesConnector(IConfiguration source, ILogger<AssetServicesConnector> logger) 
         {
+            _logger = logger;
+
             Initialise(source);
         }
 
@@ -82,7 +71,7 @@ namespace OpenSim.Services.Connectors
             var assetConfig = source.GetSection("AssetService");
             if (!assetConfig.Exists())
             {
-                m_log.Error("[ASSET CONNECTOR]: AssetService missing from OpenSim.ini");
+                _logger.LogError("[ASSET CONNECTOR]: AssetService missing from OpenSim.ini");
                 throw new Exception("Asset connector init error");
             }
 
@@ -95,7 +84,7 @@ namespace OpenSim.Services.Connectors
             
             if (string.IsNullOrEmpty(m_ServerURI))
             {
-                m_log.Error("[ASSET CONNECTOR]: AssetServerURI not defined in section AssetService");
+                _logger.LogError("[ASSET CONNECTOR]: AssetServerURI not defined in section AssetService");
                 throw new Exception("Asset connector init error");
             }
 

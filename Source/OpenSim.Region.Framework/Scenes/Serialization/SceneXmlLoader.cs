@@ -25,16 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 using System.Xml;
 using OpenMetaverse;
-using log4net;
-using OpenSim.Framework;
-using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.PhysicsModule.SharedBase;
 
 namespace OpenSim.Region.Framework.Scenes.Serialization
 {
@@ -43,8 +36,6 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
     /// </summary>
     public class SceneXmlLoader
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         #region old xml format
         public static void LoadPrimsFromXml(Scene scene, string fileName, bool newIDS, Vector3 loadOffset)
         {

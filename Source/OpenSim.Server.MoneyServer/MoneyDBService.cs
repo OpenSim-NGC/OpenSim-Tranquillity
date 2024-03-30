@@ -207,7 +207,7 @@ namespace OpenSim.Server.MoneyServer
         }
 
 
-        public bool setTotalSale(TransactionData transaction)
+        public bool setTotalSale(MoneyTransactionData transaction)
         {
             if (transaction.Receiver == transaction.Sender) return false;
             if (transaction.Sender == UUID.Zero.ToString()) return false;
@@ -236,7 +236,7 @@ namespace OpenSim.Server.MoneyServer
         }
 
 
-        public bool addTransaction(TransactionData transaction)
+        public bool addTransaction(MoneyTransactionData transaction)
         {
             MySQLSuperManager dbm = GetLockedConnection();
 
@@ -264,7 +264,7 @@ namespace OpenSim.Server.MoneyServer
 
         public bool addUser(string userID, int balance, int status, int type)
         {
-            TransactionData transaction = new TransactionData();
+            MoneyTransactionData transaction = new MoneyTransactionData();
             transaction.TransUUID = UUID.Random();
             transaction.Sender = UUID.Zero.ToString();
             transaction.Receiver = userID;
@@ -389,7 +389,7 @@ namespace OpenSim.Server.MoneyServer
         }
 
 
-        public TransactionData FetchTransaction(UUID transactionID)
+        public MoneyTransactionData FetchTransaction(UUID transactionID)
         {
             MySQLSuperManager dbm = GetLockedConnection();
 
@@ -415,10 +415,10 @@ namespace OpenSim.Server.MoneyServer
         }
 
 
-        public TransactionData FetchTransaction(string userID, int startTime, int endTime, int lastIndex)
+        public MoneyTransactionData FetchTransaction(string userID, int startTime, int endTime, int lastIndex)
         {
             MySQLSuperManager dbm = GetLockedConnection();
-            TransactionData[] arrTransaction;
+            MoneyTransactionData[] arrTransaction;
 
             uint index = 0;
             if (lastIndex >= 0) index = Convert.ToUInt32(lastIndex) + 1;
@@ -459,7 +459,7 @@ namespace OpenSim.Server.MoneyServer
         {
             bool do_trans = false;
 
-            TransactionData transaction = new TransactionData();
+            MoneyTransactionData transaction = new MoneyTransactionData();
             transaction = FetchTransaction(transactionUUID);
 
             if (transaction != null && transaction.Status == (int)Status.PENDING_STATUS)
@@ -528,7 +528,7 @@ namespace OpenSim.Server.MoneyServer
         // by Fumi.Iseki
         public bool DoAddMoney(UUID transactionUUID)
         {
-            TransactionData transaction = new TransactionData();
+            MoneyTransactionData transaction = new MoneyTransactionData();
             transaction = FetchTransaction(transactionUUID);
 
             if (transaction != null && transaction.Status == (int)Status.PENDING_STATUS)

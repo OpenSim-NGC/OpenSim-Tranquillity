@@ -25,18 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
-using System.Reflection;
 using System.Xml;
-using log4net;
+
 using OpenMetaverse;
 
 namespace OpenSim.Region.Framework.Scenes.Animation
 {
     public class DefaultAvatarAnimations
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         public static readonly string DefaultAnimationsPath = "data/avataranimations.xml";
 
         public static Dictionary<string, UUID> AnimsUUIDbyName = new Dictionary<string, UUID>();

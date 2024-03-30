@@ -25,13 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
-using System.Reflection;
-using System.Threading;
-using log4net;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
@@ -49,25 +45,28 @@ namespace OpenSim.Framework.Capabilities
 
     public class Caps : IDisposable
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger _logger;
 
-        private readonly string m_httpListenerHostName;
-        private readonly uint m_httpListenPort;
+        private  string m_httpListenerHostName;
+        private  uint m_httpListenPort;
 
         /// <summary>
         /// This is the uuid portion of every CAPS path.  It is used to make capability urls private to the requester.
         /// </summary>
-        private readonly string m_capsObjectPath;
+        private  string m_capsObjectPath;
+
+        private CapsHandlers m_capsHandlers;
+        
+        private ConcurrentDictionary<string, PollServiceEventArgs> m_pollServiceHandlers = new();
+        private Dictionary<string, string> m_externalCapsHandlers = new();
+
+        private IHttpServer m_httpListener;
+        private UUID m_agentID;
+        private string m_regionName;
+        private ManualResetEvent m_capsActive = new(false);
+
         public string CapsObjectPath { get { return m_capsObjectPath; } }
 
-        private readonly CapsHandlers m_capsHandlers;
-        private readonly ConcurrentDictionary<string, PollServiceEventArgs> m_pollServiceHandlers = new ();
-        private readonly Dictionary<string, string> m_externalCapsHandlers = new ();
-
-        private readonly IHttpServer m_httpListener;
-        private readonly UUID m_agentID;
-        private readonly string m_regionName;
-        private ManualResetEvent m_capsActive = new(false);
 
         public UUID AgentID
         {
@@ -127,8 +126,19 @@ namespace OpenSim.Framework.Capabilities
 
         public CapsFlags Flags { get; set;}
 
-        public Caps(IHttpServer httpServer, string httpListen, uint httpPort, string capsPath,
-                    UUID agent, string regionName)
+        // Construct using DI or Resolve on container
+        public Caps(ILogger<Caps> logger)
+        {
+            _logger = logger;
+        }
+
+        public void Initialize(
+            IHttpServer httpServer, 
+            string httpListen, 
+            uint httpPort, 
+            string capsPath,  
+            UUID agent, 
+            string regionName)
         {
             m_capsObjectPath = capsPath;
             m_httpListener = httpServer;
@@ -195,11 +205,12 @@ namespace OpenSim.Framework.Capabilities
             //    "[CAPS]: Registering handler with name {0}, url {1} for {2}",
             //    capName, pollServiceHandler.Url, m_agentID, m_regionName);
 
-            if(!m_pollServiceHandlers.TryAdd(capName, pollServiceHandler))
+            if (m_pollServiceHandlers.TryAdd(capName, pollServiceHandler) is false)
             {
-                m_log.ErrorFormat(
-                    "[CAPS]: Handler with name {0} already registered (ulr {1}, agent {2}, region {3}",
-                    capName, pollServiceHandler.Url, m_agentID, m_regionName);
+                _logger.LogError(
+                    $"[CAPS]: Handler with name {capName} already registered " +
+                    $"(ulr {pollServiceHandler.Url}, agent {m_agentID}, region {m_regionName}");
+
                 return;
             }
 

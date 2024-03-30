@@ -26,8 +26,8 @@
  */
 
 using System.Net;
+using Microsoft.Extensions.Logging;
 using Nwc.XmlRpc;
-using OpenSim.Framework;
 
 
 namespace OpenSim.Framework.Servers.HttpServer
@@ -40,13 +40,13 @@ namespace OpenSim.Framework.Servers.HttpServer
         private readonly BasicDosProtectorOptions _options;
         private readonly BasicDOSProtector _dosProtector;
 
-        public XmlRpcBasicDOSProtector(XmlRpcMethod normalMethod, XmlRpcMethod throttledMethod,BasicDosProtectorOptions options)
+        public XmlRpcBasicDOSProtector(ILogger logger, XmlRpcMethod normalMethod, XmlRpcMethod throttledMethod,BasicDosProtectorOptions options)
         {
             _normalMethod = normalMethod;
             _throttledMethod = throttledMethod;
 
             _options = options;
-            _dosProtector = new BasicDOSProtector(_options);
+            _dosProtector = new BasicDOSProtector(logger, _options);
 
         }
         public XmlRpcResponse Process(XmlRpcRequest request, IPEndPoint client)

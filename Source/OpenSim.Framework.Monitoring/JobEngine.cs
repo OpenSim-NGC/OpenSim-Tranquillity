@@ -25,19 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Reflection;
-using System.Threading;
-using log4net;
-using OpenSim.Framework;
 
 namespace OpenSim.Framework.Monitoring
 {
     public class JobEngine
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         public int LogLevel { get; set; }
 
         private object JobLock = new object();
@@ -71,11 +66,14 @@ namespace OpenSim.Framework.Monitoring
 
         private int m_timeout = -1;
         private int m_concurrency = 1;
-
         private int m_numberThreads = 0;
+
+//        private readonly ILogger<JobEngine> m_logger;
 
         public JobEngine(string name, string loggingName, int timeout = -1, int concurrency = 1)
         {
+//            m_logger = logger;
+
             Name = name;
             LoggingName = loggingName;
             m_timeout = timeout;
@@ -104,7 +102,7 @@ namespace OpenSim.Framework.Monitoring
                     if (!IsRunning)
                         return;
 
-                    m_log.DebugFormat("[JobEngine] Stopping {0}", Name);
+//                    m_logger.LogDebug($"[JobEngine] Stopping {Name}");
 
                     IsRunning = false;
                     if(m_numberThreads > 0)
@@ -207,10 +205,7 @@ namespace OpenSim.Framework.Monitoring
             {
                 if (m_warnOverMaxQueue)
                 {
-                    m_log.WarnFormat(
-                        "[{0}]: Job queue at maximum capacity, not recording job from {1} in {2}",
-                        LoggingName, job.Name, Name);
-
+//                    m_logger.LogWarning($"[{LoggingName}]: Job queue at maximum capacity, not recording job from {job.Name} in {Name}");
                     m_warnOverMaxQueue = false;
                 }
                 return false;
@@ -240,8 +235,10 @@ namespace OpenSim.Framework.Monitoring
                     break;
                 }
 
-                if(LogLevel >= 1)
-                    m_log.DebugFormat("[{0}]: Processing job {1}",LoggingName,currentJob.Name);
+                if (LogLevel >= 1)
+                {
+//                    m_logger.LogDebug($"[{LoggingName}]: Processing job {currentJob.Name}");
+                }
 
                 try
                 {
@@ -249,18 +246,22 @@ namespace OpenSim.Framework.Monitoring
                 }
                 catch(Exception e)
                 {
-                    m_log.ErrorFormat(
-                        "[{0}]: Job {1} failed, continuing.  Exception {2}",LoggingName, currentJob.Name, e);
+//                    m_logger.LogError(e, $"[{LoggingName}]: Job {currentJob.Name} failed, continuing.");
                 }
 
-                if(LogLevel >= 1)
-                    m_log.DebugFormat("[{0}]: Processed job {1}",LoggingName,currentJob.Name);
+                if (LogLevel >= 1)
+                {
+//                    m_logger.LogDebug($"[{LoggingName}]: Processed job {currentJob.Name}");
+                }
 
                 currentJob.Action = null;
                 currentJob = null;
             }
+
             lock (JobLock)
+            {
                 --m_numberThreads;
+            }
         }
 
         public class Job

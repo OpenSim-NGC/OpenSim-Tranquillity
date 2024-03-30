@@ -32,11 +32,6 @@
 
 // terrain patchs must be 16mx16m
 
-using System;
-using System.Collections.Generic;
-
-using log4net;
-
 using OpenSim.Framework;
 
 using OpenMetaverse;

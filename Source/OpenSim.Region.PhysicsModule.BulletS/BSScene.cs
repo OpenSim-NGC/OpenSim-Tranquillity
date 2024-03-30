@@ -35,7 +35,6 @@ using OpenSim.Region.PhysicsModule.SharedBase;
 using OpenMetaverse;
 
 using Microsoft.Extensions.Configuration;
-using log4net.Core;
 using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModule.BulletS
@@ -418,20 +417,20 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             }
         }
 
-        // A helper function that handles a true/false parameter and returns the proper float number encoding
-        float ParamBoolean(IConfig config, string parmName, float deflt)
-        {
-            float ret = deflt;
-            if (config.Contains(parmName))
-            {
-                ret = ConfigurationParameters.numericFalse;
-                if (config.GetBoolean(parmName, false))
-                {
-                    ret = ConfigurationParameters.numericTrue;
-                }
-            }
-            return ret;
-        }
+        //// A helper function that handles a true/false parameter and returns the proper float number encoding
+        //float ParamBoolean(IConfig config, string parmName, float deflt)
+        //{
+        //    float ret = deflt;
+        //    if (config.Contains(parmName))
+        //    {
+        //        ret = ConfigurationParameters.numericFalse;
+        //        if (config.GetBoolean(parmName, false))
+        //        {
+        //            ret = ConfigurationParameters.numericTrue;
+        //        }
+        //    }
+        //    return ret;
+        //}
 
         // Select the connection to the actual Bullet implementation.
         // The main engine selection is the engineName up to the first hypen.

@@ -25,28 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Text;
 using System.Xml;
-using System.IO;
-using System.Collections.Generic;
 using System.Collections;
 using System.Reflection;
-using System.Threading;
 using OpenMetaverse;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.Framework.Scenes.Scripting;
-using OpenSim.Region.Framework.Scenes.Serialization;
+
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.Framework.Scenes
 {
     public class SceneObjectPartInventory : IEntityInventory , IDisposable
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private byte[] m_inventoryFileData = Array.Empty<byte>();
         private byte[] m_inventoryFileNameBytes = Array.Empty<byte>();
         private string m_inventoryFileName = "";

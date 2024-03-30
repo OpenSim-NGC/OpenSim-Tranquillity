@@ -39,8 +39,6 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="8.0.0" />
-    <PackageReference Include="log4net" Version="2.0.15" />
-    <PackageReference Include="RawScape.Nini" Version="1.0.0" />
     <PackageReference Include="NDesk.Options.Core" Version="1.2.6" />
   </ItemGroup>
 </Project>

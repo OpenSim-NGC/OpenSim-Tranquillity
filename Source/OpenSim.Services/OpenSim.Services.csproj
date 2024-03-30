@@ -49,6 +49,7 @@
       <Compile Remove="LLLoginService/**"/>    
       <Compile Remove="PresenceService/**"/>
       <Compile Remove="SimulationService/**"/>
+	  <Compile Remove="Connectors/**"/>
   </ItemGroup>
 
 </Project>

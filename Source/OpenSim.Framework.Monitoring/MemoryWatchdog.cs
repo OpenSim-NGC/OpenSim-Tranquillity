@@ -25,13 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Threading;
-using log4net;
-
 namespace OpenSim.Framework.Monitoring
 {
     /// <summary>
@@ -39,8 +32,6 @@ namespace OpenSim.Framework.Monitoring
     /// </summary>
     public static class MemoryWatchdog
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         /// <summary>
         /// Is this watchdog active?
         /// </summary>

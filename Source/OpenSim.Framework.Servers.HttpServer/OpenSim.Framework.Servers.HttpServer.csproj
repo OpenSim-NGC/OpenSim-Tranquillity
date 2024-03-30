@@ -8,8 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="8.0.0" />
-    <PackageReference Include="log4net" Version="2.0.15" />
-    <PackageReference Include="RawScape.Nini" Version="1.0.0" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="OpenMetaverse.StructuredData">
@@ -28,6 +26,5 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Framework.Monitoring\OpenSim.Framework.Monitoring.csproj" />
-    <ProjectReference Include="..\..\ThirdParty\SmartThreadPool\SmartThreadPool.csproj" />
   </ItemGroup>
 </Project>

@@ -25,11 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
-using System.Reflection;
 using System.Text;
-using log4net;
 
 namespace OpenSim.Framework.Serialization
 {
@@ -38,8 +34,6 @@ namespace OpenSim.Framework.Serialization
     /// </summary>
     public class TarArchiveReader
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         public enum TarEntryType
         {
             TYPE_UNKNOWN = 0,

@@ -27,9 +27,9 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Data.MySQL.MoneyData
+namespace OpenSim.Data
 {
-    public class TransactionData
+    public class MoneyTransactionData
     {
         UUID m_uuid;
         string m_sender = string.Empty;
@@ -50,7 +50,7 @@ namespace OpenSim.Data.MySQL.MoneyData
         string m_description = string.Empty;
 
         /*
-                public TransactionData(string uuid, string sender, string receiver,
+                public MoneyTransactionData(string uuid, string sender, string receiver,
                     int amount, int time, int status, string description)
                 {
                     this.m_uuid = uuid;

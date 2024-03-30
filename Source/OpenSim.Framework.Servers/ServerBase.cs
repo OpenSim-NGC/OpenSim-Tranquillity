@@ -26,14 +26,9 @@
  */
 
 using System.Diagnostics;
-using System.Reflection;
 using System.Runtime;
 using System.Text;
 using System.Text.RegularExpressions;
-using log4net;
-using log4net.Appender;
-using log4net.Core;
-using log4net.Repository;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenSim.Framework.Console;
@@ -54,10 +49,6 @@ namespace OpenSim.Framework.Servers
         /// </summary>
         protected ICommandConsole m_console;
         public ICommandConsole Console { get => m_console; set => m_console = value; }
-
-        protected OpenSimAppender m_consoleAppender;
-        protected FileAppender m_logFileAppender;
-        protected FileAppender m_statsLogFileAppender;
 
         protected DateTime m_startuptime;
         protected string m_startupDirectory = Environment.CurrentDirectory;
@@ -114,14 +105,6 @@ namespace OpenSim.Framework.Servers
 
             m_console.Commands.AddCommand(
                 "General", false, "show uptime", "show uptime", "Show server uptime", HandleShow);
-
-            m_console.Commands.AddCommand(
-                "General", false, "get log level", "get log level", "Get the current console logging level",
-                (mod, cmd) => ShowLogLevel());
-
-            m_console.Commands.AddCommand(
-                "General", false, "set log level", "set log level <level>",
-                "Set the console logging level for this session.", HandleSetLogLevel);
 
             m_console.Commands.AddCommand(
                 "General", false, "config get",
@@ -484,45 +467,6 @@ namespace OpenSim.Framework.Servers
             }
         }
 
-        private void HandleSetLogLevel(string module, string[] cmd)
-        {
-            if (cmd.Length != 4)
-            {
-                Notice("Usage: set log level <level>");
-                return;
-            }
-
-            if (null == m_consoleAppender)
-            {
-                Notice("No appender named Console found (see the log4net config file for this executable)!");
-                return;
-            }
-
-            string rawLevel = cmd[3];
-
-            ILoggerRepository repository = LogManager.GetRepository();
-            Level consoleLevel = repository.LevelMap[rawLevel];
-
-            if (consoleLevel != null)
-                m_consoleAppender.Threshold = consoleLevel;
-            else
-                Notice(
-                    "{0} is not a valid logging level.  Valid logging levels are ALL, DEBUG, INFO, WARN, ERROR, FATAL, OFF",
-                    rawLevel);
-
-            ShowLogLevel();
-        }
-
-        private void ShowLogLevel()
-        {
-            if (null == m_consoleAppender)
-            {
-                Notice("No appender named Console found (see the log4net config file for this executable)!");
-                return;
-            }
-            Notice("Console log level is {0}", m_consoleAppender.Threshold);
-        }
-
         protected virtual void HandleScript(string module, string[] parms)
         {
             if (parms.Length != 2)
@@ -583,8 +527,6 @@ namespace OpenSim.Framework.Servers
         {
             Notice(GetVersionText());
             Notice("Startup directory: " + m_startupDirectory);
-            if (null != m_consoleAppender)
-                Notice(String.Format("Console log level: {0}", m_consoleAppender.Threshold));
         }
 
         /// <summary>

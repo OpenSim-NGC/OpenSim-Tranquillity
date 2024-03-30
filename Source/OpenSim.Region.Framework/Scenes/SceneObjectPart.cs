@@ -30,7 +30,6 @@ using System.Reflection;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
 using OpenSim.Framework;
@@ -108,8 +107,6 @@ namespace OpenSim.Region.Framework.Scenes
         private const scriptEvents PhyscicsVolumeDtcSubsEvents = (
                     scriptEvents.collision_start | scriptEvents.collision_end
                     );
-
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         /// <summary>
         /// Dynamic attributes can be created and deleted as required.

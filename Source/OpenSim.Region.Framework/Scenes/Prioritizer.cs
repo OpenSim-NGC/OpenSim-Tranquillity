@@ -25,10 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using log4net;
-using Nini.Config;
 using OpenSim.Framework;
 using OpenMetaverse;
 using OpenSim.Region.PhysicsModule.SharedBase;
@@ -43,8 +39,6 @@ namespace OpenSim.Region.Framework.Scenes
 
     public class Prioritizer
     {
-        private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
-
         private Scene m_scene;
 
         public Prioritizer(Scene scene)
@@ -60,7 +54,6 @@ namespace OpenSim.Region.Framework.Scenes
             // If entity is null we have a serious problem
             if (entity == null)
             {
-                m_log.WarnFormat("[PRIORITIZER] attempt to prioritize null entity");
                 throw new InvalidOperationException("Prioritization entity not defined");
             }
 

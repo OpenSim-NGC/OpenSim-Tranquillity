@@ -37,11 +37,11 @@ namespace OpenSim.Framework.Tests
             // 256000
             Location TestLocation1 = new Location(1099511628032000);
             Location TestLocation2 = new Location(1099511628032000);
-            Assert.True(TestLocation1 == TestLocation2);
+            Assert.That(TestLocation1 == TestLocation2);
 
             TestLocation1 = new Location(1099511628032001);
             TestLocation2 = new Location(1099511628032000);
-            Assert.True(TestLocation1 != TestLocation2);
+            Assert.That(TestLocation1 != TestLocation2);
         }
 
         [Test]
@@ -49,36 +49,36 @@ namespace OpenSim.Framework.Tests
         {
             Location TestLocation1 = new Location(255000,256000);
             Location TestLocation2 = new Location(1095216660736000);
-            Assert.True(TestLocation1 == TestLocation2);
+            Assert.That(TestLocation1 == TestLocation2);
 
-            Assert.True(TestLocation1.X == 255000 && TestLocation1.Y == 256000, "Test xy location doesn't match position in the constructor");
-            Assert.True(TestLocation2.X == 255000 && TestLocation2.Y == 256000, "Test xy location doesn't match regionhandle provided");
+            Assert.That(TestLocation1.X == 255000 && TestLocation1.Y == 256000, "Test xy location doesn't match position in the constructor");
+            Assert.That(TestLocation2.X == 255000 && TestLocation2.Y == 256000, "Test xy location doesn't match regionhandle provided");
 
-            Assert.True(TestLocation2.RegionHandle == 1095216660736000,
+            Assert.That(TestLocation2.RegionHandle == 1095216660736000,
                         "Location RegionHandle Property didn't match regionhandle provided in constructor");
 
             ulong RegionHandle = TestLocation1.RegionHandle;
-            Assert.True(RegionHandle.Equals(1095216660736000), "Equals(regionhandle) failed to match the position in the constructor");
+            Assert.That(RegionHandle.Equals(1095216660736000), "Equals(regionhandle) failed to match the position in the constructor");
 
             TestLocation2 = new Location(RegionHandle);
-            Assert.True(TestLocation2.Equals(255000, 256000), "Decoded regionhandle failed to match the original position in the constructor");
+            Assert.That(TestLocation2.Equals(255000, 256000), "Decoded regionhandle failed to match the original position in the constructor");
 
 
             TestLocation1 = new Location(255001, 256001);
             TestLocation2 = new Location(1095216660736000);
-            Assert.True(TestLocation1 != TestLocation2);
+            Assert.That(TestLocation1 != TestLocation2);
 
-            Assert.True(TestLocation1.Equals(255001, 256001), "Equals(x,y) failed to match the position in the constructor");
+            Assert.That(TestLocation1.Equals(255001, 256001), "Equals(x,y) failed to match the position in the constructor");
 
-            Assert.True(TestLocation2.GetHashCode() == (TestLocation2.X.GetHashCode() ^ TestLocation2.Y.GetHashCode()), "GetHashCode failed to produce the expected hashcode");
+            Assert.That(TestLocation2.GetHashCode() == (TestLocation2.X.GetHashCode() ^ TestLocation2.Y.GetHashCode()), "GetHashCode failed to produce the expected hashcode");
 
             Location TestLocation3;
             object cln = TestLocation2.Clone();
             TestLocation3 = (Location) cln;
-            Assert.True(TestLocation3.X == TestLocation2.X && TestLocation3.Y == TestLocation2.Y,
+            Assert.That(TestLocation3.X == TestLocation2.X && TestLocation3.Y == TestLocation2.Y,
                         "Cloned Location values do not match");
 
-            Assert.True(TestLocation2.Equals(cln), "Cloned object failed .Equals(obj) Test");
+            Assert.That(TestLocation2.Equals(cln), "Cloned object failed .Equals(obj) Test");
         }
 
     }

@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using OpenMetaverse;
 
@@ -75,6 +74,7 @@ namespace OpenSim.Framework
                     }
                 }
             }
+
             return new AuthenticateResponse();
         }
 

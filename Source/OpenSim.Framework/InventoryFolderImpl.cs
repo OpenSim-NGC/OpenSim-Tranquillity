@@ -25,18 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using log4net;
 using OpenMetaverse;
 
 namespace OpenSim.Framework
 {
     public class InventoryFolderImpl : InventoryFolderBase
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         public static readonly string PATH_DELIMITER = "/";
 
         /// <summary>
@@ -385,8 +379,6 @@ namespace OpenSim.Framework
                     itemList.Add(item);
                 }
             }
-
-            //m_log.DebugFormat("[INVENTORY FOLDER IMPL]: Found {0} items", itemList.Count);
 
             return itemList;
         }

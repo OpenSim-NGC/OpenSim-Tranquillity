@@ -25,18 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Threading;
 using OpenMetaverse;
-using log4net;
-using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Client;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes.Animation;
-using OpenSim.Region.Framework.Scenes.Types;
 using OpenSim.Region.PhysicsModule.SharedBase;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Services.Interfaces;
@@ -83,16 +77,10 @@ namespace OpenSim.Region.Framework.Scenes
 
     public class ScenePresence : EntityBase, IScenePresence, IDisposable
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        //~ScenePresence()
-        //{
-        //    m_log.DebugFormat("[SCENE PRESENCE]: Destructor called on {0}", Name);
-        //}
-
         public bool GotAttachmentsData = false;
         public int EnvironmentVersion = -1;
         private ViewerEnvironment m_environment = null;
+
         public ViewerEnvironment Environment
         {
             get

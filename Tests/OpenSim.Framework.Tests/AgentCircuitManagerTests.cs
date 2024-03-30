@@ -113,19 +113,19 @@ namespace OpenSim.Framework.Tests
             agentCircuitManager.AddNewCircuit(circuitcode2, m_agentCircuitData2);
             AgentCircuitData agent = agentCircuitManager.GetAgentCircuitData(circuitcode1);
 
-            Assert.True((m_agentCircuitData1.AgentID == agent.AgentID));
-            Assert.True((m_agentCircuitData1.BaseFolder == agent.BaseFolder));
+            Assert.That(m_agentCircuitData1.AgentID, Is.EqualTo(agent.AgentID));
+            Assert.That(m_agentCircuitData1.BaseFolder, Is.EqualTo(agent.BaseFolder));
 
-            Assert.True((m_agentCircuitData1.CapsPath == agent.CapsPath));
-            Assert.True((m_agentCircuitData1.child == agent.child));
-            Assert.True((m_agentCircuitData1.ChildrenCapSeeds.Count == agent.ChildrenCapSeeds.Count));
-            Assert.True((m_agentCircuitData1.circuitcode == agent.circuitcode));
-            Assert.True((m_agentCircuitData1.firstname == agent.firstname));
-            Assert.True((m_agentCircuitData1.InventoryFolder == agent.InventoryFolder));
-            Assert.True((m_agentCircuitData1.lastname == agent.lastname));
-            Assert.True((m_agentCircuitData1.SecureSessionID == agent.SecureSessionID));
-            Assert.True((m_agentCircuitData1.SessionID == agent.SessionID));
-            Assert.True((m_agentCircuitData1.startpos == agent.startpos));
+            Assert.That(m_agentCircuitData1.CapsPath, Is.EqualTo(agent.CapsPath));
+            Assert.That(m_agentCircuitData1.child, Is.EqualTo(agent.child));
+            Assert.That(m_agentCircuitData1.ChildrenCapSeeds, Is.EqualTo(agent.ChildrenCapSeeds));
+            Assert.That(m_agentCircuitData1.circuitcode, Is.EqualTo(agent.circuitcode));
+            Assert.That(m_agentCircuitData1.firstname, Is.EqualTo(agent.firstname));
+            Assert.That(m_agentCircuitData1.InventoryFolder, Is.EqualTo(agent.InventoryFolder));
+            Assert.That(m_agentCircuitData1.lastname, Is.EqualTo(agent.lastname));
+            Assert.That(m_agentCircuitData1.SecureSessionID, Is.EqualTo(agent.SecureSessionID));
+            Assert.That(m_agentCircuitData1.SessionID, Is.EqualTo(agent.SessionID));
+            Assert.That(m_agentCircuitData1.startpos, Is.EqualTo(agent.startpos));
         }
 
         /// <summary>
@@ -135,12 +135,13 @@ namespace OpenSim.Framework.Tests
         public void RemoveAgentCircuitTest()
         {
             AgentCircuitManager agentCircuitManager = new AgentCircuitManager();
+
             agentCircuitManager.AddNewCircuit(circuitcode1, m_agentCircuitData1);
             agentCircuitManager.AddNewCircuit(circuitcode2, m_agentCircuitData2);
             agentCircuitManager.RemoveCircuit(circuitcode2);
 
             AgentCircuitData agent = agentCircuitManager.GetAgentCircuitData(circuitcode2);
-            Assert.True(agent == null);
+            Assert.That(agent, Is.EqualTo(null));
 
         }
 
@@ -160,9 +161,9 @@ namespace OpenSim.Framework.Tests
             AgentCircuitData agent = agentCircuitManager.GetAgentCircuitData(393930);
             AgentCircuitData agent2 = agentCircuitManager.GetAgentCircuitData(circuitcode1);
 
-            Assert.True(agent != null);
-            Assert.True(agent2 == null);
-            Assert.True(result);
+            Assert.That(agent != null);
+            Assert.That(agent2 == null);
+            Assert.That(result);
 
         }
 
@@ -180,25 +181,25 @@ namespace OpenSim.Framework.Tests
 
             // should be authorized
             AuthenticateResponse resp = agentCircuitManager.AuthenticateSession(SessionId1, AgentId1, circuitcode1);
-            Assert.True(resp.Authorised);
+            Assert.That(resp.Authorised);
 
             //should not be authorized
             resp = agentCircuitManager.AuthenticateSession(SessionId1, UUID.Random(), circuitcode1);
-            Assert.True(!resp.Authorised);
+            Assert.That(!resp.Authorised);
 
             resp = agentCircuitManager.AuthenticateSession(UUID.Random(), AgentId1, circuitcode1);
-            Assert.True(!resp.Authorised);
+            Assert.That(!resp.Authorised);
 
             resp = agentCircuitManager.AuthenticateSession(SessionId1, AgentId1, circuitcode2);
-            Assert.True(!resp.Authorised);
+            Assert.That(!resp.Authorised);
 
             resp = agentCircuitManager.AuthenticateSession(SessionId2, AgentId1, circuitcode2);
-            Assert.True(!resp.Authorised);
+            Assert.That(!resp.Authorised);
 
             agentCircuitManager.RemoveCircuit(circuitcode2);
 
             resp = agentCircuitManager.AuthenticateSession(SessionId2, AgentId2, circuitcode2);
-            Assert.True(!resp.Authorised);
+            Assert.That(!resp.Authorised);
         }
     }
 }

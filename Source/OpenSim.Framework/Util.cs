@@ -25,38 +25,32 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
-using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
-using System.Threading;
-using log4net;
-using log4net.Appender;
-using Nini.Config;
+
 using Nwc.XmlRpc;
+using Amib.Threading;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using Amib.Threading;
-using System.Collections.Concurrent;
-using System.Net.Http;
+
 using Microsoft.Extensions.Configuration;
+
 
 namespace OpenSim.Framework
 {
@@ -141,8 +135,6 @@ namespace OpenSim.Framework
     /// </summary>
     public static class Util
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         /// <summary>
         /// Log-level for the thread pool:
         /// 0 = no logging
@@ -164,7 +156,7 @@ namespace OpenSim.Framework
             LogOverloads = true;
             TimeStampClockPeriod = 1.0D / (double)Stopwatch.Frequency;
             TimeStampClockPeriodMS = 1e3 * TimeStampClockPeriod;
-            m_log.Info($"[UTIL] TimeStamp clock with period of {Math.Round(TimeStampClockPeriodMS, 6, MidpointRounding.AwayFromZero)}ms");
+//            m_log.Info($"[UTIL] TimeStamp clock with period of {Math.Round(TimeStampClockPeriodMS, 6, MidpointRounding.AwayFromZero)}ms");
         }
 
         private static uint nextXferID = 5000;
@@ -1097,11 +1089,11 @@ namespace OpenSim.Framework
             else
                 nativeLibraryPath = Path.Combine(Path.Combine(path, "lib32"), libraryName);
 
-            m_log.Debug($"[UTIL]: Loading native Windows library at {nativeLibraryPath}");
+            // m_log.Debug($"[UTIL]: Loading native Windows library at {nativeLibraryPath}");
 
             if (!NativeLibrary.TryLoad(nativeLibraryPath, out _))
             {
-                m_log.Error($"[UTIL]: Couldn't find native Windows library at {nativeLibraryPath}");
+                // m_log.Error($"[UTIL]: Couldn't find native Windows library at {nativeLibraryPath}");
                 return false;
             }
             return true;
@@ -1762,37 +1754,37 @@ namespace OpenSim.Framework
             return ".";
         }
 
-        public static string logFile()
-        {
-            foreach (IAppender appender in LogManager.GetRepository().GetAppenders())
-            {
-                if (appender is FileAppender appender1 && appender1.Name == "LogFileAppender")
-                {
-                    return appender1.File;
-                }
-            }
+        //public static string logFile()
+        //{
+        //    foreach (IAppender appender in LogManager.GetRepository().GetAppenders())
+        //    {
+        //        if (appender is FileAppender appender1 && appender1.Name == "LogFileAppender")
+        //        {
+        //            return appender1.File;
+        //        }
+        //    }
 
-            return "./OpenSim.log";
-        }
+        //    return "./OpenSim.log";
+        //}
 
-        public static string StatsLogFile()
-        {
-            foreach (IAppender appender in LogManager.GetRepository().GetAppenders())
-            {
-                if (appender is FileAppender appender1 && appender1.Name == "StatsLogFileAppender")
-                {
-                    return appender1.File;
-                }
-            }
+        //public static string StatsLogFile()
+        //{
+        //    foreach (IAppender appender in LogManager.GetRepository().GetAppenders())
+        //    {
+        //        if (appender is FileAppender appender1 && appender1.Name == "StatsLogFileAppender")
+        //        {
+        //            return appender1.File;
+        //        }
+        //    }
 
-            return "./OpenSimStats.log";
-        }
+        //    return "./OpenSimStats.log";
+        //}
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static string logDir()
-        {
-            return Path.GetDirectoryName(logFile());
-        }
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //public static string logDir()
+        //{
+        //    return Path.GetDirectoryName(logFile());
+        //}
 
         // From: http://coercedcode.blogspot.com/2008/03/c-generate-unique-filenames-within.html
         public static string GetUniqueFilename(string FileName)
@@ -1915,8 +1907,8 @@ namespace OpenSim.Framework
                     val = cnf.GetValue<float>(varname, (float)val);
                 else if (typeof(T) == typeof(double))
                     val = cnf.GetValue<double>(varname, (double)val);
-                else
-                    m_log.ErrorFormat($"[UTIL]: Unhandled type {typeof(T)}");
+                //else
+                //    m_log.ErrorFormat($"[UTIL]: Unhandled type {typeof(T)}");
             }
 
             return (T)val;
@@ -2477,13 +2469,13 @@ namespace OpenSim.Framework
                 else
                 {
                     // uh?
-                    m_log.Debug($"[UTILS]: Got OSD of unexpected type {buffer.Type}");
+                    //m_log.Debug($"[UTILS]: Got OSD of unexpected type {buffer.Type}");
                     return null;
                 }
             }
             catch (Exception ex)
             {
-                m_log.Debug($"[UTILS]: exception on GetOSDMap {ex.Message}");
+                //m_log.Debug($"[UTILS]: exception on GetOSDMap {ex.Message}");
                 return null;
             }
         }
@@ -2892,23 +2884,19 @@ namespace OpenSim.Framework
             if (minThreads > maxThreads || minThreads < 2)
                 throw new ArgumentOutOfRangeException(nameof(minThreads), "minThreads must be greater than 2 and less than or equal to maxThreads");
 
-            if (m_ThreadPool != null)
+            if (m_ThreadPool is null)
             {
-                m_log.Warn("SmartThreadPool is already initialized.  Ignoring request.");
-                return;
+                STPStartInfo startInfo = new()
+                {
+                    ThreadPoolName = "Util",
+                    IdleTimeout = 20000,
+                    MaxWorkerThreads = maxThreads,
+                    MinWorkerThreads = minThreads,
+                };
+
+                m_ThreadPool = new SmartThreadPool(startInfo);
+                m_threadPoolWatchdog = new Timer(ThreadPoolWatchdog, null, 0, 1000);
             }
-
-            STPStartInfo startInfo = new()
-            {
-                ThreadPoolName = "Util",
-                IdleTimeout = 20000,
-                MaxWorkerThreads = maxThreads,
-                MinWorkerThreads = minThreads,
-                SuppressFlow = true
-            };
-
-            m_ThreadPool = new SmartThreadPool(startInfo);
-            m_threadPoolWatchdog = new Timer(ThreadPoolWatchdog, null, 0, 1000);
         }
 
         public static int FireAndForgetCount()
@@ -3030,7 +3018,7 @@ namespace OpenSim.Framework
                 ThreadInfo t = entry.Value;
                 if (t.DoTimeout && t.Running && !t.Aborted && (t.Elapsed() >= THREAD_TIMEOUT))
                 {
-                    m_log.Warn($"Timeout in threadfunc {t.ThreadFuncNum} ({t.Thread.Name}) {t.GetStackTrace()}");
+                    // m_log.Warn($"Timeout in threadfunc {t.ThreadFuncNum} ({t.Thread.Name}) {t.GetStackTrace()}");
                     t.Abort();
                     activeThreads.TryRemove(entry.Key, out _);
 
@@ -3103,8 +3091,8 @@ namespace OpenSim.Framework
 
                     try
                     {
-                        if (loggingEnabled && threadInfo.LogThread)
-                            m_log.DebugFormat("Run threadfunc {0} (Queued {1}, Running {2})", threadFuncNum, numQueued1, numRunning1);
+                        //if (loggingEnabled && threadInfo.LogThread)
+                        //    m_log.DebugFormat("Run threadfunc {0} (Queued {1}, Running {2})", threadFuncNum, numQueued1, numRunning1);
 
                         Culture.SetCurrentCulture();
                         callback(o);
@@ -3114,14 +3102,16 @@ namespace OpenSim.Framework
                     }
                     catch (Exception e)
                     {
-                        m_log.Error($"[UTIL]: Util STP threadfunc {threadFuncNum} terminated with error {e.Message}");
+                       // m_log.Error($"[UTIL]: Util STP threadfunc {threadFuncNum} terminated with error {e.Message}");
                     }
                     finally
                     {
                         Interlocked.Decrement(ref numRunningThreadFuncs);
                         activeThreads.TryRemove(threadFuncNum, out ThreadInfo dummy);
-                        if (loggingEnabled && threadInfo.LogThread)
-                            m_log.Debug($"Exit threadfunc {threadFuncNum} ({FormatDuration(threadInfo.Elapsed())}");
+
+                        //if (loggingEnabled && threadInfo.LogThread)
+                        //    m_log.Debug($"Exit threadfunc {threadFuncNum} ({FormatDuration(threadInfo.Elapsed())}");
+
                         callback = null;
                         o = null;
                         threadInfo = null;
@@ -3140,18 +3130,22 @@ namespace OpenSim.Framework
                     case FireAndForgetMethod.None:
                         realCallback.Invoke(obj);
                         break;
+
                     case FireAndForgetMethod.QueueUserWorkItem:
                         ThreadPool.UnsafeQueueUserWorkItem(realCallback, obj);
                         break;
-                    case FireAndForgetMethod.SmartThreadPool:
-                        if (m_ThreadPool == null)
-                            InitThreadPool(2, 15);
-                        threadInfo.WorkItem = m_ThreadPool.QueueWorkItem(realCallback, obj);
-                        break;
+
+                    //case FireAndForgetMethod.SmartThreadPool:
+                    //    if (m_ThreadPool == null)
+                    //        InitThreadPool(2, 15);
+                    //    threadInfo.WorkItem = m_ThreadPool.QueueWorkItem(realCallback, obj);
+                    //    break;
+
                     case FireAndForgetMethod.Thread:
                         Thread thread = new(delegate (object o) { realCallback(o); realCallback = null; });
                         thread.Start(obj);
                         break;
+
                     default:
                         throw new NotImplementedException();
                 }
@@ -3499,27 +3493,27 @@ namespace OpenSim.Framework
             return str;
         }
 
-        /// <summary>
-        /// Prints the call stack at any given point. Useful for debugging.
-        /// </summary>
-        public static void PrintCallStack()
-        {
-            PrintCallStack(m_log.DebugFormat);
-        }
+        ///// <summary>
+        ///// Prints the call stack at any given point. Useful for debugging.
+        ///// </summary>
+        //public static void PrintCallStack()
+        //{
+        //    PrintCallStack(m_log.DebugFormat);
+        //}
 
-        public delegate void DebugPrinter(string msg, params Object[] parm);
-        public static void PrintCallStack(DebugPrinter printer)
-        {
-            StackTrace stackTrace = new(true);           // get call stack
-            StackFrame[] stackFrames = stackTrace.GetFrames();  // get method calls (frames)
+        //public delegate void DebugPrinter(string msg, params Object[] parm);
+        //public static void PrintCallStack(DebugPrinter printer)
+        //{
+        //    StackTrace stackTrace = new(true);           // get call stack
+        //    StackFrame[] stackFrames = stackTrace.GetFrames();  // get method calls (frames)
 
-            // write call stack method names
-            foreach (StackFrame stackFrame in stackFrames)
-            {
-                MethodBase mb = stackFrame.GetMethod();
-                printer($"{mb.DeclaringType}.{mb.Name}:{stackFrame.GetFileLineNumber()}"); // write method name
-            }
-        }
+        //    // write call stack method names
+        //    foreach (StackFrame stackFrame in stackFrames)
+        //    {
+        //        MethodBase mb = stackFrame.GetMethod();
+        //        printer($"{mb.DeclaringType}.{mb.Name}:{stackFrame.GetFileLineNumber()}"); // write method name
+        //    }
+        //}
 
         /// <summary>
         /// Gets the client IP address
@@ -3540,7 +3534,7 @@ namespace OpenSim.Framework
                 }
                 catch (Exception e)
                 {
-                    m_log.Warn($"[UTIL]: Exception parsing XFF header {xff}: {e.Message}");
+                    //m_log.Warn($"[UTIL]: Exception parsing XFF header {xff}: {e.Message}");
                 }
             }
 
@@ -3559,7 +3553,7 @@ namespace OpenSim.Framework
                 }
                 catch (Exception e)
                 {
-                    m_log.Warn($"[UTIL]: exception in GetCallerIP: {e.Message}");
+                    //m_log.Warn($"[UTIL]: exception in GetCallerIP: {e.Message}");
                 }
             }
             return string.Empty;
@@ -4301,23 +4295,23 @@ namespace OpenSim.Framework
             return name;
         }
 
-        public static void LogFailedXML(string message, string xml)
-        {
-            int length = xml.Length;
-            if (length > 250)
-                xml = xml[..250] + "...";
+        //public static void LogFailedXML(string message, string xml)
+        //{
+        //    int length = xml.Length;
+        //    if (length > 250)
+        //        xml = xml[..250] + "...";
 
-            for (int i = 0; i < xml.Length; i++)
-            {
-                if (xml[i] < 0x20)
-                {
-                    xml = "Unprintable binary data";
-                    break;
-                }
-            }
+        //    for (int i = 0; i < xml.Length; i++)
+        //    {
+        //        if (xml[i] < 0x20)
+        //        {
+        //            xml = "Unprintable binary data";
+        //            break;
+        //        }
+        //    }
 
-            m_log.Error($"{message} Failed XML ({length} bytes) = {xml}");
-        }
+        //    //m_log.Error($"{message} Failed XML ({length} bytes) = {xml}");
+        //}
 
         /// <summary>
         /// Performs a high quality image resize

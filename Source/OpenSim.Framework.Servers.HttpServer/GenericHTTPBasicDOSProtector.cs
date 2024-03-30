@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Logging;
 using System.Collections;
 
 namespace OpenSim.Framework.Servers.HttpServer
@@ -37,13 +38,13 @@ namespace OpenSim.Framework.Servers.HttpServer
         private readonly BasicDosProtectorOptions _options;
         private readonly BasicDOSProtector _dosProtector;
 
-        public GenericHTTPDOSProtector(GenericHTTPMethod normalMethod, GenericHTTPMethod throttledMethod, BasicDosProtectorOptions options)
+        public GenericHTTPDOSProtector(ILogger logger, GenericHTTPMethod normalMethod, GenericHTTPMethod throttledMethod, BasicDosProtectorOptions options)
         {
             _normalMethod = normalMethod;
             _throttledMethod = throttledMethod;
 
             _options = options;
-            _dosProtector = new BasicDOSProtector(_options);
+            _dosProtector = new BasicDOSProtector(logger, _options);
         }
         public Hashtable Process(Hashtable request)
         {

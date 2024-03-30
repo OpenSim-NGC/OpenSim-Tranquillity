@@ -25,15 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Reflection;
 using System.Xml;
-using System.Diagnostics;
 using System.Xml.Schema;
 using System.Xml.Serialization;
-using log4net;
 using OpenMetaverse;
 
 namespace OpenSim.Framework
@@ -50,7 +44,6 @@ namespace OpenSim.Framework
         // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private static XmlSerializer tiiSerializer = new XmlSerializer(typeof (TaskInventoryItem));
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private Thread LockedByThread;
 //        private string WriterStack;
@@ -119,7 +112,7 @@ namespace OpenSim.Framework
 
                 if (m_itemLock.RecursiveReadCount > 0)
                 {
-                    m_log.Error("[TaskInventoryDictionary] Recursive read lock requested. This should not happen and means something needs to be fixed. For now though, it's safe to continue.");
+                    //m_log.Error("[TaskInventoryDictionary] Recursive read lock requested. This should not happen and means something needs to be fixed. For now though, it's safe to continue.");
                     try
                     {
                         // That call stack is useful for end users only. RealProgrammers need a full dump. Commented.
@@ -148,7 +141,7 @@ namespace OpenSim.Framework
                 }
                 if (m_itemLock.RecursiveWriteCount > 0)
                 {
-                    m_log.Error("[TaskInventoryDictionary] Recursive write lock requested. This should not happen and means something needs to be fixed.");
+//                    m_log.Error("[TaskInventoryDictionary] Recursive write lock requested. This should not happen and means something needs to be fixed.");
 //                    try
 //                    {
 //                        System.Console.WriteLine("------------------------------------------");
@@ -164,9 +157,9 @@ namespace OpenSim.Framework
 
                 while (!m_itemLock.TryEnterReadLock(60000))
                 {
-                    m_log.Error("Thread lock detected while trying to aquire READ lock in TaskInventoryDictionary. Locked by thread " + LockedByThread.Name + ". I'm going to try to solve the thread lock automatically to preserve region stability, but this needs to be fixed.");
-                    //if (m_itemLock.IsWriteLockHeld)
-                    //{
+//                    m_log.Error("Thread lock detected while trying to aquire READ lock in TaskInventoryDictionary. Locked by thread " + LockedByThread.Name + ". I'm going to try to solve the thread lock automatically to preserve region stability, but this needs to be fixed.");
+//                    if (m_itemLock.IsWriteLockHeld)
+//                    {
                         m_itemLock = new System.Threading.ReaderWriterLockSlim();
 //                        System.Console.WriteLine("------------------------------------------");
 //                        System.Console.WriteLine("My call stack:\n" + Environment.StackTrace);
@@ -200,12 +193,12 @@ namespace OpenSim.Framework
                 //Enter a write lock, wait indefinately for one to open.
                 if (m_itemLock.RecursiveReadCount > 0)
                 {
-                    m_log.Error("[TaskInventoryDictionary] Recursive read lock requested. This should not happen and means something needs to be fixed. For now though, it's safe to continue.");
+//                    m_log.Error("[TaskInventoryDictionary] Recursive read lock requested. This should not happen and means something needs to be fixed. For now though, it's safe to continue.");
                     m_itemLock.ExitReadLock();
                 }
                 if (m_itemLock.RecursiveWriteCount > 0)
                 {
-                    m_log.Error("[TaskInventoryDictionary] Recursive write lock requested. This should not happen and means something needs to be fixed.");
+//                    m_log.Error("[TaskInventoryDictionary] Recursive write lock requested. This should not happen and means something needs to be fixed.");
 
                     m_itemLock.ExitWriteLock();
                 }
@@ -213,7 +206,7 @@ namespace OpenSim.Framework
                 {
                     if (m_itemLock.IsWriteLockHeld)
                     {
-                        m_log.Error("Thread lock detected while trying to aquire WRITE lock in TaskInventoryDictionary. Locked by thread " + LockedByThread.Name + ". I'm going to try to solve the thread lock automatically to preserve region stability, but this needs to be fixed.");
+//                        m_log.Error("Thread lock detected while trying to aquire WRITE lock in TaskInventoryDictionary. Locked by thread " + LockedByThread.Name + ". I'm going to try to solve the thread lock automatically to preserve region stability, but this needs to be fixed.");
 //                        System.Console.WriteLine("------------------------------------------");
 //                        System.Console.WriteLine("My call stack:\n" + Environment.StackTrace);
 //                        System.Console.WriteLine("------------------------------------------");
@@ -222,7 +215,7 @@ namespace OpenSim.Framework
                     }
                     else
                     {
-                        m_log.Error("Thread lock detected while trying to aquire WRITE lock in TaskInventoryDictionary. Locked by a reader. I'm going to try to solve the thread lock automatically to preserve region stability, but this needs to be fixed.");
+//                        m_log.Error("Thread lock detected while trying to aquire WRITE lock in TaskInventoryDictionary. Locked by a reader. I'm going to try to solve the thread lock automatically to preserve region stability, but this needs to be fixed.");
 //                        System.Console.WriteLine("------------------------------------------");
 //                        System.Console.WriteLine("My call stack:\n" + Environment.StackTrace);
 //                        System.Console.WriteLine("------------------------------------------");

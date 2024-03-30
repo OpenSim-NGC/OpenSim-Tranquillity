@@ -25,12 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework.Monitoring
 {
@@ -39,8 +34,6 @@ namespace OpenSim.Framework.Monitoring
     /// </summary>
     public static class ChecksManager
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         // Subcommand used to list other stats.
         public const string ListSubCommand = "list";
 
@@ -223,8 +216,9 @@ namespace OpenSim.Framework.Monitoring
                         foreach (Check check in container.Values)
                         {
                             if (!check.CheckIt())
-                                m_log.WarnFormat(
-                                    "[CHECKS MANAGER]: Check {0}.{1}.{2} failed with message {3}", check.Category, check.Container, check.ShortName, check.LastFailureMessage);
+                            {
+//                                logger.LogWarning($"[CHECKS MANAGER]: Check {check.Category}.{check.Container}.{check.ShortName} failed with message {check.LastFailureMessage}");
+                            }
                         }
                     }
                 }

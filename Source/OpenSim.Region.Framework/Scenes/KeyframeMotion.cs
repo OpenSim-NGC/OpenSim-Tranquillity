@@ -25,35 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Timers;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Diagnostics;
-using System.Reflection;
-using System.Threading;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.PhysicsModule.SharedBase;
-using OpenSim.Region.Framework.Scenes.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
-using System.Runtime.Serialization;
+
 using Timer = System.Timers.Timer;
-using log4net;
 
 namespace OpenSim.Region.Framework.Scenes
 {
     public class KeyframeTimer
     {
-        private static Dictionary<Scene, KeyframeTimer> m_timers =
-                new Dictionary<Scene, KeyframeTimer>();
+        private static Dictionary<Scene, KeyframeTimer> m_timers = new();
 
         private Timer m_timer;
-        private Dictionary<KeyframeMotion, object> m_motions = new Dictionary<KeyframeMotion, object>();
+        private Dictionary<KeyframeMotion, object> m_motions = new();
+
         private object m_lockObject = new object();
         private object m_timerLock = new object();
+
         private const double m_tickDuration = 50.0;
 
         public double TickDuration

@@ -25,14 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Reflection;
-using System.Text;
-using log4net;
 
 namespace OpenSim.Framework
 {
@@ -46,9 +41,6 @@ namespace OpenSim.Framework
     /// </summary>
     public static class NetworkUtil
     {
-        // Logger
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private static bool m_disabled = true;
 
         public static bool Enabled
@@ -70,7 +62,6 @@ namespace OpenSim.Framework
             {
                 if (host.Equals(user) && host.AddressFamily == AddressFamily.InterNetwork)
                 {
-                    m_log.Info("[NetworkUtil] Localhost user detected, sending them '" + host + "' instead of '" + simulator + "'");
                     return host;
                 }
             }
@@ -101,7 +92,6 @@ namespace OpenSim.Framework
 
                 if (valid)
                 {
-                    m_log.Info("[NetworkUtil] Local LAN user detected, sending them '" + subnet.Key + "' instead of '" + simulator + "'");
                     return subnet.Key;
                 }
             }
@@ -119,7 +109,6 @@ namespace OpenSim.Framework
                 {
                     if (host.AddressFamily == AddressFamily.InterNetworkV6)
                     {
-                        m_log.Info("[NetworkUtil] Localhost user detected, sending them '" + host + "' instead of '" + defaultHostname + "'");
                         return host;
                     }
                 }
@@ -134,7 +123,6 @@ namespace OpenSim.Framework
                 IPAddress host = pair.Value;
                 if (host.Equals(destination) && host.AddressFamily == AddressFamily.InterNetwork)
                 {
-                    m_log.Info("[NATROUTING] Localhost user detected, sending them '" + host + "' instead of '" + defaultHostname + "'");
                     return destination;
                 }
             }
@@ -165,7 +153,6 @@ namespace OpenSim.Framework
 
                 if (valid)
                 {
-                    m_log.Info("[NetworkUtil] Local LAN user detected, sending them '" + subnet.Key + "' instead of '" + defaultHostname + "'");
                     return subnet.Key;
                 }
             }

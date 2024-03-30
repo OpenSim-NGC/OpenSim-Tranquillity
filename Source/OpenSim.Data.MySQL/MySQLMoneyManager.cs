@@ -33,7 +33,7 @@ using MySqlConnector;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace OpenSim.Data.MySQL.MoneyData
+namespace OpenSim.Data.MySQL
 {
     public class MySQLMoneyManager : IMoneyManager
     {
@@ -1345,7 +1345,7 @@ namespace OpenSim.Data.MySQL.MoneyData
         //
         // transactions
         //
-        public bool addTransaction(TransactionData transaction)
+        public bool addTransaction(MoneyTransactionData transaction)
         {
             bool bRet = false;
             string sql = string.Empty;
@@ -1462,9 +1462,9 @@ namespace OpenSim.Data.MySQL.MoneyData
         }
 
 
-        public TransactionData FetchTransaction(UUID transactionID)
+        public MoneyTransactionData FetchTransaction(UUID transactionID)
         {
-            TransactionData transactionData = new TransactionData();
+            MoneyTransactionData transactionData = new MoneyTransactionData();
             transactionData.TransUUID = transactionID;
             string sql = string.Empty;
 
@@ -1514,9 +1514,9 @@ namespace OpenSim.Data.MySQL.MoneyData
         }
 
 
-        public TransactionData[] FetchTransaction(string userID, int startTime, int endTime, uint index, uint retNum)
+        public MoneyTransactionData[] FetchTransaction(string userID, int startTime, int endTime, uint index, uint retNum)
         {
-            List<TransactionData> rows = new List<TransactionData>();
+            List<MoneyTransactionData> rows = new List<MoneyTransactionData>();
             string sql = string.Empty;
 
             sql = "SELECT * FROM " + Table_of_Transactions + " WHERE time>=?start AND time<=?end ";
@@ -1537,7 +1537,7 @@ namespace OpenSim.Data.MySQL.MoneyData
                     {
                         try
                         {
-                            TransactionData transactionData = new TransactionData();
+                            MoneyTransactionData transactionData = new MoneyTransactionData();
                             string uuid = (string)r["UUID"];
                             UUID transUUID;
                             UUID.TryParse(uuid, out transUUID);

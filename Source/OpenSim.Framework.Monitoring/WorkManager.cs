@@ -25,10 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using log4net;
 
 namespace OpenSim.Framework.Monitoring
 {
@@ -49,8 +46,6 @@ namespace OpenSim.Framework.Monitoring
     /// </remarks>
     public static class WorkManager
     {
-        private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
-
         public static JobEngine JobEngine { get; private set; }
 
         static WorkManager()
@@ -152,7 +147,7 @@ namespace OpenSim.Framework.Monitoring
                 AlarmMethod = alarmMethod
             };
 
-            Watchdog.AddThread(twi, name, log);
+            Watchdog.AddThread(twi, name);
 
             thread.Start();
 
@@ -191,7 +186,7 @@ namespace OpenSim.Framework.Monitoring
                 AlarmMethod = null
             };
 
-            Watchdog.AddThread(twi, name, false);
+            Watchdog.AddThread(twi, name);
 
             thread.Start();
 
@@ -205,7 +200,7 @@ namespace OpenSim.Framework.Monitoring
         /// <param name="callback">Code for the thread to execute.</param>
         /// <param name="obj">Object to pass to the thread.</param>
         /// <param name="name">Name of the thread</param>
-        public static void RunInThread(WaitCallback callback, object obj, string name, bool log = false)
+        public static void RunInThread(WaitCallback callback, object obj, string name)
         {
             if (Util.FireAndForgetMethod == FireAndForgetMethod.RegressionTest)
             {
@@ -221,21 +216,20 @@ namespace OpenSim.Framework.Monitoring
                     Culture.SetCurrentCulture();
                     callback(obj);
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
-                    m_log.Error(string.Format("[WATCHDOG]: Exception in thread {0}.", name), e);
                 }
                 finally
                 {
                     try
                     {
-                        Watchdog.RemoveThread(log: false);
+                        Watchdog.RemoveThread( );
                     }
                     catch { }
                 }
             });
 
-            StartThread(ts, name, false, log);
+            StartThread(ts, name, false);
         }
 
         /// <summary>

@@ -25,25 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Text;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-
-using OpenSim.Framework;
-
-using Animation = OpenSim.Framework.Animation;
 
 namespace OpenSim.Region.Framework.Scenes.Animation
 {
     [Serializable]
     public class AnimationSet
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private OpenSim.Framework.Animation m_implicitDefaultAnimation = new OpenSim.Framework.Animation();
         private OpenSim.Framework.Animation m_defaultAnimation = new OpenSim.Framework.Animation();
         private readonly List<OpenSim.Framework.Animation> m_animations = new List<OpenSim.Framework.Animation>();

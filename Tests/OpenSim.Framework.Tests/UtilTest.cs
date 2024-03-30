@@ -138,15 +138,15 @@ namespace OpenSim.Framework.Tests
         [Test]
         public void UUIDTests()
         {
-            Assert.True(Util.isUUID("01234567-89ab-Cdef-0123-456789AbCdEf"),
+            Assert.That(Util.isUUID("01234567-89ab-Cdef-0123-456789AbCdEf") is true,
                           "A correct UUID wasn't recognized.");
-            Assert.False(Util.isUUID("FOOBAR67-89ab-Cdef-0123-456789AbCdEf"),
+            Assert.That(Util.isUUID("FOOBAR67-89ab-Cdef-0123-456789AbCdEf") is false,
                            "UUIDs with non-hex characters are recognized as correct UUIDs.");
-            Assert.False(Util.isUUID("01234567"),
+            Assert.That(Util.isUUID("01234567") is false,
                            "Too short UUIDs are recognized as correct UUIDs.");
-            Assert.False(Util.isUUID("01234567-89ab-Cdef-0123-456789AbCdEf0"),
+            Assert.That(Util.isUUID("01234567-89ab-Cdef-0123-456789AbCdEf0") is false,
                            "Too long UUIDs are recognized as correct UUIDs.");
-            Assert.False(Util.isUUID("01234567-89ab-Cdef-0123+456789AbCdEf"),
+            Assert.That(Util.isUUID("01234567-89ab-Cdef-0123+456789AbCdEf") is false,
                           "UUIDs with wrong format are recognized as correct UUIDs.");
         }
 
@@ -157,8 +157,8 @@ namespace OpenSim.Framework.Tests
             string string2 = "This is another";
 
             // Two consecutive runs should equal the same
-            Assert.AreEqual(Util.GetHashGuid(string1, "secret1"), Util.GetHashGuid(string1, "secret1"));
-            Assert.AreEqual(Util.GetHashGuid(string2, "secret1"), Util.GetHashGuid(string2, "secret1"));
+            Assert.That(Util.GetHashGuid(string1, "secret1"), Is.EqualTo(Util.GetHashGuid(string1, "secret1")));
+            Assert.That(Util.GetHashGuid(string2, "secret1"), Is.EqualTo(Util.GetHashGuid(string2, "secret1")));
 
             // Varying data should not eqal the same
             Assert.That(Util.GetHashGuid(string2, "secret1"), Is.Not.EqualTo(Util.GetHashGuid(string1, "secret1")));
@@ -198,7 +198,7 @@ namespace OpenSim.Framework.Tests
 
             for (int i=0;i<assettypes.Length;i++)
             {
-                Assert.True(
+                Assert.That(
                         SLUtil.SLAssetTypeToContentType(assettypes[i]) == contenttypes[i], 
                         $"Expecting {contenttypes[i]} but got {SLUtil.SLAssetTypeToContentType(assettypes[i])}");
             }
@@ -211,7 +211,7 @@ namespace OpenSim.Framework.Tests
                 else
                     expected = assettypes[i];
                 
-                Assert.True(
+                Assert.That(
                         expected == SLUtil.ContentTypeToSLAssetType(contenttypes[i]),
                         $"Incorrect AssetType mapped from Content-Type ({contenttypes[i]})");
             }
@@ -236,7 +236,7 @@ namespace OpenSim.Framework.Tests
 
             for (int i=0;i<inventorytypes.Length;i++)
             {
-                Assert.True(invcontenttypes[i] == SLUtil.SLInvTypeToContentType(inventorytypes[i]),
+                Assert.That(invcontenttypes[i] == SLUtil.SLInvTypeToContentType(inventorytypes[i]),
                     String.Format("Incorrect Content-Type mapped from InventoryType {0}", inventorytypes[i]));
             }
 
@@ -270,7 +270,7 @@ namespace OpenSim.Framework.Tests
 
             for (int i = 0; i < invtypes.Length; i++)
             {
-                Assert.True(invtypes[i] == SLUtil.ContentTypeToSLInvType(invcontenttypes[i]),
+                Assert.That(invtypes[i] == SLUtil.ContentTypeToSLInvType(invcontenttypes[i]),
                     String.Format("Incorrect InventoryType mapped from Content-Type {0}", invcontenttypes[i]));
             }
         }
@@ -294,21 +294,21 @@ namespace OpenSim.Framework.Tests
             UUID fakeParcelID1, uuid;
 
             ulong bigInt64 = Util.BytesToUInt64Big(hexBytes8);
-            Assert.True(var64Bit == bigInt64,"BytesToUint64Bit conversion of 8 bytes to UInt64 failed.");
+            Assert.That(var64Bit == bigInt64,"BytesToUint64Bit conversion of 8 bytes to UInt64 failed.");
 
             //Test building and decoding using some typical input values
             fakeParcelID1 = Util.BuildFakeParcelID(regionHandle1, x1, y1);
             Util.ParseFakeParcelID(fakeParcelID1, out regionHandle2, out x2, out y2);
-            Assert.True(regionHandle1 == regionHandle2, "region handle decoded from FakeParcelID wth X/Y failed.");
-            Assert.True(x1 == x2, "X coordinate decoded from FakeParcelID wth X/Y failed.");
-            Assert.True(y1 == y2, "Y coordinate decoded from FakeParcelID wth X/Y failed.");
+            Assert.That(regionHandle1 == regionHandle2, "region handle decoded from FakeParcelID wth X/Y failed.");
+            Assert.That(x1 == x2, "X coordinate decoded from FakeParcelID wth X/Y failed.");
+            Assert.That(y1 == y2, "Y coordinate decoded from FakeParcelID wth X/Y failed.");
 
             fakeParcelID1 = Util.BuildFakeParcelID(regionHandle1, x1, y1, z1);
             Util.ParseFakeParcelID(fakeParcelID1, out regionHandle2, out x2, out y2, out z2);
-            Assert.True(regionHandle1 == regionHandle2, "region handle decoded from FakeParcelID with X/Y/Z failed.");
-            Assert.True(x1 == x2, "X coordinate decoded from FakeParcelID with X/Y/Z failed.");
-            Assert.True(y1 == y2, "Y coordinate decoded from FakeParcelID with X/Y/Z failed.");
-            Assert.True(z1 ==  z2, "Z coordinate decoded from FakeParcelID with X/Y/Z failed.");
+            Assert.That(regionHandle1 == regionHandle2, "region handle decoded from FakeParcelID with X/Y/Z failed.");
+            Assert.That(x1 == x2, "X coordinate decoded from FakeParcelID with X/Y/Z failed.");
+            Assert.That(y1 == y2, "Y coordinate decoded from FakeParcelID with X/Y/Z failed.");
+            Assert.That(z1 ==  z2, "Z coordinate decoded from FakeParcelID with X/Y/Z failed.");
 
             //Do some more extreme tests to check the encoding and decoding
             x1 = 0x55aa;
@@ -317,24 +317,24 @@ namespace OpenSim.Framework.Tests
 
             fakeParcelID1 = Util.BuildFakeParcelID(var64Bit, x1, y1);
             Util.ParseFakeParcelID(fakeParcelID1, out regionHandle2, out x2, out y2);
-            Assert.True(var64Bit == regionHandle2, "region handle decoded from FakeParcelID with X/Y/Z failed.");
-            Assert.True(x1 == x2, "X coordinate decoded from FakeParcelID with X/Y/Z failed.");
-            Assert.True(y1 == y2, "Y coordinate decoded from FakeParcelID with X/Y/Z failed.");
+            Assert.That(var64Bit == regionHandle2, "region handle decoded from FakeParcelID with X/Y/Z failed.");
+            Assert.That(x1 == x2, "X coordinate decoded from FakeParcelID with X/Y/Z failed.");
+            Assert.That(y1 == y2, "Y coordinate decoded from FakeParcelID with X/Y/Z failed.");
 
             fakeParcelID1 = Util.BuildFakeParcelID(var64Bit, x1, y1, z1);
             Util.ParseFakeParcelID(fakeParcelID1, out regionHandle2, out x2, out y2, out z2);
 
-            Assert.True(var64Bit == regionHandle2, "region handle decoded from FakeParcelID with X/Y/Z failed.");
-            Assert.True(x1 == x2, "X coordinate decoded from FakeParcelID with X/Y/Z failed.");
-            Assert.True(y1 == y2, "Y coordinate decoded from FakeParcelID with X/Y/Z failed.");
-            Assert.True(z1 == z2, "Z coordinate decoded from FakeParcelID with X/Y/Z failed.");
+            Assert.That(var64Bit == regionHandle2, "region handle decoded from FakeParcelID with X/Y/Z failed.");
+            Assert.That(x1 == x2, "X coordinate decoded from FakeParcelID with X/Y/Z failed.");
+            Assert.That(y1 == y2, "Y coordinate decoded from FakeParcelID with X/Y/Z failed.");
+            Assert.That(z1 == z2, "Z coordinate decoded from FakeParcelID with X/Y/Z failed.");
 
             x1 = 64;
             y1 = 192;
             fakeParcelID1 = Util.BuildFakeParcelID(regionHandle1, x1, y1);
             Util.FakeParcelIDToGlobalPosition(fakeParcelID1, out x2, out y2);
-            Assert.True(255000+x1 == x2, "Global X coordinate decoded from regionHandle failed.");
-            Assert.True(256000+y1 == y2, "Global Y coordinate decoded from regionHandle failed.");
+            Assert.That(255000+x1 == x2, "Global X coordinate decoded from regionHandle failed.");
+            Assert.That(256000+y1 == y2, "Global Y coordinate decoded from regionHandle failed.");
 
             uuid = new UUID("00dd0700-00d1-0700-3800-000032000000");
             Util.FakeParcelIDToGlobalPosition(uuid, out x2, out y2);

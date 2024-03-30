@@ -25,11 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
-using log4net;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
@@ -403,8 +400,6 @@ namespace OpenSim.Framework
 
         public List<UUID> CachedFriendsOnline;
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         public void SetLookAt(Vector3 value)
         {
             if (value.X == 0 && value.Y == 0)
@@ -422,7 +417,7 @@ namespace OpenSim.Framework
 
         public virtual OSDMap Pack(EntityTransferContext ctx)
         {
-            //m_log.InfoFormat("[CHILDAGENTDATAUPDATE] Pack data");
+            ////m_log.InfoFormat("[CHILDAGENTDATAUPDATE] Pack data");
 
             OSDMap args = new OSDMap();
             args["message_type"] = OSD.FromString("AgentData");
@@ -562,7 +557,7 @@ namespace OpenSim.Framework
                     }
                     catch (IndexOutOfRangeException)
                     {
-                        m_log.WarnFormat("[CHILD AGENT DATA]: scripts list is shorter than object list.");
+                        //m_logger.LogWarning("[CHILD AGENT DATA]: scripts list is shorter than object list.");
                     }
 
                     attObjs.Add(info);
@@ -591,7 +586,7 @@ namespace OpenSim.Framework
         /// <param name="hash"></param>
         public virtual void Unpack(OSDMap args, IScene scene, EntityTransferContext ctx)
         {
-            //m_log.InfoFormat("[CHILDAGENTDATAUPDATE] Unpack data");
+            ////m_log.InfoFormat("[CHILDAGENTDATAUPDATE] Unpack data");
             OSD tmp;
             if (args.TryGetValue("region_id", out tmp) && tmp != null)
                 UUID.TryParse(tmp.AsString(), out RegionID);
@@ -781,13 +776,13 @@ namespace OpenSim.Framework
             // packed_appearence should contain all appearance information
             if (args.TryGetValue("packed_appearance", out tmp) && tmp is OSDMap)
             {
-                //m_log.WarnFormat("[CHILDAGENTDATAUPDATE] got packed appearance");
+                ////m_log.WarnFormat("[CHILDAGENTDATAUPDATE] got packed appearance");
                 Appearance = new AvatarAppearance((OSDMap)tmp);
             }
             else
             {
                 // if missing try the old pack method
-                m_log.WarnFormat("[CHILDAGENTDATAUPDATE] No packed appearance, checking old method");
+                //m_log.WarnFormat("[CHILDAGENTDATAUPDATE] No packed appearance, checking old method");
 
                 Appearance = new AvatarAppearance();
 
@@ -825,7 +820,7 @@ namespace OpenSim.Framework
                             // We know all of these must end up as attachments so we
                             // append rather than replace to ensure multiple attachments
                             // per point continues to work
-                            //                        m_log.DebugFormat("[CHILDAGENTDATAUPDATE]: Appending attachments for {0}", AgentID);
+                            //                        //m_log.DebugFormat("[CHILDAGENTDATAUPDATE]: Appending attachments for {0}", AgentID);
                             Appearance.AppendAttachment(new AvatarAttachment((OSDMap)o));
                         }
                     }

@@ -29,20 +29,13 @@ using System.Reflection;
 using System.Xml;
 using System.Xml.Serialization;
 using System.Text;
-using log4net;
 using OpenSim.Framework;
 using OpenMetaverse;
-using OpenSim.Framework.Servers.HttpServer;
-
-using Microsoft.Extensions.Configuration;
-using System.Net;
 
 namespace OpenSim.Server.Base
 {
     public static class ServerUtils
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         public static  byte[] SerializeResult(XmlSerializer xs, object data)
         {
             using (MemoryStream ms = new MemoryStream())
@@ -324,10 +317,10 @@ namespace OpenSim.Server.Base
                 if (!xr.ReadToFollowing("ServerResponse"))
                             return new Dictionary<string, object>();
                     return ScanXmlResponse(xr);
-                }
+            }
             catch (Exception e)
             {
-                m_log.DebugFormat("[serverUtils.ParseXmlResponse]: failed error: {0}\n --string:\n{1}\n", e.Message, data);
+                //m_log.DebugFormat("[serverUtils.ParseXmlResponse]: failed error: {0}\n --string:\n{1}\n", e.Message, data);
             }
             return new Dictionary<string, object>();
         }

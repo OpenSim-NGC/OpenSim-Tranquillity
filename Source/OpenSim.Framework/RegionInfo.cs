@@ -25,21 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.Ini;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-
 using System.Net;
-using System.Reflection;
-using System.Xml;
 
 namespace OpenSim.Framework
 {
     public class RegionInfo
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private static readonly string LogHeader = "[REGION INFO]";
 
         public bool commFailTF = false;
@@ -437,13 +430,13 @@ XXX
             m_internalEndPoint = tmpEPE;
         }
 
-        public string GetSetting(string key)
+        public string? GetSetting(string key)
         {
             string val;
             string keylower = key.ToLower();
             if (m_extraSettings.TryGetValue(keylower, out val))
                 return val;
-            m_log.DebugFormat("[RegionInfo] Could not locate value for parameter {0}", key);
+
             return null;
         }
 
@@ -749,9 +742,6 @@ XXX
             // Height
             if (DefaultLandingPoint.Z < 0f)
                 DefaultLandingPoint.Z = 0f;
-
-            if (ValuesCapped)
-                m_log.WarnFormat("[RegionInfo]: The default landing location for {0} has been capped to {1}", RegionName, DefaultLandingPoint);
         }
 
         // Make sure user specified region sizes are sane.
@@ -768,17 +758,14 @@ XXX
                     RegionSizeX -= partial;
                     if (RegionSizeX == 0)
                         RegionSizeX = Constants.RegionSize;
-                    m_log.ErrorFormat("{0} Region size must be multiple of {1}. Enforcing {2}.RegionSizeX={3} instead of specified {4}",
-                        LogHeader, Constants.RegionSize, m_regionName, RegionSizeX, RegionSizeX + partial);
                 }
+
                 partial = RegionSizeY % Constants.RegionSize;
                 if (partial != 0)
                 {
                     RegionSizeY -= partial;
                     if (RegionSizeY == 0)
                         RegionSizeY = Constants.RegionSize;
-                    m_log.ErrorFormat("{0} Region size must be multiple of {1}. Enforcing {2}.RegionSizeY={3} instead of specified {4}",
-                        LogHeader, Constants.RegionSize, m_regionName, RegionSizeY, RegionSizeY + partial);
                 }
 
                 // Because of things in the viewer, regions MUST be square.
@@ -788,8 +775,6 @@ XXX
                     uint minSize = Math.Min(RegionSizeX, RegionSizeY);
                     RegionSizeX = minSize;
                     RegionSizeY = minSize;
-                    m_log.ErrorFormat("{0} Regions must be square until viewers are updated. Forcing region {1} size to <{2},{3}>",
-                                        LogHeader, m_regionName, RegionSizeX, RegionSizeY);
                 }
 
                 // There is a practical limit to region size.
@@ -797,11 +782,7 @@ XXX
                 {
                     RegionSizeX = Util.Clamp<uint>(RegionSizeX, Constants.RegionSize, Constants.MaximumRegionSize);
                     RegionSizeY = Util.Clamp<uint>(RegionSizeY, Constants.RegionSize, Constants.MaximumRegionSize);
-                    m_log.ErrorFormat("{0} Region dimensions must be less than {1}. Clamping {2}'s size to <{3},{4}>",
-                                        LogHeader, Constants.MaximumRegionSize, m_regionName, RegionSizeX, RegionSizeY);
                 }
-
-                m_log.InfoFormat("{0} Region {1} size set to <{2},{3}>", LogHeader, m_regionName, RegionSizeX, RegionSizeY);
             }
         }
 

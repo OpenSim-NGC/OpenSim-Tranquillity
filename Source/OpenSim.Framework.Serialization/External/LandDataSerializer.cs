@@ -25,12 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Text;
 using System.Xml;
-using log4net;
+
 using OpenMetaverse;
 
 namespace OpenSim.Framework.Serialization.External
@@ -40,8 +37,6 @@ namespace OpenSim.Framework.Serialization.External
     /// </summary>
     public class LandDataSerializer
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private static Dictionary<string, Action<LandData, XmlReader>> m_ldProcessors
             = new Dictionary<string, Action<LandData, XmlReader>>();
 

@@ -25,26 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Threading;
 using OpenMetaverse;
-using log4net;
-using Nini.Config;
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
-
 using OpenSim.Region.Framework.Interfaces;
+
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
+
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes
 {
     public abstract class SceneBase : IScene
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
 #pragma warning disable 414
         private static readonly string LogHeader = "[SCENE]";
 #pragma warning restore 414
@@ -59,12 +52,22 @@ namespace OpenSim.Region.Framework.Scenes
 
         public string Name { get { return RegionInfo.RegionName; } }
 
-        public IConfiguration Config
+        public IConfiguration? Config
         {
             get { return GetConfig(); }
         }
 
-        protected virtual IConfiguration GetConfig()
+        protected virtual IConfiguration? GetConfig()
+        {
+            return null;
+        }
+
+        public ILogger? Logger
+        {
+            get { return GetLogger(); }
+        }
+
+        protected virtual ILogger? GetLogger()
         {
             return null;
         }
@@ -76,6 +79,7 @@ namespace OpenSim.Region.Framework.Scenes
         {
             get { return m_regionModules; }
         }
+
         private Dictionary<string, IRegionModuleBase> m_regionModules = new Dictionary<string, IRegionModuleBase>();
 
         /// <value>

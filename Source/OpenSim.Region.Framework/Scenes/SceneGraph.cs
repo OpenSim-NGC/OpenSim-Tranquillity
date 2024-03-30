@@ -25,18 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Threading;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.Reflection;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
-using log4net;
 using OpenSim.Framework;
-using OpenSim.Region.Framework.Scenes.Types;
 using OpenSim.Region.PhysicsModule.SharedBase;
-using OpenSim.Region.Framework.Interfaces;
 using System.Runtime.InteropServices;
 
 namespace OpenSim.Region.Framework.Scenes
@@ -52,8 +45,6 @@ namespace OpenSim.Region.Framework.Scenes
     /// </summary>
     public class SceneGraph
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         #region Events
 
         protected internal event PhysicsCrash UnRecoverableError;
