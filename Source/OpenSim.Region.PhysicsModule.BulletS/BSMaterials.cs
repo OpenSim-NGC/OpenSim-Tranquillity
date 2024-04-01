@@ -28,7 +28,8 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Reflection;
-using Nini.Config;
+
+using Microsoft.Extensions.Configuration;
 
 namespace OpenSim.Region.PhysicsModule.BulletS
 {
@@ -151,25 +152,27 @@ namespace OpenSim.Region.PhysicsModule.BulletS
         //    physical instantiations. When setting the non-physical value,
         //    both values are changed. Setting the physical value only changes
         //    the physical value.
-        public static void InitializefromParameters(IConfig pConfig)
+        public static void InitializefromParameters(IConfiguration pConfig)
         {
             foreach (KeyValuePair<string, MaterialAttributes.Material> kvp in MaterialMap)
             {
+                var configKeys = pConfig.AsEnumerable().ToDictionary(x => x.Key, x => x.Value).Keys;
+
                 string matName = kvp.Key;
                 foreach (string attribName in MaterialAttributes.MaterialAttribs)
                 {
                     string paramName = matName + attribName;
-                    if (pConfig.Contains(paramName))
+                    if (configKeys.Contains(paramName))
                     {
-                        float paramValue = pConfig.GetFloat(paramName);
+                        float paramValue = pConfig.GetValue<float>(paramName);
                         SetAttributeValue((int)kvp.Value, attribName, paramValue);
                         // set the physical value also
                         SetAttributeValue((int)kvp.Value + (int)MaterialAttributes.Material.NumberOfTypes, attribName, paramValue);
                     }
                     paramName += "Physical";
-                    if (pConfig.Contains(paramName))
+                    if (configKeys.Contains(paramName))
                     {
-                        float paramValue = pConfig.GetFloat(paramName);
+                        float paramValue = pConfig.GetValue<float>(paramName);
                         SetAttributeValue((int)kvp.Value + (int)MaterialAttributes.Material.NumberOfTypes, attribName, paramValue);
                     }
                 }

@@ -29,10 +29,13 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.PhysicsModule.SharedBase;
 
 using OpenMetaverse;
-using Nini.Config;
+
 
 namespace OpenSim.Region.PhysicsModule.BulletS
 {
@@ -321,7 +324,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                 if (prop == null)
                 {
                     // This should only be output when someone adds a new INI parameter and misspells the name.
-                    s.Logger.ErrorFormat("{0} SetValueByName: did not find '{1}'. Verify specified property name is the same as the given INI parameters name.", LogHeader, pName);
+                    s.Logger.LogError("{0} SetValueByName: did not find '{1}'. Verify specified property name is the same as the given INI parameters name.", LogHeader, pName);
                 }
                 else
                 {
@@ -335,7 +338,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                 if (prop == null)
                 {
                     // This should only be output when someone adds a new INI parameter and misspells the name.
-                    s.Logger.ErrorFormat("{0} GetValueByName: did not find '{1}'. Verify specified property name is the same as the given INI parameter name.", LogHeader, pName);
+                    s.Logger.LogError("{0} GetValueByName: did not find '{1}'. Verify specified property name is the same as the given INI parameter name.", LogHeader, pName);
                 }
                 return (T)prop.GetValue(null, null);
             }
@@ -359,7 +362,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                     }
                     catch
                     {
-                        s.Logger.Error($"{LogHeader} Failed setting string parameter value '{valAsString}'");
+                        s.Logger.LogError($"{LogHeader} Failed setting string parameter value '{valAsString}'");
                     }
                     return;
                 }
@@ -372,7 +375,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                 }
                 catch (Exception e)
                 {
-                    s.Logger.Error($"{LogHeader} Exception getting parser for type '{genericType}': {e.Message}");
+                    s.Logger.LogError($"{LogHeader} Exception getting parser for type '{genericType}': {e.Message}");
                     return;
                 }
                 if (parser != null)
@@ -387,11 +390,11 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                     }
                     catch
                     {
-                        s.Logger.Error($"{LogHeader} Failed parsing parameter value '{valAsString}' as type '{genericType}'");
+                        s.Logger.LogError($"{LogHeader} Failed parsing parameter value '{valAsString}' as type '{genericType}'");
                     }
                 }
                 else
-                    s.Logger.Error($"{LogHeader} Could not find parameter parser for type '{genericType}'");
+                    s.Logger.LogError($"{LogHeader} Could not find parameter parser for type '{genericType}'");
             }
             public override bool HasSetOnObject
             {
@@ -917,11 +920,11 @@ namespace OpenSim.Region.PhysicsModule.BulletS
         }
 
         // Get user set values out of the ini file.
-        internal static void SetParameterConfigurationValues(BSScene physicsScene, IConfig cfg)
+        internal static void SetParameterConfigurationValues(BSScene physicsScene, IConfiguration cfg)
         {
             foreach (ParameterDefnBase parm in ParameterDefinitions)
             {
-                parm.SetValue(physicsScene, cfg.GetString(parm.name, parm.GetValue(physicsScene)));
+                parm.SetValue(physicsScene, cfg.GetValue<string>(parm.name, parm.GetValue(physicsScene)));
             }
         }
 

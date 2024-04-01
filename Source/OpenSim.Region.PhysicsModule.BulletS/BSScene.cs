@@ -43,6 +43,9 @@ namespace OpenSim.Region.PhysicsModule.BulletS
     {
         private bool m_Enabled = false;
 
+        // module name for logging
+        private readonly string LogHeader = "BSScene";
+
         // The name of the region we're working for.
         public string RegionName { get; private set; }
 
@@ -196,6 +199,9 @@ namespace OpenSim.Region.PhysicsModule.BulletS
         private readonly IConfiguration m_configuration;
         private readonly ILogger<BSScene> m_logger;
 
+        // Some of the associated code needs a reference to a logger to report errors
+        public ILogger<BSScene> Logger { get { return m_logger; } }
+
         public BSScene(
             IConfiguration configuration,
             ILogger<BSScene> logger
@@ -252,7 +258,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
 
             scene.RegisterModuleInterface<PhysicsScene>(this);
             Vector3 extent = new Vector3(scene.RegionInfo.RegionSizeX, scene.RegionInfo.RegionSizeY, scene.RegionInfo.RegionSizeZ);
-            Initialise(m_Config, extent);
+            Initialise(m_configuration, extent);
 
             base.Initialise(scene.PhysicsRequestAsset,
                 (scene.Heightmap != null ? scene.Heightmap.GetFloatsSerialised() : new float[scene.RegionInfo.RegionSizeX * scene.RegionInfo.RegionSizeY]),
@@ -282,7 +288,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
 
             mesher = scene.RequestModuleInterface<IMesher>();
             if (mesher == null)
-                m_log.WarnFormat("{0} No mesher. Things will not work well.", LogHeader);
+                m_logger.LogWarning("{0} No mesher. Things will not work well.", LogHeader);
 
             scene.PhysicsEnabled = true;
         }
@@ -311,7 +317,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             // Only use heightmap terrain implementation if terrain larger than legacy size
             if ((uint)regionExtent.X > Constants.RegionSize || (uint)regionExtent.Y > Constants.RegionSize)
             {
-                m_log.WarnFormat("{0} Forcing terrain implementation to heightmap for large region", LogHeader);
+                m_logger.LogWarning("{0} Forcing terrain implementation to heightmap for large region", LogHeader);
                 BSParam.TerrainImplementation = (float)BSTerrainPhys.TerrainImplementation.Heightmap;
             }
 
@@ -324,7 +330,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             if (m_physicsLoggingEnabled)
             {
                 PhysicsLogging = new LogWriter(m_physicsLoggingDir, m_physicsLoggingPrefix, m_physicsLoggingFileMinutes, m_physicsLoggingDoFlush);
-                PhysicsLogging.ErrorLogger = m_log; // for DEBUG. Let's the logger output its own error messages.
+                PhysicsLogging.ErrorLogger = m_logger; // for DEBUG. Let's the logger output its own error messages.
             }
             else
             {
@@ -349,7 +355,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             TerrainManager.CreateInitialGroundPlaneAndTerrain();
 
             // Put some informational messages into the log file.
-            m_log.InfoFormat("{0} Linksets implemented with {1}", LogHeader, (BSLinkset.LinksetImplementation)BSParam.LinksetImplementation);
+            m_logger.LogInformation("{0} Linksets implemented with {1}", LogHeader, (BSLinkset.LinksetImplementation)BSParam.LinksetImplementation);
 
             InSimulationTime = false;
             m_initialized = true;
@@ -376,25 +382,26 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             if (config != null)
             {
                 // If there are specifications in the ini file, use those values
-                IConfig pConfig = config.Configs["BulletSim"];
+                IConfigurationSection pConfig = config.GetSection("BulletSim");
                 if (pConfig != null)
                 {
                     BSParam.SetParameterConfigurationValues(this, pConfig);
 
                     // There are two Bullet implementations to choose from
-                    BulletEngineName = pConfig.GetString("BulletEngine", "BulletUnmanaged");
+                    // BulletEngineName = pConfig.GetString("BulletEngine", "BulletUnmanaged");
+                    BulletEngineName = pConfig.GetValue<string>("BulletEngine", "BulletUnmanaged") ?? "BulletUnmanaged";
 
                     // Very detailed logging for physics debugging
                     // TODO: the boolean values can be moved to the normal parameter processing.
-                    m_physicsLoggingEnabled = pConfig.GetBoolean("PhysicsLoggingEnabled", false);
-                    m_physicsLoggingDir = pConfig.GetString("PhysicsLoggingDir", ".");
-                    m_physicsLoggingPrefix = pConfig.GetString("PhysicsLoggingPrefix", "physics-%REGIONNAME%-");
-                    m_physicsLoggingFileMinutes = pConfig.GetInt("PhysicsLoggingFileMinutes", 5);
-                    m_physicsLoggingDoFlush = pConfig.GetBoolean("PhysicsLoggingDoFlush", false);
-                    m_physicsPhysicalDumpEnabled = pConfig.GetBoolean("PhysicsPhysicalDumpEnabled", false);
+                    m_physicsLoggingEnabled = pConfig.GetValue<bool>("PhysicsLoggingEnabled", false);
+                    m_physicsLoggingDir = pConfig.GetValue<string>("PhysicsLoggingDir", ".") ?? ".";
+                    m_physicsLoggingPrefix = pConfig.GetValue<string>("PhysicsLoggingPrefix", "physics-%REGIONNAME%-") ?? "physics-%REGIONNAME%-";
+                    m_physicsLoggingFileMinutes = pConfig.GetValue<int>("PhysicsLoggingFileMinutes", 5);
+                    m_physicsLoggingDoFlush = pConfig.GetValue<bool>("PhysicsLoggingDoFlush", false);
+                    m_physicsPhysicalDumpEnabled = pConfig.GetValue<bool>("PhysicsPhysicalDumpEnabled", false);
                     // Very detailed logging for vehicle debugging
-                    VehicleLoggingEnabled = pConfig.GetBoolean("VehicleLoggingEnabled", false);
-                    VehiclePhysicalLoggingEnabled = pConfig.GetBoolean("VehiclePhysicalLoggingEnabled", false);
+                    VehicleLoggingEnabled = pConfig.GetValue<bool>("VehicleLoggingEnabled", false);
+                    VehiclePhysicalLoggingEnabled = pConfig.GetValue<bool>("VehiclePhysicalLoggingEnabled", false);
 
                     // Do any replacements in the parameters
                     m_physicsLoggingPrefix = m_physicsLoggingPrefix.Replace("%REGIONNAME%", RegionName);
@@ -417,20 +424,20 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             }
         }
 
-        //// A helper function that handles a true/false parameter and returns the proper float number encoding
-        //float ParamBoolean(IConfig config, string parmName, float deflt)
-        //{
-        //    float ret = deflt;
-        //    if (config.Contains(parmName))
-        //    {
-        //        ret = ConfigurationParameters.numericFalse;
-        //        if (config.GetBoolean(parmName, false))
-        //        {
-        //            ret = ConfigurationParameters.numericTrue;
-        //        }
-        //    }
-        //    return ret;
-        //}
+        // A helper function that handles a true/false parameter and returns the proper float number encoding
+        float ParamBoolean(IConfiguration config, string parmName, float deflt)
+        {
+            float ret = deflt;
+            if (config.AsEnumerable().ToDictionary().Keys.Contains(parmName))
+            {
+                ret = ConfigurationParameters.numericFalse;
+                if (config.GetValue<bool>(parmName, false))
+                {
+                    ret = ConfigurationParameters.numericTrue;
+                }
+            }
+            return ret;
+        }
 
         // Select the connection to the actual Bullet implementation.
         // The main engine selection is the engineName up to the first hypen.
@@ -456,25 +463,25 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                 case "bulletxna":
                     ret = new BSAPIXNA(engineName, this);
                     // Disable some features that are not implemented in BulletXNA
-                    m_log.InfoFormat("{0} Disabling some physics features not implemented by BulletXNA", LogHeader);
-                    m_log.InfoFormat("{0}    Disabling ShouldUseBulletHACD", LogHeader);
+                    m_logger.LogInformation("{0} Disabling some physics features not implemented by BulletXNA", LogHeader);
+                    m_logger.LogInformation("{0}    Disabling ShouldUseBulletHACD", LogHeader);
                     BSParam.ShouldUseBulletHACD = false;
-                    m_log.InfoFormat("{0}    Disabling ShouldUseSingleConvexHullForPrims", LogHeader);
+                    m_logger.LogInformation("{0}    Disabling ShouldUseSingleConvexHullForPrims", LogHeader);
                     BSParam.ShouldUseSingleConvexHullForPrims = false;
-                    m_log.InfoFormat("{0}    Disabling ShouldUseGImpactShapeForPrims", LogHeader);
+                    m_logger.LogInformation("{0}    Disabling ShouldUseGImpactShapeForPrims", LogHeader);
                     BSParam.ShouldUseGImpactShapeForPrims = false;
-                    m_log.InfoFormat("{0}    Setting terrain implimentation to Heightmap", LogHeader);
+                    m_logger.LogInformation("{0}    Setting terrain implimentation to Heightmap", LogHeader);
                     BSParam.TerrainImplementation = (float)BSTerrainPhys.TerrainImplementation.Heightmap;
                     break;
             }
 
             if (ret == null)
             {
-                m_log.ErrorFormat("{0} COULD NOT SELECT BULLET ENGINE: '[BulletSim]PhysicsEngine' must be either 'BulletUnmanaged-*' or 'BulletXNA-*'", LogHeader);
+                m_logger.LogError("{0} COULD NOT SELECT BULLET ENGINE: '[BulletSim]PhysicsEngine' must be either 'BulletUnmanaged-*' or 'BulletXNA-*'", LogHeader);
             }
             else
             {
-                m_log.InfoFormat("{0} Selected bullet engine {1} -> {2}/{3}", LogHeader, engineName, ret.BulletEngineName, ret.BulletEngineVersion);
+                m_logger.LogInformation("{0} Selected bullet engine {1} -> {2}/{3}", LogHeader, engineName, ret.BulletEngineName, ret.BulletEngineVersion);
             }
 
             return ret;
@@ -482,7 +489,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
 
         public override void Dispose()
         {
-            // m_log.DebugFormat("{0}: Dispose()", LogHeader);
+            // m_logger.LogDebug("{0}: Dispose()", LogHeader);
 
             // make sure no stepping happens while we're deleting stuff
             m_initialized = false;
@@ -528,7 +535,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
 
         public override PhysicsActor AddAvatar(string avName, Vector3 position, Vector3 velocity, Vector3 size, bool isFlying)
         {
-            m_log.ErrorFormat("{0}: CALL TO AddAvatar in BSScene. NOT IMPLEMENTED", LogHeader);
+            m_logger.LogError("{0}: CALL TO AddAvatar in BSScene. NOT IMPLEMENTED", LogHeader);
             return null;
         }
 
@@ -553,7 +560,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
 
         public override void RemoveAvatar(PhysicsActor actor)
         {
-            // m_log.DebugFormat("{0}: RemoveAvatar", LogHeader);
+            // m_logger.LogDebug("{0}: RemoveAvatar", LogHeader);
 
             if (!m_initialized) return;
 
@@ -570,14 +577,14 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("{0}: Attempt to remove avatar that is not in physics scene: {1}", LogHeader, e);
+                    m_logger.LogError("{0}: Attempt to remove avatar that is not in physics scene: {1}", LogHeader, e);
                 }
                 bsactor.Destroy();
                 // bsactor.dispose();
             }
             else
             {
-                m_log.ErrorFormat("{0}: Requested to remove avatar that is not a BSCharacter. ID={1}, type={2}",
+                m_logger.LogError("{0}: Requested to remove avatar that is not a BSCharacter. ID={1}, type={2}",
                                             LogHeader, actor.LocalID, actor.GetType().Name);
             }
         }
@@ -590,28 +597,28 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             if (bsprim != null)
             {
                 DetailLog("{0},RemovePrim,call", bsprim.LocalID);
-                // m_log.DebugFormat("{0}: RemovePrim. id={1}/{2}", LogHeader, bsprim.Name, bsprim.LocalID);
+                // m_logger.LogDebu("{0}: RemovePrim. id={1}/{2}", LogHeader, bsprim.Name, bsprim.LocalID);
                 try
                 {
                     lock (PhysObjects) PhysObjects.Remove(bsprim.LocalID);
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("{0}: Attempt to remove prim that is not in physics scene: {1}", LogHeader, e);
+                    m_logger.LogError("{0}: Attempt to remove prim that is not in physics scene: {1}", LogHeader, e);
                 }
                 bsprim.Destroy();
                 // bsprim.dispose();
             }
             else
             {
-                m_log.ErrorFormat("{0}: Attempt to remove prim that is not a BSPrim type.", LogHeader);
+                m_logger.LogError("{0}: Attempt to remove prim that is not a BSPrim type.", LogHeader);
             }
         }
 
         public override PhysicsActor AddPrimShape(string primName, PrimitiveBaseShape pbs, Vector3 position,
                                                   Vector3 size, Quaternion rotation, bool isPhysical, uint localID)
         {
-            // m_log.DebugFormat("{0}: AddPrimShape2: {1}", LogHeader, primName);
+            // m_logger.LogDebug("{0}: AddPrimShape2: {1}", LogHeader, primName);
 
             if (!m_initialized) return null;
 
@@ -684,7 +691,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("{0},PhysicsStep Exception: nTaints={1}, substeps={2}, updates={3}, colliders={4}, e={5}",
+                    m_logger.LogWarning("{0},PhysicsStep Exception: nTaints={1}, substeps={2}, updates={3}, colliders={4}, e={5}",
                                 LogHeader, numTaints, numSubSteps, updatedEntityCount, collidersCount, e);
                     DetailLog("{0},PhysicsStepException,call, nTaints={1}, substeps={2}, updates={3}, colliders={4}",
                                 DetailLogZero, numTaints, numSubSteps, updatedEntityCount, collidersCount);
@@ -954,7 +961,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
 
         public override void DeleteTerrain()
         {
-            // m_log.DebugFormat("{0}: DeleteTerrain()", LogHeader);
+            // m_logger.LogDebug("{0}: DeleteTerrain()", LogHeader);
         }
 
         #endregion // Terrain
@@ -1305,7 +1312,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                     }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat("{0}: ProcessTaints: {1}: Exception: {2}", LogHeader, tcbe.ident, e);
+                        m_logger.LogError("{0}: ProcessTaints: {1}: Exception: {2}", LogHeader, tcbe.ident, e);
                     }
                 }
                 oldList.Clear();
@@ -1353,7 +1360,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                     }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat("{0}: ProcessPostTaintTaints: {1}: Exception: {2}", LogHeader, kvp.Key, e);
+                        m_logger.LogError("{0}: ProcessPostTaintTaints: {1}: Exception: {2}", LogHeader, kvp.Key, e);
                     }
                 }
                 oldList.Clear();

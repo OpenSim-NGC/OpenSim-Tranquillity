@@ -26,17 +26,19 @@
  */
 //#define SPAM
 
+using System.Drawing;
+using System.IO.Compression;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.PhysicsModule.SharedBase;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using System.Drawing;
-using System.IO.Compression;
+
 using PrimMesher;
 using Microsoft.Extensions.Configuration;
-using log4net.Core;
 using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModule.ubODEMeshing
