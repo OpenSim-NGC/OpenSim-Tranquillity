@@ -59,9 +59,9 @@ namespace OpenSim.Data.SQLite
         {
         }
 
-        public SQLiteUserProfilesData(string connectionString)
+        public void Initialize(string connectionString)
         {
-            Initialise(connectionString);
+            base.Initialize(connectionString);
         }
 
         public void Initialise(string connectionString)

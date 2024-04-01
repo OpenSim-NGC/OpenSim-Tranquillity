@@ -28,6 +28,8 @@
 using Microsoft.Extensions.Logging;
 using System.Text;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Framework
 {
     /// <summary>
@@ -46,14 +48,14 @@ namespace OpenSim.Framework
         private int m_logMaxFileTimeMin = 5;    // 5 minutes
         public String LogFileHeader { get; set; }
 
-        private StreamWriter m_logFile = null;
+        private StreamWriter? m_logFile = null;
         private TimeSpan m_logFileLife;
         private DateTime m_logFileEndTime;
         private Object m_logFileWriteLock = new Object();
         private bool m_flushWrite;
 
         // set externally when debugging. If let 'null', this does not write any error messages.
-        public ILogger ErrorLogger = null;
+        public ILogger? ErrorLogger = null;
         private string LogHeader = "[LOG WRITER]";
 
         /// <summary>
@@ -64,6 +66,7 @@ namespace OpenSim.Framework
         {
             Enabled = false;
             m_logFile = null;
+            LogFileHeader = "log-";
         }
 
         /// <summary>

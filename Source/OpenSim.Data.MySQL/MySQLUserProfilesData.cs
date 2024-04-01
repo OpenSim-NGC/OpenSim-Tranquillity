@@ -28,14 +28,18 @@
 using System;
 using System.Data;
 using System.Reflection;
+using System.Security.AccessControl;
+
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
+
 using MySqlConnector;
+
+using log4net;
 using log4net.Core;
-using Microsoft.Extensions.Logging;
-using System.Security.AccessControl;
 
 namespace OpenSim.Data.MySQL
 {

@@ -6,6 +6,8 @@ using System.Net;
 using System.Text;
 using System.Threading;
 
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
@@ -20,6 +22,7 @@ namespace OpenSim.Region.ClientStack.Linden
     public delegate UUID UpdateItem(UUID itemID, UUID objectID, byte[] data);
     public delegate UUID ItemUpdatedCallback(UUID userID, UUID itemID, UUID objectID, byte[] data);
 
+    // Extend BunchOfCaps class with functions for assets
     public partial class BunchOfCaps
     {
         public void UpdateNotecardItemAsset(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap map)
@@ -54,7 +57,7 @@ namespace OpenSim.Region.ClientStack.Linden
 
         private void UpdateInventoryItemAsset(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap map, byte atype, bool taskSript = false)
         {
-            m_log.Debug("[CAPS]: UpdateInventoryItemAsset Request in region: " + m_regionName + "\n");
+            m_logger.LogDebug("[CAPS]: UpdateInventoryItemAsset Request in region: " + m_regionName + "\n");
 
             httpResponse.StatusCode = (int)HttpStatusCode.OK;
 
@@ -233,7 +236,7 @@ namespace OpenSim.Region.ClientStack.Linden
             }
             catch (Exception e)
             {
-                m_log.Error("[UpdateScriptTaskInventory]: " + e.ToString());
+                m_logger.LogError("[UpdateScriptTaskInventory]: " + e.ToString());
             }
         }
         /// <summary>
