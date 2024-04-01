@@ -33,6 +33,7 @@ using OpenMetaverse;
 using OpenMetaverse.Packets;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -618,14 +619,16 @@ namespace OpenSim.Region.Framework.Scenes
                     {
                         if(!req.RemoteClient.IsActive)
                             continue;
+
                         SendInventoryUpdate(req.RemoteClient, new InventoryFolderBase(req.FolderID), req.FetchFolders, req.FetchItems);
                         Thread.Sleep(50);
                     }
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[AGENT INVENTORY]: Error in SendInventoryAsync(). Exception {0}", e);
+                    Logger?.LogError(e, "[AGENT INVENTORY]: Error in SendInventoryAsync().");
                 }
+
                 m_descendentsRequestProcessing = false;
             }
         }

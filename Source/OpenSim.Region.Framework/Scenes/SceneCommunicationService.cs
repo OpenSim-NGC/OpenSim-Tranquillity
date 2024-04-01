@@ -42,13 +42,13 @@ namespace OpenSim.Region.Framework.Scenes
     /// </summary>
     public class SceneCommunicationService //one instance per region
     {
-        private readonly ILogger<SceneCommunicationService> _logger;
+        private readonly ILogger? _logger;
         private static readonly string LogHeader = "[SCENE COMM]";
 
-        protected RegionInfo m_regionInfo;
-        protected Scene m_scene;
+        protected RegionInfo? m_regionInfo;
+        protected Scene? m_scene;
 
-        public SceneCommunicationService(ILogger<SceneCommunicationService> logger)
+        public SceneCommunicationService(ILogger? logger)
         {
             _logger = logger;
         }
@@ -63,7 +63,7 @@ namespace OpenSim.Region.Framework.Scenes
         {
             if (neighbourService == null)
             {
-                _logger.LogError($"{LogHeader} No neighbour service provided for region {m_scene.Name} to inform neigbhours of status");
+                _logger?.LogError($"{LogHeader} No neighbour service provided for region {m_scene.Name} to inform neigbhours of status");
                 return;
             }
 
@@ -99,14 +99,15 @@ namespace OpenSim.Region.Framework.Scenes
                     {
                         Util.RegionHandleToRegionLoc(regionhandle, out uint rx, out uint ry);
                         GridRegion neighbour = neighbourService.HelloNeighbour(regionhandle, region);
+
                         if (neighbour != null)
                         {
-                            _logger.LogDebug($"{LogHeader} Region {m_scene.Name} successfully informed neighbour {neighbour.RegionName} at {rx}-{ry} that it is up");
+                            _logger?.LogDebug($"{LogHeader} Region {m_scene.Name} successfully informed neighbour {neighbour.RegionName} at {rx}-{ry} that it is up");
                             m_scene.EventManager.TriggerOnRegionUp(neighbour);
                         }
                         else
                         {
-                            _logger.LogWarning($"{LogHeader} Region {m_scene.Name} failed to inform neighbour at {rx}-{ry} that it is up.");
+                            _logger?.LogWarning($"{LogHeader} Region {m_scene.Name} failed to inform neighbour at {rx}-{ry} that it is up.");
                         }
                     }
                 });
@@ -175,11 +176,11 @@ namespace OpenSim.Region.Framework.Scenes
                     GridRegion destination = m_scene.GridService.GetRegionByHandle(m_regionInfo.ScopeID, regionHandle);
                     if (destination == null)
                     {
-                        _logger.LogDebug($"[SCENE COMMUNICATION SERVICE]: Sending close agent ID {agentID} FAIL, region with handle {regionHandle} not found");
+                        _logger?.LogDebug($"[SCENE COMMUNICATION SERVICE]: Sending close agent ID {agentID} FAIL, region with handle {regionHandle} not found");
                         return;
                     }
 
-                    _logger.LogDebug($"[SCENE COMMUNICATION SERVICE]: Sending close agent ID {agentID} to {destination.RegionName}");
+                    _logger?.LogDebug($"[SCENE COMMUNICATION SERVICE]: Sending close agent ID {agentID} to {destination.RegionName}");
                     m_scene.SimulationService.CloseAgent(destination, agentID, auth_code);
                 }
             }, null, "SCOMM.SendCloseChildAgentConnections");

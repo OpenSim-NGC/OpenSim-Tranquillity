@@ -43,9 +43,9 @@ namespace OpenSim.Region.Framework.Scenes
     /// </summary>
     public class EventManager
     {
-        private readonly ILogger<EventManager> _logger;
+        private readonly ILogger? _logger;
 
-        public EventManager(ILogger<EventManager> logger)
+        public EventManager(ILogger? logger)
         {
             _logger = logger;
         }
@@ -456,7 +456,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerNewScript failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerNewScript failed - continuing.");
                     }
                 }
             }
@@ -489,7 +489,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerUpdateScript failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerUpdateScript failed - continuing.");
                     }
                 }
             }
@@ -1072,7 +1072,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnAttach failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnAttach failed - continuing.");
                     }
                 }
             }
@@ -1091,7 +1091,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerGetScriptRunning failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerGetScriptRunning failed - continuing.");
                     }
                 }
             }
@@ -1110,7 +1110,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnScriptChangedEvent failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnScriptChangedEvent failed - continuing.");
                     }
                 }
             }
@@ -1129,7 +1129,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnClientMovement failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnClientMovement failed - continuing.");
                     }
                 }
             }
@@ -1148,7 +1148,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerPermissionError failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerPermissionError failed - continuing.");
                     }
                 }
             }
@@ -1167,7 +1167,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnPluginConsole failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnPluginConsole failed - continuing.");
                     }
                 }
             }
@@ -1186,7 +1186,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnFrame failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnFrame failed - continuing.");
                     }
                 }
             }
@@ -1205,7 +1205,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnNewClient failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnNewClient failed - continuing.");
                     }
                 }
             }
@@ -1224,7 +1224,7 @@ namespace OpenSim.Region.Framework.Scenes
                         }
                         catch (Exception e)
                         {
-                            _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnNewClient (IClientCore) failed - continuing.");
+                            _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnNewClient (IClientCore) failed - continuing.");
                         }
                     }
                 }
@@ -1244,7 +1244,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnClientLogin failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnClientLogin failed - continuing.");
                     }
                 }
             }
@@ -1264,7 +1264,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnNewPresence failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnNewPresence failed - continuing.");
                     }
                 }
             }
@@ -1283,7 +1283,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnRemovePresence failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnRemovePresence failed - continuing.");
                     }
                 }
             }
@@ -1302,7 +1302,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnBackup failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerOnBackup failed - continuing.");
                     }
                 }
             }
@@ -1321,7 +1321,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerParcelPrimCountUpdate failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerParcelPrimCountUpdate failed - continuing.");
                     }
                 }
             }
@@ -1340,7 +1340,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerMoneyTransfer failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerMoneyTransfer failed - continuing.");
                     }
                 }
             }
@@ -1358,7 +1358,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerTerrainUpdate failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerTerrainUpdate failed - continuing.");
                     }
                 }
             }
@@ -1377,7 +1377,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerTerrainTick failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerTerrainTick failed - continuing.");
                     }
                 }
             }
@@ -1396,7 +1396,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TerrainCheckUpdates failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TerrainCheckUpdates failed - continuing.");
                     }
                 }
             }
@@ -1415,7 +1415,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerTerrainTainted failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerTerrainTainted failed - continuing.");
                     }
                 }
             }
@@ -1434,7 +1434,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerParcelPrimCountAdd failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerParcelPrimCountAdd failed - continuing.");
                     }
                 }
             }
@@ -1453,7 +1453,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectAddedToScene failed - continuing."
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectAddedToScene failed - continuing."
 );
                     }
                 }
@@ -1475,7 +1475,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerDeRezRequested failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerDeRezRequested failed - continuing.");
                     }
                 }
             }
@@ -1496,7 +1496,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectBeingRemovedFromScene failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectBeingRemovedFromScene failed - continuing.");
                     }
                 }
             }
@@ -1515,7 +1515,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectAddedToPhysicalScene failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectAddedToPhysicalScene failed - continuing.");
                     }
                 }
             }
@@ -1534,7 +1534,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectRemovedFromPhysicalScene failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectRemovedFromPhysicalScene failed - continuing.");
                     }
                 }
             }
@@ -1553,7 +1553,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerShutdown failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerShutdown failed - continuing.");
                     }
                 }
             }
@@ -1572,7 +1572,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectGrab failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectGrab failed - continuing.");
                     }
                 }
             }
@@ -1591,7 +1591,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectGrabbing failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectGrabbing failed - continuing.");
                     }
                 }
             }
@@ -1610,7 +1610,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectDeGrab failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerObjectDeGrab failed - continuing.");
                     }
                 }
             }
@@ -1629,7 +1629,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptReset failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptReset failed - continuing.");
                     }
                 }
             }
@@ -1648,7 +1648,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerRezScript failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerRezScript failed - continuing.");
                     }
                 }
             }
@@ -1667,7 +1667,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerStartScript failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerStartScript failed - continuing.");
                     }
                 }
             }
@@ -1686,7 +1686,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerStopScript failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerStopScript failed - continuing.");
                     }
                 }
             }
@@ -1705,7 +1705,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerRemoveScript failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerRemoveScript failed - continuing.");
                     }
                 }
             }
@@ -1727,7 +1727,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerGroupMove failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerGroupMove failed - continuing.");
                     }
                 }
             }
@@ -1751,7 +1751,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerGroupSpinStart failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerGroupSpinStart failed - continuing.");
                     }
                 }
             }
@@ -1775,7 +1775,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerGroupSpin failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerGroupSpin failed - continuing.");
                     }
                 }
             }
@@ -1796,7 +1796,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerGroupGrab failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerGroupGrab failed - continuing.");
                     }
                 }
             }
@@ -1815,7 +1815,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerLandObjectAdded failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerLandObjectAdded failed - continuing.");
                     }
                 }
             }
@@ -1834,7 +1834,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerLandObjectRemoved failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerLandObjectRemoved failed - continuing.");
                     }
                 }
             }
@@ -1858,7 +1858,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerAvatarEnteringNewParcel failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerAvatarEnteringNewParcel failed - continuing.");
                     }
                 }
             }
@@ -1877,7 +1877,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerAvatarAppearanceChanged failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerAvatarAppearanceChanged failed - continuing.");
                     }
                 }
             }
@@ -1896,7 +1896,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerCrossAgentToNewRegion failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerCrossAgentToNewRegion failed - continuing.");
                     }
                 }
             }
@@ -1915,7 +1915,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerIncomingInstantMessage failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerIncomingInstantMessage failed - continuing.");
                     }
                 }
             }
@@ -1934,7 +1934,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnAttach failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnAttach failed - continuing.");
                     }
                 }
             }
@@ -1953,7 +1953,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerClientClosed failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerClientClosed failed - continuing.");
                     }
                 }
             }
@@ -1972,7 +1972,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnMakeChildAgent failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnMakeChildAgent failed - continuing.");
                     }
                 }
             }
@@ -1991,7 +1991,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnMakeRootAgent failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnMakeRootAgent failed - continuing.");
                     }
                 }
             }
@@ -2010,7 +2010,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnIncomingSceneObject failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnIncomingSceneObject failed - continuing.");
                     }
                 }
             }
@@ -2029,7 +2029,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnRegisterCaps failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnRegisterCaps failed - continuing.");
                     }
                 }
             }
@@ -2048,7 +2048,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnDeregisterCaps failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnDeregisterCaps failed - continuing.");
                     }
                 }
             }
@@ -2067,7 +2067,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnNewInventoryItemUploadComplete failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnNewInventoryItemUploadComplete failed - continuing.");
                     }
                 }
             }
@@ -2086,7 +2086,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerLandBuy failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerLandBuy failed - continuing.");
                     }
                 }
             }
@@ -2105,7 +2105,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerValidateLandBuy failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerValidateLandBuy failed - continuing.");
                     }
                 }
             }
@@ -2124,7 +2124,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerAtTargetEvent failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerAtTargetEvent failed - continuing.");
                     }
                 }
             }
@@ -2143,7 +2143,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerNotAtTargetEvent failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerNotAtTargetEvent failed - continuing.");
                     }
                 }
             }
@@ -2162,7 +2162,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerAtRotTargetEvent failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerAtRotTargetEvent failed - continuing.");
                     }
                 }
             }
@@ -2181,7 +2181,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerNotAtRotTargetEvent failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerNotAtRotTargetEvent failed - continuing.");
                     }
                 }
             }
@@ -2200,7 +2200,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerMovingStartEvent failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerMovingStartEvent failed - continuing.");
                     }
                 }
             }
@@ -2219,7 +2219,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerMovingEndEvent failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerMovingEndEvent failed - continuing.");
                     }
                 }
             }
@@ -2244,7 +2244,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerRequestChangeWaterHeight failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerRequestChangeWaterHeight failed - continuing.");
                     }
                 }
             }
@@ -2263,7 +2263,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerAvatarKill failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerAvatarKill failed - continuing.");
                     }
                 }
             }
@@ -2282,7 +2282,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerSignificantClientMovement failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerSignificantClientMovement failed - continuing.");
                     }
                 }
             }
@@ -2301,7 +2301,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnChatFromWorld failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnChatFromWorld failed - continuing.");
                     }
                 }
             }
@@ -2320,7 +2320,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnChatFromClient failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnChatFromClient failed - continuing.");
                     }
                 }
             }
@@ -2339,7 +2339,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnChatBroadcast failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnChatBroadcast failed - continuing.");
                     }
                 }
             }
@@ -2358,7 +2358,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerControlEvent failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerControlEvent failed - continuing.");
                     }
                 }
             }
@@ -2377,7 +2377,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerNoticeNoLandDataFromStorage failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerNoticeNoLandDataFromStorage failed - continuing.");
                     }
                 }
             }
@@ -2396,7 +2396,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerIncomingLandDataFromStorage failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerIncomingLandDataFromStorage failed - continuing.");
                     }
                 }
             }
@@ -2415,7 +2415,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerSetAllowForcefulBan failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerSetAllowForcefulBan failed - continuing.");
                     }
                 }
             }
@@ -2434,7 +2434,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerRequestParcelPrimCountUpdate failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerRequestParcelPrimCountUpdate failed - continuing.");
                     }
                 }
             }
@@ -2453,7 +2453,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerParcelPrimCountTainted failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerParcelPrimCountTainted failed - continuing.");
                     }
                 }
             }
@@ -2491,7 +2491,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerEstateToolsSunUpdate failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerEstateToolsSunUpdate failed - continuing.");
                     }
                 }
             }
@@ -2510,7 +2510,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnAttach failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnAttach failed - continuing.");
                     }
                 }
             }
@@ -2531,7 +2531,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOarFileLoaded failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOarFileLoaded failed - continuing.");
                     }
                 }
             }
@@ -2550,7 +2550,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOarFileSaved failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOarFileSaved failed - continuing.");
                     }
                 }
             }
@@ -2569,7 +2569,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerEmptyScriptCompileQueue failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerEmptyScriptCompileQueue failed - continuing.");
                     }
                 }
             }
@@ -2588,7 +2588,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptCollidingStart failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptCollidingStart failed - continuing.");
                     }
                 }
             }
@@ -2607,7 +2607,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptColliding failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptColliding failed - continuing.");
                     }
                 }
             }
@@ -2626,7 +2626,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptCollidingEnd failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptCollidingEnd failed - continuing.");
                     }
                 }
             }
@@ -2645,7 +2645,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptLandCollidingStart failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptLandCollidingStart failed - continuing.");
                     }
                 }
             }
@@ -2664,7 +2664,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptLandColliding failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptLandColliding failed - continuing.");
                     }
                 }
             }
@@ -2683,7 +2683,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptLandCollidingEnd failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerScriptLandCollidingEnd failed - continuing.");
                     }
                 }
             }
@@ -2702,7 +2702,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerSetRootAgentScene failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerSetRootAgentScene failed - continuing.");
                     }
                 }
             }
@@ -2721,7 +2721,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnRegionUp failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnRegionUp failed - continuing.");
                     }
                 }
             }
@@ -2740,7 +2740,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnSceneObjectLoaded failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnSceneObjectLoaded failed - continuing.");
                     }
                 }
             }
@@ -2759,7 +2759,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnSceneObjectPreSave failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnSceneObjectPreSave failed - continuing.");
                     }
                 }
             }
@@ -2778,7 +2778,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnSceneObjectPartCopy failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnSceneObjectPartCopy failed - continuing.");
                     }
                 }
             }
@@ -2797,7 +2797,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerSceneObjectPartUpdated failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerSceneObjectPartUpdated failed - continuing.");
                     }
                 }
             }
@@ -2816,7 +2816,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerScenePresenceUpdated failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerScenePresenceUpdated failed - continuing.");
                     }
                 }
             }
@@ -2836,7 +2836,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerOnSceneObjectPartCopy failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerOnSceneObjectPartCopy failed - continuing.");
                     }
                 }
             }
@@ -2855,7 +2855,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError($"[EVENT MANAGER]: Delegate for TriggerSceneShuttingDown failed - continuing.");
+                        _logger?.LogError($"[EVENT MANAGER]: Delegate for TriggerSceneShuttingDown failed - continuing.");
                     }
                 }
             }
@@ -2875,7 +2875,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for RegionStarted failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for RegionStarted failed - continuing.");
                     }
                 }
             }
@@ -2895,7 +2895,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for OnRegionHeartbeatStart failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for OnRegionHeartbeatStart failed - continuing.");
                     }
                 }
             }
@@ -2915,7 +2915,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for OnRegionHeartbeatEnd failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for OnRegionHeartbeatEnd failed - continuing.");
                     }
                 }
             }
@@ -2935,7 +2935,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for OnRegionLoginsStatusChange failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for OnRegionLoginsStatusChange failed - continuing.");
                     }
                 }
             }
@@ -2955,7 +2955,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for OnRegionReadyStatusChange failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for OnRegionReadyStatusChange failed - continuing.");
                     }
                 }
             }
@@ -2975,7 +2975,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for PrimsLoaded failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for PrimsLoaded failed - continuing.");
                     }
                 }
             }
@@ -2995,7 +2995,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TeleportStart failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TeleportStart failed - continuing.");
                     }
                 }
             }
@@ -3015,7 +3015,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TeleportFail failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TeleportFail failed - continuing.");
                     }
                 }
             }
@@ -3037,7 +3037,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for ExtraSettingChanged failed - continuing.");
+                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for ExtraSettingChanged failed - continuing.");
                     }
                 }
             }
@@ -3062,7 +3062,7 @@ namespace OpenSim.Region.Framework.Scenes
         //                    }
         //                    catch (Exception e)
         //                    {
-        //                        _logger.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerUuidGather failed - continuing {0} - {1}",
+        //                        _logger?.LogError(e, $"[EVENT MANAGER]: Delegate for TriggerUuidGather failed - continuing {0} - {1}",
         //);
         //                    }
         //                }

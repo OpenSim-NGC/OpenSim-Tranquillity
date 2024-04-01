@@ -366,9 +366,9 @@ namespace OpenSim.Framework
         private string m_DestinationGuideURL = string.Empty;
         private string m_economyURL = string.Empty;
 
-        private readonly ILogger<GridInfo> m_logger;
+        private readonly ILogger? m_logger;
 
-        public GridInfo (IConfiguration config, ILogger<GridInfo> logger, string defaultURI = "")
+        public GridInfo (IConfiguration config, ILogger? logger, string defaultURI = "")
         {
             m_logger = logger;
 
@@ -401,7 +401,7 @@ namespace OpenSim.Framework
 
             if (!m_gateKeeperURL.IsResolvedHost)
             {
-                m_logger.LogError(m_gateKeeperURL.IsValidHost ?  "Could not resolve GatekeeperURI" : "GatekeeperURI is a invalid host");
+                m_logger?.LogError(m_gateKeeperURL.IsValidHost ?  "Could not resolve GatekeeperURI" : "GatekeeperURI is a invalid host");
                 throw new Exception("GatekeeperURI configuration error");
             }
 
@@ -446,7 +446,7 @@ namespace OpenSim.Framework
 
             if (!m_homeURL.IsResolvedHost)
             {
-                m_logger.LogError(m_homeURL.IsValidHost ?  "Could not resolve HomeURI" : "HomeURI is a invalid host");
+                m_logger?.LogError(m_homeURL.IsValidHost ?  "Could not resolve HomeURI" : "HomeURI is a invalid host");
                 throw new Exception("HomeURI configuration error");
             }
 
@@ -483,7 +483,7 @@ namespace OpenSim.Framework
                 tmpuri = new OSHTTPURI(m_SearchURL.Trim(), true);
                 if (!tmpuri.IsResolvedHost)
                 {
-                    m_logger.LogError(tmpuri.IsValidHost ? "Could not resolve SearchServerURI" : "SearchServerURI is a invalid host");
+                    m_logger?.LogError(tmpuri.IsValidHost ? "Could not resolve SearchServerURI" : "SearchServerURI is a invalid host");
                     throw new Exception("SearchServerURI configuration error");
                 }
                 m_SearchURL = tmpuri.URI;
@@ -499,7 +499,7 @@ namespace OpenSim.Framework
                 tmpuri = new OSHTTPURI(m_DestinationGuideURL.Trim(), true);
                 if (!tmpuri.IsResolvedHost)
                 {
-                    m_logger.LogError(tmpuri.IsValidHost ? "Could not resolve DestinationGuideURL" : "DestinationGuideURL is a invalid host");
+                    m_logger?.LogError(tmpuri.IsValidHost ? "Could not resolve DestinationGuideURL" : "DestinationGuideURL is a invalid host");
                     throw new Exception("DestinationGuideURL configuration error");
                 }
                 m_DestinationGuideURL = tmpuri.URI;
@@ -511,7 +511,7 @@ namespace OpenSim.Framework
                 tmpuri = new OSHTTPURI(m_economyURL.Trim(), true);
                 if (!tmpuri.IsResolvedHost)
                 {
-                    m_logger.LogError(tmpuri.IsValidHost ? "Could not resolve economyURL" : "economyURL is a invalid host");
+                    m_logger?.LogError(tmpuri.IsValidHost ? "Could not resolve economyURL" : "economyURL is a invalid host");
                     throw new Exception("economyURL configuration error");
                 }
                 m_economyURL = tmpuri.URI;
