@@ -86,7 +86,7 @@ namespace OpenSim.Server.Handlers.Hypergrid
                 
             m_UserAgentService = m_context.ResolveNamed<IUserAgentService>(theService);
 
-            HttpServer.AddStreamHandler(new HGFriendsServerPostHandler(m_TheService, m_UserAgentService, null /*m_friendsSimConnector*/ ));
+            HttpServer.AddStreamHandler(new HGFriendsServerPostHandler(m_logger, m_TheService, m_UserAgentService, null /*m_friendsSimConnector*/ ));
         }
     }
 }

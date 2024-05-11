@@ -35,9 +35,9 @@ namespace OpenSim.Region.Framework.Scenes
         private object MAOLock = new object();
         private Dictionary<string, UUID> m_overrides = new Dictionary<string, UUID>();
 
-        private readonly ILogger _logger;
+        private readonly ILogger? _logger;
 
-        public MovementAnimationOverrides(ILogger<MovementAnimationOverrides> logger)
+        public MovementAnimationOverrides(ILogger? logger)
         {
             _logger = logger;
         }
@@ -53,7 +53,7 @@ namespace OpenSim.Region.Framework.Scenes
                 return;
             }
 
-            _logger.LogDebug($"Setting override for {state} to {animID}", state, animID);
+            _logger?.LogDebug($"Setting override for {state} to {animID}", state, animID);
 
             lock (MAOLock)
                 m_overrides[state] = animID;

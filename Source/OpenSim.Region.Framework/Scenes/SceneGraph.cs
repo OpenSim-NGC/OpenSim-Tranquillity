@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
 using OpenSim.Framework;
@@ -109,6 +109,8 @@ namespace OpenSim.Region.Framework.Scenes
             m_scenePartsLock.Dispose();
             m_scenePresencesLock.Dispose();
         }
+
+        public ILogger? Logger { get { return m_parentScene?.Logger;  } }
 
         public PhysicsScene PhysicsScene
         {
@@ -412,24 +414,24 @@ namespace OpenSim.Region.Framework.Scenes
         {
             if (sceneObject is null)
             {
-                m_log.Error("[SCENEGRAPH]: Tried to add null scene object");
+                Logger?.LogError("[SCENEGRAPH]: Tried to add null scene object");
                 return false;
             }
             if (sceneObject.UUID.IsZero())
             {
-                m_log.Error(
-                    $"[SCENEGRAPH]: Tried to add scene object {sceneObject.Name} to {m_parentScene.RegionInfo.RegionName} with Zero UUID");
+                Logger?.LogError($"[SCENEGRAPH]: Tried to add scene object {sceneObject.Name} to {m_parentScene.RegionInfo.RegionName} with Zero UUID");
                 return false;
             }
 
             if (Entities.ContainsKey(sceneObject.UUID))
             {
-                m_log.Debug(
-                    $"[SCENEGRAPH]: Scene graph for {m_parentScene.RegionInfo.RegionName} already contains object {sceneObject.UUID} in AddSceneObject()");
+                Logger?.LogDebug(
+                    $"[SCENEGRAPH]: Scene graph for {m_parentScene.RegionInfo.RegionName} " +
+                    $"already contains object {sceneObject.UUID} in AddSceneObject()");
                 return false;
             }
 
-            //m_log.DebugFormat(
+            //Logger?.DebugFormat(
             //    "[SCENEGRAPH]: Adding scene object {0} {1}, with {2} parts on {3}",
             //    sceneObject.Name, sceneObject.UUID, sceneObject.Parts.Length, m_parentScene.RegionInfo.RegionName);
 
@@ -502,7 +504,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <returns>true if the object was deleted, false if there was no object to delete</returns>
         public bool DeleteSceneObject(UUID uuid, bool resultOfObjectLinked)
         {
-//            m_log.DebugFormat(
+//            Logger?.DebugFormat(
 //                "[SCENE GRAPH]: Deleting scene object with uuid {0}, resultOfObjectLinked = {1}",
 //                uuid, resultOfObjectLinked);
 
@@ -624,7 +626,7 @@ namespace OpenSim.Region.Framework.Scenes
                 }
                 catch (Exception e)
                 {
-                    m_log.Error($"[INNER SCENE]: Failed to update {sog.Name}, {sog.UUID} - {e.Message}");
+                    Logger?.LogError(e, $"[INNER SCENE]: Failed to update {sog.Name}, {sog.UUID}.");
                 }
             }
         }
@@ -713,7 +715,7 @@ namespace OpenSim.Region.Framework.Scenes
         {
             if (!Entities.Remove(agentID))
             {
-                m_log.Warn($"[SCENE GRAPH]: Tried to remove non-existent scene presence with ID {agentID}");
+                Logger?.LogWarning($"[SCENE GRAPH]: Tried to remove non-existent scene presence with ID {agentID}");
             }
 
             bool entered = false;
@@ -743,7 +745,7 @@ namespace OpenSim.Region.Framework.Scenes
                 }
                 else
                 {
-                    m_log.Warn($"[SCENE GRAPH]: Tried to remove non-existent scene presence with ID {agentID}");
+                    Logger?.LogWarning($"[SCENE GRAPH]: Tried to remove non-existent scene presence with ID {agentID}");
                 }
             }
             finally
@@ -1350,7 +1352,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        m_log.Warn($"[SCENEGRAPH]: Problem processing action in ForEachSOG: {e.Message}");
+                        Logger?.LogWarning(e, $"[SCENEGRAPH]: Problem processing action in ForEachSOG.");
                     }
                 }
             }
@@ -1375,7 +1377,7 @@ namespace OpenSim.Region.Framework.Scenes
                 }
                 catch (Exception e)
                 {
-                    m_log.Error($"[SCENEGRAPH]: Error in {m_parentScene.RegionInfo.RegionName}: {e.Message}");
+                    Logger?.LogError(e, $"[SCENEGRAPH]: Error in {m_parentScene.RegionInfo.RegionName}.");
                 }
             };
         }
@@ -1397,7 +1399,7 @@ namespace OpenSim.Region.Framework.Scenes
                 }
                 catch (Exception e)
                 {
-                    m_log.Error($"[SCENEGRAPH]: Error in {m_parentScene.RegionInfo.RegionName}: {e.Message}");
+                    Logger?.LogError(e, $"[SCENEGRAPH]: Error in {m_parentScene.RegionInfo.RegionName}");
                 }
             }
         }
@@ -1760,7 +1762,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="clickAction"></param>
         protected internal void PrimClickAction(IClientAPI remoteClient, uint primLocalID, string clickAction)
         {
-            //m_log.DebugFormat(
+            //Logger?.DebugFormat(
             //    "[SCENEGRAPH]: User {0} set click action for {1} to {2}", remoteClient.Name, primLocalID, clickAction);
 
             SceneObjectGroup group = GetGroupByPrim(primLocalID);
@@ -2102,7 +2104,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <summary>
         public SceneObjectGroup DuplicateObject(uint originalPrimID, Vector3 offset, UUID AgentID, UUID GroupID, Quaternion rot, bool createSelected)
         {
-//            m_log.DebugFormat(
+//            Logger?.DebugFormat(
 //                "[SCENE]: Duplication of object {0} at offset {1} requested by agent {2}",
 //                originalPrimID, offset, AgentID);
 
@@ -2186,7 +2188,7 @@ namespace OpenSim.Region.Framework.Scenes
             }
             else
             {
-                m_log.Warn($"[SCENE]: Attempted to duplicate nonexistant prim id {GroupID}");
+                Logger?.LogWarning($"[SCENE]: Attempted to duplicate nonexistant prim id {GroupID}");
             }
 
             return null;

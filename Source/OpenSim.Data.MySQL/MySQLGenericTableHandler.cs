@@ -38,11 +38,22 @@ namespace OpenSim.Data.MySQL
 {
     public class MySQLGenericTableHandler<T> : MySqlFramework where T: class, new()
     {
+        private readonly ILogger _logger;
+
         protected Dictionary<string, FieldInfo> m_Fields = new Dictionary<string, FieldInfo>();
 
         protected List<string> m_ColumnNames = null;
         protected string m_Realm;
         protected FieldInfo m_DataField = null;
+
+        public MySQLGenericTableHandler(ILogger logger)
+        {
+            _logger = logger;
+        }
+
+        public MySQLGenericTableHandler()
+        {
+        }
 
         public string Realm => m_Realm;
 
@@ -74,7 +85,7 @@ namespace OpenSim.Data.MySQL
                 using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
                 {
                     dbcon.Open();
-                    Migration m = new Migration(dbcon, Assembly, storeName);
+                    Migration m = new Migration(_logger, dbcon, Assembly, storeName);
                     m.Update();
                 }
             }

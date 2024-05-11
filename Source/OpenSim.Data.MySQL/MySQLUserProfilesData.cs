@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Data;
 using System.Reflection;
 using System.Security.AccessControl;
@@ -37,9 +36,6 @@ using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
 using MySqlConnector;
-
-using log4net;
-using log4net.Core;
 
 namespace OpenSim.Data.MySQL
 {
@@ -81,7 +77,7 @@ namespace OpenSim.Data.MySQL
             {
                 dbcon.Open();
 
-                Migration m = new Migration(dbcon, Assembly, "UserProfiles");
+                Migration m = new Migration(m_logger, dbcon, Assembly, "UserProfiles");
                 m.Update();
                 dbcon.Close();
             }

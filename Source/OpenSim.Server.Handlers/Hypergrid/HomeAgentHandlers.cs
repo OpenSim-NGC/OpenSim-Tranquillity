@@ -25,40 +25,33 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.IO;
-using System.Reflection;
 using System.Net;
-using System.Text;
-
-using OpenSim.Server.Base;
-using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
+
 using OpenSim.Framework;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Simulation;
-using Utils = OpenSim.Server.Handlers.Simulation.Utils;
-
-using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using Nini.Config;
-using log4net;
 
+using GridRegion = OpenSim.Services.Interfaces.GridRegion;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Hypergrid
 {
     public class HomeAgentHandler : AgentPostHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private IUserAgentService m_UserAgentService;
+        private readonly ILogger m_logger;
+        private readonly IUserAgentService m_UserAgentService;
 
         private string m_LoginServerIP;
 
-        public HomeAgentHandler(IUserAgentService userAgentService, string loginServerIP, bool proxy) :
-            base("/homeagent")
+        public HomeAgentHandler(
+            ILogger logger, 
+            IUserAgentService userAgentService, 
+            string loginServerIP, 
+            bool proxy) :
+            base(logger, "/homeagent")
         {
+            m_logger = logger;
             m_UserAgentService = userAgentService;
             m_LoginServerIP = loginServerIP;
             m_Proxy = proxy;
@@ -87,13 +80,12 @@ namespace OpenSim.Server.Handlers.Hypergrid
             }
             catch (InvalidCastException)
             {
-                m_log.ErrorFormat("[HOME AGENT HANDLER]: Bad cast in UnpackData");
+                m_logger.LogError("[HOME AGENT HANDLER]: Bad cast in UnpackData");
             }
 
             // Verify if this call came from the login server
             if (remoteAddress == m_LoginServerIP)
                 data.fromLogin = true;
-
         }
 
         protected override GridRegion ExtractGatekeeper(AgentDestinationData d)
@@ -110,7 +102,9 @@ namespace OpenSim.Server.Handlers.Hypergrid
                 return gatekeeper;
             }
             else
-                m_log.WarnFormat("[HOME AGENT HANDLER]: Wrong data type");
+            {
+                m_logger.LogWarning("[HOME AGENT HANDLER]: Wrong data type");
+            }
 
             return null;
         }
@@ -132,5 +126,4 @@ namespace OpenSim.Server.Handlers.Hypergrid
         public string destinationServerURI;
 
     }
-
 }

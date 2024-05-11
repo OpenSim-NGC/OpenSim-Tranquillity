@@ -27,6 +27,7 @@
 
 using System.Net;
 using System.Reflection;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
@@ -74,27 +75,28 @@ namespace OpenSim.Region.Framework.Scenes
                             }
                             catch (Exception e)
                             {
-                                m_log.ErrorFormat("[SCENE MANAGER]: Delegate for OnRegionsReadyStatusChange failed - continuing {0} - {1}",
-                                    e.Message, e.StackTrace);
+                                Logger?.LogError(e, $"[SCENE MANAGER]: Delegate for OnRegionsReadyStatusChange failed - continuing.");
                             }
                         }
                     }
                 }
             }
         }
+
         private bool m_allRegionsReady;
 
-        private static SceneManager m_instance = null;
+        private static SceneManager? m_instance = null;
         public static SceneManager Instance
         {
             get {
                 if (m_instance == null)
                     m_instance = new SceneManager();
+
                 return m_instance;
             }
         }
 
-        private readonly DoubleDictionary<UUID, string, Scene> m_localScenes = new DoubleDictionary<UUID, string, Scene>();
+        private readonly DoubleDictionary<UUID, string, Scene> m_localScenes = new();
 
         public List<Scene> Scenes
         {
@@ -127,10 +129,21 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
-        public SceneManager()
+        /// <summary>
+        /// Logger for the Scene Manager
+        /// <value>
+        /// If null no logging is produced but we'll still function.
+        /// </value>
+        /// </summary>
+        private readonly ILogger? m_logger = null;
+
+        ILogger? Logger { get { return m_logger; } }
+
+        public SceneManager(ILogger<SceneManager>? logger = null)
         {
             m_instance = this;
-            m_localScenes = new DoubleDictionary<UUID, string, Scene>();
+            m_localScenes = new();
+            m_logger = logger;
         }
 
         public void Close()
@@ -213,7 +226,7 @@ namespace OpenSim.Region.Framework.Scenes
             }
             else
             {
-                m_log.Error("[REGION]: Unable to notify Other regions of this Region coming up");
+                Logger?.LogError("[REGION]: Unable to notify Other regions of this Region coming up");
             }
         }
 

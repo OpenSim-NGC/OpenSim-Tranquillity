@@ -4,16 +4,15 @@
  */
 
 
-using System;
 using System.Collections;
-using System.IO;
 using System.Xml;
 using System.Net;
 using System.Text;
-using System.Reflection;
+
 using System.Security.Cryptography.X509Certificates;
-using log4net;
+
 using Nwc.XmlRpc;
+using Microsoft.Extensions.Logging;
 
 
 
@@ -21,21 +20,24 @@ namespace NSL.Network.XmlRpc
 {
     public class NSLXmlRpcRequest : XmlRpcRequest
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private Encoding _encoding = new UTF8Encoding();
         private XmlRpcRequestSerializer _serializer = new XmlRpcRequestSerializer();
         private XmlRpcResponseDeserializer _deserializer = new XmlRpcResponseDeserializer();
 
+        private readonly ILogger<NSLXmlRpcRequest> _logger;
 
-        public NSLXmlRpcRequest()
+        public NSLXmlRpcRequest(ILogger<NSLXmlRpcRequest> logger)
         {
+            _logger = logger;
+
             _params = new ArrayList();
         }
 
 
-        public NSLXmlRpcRequest(String methodName, IList parameters)
+        public NSLXmlRpcRequest(ILogger<NSLXmlRpcRequest> logger, String methodName, IList parameters)
         {
+            _logger = logger;
+
             MethodName = methodName;
             _params = parameters;
         }
@@ -43,9 +45,10 @@ namespace NSL.Network.XmlRpc
 
         public XmlRpcResponse certSend(String url, X509Certificate2 myClientCert, bool checkServerCert, Int32 timeout)
         {
-            m_log.InfoFormat("[MONEY NSL RPC]: XmlRpcResponse certSend: connect to {0}", url);
+            _logger.LogInformation($"[MONEY NSL RPC]: XmlRpcResponse certSend: connect to {url}");
 
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+
             if (request == null)
             {
                 throw new XmlRpcException(XmlRpcErrorCodes.TRANSPORT_ERROR, XmlRpcErrorCodes.TRANSPORT_ERROR_MSG + ": Could not create request with " + url);
@@ -60,37 +63,44 @@ namespace NSL.Network.XmlRpc
             if (myClientCert != null)
             {
                 request.ClientCertificates.Add(myClientCert);   // Own certificate
-                m_log.ErrorFormat("[MONEY NSL RPC]: 111111111111111111111111111");
+                _logger.LogError("[MONEY NSL RPC]: 111111111111111111111111111");
             }
+
             if (!checkServerCert) request.Headers.Add("NoVerifyCert", "true");    // Do not verify the certificate of the other party
 
-            Stream stream = null;
+            Stream? stream = null;
             try
             {
                 stream = request.GetRequestStream();
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[MONEY NSL RPC]: GetRequestStream Error: {0}", ex);
+                _logger.LogError(ex, $"[MONEY NSL RPC]: GetRequestStream Error.");
                 stream = null;
             }
-            if (stream == null) return null;
 
-            //
+            if (stream == null)
+            {
+                return null;
+            }
+
             XmlTextWriter xml = new XmlTextWriter(stream, _encoding);
+
             _serializer.Serialize(xml, this);
             xml.Flush();
             xml.Close();
 
-            HttpWebResponse response = null;
+            HttpWebResponse? response = null;
+
             try
             {
                 response = (HttpWebResponse)request.GetResponse();
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[MONEY NSL RPC]: XmlRpcResponse certSend: GetResponse Error: {0}", ex.ToString());
+                _logger.LogError(ex, $"[MONEY NSL RPC]: XmlRpcResponse certSend: GetResponse Error.");
             }
+
             StreamReader input = new StreamReader(response.GetResponseStream());
 
             string inputXml = input.ReadToEnd();
@@ -98,6 +108,7 @@ namespace NSL.Network.XmlRpc
 
             input.Close();
             response.Close();
+
             return resp;
         }
     }

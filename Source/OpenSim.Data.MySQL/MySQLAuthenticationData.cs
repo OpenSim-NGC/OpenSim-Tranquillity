@@ -36,11 +36,19 @@ namespace OpenSim.Data.MySQL
 {
     public class MySqlAuthenticationData : MySqlFramework, IAuthenticationData
     {
+        private readonly ILogger<MySqlAuthenticationData> _logger;
+
         private string m_Realm;
         private List<string> m_ColumnNames;
         private int m_LastExpire;
+
+        public MySqlAuthenticationData(ILogger<MySqlAuthenticationData> logger)
+        {
+            _logger = logger;
+        }
+
         // private string m_connectionString;
-        
+
         protected virtual Assembly Assembly
         {
             get { return GetType().Assembly; }
@@ -56,7 +64,7 @@ namespace OpenSim.Data.MySQL
             using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
             {
                 dbcon.Open();
-                Migration m = new Migration(dbcon, Assembly, "AuthStore");
+                Migration m = new Migration(_logger, dbcon, Assembly, "AuthStore");
                 m.Update();
                 dbcon.Close();
             }

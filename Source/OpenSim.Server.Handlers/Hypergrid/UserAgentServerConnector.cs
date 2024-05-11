@@ -47,7 +47,7 @@ namespace OpenSim.Server.Handlers.Hypergrid
 {
     public class UserAgentServerConnector : IServiceConnector
     {
-        private string[] m_AuthorizedCallers;
+        private string[]? m_AuthorizedCallers;
         private bool m_VerifyCallers = false;
 
         private readonly IConfiguration m_configuration;
@@ -55,18 +55,18 @@ namespace OpenSim.Server.Handlers.Hypergrid
         private readonly IComponentContext m_context;
         
         public UserAgentServerConnector(
+            IComponentContext componentContext,
             IConfiguration config, 
-            ILogger<UserAgentServerConnector> logger,
-            IComponentContext componentContext)
+            ILogger<UserAgentServerConnector> logger)
         {
             m_configuration = config;
             m_logger = logger;
             m_context = componentContext;
         }
 
-        private IUserAgentService m_HomeUsersService;
+        private IUserAgentService? m_HomeUsersService;
         
-        public IUserAgentService HomeUsersService
+        public IUserAgentService? HomeUsersService
         {
             get { return m_HomeUsersService; }
         }
@@ -82,20 +82,22 @@ namespace OpenSim.Server.Handlers.Hypergrid
             var gridConfig = m_configuration.GetSection(ConfigName);
             if (gridConfig.Exists())
             {
-                string service = gridConfig.GetValue("LocalServiceModule", string.Empty);
-                m_HomeUsersService = m_context.ResolveNamed<IUserAgentService>(service);
+                string? service = gridConfig.GetValue("LocalServiceModule", string.Empty);
+                if (string.IsNullOrEmpty(service) is false)
+                    m_HomeUsersService = m_context.ResolveNamed<IUserAgentService>(service);
             }
 
             if (m_HomeUsersService == null)
                 throw new Exception("UserAgent server connector cannot proceed because of missing service");
 
-            string loginServerIP = gridConfig.GetValue("LoginServerIP", "127.0.0.1");
+            string? loginServerIP = gridConfig.GetValue("LoginServerIP", "127.0.0.1");
             bool proxy = gridConfig.GetValue<bool>("HasProxy", false);
             m_VerifyCallers = gridConfig.GetValue<bool>("VerifyCallers", false);
-            string csv = gridConfig.GetValue("AuthorizedCallers", "127.0.0.1");
 
-            csv = csv.Replace(" ", "");
-            m_AuthorizedCallers = csv.Split(',');
+            string? csv = gridConfig.GetValue("AuthorizedCallers", "127.0.0.1");
+            csv = csv?.Replace(" ", "");
+
+            m_AuthorizedCallers = csv?.Split(',');
 
             HttpServer.AddXmlRPCHandler("agent_is_coming_home", AgentIsComingHome, false);
             HttpServer.AddXmlRPCHandler("get_home_region", GetHomeRegion, false);
@@ -111,12 +113,12 @@ namespace OpenSim.Server.Handlers.Hypergrid
             HttpServer.AddXmlRPCHandler("get_uui", GetUUI, false);
             HttpServer.AddXmlRPCHandler("get_uuid", GetUUID, false);
 
-            HttpServer.AddSimpleStreamHandler(new HomeAgentHandler(m_HomeUsersService, loginServerIP, proxy), true);
+            HttpServer.AddSimpleStreamHandler(new HomeAgentHandler(m_logger, m_HomeUsersService, loginServerIP, proxy), true);
         }
 
         public XmlRpcResponse GetHomeRegion(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            Hashtable requestData = (Hashtable)request.Params[0];
+            Hashtable? requestData = (Hashtable)request.Params[0];
             //string host = (string)requestData["host"];
             //string portstr = (string)requestData["port"];
             string userID_str = (string)requestData["userID"];

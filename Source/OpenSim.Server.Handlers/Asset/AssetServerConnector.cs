@@ -43,14 +43,17 @@ namespace OpenSim.Server.Handlers.Asset
 {
     public class AssetServiceConnector : IServiceConnector
     {
+        private readonly IServiceProvider m_serviceProvider;
         private readonly IComponentContext m_context;
         private IAssetService m_AssetService;
        
         public AssetServiceConnector(
+            IServiceProvider serviceProvider,
             IComponentContext componentContext,
             IConfiguration configuration,
             ILogger<AssetServiceConnector> logger)
         {
+            m_serviceProvider = serviceProvider;
             m_context = componentContext;
             Config = configuration;
             Logger = logger;
@@ -86,7 +89,7 @@ namespace OpenSim.Server.Handlers.Asset
 
             bool allowDelete = serverConfig.GetValue<bool>("AllowRemoteDelete", false);
             bool allowDeleteAllTypes = serverConfig.GetValue<bool>("AllowRemoteDeleteAllTypes", false);
-            string redirectURL = serverConfig.GetValue<string>("RedirectURL", string.Empty);
+            string? redirectURL = serverConfig.GetValue<string>("RedirectURL", string.Empty);
 
             AllowedRemoteDeleteTypes allowedRemoteDeleteTypes;
 
@@ -104,9 +107,9 @@ namespace OpenSim.Server.Handlers.Asset
 
             IServiceAuth auth = ServiceAuth.Create(Config, ConfigName);
 
-            HttpServer.AddStreamHandler(new AssetServerGetHandler(m_AssetService, auth, redirectURL));
+            HttpServer.AddStreamHandler(new AssetServerGetHandler(Logger, m_AssetService, auth, redirectURL));
             HttpServer.AddStreamHandler(new AssetServerPostHandler(m_AssetService, auth));
-            HttpServer.AddStreamHandler(new AssetServerDeleteHandler(m_AssetService, allowedRemoteDeleteTypes, auth));
+            HttpServer.AddStreamHandler(new AssetServerDeleteHandler(Logger, m_AssetService, allowedRemoteDeleteTypes, auth));
             HttpServer.AddStreamHandler(new AssetsExistHandler(m_AssetService));
 
             MainConsole.Instance.Commands.AddCommand("Assets", false,

@@ -25,23 +25,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
-using System.Collections.Generic;
 using System.Data;
 using OpenSim.Framework;
-using log4net;
 using OpenMetaverse;
 using MySqlConnector;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.MySQL
 {
     public class MySQLFSAssetData : IFSAssetDataPlugin
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        protected readonly ILogger _logger;
 
-        protected string m_ConnectionString;
-        protected string m_Table;
+        protected string? m_ConnectionString;
+        protected string? m_Table;
 
         /// <summary>
         /// Number of days that must pass before we update the access time on an asset when it has been fetched
@@ -54,8 +52,9 @@ namespace OpenSim.Data.MySQL
             get { return GetType().Assembly; }
         }
 
-        public MySQLFSAssetData()
+        public MySQLFSAssetData(ILogger<MySQLFSAssetData> logger)
         {
+            _logger = logger;
         }
 
         #region IPlugin Members
@@ -75,14 +74,14 @@ namespace OpenSim.Data.MySQL
                 using (MySqlConnection conn = new MySqlConnection(m_ConnectionString))
                 {
                     conn.Open();
-                    Migration m = new Migration(conn, Assembly, "FSAssetStore");
+                    Migration m = new Migration(_logger, conn, Assembly, "FSAssetStore");
                     m.Update();
                     conn.Close();
                 }
             }
             catch (MySqlException e)
             {
-                m_log.ErrorFormat("[FSASSETS]: Can't connect to database: {0}", e.Message.ToString());
+                _logger.LogError(e, $"[FSASSETS]: Can't connect to database.");
             }
         }
 
@@ -110,7 +109,7 @@ namespace OpenSim.Data.MySQL
                 }
                 catch (MySqlException e)
                 {
-                    m_log.ErrorFormat("[FSASSETS]: Database open failed with {0}", e.ToString());
+                    _logger.LogError(e, $"[FSASSETS]: Database open failed.");
                     return false;
                 }
 
@@ -123,7 +122,7 @@ namespace OpenSim.Data.MySQL
                 {
                     cmd.Connection = null;
                     conn.Close();
-                    m_log.ErrorFormat("[FSASSETS]: Query {0} failed with {1}", cmd.CommandText, e.ToString());
+                    _logger.LogError(e, $"[FSASSETS]: Query {cmd.CommandText} failed.");
                     return false;
                 }
                 conn.Close();
@@ -149,7 +148,7 @@ namespace OpenSim.Data.MySQL
                 }
                 catch (MySqlException e)
                 {
-                    m_log.ErrorFormat("[FSASSETS]: Database open failed with {0}", e.ToString());
+                    _logger.LogError(e, $"[FSASSETS]: Database open failed.");
                     return null;
                 }
 
@@ -179,6 +178,7 @@ namespace OpenSim.Data.MySQL
                         UpdateAccessTime(id, AccessTime);
                     }
                 }
+
                 conn.Close();
             }
 
@@ -200,7 +200,7 @@ namespace OpenSim.Data.MySQL
                 }
                 catch (MySqlException e)
                 {
-                    m_log.ErrorFormat("[FSASSETS]: Database open failed with {0}", e.ToString());
+                    _logger.LogError(e, $"[FSASSETS]: Database open failed.");
                     return;
                 }
 
@@ -210,6 +210,7 @@ namespace OpenSim.Data.MySQL
                     cmd.Parameters.AddWithValue("?id", AssetID);
                     cmd.ExecuteNonQuery();
                 }
+
                 conn.Close();
             }
         }
@@ -254,8 +255,7 @@ namespace OpenSim.Data.MySQL
             }
             catch(Exception e)
             {
-                m_log.Error("[FSAssets] Failed to store asset with ID " + meta.ID);
-                m_log.Error(e.ToString());
+                _logger.LogError(e, $"[FSAssets] Failed to store asset with ID {meta.ID}.");
                 return false;
             }
         }
@@ -287,7 +287,7 @@ namespace OpenSim.Data.MySQL
                 }
                 catch (MySqlException e)
                 {
-                    m_log.ErrorFormat("[FSASSETS]: Failed to open database: {0}", e.ToString());
+                    _logger.LogError(e, $"[FSASSETS]: Failed to open database.");
                     return results;
                 }
 
@@ -309,6 +309,7 @@ namespace OpenSim.Data.MySQL
 
             for (int i = 0; i < uuids.Length; i++)
                 results[i] = exists.Contains(uuids[i]);
+
             return results;
         }
 
@@ -324,7 +325,7 @@ namespace OpenSim.Data.MySQL
                 }
                 catch (MySqlException e)
                 {
-                    m_log.ErrorFormat("[FSASSETS]: Failed to open database: {0}", e.ToString());
+                    _logger.LogError(e, $"[FSASSETS]: Failed to open database.");
                     return 0;
                 }
 
@@ -372,9 +373,7 @@ namespace OpenSim.Data.MySQL
                 }
                 catch (MySqlException e)
                 {
-                    m_log.ErrorFormat("[FSASSETS]: Can't connect to database: {0}",
-                            e.Message.ToString());
-
+                    _logger.LogError(e, $"[FSASSETS]: Can't connect to database.");
                     return;
                 }
 

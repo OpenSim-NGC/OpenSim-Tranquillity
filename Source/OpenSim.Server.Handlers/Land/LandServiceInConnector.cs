@@ -75,7 +75,7 @@ namespace OpenSim.Server.Handlers.Land
             //if (authentication)
             //    m_AuthenticationService = m_scene.RequestModuleInterface<IAuthenticationService>();
 
-            LandHandlers landHandlers = new LandHandlers(m_LandService);
+            LandHandlers landHandlers = new LandHandlers(Logger, m_LandService);
             HttpServer.AddXmlRPCHandler("land_data", landHandlers.GetLandData, false);
         }
     }

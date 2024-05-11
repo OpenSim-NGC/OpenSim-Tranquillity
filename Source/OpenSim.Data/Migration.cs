@@ -73,25 +73,25 @@ namespace OpenSim.Data
         private Regex _match_old;
         private Regex _match_new;
 
-        protected readonly ILogger<Migration> _logger;
+        protected readonly ILogger _logger;
 
         /// <summary>Have the parameterless constructor just so we can specify it as a generic parameter with the new() constraint.
         /// Currently this is only used in the tests. A Migration instance created this way must be then
         /// initialized with Initialize(). Regular creation should be through the parameterized constructors.
         /// </summary>
-        public Migration(ILogger<Migration> logger)
+        public Migration(ILogger logger)
         {
             _logger = logger;
         }
 
-        public Migration(ILogger<Migration> logger, DbConnection conn, Assembly assem, string subtype, string type)
+        public Migration(ILogger logger, DbConnection conn, Assembly assem, string subtype, string type)
         {
             _logger = logger;
 
             Initialize(conn, assem, type, subtype);
         }
 
-        public Migration(ILogger<Migration> logger, DbConnection conn, Assembly assem, string type)
+        public Migration(ILogger logger, DbConnection conn, Assembly assem, string type)
         {
             _logger = logger;
 
@@ -126,6 +126,7 @@ namespace OpenSim.Data
             {
                 if (ver < 0)
                     ExecuteScript("create table migrations(name varchar(100), version int)");
+
                 InsertVersion("migrations", 1);
             }
         }

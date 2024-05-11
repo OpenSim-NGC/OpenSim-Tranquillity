@@ -25,13 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Data;
-using log4net;
 using OpenMetaverse;
-using OpenSim.Framework;
 using MySqlConnector;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.MySQL
 {
@@ -40,19 +37,22 @@ namespace OpenSim.Data.MySQL
     /// </summary>
     public class MySQLXInventoryData : IXInventoryData
     {
+        private readonly ILogger _logger;
+
         private MySqlFolderHandler m_Folders;
         private MySqlItemHandler m_Items;
 
-        public MySQLXInventoryData()
+        public MySQLXInventoryData(ILogger logger)
         {
+            _logger = logger;
         }
 
         public void Initialize(string connString, string realm)
         {
-            m_Folders = new MySqlFolderHandler();
+            m_Folders = new MySqlFolderHandler(_logger);
             m_Folders.Initialize(connString, "inventoryfolders", "InventoryStore");
 
-            m_Items = new MySqlItemHandler();
+            m_Items = new MySqlItemHandler(_logger);
             m_Items.Initialize(connString, "inventoryitems", string.Empty);
         }
 
@@ -132,6 +132,10 @@ namespace OpenSim.Data.MySQL
 
     public class MySqlItemHandler : MySqlInventoryHandler<XInventoryItem>
     {
+        public MySqlItemHandler(ILogger logger) : base(logger)
+        {
+        }
+
         public void Initialize(string c, string t, string m)
         {
             base.Initialize(c, t, m);
@@ -256,6 +260,10 @@ namespace OpenSim.Data.MySQL
 
     public class MySqlFolderHandler : MySqlInventoryHandler<XInventoryFolder>
     {
+        public MySqlFolderHandler(ILogger logger) : base(logger)
+        {
+        }
+
         public void Initialize(string c, string t, string m)
         {
             base.Initialize(c, t, m);
@@ -298,7 +306,11 @@ namespace OpenSim.Data.MySQL
     }
 
     public class MySqlInventoryHandler<T> : MySQLGenericTableHandler<T> where T: class, new()
-    { 
+    {
+        public MySqlInventoryHandler(ILogger logger) : base(logger)
+        {
+        }
+
         public void Initialize(string c, string t, string m)
         {
             base.Initialize(c, t, m);

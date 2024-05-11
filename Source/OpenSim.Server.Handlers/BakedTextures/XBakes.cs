@@ -25,22 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
-using log4net;
+
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.BakedTextures
 {
     public class XBakes : IBakedTextureService
     {
-        private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
-
         protected string m_FSBase;
+        protected readonly ILogger<XBakes> m_logger;
 
-        public XBakes(IConfiguration config)
+        public XBakes(IConfiguration config, ILogger<XBakes> logger)
         {
+            m_logger = logger;
+
             MainConsole.Instance.Commands.AddCommand("fs", false,
                     "delete bakes", "delete bakes <ID>",
                     "Delete agent's baked textures from server",
@@ -55,11 +56,11 @@ namespace OpenSim.Server.Handlers.BakedTextures
             m_FSBase = assetConfig.GetValue("BaseDirectory", string.Empty);
             if (string.IsNullOrEmpty(m_FSBase))
             {
-                m_log.ErrorFormat("[BAKES]: BaseDirectory not specified");
+                m_logger.LogError($"[BAKES]: BaseDirectory not specified");
                 throw new Exception("Configuration error");
             }
 
-            m_log.Info("[BAKES]: XBakes service enabled");
+            m_logger.LogInformation($"[BAKES]: XBakes service enabled");
         }
 
         public byte[] Get(string id)
@@ -75,6 +76,7 @@ namespace OpenSim.Server.Handlers.BakedTextures
             catch
             {
             }
+
             return Array.Empty<byte>();
         }
 

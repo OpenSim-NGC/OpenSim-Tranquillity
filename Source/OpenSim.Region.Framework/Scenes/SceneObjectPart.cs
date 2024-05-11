@@ -30,6 +30,7 @@ using System.Reflection;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
 using OpenSim.Framework;
@@ -374,7 +375,7 @@ namespace OpenSim.Region.Framework.Scenes
 //            Console.WriteLine(
 //                "[SCENE OBJECT PART]: Destructor called for {0}, local id {1}, parent {2} {3}",
 //                Name, LocalId, ParentGroup.Name, ParentGroup.LocalId);
-//            m_log.DebugFormat(
+//            Logger?.DebugFormat(
 //                "[SCENE OBJECT PART]: Destructor called for {0}, local id {1}, parent {2} {3}",
 //                Name, LocalId, ParentGroup.Name, ParentGroup.LocalId);
 //        }
@@ -806,7 +807,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat("[SCENEOBJECTPART]: GROUP POSITION. {0}", e);
+                        Logger?.LogError(e, $"[SCENEOBJECTPART]: GROUP POSITION.");
                     }
                 }
             }
@@ -908,19 +909,19 @@ namespace OpenSim.Region.Framework.Scenes
                         if (_parentID == 0)
                         {
                             actor.Orientation = value;
-                            //m_log.Info("[PART]: RO1:" + actor.Orientation.ToString());
+                            //Logger?.Info("[PART]: RO1:" + actor.Orientation.ToString());
                         }
                         else
                         {
                             // Child prim we have to calculate it's world rotationwel
                             Quaternion resultingrotation = GetWorldRotation();
                             actor.Orientation = resultingrotation;
-                            //m_log.Info("[PART]: RO2:" + actor.Orientation.ToString());
+                            //Logger?.Info("[PART]: RO2:" + actor.Orientation.ToString());
                         }
                     }
                     catch (Exception ex)
                     {
-                        m_log.Error("[SCENEOBJECTPART]: ROTATIONOFFSET" + ex.Message);
+                        Logger?.LogError(ex, $"[SCENEOBJECTPART]: ROTATIONOFFSET");
                     }
                 }
             }
@@ -1063,7 +1064,7 @@ namespace OpenSim.Region.Framework.Scenes
             {
 //                if (ParentGroup != null)
 //                {
-//                    m_log.DebugFormat(
+//                    Logger?.DebugFormat(
 //                        "[SCENE OBJECT PART]: Setting linknum of {0}@{1} to {2} from {3}",
 //                        Name, AbsolutePosition, value, m_linkNum);
 //                    Util.PrintCallStack();
@@ -1199,7 +1200,7 @@ namespace OpenSim.Region.Framework.Scenes
             get { return m_createSelected; }
             set
             {
-//                m_log.DebugFormat("[SOP]: Setting CreateSelected to {0} for {1} {2}", value, Name, UUID);
+//                Logger?.DebugFormat("[SOP]: Setting CreateSelected to {0} for {1} {2}", value, Name, UUID);
                 m_createSelected = value;
             }
         }
@@ -1237,7 +1238,7 @@ namespace OpenSim.Region.Framework.Scenes
             set
             {
                 m_sitTargetOrientation = value;
-//                m_log.DebugFormat("[SCENE OBJECT PART]: Set sit target orientation {0} for {1} {2}", m_sitTargetOrientation, Name, LocalId);
+//                Logger?.DebugFormat("[SCENE OBJECT PART]: Set sit target orientation {0} for {1} {2}", m_sitTargetOrientation, Name, LocalId);
             }
         }
 
@@ -1247,7 +1248,7 @@ namespace OpenSim.Region.Framework.Scenes
             set
             {
                 m_sitTargetPosition = value;
-//                m_log.DebugFormat("[SCENE OBJECT PART]: Set sit target position to {0} for {1} {2}", m_sitTargetPosition, Name, LocalId);
+//                Logger?.DebugFormat("[SCENE OBJECT PART]: Set sit target position to {0} for {1} {2}", m_sitTargetPosition, Name, LocalId);
             }
         }
 
@@ -1391,7 +1392,7 @@ namespace OpenSim.Region.Framework.Scenes
             get { return m_flags; }
             set
             {
-                //m_log.DebugFormat("[SOP]: Setting flags for {0} {1} to {2}", UUID, Name, value);
+                //Logger?.DebugFormat("[SOP]: Setting flags for {0} {1} to {2}", UUID, Name, value);
                 m_flags = value & ~(PrimFlags.Touch | PrimFlags.Money | PrimFlags.AllowInventoryDrop);
             }
         }
@@ -1900,13 +1901,13 @@ namespace OpenSim.Region.Framework.Scenes
         {
             if ((m_flags & flag) == 0)
             {
-                //m_log.Debug("Adding flag: " + ((PrimFlags) flag).ToString());
+                //Logger?.Debug("Adding flag: " + ((PrimFlags) flag).ToString());
                 m_flags |= flag;
 
                 if (flag == PrimFlags.TemporaryOnRez)
                     ResetExpire();
             }
-            // m_log.Debug("Aprev: " + prevflag.ToString() + " curr: " + Flags.ToString());
+            // Logger?.Debug("Aprev: " + prevflag.ToString() + " curr: " + Flags.ToString());
         }
 
         public void AddNewParticleSystem(Primitive.ParticleSystem pSystem, bool expire)
@@ -2212,7 +2213,7 @@ namespace OpenSim.Region.Framework.Scenes
 
             ParentGroup.Scene.EventManager.TriggerOnSceneObjectPartCopy(dupe, this, userExposed);
 
-            //m_log.DebugFormat("[SCENE OBJECT PART]: Clone of {0} {1} finished", Name, UUID);
+            //Logger?.DebugFormat("[SCENE OBJECT PART]: Clone of {0} {1} finished", Name, UUID);
 
             return dupe;
         }
@@ -2912,9 +2913,9 @@ namespace OpenSim.Region.Framework.Scenes
         {
             // Note: This is only being called on the root prim at this time.
 
-            m_log.ErrorFormat(
-                "[SCENE OBJECT PART]: Physical object {0}, localID {1} went out of bounds at {2} in {3}.  Stopping at {4} and making non-physical.",
-                Name, LocalId, pos, ParentGroup.Scene.Name, AbsolutePosition);
+            Logger?.LogError(
+                $"[SCENE OBJECT PART]: Physical object {Name}, localID {LocalId} went out of bounds at {pos} " +
+                $"in {ParentGroup.Scene.Name}.  Stopping at {AbsolutePosition} and making non-physical.");
 
             RemFlag(PrimFlags.Physics);
             DoPhysicsPropertyUpdate(false, true);
@@ -2944,10 +2945,10 @@ namespace OpenSim.Region.Framework.Scenes
             // PrimFlags prevflag = Flags;
             if ((m_flags & flag) != 0)
             {
-                //m_log.Debug("Removing flag: " + ((PrimFlags)flag).ToString());
+                //Logger?.Debug("Removing flag: " + ((PrimFlags)flag).ToString());
                 m_flags &= ~flag;
             }
-            //m_log.Debug("prev: " + prevflag.ToString() + " curr: " + Flags.ToString());
+            //Logger?.Debug("prev: " + prevflag.ToString() + " curr: " + Flags.ToString());
             //ScheduleFullUpdate();
         }
 
@@ -3059,7 +3060,7 @@ namespace OpenSim.Region.Framework.Scenes
                 scale.Y = Utils.Clamp(scale.Y, minsize, maxsize);
                 scale.Z = Utils.Clamp(scale.Z, minsize, maxsize);
             }
-//            m_log.DebugFormat("[SCENE OBJECT PART]: Resizing {0} {1} to {2}", Name, LocalId, scale);
+//            Logger?.DebugFormat("[SCENE OBJECT PART]: Resizing {0} {1} to {2}", Name, LocalId, scale);
 
             Scale = scale;
 
@@ -3089,7 +3090,7 @@ namespace OpenSim.Region.Framework.Scenes
 
             if (APIDStrength <= 0)
             {
-                m_log.WarnFormat("[SceneObjectPart] Invalid rotation strength {0}",APIDStrength);
+                Logger?.LogWarning($"[SceneObjectPart] Invalid rotation strength {APIDStrength}");
                 return;
             }
 
@@ -3911,7 +3912,7 @@ namespace OpenSim.Region.Framework.Scenes
         public void SetGroup(UUID groupID, IClientAPI client)
         {
             // Scene.AddNewPrims() calls with client == null so can't use this.
-            // m_log.DebugFormat(
+            // Logger?.DebugFormat(
             //      "[SCENE OBJECT PART]: Setting group for {0} to {1} for {2}",
             //      Name, groupID, OwnerID);
 
@@ -3953,7 +3954,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="events"></param>
         public void SetScriptEvents(UUID scriptid, ulong events)
         {
-            //            m_log.DebugFormat(
+            //            Logger?.DebugFormat(
             //                "[SCENE OBJECT PART]: Set script events for script with id {0} on {1}/{2} to {3} in {4}",
             //                scriptid, Name, ParentGroup.Name, events, ParentGroup.Scene.Name);
             // scriptEvents oldparts;
@@ -4278,7 +4279,7 @@ namespace OpenSim.Region.Framework.Scenes
             // Get our plane normals
             for (int i = 0; i < 6; i++)
             {
-                //m_log.Info("[FACECALCULATION]: FaceA[" + i + "]=" + FaceA[i] + " FaceB[" + i + "]=" + FaceB[i] + " FaceC[" + i + "]=" + FaceC[i] + " FaceD[" + i + "]=" + FaceD[i]);
+                //Logger?.Info("[FACECALCULATION]: FaceA[" + i + "]=" + FaceA[i] + " FaceB[" + i + "]=" + FaceB[i] + " FaceC[" + i + "]=" + FaceC[i] + " FaceD[" + i + "]=" + FaceD[i]);
 
                 // Our Plane direction
                 AmBa = FaceA[i] - FaceB[i];
@@ -4289,7 +4290,7 @@ namespace OpenSim.Region.Framework.Scenes
                 // normalize the cross product to get the normal.
                 normals[i] = cross / cross.Length();
 
-                //m_log.Info("[NORMALS]: normals[ " + i + "]" + normals[i].ToString());
+                //Logger?.Info("[NORMALS]: normals[ " + i + "]" + normals[i].ToString());
                 //distance[i] = (normals[i].X * AmBa.X + normals[i].Y * AmBa.Y + normals[i].Z * AmBa.Z) * -1;
             }
 
@@ -4405,9 +4406,9 @@ namespace OpenSim.Region.Framework.Scenes
                         result.HitTF = true;
                         result.ipoint = q;
                         result.face = i;
-                        //m_log.Info("[FACE]:" + i.ToString());
-                        //m_log.Info("[POINT]: " + q.ToString());
-                        //m_log.Info("[DIST]: " + distance2.ToString());
+                        //Logger?.Info("[FACE]:" + i.ToString());
+                        //Logger?.Info("[POINT]: " + q.ToString());
+                        //Logger?.Info("[DIST]: " + distance2.ToString());
                         if (faceCenters)
                         {
                             result.normal = AAfacenormals[i] * AXrot;
@@ -4731,7 +4732,7 @@ namespace OpenSim.Region.Framework.Scenes
                 ScheduleFullUpdate();
             }
 
-//            m_log.DebugFormat("[SCENE OBJECT PART]: Updated PrimFlags on {0} {1} to {2}", Name, LocalId, Flags);
+//            Logger?.DebugFormat("[SCENE OBJECT PART]: Updated PrimFlags on {0} {1} to {2}", Name, LocalId, Flags);
         }
 
         /// <summary>
@@ -4766,7 +4767,7 @@ namespace OpenSim.Region.Framework.Scenes
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[SCENE]: caught exception meshing object {0}. Object set to phantom. e={1}", m_uuid, e);
+                Logger?.LogError(e, $"[SCENE]: caught exception meshing object {m_uuid}. Object set to phantom.");
                 pa = null;
             }
 
@@ -5188,7 +5189,7 @@ namespace OpenSim.Region.Framework.Scenes
             }
             else
             {
-//                m_log.DebugFormat(
+//                Logger?.DebugFormat(
 //                    "[SCENE OBJECT PART]: Scheduling part {0} {1} for full update in aggregateScriptEvents()", Name, LocalId);
                 UpdatePhysicsSubscribedEvents();
                 ScheduleFullUpdate();
@@ -5332,7 +5333,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="message"></param>
         private void LogPermissions(String message)
         {
-            PermissionsUtil.LogPermissions(Name, message, BaseMask, OwnerMask, NextOwnerMask);
+            PermissionsUtil.LogPermissions(Logger, Name, message, BaseMask, OwnerMask, NextOwnerMask);
         }
 
         public void ApplyNextOwnerPermissions()
@@ -5386,7 +5387,7 @@ namespace OpenSim.Region.Framework.Scenes
             }
             catch (Exception ex)
             {
-                m_log.Error("[Physics] " + ex);
+                Logger?.LogError(ex, "[Physics] ");
             }
         }
 

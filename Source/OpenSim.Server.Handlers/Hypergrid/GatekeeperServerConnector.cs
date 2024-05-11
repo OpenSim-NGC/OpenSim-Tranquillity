@@ -67,8 +67,6 @@ namespace OpenSim.Server.Handlers.Hypergrid
 
         public IHttpServer HttpServer { get; private set; }
 
-//        public GatekeeperServiceInConnector(IConfigSource config, IHttpServer server, ISimulationService simService) :
-
         public void Initialize(IHttpServer httpServer)
         {
             HttpServer = httpServer;
@@ -76,7 +74,7 @@ namespace OpenSim.Server.Handlers.Hypergrid
             var gridConfig = m_configuration.GetSection(ConfigName);
             if (gridConfig.Exists() is false)
             {
-                string service = gridConfig.GetValue("LocalServiceModule", string.Empty);
+                string? service = gridConfig.GetValue("LocalServiceModule", string.Empty);
                 if (string.IsNullOrWhiteSpace(service))
                     throw new Exception("No LocalServiceModule in config file");
 
@@ -88,12 +86,12 @@ namespace OpenSim.Server.Handlers.Hypergrid
 
             m_Proxy = gridConfig.GetValue<bool>("HasProxy", false);
 
-            HypergridHandlers hghandlers = new HypergridHandlers(m_GatekeeperService);
+            HypergridHandlers hghandlers = new HypergridHandlers(m_logger, m_GatekeeperService);
 
             HttpServer.AddXmlRPCHandler("link_region", hghandlers.LinkRegionRequest, false);
             HttpServer.AddXmlRPCHandler("get_region", hghandlers.GetRegion, false);
 
-            HttpServer.AddSimpleStreamHandler(new GatekeeperAgentHandler(m_GatekeeperService, m_Proxy),true);
+            HttpServer.AddSimpleStreamHandler(new GatekeeperAgentHandler(m_logger, m_GatekeeperService, m_Proxy),true);
         }
 
     }

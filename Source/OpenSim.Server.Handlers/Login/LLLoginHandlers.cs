@@ -25,38 +25,32 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.IO;
-using System.Reflection;
 using System.Net;
-using System.Text;
-
-using OpenSim.Server.Base;
-using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
-using OpenSim.Framework.Servers.HttpServer;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using Nwc.XmlRpc;
-using Nini.Config;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 
 namespace OpenSim.Server.Handlers.Login
 {
     public class LLLoginHandlers
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        private readonly ILogger m_logger;
         private ILoginService m_LocalService;
         private bool m_Proxy;
 
 
-        public LLLoginHandlers(ILoginService service, bool hasProxy)
+        public LLLoginHandlers(
+            ILogger logger,
+            ILoginService service, 
+            bool hasProxy)
         {
+            m_logger = logger;
             m_LocalService = service;
             m_Proxy = hasProxy;
         }
@@ -104,18 +98,23 @@ namespace OpenSim.Server.Handlers.Login
                     else if (requestData.ContainsKey("web_login_key"))
                     {
                         passwd = "$1$" + requestData["web_login_key"].ToString();
-                        m_log.InfoFormat("[LOGIN]: XMLRPC Login Req key {0}", passwd);
+
+                        m_logger.LogInformation($"[LOGIN]: XMLRPC Login Req key {passwd}");
                     }
+
                     string startLocation = string.Empty;
                     UUID scopeID = UUID.Zero;
+                    
                     if (requestData["scope_id"] != null)
                         scopeID = new UUID(requestData["scope_id"].ToString());
+                    
                     if (requestData.ContainsKey("start"))
                         startLocation = requestData["start"].ToString();
 
                     string clientVersion = "Unknown";
                     if (requestData.Contains("version") && requestData["version"] != null)
                         clientVersion = requestData["version"].ToString();
+                    
                     // We should do something interesting with the client version...
 
                     string channel = "Unknown";
@@ -137,8 +136,8 @@ namespace OpenSim.Server.Handlers.Login
 
                     XmlRpcResponse response = new XmlRpcResponse();
                     response.Value = reply.ToHashtable();
+                    
                     return response;
-
                 }
             }
 
@@ -173,7 +172,7 @@ namespace OpenSim.Server.Handlers.Login
                     string passwd = requestData["passwd"].ToString();
                     int level = Int32.Parse(requestData["level"].ToString());
 
-                    m_log.InfoFormat("[LOGIN]: XMLRPC Set Level to {2} Requested by {0} {1}", first, last, level);
+                    m_logger.LogInformation($"[LOGIN]: XMLRPC Set Level to {level} Requested by {first} {last}");
 
                     Hashtable reply = m_LocalService.SetLevel(first, last, passwd, level, remoteClient);
 
@@ -216,12 +215,13 @@ namespace OpenSim.Server.Handlers.Login
                     if (map.TryGetValue("scope_id", out otmp))
                         scopeID = new UUID(otmp.AsString());
 
-                    m_log.Info("[LOGIN]: LLSD Login Requested for: '" + first + "' '" + last + "' / " + startLocation);
+                    m_logger.LogInformation($"[LOGIN]: LLSD Login Requested for: {first} {last} / {startLocation}");
 
                     LoginResponse reply = null;
                     reply = m_LocalService.Login(first, last, passwd, startLocation, scopeID,
                         map["version"].AsString(), map["channel"].AsString(), map["mac"].AsString(),
                         map["id0"].AsString(), remoteClient);
+                        
                     return reply.ToOSDMap();
                 }
             }

@@ -78,7 +78,7 @@ namespace OpenSim.Region.Framework.Scenes
                 args.SenderObject = obj;
             }
 
-            //m_log.DebugFormat(
+            //Logger?.DebugFormat(
             //    "[SCENE]: Sending message {0} on channel {1}, type {2} from {3}, broadcast {4}",
             //    args.Message.Replace("\n", "\\n"), args.Channel, args.Type, fromName, broadcast);
 
@@ -248,7 +248,7 @@ namespace OpenSim.Region.Framework.Scenes
 
                 if (gmd == null)
                 {
-//                    m_log.WarnFormat(
+//                    Logger?.WarnFormat(
 //                        "[GROUPS]: User {0} is not a member of group {1} so they can't update {2} to this group",
 //                        remoteClient.Name, GroupID, objectLocalID);
 
@@ -512,7 +512,7 @@ namespace OpenSim.Region.Framework.Scenes
                 if ((EffectType)effect.Type != EffectType.LookAt && (EffectType)effect.Type != EffectType.Beam)
                     discardableEffects = false;
 
-                //m_log.DebugFormat("[YYY]: VE {0} {1} {2}", effect.AgentID, effect.Duration, (EffectType)effect.Type);
+                //Logger?.DebugFormat("[YYY]: VE {0} {1} {2}", effect.AgentID, effect.Duration, (EffectType)effect.Type);
             }
 
             ForEachScenePresence(sp =>
@@ -522,11 +522,11 @@ namespace OpenSim.Region.Framework.Scenes
                         if (!discardableEffects ||
                            (discardableEffects && ShouldSendDiscardableEffect(remoteClient, sp)))
                         {
-                            //m_log.DebugFormat("[YYY]: Sending to {0}", sp.UUID);
+                            //Logger?.DebugFormat("[YYY]: Sending to {0}", sp.UUID);
                             sp.ControllingClient.SendViewerEffect(effectBlockArray);
                         }
                         //else
-                        //    m_log.DebugFormat("[YYY]: Not sending to {0}", sp.UUID);
+                        //    Logger?.DebugFormat("[YYY]: Not sending to {0}", sp.UUID);
                     }
                 });
         }
@@ -562,7 +562,7 @@ namespace OpenSim.Region.Framework.Scenes
         public void HandleFetchInventoryDescendents(IClientAPI remoteClient, UUID folderID, UUID ownerID,
                                                     bool fetchFolders, bool fetchItems, int sortOrder)
         {
-//            m_log.DebugFormat(
+//            Logger?.DebugFormat(
 //                "[USER INVENTORY]: HandleFetchInventoryDescendents() for {0}, folder={1}, fetchFolders={2}, fetchItems={3}, sortOrder={4}",
 //                remoteClient.Name, folderID, fetchFolders, fetchItems, sortOrder);
 
@@ -641,15 +641,17 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="folderType"></param>
         /// <param name="folderName"></param>
         /// <param name="parentID"></param>
-        public void HandleCreateInventoryFolder(IClientAPI remoteClient, UUID folderID, ushort folderType,
-                                                string folderName, UUID parentID)
+        public void HandleCreateInventoryFolder(
+            IClientAPI remoteClient, 
+            UUID folderID, 
+            ushort folderType,
+            string folderName, 
+            UUID parentID)
         {
             InventoryFolderBase folder = new InventoryFolderBase(folderID, folderName, remoteClient.AgentId, (short)folderType, parentID, 1);
             if (!InventoryService.AddFolder(folder))
             {
-                m_log.WarnFormat(
-                     "[AGENT INVENTORY]: Failed to create folder for user {0} {1}",
-                     remoteClient.Name, remoteClient.AgentId);
+                Logger?.LogWarning($"[AGENT INVENTORY]: Failed to create folder for user {remoteClient.Name} {remoteClient.AgentId}");
             }
         }
 
@@ -665,7 +667,7 @@ namespace OpenSim.Region.Framework.Scenes
         public void HandleUpdateInventoryFolder(IClientAPI remoteClient, UUID folderID, ushort type, string name,
                                                 UUID parentID)
         {
-//            m_log.DebugFormat(
+//            Logger?.DebugFormat(
 //                "[AGENT INVENTORY]: Updating inventory folder {0} {1} for {2} {3}", folderID, name, remoteClient.Name, remoteClient.AgentId);
 
             InventoryFolderBase folder = InventoryService.GetFolder(remoteClient.AgentId, folderID);
@@ -676,9 +678,7 @@ namespace OpenSim.Region.Framework.Scenes
                 folder.ParentID = parentID;
                 if (!InventoryService.UpdateFolder(folder))
                 {
-                    m_log.ErrorFormat(
-                         "[AGENT INVENTORY]: Failed to update folder for user {0} {1}",
-                         remoteClient.Name, remoteClient.AgentId);
+                    Logger?.LogError($"[AGENT INVENTORY]: Failed to update folder for user {remoteClient.Name} {remoteClient.AgentId}");
                 }
             }
         }
@@ -690,13 +690,17 @@ namespace OpenSim.Region.Framework.Scenes
             {
                 folder.ParentID = parentID;
                 if (!InventoryService.MoveFolder(folder))
-                    m_log.WarnFormat("[AGENT INVENTORY]: could not move folder {0}", folderID);
+                {
+                    Logger?.LogWarning($"[AGENT INVENTORY]: could not move folder {folderID}");
+                }
                 else
-                    m_log.DebugFormat("[AGENT INVENTORY]: folder {0} moved to parent {1}", folderID, parentID);
+                {
+                    Logger?.LogDebug($"[AGENT INVENTORY]: folder {folderID} moved to parent {parentID}", folderID, parentID);
+                }
             }
             else
             {
-                m_log.WarnFormat("[AGENT INVENTORY]: request to move folder {0} but folder not found", folderID);
+                Logger?.LogWarning($"[AGENT INVENTORY]: request to move folder {folderID} but folder not found");
             }
         }
 
@@ -718,7 +722,7 @@ namespace OpenSim.Region.Framework.Scenes
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[AGENT INVENTORY]: Exception on purge folder for user {0}: {1}", remoteClient.AgentId, e.Message);
+                Logger?.LogWarning(e, $"[AGENT INVENTORY]: Exception on purge folder for user {remoteClient.AgentId}.");
             }
         }
 
@@ -729,13 +733,13 @@ namespace OpenSim.Region.Framework.Scenes
            try
             {
                 if (InventoryService.PurgeFolder(folder))
-                    m_log.DebugFormat("[AGENT INVENTORY]: folder {0} purged successfully", folderID);
+                    Logger?.LogDebug($"[AGENT INVENTORY]: folder {folderID} purged successfully");
                 else
-                    m_log.WarnFormat("[AGENT INVENTORY]: could not purge folder {0}", folderID);
+                    Logger?.LogWarning($"[AGENT INVENTORY]: could not purge folder {folderID}");
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[AGENT INVENTORY]: Exception on async purge folder for user {0}: {1}", userID, e.Message);
+                Logger?.LogWarning(e, $"[AGENT INVENTORY]: Exception on async purge folder for user {userID}.");
             }
         }
     }

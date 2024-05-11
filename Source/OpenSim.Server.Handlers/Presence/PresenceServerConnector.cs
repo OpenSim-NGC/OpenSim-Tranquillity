@@ -76,7 +76,7 @@ namespace OpenSim.Server.Handlers.Presence
 
             IServiceAuth auth = ServiceAuth.Create(m_configuration, ConfigName);
 
-            HttpServer.AddStreamHandler(new PresenceServerPostHandler(m_PresenceService, auth));
+            HttpServer.AddStreamHandler(new PresenceServerPostHandler(m_logger, m_PresenceService, auth));
         }
 
     }

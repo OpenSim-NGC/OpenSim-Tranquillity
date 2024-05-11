@@ -68,7 +68,7 @@ namespace OpenSim.Server.Handlers.Grid
             if (serverConfig.Exists() is false)
                 throw new Exception($"No section {ConfigName} in config file");
 
-            string gridService = serverConfig.GetValue("LocalServiceModule", String.Empty);
+            string? gridService = serverConfig.GetValue("LocalServiceModule", String.Empty);
             if (string.IsNullOrEmpty(gridService))
                 throw new Exception("No LocalServiceModule in config file");
 
@@ -76,7 +76,7 @@ namespace OpenSim.Server.Handlers.Grid
 
             IServiceAuth auth = ServiceAuth.Create(m_configuration, ConfigName);
 
-            HttpServer.AddStreamHandler(new GridServerPostHandler(m_GridService, auth));
+            HttpServer.AddStreamHandler(new GridServerPostHandler(m_logger, m_GridService, auth));
         }
     }
 }

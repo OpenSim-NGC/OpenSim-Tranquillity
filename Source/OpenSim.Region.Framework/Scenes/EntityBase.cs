@@ -27,6 +27,7 @@
 
 using OpenSim.Framework;
 using OpenMetaverse;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -40,6 +41,11 @@ namespace OpenSim.Region.Framework.Scenes
         {
             get { return m_scene; }
         }
+
+        /// <summary>
+        /// A Logger to use for this scene and related objects.
+        /// </summary>
+        public ILogger? Logger {  get { return Scene?.Logger; } }
 
         protected UUID m_uuid;
         public virtual UUID UUID

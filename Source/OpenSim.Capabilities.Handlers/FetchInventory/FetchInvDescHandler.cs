@@ -25,42 +25,47 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Text;
-using log4net;
-using Nini.Config;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Framework.Capabilities;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
+
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Capabilities.Handlers
 {
     public class FetchInvDescHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private static readonly byte[] EmptyResponse = Util.UTF8NBGetbytes("<llsd><map><key>folders</key><array /></map></llsd>");
+        private readonly ILogger m_logger;
         private readonly IInventoryService m_InventoryService;
         private readonly ILibraryService m_LibraryService;
         private readonly UUID libOwner;
         private readonly IScene m_Scene;
 
-        public FetchInvDescHandler(IInventoryService invService, ILibraryService libService, IScene s)
+        public FetchInvDescHandler(
+            ILogger logger, 
+            IInventoryService invService, 
+            ILibraryService libService, 
+            IScene s)
         {
+            m_logger = logger;
             m_InventoryService = invService;
+
             if(libService != null && libService.LibraryRootFolder != null)
             {
                 m_LibraryService = libService;
                 libOwner = libService.LibraryRootFolder.Owner;
             }
+
             m_Scene = s;
         }
 
@@ -108,7 +113,7 @@ namespace OpenSim.Capabilities.Handlers
                         }
                         catch (Exception e)
                         {
-                            m_log.Debug("[WEB FETCH INV DESC HANDLER]: caught exception doing OSD deserialize" + e.Message);
+                            m_logger.LogDebug(e, "[WEB FETCH INV DESC HANDLER]: caught exception doing OSD deserialize.");
                             continue;
                         }
                         folders.Add(llsdRequest);
@@ -119,7 +124,7 @@ namespace OpenSim.Capabilities.Handlers
             }
             catch (Exception e)
             {
-                m_log.Error("[FETCH INV DESC]: fail parsing request: " + e.Message);
+                m_logger.LogError(e, "[FETCH INV DESC]: fail parsing request.");
                 httpResponse.RawBuffer = EmptyResponse;
                 return;
             }
@@ -151,7 +156,8 @@ namespace OpenSim.Capabilities.Handlers
                 {
                     if (limit < 0)
                         osu.AppendASCII(" ...");
-                    m_log.Warn(osu.ToString());
+
+                    m_logger.LogWarning(osu.ToString());
                 }
 
                 osu.Clear();
@@ -264,9 +270,13 @@ namespace OpenSim.Capabilities.Handlers
                     if(--limit < 0)
                         break;
                 }
+
                 if(limit < 0)
+                {
                     sb.Append(" ...");
-                m_log.Warn(osStringBuilderCache.GetStringAndRelease(sb));
+                }
+
+                m_logger.LogWarning(osStringBuilderCache.GetStringAndRelease(sb));
             }
 
             httpResponse.RawBuffer = LLSDxmlEncode2.EndToBytes(lastresponse);

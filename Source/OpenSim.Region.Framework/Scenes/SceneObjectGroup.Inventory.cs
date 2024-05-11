@@ -32,6 +32,7 @@ using OpenSim.Region.Framework.Interfaces;
 using System.Xml;
 
 using PermissionMask = OpenSim.Framework.PermissionMask;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -64,7 +65,7 @@ namespace OpenSim.Region.Framework.Scenes
 
             if (m_scene == null)
             {
-                m_log.DebugFormat("[PRIM INVENTORY]: m_scene is null. Unable to create script instances");
+                Logger?.LogDebug($"[PRIM INVENTORY]: m_scene is null. Unable to create script instances");
                 return 0;
             }
 
@@ -139,10 +140,7 @@ namespace OpenSim.Region.Framework.Scenes
             SceneObjectPart part = GetPart(localID);
             if (part is null)
             {
-                m_log.ErrorFormat(
-                    "[PRIM INVENTORY]: " +
-                    "Couldn't find prim local ID {0} in group {1}, {2} to add inventory item ID {3}",
-                    localID, Name, UUID, newItemId);
+                Logger?.LogError($"[PRIM INVENTORY]: Couldn't find prim local ID {localID} in group {Name}, {UUID} to add inventory item ID {newItemId}");
                 return false;
             }
 
@@ -217,10 +215,7 @@ namespace OpenSim.Region.Framework.Scenes
             }
             else
             {
-                m_log.ErrorFormat(
-                    "[PRIM INVENTORY]: " +
-                    "Couldn't find prim local ID {0} in prim {1}, {2} to get inventory item ID {3}",
-                    primID, part.Name, part.UUID, itemID);
+                Logger?.LogError($"[PRIM INVENTORY]: Couldn't find prim local ID {primID} in prim {part.Name}, {part.UUID} to get inventory item ID {itemID}");
             }
 
             return null;
@@ -243,10 +238,7 @@ namespace OpenSim.Region.Framework.Scenes
             }
             else
             {
-                m_log.ErrorFormat(
-                    "[PRIM INVENTORY]: " +
-                    "Couldn't find prim ID {0} to update item {1}, {2}",
-                    item.ParentPartID, item.Name, item.ItemID);
+                Logger?.LogError($"[PRIM INVENTORY]: Couldn't find prim ID {item.ParentPartID} to update item {item.Name}, {item.ItemID}");
             }
 
             return false;

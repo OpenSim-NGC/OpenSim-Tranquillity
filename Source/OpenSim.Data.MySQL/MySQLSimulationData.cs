@@ -25,13 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
 using System.Reflection;
 using System.Text;
-using log4net;
+using Microsoft.Extensions.Logging;
 using MySqlConnector;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -45,7 +43,8 @@ namespace OpenSim.Data.MySQL
     /// </summary>
     public class MySQLSimulationData : ISimulationDataStore
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger _logger;
+
         private static string LogHeader = "[REGION DB MYSQL]";
 
         private string m_connectionString;
@@ -65,13 +64,9 @@ namespace OpenSim.Data.MySQL
             get { return GetType().Assembly; }
         }
 
-        public MySQLSimulationData()
+        public MySQLSimulationData(ILogger<MySQLSimulationData> logger)
         {
-        }
-
-        public MySQLSimulationData(string connectionString)
-        {
-            Initialise(connectionString);
+            _logger = logger;
         }
 
         public virtual void Initialise(string connectionString)
@@ -82,10 +77,9 @@ namespace OpenSim.Data.MySQL
             {
                 dbcon.Open();
 
-                // Apply new Migrations
-                //
-                Migration m = new Migration(dbcon, Assembly, "RegionStore");
+                Migration m = new Migration(_logger, dbcon, Assembly, "RegionStore");
                 m.Update();
+
                 dbcon.Close();
             }
         }
@@ -98,7 +92,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("{0} MySQL error in ExecuteReader: {1}", LogHeader, e);
+                _logger.LogError(e, $"{0} MySQL error in ExecuteReader", LogHeader);
                 throw;
             }
         }
@@ -111,7 +105,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (Exception e)
             {
-                m_log.Error("[REGION DB]: MySQL error in ExecuteNonQuery: " + e.Message);
+                _logger.LogError(e, "[REGION DB]: MySQL error in ExecuteNonQuery.");
                 throw;
             }
         }
@@ -361,7 +355,9 @@ namespace OpenSim.Data.MySQL
 
                                 ++count;
                                 if (count % ROWS_PER_QUERY == 0)
-                                    m_log.Debug("[REGION DB]: Loaded " + count + " prims...");
+                                {
+                                    _logger.LogDebug($"[REGION DB]: Loaded {count} prims...");
+                                }
                             }
                         }
                     }
@@ -401,16 +397,16 @@ namespace OpenSim.Data.MySQL
                     }
                     else
                     {
-                        m_log.WarnFormat(
-                            "[REGION DB]: Database contains an orphan child prim {0} {1} in region {2} pointing to missing parent {3}.  This prim will not be loaded.",
-                            prim.Name, prim.UUID, regionID, prim.ParentUUID);
+                        _logger.LogWarning(
+                            $"[REGION DB]: Database contains an orphan child prim {prim.Name} {prim.UUID} " +
+                            $"in region {regionID} pointing to missing parent {prim.ParentUUID}.  This prim will not be loaded.");
                     }
                 }
             }
 
             #endregion SceneObjectGroup Creation
 
-            m_log.DebugFormat("[REGION DB]: Loaded {0} objects using {1} prims", objects.Count, prims.Count);
+            _logger.LogDebug($"[REGION DB]: Loaded {objects.Count} objects using {prims.Count} prims");
 
             #region Prim Inventory Loading
 
@@ -452,7 +448,7 @@ namespace OpenSim.Data.MySQL
 
             #endregion Prim Inventory Loading
 
-            m_log.DebugFormat("[REGION DB]: Loaded inventory from {0} objects", primsWithInventory.Count);
+            _logger.LogDebug($"[REGION DB]: Loaded inventory from {primsWithInventory.Count} objects");
 
             return new List<SceneObjectGroup>(objects.Values);
         }
@@ -502,9 +498,9 @@ namespace OpenSim.Data.MySQL
 
         public void StoreTerrain(TerrainData terrData, UUID regionID)
         {
-            Util.FireAndForget(delegate(object x)
+            Util.FireAndForget(delegate(object? x)
             {
-                m_log.Info("[REGION DB]: Storing terrain");
+                _logger.LogInformation("[REGION DB]: Storing terrain");
 
                 int terrainDBRevision;
                 Array terrainDBblob;
@@ -538,7 +534,7 @@ namespace OpenSim.Data.MySQL
                                 }
                                 catch (Exception e)
                                 {
-                                    m_log.ErrorFormat(e.ToString());
+                                    _logger.LogError(e, "[REGION DB]: Error Storing Terrain");
                                 }
                             }
                         }
@@ -550,9 +546,9 @@ namespace OpenSim.Data.MySQL
 
         public void StoreBakedTerrain(TerrainData terrData, UUID regionID)
         {
-            Util.FireAndForget(delegate(object x)
+            Util.FireAndForget(delegate(object? x)
             {
-                m_log.Info("[REGION DB]: Storing Baked terrain");
+                _logger.LogInformation("[REGION DB]: Storing Baked terrain");
 
                 int terrainDBRevision;
                 Array terrainDBblob;
@@ -586,7 +582,7 @@ namespace OpenSim.Data.MySQL
                                 }
                                 catch (Exception e)
                                 {
-                                    m_log.ErrorFormat(e.ToString());
+                                    _logger.LogError(e, "[REGION DB]: Error in StoreBakedTerrain");
                                 }
                             }
                         }
@@ -1244,7 +1240,7 @@ namespace OpenSim.Data.MySQL
             }
             catch
             {
-                m_log.ErrorFormat("[MYSQL DB]: Error reading task inventory: itemID was {0}, primID was {1}", row["itemID"].ToString(), row["primID"].ToString());
+                //_logger.LogError($"[MYSQL DB]: Error reading task inventory: itemID was {0}, primID was {1}", row["itemID"].ToString(), row["primID"].ToString());
                 throw;
             }
         }
@@ -1372,7 +1368,7 @@ namespace OpenSim.Data.MySQL
             {
                 newData.UserLocation = Vector3.Zero;
                 newData.UserLookAt = Vector3.Zero;
-                m_log.ErrorFormat("[PARCEL]: unable to get parcel telehub settings for {1}", newData.Name);
+                //m_log.ErrorFormat("[PARCEL]: unable to get parcel telehub settings for {1}", newData.Name);
             }
 
             newData.MediaDescription = (string) row["MediaDescription"];

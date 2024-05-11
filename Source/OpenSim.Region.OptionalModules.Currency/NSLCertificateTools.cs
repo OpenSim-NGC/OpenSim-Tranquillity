@@ -3,12 +3,11 @@
  *
  */
 
-using System;
+using Microsoft.Extensions.Logging;
+
 using System.Net;
 using System.Net.Security;
-using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
-using log4net;
 
 
 namespace NSL.Certificate.Tools
@@ -18,19 +17,20 @@ namespace NSL.Certificate.Tools
     /// </summary>
     public class NSLCertificateVerify
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private X509Chain? m_chain = null;
+        private X509Certificate2? m_cacert = null;
+        private Mono.Security.X509.X509Crl? m_clientcrl = null;
 
-        private X509Chain m_chain = null;
-        private X509Certificate2 m_cacert = null;
-
-        private Mono.Security.X509.X509Crl m_clientcrl = null;
+        private readonly ILogger<NSLCertificateVerify> _logger;
 
 
         /// <summary>
         /// NSL Certificate Verify
         /// </summary>
-        public NSLCertificateVerify()
+        public NSLCertificateVerify(ILogger<NSLCertificateVerify> logger)
         {
+            _logger = logger;
+
             m_chain = null;
             m_cacert = null;
             m_clientcrl = null;
@@ -41,8 +41,10 @@ namespace NSL.Certificate.Tools
         /// NSL Certificate Verify
         /// </summary>
         /// <param name="certfile"></param>
-        public NSLCertificateVerify(string certfile)
+        public NSLCertificateVerify(ILogger<NSLCertificateVerify> logger, string certfile)
         {
+            _logger = logger;
+
             SetPrivateCA(certfile);
         }
 
@@ -52,8 +54,10 @@ namespace NSL.Certificate.Tools
         /// </summary>
         /// <param name="certfile"></param>
         /// <param name="crlfile"></param>
-        public NSLCertificateVerify(string certfile, string crlfile)
+        public NSLCertificateVerify(ILogger<NSLCertificateVerify> logger, string certfile, string crlfile)
         {
+            _logger = logger;
+
             SetPrivateCA(certfile);
             SetPrivateCRL(crlfile);
         }
@@ -72,7 +76,7 @@ namespace NSL.Certificate.Tools
             catch (Exception ex)
             {
                 m_cacert = null;
-                m_log.ErrorFormat("[SET PRIVATE CA]: CA File reading error [{0}]. {1}", certfile, ex);
+                _logger.LogError(ex, $"[SET PRIVATE CA]: CA File reading error [{certfile}].");
             }
 
             if (m_cacert != null)
@@ -95,7 +99,7 @@ namespace NSL.Certificate.Tools
             catch (Exception ex)
             {
                 m_clientcrl = null;
-                m_log.ErrorFormat("[SET PRIVATE CRL]: CRL File reading error [{0}]. {1}", crlfile, ex);
+                _logger.LogError($"[SET PRIVATE CRL]: CRL File reading error [{crlfile}].");
             }
         }
 
@@ -122,7 +126,7 @@ namespace NSL.Certificate.Tools
             {
                 if (m_chain.ChainStatus[i].Status == X509ChainStatusFlags.UntrustedRoot) return true;
             }
-            //
+
             return false;
         }
 
@@ -145,15 +149,16 @@ namespace NSL.Certificate.Tools
         /// <returns></returns>
         public bool ValidateServerCertificate(object obj, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
-            m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Start.");
+            _logger.LogInformation("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Start.");
 
             if (obj is HttpWebRequest)
             {
                 HttpWebRequest Request = (HttpWebRequest)obj;
-                string noVerify = Request.Headers.Get("NoVerifyCert");
-                if (noVerify != null && noVerify.ToLower() == "true")
+                string? noVerify = Request.Headers.Get("NoVerifyCert");
+
+                if (noVerify is not null && noVerify.ToLower() == "true")
                 {
-                    m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: No Verify Certificate.");
+                    _logger.LogInformation($"[NSL SERVER CERT VERIFY]: ValidateServerCertificate: No Verify Certificate.");
                     return true;
                 }
             }
@@ -164,19 +169,21 @@ namespace NSL.Certificate.Tools
             // None, ChainErrors Error except for．
             if (sslPolicyErrors != SslPolicyErrors.None && sslPolicyErrors != SslPolicyErrors.RemoteCertificateChainErrors)
             {
-                m_log.ErrorFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Policy Error! {0}", sslPolicyErrors);
+                _logger.LogError($"[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Policy Error! {sslPolicyErrors}");
                 return false;
             }
 
             bool valid = CheckPrivateChain(certificate2);
+
             if (valid)
             {
-                m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Valid Server Certification for \"{0}\"", simplename);
+                _logger.LogInformation($"[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Valid Server Certification for \"{simplename}\"");
             }
             else
             {
-                m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Failed to Verify Server Certification for \"{0}\"", simplename);
+                _logger.LogInformation($"[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Failed to Verify Server Certification for \"{simplename}\"");
             }
+
             return valid;
         }
 
@@ -191,16 +198,16 @@ namespace NSL.Certificate.Tools
         /// <returns></returns>
         public bool ValidateClientCertificate(object obj, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
-            m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: ValidateClientCertificate: Start");
+            _logger.LogInformation($"[NSL CLIENT CERT VERIFY]: ValidateClientCertificate: Start");
 
             X509Certificate2 certificate2 = new X509Certificate2(certificate);
             string simplename = certificate2.GetNameInfo(X509NameType.SimpleName, false);
-            m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: ValidateClientCertificate: Simple Name is \"{0}\"", simplename);
+            _logger.LogInformation($"[NSL CLIENT CERT VERIFY]: ValidateClientCertificate: Simple Name is \"{simplename}\"");
 
-            // None, ChainErrors 以外は全てエラーとする．
+            // None, ChainErrors
             if (sslPolicyErrors != SslPolicyErrors.None && sslPolicyErrors != SslPolicyErrors.RemoteCertificateChainErrors)
             {
-                m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: ValidateClientCertificate: Policy Error! {0}", sslPolicyErrors);
+                _logger.LogInformation($"[NSL CLIENT CERT VERIFY]: ValidateClientCertificate: Policy Error! {sslPolicyErrors}");
                 return false;
             }
 
@@ -209,22 +216,25 @@ namespace NSL.Certificate.Tools
             {
                 Mono.Security.X509.X509Certificate monocert = new Mono.Security.X509.X509Certificate(certificate.GetRawCertData());
                 Mono.Security.X509.X509Crl.X509CrlEntry entry = m_clientcrl.GetCrlEntry(monocert);
+
                 if (entry != null)
                 {
-                    m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: Common Name \"{0}\" was revoked at {1}", simplename, entry.RevocationDate.ToString());
+                    _logger.LogInformation($"[NSL CLIENT CERT VERIFY]: Common Name \"{simplename}\" was revoked at {entry.RevocationDate}");
                     return false;
                 }
             }
 
             bool valid = CheckPrivateChain(certificate2);
+
             if (valid)
             {
-                m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: Valid Client Certification for \"{0}\"", simplename);
+                _logger.LogInformation($"[NSL CLIENT CERT VERIFY]: Valid Client Certification for \"{simplename}\"");
             }
             else
             {
-                m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: Failed to Verify Client Certification for \"{0}\"", simplename);
+                _logger.LogInformation($"[NSL CLIENT CERT VERIFY]: Failed to Verify Client Certification for \"{simplename}\"");
             }
+
             return valid;
         }
     }

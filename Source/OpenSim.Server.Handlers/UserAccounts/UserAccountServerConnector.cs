@@ -79,7 +79,7 @@ namespace OpenSim.Server.Handlers.UserAccounts
 
             IServiceAuth auth = ServiceAuth.Create(m_configuration, ConfigName);
 
-            HttpServer.AddStreamHandler(new UserAccountServerPostHandler(m_UserAccountService, serverConfig, auth));
+            HttpServer.AddStreamHandler(new UserAccountServerPostHandler(m_logger, m_UserAccountService, serverConfig, auth));
         }
     }
 }

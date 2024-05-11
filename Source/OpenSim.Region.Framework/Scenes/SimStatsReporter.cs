@@ -235,9 +235,9 @@ namespace OpenSim.Region.Framework.Scenes
             }
             catch (Exception e)
             {
-                m_log.Warn(string.Format(
-                    "[SIM STATS REPORTER] Update for {0} failed with exception ",
-                    m_scene.RegionInfo.RegionName), e);
+                //m_log.Warn(string.Format(
+                //    "[SIM STATS REPORTER] Update for {0} failed with exception ",
+                //    m_scene.RegionInfo.RegionName), e);
             }
         }
 

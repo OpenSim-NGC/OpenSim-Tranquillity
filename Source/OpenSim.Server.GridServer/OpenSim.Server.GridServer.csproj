@@ -30,7 +30,12 @@
     <ProjectReference Include="..\OpenSim.Data.MySQL\OpenSim.Data.MySQL.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Services\OpenSim.Services.csproj" />
   </ItemGroup>
+    <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.3" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+  </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.2.0" />
     <PackageReference Include="Autofac" Version="8.0.0" />
     <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="9.0.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
@@ -38,5 +43,10 @@
     <PackageReference Include="ConfigurationSubstitutor" Version="1.5.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Events/**"/>    
+    <Compile Remove="Models/**"/>
   </ItemGroup>
 </Project>

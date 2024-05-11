@@ -62,7 +62,7 @@ using Microsoft.Extensions.Logging;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using OpenSim.Data.MySQL.MoneyData;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
@@ -72,6 +72,7 @@ using System.Collections;
 using System.Security.Cryptography;
 using System.Text;
 using OpenSim.Services.Interfaces;
+using OpenSim.Data;
 
 namespace OpenSim.Region.OptionalModules.Currency
 {
@@ -232,8 +233,6 @@ namespace OpenSim.Region.OptionalModules.Currency
 
         private int m_hg_avatarClass = (int)AvatarType.HG_AVATAR;
 
-        private NSLCertificateVerify m_certVerify = new NSLCertificateVerify(); // For server authentication
-
         /// <summary>
         /// Scene dictionary indexed by Region Handle
         /// </summary>
@@ -268,16 +267,19 @@ namespace OpenSim.Region.OptionalModules.Currency
         
         private readonly IConfiguration m_configuration;
         private readonly ILogger<DTLNSLMoneyModule> m_logger;
+        private readonly NSLCertificateVerify m_certVerify;
 
         #endregion Constant numbers and members.
 
         public DTLNSLMoneyModule(
             IConfiguration configuration,
-            ILogger<DTLNSLMoneyModule> logger
+            ILogger<DTLNSLMoneyModule> logger,
+            NSLCertificateVerify verify
             )
         {
             m_configuration = configuration;
             m_logger = logger;
+            m_certVerify = verify;
         }
 
         #region ISharedRegionModule interface

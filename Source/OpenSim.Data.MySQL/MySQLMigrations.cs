@@ -25,8 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Logging;
+
 using MySqlConnector;
-using System;
 using System.Data.Common;
 using System.Reflection;
 
@@ -38,18 +39,17 @@ namespace OpenSim.Data.MySQL
     /// </summary>
     public class MySqlMigration : Migration
     {
-        public MySqlMigration()
-            : base()
+        public MySqlMigration(ILogger logger) : base(logger)
         {
         }
 
-        public MySqlMigration(DbConnection conn, Assembly assem, string subtype, string type) :
-            base(conn, assem, subtype, type)
+        public MySqlMigration(ILogger logger, DbConnection conn, Assembly assem, string subtype, string type) :
+            base(logger,  conn, assem, subtype, type)
         {
         }
 
-        public MySqlMigration(DbConnection conn, Assembly assem, string type) :
-            base(conn, assem, type)
+        public MySqlMigration(ILogger logger, DbConnection conn, Assembly assem, string type) :
+            base(logger, conn, assem, type)
         {
         }
 

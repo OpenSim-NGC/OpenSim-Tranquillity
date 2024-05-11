@@ -28,6 +28,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Security.Policy;
 using System.Text;
 
 using log4net;
@@ -37,6 +38,7 @@ using OpenSim.Framework.Serialization.External;
 
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using Org.BouncyCastle.Crypto;
 
 namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 {
@@ -194,8 +196,10 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
         public void Get(UUID assetID, UUID ownerID, string userAssetURL)
         {
             // The act of gathering UUIDs downloads some assets from the remote server
-            // but not all...
-            HGUuidGatherer uuidGatherer = new HGUuidGatherer(m_scene.AssetService, userAssetURL);
+            // but not all...          
+            HGUuidGatherer uuidGatherer = new HGUuidGatherer(m_scene.Logger, m_scene.AssetService);
+            uuidGatherer.Initialize(assetServerURL: userAssetURL);
+
             uuidGatherer.AddForInspection(assetID);
             uuidGatherer.GatherAll();
 
@@ -227,7 +231,9 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
             m_log.DebugFormat("[HG ASSET MAPPER  POST]: Starting to send asset {0} to asset server {1}", assetID, userAssetURL);
 
             // Find all the embedded assets
-            HGUuidGatherer uuidGatherer = new HGUuidGatherer(m_scene.AssetService, string.Empty);
+            HGUuidGatherer uuidGatherer = new HGUuidGatherer(m_scene.Logger, m_scene.AssetService);
+            uuidGatherer.Initialize(assetServerURL: string.Empty);
+
             uuidGatherer.AddForInspection(asset.FullID);
             uuidGatherer.GatherAll(true);
 

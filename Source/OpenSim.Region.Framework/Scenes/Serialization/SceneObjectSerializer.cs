@@ -61,8 +61,8 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
                     }
                     catch (Exception e)
                     {
-                        m_log.Error("[SERIALIZER]: Deserialization of xml failed ", e);
-                        Util.LogFailedXML("[SERIALIZER]:", fixedData);
+                        //m_log.Error("[SERIALIZER]: Deserialization of xml failed ", e);
+                        //Util.LogFailedXML("[SERIALIZER]:", fixedData);
                         return null;
                     }
                 }
@@ -277,8 +277,8 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
 
                 if (parts.Count == 0)
                 {
-                    m_log.Error("[SERIALIZER]: Deserialization of xml failed: No SceneObjectPart nodes");
-                    Util.LogFailedXML("[SERIALIZER]:", xmlData);
+                    //m_log.Error("[SERIALIZER]: Deserialization of xml failed: No SceneObjectPart nodes");
+                    //Util.LogFailedXML("[SERIALIZER]:", xmlData);
                     return null;
                 }
 
@@ -330,8 +330,8 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
             }
             catch (Exception e)
             {
-                m_log.Error("[SERIALIZER]: Deserialization of xml failed ", e);
-                Util.LogFailedXML("[SERIALIZER]:", xmlData);
+                //m_log.Error("[SERIALIZER]: Deserialization of xml failed ", e);
+                //Util.LogFailedXML("[SERIALIZER]:", xmlData);
                 return null;
             }
         }
@@ -379,7 +379,7 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
 
                 if (coa.Objects.Count == 0)
                 {
-                    m_log.WarnFormat("[SERIALIZER]: Aborting load of coalesced object from asset {0} as it has zero loaded components", assetId);
+                    //m_log.WarnFormat("[SERIALIZER]: Aborting load of coalesced object from asset {0} as it has zero loaded components", assetId);
                     return null;
                 }
 
@@ -395,7 +395,7 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
                 }
                 else
                 {
-                    m_log.WarnFormat("[SERIALIZER]: Aborting load of object from asset {0} as deserialization failed", assetId);
+                    //m_log.WarnFormat("[SERIALIZER]: Aborting load of object from asset {0} as deserialization failed", assetId);
                     return null;
                 }
             }
@@ -824,9 +824,9 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
             }
             catch 
             {
-                m_log.DebugFormat(
-                   "[SceneObjectSerializer]: Exception while processing linksetdata for object part {0} {1}.",
-                   obj.Name, obj.UUID);
+                //m_log.DebugFormat(
+                //   "[SceneObjectSerializer]: Exception while processing linksetdata for object part {0} {1}.",
+                //   obj.Name, obj.UUID);
             }
         }
 
@@ -837,9 +837,9 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
             if (vehicle == null)
             {
                 obj.VehicleParams = null;
-                m_log.DebugFormat(
-                    "[SceneObjectSerializer]: Parsing Vehicle for object part {0} {1} encountered errors.  Please see earlier log entries.",
-                    obj.Name, obj.UUID);
+                //m_log.DebugFormat(
+                //    "[SceneObjectSerializer]: Parsing Vehicle for object part {0} {1} encountered errors.  Please see earlier log entries.",
+                //    obj.Name, obj.UUID);
             }
             else
             {
@@ -854,9 +854,9 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
             if (pdata == null)
             {
                 obj.PhysicsInertia = null;
-                m_log.DebugFormat(
-                    "[SceneObjectSerializer]: Parsing PhysicsInertiaData for object part {0} {1} encountered errors.  Please see earlier log entries.",
-                    obj.Name, obj.UUID);
+                //m_log.DebugFormat(
+                //    "[SceneObjectSerializer]: Parsing PhysicsInertiaData for object part {0} {1} encountered errors.  Please see earlier log entries.",
+                //    obj.Name, obj.UUID);
             }
             else
             {
@@ -879,9 +879,9 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
             }
             catch { }
 
-            m_log.DebugFormat(
-                    "[SceneObjectSerializer]: Parsing ProcessSOPAnims for object part {0} {1} encountered errors",
-                    obj.Name, obj.UUID);
+            //m_log.DebugFormat(
+            //        "[SceneObjectSerializer]: Parsing ProcessSOPAnims for object part {0} {1} encountered errors",
+            //        obj.Name, obj.UUID);
         }
 
         private static void ProcessShape(SceneObjectPart obj, XmlReader reader)
@@ -890,9 +890,9 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
 
             if (errorNodeNames != null)
             {
-                m_log.DebugFormat(
-                    "[SceneObjectSerializer]: Parsing PrimitiveBaseShape for object part {0} {1} encountered errors in properties {2}.",
-                    obj.Name, obj.UUID, string.Join(", ", errorNodeNames.ToArray()));
+                //m_log.DebugFormat(
+                //    "[SceneObjectSerializer]: Parsing PrimitiveBaseShape for object part {0} {1} encountered errors in properties {2}.",
+                //    obj.Name, obj.UUID, string.Join(", ", errorNodeNames.ToArray()));
             }
         }
 
@@ -1473,7 +1473,7 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
                 }
                 catch
                 {
-                    m_log.ErrorFormat("[SERIALIZER] Failed parsing halcyon MOAP information");
+                    //m_log.ErrorFormat("[SERIALIZER] Failed parsing halcyon MOAP information");
                 }
             }
         }
@@ -1899,8 +1899,8 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
                 m_SOPXmlProcessors,
                 reader,
                 (o, nodeName, e) => {
-                    m_log.Debug(string.Format("[SceneObjectSerializer]: Error while parsing element {0} in object {1} {2} ",
-                        nodeName, ((SceneObjectPart)o).Name, ((SceneObjectPart)o).UUID), e);
+                    //m_log.Debug(string.Format("[SceneObjectSerializer]: Error while parsing element {0} in object {1} {2} ",
+                    //    nodeName, ((SceneObjectPart)o).Name, ((SceneObjectPart)o).UUID), e);
                 });
 
             if (errors)
@@ -1968,8 +1968,8 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
                 m_ShapeXmlProcessors,
                 reader,
                 (o, nodeName, e) => {
-                    m_log.Debug(string.Format("[SceneObjectSerializer]: Error while parsing element {0} in Shape property of object {1} {2} ",
-                        nodeName, obj.Name, obj.UUID), e);
+                    //m_log.Debug(string.Format("[SceneObjectSerializer]: Error while parsing element {0} in Shape property of object {1} {2} ",
+                    //    nodeName, obj.Name, obj.UUID), e);
 
                     internalErrorNodeNames ??= new List<string>();
                     internalErrorNodeNames.Add(nodeName);

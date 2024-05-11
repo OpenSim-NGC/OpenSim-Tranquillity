@@ -80,7 +80,7 @@ namespace OpenSim.Server.Handlers.Profiles
             string service = serverConfig.GetValue("LocalServiceModule", String.Empty);
             ServiceModule = m_context.ResolveNamed<IUserProfilesService>(service);
 
-            JsonRpcProfileHandlers handler = new JsonRpcProfileHandlers(ServiceModule);
+            JsonRpcProfileHandlers handler = new JsonRpcProfileHandlers(m_logger, ServiceModule);
 
             HttpServer.AddJsonRPCHandler("avatarclassifiedsrequest", handler.AvatarClassifiedsRequest);
             HttpServer.AddJsonRPCHandler("classified_update", handler.ClassifiedUpdate);

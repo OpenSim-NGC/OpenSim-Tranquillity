@@ -70,7 +70,7 @@ namespace OpenSim.Server.Handlers.Friends
             if (serverConfig.Exists() is false)
                 throw new Exception($"No section {ConfigName} in config file");
 
-            string theService = serverConfig.GetValue<string>("LocalServiceModule", String.Empty);
+            string? theService = serverConfig.GetValue<string>("LocalServiceModule", String.Empty);
             if (string.IsNullOrEmpty(theService))
                 throw new Exception("No LocalServiceModule in config file");
 
@@ -78,7 +78,7 @@ namespace OpenSim.Server.Handlers.Friends
 
             IServiceAuth auth = ServiceAuth.Create(m_configuration, ConfigName);
             
-            HttpServer.AddStreamHandler(new FriendsServerPostHandler(m_FriendsService, auth));
+            HttpServer.AddStreamHandler(new FriendsServerPostHandler(m_logger, m_FriendsService, auth));
         }
     }
 }

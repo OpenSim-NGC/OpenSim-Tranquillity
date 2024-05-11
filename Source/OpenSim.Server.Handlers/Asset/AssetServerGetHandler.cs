@@ -25,42 +25,39 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.IO;
-using System.Reflection;
+
 using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
 using System.Xml.Serialization;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Asset
 {
     public class AssetServerGetHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger m_logger;
+        private readonly IAssetService m_AssetService;
+        private readonly string? m_RedirectURL;
 
-        private IAssetService m_AssetService;
-        private string m_RedirectURL;
-
-        public AssetServerGetHandler(IAssetService service) :
+        public AssetServerGetHandler(ILogger logger, IAssetService service) :
                 base("GET", "/assets")
         {
+            m_logger = logger;
             m_AssetService = service;
+            m_RedirectURL = string.Empty;
         }
 
-        public AssetServerGetHandler(IAssetService service, IServiceAuth auth, string redirectURL) :
+        public AssetServerGetHandler(ILogger logger, IAssetService service, IServiceAuth auth, string? redirectURL) :
             base("GET", "/assets", auth)
         {
+            m_logger = logger;
             m_AssetService = service;
             m_RedirectURL = redirectURL;
+
             if (!m_RedirectURL.EndsWith("/"))
                 m_RedirectURL = m_RedirectURL.TrimEnd('/');
         }
@@ -161,8 +158,10 @@ namespace OpenSim.Server.Handlers.Asset
                     rurl += "/";
                 rurl += path;
                 httpResponse.Redirect(rurl);
-                m_log.DebugFormat("[ASSET GET HANDLER]: Asset not found, redirecting to {0} ({1})", rurl, httpResponse.StatusCode);
+
+                m_logger.LogDebug($"[ASSET GET HANDLER]: Asset not found, redirecting to {rurl} ({httpResponse.StatusCode})");
             }
+
             return result;
         }
     }

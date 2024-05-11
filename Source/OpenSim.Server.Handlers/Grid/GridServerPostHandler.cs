@@ -25,40 +25,30 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
+
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
+using Microsoft.Extensions.Logging;
+
+using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Server.Handlers.Grid
 {
     public class GridServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly string LogHeader = "[GRID HANDLER]";
+        private readonly ILogger m_logger;
+        private readonly IGridService m_GridService;
 
-#pragma warning disable 414
-        private static string LogHeader = "[GRID HANDLER]";
-#pragma warning restore 414
-
-        private IGridService m_GridService;
-
-        public GridServerPostHandler(IGridService service, IServiceAuth auth) :
+        public GridServerPostHandler(ILogger logger, IGridService service, IServiceAuth auth) :
                 base("POST", "/grid", auth)
         {
+            m_logger = logger;
             m_GridService = service;
         }
 
@@ -70,7 +60,7 @@ namespace OpenSim.Server.Handlers.Grid
                 body = sr.ReadToEnd();
             body = body.Trim();
 
-            //m_log.DebugFormat("[XXX]: query String: {0}", body);
+            //m_logger.DebugFormat("[XXX]: query String: {0}", body);
 
             try
             {
@@ -80,7 +70,7 @@ namespace OpenSim.Server.Handlers.Grid
                 if (!request.ContainsKey("METHOD"))
                     return FailureResult();
 
-                string method = request["METHOD"].ToString();
+                string? method = request["METHOD"].ToString();
 
                 switch (method)
                 {
@@ -130,11 +120,11 @@ namespace OpenSim.Server.Handlers.Grid
                         return GetGridExtraFeatures(request);
                 }
 
-                m_log.DebugFormat("[GRID HANDLER]: unknown method request {0}", method);
+                m_logger.LogDebug($"[GRID HANDLER]: unknown method request {method}");
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[GRID HANDLER]: Exception {0} {1}", e.Message, e.StackTrace);
+                m_logger.LogError(e, $"[GRID HANDLER]: Exception.");
             }
 
             return FailureResult();
@@ -145,21 +135,34 @@ namespace OpenSim.Server.Handlers.Grid
         byte[] Register(Dictionary<string, object> request)
         {
             UUID scopeID = UUID.Zero;
+
             if (request.ContainsKey("SCOPEID"))
+            {
                 UUID.TryParse(request["SCOPEID"].ToString(), out scopeID);
+            }
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to register region");
+            {
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to register region");
+            }
 
             int versionNumberMin = 0, versionNumberMax = 0;
             if (request.ContainsKey("VERSIONMIN"))
+            {
                 Int32.TryParse(request["VERSIONMIN"].ToString(), out versionNumberMin);
+            }
             else
-                m_log.WarnFormat("[GRID HANDLER]: no minimum protocol version in request to register region");
+            {
+                m_logger.LogWarning("[GRID HANDLER]: no minimum protocol version in request to register region");
+            }
 
             if (request.ContainsKey("VERSIONMAX"))
+            {
                 Int32.TryParse(request["VERSIONMAX"].ToString(), out versionNumberMax);
+            }
             else
-                m_log.WarnFormat("[GRID HANDLER]: no maximum protocol version in request to register region");
+            {
+                m_logger.LogWarning("[GRID HANDLER]: no maximum protocol version in request to register region");
+            }
 
             // Check the protocol version
             // This is how it works:
@@ -191,11 +194,12 @@ namespace OpenSim.Server.Handlers.Grid
             {
                 foreach (KeyValuePair<string, object> kvp in request)
                     rinfoData[kvp.Key] = kvp.Value.ToString();
+                    
                 rinfo = new GridRegion(rinfoData);
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[GRID HANDLER]: exception unpacking region data: {0}", e);
+                m_logger.LogDebug(e, "[GRID HANDLER]: exception unpacking region data.");
             }
 
             string result = "Error communicating with grid service";
@@ -214,7 +218,7 @@ namespace OpenSim.Server.Handlers.Grid
             if (request.ContainsKey("REGIONID"))
                 UUID.TryParse(request["REGIONID"].ToString(), out regionID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no regionID in request to deregister region");
+                m_logger.LogWarning("[GRID HANDLER]: no regionID in request to deregister region");
 
             bool result = m_GridService.DeregisterRegion(regionID);
 
@@ -231,16 +235,16 @@ namespace OpenSim.Server.Handlers.Grid
             if (request.ContainsKey("SCOPEID"))
                 UUID.TryParse(request["SCOPEID"].ToString(), out scopeID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to get neighbours");
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to get neighbours");
 
             UUID regionID = UUID.Zero;
             if (request.ContainsKey("REGIONID"))
                 UUID.TryParse(request["REGIONID"].ToString(), out regionID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no regionID in request to get neighbours");
+                m_logger.LogWarning("[GRID HANDLER]: no regionID in request to get neighbours");
 
             List<GridRegion> rinfos = m_GridService.GetNeighbours(scopeID, regionID);
-            //m_log.DebugFormat("[GRID HANDLER]: neighbours for region {0}: {1}", regionID, rinfos.Count);
+            //m_logger.DebugFormat("[GRID HANDLER]: neighbours for region {0}: {1}", regionID, rinfos.Count);
 
             Dictionary<string, object> result = new Dictionary<string, object>();
             if ((rinfos == null) || ((rinfos != null) && (rinfos.Count == 0)))
@@ -258,7 +262,7 @@ namespace OpenSim.Server.Handlers.Grid
 
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            //m_logger.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
@@ -268,16 +272,16 @@ namespace OpenSim.Server.Handlers.Grid
             if (request.ContainsKey("SCOPEID"))
                 UUID.TryParse(request["SCOPEID"].ToString(), out scopeID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to get neighbours");
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to get neighbours");
 
             UUID regionID = UUID.Zero;
             if (request.ContainsKey("REGIONID"))
                 UUID.TryParse(request["REGIONID"].ToString(), out regionID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no regionID in request to get neighbours");
+                m_logger.LogWarning("[GRID HANDLER]: no regionID in request to get neighbours");
 
             GridRegion rinfo = m_GridService.GetRegionByUUID(scopeID, regionID);
-            //m_log.DebugFormat("[GRID HANDLER]: neighbours for region {0}: {1}", regionID, rinfos.Count);
+            //m_logger.DebugFormat("[GRID HANDLER]: neighbours for region {0}: {1}", regionID, rinfos.Count);
 
             Dictionary<string, object> result = new Dictionary<string, object>();
             if (rinfo == null)
@@ -287,7 +291,7 @@ namespace OpenSim.Server.Handlers.Grid
 
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            //m_logger.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
@@ -297,19 +301,19 @@ namespace OpenSim.Server.Handlers.Grid
             if (request.ContainsKey("SCOPEID"))
                 UUID.TryParse(request["SCOPEID"].ToString(), out scopeID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to get region by position");
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to get region by position");
 
             int x = 0, y = 0;
             if (request.ContainsKey("X"))
                 Int32.TryParse(request["X"].ToString(), out x);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no X in request to get region by position");
+                m_logger.LogWarning("[GRID HANDLER]: no X in request to get region by position");
             if (request.ContainsKey("Y"))
                 Int32.TryParse(request["Y"].ToString(), out y);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no Y in request to get region by position");
+                m_logger.LogWarning("[GRID HANDLER]: no Y in request to get region by position");
 
-            // m_log.DebugFormat("{0} GetRegionByPosition: loc=<{1},{2}>", LogHeader, x, y);
+            // m_logger.DebugFormat("{0} GetRegionByPosition: loc=<{1},{2}>", LogHeader, x, y);
             GridRegion rinfo = m_GridService.GetRegionByPosition(scopeID, x, y);
 
             Dictionary<string, object> result = new Dictionary<string, object>();
@@ -320,7 +324,7 @@ namespace OpenSim.Server.Handlers.Grid
 
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            //m_logger.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
@@ -330,16 +334,16 @@ namespace OpenSim.Server.Handlers.Grid
             if (request.ContainsKey("SCOPEID"))
                 UUID.TryParse(request["SCOPEID"].ToString(), out scopeID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to get region by name");
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to get region by name");
 
             string regionName = string.Empty;
             if (request.ContainsKey("NAME"))
                 regionName = request["NAME"].ToString();
             else
-                m_log.WarnFormat("[GRID HANDLER]: no name in request to get region by name");
+                m_logger.LogWarning("[GRID HANDLER]: no name in request to get region by name");
 
             GridRegion rinfo = m_GridService.GetRegionByName(scopeID, regionName);
-            //m_log.DebugFormat("[GRID HANDLER]: neighbours for region {0}: {1}", regionID, rinfos.Count);
+            //m_logger.DebugFormat("[GRID HANDLER]: neighbours for region {0}: {1}", regionID, rinfos.Count);
 
             Dictionary<string, object> result = new Dictionary<string, object>();
             if (rinfo == null)
@@ -349,7 +353,7 @@ namespace OpenSim.Server.Handlers.Grid
 
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            //m_logger.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
@@ -359,22 +363,22 @@ namespace OpenSim.Server.Handlers.Grid
             if (request.ContainsKey("SCOPEID"))
                 UUID.TryParse(request["SCOPEID"].ToString(), out scopeID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to get regions by name");
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to get regions by name");
 
             string regionName = string.Empty;
             if (request.ContainsKey("NAME"))
                 regionName = request["NAME"].ToString();
             else
-                m_log.WarnFormat("[GRID HANDLER]: no NAME in request to get regions by name");
+                m_logger.LogWarning("[GRID HANDLER]: no NAME in request to get regions by name");
 
             int max = 0;
             if (request.ContainsKey("MAX"))
                 Int32.TryParse(request["MAX"].ToString(), out max);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no MAX in request to get regions by name");
+                m_logger.LogWarning("[GRID HANDLER]: no MAX in request to get regions by name");
 
             List<GridRegion> rinfos = m_GridService.GetRegionsByName(scopeID, regionName, max);
-            //m_log.DebugFormat("[GRID HANDLER]: neighbours for region {0}: {1}", regionID, rinfos.Count);
+            //m_logger.DebugFormat("[GRID HANDLER]: neighbours for region {0}: {1}", regionID, rinfos.Count);
 
             Dictionary<string, object> result = new Dictionary<string, object>();
             if ((rinfos == null) || ((rinfos != null) && (rinfos.Count == 0)))
@@ -392,36 +396,36 @@ namespace OpenSim.Server.Handlers.Grid
 
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            //m_logger.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
         byte[] GetRegionRange(Dictionary<string, object> request)
         {
-            //m_log.DebugFormat("[GRID HANDLER]: GetRegionRange");
+            //m_logger.DebugFormat("[GRID HANDLER]: GetRegionRange");
             UUID scopeID = UUID.Zero;
             if (request.ContainsKey("SCOPEID"))
                 UUID.TryParse(request["SCOPEID"].ToString(), out scopeID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to get region range");
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to get region range");
 
             int xmin = 0, xmax = 0, ymin = 0, ymax = 0;
             if (request.ContainsKey("XMIN"))
                 Int32.TryParse(request["XMIN"].ToString(), out xmin);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no XMIN in request to get region range");
+                m_logger.LogWarning("[GRID HANDLER]: no XMIN in request to get region range");
             if (request.ContainsKey("XMAX"))
                 Int32.TryParse(request["XMAX"].ToString(), out xmax);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no XMAX in request to get region range");
+                m_logger.LogWarning("[GRID HANDLER]: no XMAX in request to get region range");
             if (request.ContainsKey("YMIN"))
                 Int32.TryParse(request["YMIN"].ToString(), out ymin);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no YMIN in request to get region range");
+                m_logger.LogWarning("[GRID HANDLER]: no YMIN in request to get region range");
             if (request.ContainsKey("YMAX"))
                 Int32.TryParse(request["YMAX"].ToString(), out ymax);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no YMAX in request to get region range");
+                m_logger.LogWarning("[GRID HANDLER]: no YMAX in request to get region range");
 
 
             List<GridRegion> rinfos = m_GridService.GetRegionRange(scopeID, xmin, xmax, ymin, ymax);
@@ -441,18 +445,18 @@ namespace OpenSim.Server.Handlers.Grid
             }
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            //m_logger.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
         byte[] GetDefaultRegions(Dictionary<string, object> request)
         {
-            //m_log.DebugFormat("[GRID HANDLER]: GetDefaultRegions");
+            //m_logger.DebugFormat("[GRID HANDLER]: GetDefaultRegions");
             UUID scopeID = UUID.Zero;
             if (request.ContainsKey("SCOPEID"))
                 UUID.TryParse(request["SCOPEID"].ToString(), out scopeID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to get region range");
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to get region range");
 
             List<GridRegion> rinfos = m_GridService.GetDefaultRegions(scopeID);
 
@@ -471,18 +475,18 @@ namespace OpenSim.Server.Handlers.Grid
             }
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            //m_logger.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
         byte[] GetDefaultHypergridRegions(Dictionary<string, object> request)
         {
-            //m_log.DebugFormat("[GRID HANDLER]: GetDefaultRegions");
+            //m_logger.DebugFormat("[GRID HANDLER]: GetDefaultRegions");
             UUID scopeID = UUID.Zero;
             if (request.ContainsKey("SCOPEID"))
                 UUID.TryParse(request["SCOPEID"].ToString(), out scopeID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to get region range");
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to get region range");
 
             List<GridRegion> rinfos = m_GridService.GetDefaultHypergridRegions(scopeID);
 
@@ -501,28 +505,28 @@ namespace OpenSim.Server.Handlers.Grid
             }
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            //m_logger.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
         byte[] GetFallbackRegions(Dictionary<string, object> request)
         {
-            //m_log.DebugFormat("[GRID HANDLER]: GetRegionRange");
+            //m_logger.DebugFormat("[GRID HANDLER]: GetRegionRange");
             UUID scopeID = UUID.Zero;
             if (request.ContainsKey("SCOPEID"))
                 UUID.TryParse(request["SCOPEID"].ToString(), out scopeID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to get fallback regions");
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to get fallback regions");
 
             int x = 0, y = 0;
             if (request.ContainsKey("X"))
                 Int32.TryParse(request["X"].ToString(), out x);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no X in request to get fallback regions");
+                m_logger.LogWarning("[GRID HANDLER]: no X in request to get fallback regions");
             if (request.ContainsKey("Y"))
                 Int32.TryParse(request["Y"].ToString(), out y);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no Y in request to get fallback regions");
+                m_logger.LogWarning("[GRID HANDLER]: no Y in request to get fallback regions");
 
 
             List<GridRegion> rinfos = m_GridService.GetFallbackRegions(scopeID, x, y);
@@ -542,7 +546,7 @@ namespace OpenSim.Server.Handlers.Grid
             }
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            //m_logger.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
@@ -554,21 +558,21 @@ namespace OpenSim.Server.Handlers.Grid
             if (request.TryGetValue("SCOPEID", out o))
                 UUID.TryParse(o.ToString(), out scopeID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to get online regions");
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to get online regions");
 
             int x = 0, y = 0, max = 0;
             if (request.TryGetValue("X", out o))
                 Int32.TryParse(o.ToString(), out x);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no X in request to get online regions");
+                m_logger.LogWarning("[GRID HANDLER]: no X in request to get online regions");
             if (request.TryGetValue("Y", out o))
                 Int32.TryParse(o.ToString(), out y);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no Y in request to get online regions");
+                m_logger.LogWarning("[GRID HANDLER]: no Y in request to get online regions");
             if (request.TryGetValue("MC", out o))
                 Int32.TryParse(o.ToString(), out max);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no Max Count in request to get online regions");
+                m_logger.LogWarning("[GRID HANDLER]: no Max Count in request to get online regions");
 
             List<GridRegion> rinfos = null;
             if (max > 0)
@@ -589,18 +593,18 @@ namespace OpenSim.Server.Handlers.Grid
             }
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            //m_logger.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
         byte[] GetHyperlinks(Dictionary<string, object> request)
         {
-            //m_log.DebugFormat("[GRID HANDLER]: GetHyperlinks");
+            //m_logger.DebugFormat("[GRID HANDLER]: GetHyperlinks");
             UUID scopeID = UUID.Zero;
             if (request.ContainsKey("SCOPEID"))
                 UUID.TryParse(request["SCOPEID"].ToString(), out scopeID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to get linked regions");
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to get linked regions");
 
             List<GridRegion> rinfos = m_GridService.GetHyperlinks(scopeID);
 
@@ -619,7 +623,7 @@ namespace OpenSim.Server.Handlers.Grid
             }
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            //m_logger.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
@@ -629,23 +633,23 @@ namespace OpenSim.Server.Handlers.Grid
             if (request.ContainsKey("SCOPEID"))
                 UUID.TryParse(request["SCOPEID"].ToString(), out scopeID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no scopeID in request to get RegionFlags");
+                m_logger.LogWarning("[GRID HANDLER]: no scopeID in request to get RegionFlags");
 
             UUID regionID = UUID.Zero;
             if (request.ContainsKey("REGIONID"))
                 UUID.TryParse(request["REGIONID"].ToString(), out regionID);
             else
-                m_log.WarnFormat("[GRID HANDLER]: no regionID in request to get RegionFlags");
+                m_logger.LogWarning("[GRID HANDLER]: no regionID in request to get RegionFlags");
 
             int flags = m_GridService.GetRegionFlags(scopeID, regionID);
-           // m_log.DebugFormat("[GRID HANDLER]: flags for region {0}: {1}", regionID, flags);
+           // m_logger.DebugFormat("[GRID HANDLER]: flags for region {0}: {1}", regionID, flags);
 
             Dictionary<string, object> result = new Dictionary<string, object>();
             result["result"] = flags.ToString();
 
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+            //m_logger.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 

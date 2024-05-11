@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System.Reflection;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.UserAccountService;
@@ -35,23 +33,31 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
 using OpenMetaverse;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.UserAccounts
 {
     public class UserAccountServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger m_logger;
+        private readonly IUserAccountService m_UserAccountService;
 
-        private IUserAccountService m_UserAccountService;
         private bool m_AllowCreateUser = false;
         private bool m_AllowSetAccount = false;
 
-        public UserAccountServerPostHandler(IUserAccountService service)
-            : this(service, null, null) {}
+        public UserAccountServerPostHandler(
+            ILogger logger, 
+            IUserAccountService service) :
+            this(logger, service, null, null) {}
 
-        public UserAccountServerPostHandler(IUserAccountService service, IConfigurationSection config, IServiceAuth auth) :
-                base("POST", "/accounts", auth)
+        public UserAccountServerPostHandler(
+            ILogger logger, 
+            IUserAccountService service, 
+            IConfigurationSection config, 
+            IServiceAuth auth) :
+            base("POST", "/accounts", auth)
         {
+            m_logger = logger;
             m_UserAccountService = service;
 
             if (config.Exists())
@@ -67,6 +73,7 @@ namespace OpenSim.Server.Handlers.UserAccounts
             string body;
             using(StreamReader sr = new StreamReader(requestData))
                 body = sr.ReadToEnd();
+
             body = body.Trim();
 
             // We need to check the authorization header
@@ -103,11 +110,11 @@ namespace OpenSim.Server.Handlers.UserAccounts
                             return FailureResult();
                 }
 
-                m_log.DebugFormat("[USER SERVICE HANDLER]: unknown method request: {0}", method);
+                m_logger.LogDebug($"[USER SERVICE HANDLER]: unknown method request: {method}");
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[USER SERVICE HANDLER]: Exception in method {0}: {1}", method, e);
+                m_logger.LogDebug(e, $"[USER SERVICE HANDLER]: Exception in method {method}.");
             }
 
             return FailureResult();
@@ -202,14 +209,14 @@ namespace OpenSim.Server.Handlers.UserAccounts
 
             if (!request.TryGetValue("IDS", out object oids))
             {
-                m_log.DebugFormat("[USER SERVICE HANDLER]: GetMultiAccounts called without required uuids argument");
+                m_logger.LogDebug($"[USER SERVICE HANDLER]: GetMultiAccounts called without required uuids argument");
                 return FailureResult();
             }
 
             List<string> lids = oids as List<string>;
             if (lids == null)
             {
-                m_log.DebugFormat("[USER SERVICE HANDLER]: GetMultiAccounts input argument was of unexpected type {0} or null", oids.GetType().ToString());
+                m_logger.LogDebug($"[USER SERVICE HANDLER]: GetMultiAccounts input argument was of unexpected type {oids.GetType()} or null");
                 return FailureResult();
             }
 
@@ -292,9 +299,9 @@ namespace OpenSim.Server.Handlers.UserAccounts
 
             if (!m_UserAccountService.StoreUserAccount(existingAccount))
             {
-                m_log.ErrorFormat(
-                    "[USER ACCOUNT SERVER POST HANDLER]: Account store failed for account {0} {1} {2}",
-                    existingAccount.FirstName, existingAccount.LastName, existingAccount.PrincipalID);
+                m_logger.LogError(
+                    $"[USER ACCOUNT SERVER POST HANDLER]: Account store failed for account " +
+                    $"{existingAccount.FirstName} {existingAccount.LastName} {existingAccount.PrincipalID}");
 
                 return FailureResult();
             }

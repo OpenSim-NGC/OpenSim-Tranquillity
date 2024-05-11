@@ -69,7 +69,7 @@ namespace OpenSim.Server.Handlers.UserAlias
             if (serverConfig.Exists() is false)
                 throw new Exception(String.Format("No section {0} in config file", ConfigName));
 
-            string service = serverConfig.GetValue("LocalServiceModule", String.Empty);
+            string? service = serverConfig.GetValue("LocalServiceModule", String.Empty);
             if (string.IsNullOrEmpty(service))
             {
                 throw new Exception("No LocalServiceModule in config file");
@@ -79,7 +79,7 @@ namespace OpenSim.Server.Handlers.UserAlias
 
             IServiceAuth auth = ServiceAuth.Create(m_configuration, ConfigName);
             
-            HttpServer.AddStreamHandler(new UserAliasServerPostHandler(m_UserAliasService, auth));
+            HttpServer.AddStreamHandler(new UserAliasServerPostHandler(m_logger, m_UserAliasService, auth));
         }
     }
 }

@@ -7,6 +7,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Doc", "Doc", "{033B5574-717
 	ProjectSection(SolutionItems) = preProject
 		Doc\doxygen.conf = Doc\doxygen.conf
 		Doc\README = Doc\README
+		LICENSE.md = LICENSE.md
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{8F448DF9-DE18-4810-8545-96DFE17D5C39}"
@@ -137,11 +138,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		BUILDING.md = BUILDING.md
 		CONTRIBUTORS.txt = CONTRIBUTORS.txt
-		LICENSE.txt = LICENSE.txt
 		README.md = README.md
 		RELEASE.md = RELEASE.md
 		SECURITY.md = SECURITY.md
 		TESTING.txt = TESTING.txt
+		LICENSE.md = LICENSE.md
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.Groups", "Source\OpenSim.Addons.Groups\OpenSim.Addons.Groups.csproj", "{7AC7DE42-37C4-4AFE-BD39-CBF373E85A72}"
@@ -151,6 +152,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.SQLite", "Source\OpenSim.Data.SQLite\OpenSim.Data.SQLite.csproj", "{AF2313C2-F8D3-4469-8C0F-D83842B62BE0}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.PGSQL", "Source\OpenSim.Data.PGSQL\OpenSim.Data.PGSQL.csproj", "{12B7EA13-4A71-4BCF-9723-D6F07F6C89C4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Services.Controllers", "Source\OpenSim.Services.Controllers\OpenSim.Services.Controllers.csproj", "{CCABE946-99E9-4877-B6A7-6F53544D1739}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Server.AssetServer", "Source\OpenSim.Server.AssetServer\OpenSim.Server.AssetServer.csproj", "{7FC7566A-5B1E-4D36-BCC6-CEE993315C57}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -414,6 +419,14 @@ Global
 		{12B7EA13-4A71-4BCF-9723-D6F07F6C89C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{12B7EA13-4A71-4BCF-9723-D6F07F6C89C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{12B7EA13-4A71-4BCF-9723-D6F07F6C89C4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CCABE946-99E9-4877-B6A7-6F53544D1739}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CCABE946-99E9-4877-B6A7-6F53544D1739}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CCABE946-99E9-4877-B6A7-6F53544D1739}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CCABE946-99E9-4877-B6A7-6F53544D1739}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7FC7566A-5B1E-4D36-BCC6-CEE993315C57}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7FC7566A-5B1E-4D36-BCC6-CEE993315C57}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7FC7566A-5B1E-4D36-BCC6-CEE993315C57}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7FC7566A-5B1E-4D36-BCC6-CEE993315C57}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -483,6 +496,8 @@ Global
 		{362A017B-80DE-4FA2-8AC3-0226F51AAB56} = {02C09046-CFF3-40BA-9E3F-629241EB25A5}
 		{AF2313C2-F8D3-4469-8C0F-D83842B62BE0} = {02C09046-CFF3-40BA-9E3F-629241EB25A5}
 		{12B7EA13-4A71-4BCF-9723-D6F07F6C89C4} = {02C09046-CFF3-40BA-9E3F-629241EB25A5}
+		{CCABE946-99E9-4877-B6A7-6F53544D1739} = {02C09046-CFF3-40BA-9E3F-629241EB25A5}
+		{7FC7566A-5B1E-4D36-BCC6-CEE993315C57} = {02C09046-CFF3-40BA-9E3F-629241EB25A5}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A40AD54B-8BC7-41E4-B241-19B59EA65D2A}

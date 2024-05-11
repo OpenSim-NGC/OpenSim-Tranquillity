@@ -25,14 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Data;
 using MySqlConnector;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.MySQL
 {
@@ -41,17 +39,21 @@ namespace OpenSim.Data.MySQL
     /// </summary>
     public class MySQLInventoryData : IInventoryDataPlugin
     {
-        private static readonly ILog m_log
-            = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger _logger;
 
         private string m_connectionString;
         private object m_dbLock = new object();
+
+        public MySQLInventoryData(ILogger<MySQLInventoryData> logger)
+        {
+            _logger = logger;
+        }
 
         public string Version { get { return "1.0.0.0"; } }
 
         public void Initialise()
         {
-            m_log.Info("[MySQLInventoryData]: " + Name + " cannot be default-initialized!");
+            _logger.LogInformation($"[MySQLInventoryData]: {Name} cannot be default-initialized!");
             throw new PluginNotInitialisedException (Name);
         }
 
@@ -76,7 +78,7 @@ namespace OpenSim.Data.MySQL
             using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
             {
                 dbcon.Open();
-                Migration m = new Migration(dbcon, assem, "InventoryStore");
+                Migration m = new Migration(_logger, dbcon, assem, "InventoryStore");
                 m.Update();
                 dbcon.Close();
             }
@@ -140,7 +142,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (Exception e)
             {
-                m_log.Error(e.Message, e);
+                _logger.LogError(e, Name);
                 return null;
             }
         }
@@ -181,7 +183,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (Exception e)
             {
-                m_log.Error(e.Message, e);
+                _logger.LogError(e, Name);
                 return null;
             }
         }
@@ -233,7 +235,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (Exception e)
             {
-                m_log.Error(e.Message, e);
+                _logger.LogError(e, Name);
                 return null;
             }
         }
@@ -274,7 +276,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (Exception e)
             {
-                m_log.Error(e.Message, e);
+                _logger.LogError(e, Name);
                 return null;
             }
         }
@@ -326,7 +328,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (MySqlException e)
             {
-                m_log.Error(e.ToString());
+                //_logger.LogError(e, Name);
             }
 
             return null;
@@ -366,8 +368,9 @@ namespace OpenSim.Data.MySQL
             }
             catch (Exception e)
             {
-                m_log.Error(e.Message, e);
+                _logger.LogError(e,Name);
             }
+
             return null;
         }
 
@@ -391,7 +394,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (Exception e)
             {
-                m_log.Error(e.Message, e);
+                //m_log.Error(e.Message, e);
             }
 
             return null;
@@ -432,7 +435,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (Exception e)
             {
-                m_log.Error(e.Message, e);
+                _logger.LogError(e, Name);
                 return null;
             }
         }
@@ -458,14 +461,14 @@ namespace OpenSim.Data.MySQL
             if (item.Name.Length > 64)
             {
                 itemName = item.Name.Substring(0, 64);
-                m_log.Warn("[INVENTORY DB]: Name field truncated from " + item.Name.Length + " to " + itemName.Length + " characters on add item");
+                _logger.LogWarning($"[INVENTORY DB]: Name field truncated from {item.Name.Length} to {itemName.Length} characters on add item");
             }
 
             string itemDesc = item.Description;
             if (item.Description.Length > 128)
             {
                 itemDesc = item.Description.Substring(0, 128);
-                m_log.Warn("[INVENTORY DB]: Description field truncated from " + item.Description.Length + " to " + itemDesc.Length + " characters on add item");
+                _logger.LogWarning($"[INVENTORY DB]: Description field truncated from {item.Description.Length} to {itemDesc.Length} characters on add item");
             }
 
             try
@@ -484,8 +487,7 @@ namespace OpenSim.Data.MySQL
                         result.Parameters.AddWithValue("?inventoryName", itemName);
                         result.Parameters.AddWithValue("?inventoryDescription", itemDesc);
                         result.Parameters.AddWithValue("?inventoryNextPermissions", item.NextPermissions.ToString());
-                        result.Parameters.AddWithValue("?inventoryCurrentPermissions",
-                                                       item.CurrentPermissions.ToString());
+                        result.Parameters.AddWithValue("?inventoryCurrentPermissions", item.CurrentPermissions.ToString());
                         result.Parameters.AddWithValue("?invType", item.InvType);
                         result.Parameters.AddWithValue("?creatorID", item.CreatorId);
                         result.Parameters.AddWithValue("?inventoryBasePermissions", item.BasePermissions);
@@ -516,7 +518,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (MySqlException e)
             {
-                m_log.Error(e.ToString());
+                _logger.LogError(e, Name);
             }
         }
 
@@ -553,7 +555,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (MySqlException e)
             {
-                m_log.Error(e.Message, e);
+                _logger.LogError(e, Name);
             }
         }
 
@@ -581,7 +583,7 @@ namespace OpenSim.Data.MySQL
             if (folderName.Length > 64)
             {
                 folderName = folderName.Substring(0, 64);
-                m_log.Warn("[INVENTORY DB]: Name field truncated from " + folder.Name.Length + " to " + folderName.Length + " characters on add folder");
+                _logger.LogWarning($"[INVENTORY DB]: Name field truncated from {folder.Name.Length} to {folderName.Length} characters on add folder");
             }
 
             using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
@@ -606,7 +608,7 @@ namespace OpenSim.Data.MySQL
                     }
                     catch (Exception e)
                     {
-                        m_log.Error(e.ToString());
+                        _logger.LogError(e, Name);
                     }
                 }
                 dbcon.Close();
@@ -629,8 +631,7 @@ namespace OpenSim.Data.MySQL
         /// <remarks>UPDATE inventoryfolders SET parentFolderID=?parentFolderID WHERE folderID=?folderID</remarks>
         public void moveInventoryFolder(InventoryFolderBase folder)
         {
-            string sql =
-                "UPDATE inventoryfolders SET parentFolderID=?parentFolderID WHERE folderID=?folderID";
+            string sql = "UPDATE inventoryfolders SET parentFolderID=?parentFolderID WHERE folderID=?folderID";
 
             using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
             {
@@ -650,9 +651,10 @@ namespace OpenSim.Data.MySQL
                     }
                     catch (Exception e)
                     {
-                        m_log.Error(e.ToString());
+                        _logger.LogError(e, Name);
                     }
                 }
+
                 dbcon.Close();
             }
         }
@@ -792,7 +794,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (Exception e)
             {
-                m_log.Error(e.Message, e);
+                _logger.LogError(e,Name);
                 return null;
             }
         }
@@ -822,7 +824,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (MySqlException e)
             {
-                m_log.Error(e.Message, e);
+                _logger.LogError(e, Name);
             }
         }
 
@@ -850,7 +852,7 @@ namespace OpenSim.Data.MySQL
             }
             catch (MySqlException e)
             {
-                m_log.Error(e.ToString());
+                _logger.LogError(e, Name);
             }
         }
 
@@ -907,7 +909,7 @@ namespace OpenSim.Data.MySQL
                 }
                 catch (Exception e)
                 {
-                    m_log.Error(e.Message, e);
+                    _logger.LogError(e, Name);
                     return null;
                 }
             }

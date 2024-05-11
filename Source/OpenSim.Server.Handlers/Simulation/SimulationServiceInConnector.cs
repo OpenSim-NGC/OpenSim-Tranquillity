@@ -68,8 +68,8 @@ namespace OpenSim.Server.Handlers.Simulation
             // are pure binary and shoehorning that into a string with UTF-8
             // encoding breaks it
 
-            HttpServer.AddSimpleStreamHandler(new AgentSimpleHandler(m_LocalSimulationService), true);
-            HttpServer.AddSimpleStreamHandler(new ObjectSimpleHandler(m_LocalSimulationService), true);
+            HttpServer.AddSimpleStreamHandler(new AgentSimpleHandler(Logger, m_LocalSimulationService), true);
+            HttpServer.AddSimpleStreamHandler(new ObjectSimpleHandler(Logger, m_LocalSimulationService), true);
         }
     }
 }

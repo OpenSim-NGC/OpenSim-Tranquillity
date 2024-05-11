@@ -707,7 +707,8 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
                                 //    so.Name, so.AttachedAvatar, url);
 
                                 IDictionary<UUID, sbyte> ids = new Dictionary<UUID, sbyte>();
-                                HGUuidGatherer uuidGatherer = new HGUuidGatherer(m_scene.AssetService, url, ids);
+                                HGUuidGatherer uuidGatherer = new HGUuidGatherer(m_scene.Logger, m_scene.AssetService);
+                                uuidGatherer.Initialize(assetServerURL: url, collector: ids);
                                 uuidGatherer.AddForInspection(defso);
 
                                 while (!uuidGatherer.Complete)
@@ -807,7 +808,9 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
                             {
                                 string url = aCircuit.ServiceURLs["AssetServerURI"].ToString();
                                 IDictionary<UUID, sbyte> ids = new Dictionary<UUID, sbyte>();
-                                HGUuidGatherer uuidGatherer = new HGUuidGatherer(m_scene.AssetService, url, ids);
+
+                                HGUuidGatherer uuidGatherer = new HGUuidGatherer(m_scene.Logger, m_scene.AssetService);
+                                uuidGatherer.Initialize(assetServerURL: url, collector: ids);
 
                                 foreach (SceneObjectGroup defso in deftatt)
                                 {

@@ -27,7 +27,7 @@
 
 using System.Data;
 using System.Reflection;
-
+using Microsoft.Extensions.Logging;
 using MySqlConnector;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -38,8 +38,16 @@ namespace OpenSim.Data.MySQL
 {
     public class MySqlRegionData : MySqlFramework, IRegionData
     {
+        private readonly ILogger _logger;
+
         private string m_Realm;
         private List<string> m_ColumnNames;
+
+        public MySqlRegionData(ILogger logger)
+        {
+            _logger = logger;
+        }
+
         //private string m_connectionString;
 
         protected virtual Assembly Assembly
@@ -57,7 +65,7 @@ namespace OpenSim.Data.MySQL
             using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
             {
                 dbcon.Open();
-                Migration m = new Migration(dbcon, Assembly, "GridStore");
+                Migration m = new Migration(_logger, dbcon, Assembly, "GridStore");
                 m.Update();
                 dbcon.Close();
             }

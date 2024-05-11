@@ -198,10 +198,10 @@ namespace OpenSim.Region.Framework.Scenes
         // ITerrainChannel.Merge
         public void Merge(ITerrainChannel newTerrain, Vector3 displacement, float radianRotation, Vector2 rotationDisplacement)
         {
-            m_log.DebugFormat("{0} Merge. inSize=<{1},{2}>, disp={3}, rot={4}, rotDisp={5}, outSize=<{6},{7}>", LogHeader,
-                                        newTerrain.Width, newTerrain.Height,
-                                        displacement, radianRotation, rotationDisplacement,
-                                        m_terrainData.SizeX, m_terrainData.SizeY);
+            //m_log.DebugFormat("{0} Merge. inSize=<{1},{2}>, disp={3}, rot={4}, rotDisp={5}, outSize=<{6},{7}>", LogHeader,
+            //                            newTerrain.Width, newTerrain.Height,
+            //                            displacement, radianRotation, rotationDisplacement,
+            //                            m_terrainData.SizeX, m_terrainData.SizeY);
             for (int xx = 0; xx < newTerrain.Width; xx++)
             {
                 for (int yy = 0; yy < newTerrain.Height; yy++)
@@ -286,9 +286,9 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="boundingSize">&lt;x, y&gt;</param>
         public void MergeWithBounding(ITerrainChannel newTerrain, Vector3 displacement, float rotationDegrees, Vector2 boundingOrigin, Vector2 boundingSize)
         {
-            m_log.DebugFormat("{0} MergeWithBounding: inSize=<{1},{2}>, rot={3}, boundingOrigin={4}, boundingSize={5}, disp={6}, outSize=<{7},{8}>",
-                                LogHeader, newTerrain.Width, newTerrain.Height, rotationDegrees, boundingOrigin.ToString(),
-                                boundingSize.ToString(), displacement, m_terrainData.SizeX, m_terrainData.SizeY);
+            //m_log.DebugFormat("{0} MergeWithBounding: inSize=<{1},{2}>, rot={3}, boundingOrigin={4}, boundingSize={5}, disp={6}, outSize=<{7},{8}>",
+            //                    LogHeader, newTerrain.Width, newTerrain.Height, rotationDegrees, boundingOrigin.ToString(),
+            //                    boundingSize.ToString(), displacement, m_terrainData.SizeX, m_terrainData.SizeY);
 
             // get the size of the incoming terrain
             int baseX = newTerrain.Width;
@@ -355,7 +355,7 @@ namespace OpenSim.Region.Framework.Scenes
                         }
                         catch (Exception)   //just in case we've still not taken care of every way the arrays might go out of bounds! ;)
                         {
-                            m_log.DebugFormat("{0} MergeWithBounding - Rotate: Out of Bounds sx={1} sy={2} dx={3} dy={4}", sx, sy, x, y);
+                            //m_log.DebugFormat("{0} MergeWithBounding - Rotate: Out of Bounds sx={1} sy={2} dx={3} dy={4}", sx, sy, x, y);
                         }
                     }
                 }
@@ -404,7 +404,7 @@ namespace OpenSim.Region.Framework.Scenes
                         }
                         catch (Exception)   //just in case we've still not taken care of every way the arrays might go out of bounds! ;)
                         {
-                            m_log.DebugFormat("{0} MergeWithBounding - Bound & Displace: Out of Bounds sx={1} sy={2} dx={3} dy={4}", x, y, dx, dy);
+                            //m_log.DebugFormat("{0} MergeWithBounding - Bound & Displace: Out of Bounds sx={1} sy={2} dx={3} dy={4}", x, y, dx, dy);
                         }
                     }
                 }

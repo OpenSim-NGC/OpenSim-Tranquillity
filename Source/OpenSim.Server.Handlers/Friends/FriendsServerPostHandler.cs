@@ -25,53 +25,52 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
+
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
+using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Friends
 {
     public class FriendsServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        private readonly ILogger m_logger;
         private IFriendsService m_FriendsService;
 
-        public FriendsServerPostHandler(IFriendsService service, IServiceAuth auth) :
-                base("POST", "/friends", auth)
+        public FriendsServerPostHandler(
+            ILogger logger, 
+            IFriendsService service, 
+            IServiceAuth auth) :
+            base("POST", "/friends", auth)
         {
+            m_logger = logger;
             m_FriendsService = service;
         }
 
-        protected override byte[] ProcessRequest(string path, Stream requestData,
-                IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        protected override byte[] ProcessRequest(
+            string path, 
+            Stream requestData,
+            IOSHttpRequest httpRequest, 
+            IOSHttpResponse httpResponse)
         {
             string body;
             using(StreamReader sr = new StreamReader(requestData))
                 body = sr.ReadToEnd();
+
             body = body.Trim();
 
             //m_log.DebugFormat("[XXX]: query String: {0}", body);
 
             try
             {
-                Dictionary<string, object> request =
-                        ServerUtils.ParseQueryString(body);
+                Dictionary<string, object> request = ServerUtils.ParseQueryString(body);
 
                 if (!request.ContainsKey("METHOD"))
                     return FailureResult();
@@ -97,11 +96,11 @@ namespace OpenSim.Server.Handlers.Friends
 
                 }
 
-                m_log.DebugFormat("[FRIENDS HANDLER]: unknown method request {0}", method);
+                m_logger.LogDebug($"[FRIENDS HANDLER]: unknown method request {method}");
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[FRIENDS HANDLER]: Exception {0}", e);
+                m_logger.LogDebug(e, $"[FRIENDS HANDLER]: Exception.");
             }
 
             return FailureResult();
@@ -113,9 +112,13 @@ namespace OpenSim.Server.Handlers.Friends
         {
             UUID principalID = UUID.Zero;
             if (request.ContainsKey("PRINCIPALID"))
+            {
                 UUID.TryParse(request["PRINCIPALID"].ToString(), out principalID);
+            }
             else
-                m_log.WarnFormat("[FRIENDS HANDLER]: no principalID in request to get friends");
+            {
+                m_logger.LogWarning($"[FRIENDS HANDLER]: no principalID in request to get friends");
+            }
 
             FriendInfo[] finfos = m_FriendsService.GetFriends(principalID);
 
@@ -125,10 +128,15 @@ namespace OpenSim.Server.Handlers.Friends
         byte[] GetFriendsString(Dictionary<string, object> request)
         {
             string principalID = string.Empty;
+
             if (request.ContainsKey("PRINCIPALID"))
+            {
                 principalID = request["PRINCIPALID"].ToString();
+            }
             else
-                m_log.WarnFormat("[FRIENDS HANDLER]: no principalID in request to get friends");
+            {
+                m_logger.LogWarning($"[FRIENDS HANDLER]: no principalID in request to get friends");
+            }
 
             FriendInfo[] finfos = m_FriendsService.GetFriends(principalID);
 
@@ -139,8 +147,11 @@ namespace OpenSim.Server.Handlers.Friends
         {
 
             Dictionary<string, object> result = new Dictionary<string, object>();
+
             if ((finfos == null) || ((finfos != null) && (finfos.Length == 0)))
+            {
                 result["result"] = "null";
+            }
             else
             {
                 int i = 0;
@@ -155,6 +166,7 @@ namespace OpenSim.Server.Handlers.Friends
             string xmlString = ServerUtils.BuildXmlResponse(result);
 
             //m_log.DebugFormat("[FRIENDS HANDLER]: resp string: {0}", xmlString);
+
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
@@ -173,13 +185,21 @@ namespace OpenSim.Server.Handlers.Friends
         byte[] DeleteFriend(Dictionary<string, object> request)
         {
             UUID principalID = UUID.Zero;
+
             if (request.ContainsKey("PRINCIPALID"))
+            {
                 UUID.TryParse(request["PRINCIPALID"].ToString(), out principalID);
+            }
             else
-                m_log.WarnFormat("[FRIENDS HANDLER]: no principalID in request to delete friend");
+            {
+                m_logger.LogWarning($"[FRIENDS HANDLER]: no principalID in request to delete friend");
+            }
+
             string friend = string.Empty;
             if (request.ContainsKey("FRIEND"))
+            {
                 friend = request["FRIEND"].ToString();
+            }
 
             bool success = m_FriendsService.Delete(principalID, friend);
             if (success)
@@ -192,9 +212,14 @@ namespace OpenSim.Server.Handlers.Friends
         {
             string principalID = string.Empty;
             if (request.ContainsKey("PRINCIPALID"))
+            {
                 principalID = request["PRINCIPALID"].ToString();
+            }
             else
-                m_log.WarnFormat("[FRIENDS HANDLER]: no principalID in request to delete friend");
+            {
+                m_logger.LogWarning($"[FRIENDS HANDLER]: no principalID in request to delete friend");
+            }
+
             string friend = string.Empty;
             if (request.ContainsKey("FRIEND"))
                 friend = request["FRIEND"].ToString();

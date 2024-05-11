@@ -128,9 +128,9 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
         // Called by scene serializer (save xml2)
         public static void SaveNamedPrimsToXml2(Scene scene, string primName, string fileName)
         {
-            m_log.InfoFormat(
-                "[SERIALISER]: Saving prims with name {0} in xml2 format for region {1} to {2}",
-                primName, scene.RegionInfo.RegionName, fileName);
+            //m_log.InfoFormat(
+            //    "[SERIALISER]: Saving prims with name {0} in xml2 format for region {1} to {2}",
+            //    primName, scene.RegionInfo.RegionName, fileName);
 
             EntityBase[] entityList = scene.GetEntities();
             List<EntityBase> primList = new List<EntityBase>();

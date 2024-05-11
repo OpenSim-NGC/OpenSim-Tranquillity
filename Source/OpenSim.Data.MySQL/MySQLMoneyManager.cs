@@ -41,6 +41,7 @@ namespace OpenSim.Data.MySQL
         private string Table_of_Transactions = "transactions";
         private string Table_of_TotalSales = "totalsales";
         private string Table_of_UserInfo = "userinfo";
+
         private int balances_rev = 0;
         private int userinfo_rev = 0;
 
@@ -79,9 +80,8 @@ namespace OpenSim.Data.MySQL
                     throw new Exception("[MONEY MANAGER]: Connection error while using connection string [" + connectString + "]", e);
                 }
 
-                // m_logger.LogInformation("Connection established");
+                m_logger.LogInformation("Connection established");
             }
-
             catch (Exception e)
             {
                 throw new Exception("[MONEY MANAGER]: Error initialising MySql Database: " + e.ToString());

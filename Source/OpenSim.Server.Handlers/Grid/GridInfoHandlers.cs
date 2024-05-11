@@ -25,30 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Net;
-using System.Reflection;
 using System.Security;
-using log4net;
-using Nini.Config;
 using Nwc.XmlRpc;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Grid
 {
     public class GridInfoHandlers
     {
-        private static readonly ILog _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private IConfiguration m_Config;
+        private ILogger m_logger;
+
         private Dictionary<string, string> _info = new Dictionary<string, string>();
-        private byte[] cachedJsonAnswer = null;
-        private byte[] cachedRestAnswer = null;
+        private byte[]? cachedJsonAnswer = null;
+        private byte[]? cachedRestAnswer = null;
         
         /// <summary>
         /// Instantiate a GridInfoService object.
@@ -61,9 +58,11 @@ namespace OpenSim.Server.Handlers.Grid
         /// anything else requires a general redesign of the config
         /// system.
         /// </remarks>
-        public GridInfoHandlers(IConfiguration configSource)
+        public GridInfoHandlers(IConfiguration configSource, ILogger logger)
         {
             m_Config = configSource;
+            m_logger = logger;
+
             loadGridInfo(configSource);
         }
 
@@ -82,7 +81,7 @@ namespace OpenSim.Server.Handlers.Grid
                         string[] keyparts = k.Key.Split(":");
                         if ((keyparts.Length > 1) && (keyparts[0] == "GridInfoService"))
                         {
-                            string v = gridCfg.GetValue<string>(keyparts[1]);
+                            string? v = gridCfg.GetValue<string>(keyparts[1]);
                             if (!string.IsNullOrEmpty(v))
                                 _info[keyparts[1]] = v;
                         }
@@ -141,20 +140,20 @@ namespace OpenSim.Server.Handlers.Grid
             }
             catch (Exception)
             {
-                _log.Warn("[GRID INFO SERVICE]: Cannot get grid info from config source, using minimal defaults");
+                m_logger.LogWarning("[GRID INFO SERVICE]: Cannot get grid info from config source, using minimal defaults");
             }
 
-            _log.DebugFormat("[GRID INFO SERVICE]: Grid info service initialized with {0} keys", _info.Count);
+            m_logger.LogDebug($"[GRID INFO SERVICE]: Grid info service initialized with {_info.Count} keys");
         }
 
         private void IssueWarning()
         {
-            _log.Warn("[GRID INFO SERVICE]: found no [GridInfoService] section in your configuration files");
-            _log.Warn("[GRID INFO SERVICE]: trying to guess sensible defaults, you might want to provide better ones:");
+            m_logger.LogWarning("[GRID INFO SERVICE]: found no [GridInfoService] section in your configuration files");
+            m_logger.LogWarning("[GRID INFO SERVICE]: trying to guess sensible defaults, you might want to provide better ones:");
 
             foreach (string k in _info.Keys)
             {
-                _log.WarnFormat("[GRID INFO SERVICE]: {0}: {1}", k, _info[k]);
+                m_logger.LogWarning($"[GRID INFO SERVICE]: {k}: {_info[k]}");
             }
         }
 
@@ -163,12 +162,13 @@ namespace OpenSim.Server.Handlers.Grid
             XmlRpcResponse response = new XmlRpcResponse();
             Hashtable responseData = new Hashtable();
 
-            _log.Debug("[GRID INFO SERVICE]: Request for grid info");
+            m_logger.LogDebug("[GRID INFO SERVICE]: Request for grid info");
 
             foreach (KeyValuePair<string, string>  k in _info)
             {
                 responseData[k.Key] = k.Value;
             }
+            
             response.Value = responseData;
 
             return response;

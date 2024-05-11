@@ -25,23 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.IO.Compression;
-using System.Reflection;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework.Servers.HttpServer;
 
-using log4net;
 
 namespace OpenSim.Server.Handlers.Simulation
 {
     public class Utils
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         public static byte[] falseStrBytes = osUTF8.GetASCIIBytes("false");
 
         /// <summary>

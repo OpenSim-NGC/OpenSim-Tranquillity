@@ -70,7 +70,7 @@ namespace OpenSim.Server.Handlers.Authentication
             if (serverConfig.Exists() is false)
                 throw new Exception($"No section {ConfigName} in config file");
 
-            string authenticationService = serverConfig.GetValue<string>("LocalServiceModule", String.Empty);
+            string? authenticationService = serverConfig.GetValue<string>("LocalServiceModule", String.Empty);
             if (string.IsNullOrEmpty(authenticationService))
                 throw new Exception("No LocalServiceModule in config file");
 
@@ -78,7 +78,7 @@ namespace OpenSim.Server.Handlers.Authentication
 
             IServiceAuth auth = ServiceAuth.Create(m_configuration, ConfigName);
 
-            HttpServer.AddStreamHandler(new AuthenticationServerPostHandler(m_AuthenticationService, m_configuration, auth));
+            HttpServer.AddStreamHandler(new AuthenticationServerPostHandler(m_configuration, m_logger, m_AuthenticationService, auth));
         }
     }
 }

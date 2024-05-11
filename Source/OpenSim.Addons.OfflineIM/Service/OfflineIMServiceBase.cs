@@ -27,16 +27,14 @@
 
 using Microsoft.Extensions.Configuration;
 using OpenSim.Data;
-using OpenSim.Services.Base;
 
 namespace OpenSim.OfflineIM
 {
-    public class OfflineIMServiceBase : ServiceBase
+    public class OfflineIMServiceBase 
     {
         protected IOfflineIMData m_Database = null;
 
         public OfflineIMServiceBase(IConfiguration config)
-            : base(config)
         {
             string dllName = String.Empty;
             string connString = String.Empty;

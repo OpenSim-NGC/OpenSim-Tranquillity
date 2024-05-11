@@ -25,47 +25,35 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Hypergrid
 {
     public class HGFriendsServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger m_logger;
+        private readonly IUserAgentService m_UserAgentService;
+        private readonly IFriendsSimConnector m_FriendsLocalSimConnector;
+        private readonly IHGFriendsService m_TheService;
 
-        private IUserAgentService m_UserAgentService;
-        private IFriendsSimConnector m_FriendsLocalSimConnector;
-        private IHGFriendsService m_TheService;
-
-        public HGFriendsServerPostHandler(IHGFriendsService service, IUserAgentService uas, IFriendsSimConnector friendsConn) :
-                base("POST", "/hgfriends")
+        public HGFriendsServerPostHandler(
+            ILogger logger,
+            IHGFriendsService service, 
+            IUserAgentService uas, 
+            IFriendsSimConnector friendsConn) :
+            base("POST", "/hgfriends")
         {
+            m_logger = logger;
             m_TheService = service;
             m_UserAgentService = uas;
             m_FriendsLocalSimConnector = friendsConn;
-
-            m_log.DebugFormat("[HGFRIENDS HANDLER]: HGFriendsServerPostHandler is On ({0})",
-                (m_FriendsLocalSimConnector == null ? "robust" : "standalone"));
-
-            if (m_TheService == null)
-                m_log.ErrorFormat("[HGFRIENDS HANDLER]: TheService is null!");
         }
 
         protected override byte[] ProcessRequest(string path, Stream requestData,
@@ -123,11 +111,11 @@ namespace OpenSim.Server.Handlers.Hypergrid
                         */
                 }
 
-                m_log.DebugFormat("[HGFRIENDS HANDLER]: unknown method {0}", method);
+                m_logger.LogDebug($"[HGFRIENDS HANDLER]: unknown method {method}");
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[HGFRIENDS HANDLER]: Exception {0}", e);
+                m_logger.LogDebug(e, $"[HGFRIENDS HANDLER]: Exception");
             }
 
             return FailureResult();
@@ -141,26 +129,35 @@ namespace OpenSim.Server.Handlers.Hypergrid
                 return FailureResult();
 
             UUID principalID = UUID.Zero;
+
             if (request.ContainsKey("PRINCIPALID"))
+            {
                 UUID.TryParse(request["PRINCIPALID"].ToString(), out principalID);
+            }
             else
             {
-                m_log.WarnFormat("[HGFRIENDS HANDLER]: no principalID in request to get friend perms");
+                m_logger.LogWarning($"[HGFRIENDS HANDLER]: no principalID in request to get friend perms");
                 return FailureResult();
             }
 
             UUID friendID = UUID.Zero;
+
             if (request.ContainsKey("FRIENDID"))
+            {
                 UUID.TryParse(request["FRIENDID"].ToString(), out friendID);
+            }
             else
             {
-                m_log.WarnFormat("[HGFRIENDS HANDLER]: no friendID in request to get friend perms");
+                m_logger.LogWarning($"[HGFRIENDS HANDLER]: no friendID in request to get friend perms");
                 return FailureResult();
             }
 
             int perms = m_TheService.GetFriendPerms(principalID, friendID);
+
             if (perms < 0)
+            {
                 return FailureResult("Friend not found");
+            }
 
             return SuccessResult(perms.ToString());
         }
@@ -183,6 +180,7 @@ namespace OpenSim.Server.Handlers.Hypergrid
         {
             FriendInfo friend = new FriendInfo(request);
             string secret = string.Empty;
+
             if (request.ContainsKey("SECRET"))
                 secret = request["SECRET"].ToString();
 
@@ -224,6 +222,7 @@ namespace OpenSim.Server.Handlers.Hypergrid
         {
             FriendInfo friend = new FriendInfo(request);
             UUID friendID = UUID.Zero;
+
             if (!UUID.TryParse(friend.Friend, out friendID))
                 return BoolResult(false);
 
@@ -235,25 +234,31 @@ namespace OpenSim.Server.Handlers.Hypergrid
         byte[] StatusNotification(Dictionary<string, object> request)
         {
             UUID principalID = UUID.Zero;
+            
             if (request.ContainsKey("userID"))
+            {
                 UUID.TryParse(request["userID"].ToString(), out principalID);
+            }
             else
             {
-                m_log.WarnFormat("[HGFRIENDS HANDLER]: no userID in request to notify");
+                m_logger.LogWarning($"[HGFRIENDS HANDLER]: no userID in request to notify");
                 return FailureResult();
             }
 
             bool online = true;
             if (request.ContainsKey("online"))
+            {
                 Boolean.TryParse(request["online"].ToString(), out online);
+            }
             else
             {
-                m_log.WarnFormat("[HGFRIENDS HANDLER]: no online in request to notify");
+                m_logger.LogWarning("[HGFRIENDS HANDLER]: no online in request to notify");
                 return FailureResult();
             }
 
             List<string> friends = new List<string>();
             int i = 0;
+
             foreach (KeyValuePair<string, object> kvp in request)
             {
                 if (kvp.Key.Equals("friend_" + i.ToString()))
@@ -264,10 +269,12 @@ namespace OpenSim.Server.Handlers.Hypergrid
             }
 
             List<UUID> onlineFriends = m_TheService.StatusNotification(friends, principalID, online);
-
             Dictionary<string, object> result = new Dictionary<string, object>();
+
             if ((onlineFriends == null) || ((onlineFriends != null) && (onlineFriends.Count == 0)))
+            {
                 result["RESULT"] = "NULL";
+            }
             else
             {
                 i = 0;
@@ -292,7 +299,7 @@ namespace OpenSim.Server.Handlers.Hypergrid
         {
             if (!request.ContainsKey("KEY") || !request.ContainsKey("SESSIONID"))
             {
-                m_log.WarnFormat("[HGFRIENDS HANDLER]: ignoring request without Key or SessionID");
+                m_logger.LogWarning("[HGFRIENDS HANDLER]: ignoring request without Key or SessionID");
                 return false;
             }
 
@@ -303,16 +310,17 @@ namespace OpenSim.Server.Handlers.Hypergrid
             string sessionStr = request["SESSIONID"].ToString();
 
             UUID sessionID;
+
             if (!UUID.TryParse(sessionStr, out sessionID) || serviceKey.Length == 0)
                 return false;
 
             if (!m_UserAgentService.VerifyAgent(sessionID, serviceKey))
             {
-                m_log.WarnFormat("[HGFRIENDS HANDLER]: Key {0} for session {1} did not match existing key. Ignoring request", serviceKey, sessionID);
+                m_logger.LogWarning($"[HGFRIENDS HANDLER]: Key {serviceKey} for session {sessionID} did not match existing key. Ignoring request");
                 return false;
             }
 
-            m_log.DebugFormat("[HGFRIENDS HANDLER]: Verification ok");
+            m_logger.LogDebug("[HGFRIENDS HANDLER]: Verification ok");
             return true;
         }
 
@@ -320,13 +328,11 @@ namespace OpenSim.Server.Handlers.Hypergrid
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
             doc.AppendChild(rootElement);
 
@@ -342,13 +348,11 @@ namespace OpenSim.Server.Handlers.Hypergrid
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
             doc.AppendChild(rootElement);
 
@@ -375,13 +379,11 @@ namespace OpenSim.Server.Handlers.Hypergrid
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
             doc.AppendChild(rootElement);
 
@@ -402,13 +404,11 @@ namespace OpenSim.Server.Handlers.Hypergrid
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
             doc.AppendChild(rootElement);
 

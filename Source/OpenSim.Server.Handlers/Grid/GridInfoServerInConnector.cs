@@ -53,7 +53,7 @@ namespace OpenSim.Server.Handlers.Grid
         {
             HttpServer = httpServer;
 
-            GridInfoHandlers handlers = new GridInfoHandlers(Config);
+            GridInfoHandlers handlers = new GridInfoHandlers(Config, Logger);
 
             HttpServer.AddSimpleStreamHandler(
                 new SimpleStreamHandler("/get_grid_info", handlers.RestGetGridInfoMethod));
@@ -63,6 +63,5 @@ namespace OpenSim.Server.Handlers.Grid
 
             HttpServer.AddXmlRPCHandler("get_grid_info", handlers.XmlRpcGridInfoMethod, false);
         }
-
     }
 }

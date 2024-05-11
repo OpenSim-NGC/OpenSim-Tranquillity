@@ -39,7 +39,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
     /// </summary>
     public class ScenePresenceAnimator
     {
-        private readonly ILogger<ScenePresenceAnimator> _logger;
+        private readonly ILogger? _logger;
 
         private float m_lastFallVelocity;
 
@@ -73,7 +73,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
         /// </summary>
         public bool Falling { get; private set; }
 
-        public ScenePresenceAnimator(ILogger<ScenePresenceAnimator> logger, ScenePresence sp)
+        public ScenePresenceAnimator(ILogger? logger, ScenePresence sp)
         {
             _logger = logger;
 
@@ -88,7 +88,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
 
             if (m_scenePresence.Scene.DebugAnimations)
             {
-                _logger.LogDebug($"[SCENE PRESENCE ANIMATOR]: Adding animation {GetAnimName(animID)} {animID} for {m_scenePresence.Name}");
+                _logger?.LogDebug($"[SCENE PRESENCE ANIMATOR]: Adding animation {GetAnimName(animID)} {animID} for {m_scenePresence.Name}");
             }
 
             if (m_animations.Add(animID, m_scenePresence.ControllingClient.NextAnimationSequenceNumber, objectID))
@@ -128,7 +128,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
 
             if (m_scenePresence.Scene.DebugAnimations)
             {
-                _logger.LogDebug($"[SCENE PRESENCE ANIMATOR]: Removing animation {GetAnimName(animID)} {animID} for {m_scenePresence.Name}");
+                _logger?.LogDebug($"[SCENE PRESENCE ANIMATOR]: Removing animation {GetAnimName(animID)} {animID} for {m_scenePresence.Name}");
             }
 
             if (m_animations.Remove(animID, allowNoDefault))
@@ -179,7 +179,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
         {
             if (m_scenePresence.Scene.DebugAnimations)
             {
-                _logger.LogDebug(
+                _logger?.LogDebug(
                     $"[SCENE PRESENCE ANIMATOR]: Resetting animations for {m_scenePresence.Name} " +
                     $"in {m_scenePresence.Scene.RegionInfo.RegionName}");
             }
@@ -200,7 +200,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
         {
             if (m_scenePresence.IsChildAgent)
             {
-                _logger.LogWarning($"[SCENE PRESENCE ANIMATOR]: Tried to set movement animation {anim} on child presence {m_scenePresence.Name}");
+                _logger?.LogWarning($"[SCENE PRESENCE ANIMATOR]: Tried to set movement animation {anim} on child presence {m_scenePresence.Name}");
 
                 return false;
             }

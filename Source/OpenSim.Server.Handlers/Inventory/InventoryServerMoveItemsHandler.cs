@@ -25,34 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
 using System.Xml.Serialization;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Inventory
 {
     public class InventoryServerMoveItemsHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger m_logger;
+        private readonly IInventoryService m_InventoryService;
 
-        private IInventoryService m_InventoryService;
-
-        public InventoryServerMoveItemsHandler(IInventoryService service) :
-                base("PUT", "/inventory")
+        public InventoryServerMoveItemsHandler(
+            ILogger logger, 
+            IInventoryService service) :
+            base("PUT", "/inventory")
         {
+            m_logger = logger;
             m_InventoryService = service;
         }
 
@@ -72,7 +65,9 @@ namespace OpenSim.Server.Handlers.Inventory
                 result = m_InventoryService.MoveItems(ownerID, items);
             }
             else
-                m_log.WarnFormat("[MOVEITEMS HANDLER]: ownerID not provided in request. Unable to serve.");
+            {
+                m_logger.LogWarning($"[MOVEITEMS HANDLER]: ownerID not provided in request. Unable to serve.");
+            }
 
             xs = new XmlSerializer(typeof(bool));
             return ServerUtils.SerializeResult(xs, result);

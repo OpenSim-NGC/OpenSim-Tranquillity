@@ -76,7 +76,7 @@ namespace OpenSim.Server.Handlers.GridUser
 
             IServiceAuth auth = ServiceAuth.Create(m_configuration, ConfigName);
 
-            HttpServer.AddStreamHandler(new MuteListServerPostHandler(m_MuteListService, auth));
+            HttpServer.AddStreamHandler(new MuteListServerPostHandler(m_logger, m_MuteListService, auth));
         }
     }
 }
