@@ -25,17 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Threading;
-using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
-using OpenMetaverse;
-using OpenMetaverse.Imaging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-using log4net;
 
 namespace OpenSim.Region.ClientStack.LindenUDP
 {
@@ -52,7 +48,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             }
         }
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<LLImageManager> m_logger;
         private bool m_shuttingdown;
         private AssetBase m_missingImage;
         private IAssetService m_assetCache;
@@ -77,6 +73,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
         public LLImageManager(IClientAPI client, IAssetService pAssetCache, IJ2KDecoder pJ2kDecodeModule)
         {
+            m_logger = OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LLImageManager>>();
             Client = client;
             m_assetCache = pAssetCache;
 
@@ -84,7 +81,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 m_missingImage = pAssetCache.Get("5748decc-f629-461c-9a36-a35a221fe21f");
 
             if (m_missingImage == null)
-                m_log.Error("[ClientView] - Couldn't set missing image asset, falling back to missing image packet. This is known to crash the client");
+                m_logger.LogError("[ClientView] - Couldn't set missing image asset, falling back to missing image packet. This is known to crash the client");
 
             m_j2kDecodeModule = pJ2kDecodeModule;
         }

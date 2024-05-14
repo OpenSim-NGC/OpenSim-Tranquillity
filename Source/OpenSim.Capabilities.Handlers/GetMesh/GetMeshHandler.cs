@@ -25,28 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Specialized;
-using System.Reflection;
-using System.IO;
-using System.Web;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
-using OpenMetaverse.StructuredData;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
-using OpenSim.Framework.Servers;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 using Caps = OpenSim.Framework.Capabilities.Caps;
+
+using OpenMetaverse;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Capabilities.Handlers
 {
     public class GetMeshHandler
     {
-        private static readonly ILog m_log =
-                   LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<GetMeshHandler> m_logger;
 
         private IAssetService m_assetService;
 
@@ -54,6 +49,7 @@ namespace OpenSim.Capabilities.Handlers
 
         public GetMeshHandler(IAssetService assService)
         {
+            m_logger = OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GetMeshHandler>>();
             m_assetService = assService;
         }
         public Hashtable Handle(Hashtable request)
@@ -146,7 +142,7 @@ namespace OpenSim.Capabilities.Handlers
                 return responsedata;
             }
 
-            m_log.Warn("[GETMESH]: Failed to parse a range from GetMesh request, sending full asset: " + (string)request["uri"]);
+            m_logger.LogWarning("[GETMESH]: Failed to parse a range from GetMesh request, sending full asset: " + (string)request["uri"]);
             responsedata["str_response_string"] = Convert.ToBase64String(mesh.Data);
             responsedata["int_response_code"] = (int)System.Net.HttpStatusCode.OK;
             return responsedata;

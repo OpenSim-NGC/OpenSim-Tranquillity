@@ -28,14 +28,16 @@
 
 // Revision by Ubit 2011/12
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Runtime.CompilerServices;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModule.SharedBase;
-using log4net;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
 
 namespace OpenSim.Region.PhysicsModule.ubOde
 {
@@ -70,7 +72,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
 
     public class OdeCharacter : PhysicsActor
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger<OdeCharacter> m_logger;
 
         internal AABB2D _AABB2D;
         internal Vector3 _position;
@@ -174,8 +176,12 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         private PIDHoverType m_PIDHoverType;
         private float m_targetHoverHeight;
 
-        public OdeCharacter(uint localID, String avName, ODEScene parent_scene, Vector3 pos, Vector3 pSize, float pfeetOffset, float density, float walk_divisor, float rundivisor)
+        public OdeCharacter(uint localID, String avName,
+                    ODEScene parent_scene, Vector3 pos, Vector3 pSize, float pfeetOffset,
+                    float density, float walk_divisor, float rundivisor)
         {
+            m_logger = m_logger ?? OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<OdeCharacter>>();
+
             m_baseLocalID = localID;
             m_parent_scene = parent_scene;
 
@@ -197,7 +203,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             else
             {
                 _position = new Vector3(((float)m_parent_scene.WorldExtents.X * 0.5f), ((float)m_parent_scene.WorldExtents.Y * 0.5f), parent_scene.GetTerrainHeightAtXY(128f, 128f) + 10f);
-                m_log.Warn("[PHYSICS]: Got NaN Position on Character Create");
+                m_logger.LogWarning("[PHYSICS]: Got NaN Position on Character Create");
             }
 
             m_size.X = pSize.X > 0.01f ? 0.5f * pSize.X : 0.01f;
@@ -373,7 +379,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             set
             {
                 m_flying = value;
-                //m_log.DebugFormat("[PHYSICS]: Set OdeCharacter Flying to {0}", flying);
+                //m_logger.LogDebug("[PHYSICS]: Set OdeCharacter Flying to {0}", flying);
             }
         }
 
@@ -535,7 +541,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 }
                 else
                 {
-                    m_log.Warn("[PHYSICS]: Got a NaN Position from Scene on a Character");
+                    m_logger.LogWarning("[PHYSICS]: Got a NaN Position from Scene on a Character");
                 }
             }
         }
@@ -581,7 +587,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 }
                 else
                 {
-                    m_log.Warn("[PHYSICS]: Got a NaN Size from Scene on a Character");
+                    m_logger.LogWarning("[PHYSICS]: Got a NaN Size from Scene on a Character");
                 }
             }
         }
@@ -606,7 +612,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             }
             else
             {
-                m_log.Warn("[PHYSICS]: Got a NaN AvatarSize from Scene on a Character");
+                m_logger.LogWarning("[PHYSICS]: Got a NaN AvatarSize from Scene on a Character");
             }
 
         }
@@ -735,7 +741,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 }
                 else
                 {
-                    m_log.Warn("[PHYSICS]: Got a NaN velocity from Scene in a Character");
+                    m_logger.LogWarning("[PHYSICS]: Got a NaN velocity from Scene in a Character");
                 }
             }
         }
@@ -756,7 +762,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 }
                 else
                 {
-                    m_log.Warn("[PHYSICS]: Got a NaN velocity from Scene in a Character");
+                    m_logger.LogWarning("[PHYSICS]: Got a NaN velocity from Scene in a Character");
                 }
             }
         }
@@ -858,7 +864,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             }
             else
             {
-                m_log.Warn("[PHYSICS]: Got a NaN force applied to a Character");
+                m_logger.LogWarning("[PHYSICS]: Got a NaN force applied to a Character");
             }
             //m_lastUpdateSent = false;
         }
@@ -1921,7 +1927,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             }
             else
             {
-                m_log.Warn("[PHYSICS]: Got a NaN Size from Scene on a Character");
+                m_logger.LogWarning("[PHYSICS]: Got a NaN Size from Scene on a Character");
             }
         }
 

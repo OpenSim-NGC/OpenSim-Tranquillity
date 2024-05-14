@@ -25,14 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenMetaverse;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModule.SharedBase;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
-using Microsoft.Extensions.Configuration;
-using log4net.Core;
-using Microsoft.Extensions.Logging;
+
+using OpenMetaverse;
 
 namespace OpenSim.Region.PhysicsModule.POS
 {

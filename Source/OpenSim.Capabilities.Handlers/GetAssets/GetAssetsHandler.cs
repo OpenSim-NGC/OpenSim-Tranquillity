@@ -25,28 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Net;
-using System.Reflection;
-using System.Threading;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
-using OpenMetaverse.StructuredData;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
-using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-using Caps = OpenSim.Framework.Capabilities.Caps;
+
+using OpenMetaverse;
 
 namespace OpenSim.Capabilities.Handlers
 {
     public class GetAssetsHandler
     {
-        private static readonly ILog m_log =
-                   LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<GetAssetsHandler> m_logger;
 
         private static readonly Dictionary<string, AssetType> queryTypes = new()
         {
@@ -76,6 +71,7 @@ namespace OpenSim.Capabilities.Handlers
 
         public GetAssetsHandler(IAssetService assService)
         {
+            m_logger = OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GetAssetsHandler>>();
             m_assetService = assService;
         }
 
@@ -111,7 +107,7 @@ namespace OpenSim.Capabilities.Handlers
             if(type == AssetType.Unknown)
             {
                 //m_log.Warn("[GETASSET]: Unknown type: " + query);
-                m_log.Warn("[GETASSET]: Unknown type");
+                m_logger.LogWarning("[GETASSET]: Unknown type");
                 response.StatusCode = (int)HttpStatusCode.NotFound;
                 return;
             }
@@ -145,14 +141,14 @@ namespace OpenSim.Capabilities.Handlers
 
             if (len == 0)
             {
-                m_log.Warn("[GETASSET]: asset with empty data: " + assetStr + " type " + asset.Type.ToString());
+                m_logger.LogWarning("[GETASSET]: asset with empty data: " + assetStr + " type " + asset.Type.ToString());
                 response.StatusCode = (int)HttpStatusCode.NotFound;
                 return;
             }
 
             if (asset.Type != (sbyte)type)
             {
-                m_log.Warn("[GETASSET]: asset with wrong type: " + assetStr + " " + asset.Type.ToString() + " != " + ((sbyte)type).ToString());
+                m_logger.LogWarning("[GETASSET]: asset with wrong type: " + assetStr + " " + asset.Type.ToString() + " != " + ((sbyte)type).ToString());
                 //response.StatusCode = (int)HttpStatusCode.NotFound;
                 //return;
             }

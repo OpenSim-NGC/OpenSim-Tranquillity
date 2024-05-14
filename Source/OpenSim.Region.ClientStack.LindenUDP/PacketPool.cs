@@ -25,19 +25,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using OpenSim.Server.Base;
+
 using OpenMetaverse;
 using OpenMetaverse.Packets;
-using log4net;
-using OpenSim.Framework.Monitoring;
 
 namespace OpenSim.Region.ClientStack.LindenUDP
 {
     public sealed class PacketPool
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<PacketPool> m_logger;
 
         private static readonly PacketPool instance = new PacketPool();
 
@@ -101,6 +103,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
         private PacketPool()
         {
+            m_logger = OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PacketPool>>();
             // defaults
             RecyclePackets = true;
             //RecyclePackets = false;
@@ -183,7 +186,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             int i = 0;
             Packet packet = GetPacket(type);
             if (packet == null)
-                m_log.WarnFormat("[PACKETPOOL]: Failed to get packet of type {0}", type);
+                m_logger.LogWarning("[PACKETPOOL]: Failed to get packet of type {0}", type);
             else
                 packet.FromBytes(bytes, ref i, ref packetEnd, zeroBuffer);
 

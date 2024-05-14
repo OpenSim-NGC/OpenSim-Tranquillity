@@ -27,35 +27,40 @@
 
 using System.Net;
 using System.Reflection;
-using System.Text;
-using OpenMetaverse;
-using OpenMetaverse.StructuredData;
+
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
+using OpenMetaverse;
+using OpenMetaverse.StructuredData;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
+using Microsoft.Extensions.DependencyInjection;
 
-using log4net;
 
 namespace OpenSim.Capabilities.Handlers
 {
     public class FetchInventory2Handler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<FetchInventory2Handler> m_logger;
 
         private IInventoryService m_inventoryService;
         private UUID m_agentID;
 
         public FetchInventory2Handler(IInventoryService invService, UUID agentId)
         {
+            m_logger = OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<FetchInventory2Handler>>();
             m_inventoryService = invService;
             m_agentID = agentId;
         }
 
         public string FetchInventoryRequest(string request, string path, string param, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
-            //m_log.DebugFormat("[FETCH INVENTORY HANDLER]: Received FetchInventory capability request {0}", request);
+            m_logger.LogDebug("[FETCH INVENTORY HANDLER]: Received FetchInventory capability request {0}", request);
 
             OSDMap requestmap = (OSDMap)OSDParser.DeserializeLLSDXml(Utils.StringToBytes(request));
             OSDArray itemsRequested = (OSDArray)requestmap["items"];
@@ -110,7 +115,7 @@ namespace OpenSim.Capabilities.Handlers
 
         public void FetchInventorySimpleRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap requestmap, ExpiringKey<UUID> BadRequests)
         {
-            //m_log.DebugFormat("[FETCH INVENTORY HANDLER]: Received FetchInventory capability request {0}", request);
+            // m_logger.LogDebug("[FETCH INVENTORY HANDLER]: Received FetchInventory capability request {0}", requestmap);
 
             if(BadRequests == null)
             {

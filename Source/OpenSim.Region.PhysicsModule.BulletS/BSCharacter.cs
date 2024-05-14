@@ -24,19 +24,22 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using log4net;
-using OMV = OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModule.SharedBase;
+using OpenSim.Server.Base;
+
+using OMV = OpenMetaverse;
 
 namespace OpenSim.Region.PhysicsModule.BulletS
 {
     public sealed class BSCharacter : BSPhysObject
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
         private static readonly string LogHeader = "[BULLETS CHAR]";
 
         // private bool _stopped;
@@ -76,11 +79,12 @@ namespace OpenSim.Region.PhysicsModule.BulletS
         // Avatars are always complete (in the physics engine sense)
         public override bool IsIncomplete { get { return false; } }
 
-        public BSCharacter(
-                uint localID, String avName, BSScene parent_scene, OMV.Vector3 pos, OMV.Vector3 vel, OMV.Vector3 size, float footOffset, bool isFlying)
-    
+        public BSCharacter( uint localID, String avName, BSScene parent_scene, OMV.Vector3 pos,
+                            OMV.Vector3 vel, OMV.Vector3 size, float footOffset, bool isFlying)
                 : base(parent_scene, localID, avName, "BSCharacter")
         {
+            m_logger = m_logger ?? OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<BSCharacter>>();
+
             _physicsActorType = (int)ActorTypes.Agent;
             RawPosition = pos;
     

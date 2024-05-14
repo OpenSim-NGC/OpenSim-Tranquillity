@@ -25,32 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Specialized;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.Reflection;
-using System.IO;
-using System.Web;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
-using OpenMetaverse.StructuredData;
-using OpenMetaverse.Imaging;
+
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+
 using OpenSim.Framework;
-using OpenSim.Framework.Servers;
-using OpenSim.Framework.Servers.HttpServer;
-using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-using Caps = OpenSim.Framework.Capabilities.Caps;
+
+using OpenMetaverse;
+using OpenMetaverse.Imaging;
 
 namespace OpenSim.Capabilities.Handlers
 {
     public class GetTextureHandler
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<GetTextureHandler> m_logger;
 
         private IAssetService m_assetService;
 
@@ -58,6 +51,7 @@ namespace OpenSim.Capabilities.Handlers
 
         public GetTextureHandler(IAssetService assService)
         {
+            m_logger = OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GetTextureHandler>>();
             m_assetService = assService;
         }
 
@@ -74,7 +68,7 @@ namespace OpenSim.Capabilities.Handlers
 
             if (m_assetService == null)
             {
-                m_log.Error("[GETTEXTURE]: Cannot fetch texture " + textureStr + " without an asset service");
+                m_logger.LogError("[GETTEXTURE]: Cannot fetch texture " + textureStr + " without an asset service");
             }
 
             UUID textureID;
@@ -115,7 +109,7 @@ namespace OpenSim.Capabilities.Handlers
             }
             else
             {
-                m_log.Warn("[GETTEXTURE]: Failed to parse a texture_id from GetTexture request: " + (string)request["uri"]);
+                m_logger.LogWarning("[GETTEXTURE]: Failed to parse a texture_id from GetTexture request: " + (string)request["uri"]);
             }
 
 //            m_log.DebugFormat(
@@ -189,7 +183,7 @@ namespace OpenSim.Capabilities.Handlers
 
             //WriteTextureData(request,response,null,format);
             // not found
-            //m_log.Warn("[GETTEXTURE]: Texture " + textureID + " not found");
+            //m_logger.LogWarning("[GETTEXTURE]: Texture " + textureID + " not found");
             return false;
         }
 
@@ -260,7 +254,7 @@ namespace OpenSim.Capabilities.Handlers
                 }
                 else
                 {
-                    m_log.Warn("[GETTEXTURE]: Malformed Range header: " + range);
+                    m_logger.LogWarning("[GETTEXTURE]: Malformed Range header: " + range);
                     response["int_response_code"] = (int)System.Net.HttpStatusCode.BadRequest;
                 }
             }
@@ -280,7 +274,7 @@ namespace OpenSim.Capabilities.Handlers
             }
 
 //            if (response.StatusCode < 200 || response.StatusCode > 299)
-//                m_log.WarnFormat(
+//                m_logger.LogWarning(
 //                    "[GETTEXTURE]: For texture {0} requested range {1} responded {2} with content length {3} (actual {4})",
 //                    texture.FullID, range, response.StatusCode, response.ContentLength, texture.Data.Length);
 //            else
@@ -291,7 +285,7 @@ namespace OpenSim.Capabilities.Handlers
 
         private byte[] ConvertTextureData(AssetBase texture, string format)
         {
-            m_log.DebugFormat("[GETTEXTURE]: Converting texture {0} to {1}", texture.ID, format);
+            m_logger.LogDebug("[GETTEXTURE]: Converting texture {0} to {1}", texture.ID, format);
             byte[] data = Array.Empty<byte>();
 
             MemoryStream imgstream = new MemoryStream();
@@ -322,13 +316,13 @@ namespace OpenSim.Capabilities.Handlers
                             data = imgstream.ToArray();
                         }
                         else
-                            m_log.WarnFormat("[GETTEXTURE]: No such codec {0}", format);
+                            m_logger.LogWarning("[GETTEXTURE]: No such codec {0}", format);
                     }
                 }
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[GETTEXTURE]: Unable to convert texture {0} to {1}: {2}", texture.ID, format, e.Message);
+                m_logger.LogWarning("[GETTEXTURE]: Unable to convert texture {0} to {1}: {2}", texture.ID, format, e.Message);
             }
             finally
             {

@@ -26,23 +26,25 @@
  */
 
 using System.Net;
-using System.Reflection;
-using System.Text;
-using OpenMetaverse;
-using OpenMetaverse.StructuredData;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
+using OpenMetaverse;
+using OpenMetaverse.StructuredData;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
-
-using log4net;
 
 namespace OpenSim.Capabilities.Handlers
 {
     public class FetchLib2Handler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<FetchLib2Handler> m_logger;
 
         private IInventoryService m_inventoryService;
         private ILibraryService m_LibraryService;
@@ -51,6 +53,7 @@ namespace OpenSim.Capabilities.Handlers
 
         public FetchLib2Handler(IInventoryService invService, ILibraryService libraryService, UUID agentId)
         {
+            m_logger = OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<FetchLib2Handler>>();
             m_inventoryService = invService;
             m_agentID = agentId;
             m_LibraryService = libraryService;
@@ -60,7 +63,7 @@ namespace OpenSim.Capabilities.Handlers
 
         public void FetchLibSimpleRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap requestmap, ExpiringKey<UUID> BadRequests)
         {
-            //m_log.DebugFormat("[FETCH LIB INVENTORY HANDLER]: Received FetchInventory capability request {0}", request);
+            // m_logger.LogDebug("[FETCH LIB INVENTORY HANDLER]: Received FetchInventory capability request {0}", requestmap);
 
             if (BadRequests == null)
             {

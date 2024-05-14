@@ -25,15 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModule.SharedBase;
-using log4net;
+using OpenSim.Server.Base;
+
 using OpenMetaverse;
 
 namespace OpenSim.Region.PhysicsModule.ubOde
@@ -45,6 +47,8 @@ namespace OpenSim.Region.PhysicsModule.ubOde
     /// </summary>
     public class ODERayCastRequestManager
     {
+        private static ILogger<ODERayCastRequestManager> m_logger;
+
         /// <summary>
         /// Pending ray requests
         /// </summary>
@@ -67,7 +71,6 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         /// ODE near callback delegate
         /// </summary>
         private readonly UBOdeNative.NearCallback nearCallback;
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private readonly List<ContactResult> m_contactResults = new(ResultsMaxCount);
         private readonly object m_contactResultsLock = new();
         private RayFilterFlags CurrentRayFilter;
@@ -76,6 +79,8 @@ namespace OpenSim.Region.PhysicsModule.ubOde
 
         public ODERayCastRequestManager(ODEScene pScene)
         {
+            m_logger = m_logger ?? OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<ODERayCastRequestManager>>();
+
             m_scene = pScene;
             m_contacts = pScene.m_contacts;
             nearCallback = near;
@@ -366,7 +371,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("[PHYSICS Ray]: Unable to Space collide test an object: {0}", e.Message);
+                    m_logger.LogWarning("[PHYSICS Ray]: Unable to Space collide test an object: {0}", e.Message);
                 }
                 return;
             }
@@ -378,7 +383,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PHYSICS Ray]: Unable to collide test an object: {0}", e.Message);
+                m_logger.LogWarning("[PHYSICS Ray]: Unable to collide test an object: {0}", e.Message);
                 return;
             }
 
@@ -463,7 +468,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PHYSICS Ray]: Unable to collide test an object: {0}", e.Message);
+                m_logger.LogWarning("[PHYSICS Ray]: Unable to collide test an object: {0}", e.Message);
                 return;
             }
 
@@ -531,7 +536,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PHYSICS Ray]: Unable to collide test an object: {0}", e.Message);
+                m_logger.LogWarning("[PHYSICS Ray]: Unable to collide test an object: {0}", e.Message);
                 return;
             }
 

@@ -59,11 +59,12 @@ namespace OpenSim.Server.Base
         protected readonly IConfiguration m_configuration;
         protected readonly ILogger<OpenSimServer> m_logger;
 
+
         protected ICommandConsole m_console;
 
         protected IHttpServer m_httpServer;
         
-        protected ServerStatsCollector m_serverStatsCollector;      // XXX Should be DI instantiated
+        protected ServerStatsCollector? m_serverStatsCollector;      // XXX Should be DI instantiated
 
         /// <summary>
         /// Random uuid for private data
@@ -91,6 +92,18 @@ namespace OpenSim.Server.Base
         /// </summary>
         private string m_version;
 
+        /// <summary>
+        /// Static reference to the base of information about the server.
+        /// This exists only for the global reference to base services (configuration, logging, ...) from
+        /// routines that have not been converted to DI (dependency injection).
+        /// Eventually, everything will be converted to DI and this reference would not be needed.
+        /// TODO: Someday, remove all references to this.
+        /// </summary>
+        public static OpenSimServer Instance { get; private set; }
+        public IConfiguration Configuration { get { return m_configuration; } }
+        public IServiceProvider ServiceProvider {  get { return m_serviceProvider; } }
+        // END of global references for those poor, old, un-converted classes
+
         public OpenSimServer(
             IServiceProvider provider,
             IConfiguration configuration, 
@@ -114,7 +127,9 @@ namespace OpenSim.Server.Base
 
             m_startuptime = DateTime.Now;
 
-            Version = VersionInfo.Version;
+            m_version = VersionInfo.Version;
+
+            Instance = this;
         }
 
         public ICommandConsole Console { get => m_console; set => m_console = value; }

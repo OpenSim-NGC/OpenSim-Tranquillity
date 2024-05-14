@@ -25,13 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
-using OpenSim.Framework;
 
-using log4net;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using OpenSim.Framework;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.ClientStack.LindenUDP
 {
@@ -41,7 +41,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
     /// </summary>
     public class TokenBucket
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        protected static ILogger<TokenBucket> m_logger;
 
         private static Int32 m_counter = 0;
 
@@ -180,6 +180,8 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         /// second. If zero, the bucket always remains full</param>
         public TokenBucket(TokenBucket parent, float dripRate, float MaxBurst)
         {
+            m_logger = m_logger ?? OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<TokenBucket>>();
+            
             m_counter++;
 
             Parent = parent;
@@ -293,7 +295,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             // with no drip rate...
             if (DripRate == 0)
             {
-                m_log.WarnFormat("[TOKENBUCKET] something odd is happening and drip rate is 0 for {0}", m_counter);
+                m_logger.LogWarning("[TOKENBUCKET] something odd is happening and drip rate is 0 for {0}", m_counter);
                 return;
             }
 
@@ -314,8 +316,6 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
     public class AdaptiveTokenBucket : TokenBucket
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         public bool AdaptiveEnabled { get; set; }
 
         /// <summary>

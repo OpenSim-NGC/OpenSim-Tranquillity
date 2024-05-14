@@ -25,15 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using OpenMetaverse;
-using OpenMetaverse.Imaging;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-using log4net;
-using System.Reflection;
+
+using OpenMetaverse;
+using OpenMetaverse.Imaging;
 
 namespace OpenSim.Region.ClientStack.LindenUDP
 {
@@ -54,7 +55,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         /// </remarks>
         private const int ASSET_REQUEST_TIMEOUT = 100000000;
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<J2KImage> m_logger;
 
         public uint LastSequence;
         public float Priority;
@@ -94,6 +95,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
         public J2KImage(LLImageManager imageManager)
         {
+            m_logger = OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<J2KImage>>();
             m_imageManager = imageManager;
         }
 
@@ -204,7 +206,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                         // This shouldn't happen, but if it does, we really can't proceed
                         if (m_layers == null)
                         {
-                            m_log.Warn("[J2KIMAGE]: RunUpdate() called with missing Layers. Canceling texture transfer");
+                            m_logger.LogWarning("[J2KIMAGE]: RunUpdate() called with missing Layers. Canceling texture transfer");
                             m_currentPacket = m_stopPacket;
                             return;
                         }
@@ -250,7 +252,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
             if (m_asset == null)
             {
-                m_log.Warn("[J2KIMAGE]: Sending ImageNotInDatabase for texture " + TextureID);
+                m_logger.LogWarning("[J2KIMAGE]: Sending ImageNotInDatabase for texture " + TextureID);
                 client.SendImageNotFound(TextureID);
                 return true;
             }
@@ -269,7 +271,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 try { Buffer.BlockCopy(m_asset, 0, firstImageData, 0, FIRST_PACKET_SIZE); }
                 catch (Exception)
                 {
-                    m_log.ErrorFormat("[J2KIMAGE]: Texture block copy for the first packet failed. textureid={0}, assetlength={1}", TextureID, m_asset.Length);
+                    m_logger.LogWarning("[J2KIMAGE]: Texture block copy for the first packet failed. textureid={0}, assetlength={1}", TextureID, m_asset.Length);
                     return true;
                 }
 
@@ -310,7 +312,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                     try { Buffer.BlockCopy(m_asset, currentPosition, imageData, 0, imagePacketSize); }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat("[J2KIMAGE]: Texture block copy for the first packet failed. textureid={0}, assetlength={1}, currentposition={2}, imagepacketsize={3}, exception={4}",
+                        m_logger.LogError("[J2KIMAGE]: Texture block copy for the first packet failed. textureid={0}, assetlength={1}, currentposition={2}, imagepacketsize={3}, exception={4}",
                             TextureID, m_asset.Length, currentPosition, imagePacketSize, e.Message);
                         return false;
                     }
@@ -408,7 +410,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
         private void AssetReceived(string id, Object sender, AssetBase asset)
         {
-//            m_log.DebugFormat(
+//            m_logger.LogDebug(
 //                "[J2KIMAGE]: Received asset {0} ({1} bytes)", id, asset != null ? asset.Data.Length.ToString() : "n/a");
 
             UUID assetID = UUID.Zero;
@@ -431,7 +433,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                     if (!assetServerURL.EndsWith("/") && !assetServerURL.EndsWith("="))
                         assetServerURL = assetServerURL + "/";
 
-//                    m_log.DebugFormat("[J2KIMAGE]: texture {0} not found in local asset storage. Trying user's storage.", assetServerURL + id);
+//                    m_logger.LogDebug("[J2KIMAGE]: texture {0} not found in local asset storage. Trying user's storage.", assetServerURL + id);
                     AssetService.Get(assetServerURL + id, InventoryAccessModule, AssetReceived);
                     return;
                 }
