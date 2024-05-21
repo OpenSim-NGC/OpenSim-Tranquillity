@@ -25,19 +25,21 @@
  * this file will likely require some modification.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
-using log4net;
 // TODO: convert OSDMaps to Dictionaries and UUIDs to GUIDs and remove requirement for OpenMetaverse libraries to make this more generic.
+
+using OpenSim.Server.Base;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
 namespace Gloebit.GloebitMoneyModule {
 
     public class GloebitAPIWrapper : GloebitAPI.IAsyncEndpointCallback {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         public readonly string m_key;
         private string m_keyAlias;
@@ -82,6 +84,9 @@ namespace Gloebit.GloebitMoneyModule {
         private static ISubscriptionAlert m_subscriptionAlerts;
 
         public GloebitAPIWrapper(string key, string keyAlias, string secret, Uri url, string dbProvider, string dbConnectionString, GloebitTransaction.IAssetCallback assetCallbacks, IUriLoader uriLoaders, IPlatformAccessor platformAccessors, IUserAlert userAlerts, ITransactionAlert transactionAlerts, ISubscriptionAlert subscriptionAlerts) {
+
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GloebitAPIWrapper>>();
+
             m_key = key;
             m_keyAlias = keyAlias;
             m_secret = secret;
@@ -155,8 +160,8 @@ namespace Gloebit.GloebitMoneyModule {
         /// </summary>
         /// <param name="requestData">response data from GloebitAPI.Authorize</param>
         public Hashtable authComplete_func(Hashtable requestData) {
-            m_log.InfoFormat("[GLOEBITMONEYMODULE] authComplete_func");
-            foreach(DictionaryEntry e in requestData) { m_log.DebugFormat("{0}: {1}", e.Key, e.Value); }
+            m_logger.LogInformation("[GLOEBITMONEYMODULE] authComplete_func");
+            foreach(DictionaryEntry e in requestData) { m_logger.LogDebug("{0}: {1}", e.Key, e.Value); }
 
             string agentId = requestData["agentId"] as string;
             string code = requestData["code"] as string;
@@ -166,7 +171,7 @@ namespace Gloebit.GloebitMoneyModule {
 
             // Start async flow to exchange the code for a permanent token
             m_api.ExchangeAccessToken(u, code, m_platformAccessors.GetBaseURI());
-            m_log.InfoFormat("[GLOEBITMONEYMODULE] authComplete_func started ExchangeAccessToken");
+            m_logger.LogInformation("[GLOEBITMONEYMODULE] authComplete_func started ExchangeAccessToken");
 
             // TODO: create interface function to build this response
             Uri url = BuildPurchaseURI(m_platformAccessors.GetBaseURI(), u);
@@ -218,7 +223,7 @@ namespace Gloebit.GloebitMoneyModule {
         /// <returns>Gloebit balance for the Gloebit account linked to this user or 0.0.</returns>
         public double GetUserBalance(UUID userIDOnApp, bool forceAuthOnInvalidToken, string userName)
         {
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] GetAppUserBalance userIDOnApp:{0}", userIDOnApp);
+            m_logger.LogDebug("[GLOEBITMONEYMODULE] GetAppUserBalance userIDOnApp:{0}", userIDOnApp);
             double returnfunds = 0.0;
             bool needsAuth = false;
 
@@ -234,7 +239,7 @@ namespace Gloebit.GloebitMoneyModule {
                 // Fix for having a few old tokens out in the wild without an app_user_id stored as the user.GloebitID
                 // TODO: Remove this  once it's been released for awhile, as this fix should only be necessary for a short time.
                 if (String.IsNullOrEmpty(user.GloebitID) || user.GloebitID == UUID.Zero.ToString()) {
-                    m_log.InfoFormat("[GLOEBITMONEYMODULE] GetAppUserBalance userIDOnApp:{0} INVALIDATING TOKEN FROM GMM", userIDOnApp);
+                    m_logger.LogInformation("[GLOEBITMONEYMODULE] GetAppUserBalance userIDOnApp:{0} INVALIDATING TOKEN FROM GMM", userIDOnApp);
                     user.InvalidateToken();
                     needsAuth = true;
                 }
@@ -369,21 +374,21 @@ namespace Gloebit.GloebitMoneyModule {
 
             /****** ERROR CHECKING *******/
             if (descMap == null) {
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] addDescMapEntry: Attempted to add an entry to a NULL descMap.  entryGroup:{0} entryName:{1} entryValue:{2}", entryGroup, entryName, entryValue);
+                m_logger.LogError("[GLOEBITMONEYMODULE] addDescMapEntry: Attempted to add an entry to a NULL descMap.  entryGroup:{0} entryName:{1} entryValue:{2}", entryGroup, entryName, entryValue);
                 return;
             }
             if (entryGroup == null || entryName == null || entryValue == null) {
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] addDescMapEntry: Attempted to add an entry to a descMap where one of the entry strings is NULL.  entryGroup:{0} entryName:{1} entryValue:{2}", entryGroup, entryName, entryValue);
+                m_logger.LogError("[GLOEBITMONEYMODULE] addDescMapEntry: Attempted to add an entry to a descMap where one of the entry strings is NULL.  entryGroup:{0} entryName:{1} entryValue:{2}", entryGroup, entryName, entryValue);
                 return;
             }
             if (entryGroup == String.Empty || entryName == String.Empty) {
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] addDescMapEntry: Attempted to add an entry to a descMap where entryGroup or entryName is the empty string.  entryGroup:{0} entryName:{1} entryValue:{2}", entryGroup, entryName, entryValue);
+                m_logger.LogError("[GLOEBITMONEYMODULE] addDescMapEntry: Attempted to add an entry to a descMap where entryGroup or entryName is the empty string.  entryGroup:{0} entryName:{1} entryValue:{2}", entryGroup, entryName, entryValue);
                 return;
             }
 
             List<string> permittedGroups = new List<string> {"platform", "location", "transaction"};
             if (!permittedGroups.Contains(entryGroup)) {
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] addDescMapEntry: Attempted to add a transaction description parameter in an entryGroup that is not be tracked by Gloebit.  entryGroup:{0} permittedGroups:{1} entryName:{2} entryValue:{3}", entryGroup, permittedGroups, entryName, entryValue);
+                m_logger.LogError("[GLOEBITMONEYMODULE] addDescMapEntry: Attempted to add a transaction description parameter in an entryGroup that is not be tracked by Gloebit.  entryGroup:{0} permittedGroups:{1} entryName:{2} entryValue:{3}", entryGroup, permittedGroups, entryName, entryValue);
                 return;
             }
 
@@ -403,7 +408,7 @@ namespace Gloebit.GloebitMoneyModule {
                     break;
                 default:
                     // SHOULD NEVER GET HERE
-                    m_log.ErrorFormat("[GLOEBITMONEYMODULE] addDescMapEntry: Attempted to add a transaction description parameter in an entryGroup that is not be tracked by Gloebit and made it to default of switch statement.  entryGroup:{0} permittedGroups:{1} entryName:{2} entryValue:{3}", entryGroup, permittedGroups, entryName, entryValue);
+                    m_logger.LogError("[GLOEBITMONEYMODULE] addDescMapEntry: Attempted to add a transaction description parameter in an entryGroup that is not be tracked by Gloebit and made it to default of switch statement.  entryGroup:{0} permittedGroups:{1} entryName:{2} entryValue:{3}", entryGroup, permittedGroups, entryName, entryValue);
                     break;
             }
             return;
@@ -426,7 +431,7 @@ namespace Gloebit.GloebitMoneyModule {
         /// </returns>
         public bool SubmitTransaction(GloebitTransaction txn, string description, OSDMap descMap, bool u2u)
         {
-            m_log.InfoFormat("[GLOEBITMONEYMODULE] SubmitTransaction Txn: {0}, from {1} to {2}, for amount {3}, transactionType: {4}, description: {5}", txn.TransactionID, txn.PayerID, txn.PayeeID, txn.Amount, txn.TransactionType, description);
+            m_logger.LogInformation("[GLOEBITMONEYMODULE] SubmitTransaction Txn: {0}, from {1} to {2}, for amount {3}, transactionType: {4}, description: {5}", txn.TransactionID, txn.PayerID, txn.PayeeID, txn.Amount, txn.TransactionType, description);
             m_transactionAlerts.AlertTransactionBegun(txn, description);
 
             // TODO: Update all the alert functions to handle fees properly.
@@ -450,7 +455,7 @@ namespace Gloebit.GloebitMoneyModule {
             }
 
             if (!result) {
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] SubmitTransaction failed to create HttpWebRequest in GloebitAPI.TransactU2U");
+                m_logger.LogError("[GLOEBITMONEYMODULE] SubmitTransaction failed to create HttpWebRequest in GloebitAPI.TransactU2U");
                 m_transactionAlerts.AlertTransactionFailed(txn, GloebitAPI.TransactionStage.SUBMIT, GloebitAPI.TransactionFailure.SUBMISSION_FAILED, String.Empty, new OSDMap());
             } else {
                 m_transactionAlerts.AlertTransactionStageCompleted(txn, GloebitAPI.TransactionStage.SUBMIT, String.Empty);
@@ -481,7 +486,7 @@ namespace Gloebit.GloebitMoneyModule {
         /// </returns>
         public bool SubmitSyncTransaction(GloebitTransaction txn, string description, OSDMap descMap)
         {
-            m_log.InfoFormat("[GLOEBITMONEYMODULE] SubmitSyncTransaction Txn: {0}, from {1} to {2}, for amount {3}, transactionType: {4}, description: {5}", txn.TransactionID, txn.PayerID, txn.PayeeID, txn.Amount, txn.TransactionType, description);
+            m_logger.LogInformation("[GLOEBITMONEYMODULE] SubmitSyncTransaction Txn: {0}, from {1} to {2}, for amount {3}, transactionType: {4}, description: {5}", txn.TransactionID, txn.PayerID, txn.PayeeID, txn.Amount, txn.TransactionType, description);
             m_transactionAlerts.AlertTransactionBegun(txn, description);
 
             // TODO: Should we wrap TransactU2U or request.GetResponse in Try/Catch?
@@ -501,7 +506,7 @@ namespace Gloebit.GloebitMoneyModule {
 
             if (!result) 
             {
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] SubmitSyncTransaction failed in stage: {0} with failure: {1}", stage, failure);
+                m_logger.LogError("[GLOEBITMONEYMODULE] SubmitSyncTransaction failed in stage: {0} with failure: {1}", stage, failure);
                 if (stage == GloebitAPI.TransactionStage.SUBMIT) 
                 {
                     // currently need to handle these errors here as the TransactU2UCallback is not called unless submission is successful and we receive a response
@@ -557,48 +562,48 @@ namespace Gloebit.GloebitMoneyModule {
             if (success) {
                 // If we get here, queuing and early enact were successful.
                 // When the processor runs this, we are guaranteed that it will call our enact URI eventually, or succeed if no callback-uris were provided.
-                m_log.InfoFormat("[GLOEBITMONEYMODULE].transactU2UCompleted with SUCCESS reason:{0} id:{1}", reason, tID);
+                m_logger.LogInformation("[GLOEBITMONEYMODULE].transactU2UCompleted with SUCCESS reason:{0} id:{1}", reason, tID);
                 if (reason == "success") {                                  /* successfully queued, early enacted all non-asset transaction parts */
                     // TODO: if we update GMM to allow transactions without callback-uris, then we would need to signal full success here.
                     // TODO: we should really provide an interface for checking status or require at least a single callback uri.
                     // Early enact also succeeded, so could add additional details that funds have successfully been transferred or set to stage ENACT_GLOEBIT
                     additionalDetailStr = String.Empty;
                 } else if (reason == "resubmitted") {                       /* transaction had already been created.  resubmitted to queue */
-                    m_log.InfoFormat("[GLOEBITMONEYMODULE].transactU2UCompleted resubmitted transaction  id:{0}", tID);
+                    m_logger.LogInformation("[GLOEBITMONEYMODULE].transactU2UCompleted resubmitted transaction  id:{0}", tID);
                     additionalDetailStr = "Transaction resubmitted to queue.";
                 } else {                                                    /* Unhandled success reason */
-                    m_log.ErrorFormat("[GLOEBITMONEYMODULE].transactU2UCompleted unhandled response reason:{0}  id:{1}", reason, tID);
+                    m_logger.LogError("[GLOEBITMONEYMODULE].transactU2UCompleted unhandled response reason:{0}  id:{1}", reason, tID);
                     additionalDetailStr = reason;
                 }
                 m_transactionAlerts.AlertTransactionStageCompleted(txn, GloebitAPI.TransactionStage.QUEUE, additionalDetailStr);
                 return;
             }
 
-            m_log.InfoFormat("[GLOEBITMONEYMODULE].transactU2UCompleted with FAILURE reason:{0} status:{1} id:{2}", reason, status, tID);
+            m_logger.LogInformation("[GLOEBITMONEYMODULE].transactU2UCompleted with FAILURE reason:{0} status:{1} id:{2}", reason, status, tID);
 
             // Handle errors
             switch (stage) {
                 case GloebitAPI.TransactionStage.ENACT_GLOEBIT:     /* Placed this first as it is an odd case where early-enact failed. */
                     // We're announcing failure here, but it's possible we should just announce completion of QUEUE state instead.
                     // It is unlikely, though may be possible, for this to fail and the processor (rather than server queuing and then attempting early enact) could succeed.
-                    m_log.InfoFormat("[GLOEBITMONEYMODULE].transactU2UCompleted transaction successfully queued for processing, but failed early enact.  id:{0} reason:{1}", tID, reason);
+                    m_logger.LogInformation("[GLOEBITMONEYMODULE].transactU2UCompleted transaction successfully queued for processing, but failed early enact.  id:{0} reason:{1}", tID, reason);
                     // TODO: Should we send a failure alert here?  Could transaction enact successfully?  Need to research this
                     // insufficient-balance; pending probably can't occur; something new?
                     if (failure == GloebitAPI.TransactionFailure.INSUFFICIENT_FUNDS) {
-                        m_log.InfoFormat("[GLOEBITMONEYMODULE].transactU2UCompleted transaction failed.  Buyer has insufficient funds.  id:{0}", tID);
+                        m_logger.LogInformation("[GLOEBITMONEYMODULE].transactU2UCompleted transaction failed.  Buyer has insufficient funds.  id:{0}", tID);
                     } else {
                         // unhandled, so pass reason
-                        m_log.ErrorFormat("[GLOEBITMONEYMODULE].transactU2UCompleted transaction failed during processing.  reason:{0} id:{1} failure:{2}", reason, tID, failure);
+                        m_logger.LogError("[GLOEBITMONEYMODULE].transactU2UCompleted transaction failed during processing.  reason:{0} id:{1} failure:{2}", reason, tID, failure);
                         additionalDetailStr = reason;
                     }
                     break;
                 case GloebitAPI.TransactionStage.AUTHENTICATE:
                     // failed check of OAUTH2 token - currently only one error causes this - invalid token
                     // Could try a behind the scenes renewal/reauth for expired, and then resubmit, but we don't do that right now, so just fail.
-                    m_log.InfoFormat("[GLOEBITMONEYMODULE].transactU2UCompleted transaction failed.  Authentication error.  Invalid token.  id:{0}", tID);
+                    m_logger.LogInformation("[GLOEBITMONEYMODULE].transactU2UCompleted transaction failed.  Authentication error.  Invalid token.  id:{0}", tID);
                     break;
                 case GloebitAPI.TransactionStage.VALIDATE:
-                    m_log.InfoFormat("[GLOEBITMONEYMODULE].transactU2UCompleted transaction failed.  Validation error.  id:{0}", tID);
+                    m_logger.LogInformation("[GLOEBITMONEYMODULE].transactU2UCompleted transaction failed.  Validation error.  id:{0}", tID);
 
                     // Prepare some variables necessary for log messages for some Validation failures.
                     string subscriptionIDStr = String.Empty;
@@ -624,18 +629,18 @@ namespace Gloebit.GloebitMoneyModule {
                     switch (failure) {
                         case GloebitAPI.TransactionFailure.FORM_GENERIC_ERROR:                    /* One of many form errors.  something needs fixing.  See reason */
                             // All form errors are errors the app needs to fix
-                            m_log.ErrorFormat("[GLOEBITMONEYMODULE].transactU2UCompleted Transaction failed.  App needs to fix something. id:{0} failure:{1} reason:{2}", tID, failure, reason);
+                            m_logger.LogError("[GLOEBITMONEYMODULE].transactU2UCompleted Transaction failed.  App needs to fix something. id:{0} failure:{1} reason:{2}", tID, failure, reason);
                             additionalDetailStr = reason;
                             break;
                         case GloebitAPI.TransactionFailure.FORM_MISSING_SUBSCRIPTION_ID:          /* marked as subscription, but did not include any subscription id */
-                            m_log.ErrorFormat("[GLOEBITMONEYMODULE].transactU2UCompleted Subscription-id missing from transaction marked as unattended/automated transaction.  transactionID:{0}", tID);
+                            m_logger.LogError("[GLOEBITMONEYMODULE].transactU2UCompleted Subscription-id missing from transaction marked as unattended/automated transaction.  transactionID:{0}", tID);
                             break;
                         case GloebitAPI.TransactionFailure.SUBSCRIPTION_NOT_FOUND:                /* No subscription exists under id provided */
-                            m_log.ErrorFormat("[GLOEBITMONEYMODULE].transactU2UCompleted Gloebit can not identify subscription from identifier(s).  transactionID:{0}, subscription-id:{1}, app-subscription-id:{2}", tID, subscriptionIDStr, appSubscriptionIDStr);
+                            m_logger.LogError("[GLOEBITMONEYMODULE].transactU2UCompleted Gloebit can not identify subscription from identifier(s).  transactionID:{0}, subscription-id:{1}, app-subscription-id:{2}", tID, subscriptionIDStr, appSubscriptionIDStr);
                             // TODO: We should wipe this subscription from the DB and re-create it.
                             break;
                         case GloebitAPI.TransactionFailure.SUBSCRIPTION_AUTH_NOT_FOUND:           /* No sub_auth has been created for this user for this subscription */
-                            m_log.InfoFormat("[GLOEBITMONEYMODULE].transactU2UCompleted Gloebit No subscription authorization in place.  transactionID:{0}, subscription-id:{1}, app-subscription-id:{2} PayerID:{3} PayerName:{4}", tID, subscriptionIDStr, appSubscriptionIDStr, txn.PayerID, txn.PayerName);
+                            m_logger.LogInformation("[GLOEBITMONEYMODULE].transactU2UCompleted Gloebit No subscription authorization in place.  transactionID:{0}, subscription-id:{1}, app-subscription-id:{2} PayerID:{3} PayerName:{4}", tID, subscriptionIDStr, appSubscriptionIDStr, txn.PayerID, txn.PayerName);
                             // TODO: Should we store auths so we know if we need to create it before submitting or just to ask user to auth after failed txn?
                             // We have a valid subscription, but no subscription auth for this user-id-on-app+token(gloebit_uid) combo
                             // TODO: should we validate that SubscriptionIDStr matches what we have on file?
@@ -643,28 +648,28 @@ namespace Gloebit.GloebitMoneyModule {
                         case GloebitAPI.TransactionFailure.SUBSCRIPTION_AUTH_PENDING:             /* User has not yet approved or declined the authorization for this subscription */
                             // Subscription-authorization has already been created.
                             // User has not yet responded to that request.
-                            m_log.InfoFormat("[GLOEBITMONEYMODULE] transactU2UCompleted - status:{0} \n subID:{1} appSubID:{2} apiUrl:{3} ", status, subscriptionIDStr, appSubscriptionIDStr, m_url);
+                            m_logger.LogInformation("[GLOEBITMONEYMODULE] transactU2UCompleted - status:{0} \n subID:{1} appSubID:{2} apiUrl:{3} ", status, subscriptionIDStr, appSubscriptionIDStr, m_url);
                             break;
                         case GloebitAPI.TransactionFailure.SUBSCRIPTION_AUTH_DECLINED:            /* User has declined the authorization for this subscription */
-                            m_log.InfoFormat("[GLOEBITMONEYMODULE] transactU2UCompleted - FAILURE -- user declined subscription auth.  id:{0}", tID);
+                            m_logger.LogInformation("[GLOEBITMONEYMODULE] transactU2UCompleted - FAILURE -- user declined subscription auth.  id:{0}", tID);
 
                             // TODO: We should really send another dialog here like the PendingDialog instead of just a url here.
                             // Send dialog asking user to auth or report --- needs different message.
-                            m_log.Info("[GLOEBITMONEYMODULE] TransactU2UCompleted - SUBSCRIPTION_AUTH_DECLINED - requesting SubAuth approval");
+                            m_logger.LogInformation("[GLOEBITMONEYMODULE] TransactU2UCompleted - SUBSCRIPTION_AUTH_DECLINED - requesting SubAuth approval");
                             break;
                         case GloebitAPI.TransactionFailure.PAYER_ACCOUNT_LOCKED:                  /* Buyer's Gloebit account is locked and not allowed to spend gloebits */
-                            m_log.InfoFormat("[GLOEBITMONEYMODULE] transactU2UCompleted - FAILURE -- payer account locked.  id:{0}", tID);
+                            m_logger.LogInformation("[GLOEBITMONEYMODULE] transactU2UCompleted - FAILURE -- payer account locked.  id:{0}", tID);
                             break;
                         case GloebitAPI.TransactionFailure.PAYEE_CANNOT_BE_IDENTIFIED:            /* can not identify merchant from params supplied by app */
-                            m_log.ErrorFormat("[GLOEBITMONEYMODULE].transactU2UCompleted Gloebit could not identify payee from params.  transactionID:{0} payeeID:{1}", tID, payeeUser.PrincipalID);
+                            m_logger.LogError("[GLOEBITMONEYMODULE].transactU2UCompleted Gloebit could not identify payee from params.  transactionID:{0} payeeID:{1}", tID, payeeUser.PrincipalID);
                             break;
                         case GloebitAPI.TransactionFailure.PAYEE_CANNOT_RECEIVE:                  /* Seller's Gloebit account can not receive Gloebits */
                             // TODO: research if/when account is in this state.  Only by admin?  All accounts until merchants?
-                            m_log.InfoFormat("[GLOEBITMONEYMODULE] transactU2UCompleted - FAILURE -- payee account locked - can't receive gloebits.  id:{0}", tID);
+                            m_logger.LogInformation("[GLOEBITMONEYMODULE] transactU2UCompleted - FAILURE -- payee account locked - can't receive gloebits.  id:{0}", tID);
                             break;
                         default:
                             // Shouldn't get here.
-                            m_log.ErrorFormat("[GLOEBITMONEYMODULE].transactU2UCompleted unhandled validation failure:{0}  transactionID:{1}", failure, tID);
+                            m_logger.LogError("[GLOEBITMONEYMODULE].transactU2UCompleted unhandled validation failure:{0}  transactionID:{1}", failure, tID);
                             additionalDetailStr = reason;
                             break;
                     }
@@ -672,20 +677,20 @@ namespace Gloebit.GloebitMoneyModule {
                 case GloebitAPI.TransactionStage.QUEUE:
                     switch (failure) {
                         case GloebitAPI.TransactionFailure.QUEUEING_FAILED:                     /* failed to queue.  net or processor error */
-                            m_log.InfoFormat("[GLOEBITMONEYMODULE] transactU2UCompleted - FAILURE -- queuing failed.  id:{0}", tID);
+                            m_logger.LogInformation("[GLOEBITMONEYMODULE] transactU2UCompleted - FAILURE -- queuing failed.  id:{0}", tID);
                             break;
                         case GloebitAPI.TransactionFailure.RACE_CONDITION:                      /* race condition - already queued */
                             // nothing to tell user.  buyer doesn't need to know it was double submitted
-                            m_log.ErrorFormat ("[GLOEBITMONEYMODULE].transactU2UCompleted race condition.  You double submitted transaction:{0}", tID);
+                            m_logger.LogError("[GLOEBITMONEYMODULE].transactU2UCompleted race condition.  You double submitted transaction:{0}", tID);
                             return; /* don't report anything as the other flow this hit will handle reporting */
                         default:
-                            m_log.ErrorFormat("[GLOEBITMONEYMODULE].transactU2UCompleted unhandled queueing failure:{0}  transactionID:{1}", failure, tID);
+                            m_logger.LogError("[GLOEBITMONEYMODULE].transactU2UCompleted unhandled queueing failure:{0}  transactionID:{1}", failure, tID);
                             additionalDetailStr = reason;
                             break;
                     }
                     break;
                 default:
-                    m_log.ErrorFormat("[GLOEBITMONEYMODULE].transactU2UCompleted unhandled Transaction Stage:{0} failure:{1}  transactionID:{2}", stage, failure, tID);
+                    m_logger.LogError("[GLOEBITMONEYMODULE].transactU2UCompleted unhandled Transaction Stage:{0} failure:{1}  transactionID:{2}", stage, failure, tID);
                     additionalDetailStr = reason;
                     break;
             }
@@ -712,8 +717,8 @@ namespace Gloebit.GloebitMoneyModule {
         /// --- All other reasons are considered permanent failure.
         /// </returns>
         public Hashtable transactionState_func(Hashtable requestData) {
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] transactionState_func **************** Got Callback");
-            foreach(DictionaryEntry e in requestData) { m_log.DebugFormat("{0}: {1}", e.Key, e.Value); }
+            m_logger.LogDebug("[GLOEBITMONEYMODULE] transactionState_func **************** Got Callback");
+            foreach(DictionaryEntry e in requestData) { m_logger.LogDebug("{0}: {1}", e.Key, e.Value); }
 
             // TODO: check that these exist in requestData.  If not, signal error and send response with false.
             string transactionIDstr = requestData["id"] as string;
@@ -742,7 +747,7 @@ namespace Gloebit.GloebitMoneyModule {
             //response["str_response_string"] = ja.ToString();
             response["str_response_string"] = OSDParser.SerializeJsonString(paramArray);
             response["content_type"] = "application/json";
-            m_log.InfoFormat("[GLOEBITMONEYMODULE].transactionState_func response:{0}", OSDParser.SerializeJsonString(paramArray));
+            m_logger.LogInformation("[GLOEBITMONEYMODULE].transactionState_func response:{0}", OSDParser.SerializeJsonString(paramArray));
             return response;
         }
 
@@ -770,12 +775,12 @@ namespace Gloebit.GloebitMoneyModule {
         /// </returns>
         public UUID CreateSubscription(UUID appSubID, string subName, string subDesc)
         {
-            m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.CreateSubscription for appSubID:{0}, subName:{1}, subDesc:{2}", appSubID, subName, subDesc);
+            m_logger.LogInformation("[GLOEBITMONEYMODULE] GloebitAPIWrapper.CreateSubscription for appSubID:{0}, subName:{1}, subDesc:{2}", appSubID, subName, subDesc);
             
             // Validate that subName and subDesc are not empty or null as Gloebit requires both for a Subscription creation
             if (String.IsNullOrEmpty(subName) || String.IsNullOrEmpty(subDesc)) 
             {
-                m_log.WarnFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.CreateSubscription - Can not create subscription because subscription name or description is blank - Name:{0} Description:{1}", subName, subDesc);
+                m_logger.LogWarning("[GLOEBITMONEYMODULE] GloebitAPIWrapper.CreateSubscription - Can not create subscription because subscription name or description is blank - Name:{0} Description:{1}", subName, subDesc);
                 //TODO: should this throw an exception?
                 return UUID.Zero;
             }
@@ -797,14 +802,14 @@ namespace Gloebit.GloebitMoneyModule {
 
             if (sub != null) 
             {
-                m_log.WarnFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.CreateSubscription found existing local sub for appSubID:{0}", appSubID);
+                m_logger.LogWarning("[GLOEBITMONEYMODULE] GloebitAPIWrapper.CreateSubscription found existing local sub for appSubID:{0}", appSubID);
 
                 // TODO: Should we check to see if there is a SubscriptionID on sub which would mean that this was already created on Gloebit as well?
                 //       For now, we'll assume that this could be an attempt to recreate after an issue and that Gloebit will return the Subscription ID
                 //       on a duplicate create request and that this will refresh that ID for the app.
                 if(idIsRandom) 
                 {
-                    m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.CreateSubscription randomly generated appSubID:{0} conflicted with existing sub", appSubID);
+                    m_logger.LogError("[GLOEBITMONEYMODULE] GloebitAPIWrapper.CreateSubscription randomly generated appSubID:{0} conflicted with existing sub", appSubID);
                     return UUID.Zero;
                 }
 
@@ -814,7 +819,7 @@ namespace Gloebit.GloebitMoneyModule {
 
             if (sub == null) 
             {
-                m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.CreateSubscription - creating local subscription for {0}", subName);
+                m_logger.LogDebug("[GLOEBITMONEYMODULE] GloebitAPIWrapper.CreateSubscription - creating local subscription for {0}", subName);
             
                 // Create local sub in cache and db
                 sub = GloebitSubscription.Init(appSubID.ToString(), m_key, m_url.ToString(), subName, subDesc);
@@ -845,18 +850,18 @@ namespace Gloebit.GloebitMoneyModule {
             string status = responseDataMap["status"];
 
             if (success) {
-                m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionCompleted with SUCCESS reason:{0} status:{1}", reason, status);
+                m_logger.LogInformation("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionCompleted with SUCCESS reason:{0} status:{1}", reason, status);
                 m_subscriptionAlerts.AlertSubscriptionCreated(subscription);
                 return;
 
             } else if (status == "retry") {                                /* failure could be temporary -- retry. */
-                m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionCompleted with FAILURE but suggested retry.  reason:{0}", reason);
+                m_logger.LogInformation("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionCompleted with FAILURE but suggested retry.  reason:{0}", reason);
                 // TODO: Should we retry?  How do we prevent infinite loop?
             } else if (status == "failed") {                                /* failure permanent -- requires fixing something. */
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionCompleted with FAILURE permanently.  reason:{0}", reason);
+                m_logger.LogError("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionCompleted with FAILURE permanently.  reason:{0}", reason);
                 // TODO: Any action required
             } else {                                                        /* failure - unexpected status */
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionCompleted with FAILURE - unhandled status:{0} reason:{1}", status, reason);
+                m_logger.LogError("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionCompleted with FAILURE - unhandled status:{0} reason:{1}", status, reason);
             }
             // If we added to this map.  remove so we're not leaking memory in failure cases.
             m_subscriptionAlerts.AlertSubscriptionCreationFailed(subscription);  // TODO: determine if interface really requires this
@@ -926,7 +931,7 @@ namespace Gloebit.GloebitMoneyModule {
         /// <param name="sub">local GloebitSubscription detailing the subscription the authorization is for.</param>
         /// <param name="user">GloebitUser representing the agent and app the subscription authorization is for.</param>
         public void createSubscriptionAuthorizationCompleted(OSDMap responseDataMap, GloebitSubscription sub, GloebitUser user) {
-            m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionAuthorizationCompleted");
+            m_logger.LogInformation("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionAuthorizationCompleted");
 
             bool success = (bool)responseDataMap["success"];
             string reason = responseDataMap["reason"];
@@ -935,7 +940,7 @@ namespace Gloebit.GloebitMoneyModule {
             UUID agentID = UUID.Parse(user.PrincipalID);
 
             if (success) {
-                m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionAuthorizationCompleted with SUCCESS reason:{0} status:{1}", reason, status);
+                m_logger.LogInformation("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionAuthorizationCompleted with SUCCESS reason:{0} status:{1}", reason, status);
                 switch (status) {
                     case "success":
                     case "created":
@@ -961,18 +966,18 @@ namespace Gloebit.GloebitMoneyModule {
                         break;
                     }
             } else if (status == "retry") {                                /* failure could be temporary -- retry. */
-                m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionAuthorizationCompleted with FAILURE but suggested retry.  reason:{0}", reason);
+                m_logger.LogInformation("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionAuthorizationCompleted with FAILURE but suggested retry.  reason:{0}", reason);
 
                 // TODO: Should we retry?  How do we prevent infinite loop?
 
             } else if (status == "failed") {                                /* failure permanent -- requires fixing something. */
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionAuthorizationCompleted with FAILURE permanently.  reason:{0}", reason);
+                m_logger.LogError("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionAuthorizationCompleted with FAILURE permanently.  reason:{0}", reason);
 
                 // TODO: Any action required?
                 // TODO: if we move "duplicate-and-previously-declined-by-user" to here, then we should handle it here and we need another endpoint to reset status of this subscription auth to pending
 
             } else {                                                        /* failure - unexpected status */
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionAuthorizationCompleted with FAILURE - unhandled status:{0} reason:{1}", status, reason);
+                m_logger.LogError("[GLOEBITMONEYMODULE] GloebitAPIWrapper.createSubscriptionAuthorizationCompleted with FAILURE - unhandled status:{0} reason:{1}", status, reason);
             }
             return;
         }

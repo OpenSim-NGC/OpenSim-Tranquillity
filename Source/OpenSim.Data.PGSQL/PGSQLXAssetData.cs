@@ -25,25 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 using System.Security.Cryptography;
-using System.Text;
-using log4net;
-using OpenMetaverse;
+
 using OpenSim.Framework;
-using OpenSim.Data;
+
+using OpenMetaverse;
+
 using Npgsql;
+using OpenSim.Server.Base;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.PGSQL
 {
     public class PGSQLXAssetData : IXAssetDataPlugin
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         protected virtual Assembly Assembly
         {
@@ -82,15 +82,17 @@ namespace OpenSim.Data.PGSQL
         /// <param name="connect">connect string</param>
         public void Initialise(string connect)
         {
-            m_log.ErrorFormat("[PGSQL XASSETDATA]: ***********************************************************");
-            m_log.ErrorFormat("[PGSQL XASSETDATA]: ***********************************************************");
-            m_log.ErrorFormat("[PGSQL XASSETDATA]: ***********************************************************");
-            m_log.ErrorFormat("[PGSQL XASSETDATA]: THIS PLUGIN IS STRICTLY EXPERIMENTAL.");
-            m_log.ErrorFormat("[PGSQL XASSETDATA]: DO NOT USE FOR ANY DATA THAT YOU DO NOT MIND LOSING.");
-            m_log.ErrorFormat("[PGSQL XASSETDATA]: DATABASE TABLES CAN CHANGE AT ANY TIME, CAUSING EXISTING DATA TO BE LOST.");
-            m_log.ErrorFormat("[PGSQL XASSETDATA]: ***********************************************************");
-            m_log.ErrorFormat("[PGSQL XASSETDATA]: ***********************************************************");
-            m_log.ErrorFormat("[PGSQL XASSETDATA]: ***********************************************************");
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PGSQLXAssetData>>();
+
+            m_logger.LogError("[PGSQL XASSETDATA]: ***********************************************************");
+            m_logger.LogError("[PGSQL XASSETDATA]: ***********************************************************");
+            m_logger.LogError("[PGSQL XASSETDATA]: ***********************************************************");
+            m_logger.LogError("[PGSQL XASSETDATA]: THIS PLUGIN IS STRICTLY EXPERIMENTAL.");
+            m_logger.LogError("[PGSQL XASSETDATA]: DO NOT USE FOR ANY DATA THAT YOU DO NOT MIND LOSING.");
+            m_logger.LogError("[PGSQL XASSETDATA]: DATABASE TABLES CAN CHANGE AT ANY TIME, CAUSING EXISTING DATA TO BE LOST.");
+            m_logger.LogError("[PGSQL XASSETDATA]: ***********************************************************");
+            m_logger.LogError("[PGSQL XASSETDATA]: ***********************************************************");
+            m_logger.LogError("[PGSQL XASSETDATA]: ***********************************************************");
 
             m_connectionString = connect;
             m_database = new PGSQLManager(m_connectionString);
@@ -194,7 +196,7 @@ namespace OpenSim.Data.PGSQL
                         }
                         catch (Exception e)
                         {
-                            m_log.Error(string.Format("[PGSQL XASSET DATA]: Failure fetching asset {0}", assetID), e);
+                            m_logger.LogError(string.Format("[PGSQL XASSET DATA]: Failure fetching asset {0}", assetID), e);
                         }
                     }
                 }
@@ -224,7 +226,7 @@ namespace OpenSim.Data.PGSQL
                         if (asset.Name.Length > 64)
                         {
                             assetName = asset.Name.Substring(0, 64);
-                            m_log.WarnFormat(
+                            m_logger.LogWarning(
                                 "[XASSET DB]: Name '{0}' for asset {1} truncated from {2} to {3} characters on add",
                                 asset.Name, asset.ID, asset.Name.Length, assetName.Length);
                         }
@@ -233,7 +235,7 @@ namespace OpenSim.Data.PGSQL
                         if (asset.Description.Length > 64)
                         {
                             assetDescription = asset.Description.Substring(0, 64);
-                            m_log.WarnFormat(
+                            m_logger.LogWarning(
                                 "[XASSET DB]: Description '{0}' for asset {1} truncated from {2} to {3} characters on add",
                                 asset.Description, asset.ID, asset.Description.Length, assetDescription.Length);
                         }
@@ -297,7 +299,7 @@ namespace OpenSim.Data.PGSQL
                         }
                         catch (Exception e)
                         {
-                            m_log.ErrorFormat("[ASSET DB]: PGSQL failure creating asset metadata {0} with name \"{1}\". Error: {2}",
+                            m_logger.LogError("[ASSET DB]: PGSQL failure creating asset metadata {0} with name \"{1}\". Error: {2}",
                                 asset.FullID, asset.Name, e.Message);
 
                             transaction.Rollback();
@@ -321,7 +323,7 @@ namespace OpenSim.Data.PGSQL
                             }
                             catch (Exception e)
                             {
-                                m_log.ErrorFormat("[XASSET DB]: PGSQL failure creating asset data {0} with name \"{1}\". Error: {2}",
+                                m_logger.LogError("[XASSET DB]: PGSQL failure creating asset data {0} with name \"{1}\". Error: {2}",
                                     asset.FullID, asset.Name, e.Message);
 
                                 transaction.Rollback();
@@ -375,7 +377,7 @@ namespace OpenSim.Data.PGSQL
                     }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat(
+                        m_logger.LogError(
                             "[XASSET PGSQL DB]: Failure updating access_time for asset {0} with name {1} : {2}",
                             assetMetadata.ID, assetMetadata.Name, e.Message);
                     }
@@ -414,7 +416,7 @@ namespace OpenSim.Data.PGSQL
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_logger.LogError(
                         "[XASSETS DB]: PGSql failure in ExistsData fetching hash {0}.  Exception {1}{2}",
                         hash, e.Message, e.StackTrace);
                 }
@@ -493,7 +495,7 @@ namespace OpenSim.Data.PGSQL
                         }
                         catch (Exception e)
                         {
-                            m_log.Error(string.Format("[XASSETS DB]: PGSql failure fetching asset {0}", uuid), e);
+                            m_logger.LogError(string.Format("[XASSETS DB]: PGSql failure fetching asset {0}", uuid), e);
                         }
                     }
                 }
@@ -553,7 +555,7 @@ namespace OpenSim.Data.PGSQL
                         }
                         catch (Exception e)
                         {
-                            m_log.Error("[XASSETS DB]: PGSql failure fetching asset set" + Environment.NewLine + e.ToString());
+                            m_logger.LogError("[XASSETS DB]: PGSql failure fetching asset set" + Environment.NewLine + e.ToString());
                         }
                    }
                 }

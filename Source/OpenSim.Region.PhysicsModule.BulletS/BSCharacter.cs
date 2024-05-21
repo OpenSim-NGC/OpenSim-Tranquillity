@@ -83,7 +83,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                             OMV.Vector3 vel, OMV.Vector3 size, float footOffset, bool isFlying)
                 : base(parent_scene, localID, avName, "BSCharacter")
         {
-            m_logger = m_logger ?? OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<BSCharacter>>();
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<BSCharacter>>();
 
             _physicsActorType = (int)ActorTypes.Agent;
             RawPosition = pos;

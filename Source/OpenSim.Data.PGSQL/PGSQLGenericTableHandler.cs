@@ -25,23 +25,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Reflection;
-using log4net;
-using OpenMetaverse;
-using OpenSim.Framework;
-using OpenSim.Region.Framework.Interfaces;
 using System.Text;
+
+using Microsoft.Extensions.Logging;
+
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
 using Npgsql;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace OpenSim.Data.PGSQL
 {
     public class PGSQLGenericTableHandler<T> : PGSqlFramework where T : class, new()
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         protected string? m_ConnectionString;
         protected PGSQLManager? m_database; //used for parameter type translation
@@ -60,6 +61,8 @@ namespace OpenSim.Data.PGSQL
 
         public void Initialize(string connectionString, string realm, string storeName)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PGSQLGenericTableHandler<T>>>();
+
             base.Initialize(connectionString);
 
             m_Realm = realm;

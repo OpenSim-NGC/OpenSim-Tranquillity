@@ -79,7 +79,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
 
         public ODERayCastRequestManager(ODEScene pScene)
         {
-            m_logger = m_logger ?? OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<ODERayCastRequestManager>>();
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<ODERayCastRequestManager>>();
 
             m_scene = pScene;
             m_contacts = pScene.m_contacts;

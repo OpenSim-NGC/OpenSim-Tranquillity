@@ -25,13 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Reflection;
-using log4net;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
 using Npgsql;
 
 namespace OpenSim.Data.PGSQL
@@ -43,7 +46,7 @@ namespace OpenSim.Data.PGSQL
     {
         private const string _migrationStore = "InventoryStore";
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         /// <summary>
         /// The database manager
@@ -56,7 +59,9 @@ namespace OpenSim.Data.PGSQL
         [Obsolete("Cannot be default-initialized!")]
         public void Initialise()
         {
-            m_log.Info("[PGSQLInventoryData]: " + Name + " cannot be default-initialized!");
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PGSQLInventoryData>>();
+
+            m_logger.LogInformation("[PGSQLInventoryData]: " + Name + " cannot be default-initialized!");
             throw new PluginNotInitialisedException(Name);
         }
 
@@ -172,7 +177,7 @@ namespace OpenSim.Data.PGSQL
                     }
                 }
             }
-            m_log.InfoFormat("[INVENTORY DB] : Found no inventory folder with ID : {0}", folderID);
+            m_logger.LogInformation("[INVENTORY DB] : Found no inventory folder with ID : {0}", folderID);
             return null;
         }
 
@@ -235,7 +240,7 @@ namespace OpenSim.Data.PGSQL
             if (folderName.Length > 64)
             {
                 folderName = folderName.Substring(0, 64);
-                m_log.Warn("[INVENTORY DB]: Name field truncated from " + folder.Name.Length.ToString() + " to " + folderName.Length + " characters on add");
+                m_logger.LogWarning("[INVENTORY DB]: Name field truncated from " + folder.Name.Length.ToString() + " to " + folderName.Length + " characters on add");
             }
             using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
             using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
@@ -253,7 +258,7 @@ namespace OpenSim.Data.PGSQL
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[INVENTORY DB]: Error : {0}", e.Message);
+                    m_logger.LogError("[INVENTORY DB]: Error : {0}", e.Message);
                 }
             }
         }
@@ -275,7 +280,7 @@ namespace OpenSim.Data.PGSQL
             if (folderName.Length > 64)
             {
                 folderName = folderName.Substring(0, 64);
-                m_log.Warn("[INVENTORY DB]: Name field truncated from " + folder.Name.Length.ToString() + " to " + folderName.Length + " characters on update");
+                m_logger.LogWarning("[INVENTORY DB]: Name field truncated from " + folder.Name.Length.ToString() + " to " + folderName.Length + " characters on update");
             }
             using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
             using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
@@ -293,7 +298,7 @@ namespace OpenSim.Data.PGSQL
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[INVENTORY DB]: Error : {0}", e.Message);
+                    m_logger.LogError("[INVENTORY DB]: Error : {0}", e.Message);
                 }
             }
         }
@@ -317,7 +322,7 @@ namespace OpenSim.Data.PGSQL
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[INVENTORY DB]: Error : {0}", e.Message);
+                    m_logger.LogError("[INVENTORY DB]: Error : {0}", e.Message);
                 }
             }
         }
@@ -404,7 +409,7 @@ namespace OpenSim.Data.PGSQL
                 }
             }
 
-            m_log.InfoFormat("[INVENTORY DB]: Found no inventory item with ID : {0}", itemID);
+            m_logger.LogInformation("[INVENTORY DB]: Found no inventory item with ID : {0}", itemID);
             return null;
         }
 
@@ -435,14 +440,14 @@ namespace OpenSim.Data.PGSQL
             if (item.Name.Length > 64)
             {
                 itemName = item.Name.Substring(0, 64);
-                m_log.Warn("[INVENTORY DB]: Name field truncated from " + item.Name.Length.ToString() + " to " + itemName.Length.ToString() + " characters");
+                m_logger.LogWarning("[INVENTORY DB]: Name field truncated from " + item.Name.Length.ToString() + " to " + itemName.Length.ToString() + " characters");
             }
 
             string itemDesc = item.Description;
             if (item.Description.Length > 128)
             {
                 itemDesc = item.Description.Substring(0, 128);
-                m_log.Warn("[INVENTORY DB]: Description field truncated from " + item.Description.Length.ToString() + " to " + itemDesc.Length.ToString() + " characters");
+                m_logger.LogWarning("[INVENTORY DB]: Description field truncated from " + item.Description.Length.ToString() + " to " + itemDesc.Length.ToString() + " characters");
             }
 
             using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
@@ -475,7 +480,7 @@ namespace OpenSim.Data.PGSQL
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[INVENTORY DB]: Error inserting item :" + e.Message);
+                    m_logger.LogError("[INVENTORY DB]: Error inserting item :" + e.Message);
                 }
             }
 
@@ -491,7 +496,7 @@ namespace OpenSim.Data.PGSQL
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[INVENTORY DB] Error updating inventory folder for new item :" + e.Message);
+                    m_logger.LogError("[INVENTORY DB] Error updating inventory folder for new item :" + e.Message);
                 }
             }
         }
@@ -527,14 +532,14 @@ namespace OpenSim.Data.PGSQL
             if (item.Name.Length > 64)
             {
                 itemName = item.Name.Substring(0, 64);
-                m_log.Warn("[INVENTORY DB]: Name field truncated from " + item.Name.Length.ToString() + " to " + itemName.Length.ToString() + " characters on update");
+                m_logger.LogWarning("[INVENTORY DB]: Name field truncated from " + item.Name.Length.ToString() + " to " + itemName.Length.ToString() + " characters on update");
             }
 
             string itemDesc = item.Description;
             if (item.Description.Length > 128)
             {
                 itemDesc = item.Description.Substring(0, 128);
-                m_log.Warn("[INVENTORY DB]: Description field truncated from " + item.Description.Length.ToString() + " to " + itemDesc.Length.ToString() + " characters on update");
+                m_logger.LogWarning("[INVENTORY DB]: Description field truncated from " + item.Description.Length.ToString() + " to " + itemDesc.Length.ToString() + " characters on update");
             }
 
             using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
@@ -567,7 +572,7 @@ namespace OpenSim.Data.PGSQL
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[INVENTORY DB]: Error updating item :" + e.Message);
+                    m_logger.LogError("[INVENTORY DB]: Error updating item :" + e.Message);
                 }
             }
         }
@@ -592,7 +597,7 @@ namespace OpenSim.Data.PGSQL
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[INVENTORY DB]: Error deleting item :" + e.Message);
+                    m_logger.LogError("[INVENTORY DB]: Error deleting item :" + e.Message);
                 }
             }
         }
@@ -656,7 +661,7 @@ namespace OpenSim.Data.PGSQL
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[INVENTORY DB] Error deleting item :" + e.Message);
+                    m_logger.LogError("[INVENTORY DB] Error deleting item :" + e.Message);
                 }
             }
         }
@@ -756,7 +761,7 @@ namespace OpenSim.Data.PGSQL
             }
             catch (Exception e)
             {
-                m_log.Error("[INVENTORY DB] Error reading inventory folder :" + e.Message);
+                m_logger.LogError("[INVENTORY DB] Error reading inventory folder :" + e.Message);
             }
 
             return null;
@@ -798,7 +803,7 @@ namespace OpenSim.Data.PGSQL
             }
             catch (NpgsqlException e)
             {
-                m_log.Error("[INVENTORY DB]: Error reading inventory item :" + e.Message);
+                m_logger.LogError("[INVENTORY DB]: Error reading inventory item :" + e.Message);
             }
 
             return null;
@@ -822,7 +827,7 @@ namespace OpenSim.Data.PGSQL
             }
             catch (NpgsqlException e)
             {
-                m_log.Error("[INVENTORY DB]: Error deleting folder :" + e.Message);
+                m_logger.LogError("[INVENTORY DB]: Error deleting folder :" + e.Message);
             }
         }
 

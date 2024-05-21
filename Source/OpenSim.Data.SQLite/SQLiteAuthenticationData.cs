@@ -25,22 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Data;
-using System.Reflection;
-using log4net;
-using OpenMetaverse;
-using OpenSim.Framework;
 using System.Data.SQLite;
-
+using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using OpenMetaverse;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Data.SQLite
 {
     public class SQLiteAuthenticationData : SQLiteFramework, IAuthenticationData
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private string m_Realm;
         private List<string> m_ColumnNames;
@@ -57,6 +54,8 @@ namespace OpenSim.Data.SQLite
         public SQLiteAuthenticationData(string connectionString, string realm)
                 : base(connectionString)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SQLiteAuthenticationData>>();
+
             m_Realm = realm;
 
             if (!m_initialized)
@@ -166,7 +165,7 @@ namespace OpenSim.Data.SQLite
                     }
                     catch (Exception e)
                     {
-                        m_log.Error("[SQLITE]: Exception storing authentication data", e);
+                        m_logger.LogError("[SQLITE]: Exception storing authentication data", e);
                         //CloseCommand(cmd);
                         return false;
                     }

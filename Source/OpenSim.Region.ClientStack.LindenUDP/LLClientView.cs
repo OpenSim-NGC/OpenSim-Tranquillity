@@ -1692,9 +1692,9 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             }
         }
 
-        private static void DebugSendingPatches(string pWho, int[] pX, int[] pY)
+        private void DebugSendingPatches(string pWho, int[] pX, int[] pY)
         {
-            if (m_logger.IsDebugEnabled)
+            if (m_logger.IsEnabled(LogLevel.Debug))
             {
                 int numPatches = pX.Length;
                 string Xs = "";

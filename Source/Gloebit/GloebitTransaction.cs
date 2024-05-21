@@ -23,17 +23,17 @@
  * See GloebitTransactionData.cs for DB implementation
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
-using log4net;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using OpenSim.Server.Base;
+
 using OpenMetaverse;
 
 namespace Gloebit.GloebitMoneyModule {
 
     public class GloebitTransaction {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         // Primary Key value
         //public UUID TransactionID;
@@ -100,6 +100,7 @@ namespace Gloebit.GloebitMoneyModule {
         // See Create() to generate a new transaction record
         // See Get() to retrieve an existing transaction record
         public GloebitTransaction() {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GloebitTransaction>>();
             m_localID = null;
         }
 
@@ -119,7 +120,7 @@ namespace Gloebit.GloebitMoneyModule {
             string partDescription, 
             string categoryID, 
             uint localID, 
-            int saleType) 
+            int saleType) : this()
         {
             // Primary Key value
             this.TransactionID = transactionID;
@@ -237,26 +238,26 @@ namespace Gloebit.GloebitMoneyModule {
         }
 
         public static GloebitTransaction Get(string transactionIDStr) {
-            m_log.InfoFormat("[GLOEBITMONEYMODULE] in Transaction.Get");
+            m_logger.LogInformation("[GLOEBITMONEYMODULE] in Transaction.Get");
             GloebitTransaction transaction = null;
             lock(s_transactionMap) {
                 s_transactionMap.TryGetValue(transactionIDStr, out transaction);
             }
 
             if(transaction == null) {
-                m_log.DebugFormat("[GLOEBITMONEYMODULE] Looking for prior transaction for {0}", transactionIDStr);
+                m_logger.LogDebug("[GLOEBITMONEYMODULE] Looking for prior transaction for {0}", transactionIDStr);
                 GloebitTransaction[] transactions = GloebitTransactionData.Instance.Get("TransactionID", transactionIDStr);
 
                 switch(transactions.Length) {
                 case 1:
                     transaction = transactions[0];
-                    m_log.DebugFormat("[GLOEBITMONEYMODULE] FOUND TRANSACTION! {0} {1} {2}", transaction.TransactionID, transaction.PayerID, transaction.PayeeID);
+                    m_logger.LogDebug("[GLOEBITMONEYMODULE] FOUND TRANSACTION! {0} {1} {2}", transaction.TransactionID, transaction.PayerID, transaction.PayeeID);
                     lock(s_transactionMap) {
                         s_transactionMap[transactionIDStr] = transaction;
                     }
                     return transaction;
                 case 0:
-                    m_log.DebugFormat("[GLOEBITMONEYMODULE] Could not find transaction matching tID:{0}", transactionIDStr);
+                    m_logger.LogDebug("[GLOEBITMONEYMODULE] Could not find transaction matching tID:{0}", transactionIDStr);
                     return null;
                 default:
                     throw new Exception(String.Format("[GLOEBITMONEYMODULE] Failed to find exactly one transaction for {0}", transactionIDStr));
@@ -376,23 +377,23 @@ namespace Gloebit.GloebitMoneyModule {
             this.enacted = assetCallbacks.processAssetEnactHold(this, out returnMsg);
 
             // TODO: remove this after testing.
-            m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitTransaction.enactHold: {0}", this.enacted);
+            m_logger.LogInformation("[GLOEBITMONEYMODULE] GloebitTransaction.enactHold: {0}", this.enacted);
             if (this.enacted) {
-                m_log.InfoFormat("TransactionID: {0}", this.TransactionID);
-                m_log.DebugFormat("PayerID: {0}", this.PayerID);
-                m_log.DebugFormat("PayeeID: {0}", this.PayeeID);
-                m_log.DebugFormat("PartID: {0}", this.PartID);
-                m_log.DebugFormat("PartName: {0}", this.PartName);
-                m_log.DebugFormat("CategoryID: {0}", this.CategoryID);
-                m_log.DebugFormat("SaleType: {0}", this.SaleType);
-                m_log.DebugFormat("Amount: {0}", this.Amount);
-                m_log.DebugFormat("PayerEndingBalance: {0}", this.PayerEndingBalance);
-                m_log.DebugFormat("enacted: {0}", this.enacted);
-                m_log.DebugFormat("consumed: {0}", this.consumed);
-                m_log.DebugFormat("canceled: {0}", this.canceled);
-                m_log.DebugFormat("cTime: {0}", this.cTime);
-                m_log.DebugFormat("enactedTime: {0}", this.enactedTime);
-                m_log.DebugFormat("finishedTime: {0}", this.finishedTime);
+                m_logger.LogInformation("TransactionID: {0}", this.TransactionID);
+                m_logger.LogDebug("PayerID: {0}", this.PayerID);
+                m_logger.LogDebug("PayeeID: {0}", this.PayeeID);
+                m_logger.LogDebug("PartID: {0}", this.PartID);
+                m_logger.LogDebug("PartName: {0}", this.PartName);
+                m_logger.LogDebug("CategoryID: {0}", this.CategoryID);
+                m_logger.LogDebug("SaleType: {0}", this.SaleType);
+                m_logger.LogDebug("Amount: {0}", this.Amount);
+                m_logger.LogDebug("PayerEndingBalance: {0}", this.PayerEndingBalance);
+                m_logger.LogDebug("enacted: {0}", this.enacted);
+                m_logger.LogDebug("consumed: {0}", this.consumed);
+                m_logger.LogDebug("canceled: {0}", this.canceled);
+                m_logger.LogDebug("cTime: {0}", this.cTime);
+                m_logger.LogDebug("enactedTime: {0}", this.enactedTime);
+                m_logger.LogDebug("finishedTime: {0}", this.finishedTime);
 
                 // TODO: Should we store and update the time even if it fails to track time enact attempted/failed?
                 this.enactedTime = DateTime.UtcNow;

@@ -25,15 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Data;
 using System.Reflection;
-using System.Collections.Generic;
-using log4net;
 using System.Data.SQLite;
 
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
 
 namespace OpenSim.Data.SQLite
 {
@@ -42,7 +44,7 @@ namespace OpenSim.Data.SQLite
     /// </summary>
     public class SQLiteAssetData : AssetDataBase
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private const string SelectAssetSQL = "select * from assets where UUID=:UUID";
         private const string SelectAssetMetadataSQL = "select Name, Description, Type, Temporary, asset_flags, UUID, CreatorID from assets limit :start, :count";
@@ -77,6 +79,7 @@ namespace OpenSim.Data.SQLite
         /// <param name="dbconnect">connect string</param>
         override public void Initialise(string dbconnect)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SQLiteAssetData>>();
             DllmapConfigHelper.RegisterAssembly(typeof(SQLiteConnection).Assembly);
 
             if (dbconnect.Length == 0)
@@ -132,7 +135,7 @@ namespace OpenSim.Data.SQLite
             if (asset.Name.Length > AssetBase.MAX_ASSET_NAME)
             {
                 assetName = asset.Name.Substring(0, AssetBase.MAX_ASSET_NAME);
-                m_log.WarnFormat(
+                m_logger.LogWarning(
                     "[ASSET DB]: Name '{0}' for asset {1} truncated from {2} to {3} characters on add",
                     asset.Name, asset.ID, asset.Name.Length, assetName.Length);
             }
@@ -141,7 +144,7 @@ namespace OpenSim.Data.SQLite
             if (asset.Description.Length > AssetBase.MAX_ASSET_DESC)
             {
                 assetDescription = asset.Description.Substring(0, AssetBase.MAX_ASSET_DESC);
-                m_log.WarnFormat(
+                m_logger.LogWarning(
                     "[ASSET DB]: Description '{0}' for asset {1} truncated from {2} to {3} characters on add",
                     asset.Description, asset.ID, asset.Description.Length, assetDescription.Length);
             }

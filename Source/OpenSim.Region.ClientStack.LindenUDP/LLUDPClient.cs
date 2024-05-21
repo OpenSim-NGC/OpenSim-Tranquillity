@@ -213,7 +213,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             LLUDPServer server, ThrottleRates rates, TokenBucket parentThrottle, uint circuitCode, UUID agentID,
             IPEndPoint remoteEndPoint, int defaultRTO, int maxRTO)
         {
-            m_logger = m_logger ?? OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LLUDPClient>>();
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LLUDPClient>>();
 
             AgentID = agentID;
             RemoteEndPoint = remoteEndPoint;

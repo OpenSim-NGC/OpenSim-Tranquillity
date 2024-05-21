@@ -25,14 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.IO;
 using System.Reflection;
-using OpenSim.Framework;
-using log4net;
+
 using OpenMetaverse;
+
 using Npgsql;
 using NpgsqlTypes;
 
@@ -43,7 +40,7 @@ namespace OpenSim.Data.PGSQL
     /// </summary>
     public class PGSQLManager
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        //private static readonly ILogger m_logger;
 
         /// <summary>
         /// Connection string for ADO.net

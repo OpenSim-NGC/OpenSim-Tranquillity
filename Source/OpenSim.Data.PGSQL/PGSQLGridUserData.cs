@@ -25,15 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Reflection;
-using System.Threading;
-using log4net;
-using OpenMetaverse;
-using OpenSim.Framework;
-
 namespace OpenSim.Data.PGSQL
 {
     /// <summary>
@@ -41,7 +32,7 @@ namespace OpenSim.Data.PGSQL
     /// </summary>
     public class PGSQLGridUserData : PGSQLGenericTableHandler<GridUserData>, IGridUserData
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_logger
 
         public void Initialize(string connectionString, string realm)
         {

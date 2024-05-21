@@ -25,29 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Text;
-using System.Reflection;
-using System.Threading;
+using Microsoft.Extensions.Logging;
 
 using OpenMetaverse;
-using log4net;
-using log4net.Appender;
-using log4net.Layout;
 
 using OpenSim.Framework;
-using OpenSim.Services.Interfaces;
-using OpenSim.Services.Connectors;
 
 namespace OpenSim.Tests.Clients.AssetsClient
 {
     public class AssetsClient
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private static int m_MaxThreadID = 0;
         private static readonly int NREQS = 150;
@@ -55,30 +43,28 @@ namespace OpenSim.Tests.Clients.AssetsClient
 
         public static void Main(string[] args)
         {
-            ConsoleAppender consoleAppender = new ConsoleAppender();
-            consoleAppender.Layout =
-                new PatternLayout("[%thread] - %message%newline");
-            log4net.Config.BasicConfigurator.Configure(consoleAppender);
-
+            m_logger ??= LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<AssetsClient>();
+            // TODO: how to format output: consoleAppender.Layout = new PatternLayout("[%thread] - %message%newline");
+            
             string serverURI = "http://127.0.0.1:8003";
             if (args.Length > 1)
                 serverURI = args[1];
             int max1, max2;
             ThreadPool.GetMaxThreads(out max1, out max2);
-            m_log.InfoFormat("[ASSET CLIENT]: Connecting to {0} max threads = {1} - {2}", serverURI, max1, max2);
+            m_logger.LogInformation("[ASSET CLIENT]: Connecting to {0} max threads = {1} - {2}", serverURI, max1, max2);
             ThreadPool.GetMinThreads(out max1, out max2);
-            m_log.InfoFormat("[ASSET CLIENT]: Connecting to {0} min threads = {1} - {2}", serverURI, max1, max2);
+            m_logger.LogInformation("[ASSET CLIENT]: Connecting to {0} min threads = {1} - {2}", serverURI, max1, max2);
 
             if (!ThreadPool.SetMinThreads(1, 1))
-                m_log.WarnFormat("[ASSET CLIENT]: Failed to set min threads");
+                m_logger.LogWarning("[ASSET CLIENT]: Failed to set min threads");
 
             if (!ThreadPool.SetMaxThreads(10, 3))
-                m_log.WarnFormat("[ASSET CLIENT]: Failed to set max threads");
+                m_logger.LogWarning("[ASSET CLIENT]: Failed to set max threads");
 
             ThreadPool.GetMaxThreads(out max1, out max2);
-            m_log.InfoFormat("[ASSET CLIENT]: Post set max threads = {1} - {2}", serverURI, max1, max2);
+            m_logger.LogInformation("[ASSET CLIENT]: Connected to {0}. Post set max threads = {1} - {2}", serverURI, max1, max2);
             ThreadPool.GetMinThreads(out max1, out max2);
-            m_log.InfoFormat("[ASSET CLIENT]: Post set min threads = {1} - {2}", serverURI, max1, max2);
+            m_logger.LogInformation("[ASSET CLIENT]: Connected to {0}. Post set min threads = {1} - {2}", serverURI, max1, max2);
 
             AssetServicesConnector m_Connector = new AssetServicesConnector(serverURI);
             m_Connector.MaxAssetRequestConcurrency = 30;
@@ -87,7 +73,7 @@ namespace OpenSim.Tests.Clients.AssetsClient
             {
                 UUID uuid = UUID.Random();
                 m_Connector.Get(uuid.ToString(), null, ResponseReceived);
-                m_log.InfoFormat("[ASSET CLIENT]: [{0}] requested asset {1}", i, uuid);
+                m_logger.LogInformation("[ASSET CLIENT]: [{0}] requested asset {1}", i, uuid);
             }
 
             for (int i = 0; i < 500; i++)
@@ -100,7 +86,7 @@ namespace OpenSim.Tests.Clients.AssetsClient
             }
 
             Thread.Sleep(30 * 1000);
-            m_log.InfoFormat("[ASSET CLIENT]: Received responses {0}", m_NReceived);
+            m_logger.LogInformation("[ASSET CLIENT]: Received responses {0}", m_NReceived);
         }
 
         private static void ResponseReceived(string id, Object sender, AssetBase asset)
@@ -109,7 +95,7 @@ namespace OpenSim.Tests.Clients.AssetsClient
                 m_MaxThreadID = Thread.CurrentThread.ManagedThreadId;
             int max1, max2;
             ThreadPool.GetAvailableThreads(out max1, out max2);
-            m_log.InfoFormat("[ASSET CLIENT]: Received asset {0} ({1}) ({2}-{3}) {4}", id, m_MaxThreadID, max1, max2, DateTime.Now.ToString("hh:mm:ss"));
+            m_logger.LogInformation("[ASSET CLIENT]: Received asset {0} ({1}) ({2}-{3}) {4}", id, m_MaxThreadID, max1, max2, DateTime.Now.ToString("hh:mm:ss"));
             m_NReceived++;
         }
 
@@ -117,7 +103,7 @@ namespace OpenSim.Tests.Clients.AssetsClient
         {
             int max1, max2;
             ThreadPool.GetAvailableThreads(out max1, out max2);
-            m_log.InfoFormat("[ASSET CLIENT]: ({0}) Hello! {1} - {2} {3}", i, max1, max2, DateTime.Now.ToString("hh:mm:ss"));
+            m_logger.LogInformation("[ASSET CLIENT]: ({0}) Hello! {1} - {2} {3}", i, max1, max2, DateTime.Now.ToString("hh:mm:ss"));
             Thread.Sleep(2000);
         }
     }

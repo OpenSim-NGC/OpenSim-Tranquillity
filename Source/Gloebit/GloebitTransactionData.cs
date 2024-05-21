@@ -16,26 +16,30 @@
  * along with OpenSim-MoneyModule-Gloebit.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Data.SqlTypes;
 using System.Reflection;
-using log4net;
-using MySqlConnector;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Data.MySQL;
 using OpenSim.Data.PGSQL;
-using OpenSim.Data.SQLite;
+using OpenSim.Server.Base;
+
+using MySqlConnector;
 
 
 namespace Gloebit.GloebitMoneyModule
 {
     class GloebitTransactionData {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private static IGloebitTransactionData m_impl;
 
         public static void Initialise(string storageProvider, string connectionString) {
-            switch(storageProvider) {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GloebitTransactionData>>();
+
+            switch (storageProvider) {
                 case "OpenSim.Data.SQLite.dll":
                     m_impl = new SQLiteImpl(connectionString);
                     break;
@@ -90,7 +94,7 @@ namespace Gloebit.GloebitMoneyModule
             
             public override bool Store(GloebitTransaction txn)
             {
-                //            m_log.DebugFormat("[MYSQL GENERIC TABLE HANDLER]: Store(T row) invoked");
+                //            m_logger.LogDebug("[MYSQL GENERIC TABLE HANDLER]: Store(T row) invoked");
 
                 try
                 {
@@ -143,18 +147,19 @@ namespace Gloebit.GloebitMoneyModule
                 }
                 catch(Exception e)
                 {
-                    m_log.DebugFormat("[MYSQL GENERIC TABLE HANDLER]: Failed to store data: {0}", e);
+                    m_logger.LogDebug("[MYSQL GENERIC TABLE HANDLER]: Failed to store data: {0}", e);
                     return false;
                 }
             }
         }
 
         private class PGSQLImpl : PGSQLGenericTableHandler<GloebitTransaction>, IGloebitTransactionData {
-            private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+            private static ILogger m_logger;
 
             public PGSQLImpl(string connectionString)
                 : base(connectionString, "GloebitTransactions", "GloebitTransactionsPGSQL")
             {
+                m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PGSQLImpl>>();
             }
             
             public override bool Store(GloebitTransaction txn)
@@ -171,10 +176,10 @@ namespace Gloebit.GloebitMoneyModule
                     // call parent
                     return base.Store(txn);
 		        } catch(System.OverflowException e) {
-                    m_log.ErrorFormat("GloebitTransactionData.PGSQLImpl: Failure storing transaction type:{0}, SaleType:{1}, PayerEndingBalance:{2}, cTime:{3}, enactedTime:{4}, finishedTime:{5}, stacktrace:{6}", txn.TransactionType, txn.SaleType, txn.PayerEndingBalance, txn.cTime, txn.enactedTime, txn.finishedTime, e);
+                    m_logger.LogError("GloebitTransactionData.PGSQLImpl: Failure storing transaction type:{0}, SaleType:{1}, PayerEndingBalance:{2}, cTime:{3}, enactedTime:{4}, finishedTime:{5}, stacktrace:{6}", txn.TransactionType, txn.SaleType, txn.PayerEndingBalance, txn.cTime, txn.enactedTime, txn.finishedTime, e);
 		            return false;
 		        } catch(Exception e) {
-                    m_log.DebugFormat("[PGSQL GENERIC TABLE HANDLER]: Failed to store data: {0}", e);
+                    m_logger.LogDebug("[PGSQL GENERIC TABLE HANDLER]: Failed to store data: {0}", e);
                     return false;
                 }
             }

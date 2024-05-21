@@ -1268,7 +1268,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         public OdePrim(String primName, ODEScene parent_scene, Vector3 pos, Vector3 size,
                        Quaternion rotation, PrimitiveBaseShape pbs, bool pisPhysical,bool pisPhantom,byte _shapeType,uint plocalID)
         {
-            m_logger = m_logger ?? OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<OdePrim>>();
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<OdePrim>>();
 
             m_parentScene = parent_scene;
 

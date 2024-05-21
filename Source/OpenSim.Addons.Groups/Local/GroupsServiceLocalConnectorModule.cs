@@ -27,20 +27,24 @@
 
 using System.Reflection;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 
 using OpenMetaverse;
-using log4net;
+
 using Nini.Config;
-using Microsoft.Extensions.Configuration;
 
 namespace OpenSim.Groups
 {
     public class GroupsServiceLocalConnectorModule : ISharedRegionModule, IGroupsServicesConnector
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private bool m_Enabled = false;
         private GroupsService m_GroupsService;
@@ -71,6 +75,8 @@ namespace OpenSim.Groups
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GroupsServiceLocalConnectorModule>>();
+
             IConfig groupsConfig = config.Configs["Groups"];
             if (groupsConfig == null)
                 return;
@@ -84,7 +90,7 @@ namespace OpenSim.Groups
             Init(config);
             m_Enabled = true;
 
-            m_log.DebugFormat("[Groups]: Initializing {0}", this.Name);
+            m_logger.LogDebug("[Groups]: Initializing {0}", this.Name);
         }
 
         public string Name
@@ -102,7 +108,7 @@ namespace OpenSim.Groups
             if (!m_Enabled)
                 return;
 
-            m_log.DebugFormat("[Groups]: Registering {0} with {1}", this.Name, scene.RegionInfo.RegionName);
+            m_logger.LogDebug("[Groups]: Registering {0} with {1}", this.Name, scene.RegionInfo.RegionName);
             scene.RegisterModuleInterface<IGroupsServicesConnector>(this);
             m_Scenes.Add(scene);
         }
@@ -143,7 +149,7 @@ namespace OpenSim.Groups
         public UUID CreateGroup(UUID RequestingAgentID, string name, string charter, bool showInList, UUID insigniaID, int membershipFee, bool openEnrollment,
             bool allowPublish, bool maturePublish, UUID founderID, out string reason)
         {
-            m_log.DebugFormat("[Groups]: Creating group {0}", name);
+            m_logger.LogDebug("[Groups]: Creating group {0}", name);
             reason = string.Empty;
             return m_GroupsService.CreateGroup(RequestingAgentID.ToString(), name, charter, showInList, insigniaID,
                     membershipFee, openEnrollment, allowPublish, maturePublish, founderID, out reason);

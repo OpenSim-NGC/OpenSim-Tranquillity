@@ -180,7 +180,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                     ODEScene parent_scene, Vector3 pos, Vector3 pSize, float pfeetOffset,
                     float density, float walk_divisor, float rundivisor)
         {
-            m_logger = m_logger ?? OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<OdeCharacter>>();
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<OdeCharacter>>();
 
             m_baseLocalID = localID;
             m_parent_scene = parent_scene;

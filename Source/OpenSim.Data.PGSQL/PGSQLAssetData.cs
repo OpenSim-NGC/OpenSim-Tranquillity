@@ -25,13 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Data;
 using System.Reflection;
-using System.Collections.Generic;
-using OpenMetaverse;
-using log4net;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
 using Npgsql;
 using NpgsqlTypes;
 
@@ -44,7 +47,8 @@ namespace OpenSim.Data.PGSQL
     {
         private const string _migrationStore = "AssetStore";
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
+
         private long m_ticksToEpoch;
         /// <summary>
         /// Database manager
@@ -67,7 +71,8 @@ namespace OpenSim.Data.PGSQL
         // [Obsolete("Cannot be default-initialized!")]
         override public void Initialise()
         {
-            m_log.Info("[PGSQLAssetData]: " + Name + " cannot be default-initialized!");
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PGSQLAssetData>>();
+
             throw new PluginNotInitialisedException(Name);
         }
 
@@ -169,7 +174,7 @@ namespace OpenSim.Data.PGSQL
             if (asset.Name.Length > AssetBase.MAX_ASSET_NAME)
             {
                 assetName = asset.Name.Substring(0, AssetBase.MAX_ASSET_NAME);
-                m_log.WarnFormat(
+                m_logger.LogWarning(
                     "[ASSET DB]: Name '{0}' for asset {1} truncated from {2} to {3} characters on add",
                     asset.Name, asset.ID, asset.Name.Length, assetName.Length);
             }
@@ -178,7 +183,7 @@ namespace OpenSim.Data.PGSQL
             if (asset.Description.Length > AssetBase.MAX_ASSET_DESC)
             {
                 assetDescription = asset.Description.Substring(0, AssetBase.MAX_ASSET_DESC);
-                m_log.WarnFormat(
+                m_logger.LogWarning(
                     "[ASSET DB]: Description '{0}' for asset {1} truncated from {2} to {3} characters on add",
                     asset.Description, asset.ID, asset.Description.Length, assetDescription.Length);
             }
@@ -205,7 +210,7 @@ namespace OpenSim.Data.PGSQL
                 }
                 catch(Exception e)
                 {
-                    m_log.Error("[ASSET DB]: Error storing item :" + e.Message + " sql "+sql);
+                    m_logger.LogError("[ASSET DB]: Error storing item :" + e.Message + " sql "+sql);
                 }
             }
             return true;

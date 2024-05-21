@@ -25,19 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
-using System.IO;
 using System.Reflection;
-using System.Threading;
-using log4net;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Data;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
 using Npgsql;
 
 namespace OpenSim.Data.PGSQL
@@ -47,11 +48,12 @@ namespace OpenSim.Data.PGSQL
     /// </summary>
     public class PGSQLSimulationData : ISimulationDataStore
     {
+        private static ILogger m_logger;
+
         private const string _migrationStore = "RegionStore";
         private const string LogHeader = "[REGION DB PGSQL]";
 
         // private static FileSystemDataStore Instance = new FileSystemDataStore();
-        private static readonly ILog _Log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         /// <summary>
         /// The database manager
@@ -65,6 +67,7 @@ namespace OpenSim.Data.PGSQL
 
         public PGSQLSimulationData()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PGSQLSimulationData>>();
         }
 
         public PGSQLSimulationData(string connectionString)
@@ -150,7 +153,7 @@ namespace OpenSim.Data.PGSQL
                             // deleted).
                             if (!groupID.IsZero() && sceneObjectPart.UUID.NotEqual(groupID))
                             {
-                                _Log.WarnFormat(
+                                m_logger.LogWarning(
                                     "[REGION DB]: Found root prim {0} {1} at {2} where group was actually {3}.  Forcing UUID to group UUID",
                                     sceneObjectPart.Name, sceneObjectPart.UUID, sceneObjectPart.GroupPosition, groupID);
 
@@ -205,7 +208,7 @@ namespace OpenSim.Data.PGSQL
 
             LoadItems(primsWithInventory);
 
-            _Log.DebugFormat("[REGION DB]: Loaded {0} objects using {1} prims", objects.Count, prims.Count);
+            m_logger.LogDebug("[REGION DB]: Loaded {0} objects using {1} prims", objects.Count, prims.Count);
 
             return new List<SceneObjectGroup>(objects.Values);
         }
@@ -281,7 +284,7 @@ namespace OpenSim.Data.PGSQL
                             }
                             catch (NpgsqlException sqlEx)
                             {
-                                _Log.ErrorFormat("[REGION DB]: Store SceneObjectPrim SQL error: {0} at line {1}", sqlEx.Message, sqlEx.Line);
+                                m_logger.LogError("[REGION DB]: Store SceneObjectPrim SQL error: {0} at line {1}", sqlEx.Message, sqlEx.Line);
                                 throw;
                             }
                         }
@@ -296,7 +299,7 @@ namespace OpenSim.Data.PGSQL
                             }
                             catch (NpgsqlException sqlEx)
                             {
-                                _Log.ErrorFormat("[REGION DB]: Store SceneObjectPrimShapes SQL error: {0} at line {1}", sqlEx.Message, sqlEx.Line);
+                                m_logger.LogError("[REGION DB]: Store SceneObjectPrimShapes SQL error: {0} at line {1}", sqlEx.Message, sqlEx.Line);
                                 throw;
                             }
                         }
@@ -306,7 +309,7 @@ namespace OpenSim.Data.PGSQL
                 }
                 catch (Exception ex)
                 {
-                    _Log.ErrorFormat("[REGION DB]: Store SceneObjectGroup error: {0}, Rolling back...", ex.Message);
+                    m_logger.LogError("[REGION DB]: Store SceneObjectGroup error: {0}, Rolling back...", ex.Message);
                     try
                     {
                         transaction.Rollback();
@@ -314,7 +317,7 @@ namespace OpenSim.Data.PGSQL
                     catch (Exception ex2)
                     {
                         //Show error
-                        _Log.InfoFormat("[REGION DB]: Rollback of SceneObjectGroup store transaction failed with error: {0}", ex2.Message);
+                        m_logger.LogInformation("[REGION DB]: Rollback of SceneObjectGroup store transaction failed with error: {0}", ex2.Message);
 
                     }
                 }
@@ -449,7 +452,7 @@ namespace OpenSim.Data.PGSQL
         /// <param name="regionUUID">regionUUID (is this used anyway</param>
         public void RemoveObject(UUID objectID, UUID regionUUID)
         {
-            //_Log.InfoFormat("[PGSQL]: Removing obj: {0} from region: {1}", objectID, regionUUID);
+            //m_logger.LogInformation("[PGSQL]: Removing obj: {0} from region: {1}", objectID, regionUUID);
 
             //Remove from prims and primsitem table
             string sqlPrims = @"DELETE FROM PRIMS WHERE ""SceneGroupID"" = :objectID";
@@ -484,7 +487,7 @@ namespace OpenSim.Data.PGSQL
         /// <param name="items"></param>
         public void StorePrimInventory(UUID primID, ICollection<TaskInventoryItem> items)
         {
-            //_Log.InfoFormat("[REGION DB: Persisting Prim Inventory with prim ID {0}", primID);
+            //m_logger.LogInformation("[REGION DB: Persisting Prim Inventory with prim ID {0}", primID);
 
             //Statement from PGSQL section!
             // For now, we're just going to crudely remove all the previous inventory items
@@ -567,10 +570,10 @@ namespace OpenSim.Data.PGSQL
                         }
                         else
                         {
-                            _Log.Info("[REGION DB]: No terrain found for region");
+                            m_logger.LogInformation("[REGION DB]: No terrain found for region");
                             return null;
                         }
-                        _Log.Info("[REGION DB]: Loaded terrain revision r" + rev);
+                        m_logger.LogInformation("[REGION DB]: Loaded terrain revision r" + rev);
                     }
                 }
             }
@@ -634,7 +637,7 @@ namespace OpenSim.Data.PGSQL
                     conn.Open();
                     cmd.ExecuteNonQuery();
 
-                    _Log.InfoFormat("{0} Deleted terrain revision id = {1}", LogHeader, regionID);
+                    m_logger.LogInformation("{0} Deleted terrain revision id = {1}", LogHeader, regionID);
                 }
             }
 
@@ -654,7 +657,7 @@ namespace OpenSim.Data.PGSQL
                     conn.Open();
                     cmd.ExecuteNonQuery();
 
-                    _Log.InfoFormat("{0} Stored terrain id = {1}, terrainSize = <{2},{3}>",
+                    m_logger.LogInformation("{0} Stored terrain id = {1}, terrainSize = <{2},{3}>",
                                     LogHeader, regionID, terrData.SizeX, terrData.SizeY);
                 }
             }
@@ -678,7 +681,7 @@ namespace OpenSim.Data.PGSQL
                     conn.Open();
                     cmd.ExecuteNonQuery();
 
-                    _Log.InfoFormat("{0} Deleted bakedterrain id = {1}", LogHeader, regionID);
+                    m_logger.LogInformation("{0} Deleted bakedterrain id = {1}", LogHeader, regionID);
                 }
             }
 
@@ -698,7 +701,7 @@ namespace OpenSim.Data.PGSQL
                     conn.Open();
                     cmd.ExecuteNonQuery();
 
-                    _Log.InfoFormat("{0} Stored bakedterrain id = {1}, terrainSize = <{2},{3}>",
+                    m_logger.LogInformation("{0} Stored bakedterrain id = {1}, terrainSize = <{2},{3}>",
                                     LogHeader, regionID, terrData.SizeX, terrData.SizeY);
                 }
             }
@@ -1151,7 +1154,7 @@ namespace OpenSim.Data.PGSQL
             {
                 newData.UserLocation = Vector3.Zero;
                 newData.UserLookAt = Vector3.Zero;
-                _Log.ErrorFormat("[PARCEL]: unable to get parcel telehub settings for {1}", newData.Name);
+                m_logger.LogError("[PARCEL]: unable to get parcel telehub settings for {1}", newData.Name);
             }
 
             newData.ParcelAccessList = new List<LandAccessEntry>();

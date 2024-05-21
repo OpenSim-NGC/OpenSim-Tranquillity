@@ -25,16 +25,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Data;
 using System.Reflection;
-using log4net;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
-using OpenSim.Data;
 using RegionFlags = OpenSim.Framework.RegionFlags;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
 using Npgsql;
 
 namespace OpenSim.Data.PGSQL
@@ -44,11 +46,12 @@ namespace OpenSim.Data.PGSQL
     /// </summary>
     public class PGSQLRegionData : IRegionData
     {
+        private static ILogger m_logger;
+
         private string m_Realm;
         private List<string> m_ColumnNames = null;
         private string m_ConnectionString;
         private PGSQLManager m_database;
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         protected Dictionary<string, string> m_FieldTypes = new Dictionary<string, string>();
 
@@ -59,6 +62,8 @@ namespace OpenSim.Data.PGSQL
 
         public void Initialize(string connectionString, string realm)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PGSQLRegionData>>();
+
             m_Realm = realm;
             m_ConnectionString = connectionString;
             m_database = new PGSQLManager(connectionString);
@@ -366,13 +371,13 @@ namespace OpenSim.Data.PGSQL
                         }
                         catch (Exception ex)
                         {
-                            m_log.Warn("[PGSQL Grid]: Error inserting into Regions table: " + ex.Message + ", INSERT sql: " + insert);
+                            m_logger.LogWarning("[PGSQL Grid]: Error inserting into Regions table: " + ex.Message + ", INSERT sql: " + insert);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    m_log.Warn("[PGSQL Grid]: Error updating Regions table: " + ex.Message + ", UPDATE sql: " + update);
+                    m_logger.LogWarning("[PGSQL Grid]: Error updating Regions table: " + ex.Message + ", UPDATE sql: " + update);
                 }
             }
 

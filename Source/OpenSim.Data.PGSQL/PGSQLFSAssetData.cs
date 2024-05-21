@@ -25,13 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
-using System.Collections.Generic;
 using System.Data;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
-using log4net;
+using OpenSim.Server.Base;
+
 using OpenMetaverse;
 using Npgsql;
 using NpgsqlTypes;
@@ -40,9 +42,10 @@ namespace OpenSim.Data.PGSQL
 {
     public class PGSQLFSAssetData : IFSAssetDataPlugin
     {
+        private static ILogger m_logger;
+
         private const string _migrationStore = "FSAssetStore";
         private static string m_Table = "fsassets";
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private long m_ticksToEpoch;
 
         private PGSQLManager m_database;
@@ -50,6 +53,7 @@ namespace OpenSim.Data.PGSQL
 
         public PGSQLFSAssetData()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetService<ILogger<PGSQLFSAssetData>>();
         }
 
         public void Initialise(string connect, string realm, int UpdateAccessTime)

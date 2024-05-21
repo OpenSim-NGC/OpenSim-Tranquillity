@@ -25,35 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Reflection;
-
-using OpenMetaverse;
-using log4net;
-using log4net.Appender;
-using log4net.Layout;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
-using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
-using OpenSim.Services.Connectors;
+
+using OpenMetaverse;
 
 namespace OpenSim.Tests.Clients.GridClient
 {
     public class GridClient
     {
-//        private static readonly ILog m_log =
-//                LogManager.GetLogger(
-//                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         public static void Main(string[] args)
         {
-            ConsoleAppender consoleAppender = new ConsoleAppender();
-            consoleAppender.Layout =
-                new PatternLayout("%date [%thread] %-5level %logger [%property{NDC}] - %message%newline");
-            log4net.Config.BasicConfigurator.Configure(consoleAppender);
+            m_logger ??= LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<GridClient>();
+            // TODO: how to format output: consoleAppender.Layout = new PatternLayout("%date [%thread] %-5level %logger [%property{NDC}] - %message%newline");
 
             string serverURI = "http://127.0.0.1:8001";
             GridServicesConnector m_Connector = new GridServicesConnector(serverURI);

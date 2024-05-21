@@ -180,7 +180,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         /// second. If zero, the bucket always remains full</param>
         public TokenBucket(TokenBucket parent, float dripRate, float MaxBurst)
         {
-            m_logger = m_logger ?? OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<TokenBucket>>();
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<TokenBucket>>();
             
             m_counter++;
 

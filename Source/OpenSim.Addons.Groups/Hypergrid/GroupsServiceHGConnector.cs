@@ -25,34 +25,33 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-using log4net;
+
 
 namespace OpenSim.Groups
 {
     public class GroupsServiceHGConnector
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private string m_ServerURI;
         private object m_Lock = new object();
 
         public GroupsServiceHGConnector(string url)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GroupsServiceHGConnector>>();
+
             m_ServerURI = url;
             if (!m_ServerURI.EndsWith("/"))
                 m_ServerURI += "/";
 
-            m_log.DebugFormat("[Groups.HGConnector]: Groups server at {0}", m_ServerURI);
+            m_logger.LogDebug("[Groups.HGConnector]: Groups server at {0}", m_ServerURI);
         }
 
         public bool CreateProxy(string RequestingAgentID, string AgentID, string accessToken, UUID groupID, string url, string name, out string reason)
@@ -280,7 +279,7 @@ namespace OpenSim.Groups
                 return null;
             }
 
-            //m_log.DebugFormat("[XXX]: reply was {0}", reply);
+            //m_logger.LogDebug("[XXX]: reply was {0}", reply);
 
             if (string.IsNullOrEmpty(reply))
                 return null;

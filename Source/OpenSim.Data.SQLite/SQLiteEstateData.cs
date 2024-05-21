@@ -25,22 +25,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Reflection;
-using log4net;
 using System.Data.SQLite;
-using OpenMetaverse;
+using System.Reflection;
+
 using OpenSim.Framework;
-using OpenSim.Region.Framework.Interfaces;
+
+using OpenMetaverse;
+using OpenSim.Server.Base;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.SQLite
 {
     public class SQLiteEstateStore : IEstateDataStore
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private SQLiteConnection m_connection;
         private string m_connectionString;
@@ -56,6 +56,7 @@ namespace OpenSim.Data.SQLite
 
         public SQLiteEstateStore()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SQLiteEstateStore>>();
         }
 
         public SQLiteEstateStore(string connectionString)
@@ -69,7 +70,7 @@ namespace OpenSim.Data.SQLite
 
             m_connectionString = connectionString;
 
-            m_log.Info("[ESTATE DB]: Sqlite - connecting: "+m_connectionString);
+            m_logger.LogInformation("[ESTATE DB]: Sqlite - connecting: "+m_connectionString);
 
             m_connection = new SQLiteConnection(m_connectionString);
             m_connection.Open();
@@ -119,7 +120,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (SQLiteException)
             {
-                m_log.Error("[SQLITE]: There was an issue loading the estate settings.  This can happen the first time running OpenSimulator with CSharpSqlite the first time.  OpenSimulator will probably crash, restart it and it should be good to go.");
+                m_logger.LogError("[SQLITE]: There was an issue loading the estate settings.  This can happen the first time running OpenSimulator with CSharpSqlite the first time.  OpenSimulator will probably crash, restart it and it should be good to go.");
             }
 
             if (r != null && r.Read())

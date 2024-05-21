@@ -25,27 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
-using System.Text;
-using System.Xml;
-using System.Collections.Generic;
-using System.IO;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Server.Base;
-using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
-using OpenSim.Server.Handlers.Base;
-using log4net;
+
 using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Groups
 {
     public class GroupsServiceRobustConnector : ServiceConnector
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private GroupsService m_GroupsService;
         private string m_ConfigName = "Groups";
@@ -53,17 +51,19 @@ namespace OpenSim.Groups
         public GroupsServiceRobustConnector(IConfiguration config, IHttpServer server, string configName) :
             base(config, server, configName)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GroupsServiceRobustConnector>>();
+
             string key = string.Empty;
             if (configName != String.Empty)
                 m_ConfigName = configName;
 
-            m_log.DebugFormat("[Groups.RobustConnector]: Starting with config name {0}", m_ConfigName);
+            m_logger.LogDebug("[Groups.RobustConnector]: Starting with config name {0}", m_ConfigName);
 
             IConfig groupsConfig = config.Configs[m_ConfigName];
             if (groupsConfig != null)
             {
                 key = groupsConfig.GetString("SecretKey", string.Empty);
-                m_log.DebugFormat("[Groups.RobustConnector]: Starting with secret key {0}", key);
+                m_logger.LogDebug("[Groups.RobustConnector]: Starting with secret key {0}", key);
             }
 //            else
 //                m_log.DebugFormat("[Groups.RobustConnector]: Unable to find {0} section in configuration", m_ConfigName);
@@ -78,13 +78,15 @@ namespace OpenSim.Groups
 
     public class GroupsServicePostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private GroupsService m_GroupsService;
 
         public GroupsServicePostHandler(GroupsService service, IServiceAuth auth) :
             base("POST", "/groups", auth)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GroupsServicePostHandler>>();
+
             m_GroupsService = service;
         }
 
@@ -150,11 +152,11 @@ namespace OpenSim.Groups
                     case "FINDGROUPS":
                         return HandleFindGroups(request);
                 }
-                m_log.DebugFormat("[GROUPS HANDLER]: unknown method request: {0}", method);
+                m_logger.LogDebug("[GROUPS HANDLER]: unknown method request: {0}", method);
             }
             catch (Exception e)
             {
-                m_log.Error(string.Format("[GROUPS HANDLER]: Exception {0} ", e.Message), e);
+                m_logger.LogError(string.Format("[GROUPS HANDLER]: Exception {0} ", e.Message), e);
             }
 
             return FailureResult();

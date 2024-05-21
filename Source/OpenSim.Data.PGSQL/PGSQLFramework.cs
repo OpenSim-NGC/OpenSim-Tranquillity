@@ -25,14 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Data;
-using System.Reflection;
-using OpenMetaverse;
-using OpenSim.Framework;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Npgsql;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Data.PGSQL
 {
@@ -41,15 +37,15 @@ namespace OpenSim.Data.PGSQL
     /// </summary>
     public class PGSqlFramework
     {
-        private static readonly log4net.ILog m_log =
-                log4net.LogManager.GetLogger(
-                System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         protected string m_connectionString;
         protected object m_dbLock = new object();
 
         protected void Initialize(string connectionString)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PGSqlFramework>>();
+
             m_connectionString = connectionString;
         }
 
@@ -73,7 +69,7 @@ namespace OpenSim.Data.PGSQL
                     }
                     catch (Exception e)
                     {
-                        m_log.Error(e.Message, e);
+                        m_logger.LogError(e.Message, e);
                         return 0;
                     }
                 }

@@ -25,25 +25,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-using log4net;
+
 using Nini.Config;
 
 namespace OpenSim.Groups
 {
     public class GroupsServiceRemoteConnector
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private string m_ServerURI;
         private IServiceAuth m_Auth;
@@ -51,6 +48,8 @@ namespace OpenSim.Groups
 
         public GroupsServiceRemoteConnector(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GroupsServiceRemoteConnector>>();
+
             IConfig groupsConfig = config.Configs["Groups"];
             string url = groupsConfig.GetString("GroupsServerURI", string.Empty);
             if (!Uri.IsWellFormedUriString(url, UriKind.Absolute))
@@ -71,7 +70,7 @@ namespace OpenSim.Groups
             }
             ///
 
-            m_log.DebugFormat("[Groups.RemoteConnector]: Groups server at {0}, authentication {1}",
+            m_logger.LogDebug("[Groups.RemoteConnector]: Groups server at {0}, authentication {1}",
                 m_ServerURI, (m_Auth == null ? "None" : m_Auth.GetType().ToString()));
         }
 

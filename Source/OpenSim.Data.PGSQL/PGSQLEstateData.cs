@@ -25,14 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using log4net;
-using OpenMetaverse;
-using OpenSim.Framework;
-using OpenSim.Region.Framework.Interfaces;
 using System.Data;
+using System.Reflection;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using OpenSim.Framework;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
 using Npgsql;
 using NpgsqlTypes;
 
@@ -42,7 +45,7 @@ namespace OpenSim.Data.PGSQL
     {
         private const string _migrationStore = "EstateStore";
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private PGSQLManager _Database;
         private string m_connectionString;
@@ -53,6 +56,8 @@ namespace OpenSim.Data.PGSQL
 
         public void Initialize(string connectionString)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PGSQLEstateStore>>();
+
             Initialise(connectionString);
         }
 
@@ -565,7 +570,7 @@ namespace OpenSim.Data.PGSQL
                 }
                 catch (Exception ex)
                 {
-                    m_log.Error("[REGION DB]: LinkRegion failed: " + ex.Message);
+                    m_logger.LogError("[REGION DB]: LinkRegion failed: " + ex.Message);
                     transaction.Rollback();
                 }
             }
