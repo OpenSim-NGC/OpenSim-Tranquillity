@@ -27,21 +27,24 @@
 
 using System.Reflection;
 
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 {
     public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedRegionModule, IInventoryAccessModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private static HGAssetMapper m_assMapper;
         public static HGAssetMapper AssetMapper
@@ -73,6 +76,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
         public override void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HGInventoryAccessModule>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -83,7 +87,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
                     InitialiseCommon(source);
 
-                    m_log.InfoFormat("[HG INVENTORY ACCESS MODULE]: {0} enabled.", Name);
+                    m_logger?.LogInformation("[HG INVENTORY ACCESS MODULE]: {0} enabled.", Name);
 
                     IConfig thisModuleConfig = source.Configs["HGInventoryAccessModule"];
                     if (thisModuleConfig != null)
@@ -96,7 +100,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
                     }
                     else
-                        m_log.Warn("[HG INVENTORY ACCESS MODULE]: HGInventoryAccessModule configs not found");
+                        m_logger?.LogWarning("[HG INVENTORY ACCESS MODULE]: HGInventoryAccessModule configs not found");
 
                     m_bypassPermissions = !Util.GetConfigVarFromSections<bool>(source, "serverside_object_permissions",
                                             new string[] { "Startup", "Permissions" }, true);
@@ -141,7 +145,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
         protected void OnCompleteMovementToRegion(IClientAPI client, bool arg2)
         {
-            //m_log.DebugFormat("[HG INVENTORY ACCESS MODULE]: OnCompleteMovementToRegion of user {0}", client.Name);
+            //m_logger?.LogDebug("[HG INVENTORY ACCESS MODULE]: OnCompleteMovementToRegion of user {0}", client.Name);
             if (client.SceneAgent is ScenePresence sp)
             {
                 AgentCircuitData aCircuit = sp.Scene.AuthenticateHandler.GetAgentCircuitData(client.AgentId);
@@ -287,7 +291,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
             }
             else
             {
-                m_log.Debug("[HGScene]: Scene.Inventory did not create asset");
+                m_logger?.LogDebug("[HGScene]: Scene.Inventory did not create asset");
             }
         }
 
@@ -351,7 +355,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
             // If both users have the same asset server, no need to transfer the asset
             if (senderAssetServer.Equals(receiverAssetServer))
             {
-                m_log.DebugFormat("[HGScene]: Asset transfer between foreign users, but they have the same server. No transfer.");
+                m_logger?.LogDebug("[HGScene]: Asset transfer between foreign users, but they have the same server. No transfer.");
                 return;
             }
 
@@ -393,12 +397,12 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
                 {
                     if (IsLocalInventoryAssetsUser(userID, out assetServerURL))
                     {
-                        m_log.DebugFormat("[HGScene]: user {0} has local assets {1}", userID, assetServerURL);
+                        m_logger?.LogDebug("[HGScene]: user {0} has local assets {1}", userID, assetServerURL);
                         return false;
                     }
                     else
                     {
-                        m_log.DebugFormat("[HGScene]: user {0} has foreign assets {1}", userID, assetServerURL);
+                        m_logger?.LogDebug("[HGScene]: user {0} has foreign assets {1}", userID, assetServerURL);
                         return true;
                     }
                 }
@@ -447,7 +451,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
         {
             if(!client.IsActive)
                 return;
-            m_log.DebugFormat("[HG INVENTORY ACCESS MODULE]: Restoring root folder for local user {0}", client.Name);
+            m_logger?.LogDebug("[HG INVENTORY ACCESS MODULE]: Restoring root folder for local user {0}", client.Name);
             InventoryFolderBase root = m_Scene.InventoryService.GetRootFolder(client.AgentId);
             InventoryCollection content = m_Scene.InventoryService.GetFolderContent(client.AgentId, root.ID);
 
@@ -478,7 +482,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
             InventoryFolderBase root = m_Scene.InventoryService.GetRootFolder(client.AgentId);
             if (root != null)
             {
-                m_log.DebugFormat("[HG INVENTORY ACCESS MODULE]: Changing root inventory for user {0}", client.Name);
+                m_logger?.LogDebug("[HG INVENTORY ACCESS MODULE]: Changing root inventory for user {0}", client.Name);
                 InventoryCollection content = m_Scene.InventoryService.GetFolderContent(client.AgentId, root.ID);
 
                 List<InventoryFolderBase> keep = new List<InventoryFolderBase>();

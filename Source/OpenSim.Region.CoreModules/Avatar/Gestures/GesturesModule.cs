@@ -25,26 +25,30 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
-using OpenSim.Framework;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
+using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Gestures
 {
     public class GesturesModule : INonSharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected Scene m_scene;
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GesturesModule>>();
         }
 
         public void AddRegion(Scene scene)
@@ -89,7 +93,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Gestures
                 invService.UpdateItem(item);
             }
             else
-                m_log.WarnFormat(
+                m_logger?.LogWarning(
                     "[GESTURES]: Unable to find gesture {0} to activate for {1}", gestureId, client.Name);
         }
 
@@ -104,7 +108,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Gestures
                 invService.UpdateItem(item);
             }
             else
-                m_log.ErrorFormat(
+                m_logger?.LogError(
                     "[GESTURES]: Unable to find gesture to deactivate {0} for {1}", gestureId, client.Name);
         }
     }

@@ -25,25 +25,30 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenMetaverse;
-using Nini.Config;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
-using System.Reflection;
-using log4net;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.BakedTextures
 {
     public class XBakesModule : INonSharedRegionModule, IBakedTextureModule
     {
         protected Scene m_Scene;
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
         private UTF8Encoding enc = new UTF8Encoding();
         private string m_URL = String.Empty;
         private static XmlSerializer m_serializer = new XmlSerializer(typeof(AssetBase));
@@ -53,6 +58,8 @@ namespace OpenSim.Region.CoreModules.Avatar.BakedTextures
 
         public void Initialise(IConfiguration configSource)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<XBakesModule>>();
+
             IConfig config = configSource.Configs["XBakes"];
             if (config == null)
                 return;
@@ -160,7 +167,7 @@ namespace OpenSim.Region.CoreModules.Avatar.BakedTextures
                                     sr.ReadEndElement();
                                 }
                             }
-                            m_log.DebugFormat("[XBakes]: read {0} textures for user {1}",ret.Count,id);
+                            m_logger.LogDebug("[XBakes]: read {0} textures for user {1}",ret.Count,id);
                         }
                         return ret.ToArray();
                     }
@@ -238,7 +245,7 @@ namespace OpenSim.Region.CoreModules.Avatar.BakedTextures
                     {
                         rc.AddResourcePath("bakes/" + agentId.ToString());
                         rc.POSTRequest(uploadData, m_Auth);
-                        m_log.DebugFormat("[XBakes]: stored {0} textures for user {1}", numberWears, agentId);
+                        m_logger.LogDebug("[XBakes]: stored {0} textures for user {1}", numberWears, agentId);
                     }
                     uploadData = null;
                 }, null, "XBakesModule.Store"

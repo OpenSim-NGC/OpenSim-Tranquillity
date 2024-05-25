@@ -25,23 +25,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Timers;
-using log4net;
-using Nini.Config;
 
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Data;
 using OpenSim.Framework;
-using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Groups
 {
     public class GroupsService : GroupsServiceBase
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         public const GroupPowers DefaultEveryonePowers =
             GroupPowers.AllowSetHome |
@@ -108,6 +109,7 @@ namespace OpenSim.Groups
         public GroupsService(IConfiguration config, string configName)
             : base(config, configName)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GroupsService>>();
         }
 
         public GroupsService(IConfiguration config)
@@ -186,7 +188,7 @@ namespace OpenSim.Groups
             // Check perms
             if (!HasPower(RequestingAgentID, groupID, GroupPowers.ChangeActions))
             {
-                m_log.DebugFormat("[Groups]: ({0}) Attempt at updating group {1} denied because of lack of permission", RequestingAgentID, groupID);
+                m_logger.LogDebug("[Groups]: ({0}) Attempt at updating group {1} denied because of lack of permission", RequestingAgentID, groupID);
                 return;
             }
 
@@ -241,7 +243,7 @@ namespace OpenSim.Groups
                         g.groupName = d.Data["Name"];
                     else
                     {
-                        m_log.DebugFormat("[Groups]: Key Name not found");
+                        m_logger.LogDebug("[Groups]: Key Name not found");
                         continue;
                     }
 
@@ -352,7 +354,7 @@ namespace OpenSim.Groups
             // check that the requesting agent has permissions to add role
             if (!HasPower(RequestingAgentID, groupID, GroupPowers.CreateRole))
             {
-                m_log.DebugFormat("[Groups]: ({0}) Attempt at creating role in group {1} denied because of lack of permission", RequestingAgentID, groupID);
+                m_logger.LogDebug("[Groups]: ({0}) Attempt at creating role in group {1} denied because of lack of permission", RequestingAgentID, groupID);
                 reason = "Insufficient permission to create role";
                 return false;
             }
@@ -366,7 +368,7 @@ namespace OpenSim.Groups
             // check perms
             if (!HasPower(RequestingAgentID, groupID, GroupPowers.ChangeActions))
             {
-                m_log.DebugFormat("[Groups]: ({0}) Attempt at changing role in group {1} denied because of lack of permission", RequestingAgentID, groupID);
+                m_logger.LogDebug("[Groups]: ({0}) Attempt at changing role in group {1} denied because of lack of permission", RequestingAgentID, groupID);
                 return false;
             }
 
@@ -378,27 +380,27 @@ namespace OpenSim.Groups
             // check perms
             if (!HasPower(RequestingAgentID, groupID, GroupPowers.DeleteRole))
             {
-                m_log.DebugFormat("[Groups]: ({0}) Attempt at deleting role from group {1} denied because of lack of permission", RequestingAgentID, groupID);
+                m_logger.LogDebug("[Groups]: ({0}) Attempt at deleting role from group {1} denied because of lack of permission", RequestingAgentID, groupID);
                 return;
             }
 
             // Can't delete Everyone and Owners roles
             if (roleID.IsZero())
             {
-                m_log.DebugFormat("[Groups]: Attempt at deleting Everyone role from group {0} denied", groupID);
+                m_logger.LogDebug("[Groups]: Attempt at deleting Everyone role from group {0} denied", groupID);
                 return;
             }
 
             GroupData group = m_Database.RetrieveGroup(groupID);
             if (group == null)
             {
-                m_log.DebugFormat("[Groups]: Attempt at deleting role from non-existing group {0}", groupID);
+                m_logger.LogDebug("[Groups]: Attempt at deleting role from non-existing group {0}", groupID);
                 return;
             }
 
             if (roleID == new UUID(group.Data["OwnerRoleID"]))
             {
-                m_log.DebugFormat("[Groups]: Attempt at deleting Owners role from group {0} denied", groupID);
+                m_logger.LogDebug("[Groups]: Attempt at deleting Owners role from group {0} denied", groupID);
                 return;
             }
 
@@ -453,7 +455,7 @@ namespace OpenSim.Groups
             // Check permission to invite
             if (!HasPower(RequestingAgentID, groupID, GroupPowers.Invite))
             {
-                m_log.DebugFormat("[Groups]: ({0}) Attempt at inviting to group {1} denied because of lack of permission", RequestingAgentID, groupID);
+                m_logger.LogDebug("[Groups]: ({0}) Attempt at inviting to group {1} denied because of lack of permission", RequestingAgentID, groupID);
                 return false;
             }
 
@@ -503,7 +505,7 @@ namespace OpenSim.Groups
             bool unlimited = HasPower(RequestingAgentID, GroupID, GroupPowers.AssignMember) || IsOwner(RequestingAgentID, GroupID);
             if (!limited && !unlimited)
             {
-                m_log.DebugFormat("[Groups]: ({0}) Attempt at assigning {1} to role {2} denied because of lack of permission", RequestingAgentID, AgentID, RoleID);
+                m_logger.LogDebug("[Groups]: ({0}) Attempt at assigning {1} to role {2} denied because of lack of permission", RequestingAgentID, AgentID, RoleID);
                 return false;
             }
 
@@ -514,7 +516,7 @@ namespace OpenSim.Groups
                 RoleMembershipData rolemembership = m_Database.RetrieveRoleMember(GroupID, RoleID, RequestingAgentID);
                 if (rolemembership == null)
                 {
-                    m_log.DebugFormat("[Groups]: ({0}) Attempt at assigning {1} to role {2} denied because of limited permission", RequestingAgentID, AgentID, RoleID);
+                    m_logger.LogDebug("[Groups]: ({0}) Attempt at assigning {1} to role {2} denied because of limited permission", RequestingAgentID, AgentID, RoleID);
                     return false;
                 }
             }
@@ -535,7 +537,7 @@ namespace OpenSim.Groups
             bool unlimited = HasPower(RequestingAgentID, GroupID, GroupPowers.AssignMember) || IsOwner(RequestingAgentID, GroupID);
             if (!limited && !unlimited)
             {
-                m_log.DebugFormat("[Groups]: ({0}) Attempt at removing {1} from role {2} denied because of lack of permission", RequestingAgentID, AgentID, RoleID);
+                m_logger.LogDebug("[Groups]: ({0}) Attempt at removing {1} from role {2} denied because of lack of permission", RequestingAgentID, AgentID, RoleID);
                 return false;
             }
 
@@ -546,7 +548,7 @@ namespace OpenSim.Groups
                 RoleMembershipData rolemembership = m_Database.RetrieveRoleMember(GroupID, RoleID, RequestingAgentID);
                 if (rolemembership == null)
                 {
-                    m_log.DebugFormat("[Groups]: ({0}) Attempt at removing {1} from role {2} denied because of limited permission", RequestingAgentID, AgentID, RoleID);
+                    m_logger.LogDebug("[Groups]: ({0}) Attempt at removing {1} from role {2} denied because of limited permission", RequestingAgentID, AgentID, RoleID);
                     return false;
                 }
             }
@@ -695,7 +697,7 @@ namespace OpenSim.Groups
                 if (gmember != null)
                 {
                     memberships.Add(gmember);
-                    //m_log.DebugFormat("[XXX]: Member of {0} as {1}", gmember.GroupName, gmember.GroupTitle);
+                    //m_logger.LogDebug("[XXX]: Member of {0} as {1}", gmember.GroupName, gmember.GroupTitle);
                     //Util.PrintCallStack();
                 }
             }
@@ -733,7 +735,7 @@ namespace OpenSim.Groups
             // Check perms
             if (!HasPower(RequestingAgentID, groupID, GroupPowers.SendNotices))
             {
-                m_log.DebugFormat("[Groups]: ({0}) Attempt at sending notice to group {1} denied because of lack of permission", RequestingAgentID, groupID);
+                m_logger.LogDebug("[Groups]: ({0}) Attempt at sending notice to group {1} denied because of lack of permission", RequestingAgentID, groupID);
                 return false;
             }
 
@@ -854,13 +856,13 @@ namespace OpenSim.Groups
 
             if (add && data != null) // it already exists, can't create
             {
-                m_log.DebugFormat("[Groups]: Group {0} already exists. Can't create it again", groupID);
+                m_logger.LogDebug("[Groups]: Group {0} already exists. Can't create it again", groupID);
                 return false;
             }
 
             if (!add && data == null) // it doesn't exist, can't update
             {
-                m_log.DebugFormat("[Groups]: Group {0} doesn't exist. Can't update it", groupID);
+                m_logger.LogDebug("[Groups]: Group {0} doesn't exist. Can't update it", groupID);
                 return false;
             }
 
@@ -899,7 +901,7 @@ namespace OpenSim.Groups
             MembershipData membership = m_Database.RetrieveMember(GroupID, AgentID);
             if (membership == null)
             {
-                m_log.DebugFormat("[Groups]: ({0}) No such member {0} in group {1}", AgentID, GroupID);
+                m_logger.LogDebug("[Groups]: ({0}) No such member {0} in group {1}", AgentID, GroupID);
                 return;
             }
 

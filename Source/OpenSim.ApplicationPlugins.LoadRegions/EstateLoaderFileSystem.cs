@@ -25,18 +25,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework;
+
+using OpenMetaverse;
+
+using Nini.Config;
+using OpenSim.Server.Base;
 
 namespace OpenSim.ApplicationPlugins.LoadRegions
 {
     public class EstateLoaderFileSystem : IEstateLoader
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private IConfiguration m_configSource;
 
@@ -44,6 +48,8 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
 
         public EstateLoaderFileSystem(IOpenSimBase openSim)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EstateLoaderFileSystem>>();
+
             m_application = openSim;
         }
 
@@ -74,7 +80,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
             }
             catch
             {
-                m_log.Error("[ESTATE LOADER FILE SYSTEM]: could not open " + estateConfigPath);
+                m_logger.LogError("[ESTATE LOADER FILE SYSTEM]: could not open " + estateConfigPath);
                 return;
             }
 
@@ -82,7 +88,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
             if (iniFiles == null || iniFiles.Length == 0)
                 return;
 
-            m_log.InfoFormat("[ESTATE LOADER FILE SYSTEM]: Loading estate config files from {0}", estateConfigPath);
+            m_logger.LogInformation("[ESTATE LOADER FILE SYSTEM]: Loading estate config files from {0}", estateConfigPath);
 
             List<int> existingEstates;
 
@@ -90,7 +96,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
 
             foreach (string file in iniFiles)
             {
-                m_log.InfoFormat("[ESTATE LOADER FILE SYSTEM]: Loading config file {0}", file);
+                m_logger.LogInformation("[ESTATE LOADER FILE SYSTEM]: Loading config file {0}", file);
 
                 IConfiguration source = null;
                 try
@@ -99,7 +105,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
                 }
                 catch
                 {
-                    m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: failed to parse file {0}", file);
+                    m_logger.LogWarning("[ESTATE LOADER FILE SYSTEM]: failed to parse file {0}", file);
                 }
 
                 if(source == null)
@@ -114,7 +120,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
 
                     if (estateName.Length > 64) // need check this and if utf8 is valid
                     {
-                        m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: Estate name {0} is too large, ignoring", estateName);
+                        m_logger.LogWarning("[ESTATE LOADER FILE SYSTEM]: Estate name {0} is too large, ignoring", estateName);
                         continue;
                     }
 
@@ -141,13 +147,13 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
                         if (EstateID < 100)
                         {
                             // EstateID Cannot be less than 100
-                            m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: Estate name {0} specified estateID that is less that 100, ignoring", estateName);
+                            m_logger.LogWarning("[ESTATE LOADER FILE SYSTEM]: Estate name {0} specified estateID that is less that 100, ignoring", estateName);
                             continue;
                         }
                         else if(existingEstateIDs.Contains(EstateID))
                         {
                             // Specified EstateID Exists
-                            m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: Estate name {0} specified estateID that is already in use, ignoring", estateName);
+                            m_logger.LogWarning("[ESTATE LOADER FILE SYSTEM]: Estate name {0} specified estateID that is already in use, ignoring", estateName);
                             continue;
                         }
                     }
@@ -161,7 +167,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
                     // Persistence does not seem to effect the need to save a new estate
                     m_application.EstateDataService.StoreEstateSettings(estateSettings);
 
-                    m_log.InfoFormat("[ESTATE LOADER FILE SYSTEM]: Loaded config for estate {0}", estateName);
+                    m_logger.LogInformation("[ESTATE LOADER FILE SYSTEM]: Loaded config for estate {0}", estateName);
                 }
             }
         }

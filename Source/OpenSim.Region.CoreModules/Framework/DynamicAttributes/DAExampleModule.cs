@@ -25,19 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Framework.DynamicAttributes
 {
     public class DAExampleModule : INonSharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private readonly bool ENABLED = false;   // enable for testing
 
@@ -50,7 +54,10 @@ namespace OpenSim.Region.CoreModules.Framework.DynamicAttributes
         public string Name { get { return "DAExample Module"; } }
         public Type ReplaceableInterface { get { return null; } }
 
-        public void Initialise(IConfiguration source) {}
+        public void Initialise(IConfiguration source)
+        {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DAExampleModule>>();
+        }
 
         public void AddRegion(Scene scene)
         {
@@ -60,7 +67,7 @@ namespace OpenSim.Region.CoreModules.Framework.DynamicAttributes
                 m_scene.EventManager.OnSceneGroupMove += OnSceneGroupMove;
                 m_dialogMod = m_scene.RequestModuleInterface<IDialogModule>();
 
-                m_log.DebugFormat("[DA EXAMPLE MODULE]: Added region {0}", m_scene.Name);
+                m_logger?.LogDebug("[DA EXAMPLE MODULE]: Added region {0}", m_scene.Name);
             }
         }
 
@@ -108,7 +115,7 @@ namespace OpenSim.Region.CoreModules.Framework.DynamicAttributes
             sop.ParentGroup.HasGroupChanged = true;
 
             string msg = string.Format("{0} {1} moved {2} times", sop.Name, sop.UUID, newValue);
-            m_log.DebugFormat("[DA EXAMPLE MODULE]: {0}", msg);
+            m_logger?.LogDebug("[DA EXAMPLE MODULE]: {0}", msg);
             m_dialogMod.SendGeneralAlert(msg);
 
             return true;

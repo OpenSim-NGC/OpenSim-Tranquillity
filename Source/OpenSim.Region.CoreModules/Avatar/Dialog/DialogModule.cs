@@ -25,24 +25,29 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
-using OpenSim.Framework;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
+using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Dialog
 {
     public class DialogModule : IDialogModule, INonSharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         protected Scene m_scene;
 
-        public void Initialise(IConfiguration source) { }
+        public void Initialise(IConfiguration source) {
+                m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DialogModule>>();
+        }
 
         public Type ReplaceableInterface { get { return null; } }
 
@@ -210,7 +215,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Dialog
             if (cmdparams[0].ToLower().Equals("alert"))
             {
                 message = CombineParams(cmdparams, 1);
-                m_log.InfoFormat("[DIALOG]: Sending general alert in region {0} with message {1}",
+                m_logger.LogInformation("[DIALOG]: Sending general alert in region {0} with message {1}",
                         m_scene.RegionInfo.RegionName, message);
                 SendGeneralAlert(message);
             }
@@ -219,7 +224,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Dialog
                 string firstName = cmdparams[1];
                 string lastName = cmdparams[2];
                 message = CombineParams(cmdparams, 3);
-                m_log.InfoFormat("[DIALOG]: Sending alert in region {0} to {1} {2} with message {3}",
+                m_logger.LogInformation("[DIALOG]: Sending alert in region {0} to {1} {2} with message {3}",
                         m_scene.RegionInfo.RegionName, firstName, lastName,
                         message);
                 SendAlertToUser(firstName, lastName, message, false);

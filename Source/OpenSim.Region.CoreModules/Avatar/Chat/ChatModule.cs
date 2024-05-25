@@ -25,21 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Chat
 {
     public class ChatModule : ISharedRegionModule
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         protected const int DEBUG_CHANNEL = 2147483647;
 
@@ -57,9 +59,12 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat
         protected string m_adminPrefix = "";
         protected object m_syncy = new object();
         protected IConfig m_config;
+
         #region ISharedRegionModule Members
         public virtual void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<ChatModule>>();
+
             m_config = config.Configs["Chat"];
 
             if (m_config != null)
@@ -98,7 +103,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat
                 }
             }
 
-            m_log.InfoFormat("[CHAT]: Initialized for {0} w:{1} s:{2} S:{3}", scene.RegionInfo.RegionName,
+            m_logger.LogInformation("[CHAT]: Initialized for {0} w:{1} s:{2} S:{3}", scene.RegionInfo.RegionName,
                              m_whisperdistance, m_saydistance, m_shoutdistance);
         }
 
@@ -170,7 +175,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat
             // sanity check:
             if (c.Sender == null)
             {
-                m_log.ErrorFormat("[CHAT]: OnChatFromClient from {0} has empty Sender field!", sender);
+                m_logger.LogError("[CHAT]: OnChatFromClient from {0} has empty Sender field!", sender);
                 return;
             }
 
@@ -212,7 +217,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat
 
             if(!m_scenes.Contains(scene))
             {
-                m_log.WarnFormat("[CHAT]: message from unkown scene {0} ignored",
+                m_logger.LogWarning("[CHAT]: message from unkown scene {0} ignored",
                                      scene.RegionInfo.RegionName);
                 return;
             }

@@ -27,20 +27,24 @@
 using System.Globalization;
 using System.Reflection;
 
-using OpenMetaverse;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Profile
 {
     public class BasicProfileModule : IProfileModule, ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         //
         // Module vars
@@ -52,10 +56,11 @@ namespace OpenSim.Region.CoreModules.Avatar.Profile
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<BasicProfileModule>>();
             if(config.Configs["UserProfiles"] != null)
                 return;
 
-            m_log.DebugFormat("[PROFILE MODULE]: Basic Profile Module enabled");
+            m_logger?.LogDebug("[PROFILE MODULE]: Basic Profile Module enabled");
             m_Enabled = true;
         }
 

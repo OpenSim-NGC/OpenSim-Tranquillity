@@ -24,20 +24,24 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 {
     public class InstantMessageModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <value>
         /// Is this module enabled?
@@ -52,6 +56,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 
         public virtual void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<InstantMessageModule>>();
             if (config.Configs["Messaging"] != null)
             {
                 if (config.Configs["Messaging"].GetString(
@@ -83,7 +88,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 
                 if (m_TransferModule == null)
                 {
-                    m_log.Error("[INSTANT MESSAGE]: No message transfer module, IM will not work!");
+                    m_logger?.LogError("[INSTANT MESSAGE]: No message transfer module, IM will not work!");
                     scene.EventManager.OnNewClient -= OnClientConnect;
                     scene.EventManager.OnIncomingInstantMessage -= OnGridInstantMessage;
 

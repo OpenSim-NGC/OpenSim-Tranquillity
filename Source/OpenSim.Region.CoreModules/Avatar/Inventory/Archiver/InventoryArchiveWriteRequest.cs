@@ -25,32 +25,31 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
-using System.Reflection;
 using System.Xml;
-using log4net;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
-using OpenSim.Framework.Monitoring;
+using PermissionMask = OpenSim.Framework.PermissionMask;
 using OpenSim.Framework.Serialization;
 using OpenSim.Framework.Serialization.External;
 using OpenSim.Region.CoreModules.World.Archiver;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
-using Ionic.Zlib;
+using OpenSim.Server.Base;
+
 using GZipStream = Ionic.Zlib.GZipStream;
 using CompressionMode = Ionic.Zlib.CompressionMode;
 using CompressionLevel = Ionic.Zlib.CompressionLevel;
-using PermissionMask = OpenSim.Framework.PermissionMask;
+
+using OpenMetaverse;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 {
     public class InventoryArchiveWriteRequest
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <summary>
         /// Determine whether this archive will save assets.  Default is true.
@@ -127,6 +126,8 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
             UUID id, InventoryArchiverModule module, Scene scene,
             UserAccount userInfo, string invPath, Stream saveStream)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<InventoryArchiveWriteRequest>>();
+
             m_id = id;
             m_module = module;
             m_scene = scene;
@@ -177,7 +178,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                 {
                     if (options.ContainsKey("verbose"))
                     {
-                        m_log.InfoFormat(
+                        m_logger?.LogInformation(
                             "[INVENTORY ARCHIVER]: Skipping inventory item {0} {1} at {2}",
                             inventoryItem.Name, inventoryItem.ID, path);
                     }
@@ -191,7 +192,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
             // Check For Permissions Filter Flags
             if (!CanUserArchiveObject(m_userInfo.PrincipalID, inventoryItem))
             {
-                m_log.InfoFormat(
+                m_logger?.LogInformation(
                             "[INVENTORY ARCHIVER]: Insufficient permissions, skipping inventory item {0} {1} at {2}",
                             inventoryItem.Name, inventoryItem.ID, path);
 
@@ -202,7 +203,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
             }
 
             if (options.ContainsKey("verbose"))
-                m_log.InfoFormat(
+                m_logger?.LogInformation(
                     "[INVENTORY ARCHIVER]: Saving item {0} {1} (asset UUID {2})",
                     inventoryItem.ID, inventoryItem.Name, inventoryItem.AssetID);
 
@@ -240,14 +241,14 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 
                     if(curErrorCntr > 0)
                     {
-                        m_log.ErrorFormat("[INVENTORY ARCHIVER Warning]: item {0} '{1}', type {2}, in '{3}', contains {4} references to  missing or damaged assets",
+                        m_logger?.LogError("[INVENTORY ARCHIVER Warning]: item {0} '{1}', type {2}, in '{3}', contains {4} references to  missing or damaged assets",
                             inventoryItem.ID, inventoryItem.Name, itemAssetType.ToString(), spath, curErrorCntr);
                         if(possible > 0)
-                            m_log.WarnFormat("[INVENTORY ARCHIVER Warning]: item also contains {0} references that may be to missing or damaged assets or not a problem", possible);
+                            m_logger?.LogWarning("[INVENTORY ARCHIVER Warning]: item also contains {0} references that may be to missing or damaged assets or not a problem", possible);
                     }
                     else if(possible > 0)
                     {
-                        m_log.WarnFormat("[INVENTORY ARCHIVER Warning]: item {0} '{1}', type {2}, in '{3}', contains {4} references that may be to missing or damaged assets or not a problem", inventoryItem.ID, inventoryItem.Name, itemAssetType.ToString(), spath, possible);
+                        m_logger?.LogWarning("[INVENTORY ARCHIVER Warning]: item {0} '{1}', type {2}, in '{3}', contains {4} references that may be to missing or damaged assets or not a problem", inventoryItem.ID, inventoryItem.Name, itemAssetType.ToString(), spath, possible);
                     }
                 }
             }
@@ -272,7 +273,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                 {
                     if (options.ContainsKey("verbose"))
                     {
-                        m_log.InfoFormat(
+                        m_logger?.LogInformation(
                             "[INVENTORY ARCHIVER]: Skipping folder {0} at {1}",
                             inventoryFolder.Name, path);
                     }
@@ -281,7 +282,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
             }
 
             if (options.ContainsKey("verbose"))
-                m_log.InfoFormat("[INVENTORY ARCHIVER]: Saving folder {0}", inventoryFolder.Name);
+                m_logger?.LogInformation("[INVENTORY ARCHIVER]: Saving folder {0}", inventoryFolder.Name);
 
             if (saveThisFolderItself)
             {
@@ -417,7 +418,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 
                 m_archiveWriter = new TarArchiveWriter(m_saveStream);
 
-                m_log.InfoFormat("[INVENTORY ARCHIVER]: Adding control file to archive.");
+                m_logger?.LogInformation("[INVENTORY ARCHIVER]: Adding control file to archive.");
 
                 // Write out control file.  This has to be done first so that subsequent loaders will see this file first
                 // XXX: I know this is a weak way of doing it since external non-OAR aware tar executables will not do this
@@ -426,7 +427,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 
                 if (inventoryFolder != null)
                 {
-                    m_log.DebugFormat(
+                    m_logger?.LogDebug(
                         "[INVENTORY ARCHIVER]: Found folder {0} {1} at {2}",
                         inventoryFolder.Name,
                         inventoryFolder.ID,
@@ -437,7 +438,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                 }
                 else if (inventoryItem != null)
                 {
-                    m_log.DebugFormat(
+                    m_logger?.LogDebug(
                         "[INVENTORY ARCHIVER]: Found item {0} {1} at {2}",
                         inventoryItem.Name, inventoryItem.ID, m_invPath);
 
@@ -453,10 +454,10 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 
                     int errors = m_assetGatherer.FailedUUIDs.Count;
 
-                    m_log.DebugFormat(
+                    m_logger?.LogDebug(
                         "[INVENTORY ARCHIVER]: The items to save reference {0} possible assets", m_assetGatherer.GatheredUuids.Count + errors);
                     if(errors > 0)
-                        m_log.DebugFormat("[INVENTORY ARCHIVER]: {0} of these have problems or are not assets and will be ignored", errors);
+                        m_logger?.LogDebug("[INVENTORY ARCHIVER]: {0} of these have problems or are not assets and will be ignored", errors);
 
                     AssetsRequest ar = new AssetsRequest(
                             new AssetsArchiver(m_archiveWriter),
@@ -468,7 +469,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                 }
                 else
                 {
-                    m_log.DebugFormat("[INVENTORY ARCHIVER]: Not saving assets since --noassets was specified");
+                    m_logger?.LogDebug("[INVENTORY ARCHIVER]: Not saving assets since --noassets was specified");
 
                     ReceivedAllAssets(new List<UUID>(), new List<UUID>(), false);
                 }
@@ -485,7 +486,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
         /// </summary>
         protected void SaveUsers()
         {
-            m_log.InfoFormat("[INVENTORY ARCHIVER]: Saving user information for {0} users", m_userUuids.Count);
+            m_logger?.LogInformation("[INVENTORY ARCHIVER]: Saving user information for {0} users", m_userUuids.Count);
 
             foreach (UUID creatorId in m_userUuids.Keys)
             {
@@ -500,7 +501,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                 }
                 else
                 {
-                    m_log.WarnFormat("[INVENTORY ARCHIVER]: Failed to get creator profile for {0}", creatorId);
+                    m_logger?.LogWarning("[INVENTORY ARCHIVER]: Failed to get creator profile for {0}", creatorId);
                 }
             }
         }
@@ -583,7 +584,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                 minorVersion = 3;
             }
 
-            m_log.InfoFormat("[INVENTORY ARCHIVER]: Creating version {0}.{1} IAR", majorVersion, minorVersion);
+            m_logger?.LogInformation("[INVENTORY ARCHIVER]: Creating version {0}.{1} IAR", majorVersion, minorVersion);
 
             StringWriter sw = new StringWriter();
             XmlTextWriter xtw = new XmlTextWriter(sw);

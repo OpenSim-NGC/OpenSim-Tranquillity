@@ -25,22 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
-using System.Reflection;
 using System.Text;
-using System.Threading;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
-using OpenMetaverse.Imaging;
-using CSJ2K;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+
+using OpenMetaverse;
+using OpenMetaverse.Imaging;
+
+using CSJ2K;
+using Nini.Config;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.CoreModules.Agent.TextureSender
 {
@@ -48,7 +49,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
 
     public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         /// <summary>Temporarily holds deserialized layer data information in memory</summary>
         private readonly ExpiringCache<UUID, OpenJPEG.J2KLayerInfo[]> m_decodedCache = new ExpiringCache<UUID,OpenJPEG.J2KLayerInfo[]>();
@@ -78,6 +79,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
 
         public J2KDecoderModule()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<J2KDecoderModule>>();
         }
 
         public void Initialise(IConfiguration source)
@@ -135,7 +137,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
             // If it's cached, return the cached results
             if (m_decodedCache.TryGetValue(assetID, out result))
             {
-//                m_log.DebugFormat(
+//                m_logger.LogDebug(
 //                    "[J2KDecoderModule]: Returning existing cached {0} layers j2k decode for {1}",
 //                    result.Length, assetID);
 
@@ -212,7 +214,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
         /// <returns>true if decode was successful.  false otherwise.</returns>
         private bool DoJ2KDecode(UUID assetID, byte[] j2kData, out OpenJPEG.J2KLayerInfo[] layers, out int components)
         {
-//            m_log.DebugFormat(
+//            m_logger.LogDebug(
 //                "[J2KDecoderModule]: Doing J2K decoding of {0} bytes for asset {1}", j2kData.Length, assetID);
 
             bool decodedSuccessfully = true;
@@ -259,7 +261,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
                     }
                     catch (Exception ex)
                     {
-                        m_log.Warn("[J2KDecoderModule]: CSJ2K threw an exception decoding texture " + assetID + ": " + ex.Message);
+                        m_logger.LogWarning("[J2KDecoderModule]: CSJ2K threw an exception decoding texture " + assetID + ": " + ex.Message);
                         decodedSuccessfully = false;
                     }
                 }
@@ -267,14 +269,14 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
                 {
                     if (!OpenJPEG.DecodeLayerBoundaries(j2kData, out layers, out components))
                     {
-                        m_log.Warn("[J2KDecoderModule]: OpenJPEG failed to decode texture " + assetID);
+                        m_logger.LogWarning("[J2KDecoderModule]: OpenJPEG failed to decode texture " + assetID);
                         decodedSuccessfully = false;
                     }
                 }
 
                 if (layers == null || layers.Length == 0)
                 {
-                    m_log.Warn("[J2KDecoderModule]: Failed to decode layer data for texture " + assetID + ", guessing sane defaults");
+                    m_logger.LogWarning("[J2KDecoderModule]: Failed to decode layer data for texture " + assetID + ", guessing sane defaults");
                     // Layer decoding completely failed. Guess at sane defaults for the layer boundaries
                     layers = CreateDefaultLayers(j2kData.Length);
                     decodedSuccessfully = false;
@@ -379,7 +381,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
 
                     if (lines.Length == 0)
                     {
-                        m_log.Warn("[J2KDecodeCache]: Expiring corrupted layer data (empty) " + assetName);
+                        m_logger.LogWarning("[J2KDecodeCache]: Expiring corrupted layer data (empty) " + assetName);
                         Cache.Expire(assetName);
                         return false;
                     }
@@ -400,7 +402,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
                             }
                             catch (FormatException)
                             {
-                                m_log.Warn("[J2KDecodeCache]: Expiring corrupted layer data (format) " + assetName);
+                                m_logger.LogWarning("[J2KDecodeCache]: Expiring corrupted layer data (format) " + assetName);
                                 Cache.Expire(assetName);
                                 return false;
                             }
@@ -411,7 +413,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
                         }
                         else
                         {
-                            m_log.Warn("[J2KDecodeCache]: Expiring corrupted layer data (layout) " + assetName);
+                            m_logger.LogWarning("[J2KDecodeCache]: Expiring corrupted layer data (layout) " + assetName);
                             Cache.Expire(assetName);
                             return false;
                         }

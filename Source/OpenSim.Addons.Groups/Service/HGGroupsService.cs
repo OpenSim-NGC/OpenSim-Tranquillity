@@ -25,23 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Timers;
-using log4net;
-using Nini.Config;
 
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Data;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
+
+using OpenMetaverse;
+
+using Nini.Config;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Groups
 {
     public class HGGroupsService : GroupsService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private IOfflineIMService m_OfflineIM;
         private IUserAccountService m_UserAccounts;
@@ -50,6 +52,8 @@ namespace OpenSim.Groups
         public HGGroupsService(IConfiguration config, IOfflineIMService im, IUserAccountService users, string homeURI)
             : base(config, string.Empty)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HGGroupsService>>();
+
             m_OfflineIM = im;
             m_UserAccounts = users;
             m_HomeURI = homeURI;
@@ -143,13 +147,13 @@ namespace OpenSim.Groups
                 }
                 else
                 {
-                    m_log.DebugFormat("[Groups.HGGroupsService]: access token {0} did not match stored one {1}", token, membership.Data["AccessToken"]);
+                    m_logger.LogDebug("[Groups.HGGroupsService]: access token {0} did not match stored one {1}", token, membership.Data["AccessToken"]);
                     return false;
                 }
             }
             else
             {
-                m_log.DebugFormat("[Groups.HGGroupsService]: membership not found for {0}", AgentID);
+                m_logger.LogDebug("[Groups.HGGroupsService]: membership not found for {0}", AgentID);
                 return false;
             }
         }
@@ -229,21 +233,21 @@ namespace OpenSim.Groups
             ExtendedGroupRecord grec = GetGroupRecord(RequestingAgentID, groupID);
             if (grec == null)
             {
-                m_log.DebugFormat("[Groups.HGGroupsService]: attempt at adding notice to non-existent group proxy");
+                m_logger.LogDebug("[Groups.HGGroupsService]: attempt at adding notice to non-existent group proxy");
                 return false;
             }
 
             // check that the group is remote
             if (grec.ServiceLocation.Length == 0)
             {
-                m_log.DebugFormat("[Groups.HGGroupsService]: attempt at adding notice to local (non-proxy) group");
+                m_logger.LogDebug("[Groups.HGGroupsService]: attempt at adding notice to local (non-proxy) group");
                 return false;
             }
 
             // check that there isn't already a notice with the same ID
             if (GetGroupNotice(RequestingAgentID, noticeID) != null)
             {
-                m_log.DebugFormat("[Groups.HGGroupsService]: a notice with the same ID already exists", grec.ServiceLocation);
+                m_logger.LogDebug("[Groups.HGGroupsService]: a notice with the same ID already exists", grec.ServiceLocation);
                 return false;
             }
 
@@ -255,7 +259,7 @@ namespace OpenSim.Groups
             //GroupsServiceHGConnector c = new GroupsServiceHGConnector(grec.ServiceLocation);
             //if (!c.VerifyNotice(noticeID, groupID))
             //{
-            //    m_log.DebugFormat("[Groups.HGGroupsService]: notice does not exist at origin {0}", grec.ServiceLocation);
+            //    m_logger.LogDebug("[Groups.HGGroupsService]: notice does not exist at origin {0}", grec.ServiceLocation);
             //    return false;
             //}
 
@@ -350,10 +354,10 @@ namespace OpenSim.Groups
                 if (token != string.Empty && token.Equals(membership.Data["AccessToken"]))
                     return true;
                 else
-                    m_log.DebugFormat("[Groups.HGGroupsService]: access token {0} did not match stored one {1}", token, membership.Data["AccessToken"]);
+                    m_logger.LogDebug("[Groups.HGGroupsService]: access token {0} did not match stored one {1}", token, membership.Data["AccessToken"]);
             }
             else
-                m_log.DebugFormat("[Groups.HGGroupsService]: membership not found for {0}", agentID);
+                m_logger.LogDebug("[Groups.HGGroupsService]: membership not found for {0}", agentID);
 
             return false;
         }

@@ -24,22 +24,25 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 {
     public class PresenceModule : ISharedRegionModule, IPresenceModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
 #pragma warning disable 0067
         public event PresenceChange OnPresenceChange;
@@ -66,6 +69,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PresenceModule>>();
         }
 
         public void AddRegion(Scene scene)
@@ -119,7 +123,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
                 return;
 
             IClientAPI client = (IClientAPI)sender;
-            m_log.DebugFormat("[PRESENCE MODULE]: OnlineNotification requested by {0}", client.Name);
+            m_logger?.LogDebug("[PRESENCE MODULE]: OnlineNotification requested by {0}", client.Name);
 
             PresenceInfo[] status = PresenceService.GetAgents(args.ToArray());
 

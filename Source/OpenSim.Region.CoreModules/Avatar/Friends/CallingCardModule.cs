@@ -25,27 +25,34 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+using PermissionMask = OpenSim.Framework.PermissionMask;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
 
-using PermissionMask = OpenSim.Framework.PermissionMask;
+using OpenMetaverse;
+
+using Nini.Config;
+
 
 namespace OpenSim.Region.CoreModules.Avatar.Friends
 {
     public class CallingCardModule : ISharedRegionModule, ICallingCardModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
+
         protected List<Scene> m_Scenes = new List<Scene>();
         protected bool m_Enabled = true;
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<CallingCardModule>>();
+
             IConfig ccConfig = source.Configs["XCallingCard"];
             if (ccConfig != null)
                 m_Enabled = ccConfig.GetBoolean("Enabled", true);
@@ -186,7 +193,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends
                 folderID = folder.ID;
             }
 
-            m_log.DebugFormat("[XCALLINGCARD]: Creating calling card for {0} in inventory of {1}", info.Name, userID);
+            m_logger.LogDebug("[XCALLINGCARD]: Creating calling card for {0} in inventory of {1}", info.Name, userID);
 
             InventoryItemBase item = new InventoryItemBase();
             item.AssetID = UUID.Zero;

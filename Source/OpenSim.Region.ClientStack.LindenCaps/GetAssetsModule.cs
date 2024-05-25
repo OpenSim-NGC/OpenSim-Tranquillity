@@ -26,18 +26,20 @@
  */
 
 using System.Collections;
-using log4net.Core;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using OpenMetaverse;
+
 using OpenSim.Capabilities.Handlers;
 using OpenSim.Framework;
+using Caps = OpenSim.Framework.Capabilities.Caps;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-using Caps = OpenSim.Framework.Capabilities.Caps;
+using OpenMetaverse;
+
 
 namespace OpenSim.Region.ClientStack.Linden
 {

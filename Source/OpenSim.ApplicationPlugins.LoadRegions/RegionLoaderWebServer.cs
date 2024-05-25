@@ -25,25 +25,28 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Xml;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.ApplicationPlugins.LoadRegions
 {
     public class RegionLoaderWebServer : IRegionLoader
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private IConfiguration m_configSource;
 
         public void SetIniConfigSource(IConfiguration configSource)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RegionLoaderWebServer>>();
             m_configSource = configSource;
         }
 
@@ -54,7 +57,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
 
             if (m_configSource == null)
             {
-                m_log.Error("[WEBLOADER]: Unable to load configuration source!");
+                m_logger.LogError("[WEBLOADER]: Unable to load configuration source!");
                 return null;
             }
             else
@@ -65,7 +68,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
 
                 if (url.Length == 0)
                 {
-                    m_log.Error("[WEBLOADER]: Unable to load webserver URL - URL was empty.");
+                    m_logger?.LogError("[WEBLOADER]: Unable to load webserver URL - URL was empty.");
                     return null;
                 }
                 else
@@ -76,12 +79,12 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
                         int regionCount = 0;
                         HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(url);
                         webRequest.Timeout = 30000; //30 Second Timeout
-                        m_log.DebugFormat("[WEBLOADER]: Sending download request to {0}", url);
+                        m_logger?.LogDebug("[WEBLOADER]: Sending download request to {0}", url);
 
                         try
                         {
                             string xmlSource = String.Empty;
-                            m_log.Debug("[WEBLOADER]: Downloading region information...");
+                            m_logger?.LogDebug("[WEBLOADER]: Downloading region information...");
                             using (HttpWebResponse webResponse = (HttpWebResponse)webRequest.GetResponse())
                             using (StreamReader reader = new StreamReader(webResponse.GetResponseStream()))
                             {
@@ -92,7 +95,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
                                 }
                             }
 
-                            m_log.Debug("[WEBLOADER]: Done downloading region information from server. Total Bytes: " +
+                            m_logger?.LogDebug("[WEBLOADER]: Done downloading region information from server. Total Bytes: " +
                                         xmlSource.Length);
                             XmlDocument xmlDoc = new XmlDocument();
                             xmlDoc.LoadXml(xmlSource);
@@ -106,7 +109,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
                                     int i;
                                     for (i = 0; i < xmlDoc.FirstChild.ChildNodes.Count; i++)
                                     {
-                                        m_log.Debug(xmlDoc.FirstChild.ChildNodes[i].OuterXml);
+                                        m_logger?.LogDebug(xmlDoc.FirstChild.ChildNodes[i].OuterXml);
                                         regionInfos[i] =
                                             new RegionInfo("REGION CONFIG #" + (i + 1), xmlDoc.FirstChild.ChildNodes[i], false, m_configSource);
                                     }
@@ -127,16 +130,16 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
                         if (regionCount > 0 || allowRegionless)
                             return regionInfos;
 
-                        m_log.Debug("[WEBLOADER]: Request yielded no regions.");
+                        m_logger?.LogDebug("[WEBLOADER]: Request yielded no regions.");
                         tries--;
                         if (tries > 0)
                         {
-                            m_log.Debug("[WEBLOADER]: Retrying");
+                            m_logger?.LogDebug("[WEBLOADER]: Retrying");
                             System.Threading.Thread.Sleep(wait);
                         }
                     }
 
-                    m_log.Error("[WEBLOADER]: No region configs were available.");
+                    m_logger?.LogError("[WEBLOADER]: No region configs were available.");
                     return null;
                 }
             }

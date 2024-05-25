@@ -25,20 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Lure
 {
     public class LureModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private readonly List<Scene> m_scenes = new List<Scene>();
 
@@ -47,6 +50,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Lure
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LureModule>>();
             if (config.Configs["Messaging"] != null)
             {
                 if (config.Configs["Messaging"].GetString(
@@ -54,7 +58,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Lure
                         "LureModule")
                 {
                     m_Enabled = true;
-                    m_log.DebugFormat("[LURE MODULE]: {0} enabled", Name);
+                    m_logger?.LogDebug("[LURE MODULE]: {0} enabled", Name);
                 }
             }
         }
@@ -85,7 +89,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Lure
 
                 if (m_TransferModule == null)
                 {
-                    m_log.Error("[INSTANT MESSAGE]: No message transfer module, "+
+                    m_logger?.LogError("[INSTANT MESSAGE]: No message transfer module, "+
                     "lures will not work!");
 
                     m_Enabled = false;
@@ -166,7 +170,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Lure
                     (uint)presence.AbsolutePosition.Y,
                     (uint)presence.AbsolutePosition.Z + 2);
 
-            m_log.DebugFormat("[LURE MODULE]: TP invite with message {0}, type {1}", message, lureType);
+            m_logger?.LogDebug("[LURE MODULE]: TP invite with message {0}, type {1}", message, lureType);
 
             GridInstantMessage m;
 

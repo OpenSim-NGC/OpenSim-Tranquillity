@@ -25,26 +25,26 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Threading;
-using Nini.Config;
-using log4net;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Agent.Xfer
 {
     public class XferModule : INonSharedRegionModule, IXfer
     {
+        private static ILogger m_logger;
+
         private Scene m_scene;
         private Dictionary<string, FileData> NewFiles = new Dictionary<string, FileData>();
         private Dictionary<ulong, XferDownLoad> Transfers = new Dictionary<ulong, XferDownLoad>();
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private object  timeTickLock = new object();
         private int  lastTimeTick = 0;
@@ -70,6 +70,8 @@ namespace OpenSim.Region.CoreModules.Agent.Xfer
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<XferRequest>>();
+
             lastTimeTick = (int)Util.GetTimeStampMS() + 30000;
             lastFilesExpire = lastTimeTick + 180000;
         }
@@ -286,7 +288,7 @@ namespace OpenSim.Region.CoreModules.Agent.Xfer
                     }
                 }
                 else
-                    m_log.WarnFormat("[Xfer]: {0} not found", fileName);
+                    m_logger.LogWarning("[Xfer]: {0} not found", fileName);
             }
         }
 

@@ -25,14 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Threading;
-using OpenMetaverse;
+using Microsoft.Extensions.Logging;
 
-//using System.Reflection;
-//using log4net;
+using OpenMetaverse;
 
 namespace OpenSim.Region.ClientStack.LindenUDP
 {
@@ -63,7 +58,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             }
         }
 
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         /// <summary>Holds the actual unacked packet data, sorted by sequence number</summary>
         private SortedDictionary<uint, OutgoingPacket> m_packets = new SortedDictionary<uint, OutgoingPacket>();
@@ -202,8 +197,8 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 }
             }
 
-            // if (expiredPackets != null)
-            //     m_log.DebugFormat("[UNACKED PACKET COLLECTION]: Found {0} expired packets on timeout of {1}", expiredPackets.Count, timeoutMS);
+            if (expiredPackets != null)
+                m_logger?.LogDebug("[UNACKED PACKET COLLECTION]: Found {0} expired packets on timeout of {1}", expiredPackets.Count, timeoutMS);
 
             return expiredPackets;
         }
@@ -236,7 +231,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             // Process all the pending removes, including updating statistics and round-trip times
             while (m_pendingAcknowledgements.TryDequeue(out PendingAck pendingAcknowledgement))
             {
-                //m_log.DebugFormat("[UNACKED PACKET COLLECTION]: Processing ack {0}", pendingAcknowledgement.SequenceNumber);
+                m_logger?.LogDebug("[UNACKED PACKET COLLECTION]: Processing ack {0}", pendingAcknowledgement.SequenceNumber);
                 if (m_packets.TryGetValue(pendingAcknowledgement.SequenceNumber, out OutgoingPacket ackedPacket))
                 {
                     m_packets.Remove(pendingAcknowledgement.SequenceNumber);

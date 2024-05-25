@@ -25,13 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Text;
-using log4net;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.CoreModules.Framework.InterfaceCommander
 {
@@ -40,7 +41,7 @@ namespace OpenSim.Region.CoreModules.Framework.InterfaceCommander
     /// </summary>
     public class Commander : ICommander
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <value>
         /// Used in runtime class generation
@@ -76,6 +77,7 @@ namespace OpenSim.Region.CoreModules.Framework.InterfaceCommander
         /// <param name="name"></param>
         public Commander(string name)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<Commander>>();
             m_name = name;
             m_generatedApiClassName = m_name[0].ToString().ToUpper();
 
@@ -156,7 +158,7 @@ namespace OpenSim.Region.CoreModules.Framework.InterfaceCommander
             {
                 if (function == "api")
                 {
-                    m_log.Info(GenerateRuntimeAPI());
+                    m_logger?.LogInformation(GenerateRuntimeAPI());
                 }
                 else
                 {

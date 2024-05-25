@@ -28,19 +28,25 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Reflection;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
-using OpenMetaverse.StructuredData;
-using log4net;
-using Nini.Config;
-using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Services.Connectors.Hypergrid;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.UserProfilesService;
+using OpenSim.Server.Base;
 
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
+using OpenMetaverse.StructuredData;
+using OpenSim.Framework;
+
+using Nini.Config;
+
 
 namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
 {
@@ -50,7 +56,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
         /// <summary>
         /// Logging
         /// </summary>
-        static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         // The pair of Dictionaries are used to handle the switching of classified ads
         // by maintaining a cache of classified id to creator id mappings and an interest
@@ -263,6 +269,8 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
         /// </param>
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<UserProfileModule>>();
+
             Config = source;
             ReplaceableInterface = typeof(IProfileModule);
 
@@ -270,7 +278,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
 
             if (profileConfig is null)
             {
-                //m_log.Debug("[PROFILES]: UserProfiles disabled, no configuration");
+                //m_logger?.LogDebug("[PROFILES]: UserProfiles disabled, no configuration");
                 Enabled = false;
                 return;
             }
@@ -295,7 +303,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
 
             m_allowUserProfileWebURLs = profileConfig.GetBoolean("AllowUserProfileWebURLs", m_allowUserProfileWebURLs);
 
-            m_log.Debug("[UserProfileModule]: Full Profiles Enabled");
+            m_logger?.LogDebug("[UserProfileModule]: Full Profiles Enabled");
             ReplaceableInterface = null;
             Enabled = true;
         }
@@ -1105,7 +1113,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             }
             else
             {
-                m_log.WarnFormat(
+                m_logger?.LogWarning(
                     "[PROFILES]: PickInfoUpdate found no parcel info at {0},{1} in {2}",
                     avaPos.X, avaPos.Y, p.Scene.Name);
             }
@@ -1311,7 +1319,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             object Pref = pref;
             if(!rpc.JsonRpcRequest(ref Pref, "user_preferences_update", serverURI, UUID.Random().ToString()))
             {
-                m_log.InfoFormat("[PROFILES]: UserPreferences update error");
+                m_logger?.LogInformation("[PROFILES]: UserPreferences update error");
                 remoteClient.SendAgentAlertMessage("Error updating preferences", false);
                 return;
             }
@@ -1334,7 +1342,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             object Pref = (object)pref;
             if(!rpc.JsonRpcRequest(ref Pref, "user_preferences_request", serverURI, UUID.Random().ToString()))
             {
-                //m_log.InfoFormat("[PROFILES]: UserPreferences request error");
+                //m_logger?.LogInformation("[PROFILES]: UserPreferences request error");
                 //remoteClient.SendAgentAlertMessage("Error requesting preferences", false);
                 return;
             }
@@ -1406,7 +1414,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             if (avatarID.IsZero())
             {
                 // Looking for a reason that some viewers are sending null Id's
-                m_log.Debug("[PROFILES]: got request of null ID");
+                m_logger?.LogDebug("[PROFILES]: got request of null ID");
                 return;
             }
 
@@ -1667,7 +1675,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
                     }
                     catch (Exception e)
                     {
-                        m_log.Debug(
+                        m_logger?.LogDebug(
                             string.Format(
                                 "[PROFILES]: Request using the OpenProfile API for user {0} to {1} failed",
                                 properties.UserId, serverURI),
@@ -1682,7 +1690,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
                 if (!secondChanceSuccess)
                 {
                     message = $"JsonRpcRequest for user {properties.UserId} to {serverURI} failed";
-                    m_log.Debug($"[PROFILES]: {message}");
+                    m_logger?.LogDebug($"[PROFILES]: {message}");
                     return false;
                 }
             }
@@ -1739,7 +1747,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
                 }
                 catch (Exception e)
                 {
-                    m_log.Debug("[PROFILES]: GetUserInfo call failed ", e);
+                    m_logger?.LogDebug("[PROFILES]: GetUserInfo call failed ", e);
                     UserManagementModule.UserWebFailed(userID);
                     return false;
                 }

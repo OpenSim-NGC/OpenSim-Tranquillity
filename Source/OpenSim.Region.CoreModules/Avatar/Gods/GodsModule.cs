@@ -26,26 +26,30 @@
  */
 
 using System.Net;
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
-using OpenMetaverse.StructuredData;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
+using OpenMetaverse;
+using OpenMetaverse.StructuredData;
+
+using Nini.Config;
+
 namespace OpenSim.Region.CoreModules.Avatar.Gods
 {
     public class GodsModule : INonSharedRegionModule, IGodsModule
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <summary>Special UUID for actions that apply to all agents</summary>
         private static readonly UUID ALL_AGENTS = new UUID("44e87126-e794-4ded-05b3-7c42da3d5cdb");
@@ -55,6 +59,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Gods
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GodsModule>>();
         }
 
         public void AddRegion(Scene scene)
@@ -141,7 +146,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Gods
                 }
                 else
                 {
-                    m_log.ErrorFormat("[GOD]: Unhandled UntrustedSimulatorMessage: {0}", message);
+                    m_logger?.LogError("[GOD]: Unhandled UntrustedSimulatorMessage: {0}", message);
                     response.StatusCode = (int)HttpStatusCode.BadRequest;
                     return;
                 }
@@ -218,7 +223,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Gods
                         m_scene.RequestModuleInterface<IMessageTransferModule>();
                 if (transferModule != null)
                 {
-                    m_log.DebugFormat("[GODS]: Sending nonlocal kill for agent {0}", agentID);
+                    m_logger?.LogDebug("[GODS]: Sending nonlocal kill for agent {0}", agentID);
                     transferModule.SendInstantMessage(new GridInstantMessage(
                             m_scene, godID, "God", agentID, (byte)250, false,
                             reason, UUID.Zero, true,
@@ -297,7 +302,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Gods
                         m_scene.RequestModuleInterface<IMessageTransferModule>();
                 if (transferModule != null)
                 {
-                    m_log.DebugFormat("[GODS]: Sending nonlocal kill for agent {0}", agentID);
+                    m_logger?.LogDebug("[GODS]: Sending nonlocal kill for agent {0}", agentID);
                     transferModule.SendInstantMessage(new GridInstantMessage(
                             m_scene, Constants.servicesGodAgentID, "GRID", agentID, (byte)250, false,
                             reason, UUID.Zero, true,

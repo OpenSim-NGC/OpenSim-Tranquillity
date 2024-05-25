@@ -27,21 +27,23 @@
 
 using System.Reflection;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-using log4net;
 
-using Microsoft.Extensions.Configuration;
 
 namespace OpenSim.OfflineIM
 {
     public class OfflineIMServiceRemoteConnector : IOfflineIMService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private string m_ServerURI = string.Empty;
         private IServiceAuth m_Auth;
@@ -49,12 +51,16 @@ namespace OpenSim.OfflineIM
 
         public OfflineIMServiceRemoteConnector(string url)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<OfflineIMServiceRemoteConnector>>();
+
             m_ServerURI = url;
-            m_log.DebugFormat("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0}", m_ServerURI);
+            m_logger.LogDebug("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0}", m_ServerURI);
         }
 
         public OfflineIMServiceRemoteConnector(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<OfflineIMServiceRemoteConnector>>();
+
             var cnf = config.GetSection("Messaging");
             if (cnf.Exists() is false)
             {
@@ -75,7 +81,7 @@ namespace OpenSim.OfflineIM
             }
             
             ///
-            m_log.DebugFormat("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0} with auth {1}",
+            m_logger.LogDebug("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0} with auth {1}",
                 m_ServerURI, (m_Auth == null ? "None" : m_Auth.GetType().ToString()));
         }
 
@@ -98,7 +104,7 @@ namespace OpenSim.OfflineIM
             if (result == "NULL" || result.ToLower() == "false")
             {
                 string reason = ret.ContainsKey("REASON") ? ret["REASON"].ToString() : "Unknown error";
-                m_log.DebugFormat("[OfflineIM.V2.RemoteConnector]: GetMessages for {0} failed: {1}", principalID, reason);
+                m_logger.LogDebug("[OfflineIM.V2.RemoteConnector]: GetMessages for {0} failed: {1}", principalID, reason);
                 return ims;
             }
 

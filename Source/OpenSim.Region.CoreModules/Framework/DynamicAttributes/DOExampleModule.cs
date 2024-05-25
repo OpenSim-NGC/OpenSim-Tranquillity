@@ -25,13 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Framework.DynamicAttributes
 {
@@ -50,7 +54,7 @@ namespace OpenSim.Region.CoreModules.Framework.DynamicAttributes
             }
         }
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private static readonly bool ENABLED = false;   // enable for testing
 
@@ -60,7 +64,10 @@ namespace OpenSim.Region.CoreModules.Framework.DynamicAttributes
         public string Name { get { return "DO"; } }
         public Type ReplaceableInterface { get { return null; } }
 
-        public void Initialise(IConfiguration source) {}
+        public void Initialise(IConfiguration source)
+        {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DOExampleModule>>();
+        }
 
         public void AddRegion(Scene scene)
         {
@@ -104,7 +111,7 @@ namespace OpenSim.Region.CoreModules.Framework.DynamicAttributes
             {
                 movesSoFar = attrs["moves"].AsInteger();
 
-                m_log.DebugFormat(
+                m_logger?.LogDebug(
                     "[DO EXAMPLE MODULE]: Found saved moves {0} for {1} in {2}", movesSoFar, so.Name, m_scene.Name);
             }
 

@@ -26,11 +26,10 @@
  */
 using System.Collections;
 using System.Net;
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using Nwc.XmlRpc;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Interfaces;
@@ -38,12 +37,19 @@ using OpenSim.Region.Framework.Scenes;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nwc.XmlRpc;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 {
     public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private bool m_Enabled = false;
         protected string m_MessageKey = String.Empty;
@@ -67,6 +73,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 
         public virtual void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MessageTransferModule>>();
             IConfig cnf = config.Configs["Messaging"];
             if (cnf != null)
             {
@@ -77,7 +84,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 
                 m_MessageKey = cnf.GetString("MessageKey", String.Empty);
             }
-            m_log.Debug("[MESSAGE TRANSFER]: Module enabled");
+            m_logger?.LogDebug("[MESSAGE TRANSFER]: Module enabled");
             m_Enabled = true;
 
             IMXMLRPCSendWorkers = new ObjectJobEngine(DoSendIMviaXMLRPC, "IMXMLRPCSendWorkers", 1000, 3);
@@ -90,7 +97,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 
             lock (m_Scenes)
             {
-                m_log.Debug("[MESSAGE TRANSFER]: Message transfer module active");
+                m_logger?.LogDebug("[MESSAGE TRANSFER]: Message transfer module active");
                 scene.RegisterModuleInterface<IMessageTransferModule>(this);
                 m_Scenes.Add(scene);
             }
@@ -411,7 +418,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             }
             catch (Exception e)
             {
-                m_log.Error("[INSTANT MESSAGE]: Caught unexpected exception:", e);
+                m_logger?.LogError("[INSTANT MESSAGE]: Caught unexpected exception:", e);
                 successful = false;
             }
 
@@ -455,7 +462,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             }
             catch (Exception e)
             {
-                m_log.Error("[SendGridInstantMessageViaXMLRPC]: exception " + e.Message);
+                m_logger?.LogError("[SendGridInstantMessageViaXMLRPC]: exception " + e.Message);
             }
         }
  
@@ -517,14 +524,14 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
                     //
                     if (upd.RegionID == prevRegionID)
                     {
-                        // m_log.Error("[GRID INSTANT MESSAGE]: Unable to deliver an instant message");
+                        // m_logger?.LogError("[GRID INSTANT MESSAGE]: Unable to deliver an instant message");
                         HandleUndeliverableMessage(im, result);
                         return;
                     }
                 }
                 else
                 {
-                    // m_log.Error("[GRID INSTANT MESSAGE]: Unable to deliver an instant message");
+                    // m_logger?.LogError("[GRID INSTANT MESSAGE]: Unable to deliver an instant message");
                     HandleUndeliverableMessage(im, result);
                     return;
                 }
@@ -572,7 +579,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
                 }
                 else
                 {
-                    m_log.WarnFormat("[GRID INSTANT MESSAGE]: Unable to find region {0}", upd.RegionID);
+                    m_logger?.LogWarning("[GRID INSTANT MESSAGE]: Unable to find region {0}", upd.RegionID);
                     HandleUndeliverableMessage(im, result);
                 }
             }
@@ -617,7 +624,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[GRID INSTANT MESSAGE]: Error sending message to {0} : {1}",  reginfo.ServerURI.ToString(), e.Message);
+                m_logger?.LogError("[GRID INSTANT MESSAGE]: Error sending message to {0} : {1}",  reginfo.ServerURI.ToString(), e.Message);
             }
             finally
             {

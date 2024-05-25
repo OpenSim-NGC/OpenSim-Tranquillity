@@ -25,22 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using System.Net;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.CoreModules.Agent.IPBan
 {
     internal class SceneBanner
     {
-        private static readonly log4net.ILog m_log
-                    = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private List<string> bans;
         // private SceneBase m_scene;
         public SceneBanner(SceneBase scene, List<string> banList)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SceneBanner>>();
+
             scene.EventManager.OnNewClient += EventManager_OnClientConnect;
 
             bans = banList;
@@ -74,7 +79,7 @@ namespace OpenSim.Region.CoreModules.Agent.IPBan
                         if (endstr.StartsWith(ban))
                         {
                             client.Disconnect("Banned - network \"" + ban + "\" is not allowed to connect to this server.");
-                            m_log.Warn("[IPBAN] Disconnected '" + end + "' due to '" + ban + "' ban.");
+                            m_logger.LogWarning("[IPBAN] Disconnected '" + end + "' due to '" + ban + "' ban.");
                             return;
                         }
                     }
@@ -86,7 +91,7 @@ namespace OpenSim.Region.CoreModules.Agent.IPBan
                         if (hostName.Contains(ban) || end.ToString().StartsWith(ban))
                         {
                             client.Disconnect("Banned - network \"" + ban + "\" is not allowed to connect to this server.");
-                            m_log.Warn("[IPBAN] Disconnected '" + end + "' due to '" + ban + "' ban.");
+                            m_logger.LogWarning("[IPBAN] Disconnected '" + end + "' due to '" + ban + "' ban.");
                             return;
                         }
                     }

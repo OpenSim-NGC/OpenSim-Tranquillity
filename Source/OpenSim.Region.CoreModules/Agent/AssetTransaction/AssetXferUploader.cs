@@ -25,17 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
-using System.Reflection;
-using System.Collections.Generic;
-using log4net;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
-using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Services.Interfaces;
 using PermissionMask = OpenSim.Framework.PermissionMask;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
 
 namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
 {
@@ -58,7 +56,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
                 new UUID("1578a2b1-5179-4b53-b618-fe00ca5a5594"),
                 };
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         /// <summary>
         /// Upload state.
@@ -125,6 +123,8 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
         public AssetXferUploader(
             AgentAssetTransactions transactions, Scene scene, UUID transactionID, bool dumpAssetToFile)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<AssetXferUploader>>();
+
             m_asset = new AssetBase();
 
             m_transactions = transactions;
@@ -142,7 +142,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
         /// <returns>True if the transfer is complete, false otherwise or if the xferID was not valid</returns>
         public bool HandleXferPacket(ulong xferID, uint packetID, byte[] data)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[ASSET XFER UPLOADER]: Received packet {0} for xfer {1} (data length {2})",
 //                packetID, xferID, data.Length);
 
@@ -200,7 +200,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
             IClientAPI remoteClient, UUID assetID, UUID transaction, sbyte type, byte[] data, bool storeLocal,
             bool tempFile)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[ASSET XFER UPLOADER]: Initialised xfer from {0}, asset {1}, transaction {2}, type {3}, storeLocal {4}, tempFile {5}, already received data length {6}",
 //                remoteClient.Name, assetID, transaction, type, storeLocal, tempFile, data.Length);
 
@@ -208,7 +208,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
             {
                 if (m_uploadState != UploadState.New)
                 {
-                    m_log.WarnFormat(
+                    m_logger?.LogWarning(
                         "[ASSET XFER UPLOADER]: Tried to start upload of asset {0}, transaction {1} for {2} but this is already in state {3}.  Aborting.",
                         assetID, transaction, remoteClient.Name, m_uploadState);
 
@@ -243,7 +243,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
         {
             XferID = Util.GetNextXferID();
 
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[ASSET XFER UPLOADER]: Requesting Xfer of asset {0}, type {1}, transfer id {2} from {3}",
 //                m_asset.FullID, m_asset.Type, XferID, ourClient.Name);
 
@@ -278,7 +278,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
                 ourClient.SendAssetUploadCompleteMessage(m_asset.Type, sucess, m_asset.FullID);
             }
 
-            m_log.DebugFormat(
+            m_logger?.LogDebug(
                 "[ASSET XFER UPLOADER]: Uploaded asset {0} for transaction {1}",
                 m_asset.FullID, m_transactionID);
 
@@ -375,7 +375,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
                     }
 
 
-                    //                    m_log.DebugFormat(
+                    //                    m_logger?.LogDebug(
                     //                        "[ASSET XFER UPLOADER]: Holding update inventory item request {0} for {1} pending completion of asset xfer for transaction {2}",
                     //                        item.Name, remoteClient.Name, transactionID);
 
@@ -413,7 +413,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
         /// <param name="item"></param>
         private bool CompleteItemUpdate(InventoryItemBase item)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[ASSET XFER UPLOADER]: Storing asset {0} for earlier item update for {1} for {2}",
 //                m_asset.FullID, item.Name, ourClient.Name);
 
@@ -447,7 +447,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
         /// <param name="taskItem"></param>
         private bool CompleteTaskItemUpdate(TaskInventoryItem taskItem)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[ASSET XFER UPLOADER]: Storing asset {0} for earlier task item update for {1} for {2}",
 //                m_asset.FullID, taskItem.Name, ourClient.Name);
 
@@ -496,7 +496,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
                 Flags = wearableType,
                 CreationDate = Util.UnixTimeSinceEpoch()
             };
-            m_log.DebugFormat("[XFER]: Created item {0} with asset {1}",
+            m_logger?.LogDebug("[XFER]: Created item {0} with asset {1}",
                     item.ID, item.AssetID);
 
             // special AnimationSet case
@@ -572,7 +572,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
 
                                 if ((perms & texturesfullPermMask) != texturesfullPermMask)
                                 {
-                                    m_log.ErrorFormat("[ASSET UPLOADER]: REJECTED update with texture {0} from {1} because they do not own the texture", tx, ourClient.AgentId);
+                                    m_logger?.LogError("[ASSET UPLOADER]: REJECTED update with texture {0} from {1} because they do not own the texture", tx, ourClient.AgentId);
                                     return 0;
                                 }
                                 else

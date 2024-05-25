@@ -28,22 +28,27 @@
 using System.Globalization;
 using System.Reflection;
 
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
+
+using PermissionMask = OpenSim.Framework.PermissionMask;
 
 using OpenMetaverse;
-using log4net;
+
 using Nini.Config;
-using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 {
     public class BasicInventoryAccessModule : INonSharedRegionModule, IInventoryAccessModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected bool m_Enabled = false;
         protected Scene m_Scene;
@@ -75,6 +80,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
         public virtual void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<BasicInventoryAccessModule>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig is not null)
             {
@@ -85,7 +91,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
                     InitialiseCommon(source);
 
-                    m_log.Info($"[INVENTORY ACCESS MODULE]: {Name} enabled.");
+                    m_logger?.LogInformation($"[INVENTORY ACCESS MODULE]: {Name} enabled.");
                 }
             }
         }
@@ -164,7 +170,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
                                            sbyte assetType, byte subType,
                                            uint nextOwnerMask, int creationDate)
         {
-            m_log.DebugFormat("[INVENTORY ACCESS MODULE]: Received request to create inventory item {0} in folder {1}, transactionID {2}", name,
+            m_logger?.LogDebug("[INVENTORY ACCESS MODULE]: Received request to create inventory item {0} in folder {1}, transactionID {2}", name,
                 folderID, transactionID);
 
             if (!m_Scene.Permissions.CanCreateUserInventory(invType, remoteClient.AgentId))
@@ -176,7 +182,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
             {
                 folder = m_Scene.InventoryService.GetFolderForType(remoteClient.AgentId, (FolderType)invType);
                 if (folder is not null)
-                    m_log.DebugFormat("[INVENTORY ACCESS MODULE]: Requested folder not found but found folder for type {0}", invType);
+                    m_logger?.LogDebug("[INVENTORY ACCESS MODULE]: Requested folder not found but found folder for type {0}", invType);
             }
 
             if (folder is null || folder.Owner.NotEqual(remoteClient.AgentId))
@@ -232,7 +238,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
                         UUID assetID = envModule.GetDefaultAsset(subType);
                         if(assetID.IsZero())
                         {
-                            m_log.ErrorFormat(
+                            m_logger?.LogError(
                             "[INVENTORY ACCESS MODULE CreateNewInventoryItem]: failed to create default environment setting asset {0} for agent {1}", name, remoteClient.AgentId);
                             return;
                         }
@@ -292,7 +298,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
             }
             else
             {
-                m_log.ErrorFormat(
+                m_logger?.LogError(
                     "[INVENTORY ACCESS MODULE]: ScenePresence for agent uuid {0} unexpectedly not found in CreateNewInventoryItem",
                     remoteClient.AgentId);
             }
@@ -322,7 +328,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
             if (item is null)
             {
-                m_log.ErrorFormat(
+                m_logger?.LogError(
                     "[INVENTORY ACCESS MODULE]: Could not find item {0} for caps inventory update", itemID);
                 return UUID.Zero;
             }
@@ -420,7 +426,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
         {
             if (item is not null && asset is not null && item.Owner.Equals(ownerID))
             {
-                //m_log.DebugFormat(
+                //m_logger?.LogDebug(
                 //    "[INVENTORY ACCESS MODULE]: Updating item {0} {1} with new asset {2}",
                 //    item.Name, item.ID, asset.ID);
 
@@ -430,7 +436,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
             }
             else
             {
-                m_log.ErrorFormat("[INVENTORY ACCESS MODULE]: Given invalid item for inventory update: {0}",
+                m_logger?.LogError("[INVENTORY ACCESS MODULE]: Given invalid item for inventory update: {0}",
                     (item is null || asset is null? "null item or asset" : "wrong owner"));
                 return false;
             }
@@ -466,7 +472,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
                 }
             }
 
-            //m_log.DebugFormat(
+            //m_logger?.LogDebug(
             //    "[INVENTORY ACCESS MODULE]: Copying {0} object bundles to folder {1} action {2} for {3}",
             //    bundlesToCopy.Count, folderID, action, remoteClient.Name);
 
@@ -565,7 +571,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
             InventoryItemBase item = CreateItemForObject(action, remoteClient, objlist[0], folderID);
 
-            //m_log.DebugFormat(
+            //m_logger?.LogDebug(
             //    "[INVENTORY ACCESS MODULE]: Created item is {0}",
             //    item != null ? item.ID.ToString() : "NULL");
 
@@ -719,7 +725,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
         protected InventoryItemBase CreateItemForObject(
             DeRezAction action, IClientAPI remoteClient, SceneObjectGroup so, UUID folderID)
         {
-            //m_log.DebugFormat(
+            //m_logger?.LogDebug(
             //    "[BASIC INVENTORY ACCESS MODULE]: Creating item for object {0} {1} for folder {2}, action {3}",
             //    so.Name, so.UUID, folderID, action);
 
@@ -738,7 +744,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
                 userID = remoteClient.AgentId;
 
-                //m_log.DebugFormat(
+                //m_logger?.LogDebug(
                 //    "[INVENTORY ACCESS MODULE]: Target of {0} in CreateItemForObject() is {1} {2}",
                 //    action, remoteClient.Name, userID);
             }
@@ -753,7 +759,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
                 //
                 userID = so.RootPart.OwnerID;
 
-                //m_log.DebugFormat(
+                //m_logger?.LogDebug(
                 //    "[INVENTORY ACCESS MODULE]: Target of {0} in CreateItemForObject() is object owner {1}",
                 //    action, userID);
             }
@@ -773,7 +779,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
                 if (item is null)
                 {
-                    m_log.Debug(
+                    m_logger?.LogDebug(
                         $"[INVENTORY ACCESS MODULE]:  Object {so.Name} {so.UUID} scheduled for save to inventory has already been deleted.");
                 }
                 return item;
@@ -901,7 +907,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
             UUID RayTargetID, byte BypassRayCast, bool RayEndIsIntersection,
             bool RezSelected, bool RemoveItem, UUID fromTaskID, bool attachment)
         {
-//            m_log.DebugFormat("[INVENTORY ACCESS MODULE]: RezObject for {0}, item {1}", remoteClient.Name, itemID);
+//            m_logger?.LogDebug("[INVENTORY ACCESS MODULE]: RezObject for {0}, item {1}", remoteClient.Name, itemID);
             InventoryItemBase item = m_Scene.InventoryService.GetItem(remoteClient.AgentId, itemID);
 
             if (item is null)
@@ -948,13 +954,13 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
             {
                 if (item is not null)
                 {
-                    m_log.Warn(
+                    m_logger?.LogWarning(
                         $"[InventoryAccessModule]: Could not find asset {assetID} for item {item.Name} {item.ID} for {remoteClient.Name} in RezObject()");
                     remoteClient.SendAgentAlertMessage($"Unable to rez: could not find asset {assetID} for item {item.Name}", false);
                 }
                 else
                 {
-                    m_log.Warn($"[INVENTORY ACCESS MODULE]: Could not find asset {assetID} for {remoteClient.Name} in RezObject()");
+                    m_logger?.LogWarning($"[INVENTORY ACCESS MODULE]: Could not find asset {assetID} for {remoteClient.Name} in RezObject()");
                     remoteClient.SendAgentAlertMessage($"Unable to rez: could not find asset {assetID}", false);
                 }
                 return null;
@@ -962,7 +968,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
             if(rezAsset.Data is null || rezAsset.Data.Length == 0)
             {
-                m_log.Warn($"[INVENTORY ACCESS MODULE]: missing data in asset {assetID} to RezObject()");
+                m_logger?.LogWarning($"[INVENTORY ACCESS MODULE]: missing data in asset {assetID} to RezObject()");
                 remoteClient.SendAgentAlertMessage($"Unable to rez: missing data in asset {assetID}", false);
                 return null;
             }
@@ -1033,7 +1039,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
                 group = objlist[i];
                 SceneObjectPart rootPart = group.RootPart;
 
-                //m_log.DebugFormat(
+                //m_logger?.LogDebug(
                 //    "[INVENTORY ACCESS MODULE]: Preparing to rez {0} {1} {2} ownermask={3:X} nextownermask={4:X} groupmask={5:X} everyonemask={6:X} for {7}",
                 //    group.Name, group.LocalId, group.UUID,
                 //    group.RootPart.OwnerMask, group.RootPart.NextOwnerMask, group.RootPart.GroupMask, group.RootPart.EveryoneMask,
@@ -1042,7 +1048,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
                 //Vector3 storedPosition = group.AbsolutePosition;
                 if (group.UUID.IsZero())
                 {
-                    m_log.Debug("[INVENTORY ACCESS MODULE]: Object has UUID.Zero! Position 3");
+                    m_logger?.LogDebug("[INVENTORY ACCESS MODULE]: Object has UUID.Zero! Position 3");
                 }
 
                 // if this was previously an attachment and is now being rezzed,
@@ -1110,7 +1116,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
                 else
                     m_Scene.AddNewSceneObject(group, true, false);
 
-                //m_log.DebugFormat(
+                //m_logger?.LogDebug(
                 //    "[INVENTORY ACCESS MODULE]:  Rezzed {0} {1} {2} ownermask={3:X} nextownermask={4:X} groupmask={5:X} everyonemask={6:X} for {7}",
                 //    group.Name, group.LocalId, group.UUID,
                 //    group.RootPart.OwnerMask, group.RootPart.NextOwnerMask, group.RootPart.GroupMask, group.RootPart.EveryoneMask,
@@ -1215,7 +1221,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
                 so.FromFolderID = item.Folder;
 
-                //m_log.DebugFormat(
+                //m_logger?.LogDebug(
                 //    "[INVENTORY ACCESS MODULE]: rootPart.OwnedID {0}, item.Owner {1}, item.CurrentPermissions {2:X}",
                 //    rootPart.OwnerID, item.Owner, item.CurrentPermissions);
 
@@ -1365,7 +1371,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
             if (assetRequestItem.AssetID != requestID)
             {
-                m_log.WarnFormat(
+                m_logger?.LogWarning(
                     "[INVENTORY ACCESS MODULE]:  {0} requested asset {1} from item {2} but this does not match item's asset {3}",
                     Name, requestID, itemID, assetRequestItem.AssetID);
 

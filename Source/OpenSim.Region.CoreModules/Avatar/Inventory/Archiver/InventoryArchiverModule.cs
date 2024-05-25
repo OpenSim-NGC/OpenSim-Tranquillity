@@ -25,15 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using NDesk.Options;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using NDesk.Options;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 {
@@ -42,7 +47,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
     /// </summary>
     public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <value>
         /// Enable or disable checking whether the iar user is actually logged in
@@ -86,7 +91,9 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
         }
 
 
-        public InventoryArchiverModule() {}
+        public InventoryArchiverModule() {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<InventoryArchiverModule>>();
+        }
 
 //        public InventoryArchiverModule(bool disablePresenceChecks)
 //        {
@@ -217,10 +224,10 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                         }
                         catch (EntryPointNotFoundException e)
                         {
-                            m_log.ErrorFormat(
+                            m_logger?.LogError(
                                 "[INVENTORY ARCHIVER]: Mismatch between Mono and zlib1g library version when trying to create compression stream."
                                     + "If you've manually installed Mono, have you appropriately updated zlib1g as well?");
-                            m_log.Error(e);
+                            m_logger?.LogError(e);
 
                             return false;
                         }
@@ -229,7 +236,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 //                    }
 //                    else
 //                    {
-//                        m_log.ErrorFormat(
+//                        m_logger?.LogError(
 //                            "[INVENTORY ARCHIVER]: User {0} {1} {2} not logged in to this region simulator",
 //                            userInfo.FirstName, userInfo.LastName, userInfo.PrincipalID);
 //                    }
@@ -261,10 +268,10 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                         }
                         catch (EntryPointNotFoundException e)
                         {
-                            m_log.ErrorFormat(
+                            m_logger?.LogError(
                                 "[INVENTORY ARCHIVER]: Mismatch between Mono and zlib1g library version when trying to create compression stream."
                                     + "If you've manually installed Mono, have you appropriately updated zlib1g as well?");
-                            m_log.Error(e);
+                            m_logger?.LogError(e);
 
                             return false;
                         }
@@ -273,7 +280,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 //                    }
 //                    else
 //                    {
-//                        m_log.ErrorFormat(
+//                        m_logger?.LogError(
 //                            "[INVENTORY ARCHIVER]: User {0} {1} {2} not logged in to this region simulator",
 //                            userInfo.FirstName, userInfo.LastName, userInfo.PrincipalID);
 //                    }
@@ -309,10 +316,10 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                         }
                         catch (EntryPointNotFoundException e)
                         {
-                            m_log.ErrorFormat(
+                            m_logger?.LogError(
                                 "[INVENTORY ARCHIVER]: Mismatch between Mono and zlib1g library version when trying to create compression stream."
                                     + "If you've manually installed Mono, have you appropriately updated zlib1g as well?");
-                            m_log.Error(e);
+                            m_logger?.LogError(e);
 
                             return false;
                         }
@@ -323,13 +330,13 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 //                    }
 //                    else
 //                    {
-//                        m_log.ErrorFormat(
+//                        m_logger?.LogError(
 //                            "[INVENTORY ARCHIVER]: User {0} {1} {2} not logged in to this region simulator",
 //                            userInfo.FirstName, userInfo.LastName, userInfo.PrincipalID);
 //                    }
                 }
                 else
-                    m_log.ErrorFormat("[INVENTORY ARCHIVER]: User {0} {1} not found",
+                    m_logger?.LogError("[INVENTORY ARCHIVER]: User {0} {1} not found",
                             firstName, lastName);
             }
 
@@ -357,10 +364,10 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                         }
                         catch (EntryPointNotFoundException e)
                         {
-                            m_log.ErrorFormat(
+                            m_logger?.LogError(
                                 "[INVENTORY ARCHIVER]: Mismatch between Mono and zlib1g library version when trying to create compression stream."
                                     + "If you've manually installed Mono, have you appropriately updated zlib1g as well?");
-                            m_log.Error(e);
+                            m_logger?.LogError(e);
 
                             return false;
                         }
@@ -371,7 +378,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 //                    }
 //                    else
 //                    {
-//                        m_log.ErrorFormat(
+//                        m_logger?.LogError(
 //                            "[INVENTORY ARCHIVER]: User {0} {1} {2} not logged in to this region simulator",
 //                            userInfo.FirstName, userInfo.LastName, userInfo.PrincipalID);
 //                    }
@@ -398,7 +405,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 
                 if (mainParams.Count < 6)
                 {
-                    m_log.Error(
+                    m_logger?.LogError(
                         "[INVENTORY ARCHIVER]: usage is load iar [-m|--merge] <first name> <last name> <inventory path> <user password> [<load file path>]");
                     return;
                 }
@@ -409,7 +416,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                 string pass = mainParams[5];
                 string loadPath = (mainParams.Count > 6 ? mainParams[6] : DEFAULT_INV_BACKUP_FILENAME);
 
-                m_log.InfoFormat(
+                m_logger?.LogInformation(
                     "[INVENTORY ARCHIVER]: Loading archive {0} to inventory path {1} for {2} {3}",
                     loadPath, invPath, firstName, lastName);
 
@@ -420,7 +427,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
             }
             catch (InventoryArchiverException e)
             {
-                m_log.ErrorFormat("[INVENTORY ARCHIVER]: {0}", e.Message);
+                m_logger?.LogError("[INVENTORY ARCHIVER]: {0}", e.Message);
             }
         }
 
@@ -460,13 +467,13 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
             {
                 if (mainParams.Count < 6)
                 {
-                    m_log.Error(
+                    m_logger?.LogError(
                         "[INVENTORY ARCHIVER]: save iar [-h|--home=<url>] [--noassets] <first> <last> <inventory path> <password> [<IAR path>] [-c|--creators] [-e|--exclude=<name/uuid>] [-f|--excludefolder=<foldername/uuid>] [-v|--verbose]");
                     return;
                 }
 
                 if (options.ContainsKey("home"))
-                    m_log.WarnFormat("[INVENTORY ARCHIVER]: Please be aware that inventory archives with creator information are not compatible with OpenSim 0.7.0.2 and earlier.  Do not use the -home option if you want to produce a compatible IAR");
+                    m_logger?.LogWarning("[INVENTORY ARCHIVER]: Please be aware that inventory archives with creator information are not compatible with OpenSim 0.7.0.2 and earlier.  Do not use the -home option if you want to produce a compatible IAR");
 
                 string firstName = mainParams[2];
                 string lastName = mainParams[3];
@@ -474,7 +481,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                 string pass = mainParams[5];
                 string savePath = (mainParams.Count > 6 ? mainParams[6] : DEFAULT_INV_BACKUP_FILENAME);
 
-                m_log.InfoFormat(
+                m_logger?.LogInformation(
                     "[INVENTORY ARCHIVER]: Saving archive {0} using inventory path {1} for {2} {3}",
                     savePath, invPath, firstName, lastName);
 
@@ -485,7 +492,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
             }
             catch (InventoryArchiverException e)
             {
-                m_log.ErrorFormat("[INVENTORY ARCHIVER]: {0}", e.Message);
+                m_logger?.LogError("[INVENTORY ARCHIVER]: {0}", e.Message);
             }
         }
 
@@ -505,13 +512,13 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
             {
                 // Report success and include item count and filter count (Skipped items due to --perm or --exclude switches)
                 if(FilterCount == 0)
-                    m_log.InfoFormat("[INVENTORY ARCHIVER]: Saved archive with {0} items for {1} {2}", SaveCount, userInfo.FirstName, userInfo.LastName);
+                    m_logger?.LogInformation("[INVENTORY ARCHIVER]: Saved archive with {0} items for {1} {2}", SaveCount, userInfo.FirstName, userInfo.LastName);
                 else
-                    m_log.InfoFormat("[INVENTORY ARCHIVER]: Saved archive with {0} items for {1} {2}. Skipped {3} items due to exclude and/or perm switches", SaveCount, userInfo.FirstName, userInfo.LastName, FilterCount);
+                    m_logger?.LogInformation("[INVENTORY ARCHIVER]: Saved archive with {0} items for {1} {2}. Skipped {3} items due to exclude and/or perm switches", SaveCount, userInfo.FirstName, userInfo.LastName, FilterCount);
             }
             else
             {
-                m_log.ErrorFormat(
+                m_logger?.LogError(
                     "[INVENTORY ARCHIVER]: Archive save for {0} {1} failed - {2}",
                     userInfo.FirstName, userInfo.LastName, reportedException.Message);
             }
@@ -531,11 +538,11 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 
             if (succeeded)
             {
-                m_log.InfoFormat("[INVENTORY ARCHIVER]: Loaded {0} items from archive {1} for {2} {3}", LoadCount, invPath, userInfo.FirstName, userInfo.LastName);
+                m_logger?.LogInformation("[INVENTORY ARCHIVER]: Loaded {0} items from archive {1} for {2} {3}", LoadCount, invPath, userInfo.FirstName, userInfo.LastName);
             }
             else
             {
-                m_log.ErrorFormat(
+                m_logger?.LogError(
                     "[INVENTORY ARCHIVER]: Archive load for {0} {1} failed - {2}",
                     userInfo.FirstName, userInfo.LastName, reportedException.Message);
             }
@@ -555,7 +562,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 
             if (null == account)
             {
-                m_log.ErrorFormat(
+                m_logger?.LogError(
                     "[INVENTORY ARCHIVER]: Failed to find user info for {0} {1}",
                     firstName, lastName);
                 return null;
@@ -570,7 +577,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                 }
                 else
                 {
-                    m_log.ErrorFormat(
+                    m_logger?.LogError(
                         "[INVENTORY ARCHIVER]: Password for user {0} {1} incorrect.  Please try again.",
                         firstName, lastName);
                     return null;
@@ -578,7 +585,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[INVENTORY ARCHIVER]: Could not authenticate password, {0}", e);
+                m_logger?.LogError("[INVENTORY ARCHIVER]: Could not authenticate password, {0}", e);
                 return null;
             }
         }

@@ -24,13 +24,18 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 {
@@ -43,7 +48,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 
     public class OfflineMessageModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private bool enabled = true;
         private bool m_UseNewAvnCode = false;
@@ -55,6 +60,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<OfflineMessageModule>>();
             IConfig cnf = config.Configs["Messaging"];
             if (cnf == null)
             {
@@ -71,7 +77,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             m_RestURL = cnf.GetString("OfflineMessageURL", "");
             if (m_RestURL.Length == 0)
             {
-                m_log.Error("[OFFLINE MESSAGING] Module was enabled, but no URL is given, disabling");
+                m_logger?.LogError("[OFFLINE MESSAGING] Module was enabled, but no URL is given, disabling");
                 enabled = false;
                 return;
             }
@@ -108,7 +114,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
                     enabled = false;
                     m_SceneList.Clear();
 
-                    m_log.Error("[OFFLINE MESSAGING] No message transfer module is enabled. Diabling offline messages");
+                    m_logger?.LogError("[OFFLINE MESSAGING] No message transfer module is enabled. Diabling offline messages");
                 }
                 m_TransferModule.OnUndeliveredMessage += UndeliveredMessage;
             }
@@ -130,7 +136,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             if (!enabled)
                 return;
 
-            m_log.Debug("[OFFLINE MESSAGING] Offline messages enabled");
+            m_logger?.LogDebug("[OFFLINE MESSAGING] Offline messages enabled");
         }
 
         public string Name
@@ -188,7 +194,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             }
             else
             {
-                m_log.DebugFormat("[OFFLINE MESSAGING]: Retrieving stored messages for {0}", client.AgentId);
+                m_logger?.LogDebug("[OFFLINE MESSAGING]: Retrieving stored messages for {0}", client.AgentId);
 
                 List<GridInstantMessage> msglist
                     = SynchronousRestObjectRequester.MakeRequest<UUID, List<GridInstantMessage>>(

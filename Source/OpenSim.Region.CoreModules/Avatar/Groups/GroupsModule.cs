@@ -25,20 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Groups
 {
     public class GroupsModule : ISharedRegionModule
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private Dictionary<UUID, GroupMembershipData> m_GroupMap =
                 new Dictionary<UUID, GroupMembershipData>();
@@ -60,18 +63,19 @@ namespace OpenSim.Region.CoreModules.Avatar.Groups
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GroupsModule>>();
             IConfig groupsConfig = config.Configs["Groups"];
 
             if (groupsConfig == null)
             {
-                m_log.Info("[GROUPS]: No configuration found. Using defaults");
+                m_logger?.LogInformation("[GROUPS]: No configuration found. Using defaults");
             }
             else
             {
                 m_Enabled = groupsConfig.GetBoolean("Enabled", false);
                 if (!m_Enabled)
                 {
-                    m_log.Info("[GROUPS]: Groups disabled in configuration");
+                    m_logger?.LogInformation("[GROUPS]: Groups disabled in configuration");
                     return;
                 }
 

@@ -25,21 +25,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer
 {
     public class InventoryTransferModule : ISharedRegionModule
     {
-        private static readonly ILog m_log
-            = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <summary>
         private List<Scene> m_Scenelist = new List<Scene>();
@@ -51,6 +54,8 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<InventoryTransferModule>>();
+
             if (config.Configs["Messaging"] != null)
             {
                 // Allow disabling this module in config
@@ -145,7 +150,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer
 
         private void OnInstantMessage(IClientAPI client, GridInstantMessage im)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[INVENTORY TRANSFER]: {0} IM type received from client {1}. From={2} ({3}), To={4}",
 //                (InstantMessageDialog)im.dialog, client.Name,
 //                im.fromAgentID, im.fromAgentName, im.toAgentID);
@@ -194,7 +199,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer
                                 ids[new UUID(iddata, i + 1)] = (AssetType)im.binaryBucket[i];
                         }
 
-                        m_log.DebugFormat("[INVENTORY TRANSFER]: offering folder {0} to agent {1}'s inventory",
+                        m_logger?.LogDebug("[INVENTORY TRANSFER]: offering folder {0} to agent {1}'s inventory",
                             folderID, recipientID);
 
                         InventoryFolderBase folderCopy = scene.GiveInventoryFolder(client, recipientID, agentID, folderID, UUID.Zero, ids);
@@ -222,7 +227,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer
                             return;
                         }
 
-                        m_log.DebugFormat("[INVENTORY TRANSFER]: (giving) Inserting item {0} "+
+                        m_logger?.LogDebug("[INVENTORY TRANSFER]: (giving) Inserting item {0} "+
                                 "into agent {1}'s inventory",
                                 itemID, recipientID);
 

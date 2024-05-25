@@ -26,27 +26,31 @@
  */
 
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Text;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Console;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
+using Caps = OpenSim.Framework.Capabilities.Caps;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 
-using Caps = OpenSim.Framework.Capabilities.Caps;
+using OpenMetaverse;
+
+using Nini.Config;
+
 
 namespace OpenSim.Region.CoreModules.Framework
 {
     public class CapabilitiesModule : INonSharedRegionModule, ICapabilitiesModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private string m_showCapsCommandFormat = "   {0,-38} {1,-60}\n";
 
@@ -64,6 +68,7 @@ namespace OpenSim.Region.CoreModules.Framework
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<CapabilitiesModule>>();
         }
 
         public void AddRegion(Scene scene)
@@ -126,7 +131,7 @@ namespace OpenSim.Region.CoreModules.Framework
                 {
                     if (capsObjectPath == oldCaps.CapsObjectPath)
                     {
-                        //m_log.WarnFormat(
+                        //m_logger?.LogWarning(
                         //    "[CAPS]: Reusing caps for agent {0} in region {1}.  Old caps path {2}, new caps path {3}. ",
                         //    agentId, m_scene.RegionInfo.RegionName, oldCaps.CapsObjectPath, capsObjectPath);
                         return;
@@ -144,7 +149,7 @@ namespace OpenSim.Region.CoreModules.Framework
                     }
                 }
 
-                //m_log.DebugFormat(
+                //m_logger?.LogDebug(
                 //    "[CAPS]: Adding capabilities for agent {0} in {1} with path {2}",
                 //    agentId, m_scene.RegionInfo.RegionName, capsObjectPath);
 
@@ -152,7 +157,7 @@ namespace OpenSim.Region.CoreModules.Framework
                         (MainServer.Instance is null) ? 0: MainServer.Instance.Port,
                         capsObjectPath, agentId, m_scene.RegionInfo.RegionName);
 
-                m_log.Debug($"[CreateCaps]: new caps agent {agentId}, circuit {circuitCode}, path {caps.CapsObjectPath}");
+                m_logger?.LogDebug($"[CreateCaps]: new caps agent {agentId}, circuit {circuitCode}, path {caps.CapsObjectPath}");
 
                 m_capsObjects[circuitCode] = caps;
             }
@@ -161,7 +166,7 @@ namespace OpenSim.Region.CoreModules.Framework
 
         public void RemoveCaps(UUID agentId, uint circuitCode)
         {
-            m_log.DebugFormat("[CAPS]: Remove caps for agent {0} in region {1}", agentId, m_scene.RegionInfo.RegionName);
+            m_logger?.LogDebug("[CAPS]: Remove caps for agent {0} in region {1}", agentId, m_scene.RegionInfo.RegionName);
             lock (m_childrenSeeds)
             {
                 m_childrenSeeds.Remove(agentId);
@@ -187,7 +192,7 @@ namespace OpenSim.Region.CoreModules.Framework
                             return;
                         }
                     }
-                    m_log.WarnFormat(
+                    m_logger?.LogWarning(
                         "[CAPS]: Received request to remove CAPS handler for root agent {0} in {1}, but no such CAPS handler found!",
                         agentId, m_scene.RegionInfo.RegionName);
                 }
@@ -270,7 +275,7 @@ namespace OpenSim.Region.CoreModules.Framework
 
         public void SetChildrenSeed(UUID agentID, Dictionary<ulong, string> seeds)
         {
-            //m_log.DebugFormat(" !!! Setting child seeds in {0} to {1}", m_scene.RegionInfo.RegionName, seeds.Count);
+            //m_logger?.LogDebug(" !!! Setting child seeds in {0} to {1}", m_scene.RegionInfo.RegionName, seeds.Count);
 
             lock (m_childrenSeeds)
                 m_childrenSeeds[agentID] = seeds;
@@ -278,14 +283,14 @@ namespace OpenSim.Region.CoreModules.Framework
 
         public void DumpChildrenSeeds(UUID agentID)
         {
-            m_log.Info("================ ChildrenSeed "+m_scene.RegionInfo.RegionName+" ================");
+            m_logger?.LogInformation("================ ChildrenSeed "+m_scene.RegionInfo.RegionName+" ================");
 
             lock (m_childrenSeeds)
             {
                 foreach (KeyValuePair<ulong, string> kvp in m_childrenSeeds[agentID])
                 {
                     Util.RegionHandleToRegionLoc(kvp.Key, out uint x, out uint y);
-                    m_log.Info(" >> "+x+", "+y+": "+kvp.Value);
+                    m_logger?.LogInformation(" >> "+x+", "+y+": "+kvp.Value);
                 }
             }
         }

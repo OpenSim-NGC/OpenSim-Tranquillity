@@ -25,11 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
+using System.Collections;
+using System.Globalization;
+using System.Net;
+using System.Timers;
+using System.Xml;
+
 using Microsoft.Extensions.Logging;
-using Nini.Config;
-using Nwc.XmlRpc;
-using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
@@ -37,21 +40,22 @@ using OpenSim.Region.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
-using System.Collections;
-using System.Globalization;
-using System.Net;
-using System.Reflection;
-using System.Timers;
-using System.Xml;
+
+using OpenMetaverse;
+
+using Nwc.XmlRpc;
+
+using Nini.Config;
 
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using RegionInfo = OpenSim.Framework.RegionInfo;
+using OpenSim.Server.Base;
 
 namespace OpenSim.ApplicationPlugins.RemoteController
 {
     public class RemoteAdminPlugin : IApplicationPlugin
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private static bool m_defaultAvatarsLoaded = false;
         private static Object m_requestLock = new Object();
@@ -74,6 +78,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             IConfiguration configuration,
             ILogger<RemoteAdminPlugin> logger)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteAdminPlugin>>();
             _configuration = configuration;
             _logger = logger;
         }
@@ -90,7 +95,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
         public void Initialise()
         {
-            m_log.Error("[RADMIN]: " + Name + " cannot be default-initialized!");
+            m_logger.LogError("[RADMIN]: " + Name + " cannot be default-initialized!");
             throw new PluginNotInitialisedException(Name);
         }
 
@@ -108,7 +113,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 else
                 {
                     var config = _configuration.Configs["RemoteAdmin"];
-                    m_log.Debug("[RADMIN]: Remote Admin Plugin Enabled");
+                    m_logger.LogDebug("[RADMIN]: Remote Admin Plugin Enabled");
                     m_requiredPassword = config.GetString("access_password", String.Empty);
                     int port = config.GetInt("port", 0);
 
@@ -215,7 +220,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         {
             if (!CreateDefaultAvatars())
             {
-                m_log.Info("[RADMIN]: Default avatars not loaded");
+                m_logger.LogInformation("[RADMIN]: Default avatars not loaded");
             }
         }
 
@@ -242,7 +247,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat(
+                m_logger.LogError(
                     "[RADMIN]: Method {0} failed.  Exception {1}{2}", request.MethodName, e.Message, e.StackTrace);
 
                 responseData["success"] = false;
@@ -256,14 +261,14 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         {
             if (m_accessIP.Count > 0 && !m_accessIP.Contains(check_ip_address))
             {
-                m_log.WarnFormat("[RADMIN]: Unauthorized access blocked from IP {0}", check_ip_address);
+                m_logger.LogWarning("[RADMIN]: Unauthorized access blocked from IP {0}", check_ip_address);
                 responseData["accepted"] = false;
                 throw new Exception("not authorized");
             }
 
             if (m_requiredPassword != String.Empty && password != m_requiredPassword)
             {
-                m_log.WarnFormat("[RADMIN]: Wrong password, blocked access from IP {0}", check_ip_address);
+                m_logger.LogWarning("[RADMIN]: Wrong password, blocked access from IP {0}", check_ip_address);
                 responseData["accepted"] = false;
                 throw new Exception("wrong password");
             }
@@ -310,7 +315,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     string[] alertTimes = requestData["alerts"].ToString().Split(Util.SplitCommaArray);
                     if (alertTimes.Length == 1 && Convert.ToInt32(alertTimes[0]) == -1)
                     {
-                        m_log.Info("[RADMIN]: Request to cancel restart.");
+                        m_logger.LogInformation("[RADMIN]: Request to cancel restart.");
 
                         if (restartModule != null)
                         {
@@ -347,7 +352,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     }
                 }
 
-                m_log.Info("[RADMIN]: Request to restart Region.");
+                m_logger.LogInformation("[RADMIN]: Request to restart Region.");
 
                 message = "Region is restarting in {0}. Please save what you are doing and log out.";
 
@@ -363,7 +368,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
                 if (startupConfig.GetBoolean("SkipDelayOnEmptyRegion", false))
                 {
-                    m_log.Info("[RADMIN]: Counting affected avatars");
+                    m_logger.LogInformation("[RADMIN]: Counting affected avatars");
                     int agents = 0;
 
                     if (restartAll)
@@ -386,11 +391,11 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                         }
                     }
 
-                    m_log.InfoFormat("[RADMIN]: Avatars in region: {0}", agents);
+                    m_logger.LogInformation("[RADMIN]: Avatars in region: {0}", agents);
 
                     if (agents == 0)
                     {
-                        m_log.Info("[RADMIN]: No avatars detected, shutting down without delay");
+                        m_logger.LogInformation("[RADMIN]: No avatars detected, shutting down without delay");
 
                         times.Clear();
                         times.Add(0);
@@ -414,24 +419,24 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[RADMIN]: Restart region: failed: {0} {1}", e.Message, e.StackTrace);
+                m_logger.LogError("[RADMIN]: Restart region: failed: {0} {1}", e.Message, e.StackTrace);
                 responseData["rebooting"] = false;
 
                 throw;
             }
 
-            m_log.Info("[RADMIN]: Restart Region request complete");
+            m_logger.LogInformation("[RADMIN]: Restart Region request complete");
         }
 
         private void XmlRpcAlertMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Alert request started");
+            m_logger.LogInformation("[RADMIN]: Alert request started");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
 
             string message = (string)requestData["message"];
-            m_log.InfoFormat("[RADMIN]: Broadcasting: {0}", message);
+            m_logger.LogInformation("[RADMIN]: Broadcasting: {0}", message);
 
             responseData["accepted"] = true;
             responseData["success"] = true;
@@ -444,20 +449,20 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                             dialogModule.SendGeneralAlert(message);
                     });
 
-            m_log.Info("[RADMIN]: Alert request complete");
+            m_logger.LogInformation("[RADMIN]: Alert request complete");
         }
 
         public void XmlRpcDialogMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
             Hashtable responseData = (Hashtable)response.Value;
 
-            m_log.Info("[RADMIN]: Dialog request started");
+            m_logger.LogInformation("[RADMIN]: Dialog request started");
 
             Hashtable requestData = (Hashtable)request.Params[0];
 
             string message = (string)requestData["message"];
             string fromuuid = (string)requestData["from"];
-            m_log.InfoFormat("[RADMIN]: Broadcasting: {0}", message);
+            m_logger.LogInformation("[RADMIN]: Broadcasting: {0}", message);
 
             responseData["accepted"] = true;
             responseData["success"] = true;
@@ -470,20 +475,20 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                         dialogModule.SendNotificationToUsersInRegion(UUID.Zero, fromuuid, message);
                 });
 
-            m_log.Info("[RADMIN]: Dialog request complete");
+            m_logger.LogInformation("[RADMIN]: Dialog request complete");
         }
 
         private void XmlRpcLoadHeightmapMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Load height maps request started");
+            m_logger.LogInformation("[RADMIN]: Load height maps request started");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
 
-            //                m_log.DebugFormat("[RADMIN]: Load Terrain: XmlRpc {0}", request);
+            //                m_logger.LogDebug("[RADMIN]: Load Terrain: XmlRpc {0}", request);
             // foreach (string k in requestData.Keys)
             // {
-            //     m_log.DebugFormat("[RADMIN]: Load Terrain: XmlRpc {0}: >{1}< {2}",
+            //     m_logger.LogDebug("[RADMIN]: Load Terrain: XmlRpc {0}: >{1}< {2}",
             //                       k, (string)requestData[k], ((string)requestData[k]).Length);
             // }
 
@@ -508,17 +513,17 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 responseData["success"] = false;
             }
 
-            m_log.Info("[RADMIN]: Load height maps request complete");
+            m_logger.LogInformation("[RADMIN]: Load height maps request complete");
         }
 
         private void XmlRpcSaveHeightmapMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Save height maps request started");
+            m_logger.LogInformation("[RADMIN]: Save height maps request started");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
 
-            //                m_log.DebugFormat("[RADMIN]: Save Terrain: XmlRpc {0}", request.ToString());
+            //                m_logger.LogDebug("[RADMIN]: Save Terrain: XmlRpc {0}", request.ToString());
 
             CheckStringParameters(requestData, responseData, new string[] { "filename" });
             CheckRegionParams(requestData, responseData);
@@ -529,7 +534,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             if (scene != null)
             {
                 string file = (string)requestData["filename"];
-                m_log.InfoFormat("[RADMIN]: Terrain Saving: {0}", file);
+                m_logger.LogInformation("[RADMIN]: Terrain Saving: {0}", file);
 
                 responseData["accepted"] = true;
 
@@ -545,12 +550,12 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 responseData["success"] = false;
             }
 
-            m_log.Info("[RADMIN]: Save height maps request complete");
+            m_logger.LogInformation("[RADMIN]: Save height maps request complete");
         }
 
         private void XmlRpcShutdownMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Shutdown Administrator Request");
+            m_logger.LogInformation("[RADMIN]: Received Shutdown Administrator Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -614,7 +619,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
             responseData["success"] = true;
 
-            m_log.Info("[RADMIN]: Shutdown Administrator Request complete");
+            m_logger.LogInformation("[RADMIN]: Shutdown Administrator Request complete");
         }
 
         private void shutdownTimer_Elapsed(object sender, ElapsedEventArgs e)
@@ -687,7 +692,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         /// </remarks>
         private void XmlRpcCreateRegionMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: CreateRegion: new request");
+            m_logger.LogInformation("[RADMIN]: CreateRegion: new request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -728,7 +733,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 else
                 {
                     regionID = UUID.Random();
-                    m_log.DebugFormat("[RADMIN] CreateRegion: new region UUID {0}", regionID);
+                    m_logger.LogDebug("[RADMIN] CreateRegion: new region UUID {0}", regionID);
                 }
 
                 // create volatile or persistent region info
@@ -813,7 +818,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                                                                 Replace("/", "_")));
                     }
 
-                    m_log.DebugFormat("[RADMIN] CreateRegion: persisting region {0} to {1}",
+                    m_logger.LogDebug("[RADMIN] CreateRegion: persisting region {0} to {1}",
                                       region.RegionID, regionIniPath);
                     region.SaveRegionToFile("dynamic region", regionIniPath);
                 }
@@ -928,7 +933,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 responseData["region_name"] = region.RegionName;
                 responseData["region_id"] = region.RegionID.ToString();
 
-                m_log.Info("[RADMIN]: CreateRegion: request complete");
+                m_logger.LogInformation("[RADMIN]: CreateRegion: request complete");
             }
         }
 
@@ -960,7 +965,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         /// </remarks>
         private void XmlRpcDeleteRegionMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: DeleteRegion: new request");
+            m_logger.LogInformation("[RADMIN]: DeleteRegion: new request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -979,7 +984,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 responseData["region_name"] = scene.RegionInfo.RegionName;
                 responseData["region_id"] = scene.RegionInfo.RegionID;
 
-                m_log.Info("[RADMIN]: DeleteRegion: request complete");
+                m_logger.LogInformation("[RADMIN]: DeleteRegion: request complete");
             }
         }
 
@@ -1013,7 +1018,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         /// </remarks>
         private void XmlRpcCloseRegionMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: CloseRegion: new request");
+            m_logger.LogInformation("[RADMIN]: CloseRegion: new request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -1033,7 +1038,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
                 response.Value = responseData;
 
-                m_log.Info("[RADMIN]: CloseRegion: request complete");
+                m_logger.LogInformation("[RADMIN]: CloseRegion: request complete");
             }
         }
 
@@ -1071,7 +1076,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         /// </remarks>
         private void XmlRpcModifyRegionMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: ModifyRegion: new request");
+            m_logger.LogInformation("[RADMIN]: ModifyRegion: new request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -1114,7 +1119,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 responseData["region_name"] = scene.RegionInfo.RegionName;
                 responseData["region_id"] = scene.RegionInfo.RegionID;
 
-                m_log.Info("[RADMIN]: ModifyRegion: request complete");
+                m_logger.LogInformation("[RADMIN]: ModifyRegion: request complete");
             }
         }
 
@@ -1158,7 +1163,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         /// </remarks>
         private void XmlRpcCreateUserMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: CreateUser: new request");
+            m_logger.LogInformation("[RADMIN]: CreateUser: new request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -1202,12 +1207,12 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                                         (int)Util.RegionToWorldLoc(regionXLocation), (int)Util.RegionToWorldLoc(regionYLocation));
                     if (null == home)
                     {
-                        m_log.WarnFormat("[RADMIN]: Unable to set home region for newly created user account {0} {1}", firstName, lastName);
+                        m_logger.LogWarning("[RADMIN]: Unable to set home region for newly created user account {0} {1}", firstName, lastName);
                     }
                     else
                     {
                         scene.GridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0));
-                        m_log.DebugFormat("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, firstName, lastName);
+                        m_logger.LogDebug("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, firstName, lastName);
                     }
 
                     // Establish the avatar's initial appearance
@@ -1217,7 +1222,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     responseData["success"] = true;
                     responseData["avatar_uuid"] = account.PrincipalID.ToString();
 
-                    m_log.InfoFormat("[RADMIN]: CreateUser: User {0} {1} created, UUID {2}", firstName, lastName, account.PrincipalID);
+                    m_logger.LogInformation("[RADMIN]: CreateUser: User {0} {1} created, UUID {2}", firstName, lastName, account.PrincipalID);
                 }
                 catch
                 {
@@ -1225,7 +1230,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     throw;
                 }
 
-                m_log.Info("[RADMIN]: CreateUser: request complete");
+                m_logger.LogInformation("[RADMIN]: CreateUser: request complete");
             }
         }
 
@@ -1263,7 +1268,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         /// </remarks>
         private void XmlRpcUserExistsMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: UserExists: new request");
+            m_logger.LogInformation("[RADMIN]: UserExists: new request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -1297,7 +1302,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 responseData["success"] = true;
             }
 
-            m_log.Info("[RADMIN]: UserExists: request complete");
+            m_logger.LogInformation("[RADMIN]: UserExists: request complete");
         }
 
         /// <summary>
@@ -1344,8 +1349,8 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         /// </remarks>
         private void XmlRpcUpdateUserAccountMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: UpdateUserAccount: new request");
-            m_log.Warn("[RADMIN]: This method needs update for 0.7");
+            m_logger.LogInformation("[RADMIN]: UpdateUserAccount: new request");
+            m_logger.LogWarning("[RADMIN]: This method needs update for 0.7");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -1408,7 +1413,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
                     if (!String.IsNullOrEmpty(password))
                     {
-                        m_log.DebugFormat("[RADMIN]: UpdateUserAccount: updating password for avatar {0} {1}", firstName, lastName);
+                        m_logger.LogDebug("[RADMIN]: UpdateUserAccount: updating password for avatar {0} {1}", firstName, lastName);
                         ChangeUserPassword(firstName, lastName, password);
                     }
 
@@ -1431,12 +1436,12 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                                         (int)Util.RegionToWorldLoc((uint)regionXLocation), (int)Util.RegionToWorldLoc((uint)regionYLocation));
                         if (null == home)
                         {
-                            m_log.WarnFormat("[RADMIN]: Unable to set home region for updated user account {0} {1}", firstName, lastName);
+                            m_logger.LogWarning("[RADMIN]: Unable to set home region for updated user account {0} {1}", firstName, lastName);
                         }
                         else
                         {
                             scene.GridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0));
-                            m_log.DebugFormat("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, firstName, lastName);
+                            m_logger.LogDebug("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, firstName, lastName);
                         }
                     }
 
@@ -1447,7 +1452,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     responseData["success"] = true;
                     responseData["avatar_uuid"] = account.PrincipalID.ToString();
 
-                    m_log.InfoFormat("[RADMIN]: UpdateUserAccount: account for user {0} {1} updated, UUID {2}",
+                    m_logger.LogInformation("[RADMIN]: UpdateUserAccount: account for user {0} {1} updated, UUID {2}",
                                      firstName, lastName,
                                      account.PrincipalID);
                 }
@@ -1457,7 +1462,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     throw;
                 }
 
-                m_log.Info("[RADMIN]: UpdateUserAccount: request complete");
+                m_logger.LogInformation("[RADMIN]: UpdateUserAccount: request complete");
             }
         }
 
@@ -1496,7 +1501,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         private void XmlRpcAuthenticateUserMethod(XmlRpcRequest request, XmlRpcResponse response,
                                                    IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: AuthenticateUser: new request");
+            m_logger.LogInformation("[RADMIN]: AuthenticateUser: new request");
 
             var responseData = (Hashtable)response.Value;
             var requestData = (Hashtable)request.Params[0];
@@ -1521,7 +1526,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
                     if (scene.Equals(null))
                     {
-                        m_log.Debug("scene does not exist");
+                        m_logger.LogDebug("scene does not exist");
                         throw new Exception("Scene does not exist.");
                     }
 
@@ -1530,13 +1535,13 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
                     if (account.Equals(null) || account.PrincipalID.Equals(UUID.Zero))
                     {
-                        m_log.DebugFormat("avatar {0} {1} does not exist", firstName, lastName);
+                        m_logger.LogDebug("avatar {0} {1} does not exist", firstName, lastName);
                         throw new Exception(String.Format("avatar {0} {1} does not exist", firstName, lastName));
                     }
 
                     if (String.IsNullOrEmpty(password))
                     {
-                        m_log.DebugFormat("[RADMIN]: AuthenticateUser: no password provided for {0} {1}", firstName,
+                        m_logger.LogDebug("[RADMIN]: AuthenticateUser: no password provided for {0} {1}", firstName,
                                           lastName);
                         throw new Exception(String.Format("no password provided for {0} {1}", firstName,
                                           lastName));
@@ -1545,7 +1550,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     int lifetime;
                     if (int.TryParse((string)requestData["token_lifetime"], NumberStyles.Integer, CultureInfo.InvariantCulture, out lifetime) == false)
                     {
-                        m_log.DebugFormat("[RADMIN]: AuthenticateUser: no token lifetime provided for {0} {1}", firstName,
+                        m_logger.LogDebug("[RADMIN]: AuthenticateUser: no token lifetime provided for {0} {1}", firstName,
                                           lastName);
                         throw new Exception(String.Format("no token lifetime provided for {0} {1}", firstName,
                                           lastName));
@@ -1554,7 +1559,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     // Upper bound on lifetime set to 30s.
                     if (lifetime > 30)
                     {
-                        m_log.DebugFormat("[RADMIN]: AuthenticateUser: token lifetime longer than 30s for {0} {1}", firstName,
+                        m_logger.LogDebug("[RADMIN]: AuthenticateUser: token lifetime longer than 30s for {0} {1}", firstName,
                                           lastName);
                         throw new Exception(String.Format("token lifetime longer than 30s for {0} {1}", firstName,
                                           lastName));
@@ -1563,20 +1568,20 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     var authModule = scene.RequestModuleInterface<IAuthenticationService>();
                     if (authModule == null)
                     {
-                        m_log.Debug("[RADMIN]: AuthenticateUser: no authentication module loded");
+                        m_logger.LogDebug("[RADMIN]: AuthenticateUser: no authentication module loded");
                         throw new Exception("no authentication module loaded");
                     }
 
                     var token = authModule.Authenticate(account.PrincipalID, password, lifetime);
                     if (String.IsNullOrEmpty(token))
                     {
-                        m_log.DebugFormat("[RADMIN]: AuthenticateUser: authentication failed for {0} {1}", firstName,
+                        m_logger.LogDebug("[RADMIN]: AuthenticateUser: authentication failed for {0} {1}", firstName,
                             lastName);
                         throw new Exception(String.Format("authentication failed for {0} {1}", firstName,
                             lastName));
                     }
 
-                    m_log.DebugFormat("[RADMIN]: AuthenticateUser: account for user {0} {1} identified with token {2}",
+                    m_logger.LogDebug("[RADMIN]: AuthenticateUser: account for user {0} {1} identified with token {2}",
                         firstName, lastName, token);
 
                     responseData["token"] = token;
@@ -1589,7 +1594,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     throw;
                 }
 
-                m_log.Info("[RADMIN]: AuthenticateUser: request complete");
+                m_logger.LogInformation("[RADMIN]: AuthenticateUser: request complete");
             }
         }
 
@@ -1631,7 +1636,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         /// </remarks>
         private void XmlRpcLoadOARMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Load OAR Administrator Request");
+            m_logger.LogInformation("[RADMIN]: Received Load OAR Administrator Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -1691,7 +1696,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     throw;
                 }
 
-                m_log.Info("[RADMIN]: Load OAR Administrator Request complete");
+                m_logger.LogInformation("[RADMIN]: Load OAR Administrator Request complete");
             }
         }
 
@@ -1737,7 +1742,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         /// </remarks>
         private void XmlRpcSaveOARMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Save OAR Request");
+            m_logger.LogInformation("[RADMIN]: Received Save OAR Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -1790,7 +1795,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     Guid requestId = Guid.NewGuid();
                     scene.EventManager.OnOarFileSaved += RemoteAdminOarSaveCompleted;
 
-                    m_log.InfoFormat(
+                    m_logger.LogInformation(
                         "[RADMIN]: Submitting save OAR request for {0} to file {1}, request ID {2}",
                         scene.Name, filename, requestId);
 
@@ -1814,15 +1819,15 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 throw;
             }
 
-            m_log.Info("[RADMIN]: Save OAR Request complete");
+            m_logger.LogInformation("[RADMIN]: Save OAR Request complete");
         }
 
         private void RemoteAdminOarSaveCompleted(Guid uuid, string name)
         {
             if (name != "")
-                m_log.ErrorFormat("[RADMIN]: Saving of OAR file with request ID {0} failed with message {1}", uuid, name);
+                m_logger.LogError("[RADMIN]: Saving of OAR file with request ID {0} failed with message {1}", uuid, name);
             else
-                m_log.DebugFormat("[RADMIN]: Saved OAR file for request {0}", uuid);
+                m_logger.LogDebug("[RADMIN]: Saved OAR file for request {0}", uuid);
 
             lock (m_saveOarLock)
                 Monitor.Pulse(m_saveOarLock);
@@ -1830,7 +1835,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
         private void XmlRpcLoadXMLMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Load XML Administrator Request");
+            m_logger.LogInformation("[RADMIN]: Received Load XML Administrator Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -1878,13 +1883,13 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     throw;
                 }
 
-                m_log.Info("[RADMIN]: Load XML Administrator Request complete");
+                m_logger.LogInformation("[RADMIN]: Load XML Administrator Request complete");
             }
         }
 
         private void XmlRpcSaveXMLMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Save XML Administrator Request");
+            m_logger.LogInformation("[RADMIN]: Received Save XML Administrator Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -1930,7 +1935,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 throw;
             }
 
-            m_log.Info("[RADMIN]: Save XML Administrator Request complete");
+            m_logger.LogInformation("[RADMIN]: Save XML Administrator Request complete");
         }
 
         private void XmlRpcRegionQueryMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
@@ -1964,7 +1969,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
         private void XmlRpcConsoleCommandMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Command XML Administrator Request");
+            m_logger.LogInformation("[RADMIN]: Received Command XML Administrator Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -1973,12 +1978,12 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
             MainConsole.Instance.RunCommand(requestData["command"].ToString());
 
-            m_log.Info("[RADMIN]: Command XML Administrator Request complete");
+            m_logger.LogInformation("[RADMIN]: Command XML Administrator Request complete");
         }
 
         private void XmlRpcAccessListClear(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Access List Clear Request");
+            m_logger.LogInformation("[RADMIN]: Received Access List Clear Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -1995,12 +2000,12 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             if (scene.RegionInfo.Persistent)
                 m_application.EstateDataService.StoreEstateSettings(scene.RegionInfo.EstateSettings);
 
-            m_log.Info("[RADMIN]: Access List Clear Request complete");
+            m_logger.LogInformation("[RADMIN]: Access List Clear Request complete");
         }
 
         private void XmlRpcAccessListAdd(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Access List Add Request");
+            m_logger.LogInformation("[RADMIN]: Received Access List Add Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -2025,7 +2030,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     if (account != null)
                     {
                         uuids.Add(account.PrincipalID);
-                        m_log.DebugFormat("[RADMIN]: adding \"{0}\" to ACL for \"{1}\"", name, scene.RegionInfo.RegionName);
+                        m_logger.LogDebug("[RADMIN]: adding \"{0}\" to ACL for \"{1}\"", name, scene.RegionInfo.RegionName);
                     }
                 }
                 List<UUID> accessControlList = new List<UUID>(scene.RegionInfo.EstateSettings.EstateAccess);
@@ -2044,12 +2049,12 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
             responseData["added"] = addedUsers;
 
-            m_log.Info("[RADMIN]: Access List Add Request complete");
+            m_logger.LogInformation("[RADMIN]: Access List Add Request complete");
         }
 
         private void XmlRpcAccessListRemove(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Access List Remove Request");
+            m_logger.LogInformation("[RADMIN]: Received Access List Remove Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -2094,12 +2099,12 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             responseData["removed"] = removedUsers;
             responseData["success"] = true;
 
-            m_log.Info("[RADMIN]: Access List Remove Request complete");
+            m_logger.LogInformation("[RADMIN]: Access List Remove Request complete");
         }
 
         private void XmlRpcAccessListList(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Access List List Request");
+            m_logger.LogInformation("[RADMIN]: Received Access List List Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -2125,12 +2130,12 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             responseData["users"] = users;
             responseData["success"] = true;
 
-            m_log.Info("[RADMIN]: Access List List Request complete");
+            m_logger.LogInformation("[RADMIN]: Access List List Request complete");
         }
 
         private void XmlRpcEstateReload(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Estate Reload Request");
+            m_logger.LogInformation("[RADMIN]: Received Estate Reload Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             //            Hashtable requestData = (Hashtable)request.Params[0];
@@ -2141,7 +2146,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
             responseData["success"] = true;
 
-            m_log.Info("[RADMIN]: Estate Reload Request complete");
+            m_logger.LogInformation("[RADMIN]: Estate Reload Request complete");
         }
 
         private void XmlRpcGetAgentsMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
@@ -2202,7 +2207,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 xmlrpcAgents.Add(xmlRpcAgent);
             }
 
-            m_log.DebugFormat(
+            m_logger.LogDebug(
                 "[REMOTE ADMIN]: XmlRpcGetAgents found {0} agents in {1}", xmlrpcAgents.Count, scene.Name);
 
             xmlRpcRegion["agents"] = xmlrpcAgents;
@@ -2284,7 +2289,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             if (requestData.Contains("flags") && requestData["flags"] != null)
                 set_flags = UInt32.TryParse(requestData["flags"].ToString(), out flags);
 
-            m_log.InfoFormat("[RADMIN]: Received Reset Land Request group={0} musicURL={1} flags={2}",
+            m_logger.LogInformation("[RADMIN]: Received Reset Land Request group={0} musicURL={1} flags={2}",
                 (set_group ? groupID.ToString() : "unchanged"),
                 (set_music ? musicURL : "unchanged"),
                 (set_flags ? flags.ToString() : "unchanged"));
@@ -2305,12 +2310,12 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             }
             );
             responseData["success"] = true;
-            m_log.Info("[RADMIN]: Reset Land Request complete");
+            m_logger.LogInformation("[RADMIN]: Reset Land Request complete");
         }
 
         private void XmlRpcRefreshSearch(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Refresh Search Request");
+            m_logger.LogInformation("[RADMIN]: Received Refresh Search Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -2331,12 +2336,12 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 responseData["success"] = false;
             }
 
-            m_log.Info("[RADMIN]: Refresh Search Request complete");
+            m_logger.LogInformation("[RADMIN]: Refresh Search Request complete");
         }
 
         private void XmlRpcRefreshMap(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Refresh Map Request");
+            m_logger.LogInformation("[RADMIN]: Received Refresh Map Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -2360,24 +2365,24 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 responseData["success"] = false;
             }
 
-            m_log.Info("[RADMIN]: Refresh Map Request complete");
+            m_logger.LogInformation("[RADMIN]: Refresh Map Request complete");
         }
 
         private void XmlRpcGetOpenSimVersion(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Get OpenSim Version Request");
+            m_logger.LogInformation("[RADMIN]: Received Get OpenSim Version Request");
 
             Hashtable responseData = (Hashtable)response.Value;
 
             responseData["version"] = m_openSimVersion;
             responseData["success"] = true;
 
-            m_log.Info("[RADMIN]: Get OpenSim Version Request complete");
+            m_logger.LogInformation("[RADMIN]: Get OpenSim Version Request complete");
         }
 
         private void XmlRpcGetAgentCount(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
         {
-            m_log.Info("[RADMIN]: Received Get Agent Count Request");
+            m_logger.LogInformation("[RADMIN]: Received Get Agent Count Request");
 
             Hashtable responseData = (Hashtable)response.Value;
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -2397,7 +2402,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 responseData["success"] = true;
             }
 
-            m_log.Info("[RADMIN]: Get Agent Count Request complete");
+            m_logger.LogInformation("[RADMIN]: Get Agent Count Request complete");
         }
 
         /// <summary>
@@ -2588,7 +2593,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     {
                         success = authenticationService.SetPassword(account.PrincipalID, password);
                         if (!success)
-                            m_log.WarnFormat("[RADMIN]: Unable to set password for account {0} {1}.",
+                            m_logger.LogWarning("[RADMIN]: Unable to set password for account {0} {1}.",
                                 firstName, lastName);
                     }
 
@@ -2602,32 +2607,32 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                         if (gridUserService != null && home != null)
                             gridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0));
                         else
-                            m_log.WarnFormat("[RADMIN]: Unable to set home for account {0} {1}.",
+                            m_logger.LogWarning("[RADMIN]: Unable to set home for account {0} {1}.",
                                firstName, lastName);
                     }
                     else
-                        m_log.WarnFormat("[RADMIN]: Unable to retrieve home region for account {0} {1}.",
+                        m_logger.LogWarning("[RADMIN]: Unable to retrieve home region for account {0} {1}.",
                            firstName, lastName);
 
                     if (inventoryService != null)
                     {
                         success = inventoryService.CreateUserInventory(account.PrincipalID);
                         if (!success)
-                            m_log.WarnFormat("[RADMIN]: Unable to create inventory for account {0} {1}.",
+                            m_logger.LogWarning("[RADMIN]: Unable to create inventory for account {0} {1}.",
                                 firstName, lastName);
                     }
 
-                    m_log.InfoFormat("[RADMIN]: Account {0} {1} created successfully", firstName, lastName);
+                    m_logger.LogInformation("[RADMIN]: Account {0} {1} created successfully", firstName, lastName);
                     return account;
                 }
                 else
                 {
-                    m_log.ErrorFormat("[RADMIN]: Account creation failed for account {0} {1}", firstName, lastName);
+                    m_logger.LogError("[RADMIN]: Account creation failed for account {0} {1}", firstName, lastName);
                 }
             }
             else
             {
-                m_log.ErrorFormat("[RADMIN]: A user with the name {0} {1} already exists!", firstName, lastName);
+                m_logger.LogError("[RADMIN]: A user with the name {0} {1} already exists!", firstName, lastName);
             }
             return null;
         }
@@ -2653,7 +2658,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
                 if (!success)
                 {
-                    m_log.WarnFormat("[RADMIN]: Unable to set password for account {0} {1}.",
+                    m_logger.LogWarning("[RADMIN]: Unable to set password for account {0} {1}.",
                        firstName, lastName);
                     return false;
                 }
@@ -2661,20 +2666,20 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             }
             else
             {
-                m_log.ErrorFormat("[RADMIN]: No such user");
+                m_logger.LogError("[RADMIN]: No such user");
                 return false;
             }
         }
 
         private bool LoadHeightmap(string file, UUID regionID)
         {
-            m_log.InfoFormat("[RADMIN]: Terrain Loading: {0}", file);
+            m_logger.LogInformation("[RADMIN]: Terrain Loading: {0}", file);
 
             Scene region = null;
 
             if (!m_application.SceneManager.TryGetScene(regionID, out region))
             {
-                m_log.InfoFormat("[RADMIN]: unable to get a scene with that name: {0}", regionID.ToString());
+                m_logger.LogInformation("[RADMIN]: unable to get a scene with that name: {0}", regionID.ToString());
                 return false;
             }
 
@@ -2682,7 +2687,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             if (null == terrainModule) throw new Exception("terrain module not available");
             if (Uri.IsWellFormedUriString(file, UriKind.Absolute))
             {
-                m_log.Info("[RADMIN]: Terrain path is URL");
+                m_logger.LogInformation("[RADMIN]: Terrain path is URL");
                 Uri result;
                 if (Uri.TryCreate(file, UriKind.RelativeOrAbsolute, out result))
                 {
@@ -2696,7 +2701,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 terrainModule.LoadFromFile(file);
             }
 
-            m_log.Info("[RADMIN]: Load height maps request complete");
+            m_logger.LogInformation("[RADMIN]: Load height maps request complete");
 
             return true;
         }
@@ -2710,7 +2715,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         /// </summary>
         private void UpdateUserAppearance(Hashtable responseData, Hashtable requestData, UUID userid)
         {
-            m_log.DebugFormat("[RADMIN]: updateUserAppearance");
+            m_logger.LogDebug("[RADMIN]: updateUserAppearance");
 
             var config = _configuration.Configs["RemoteAdmin"];
 
@@ -2754,16 +2759,16 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
             if (String.IsNullOrEmpty(model))
             {
-                m_log.DebugFormat("[RADMIN]: Appearance update not requested");
+                m_logger.LogDebug("[RADMIN]: Appearance update not requested");
                 return;
             }
 
-            m_log.DebugFormat("[RADMIN]: Setting appearance for avatar {0}, using model <{1}>", userid, model);
+            m_logger.LogDebug("[RADMIN]: Setting appearance for avatar {0}, using model <{1}>", userid, model);
 
             string[] modelSpecifiers = model.Split();
             if (modelSpecifiers.Length != 2)
             {
-                m_log.WarnFormat("[RADMIN]: User appearance not set for {0}. Invalid model name : <{1}>", userid, model);
+                m_logger.LogWarning("[RADMIN]: User appearance not set for {0}. Invalid model name : <{1}>", userid, model);
                 // modelSpecifiers = dmodel.Split();
                 return;
             }
@@ -2774,7 +2779,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
             if (modelProfile == null)
             {
-                m_log.WarnFormat("[RADMIN]: Requested model ({0}) not found. Appearance unchanged", model);
+                m_logger.LogWarning("[RADMIN]: Requested model ({0}) not found. Appearance unchanged", model);
                 return;
             }
 
@@ -2784,7 +2789,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
             EstablishAppearance(userid, modelProfile.PrincipalID);
 
-            m_log.DebugFormat("[RADMIN]: Finished setting appearance for avatar {0}, using model {1}",
+            m_logger.LogDebug("[RADMIN]: Finished setting appearance for avatar {0}, using model {1}",
                               userid, model);
         }
 
@@ -2795,7 +2800,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         /// </summary>
         private void EstablishAppearance(UUID destination, UUID source)
         {
-            m_log.DebugFormat("[RADMIN]: Initializing inventory for {0} from {1}", destination, source);
+            m_logger.LogDebug("[RADMIN]: Initializing inventory for {0} from {1}", destination, source);
             Scene scene = m_application.SceneManager.CurrentOrFirstScene;
 
             // If the model has no associated appearance we're done.
@@ -2818,7 +2823,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("[RADMIN]: Error transferring appearance for {0} : {1}",
+                    m_logger.LogWarning("[RADMIN]: Error transferring appearance for {0} : {1}",
                                       destination, e.Message);
                 }
 
@@ -2849,7 +2854,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[RADMIN]: Error transferring appearance for {0} : {1}",
+                m_logger.LogWarning("[RADMIN]: Error transferring appearance for {0} : {1}",
                                    destination, e.Message);
             }
 
@@ -2883,7 +2888,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 destinationFolder.ParentID = inventoryService.GetRootFolder(destination).ID;
                 destinationFolder.Version = 1;
                 inventoryService.AddFolder(destinationFolder);     // store base record
-                m_log.ErrorFormat("[RADMIN]: Created folder for destination {0}", source);
+                m_logger.LogError("[RADMIN]: Created folder for destination {0}", source);
             }
 
             // Wearables
@@ -2924,7 +2929,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                         ApplyNextOwnerPermissions(destinationItem);
 
                         m_application.SceneManager.CurrentOrFirstScene.AddInventoryItem(destinationItem);
-                        m_log.DebugFormat("[RADMIN]: Added item {0} to folder {1}", destinationItem.ID, destinationFolder.ID);
+                        m_logger.LogDebug("[RADMIN]: Added item {0} to folder {1}", destinationItem.ID, destinationFolder.ID);
 
                         // Wear item
                         AvatarWearable newWearable = new AvatarWearable();
@@ -2933,7 +2938,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     }
                     else
                     {
-                        m_log.WarnFormat("[RADMIN]: Error transferring {0} to folder {1}", wearable[0].ItemID, destinationFolder.ID);
+                        m_logger.LogWarning("[RADMIN]: Error transferring {0} to folder {1}", wearable[0].ItemID, destinationFolder.ID);
                     }
                 }
             }
@@ -2977,15 +2982,15 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                         ApplyNextOwnerPermissions(destinationItem);
 
                         m_application.SceneManager.CurrentOrFirstScene.AddInventoryItem(destinationItem);
-                        m_log.DebugFormat("[RADMIN]: Added item {0} to folder {1}", destinationItem.ID, destinationFolder.ID);
+                        m_logger.LogDebug("[RADMIN]: Added item {0} to folder {1}", destinationItem.ID, destinationFolder.ID);
 
                         // Attach item
                         avatarAppearance.SetAttachment(attachpoint, destinationItem.ID, destinationItem.AssetID);
-                        m_log.DebugFormat("[RADMIN]: Attached {0}", destinationItem.ID);
+                        m_logger.LogDebug("[RADMIN]: Attached {0}", destinationItem.ID);
                     }
                     else
                     {
-                        m_log.WarnFormat("[RADMIN]: Error transferring {0} to folder {1}", itemID, destinationFolder.ID);
+                        m_logger.LogWarning("[RADMIN]: Error transferring {0} to folder {1}", itemID, destinationFolder.ID);
                     }
                 }
             }
@@ -3024,7 +3029,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 sourceFolder.ParentID = inventoryService.GetRootFolder(source).ID;
                 sourceFolder.Version = 1;
                 inventoryService.AddFolder(sourceFolder);     // store base record
-                m_log.ErrorFormat("[RADMIN] Created folder for source {0}", source);
+                m_logger.LogError("[RADMIN] Created folder for source {0}", source);
             }
 
             // Missing destination folder? This should *never* be the case
@@ -3045,7 +3050,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 destinationFolder.ParentID = inventoryService.GetRootFolder(destination).ID;
                 destinationFolder.Version = 1;
                 inventoryService.AddFolder(destinationFolder);     // store base record
-                m_log.ErrorFormat("[RADMIN]: Created folder for destination {0}", source);
+                m_logger.LogError("[RADMIN]: Created folder for destination {0}", source);
             }
 
             InventoryFolderBase extraFolder;
@@ -3062,7 +3067,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 extraFolder.ParentID = destinationFolder.ID;
                 inventoryService.AddFolder(extraFolder);
 
-                m_log.DebugFormat("[RADMIN]: Added folder {0} to folder {1}", extraFolder.ID, sourceFolder.ID);
+                m_logger.LogDebug("[RADMIN]: Added folder {0} to folder {1}", extraFolder.ID, sourceFolder.ID);
 
                 List<InventoryItemBase> items = inventoryService.GetFolderContent(source, folder.ID).Items;
 
@@ -3093,14 +3098,14 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
                     m_application.SceneManager.CurrentOrFirstScene.AddInventoryItem(destinationItem);
                     inventoryMap.Add(item.ID, destinationItem.ID);
-                    m_log.DebugFormat("[RADMIN]: Added item {0} to folder {1}", destinationItem.ID, extraFolder.ID);
+                    m_logger.LogDebug("[RADMIN]: Added item {0} to folder {1}", destinationItem.ID, extraFolder.ID);
 
                     // Attach item, if original is attached
                     int attachpoint = avatarAppearance.GetAttachpoint(item.ID);
                     if (attachpoint != 0)
                     {
                         avatarAppearance.SetAttachment(attachpoint, destinationItem.ID, destinationItem.AssetID);
-                        m_log.DebugFormat("[RADMIN]: Attached {0}", destinationItem.ID);
+                        m_logger.LogDebug("[RADMIN]: Attached {0}", destinationItem.ID);
                     }
                 }
             }
@@ -3143,7 +3148,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 return false;
             }
 
-            m_log.DebugFormat("[RADMIN]: Creating default avatar entries");
+            m_logger.LogDebug("[RADMIN]: Creating default avatar entries");
 
             m_defaultAvatarsLoaded = true;
 
@@ -3200,7 +3205,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
                     foreach (XmlElement avatar in avatars)
                     {
-                        m_log.DebugFormat("[RADMIN]: Loading appearance for {0}, gender = {1}",
+                        m_logger.LogDebug("[RADMIN]: Loading appearance for {0}, gender = {1}",
                             GetStringAttribute(avatar, "name", "?"), GetStringAttribute(avatar, "gender", "?"));
 
                         // Create the user identified by the avatar entry
@@ -3222,7 +3227,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                                 account = CreateUser(scopeID, names[0], names[1], password, email);
                                 if (null == account)
                                 {
-                                    m_log.ErrorFormat("[RADMIN]: Avatar {0} {1} was not created", names[0], names[1]);
+                                    m_logger.LogError("[RADMIN]: Avatar {0} {1} was not created", names[0], names[1]);
                                     return false;
                                 }
                             }
@@ -3233,22 +3238,22 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                                         (int)Util.RegionToWorldLoc(regionXLocation), (int)Util.RegionToWorldLoc(regionYLocation));
                             if (null == home)
                             {
-                                m_log.WarnFormat("[RADMIN]: Unable to set home region for newly created user account {0} {1}", names[0], names[1]);
+                                m_logger.LogWarning("[RADMIN]: Unable to set home region for newly created user account {0} {1}", names[0], names[1]);
                             }
                             else
                             {
                                 scene.GridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0));
-                                m_log.DebugFormat("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, names[0], names[1]);
+                                m_logger.LogDebug("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, names[0], names[1]);
                             }
 
                             ID = account.PrincipalID;
 
-                            m_log.DebugFormat("[RADMIN]: User {0}[{1}] created or retrieved", name, ID);
+                            m_logger.LogDebug("[RADMIN]: User {0}[{1}] created or retrieved", name, ID);
                             include = true;
                         }
                         catch (Exception e)
                         {
-                            m_log.DebugFormat("[RADMIN]: Error creating user {0} : {1}", name, e.Message);
+                            m_logger.LogDebug("[RADMIN]: Error creating user {0} : {1}", name, e.Message);
                             include = false;
                         }
 
@@ -3272,7 +3277,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
                             try
                             {
-                                // m_log.DebugFormat("[RADMIN] {0} folders, {1} items in inventory",
+                                // m_logger.LogDebug("[RADMIN] {0} folders, {1} items in inventory",
                                 //   uic.folders.Count, uic.items.Count);
 
                                 InventoryFolderBase clothingFolder = inventoryService.GetFolderForType(ID, FolderType.Clothing);
@@ -3288,7 +3293,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                                     clothingFolder.ParentID = inventoryService.GetRootFolder(ID).ID;
                                     clothingFolder.Version = 1;
                                     inventoryService.AddFolder(clothingFolder);     // store base record
-                                    m_log.ErrorFormat("[RADMIN]: Created clothing folder for {0}/{1}", name, ID);
+                                    m_logger.LogError("[RADMIN]: Created clothing folder for {0}/{1}", name, ID);
                                 }
 
                                 // OK, now we have an inventory for the user, read in the outfits from the
@@ -3301,7 +3306,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
                                 foreach (XmlElement outfit in outfits)
                                 {
-                                    m_log.DebugFormat("[RADMIN]: Loading outfit {0} for {1}",
+                                    m_logger.LogDebug("[RADMIN]: Loading outfit {0} for {1}",
                                         GetStringAttribute(outfit, "name", "?"), GetStringAttribute(avatar, "name", "?"));
 
                                     outfitName = GetStringAttribute(outfit, "name", "");
@@ -3325,7 +3330,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                                     // Otherwise, we must create the folder.
                                     if (extraFolder == null)
                                     {
-                                        m_log.DebugFormat("[RADMIN]: Creating outfit folder {0} for {1}", outfitName, name);
+                                        m_logger.LogDebug("[RADMIN]: Creating outfit folder {0} for {1}", outfitName, name);
                                         extraFolder = new InventoryFolderBase();
                                         extraFolder.ID = UUID.Random();
                                         extraFolder.Name = outfitName;
@@ -3334,7 +3339,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                                         extraFolder.Version = 1;
                                         extraFolder.ParentID = clothingFolder.ID;
                                         inventoryService.AddFolder(extraFolder);
-                                        m_log.DebugFormat("[RADMIN]: Adding outfile folder {0} to folder {1}", extraFolder.ID, clothingFolder.ID);
+                                        m_logger.LogDebug("[RADMIN]: Adding outfile folder {0} to folder {1}", extraFolder.ID, clothingFolder.ID);
                                     }
 
                                     // Now get the pieces that make up the outfit
@@ -3349,7 +3354,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                                             switch (child.Name)
                                             {
                                                 case "Permissions":
-                                                    m_log.DebugFormat("[RADMIN]: Permissions specified");
+                                                    m_logger.LogDebug("[RADMIN]: Permissions specified");
                                                     perms = child;
                                                     break;
 
@@ -3399,7 +3404,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                                             inventoryItem.Folder = extraFolder.ID; // Parent folder
 
                                             m_application.SceneManager.CurrentOrFirstScene.AddInventoryItem(inventoryItem);
-                                            m_log.DebugFormat("[RADMIN]: Added item {0} to folder {1}", inventoryItem.ID, extraFolder.ID);
+                                            m_logger.LogDebug("[RADMIN]: Added item {0} to folder {1}", inventoryItem.ID, extraFolder.ID);
                                         }
 
                                         // Attach item, if attachpoint is specified
@@ -3407,7 +3412,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                                         if (attachpoint != 0)
                                         {
                                             avatarAppearance.SetAttachment(attachpoint, inventoryItem.ID, inventoryItem.AssetID);
-                                            m_log.DebugFormat("[RADMIN]: Attached {0}", inventoryItem.ID);
+                                            m_logger.LogDebug("[RADMIN]: Attached {0}", inventoryItem.ID);
                                         }
 
                                         // Record whether or not the item is to be initially worn
@@ -3420,32 +3425,32 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                                         }
                                         catch (Exception e)
                                         {
-                                            m_log.WarnFormat("[RADMIN]: Error wearing item {0} : {1}", inventoryItem.ID, e.Message);
+                                            m_logger.LogWarning("[RADMIN]: Error wearing item {0} : {1}", inventoryItem.ID, e.Message);
                                         }
                                     } // foreach item in outfit
-                                    m_log.DebugFormat("[RADMIN]: Outfit {0} load completed", outfitName);
+                                    m_logger.LogDebug("[RADMIN]: Outfit {0} load completed", outfitName);
                                 } // foreach outfit
-                                m_log.DebugFormat("[RADMIN]: Inventory update complete for {0}", name);
+                                m_logger.LogDebug("[RADMIN]: Inventory update complete for {0}", name);
                                 scene.AvatarService.SetAppearance(ID, avatarAppearance);
                             }
                             catch (Exception e)
                             {
-                                m_log.WarnFormat("[RADMIN]: Inventory processing incomplete for user {0} : {1}",
+                                m_logger.LogWarning("[RADMIN]: Inventory processing incomplete for user {0} : {1}",
                                     name, e.Message);
                             }
                         } // End of include
                     }
-                    m_log.DebugFormat("[RADMIN]: Default avatar loading complete");
+                    m_logger.LogDebug("[RADMIN]: Default avatar loading complete");
                 }
                 else
                 {
-                    m_log.DebugFormat("[RADMIN]: No default avatar information available");
+                    m_logger.LogDebug("[RADMIN]: No default avatar information available");
                     return false;
                 }
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[RADMIN]: Exception whilst loading default avatars ; {0}", e.Message);
+                m_logger.LogWarning("[RADMIN]: Exception whilst loading default avatars ; {0}", e.Message);
                 return false;
             }
 

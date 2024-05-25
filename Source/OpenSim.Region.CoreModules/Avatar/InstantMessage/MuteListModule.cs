@@ -24,21 +24,24 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 {
     public class MuteListModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected bool m_Enabled = false;
         protected List<Scene> m_SceneList = new List<Scene>();
@@ -47,6 +50,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MuteListModule>>();
             IConfig cnf = config.Configs["Messaging"];
             if (cnf == null)
                 return;
@@ -69,7 +73,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             IXfer xfer = scene.RequestModuleInterface<IXfer>();
             if (xfer == null)
             {
-                m_log.ErrorFormat("[MuteListModule]: Xfer not available in region {0}. Module Disabled", scene.Name);
+                m_logger?.LogError("[MuteListModule]: Xfer not available in region {0}. Module Disabled", scene.Name);
                 m_Enabled = false;
                 return;
             }
@@ -77,7 +81,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             IMuteListService srv = scene.RequestModuleInterface<IMuteListService>();
             if(srv == null)
             {
-                m_log.ErrorFormat("[MuteListModule]: MuteListService not available in region {0}. Module Disabled", scene.Name);
+                m_logger?.LogError("[MuteListModule]: MuteListService not available in region {0}. Module Disabled", scene.Name);
                 m_Enabled = false;
                 return;
             }
@@ -110,7 +114,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             if (!m_Enabled)
                 return;
 
-            m_log.Debug("[MuteListModule]: enabled");
+            m_logger?.LogDebug("[MuteListModule]: enabled");
         }
 
         public string Name

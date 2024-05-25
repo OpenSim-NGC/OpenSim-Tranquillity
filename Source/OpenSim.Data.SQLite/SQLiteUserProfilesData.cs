@@ -25,24 +25,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Reflection;
-using log4net;
 using System.Data.SQLite;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using OpenSim.Framework;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using OpenSim.Framework;
-using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Data.SQLite
 {
     public class SQLiteUserProfilesData: IProfilesData
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private SQLiteConnection m_connection;
         private string m_connectionString;
@@ -57,6 +57,7 @@ namespace OpenSim.Data.SQLite
 
         public SQLiteUserProfilesData()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SQLiteUserProfilesData>>();
         }
 
         public void Initialize(string connectionString)
@@ -70,7 +71,7 @@ namespace OpenSim.Data.SQLite
 
             m_connectionString = connectionString;
 
-            m_log.Info("[PROFILES_DATA]: Sqlite - connecting: "+m_connectionString);
+            m_logger?.LogInformation("[PROFILES_DATA]: Sqlite - connecting: "+m_connectionString);
 
             m_connection = new SQLiteConnection(m_connectionString);
             m_connection.Open();
@@ -110,7 +111,7 @@ namespace OpenSim.Data.SQLite
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[PROFILES_DATA]" +
+                    m_logger?.LogError("[PROFILES_DATA]" +
                                       ": UserAccount exception {0}", e.Message);
                 }
                 n.Add("classifieduuid", OSD.FromUUID(Id));
@@ -211,7 +212,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": ClassifiedesUpdate exception {0}", e.Message);
                 result = e.Message;
                 return false;
@@ -237,7 +238,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": DeleteClassifiedRecord exception {0}", e.Message);
                 return false;
             }
@@ -283,7 +284,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": GetPickInfo exception {0}", e.Message);
             }
             return true;
@@ -320,7 +321,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": GetAvatarPicks exception {0}", e.Message);
             }
             return data;
@@ -372,7 +373,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": GetPickInfo exception {0}", e.Message);
             }
             return pick;
@@ -440,7 +441,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": UpdateAvatarNotes exception {0}", e.Message);
                 return false;
             }
@@ -465,7 +466,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": DeleteUserPickRecord exception {0}", e.Message);
                 return false;
             }
@@ -501,7 +502,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": GetAvatarNotes exception {0}", e.Message);
             }
             return true;
@@ -544,7 +545,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": UpdateAvatarNotes exception {0}", e.Message);
                 return false;
             }
@@ -571,7 +572,7 @@ namespace OpenSim.Data.SQLite
                     }
                     catch(Exception e)
                     {
-                        m_log.ErrorFormat("[PROFILES_DATA]" +
+                        m_logger?.LogError("[PROFILES_DATA]" +
                                           ": GetAvatarProperties exception {0}", e.Message);
                         result = e.Message;
                         return false;
@@ -690,7 +691,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": AgentPropertiesUpdate exception {0}", e.Message);
 
                 return false;
@@ -727,7 +728,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": AgentInterestsUpdate exception {0}", e.Message);
                 result = e.Message;
                 return false;
@@ -761,7 +762,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": AgentInterestsUpdate exception {0}", e.Message);
                 result = e.Message;
                 return false;
@@ -813,7 +814,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": Get preferences exception {0}", e.Message);
                 result = e.Message;
                 return false;
@@ -868,7 +869,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": Requst application data exception {0}", e.Message);
                 result = e.Message;
                 return false;
@@ -901,7 +902,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": SetUserData exception {0}", e.Message);
                 return false;
             }
@@ -965,7 +966,7 @@ namespace OpenSim.Data.SQLite
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_logger?.LogError("[PROFILES_DATA]" +
                                   ": GetAvatarNotes exception {0}", e.Message);
             }
             return data;

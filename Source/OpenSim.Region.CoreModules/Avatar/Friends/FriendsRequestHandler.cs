@@ -25,21 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Xml;
 
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
-using OpenSim.Server.Base;
 using OpenSim.Framework.Servers.HttpServer;
 using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
 
 using OpenMetaverse;
-using log4net;
 
 namespace OpenSim.Region.CoreModules.Avatar.Friends
 {
@@ -47,7 +45,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends
 //    public class FriendsRequestHandler : BaseStreamHandlerBasicDOSProtector
     public class FriendsSimpleRequestHandler : SimpleStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private FriendsModule m_FriendsModule;
         /*
@@ -64,6 +62,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends
         */
         public FriendsSimpleRequestHandler(FriendsModule fmodule) : base("/friends")
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<FriendsSimpleRequestHandler>>();
             m_FriendsModule = fmodule;
         }
 
@@ -128,7 +127,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends
             }
             catch (Exception e)
             {
-                m_log.Debug("[FRIENDS]: Exception {0}" + e.ToString());
+                m_logger.LogDebug("[FRIENDS]: Exception {0}" + e.ToString());
                 httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
 
             }

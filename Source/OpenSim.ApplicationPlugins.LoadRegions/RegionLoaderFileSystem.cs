@@ -25,24 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.ApplicationPlugins.LoadRegions
 {
     public class RegionLoaderFileSystem : IRegionLoader
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IConfiguration m_configSource;
 
         public void SetIniConfigSource(IConfiguration configSource)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RegionLoaderFileSystem>>();
             m_configSource = configSource;
         }
 
@@ -77,14 +80,14 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
                 iniFiles = Directory.GetFiles(regionConfigPath, "*.ini");
             }
 
-            m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loading config files from {0}", regionConfigPath);
+            m_logger?.LogInformation("[REGION LOADER FILE SYSTEM]: Loading config files from {0}", regionConfigPath);
 
             List<RegionInfo> regionInfos = new List<RegionInfo>();
 
             int i = 0;
             foreach (string file in iniFiles)
             {
-                m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loading config file {0}", file);
+                m_logger?.LogInformation("[REGION LOADER FILE SYSTEM]: Loading config file {0}", file);
 
                 IConfiguration source = new IniConfigSource(file);
 
@@ -93,7 +96,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
                     RegionInfo regionInfo = new RegionInfo("REGION CONFIG #" + (i + 1), file, false, m_configSource, config.Name);
                     regionInfos.Add(regionInfo);
 
-                    m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loaded config for region {0}", regionInfo.RegionName);
+                    m_logger?.LogInformation("[REGION LOADER FILE SYSTEM]: Loaded config for region {0}", regionInfo.RegionName);
 
                     i++;
                 }
@@ -101,12 +104,12 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
 
             foreach (string file in configFiles)
             {
-                m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loading config file {0}", file);
+                m_logger?.LogInformation("[REGION LOADER FILE SYSTEM]: Loading config file {0}", file);
 
                 RegionInfo regionInfo = new RegionInfo("REGION CONFIG #" + (i + 1), file, false, m_configSource);
                 regionInfos.Add(regionInfo);
 
-                m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loaded config for region {0}", regionInfo.RegionName);
+                m_logger?.LogInformation("[REGION LOADER FILE SYSTEM]: Loaded config for region {0}", regionInfo.RegionName);
 
                 i++;
             }

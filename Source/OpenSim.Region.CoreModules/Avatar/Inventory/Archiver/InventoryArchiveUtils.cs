@@ -25,14 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Text;
-using log4net;
-using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
+
+using OpenMetaverse;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 {
