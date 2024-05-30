@@ -24,13 +24,14 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Reflection;
-using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
 using OpenMetaverse;
-using log4net;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
 {
@@ -40,7 +41,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
         private const int CACHE_EXPIRATION_SECONDS = 3600; // 1 hour!
         private const int CACHE_NULL_EXPIRATION_SECONDS = 600; // 10minutes
 
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         //5min expire checks
         private ExpiringCacheOS<UUID, UserAccount> m_UUIDCache = new ExpiringCacheOS<UUID, UserAccount>(300000);

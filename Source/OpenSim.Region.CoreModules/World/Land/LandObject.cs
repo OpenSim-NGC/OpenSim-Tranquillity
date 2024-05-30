@@ -25,17 +25,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 
-using log4net;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using RegionFlags = OpenMetaverse.RegionFlags;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.CoreModules.World.Land
 {
@@ -46,7 +47,7 @@ namespace OpenSim.Region.CoreModules.World.Land
     {
         #region Member Variables
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private static readonly string LogHeader = "[LAND OBJECT]";
 
         protected const int GROUPMEMBERCACHETIMEOUT = 30000;  // cache invalidation after 30s
@@ -324,6 +325,7 @@ namespace OpenSim.Region.CoreModules.World.Land
 
         public LandObject(LandData landData, Scene scene)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LandObject>>();
             LandData = landData.Copy();
             m_scene = scene;
             m_scenePermissions = scene.Permissions;
@@ -340,6 +342,7 @@ namespace OpenSim.Region.CoreModules.World.Land
 
         public LandObject(UUID owner_id, bool is_group_owned, Scene scene, LandData data = null)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LandObject>>();
             m_scene = scene;
             if (m_scene == null)
             {
@@ -455,7 +458,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                 if(parcelMax > m_regionInfo.ObjectCapacity)
                     parcelMax = m_regionInfo.ObjectCapacity;
 
-                //m_log.DebugFormat("Area: {0}, Capacity {1}, Bonus {2}, Parcel {3}", LandData.Area, m_regionInfo.ObjectCapacity, m_regionInfo.RegionSettings.ObjectBonus, parcelMax);
+                //m_logger?.LogDebug("Area: {0}, Capacity {1}, Bonus {2}, Parcel {3}", LandData.Area, m_regionInfo.ObjectCapacity, m_regionInfo.RegionSettings.ObjectBonus, parcelMax);
                 return parcelMax;
             }
         }
@@ -479,7 +482,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                 // sanity check
                 if(simMax > m_regionInfo.ObjectCapacity)
                     simMax = m_regionInfo.ObjectCapacity;
-                 //m_log.DebugFormat("Simwide Area: {0}, Capacity {1}, SimMax {2}, SimWidePrims {3}",
+                 //m_logger?.LogDebug("Simwide Area: {0}, Capacity {1}, SimMax {2}, SimWidePrims {3}",
                  //    LandData.SimwideArea, m_regionInfo.ObjectCapacity, simMax, LandData.SimwidePrims);
                 return simMax;
             }
@@ -1333,7 +1336,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                 }
             }
 
-            // m_log.DebugFormat("{0} ModifyLandBitmapSquare. startXY=<{1},{2}>, endXY=<{3},{4}>, val={5}, landBitmapSize=<{6},{7}>",
+            // m_logger?.LogDebug("{0} ModifyLandBitmapSquare. startXY=<{1},{2}>, endXY=<{3},{4}>, val={5}, landBitmapSize=<{6},{7}>",
             //                         LogHeader, start_x, start_y, end_x, end_y, set_value, land_bitmap.GetLength(0), land_bitmap.GetLength(1));
             return land_bitmap;
         }
@@ -1441,7 +1444,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                         }
                         catch (Exception)   //just in case we've still not taken care of every way the arrays might go out of bounds! ;)
                         {
-                            m_log.DebugFormat("{0} RemapLandBitmap Rotate: Out of Bounds sx={1} sy={2} dx={3} dy={4}", LogHeader, sx, sy, x, y);
+                            m_logger?.LogDebug("{0} RemapLandBitmap Rotate: Out of Bounds sx={1} sy={2} dx={3} dy={4}", LogHeader, sx, sy, x, y);
                         }
                     }
                 }
@@ -1474,7 +1477,7 @@ namespace OpenSim.Region.CoreModules.World.Land
             if (endY > tmpY) endY = tmpY;
             if (endY < 0) endY = 0;
 
-            //m_log.DebugFormat("{0} RemapLandBitmap: inSize=<{1},{2}>, disp=<{3},{4}> rot={5}, offset=<{6},{7}>, boundingStart=<{8},{9}>, boundingEnd=<{10},{11}>, cosR={12}, sinR={13}, outSize=<{14},{15}>", LogHeader,
+            //m_logger?.LogDebug("{0} RemapLandBitmap: inSize=<{1},{2}>, disp=<{3},{4}> rot={5}, offset=<{6},{7}>, boundingStart=<{8},{9}>, boundingEnd=<{10},{11}>, cosR={12}, sinR={13}, outSize=<{14},{15}>", LogHeader,
             //                            baseX, baseY, dispX, dispY, radianRotation, offsetX, offsetY, startX, startY, endX, endY, cosR, sinR, newX, newY);
 
             isEmptyNow = true;
@@ -1498,7 +1501,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                         }
                         catch (Exception)   //just in case we've still not taken care of every way the arrays might go out of bounds! ;)
                         {
-                            m_log.DebugFormat("{0} RemapLandBitmap - Bound & Displace: Out of Bounds sx={1} sy={2} dx={3} dy={4}", LogHeader, x, y, dx, dy);
+                            m_logger?.LogDebug("{0} RemapLandBitmap - Bound & Displace: Out of Bounds sx={1} sy={2} dx={3} dy={4}", LogHeader, x, y, dx, dy);
                         }
                     }
                 }
@@ -1612,7 +1615,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                     xLen = (int)(Constants.RegionSize / Constants.LandUnit);
                 }
             }
-            // m_log.DebugFormat("{0} ConvertBytesToLandBitmap: bitmapLen={1}, xLen={2}", LogHeader, bitmapLen, xLen);
+            // m_logger?.LogDebug("{0} ConvertBytesToLandBitmap: bitmapLen={1}, xLen={2}", LogHeader, bitmapLen, xLen);
 
             byte tempByte;
             int x = 0, y = 0;
@@ -1628,7 +1631,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                     }
                     catch (Exception)
                     {
-                        m_log.DebugFormat("{0} ConvertBytestoLandBitmap: i={1}, x={2}, y={3}", LogHeader, i, x, y);
+                        m_logger?.LogDebug("{0} ConvertBytestoLandBitmap: i={1}, x={2}, y={3}", LogHeader, i, x, y);
                     }
                     x++;
                     if (x >= xLen)
@@ -1656,7 +1659,7 @@ namespace OpenSim.Region.CoreModules.World.Land
 
         public void DebugLandBitmap(bool[,] landBitmap)
         {
-            m_log.InfoFormat("{0}: Map Key: #=claimed land .=unclaimed land.", LogHeader);
+            m_logger?.LogInformation("{0}: Map Key: #=claimed land .=unclaimed land.", LogHeader);
             for (int y = landBitmap.GetLength(1) - 1; y >= 0; y--)
             {
                 string row = "";
@@ -1664,7 +1667,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                 {
                     row += landBitmap[x, y] ? "#" : ".";
                 }
-                m_log.InfoFormat("{0}: {1}", LogHeader, row);
+                m_logger?.LogInformation("{0}: {1}", LogHeader, row);
             }
         }
 
@@ -1706,7 +1709,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                     }
                 } catch (InvalidOperationException)
                 {
-                    m_log.Error("[LAND]: Unable to force select the parcel objects. Arr.");
+                    m_logger?.LogError("[LAND]: Unable to force select the parcel objects. Arr.");
                 }
 
                 remote_client.SendForceClientSelectObjects(resultLocalIDs);
@@ -1730,7 +1733,7 @@ namespace OpenSim.Region.CoreModules.World.Land
 
                 lock (primsOverMe)
                 {
-                    //m_log.DebugFormat(
+                    //m_logger?.LogDebug(
                     //    "[LAND OBJECT]: Request for SendLandObjectOwners() from {0} with {1} known prims on region",
                     //    remote_client.Name, primsOverMe.Count);
 
@@ -1747,7 +1750,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                             }
                             catch (NullReferenceException)
                             {
-                                m_log.Error("[LAND]: " + "Got Null Reference when searching land owners from the parcel panel");
+                                m_logger?.LogError("[LAND]: " + "Got Null Reference when searching land owners from the parcel panel");
                             }
                             try
                             {
@@ -1755,7 +1758,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                             }
                             catch (KeyNotFoundException)
                             {
-                                m_log.Error("[LAND]: Unable to match a prim with it's owner.");
+                                m_logger?.LogError("[LAND]: Unable to match a prim with it's owner.");
                             }
                             if (obj.OwnerID.Equals(obj.GroupID) && (!groups.Contains(obj.OwnerID)))
                                 groups.Add(obj.OwnerID);
@@ -1763,7 +1766,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                     }
                     catch (InvalidOperationException)
                     {
-                        m_log.Error("[LAND]: Unable to Enumerate Land object arr.");
+                        m_logger?.LogError("[LAND]: Unable to Enumerate Land object arr.");
                     }
                 }
 
@@ -1791,7 +1794,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                 }
                 catch (InvalidOperationException)
                 {
-                    m_log.Error("[LAND]: Unable to enumerate land owners. arr.");
+                    m_logger?.LogError("[LAND]: Unable to enumerate land owners. arr.");
                 }
 
             }
@@ -1804,7 +1807,7 @@ namespace OpenSim.Region.CoreModules.World.Land
 
         public void SellLandObjects(UUID previousOwner)
         {
-            // m_log.DebugFormat(
+            // m_logger?.LogDebug(
             //    "[LAND OBJECT]: Request to sell objects in {0} from {1}", LandData.Name, previousOwner);
 
             if (LandData.IsGroupOwned)
@@ -1813,13 +1816,13 @@ namespace OpenSim.Region.CoreModules.World.Land
             IBuySellModule m_BuySellModule = m_scene.RequestModuleInterface<IBuySellModule>();
             if (m_BuySellModule == null)
             {
-                m_log.Error("[LAND OBJECT]: BuySellModule not found");
+                m_logger?.LogError("[LAND OBJECT]: BuySellModule not found");
                 return;
             }
 
             if (!m_scene.TryGetScenePresence(LandData.OwnerID, out ScenePresence sp))
             {
-                m_log.Error("[LAND OBJECT]: New owner is not present in scene");
+                m_logger?.LogError("[LAND OBJECT]: New owner is not present in scene");
                 return;
             }
 
@@ -1845,7 +1848,7 @@ namespace OpenSim.Region.CoreModules.World.Land
 
         public void ReturnLandObjects(uint type, UUID[] owners, UUID[] tasks, IClientAPI remote_client)
         {
-            //m_log.DebugFormat(
+            //m_logger?.LogDebug(
             //    "[LAND OBJECT]: Request to return objects in {0} from {1}", LandData.Name, remote_client.Name);
 
             Dictionary<UUID,List<SceneObjectGroup>> returns = new();
@@ -1932,7 +1935,7 @@ namespace OpenSim.Region.CoreModules.World.Land
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddPrimOverMe(SceneObjectGroup obj)
         {
-//            m_log.DebugFormat("[LAND OBJECT]: Adding scene object {0} {1} over {2}", obj.Name, obj.LocalId, LandData.Name);
+//            m_logger?.LogDebug("[LAND OBJECT]: Adding scene object {0} {1} over {2}", obj.Name, obj.LocalId, LandData.Name);
 
             lock (primsOverMe)
                 primsOverMe.Add(obj);
@@ -1941,7 +1944,7 @@ namespace OpenSim.Region.CoreModules.World.Land
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemovePrimFromOverMe(SceneObjectGroup obj)
         {
-            //m_log.DebugFormat("[LAND OBJECT]: Removing scene object {0} {1} from over {2}", obj.Name, obj.LocalId, LandData.Name);
+            //m_logger?.LogDebug("[LAND OBJECT]: Removing scene object {0} {1} from over {2}", obj.Name, obj.LocalId, LandData.Name);
             lock (primsOverMe)
                 primsOverMe.Remove(obj);
         }
@@ -1965,7 +1968,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[LAND OBJECT]: SetMediaUrl error: {0}", e.Message);
+                    m_logger?.LogError("[LAND OBJECT]: SetMediaUrl error: {0}", e.Message);
                     return;
                 }
             }
@@ -1990,7 +1993,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[LAND OBJECT]: SetMusicUrl error: {0}", e.Message);
+                    m_logger?.LogError("[LAND OBJECT]: SetMusicUrl error: {0}", e.Message);
                     return;
                 }
             }
@@ -2075,7 +2078,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                         presence.ControllingClient.SendAlertMessage("You have been ejected from this land");
                     }
                 }
-                m_log.DebugFormat("[LAND]: Removing entry {0} because it has expired", entry.AgentID);
+                m_logger?.LogDebug("[LAND]: Removing entry {0} because it has expired", entry.AgentID);
             }
 
             if (delete.Count > 0)

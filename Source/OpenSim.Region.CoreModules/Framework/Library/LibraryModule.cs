@@ -24,10 +24,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
-
 using OpenSim.Region.CoreModules.Avatar.Inventory.Archiver;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -35,7 +35,7 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-using log4net;
+
 using Nini.Config;
 
 using PermissionMask = OpenSim.Framework.PermissionMask;
@@ -44,7 +44,7 @@ namespace OpenSim.Region.CoreModules.Framework.Library
 {
     public class LibraryModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private static bool m_HasRunOnce = false;
 
         private bool m_Enabled = false;
@@ -57,6 +57,7 @@ namespace OpenSim.Region.CoreModules.Framework.Library
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LibraryModule>>();
             m_Enabled = config.Configs["Modules"].GetBoolean("LibraryModule", m_Enabled);
             if (m_Enabled)
             {
@@ -64,7 +65,7 @@ namespace OpenSim.Region.CoreModules.Framework.Library
                 if (libConfig != null)
                 {
                     string dllName = libConfig.GetString("LocalServiceModule", string.Empty);
-                    m_log.Debug("[LIBRARY MODULE]: Library service dll is " + dllName);
+                    m_logger?.LogDebug("[LIBRARY MODULE]: Library service dll is " + dllName);
                     if (dllName != string.Empty)
                     {
                         Object[] args = new Object[] { config };
@@ -74,7 +75,7 @@ namespace OpenSim.Region.CoreModules.Framework.Library
             }
             if (m_Library == null)
             {
-                m_log.Warn("[LIBRARY MODULE]: No local library service. Module will be disabled.");
+                m_logger?.LogWarning("[LIBRARY MODULE]: No local library service. Module will be disabled.");
                 m_Enabled = false;
             }
         }
@@ -148,7 +149,7 @@ namespace OpenSim.Region.CoreModules.Framework.Library
             InventoryFolderImpl lib = m_Library.LibraryRootFolder;
             if (lib == null)
             {
-                m_log.Debug("[LIBRARY MODULE]: No library. Ignoring Library Module");
+                m_logger?.LogDebug("[LIBRARY MODULE]: No library. Ignoring Library Module");
                 return;
             }
 
@@ -167,7 +168,7 @@ namespace OpenSim.Region.CoreModules.Framework.Library
             {
                 string simpleName = Path.GetFileNameWithoutExtension(iarFileName);
 
-                m_log.InfoFormat("[LIBRARY MODULE]: Loading library archive {0} ({1})...", iarFileName, simpleName);
+                m_logger?.LogInformation("[LIBRARY MODULE]: Loading library archive {0} ({1})...", iarFileName, simpleName);
                 simpleName = GetInventoryPathFromName(simpleName);
 
                 InventoryArchiveReadRequest archread = new InventoryArchiveReadRequest(m_MockScene.InventoryService, m_MockScene.AssetService, m_MockScene.UserAccountService, uinfo, simpleName, iarFileName, false);
@@ -177,7 +178,7 @@ namespace OpenSim.Region.CoreModules.Framework.Library
                     if (nodes != null && nodes.Count == 0)
                     {
                         // didn't find the subfolder with the given name; place it on the top
-                        m_log.InfoFormat("[LIBRARY MODULE]: Didn't find {0} in library. Placing archive on the top level", simpleName);
+                        m_logger?.LogInformation("[LIBRARY MODULE]: Didn't find {0} in library. Placing archive on the top level", simpleName);
                         archread.Close();
                         archread = new InventoryArchiveReadRequest(m_MockScene.InventoryService, m_MockScene.AssetService, m_MockScene.UserAccountService, uinfo, "/", iarFileName, false);
                         archread.Execute();
@@ -188,7 +189,7 @@ namespace OpenSim.Region.CoreModules.Framework.Library
                 }
                 catch (Exception e)
                 {
-                    m_log.DebugFormat("[LIBRARY MODULE]: Exception when processing archive {0}: {1}", iarFileName, e.StackTrace);
+                    m_logger?.LogDebug("[LIBRARY MODULE]: Exception when processing archive {0}: {1}", iarFileName, e.StackTrace);
                 }
                 finally
                 {
@@ -199,7 +200,7 @@ namespace OpenSim.Region.CoreModules.Framework.Library
 
         private void FixPerms(InventoryNodeBase node)
         {
-            m_log.DebugFormat("[LIBRARY MODULE]: Fixing perms for {0} {1}", node.Name, node.ID);
+            m_logger?.LogDebug("[LIBRARY MODULE]: Fixing perms for {0} {1}", node.Name, node.ID);
 
             if (node is InventoryItemBase)
             {
@@ -215,7 +216,7 @@ namespace OpenSim.Region.CoreModules.Framework.Library
 //        {
 //            InventoryFolderImpl lib = m_Library.LibraryRootFolder;
 //
-//            m_log.DebugFormat(" - folder {0}", lib.Name);
+//            m_logger?.LogDebug(" - folder {0}", lib.Name);
 //            DumpFolder(lib);
 //        }
 //
@@ -223,7 +224,7 @@ namespace OpenSim.Region.CoreModules.Framework.Library
 //        {
 //            InventoryFolderImpl lib = m_Scene.CommsManager.UserProfileCacheService.LibraryRoot;
 //
-//            m_log.DebugFormat(" - folder {0}", lib.Name);
+//            m_logger?.LogDebug(" - folder {0}", lib.Name);
 //            DumpFolder(lib);
 //        }
 
@@ -231,11 +232,11 @@ namespace OpenSim.Region.CoreModules.Framework.Library
         {
             foreach (InventoryItemBase item in folder.Items.Values)
             {
-                m_log.DebugFormat("   --> item {0}", item.Name);
+                m_logger?.LogDebug("   --> item {0}", item.Name);
             }
             foreach (InventoryFolderImpl f in folder.RequestListOfFolderImpls())
             {
-                m_log.DebugFormat(" - folder {0}", f.Name);
+                m_logger?.LogDebug(" - folder {0}", f.Name);
                 DumpFolder(f);
             }
         }

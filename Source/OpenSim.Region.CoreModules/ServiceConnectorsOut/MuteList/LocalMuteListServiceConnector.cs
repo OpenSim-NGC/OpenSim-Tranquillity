@@ -25,23 +25,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Nini.Config;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Server.Base;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+
 using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
 {
     public class LocalMuteListServicesConnector : ISharedRegionModule, IMuteListService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private List<Scene> m_Scenes = new List<Scene>();
         protected IMuteListService m_service = null;
@@ -62,6 +63,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalMuteListServicesConnector>>();
             // only active for core mute lists module
             IConfig moduleConfig = source.Configs["Messaging"];
             if (moduleConfig == null)
@@ -82,7 +84,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
             IConfig userConfig = source.Configs["MuteListService"];
             if (userConfig == null)
             {
-                m_log.Error("[MuteList LOCALCONNECTOR]: MuteListService missing from configuration");
+                m_logger?.LogError("[MuteList LOCALCONNECTOR]: MuteListService missing from configuration");
                 return;
             }
 
@@ -91,7 +93,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
 
             if (serviceDll.Length == 0)
             {
-                m_log.Error("[MuteList LOCALCONNECTOR]: No LocalServiceModule named in section MuteListService");
+                m_logger?.LogError("[MuteList LOCALCONNECTOR]: No LocalServiceModule named in section MuteListService");
                 return;
             }
 
@@ -102,18 +104,18 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
             }
             catch
             {
-                m_log.Error("[MuteList LOCALCONNECTOR]: Failed to load mute service");
+                m_logger?.LogError("[MuteList LOCALCONNECTOR]: Failed to load mute service");
                 return;
             }
 
             if (m_service == null)
             {
-                m_log.Error("[MuteList LOCALCONNECTOR]: Can't load MuteList service");
+                m_logger?.LogError("[MuteList LOCALCONNECTOR]: Can't load MuteList service");
                 return;
             }
 
             m_Enabled = true;
-            m_log.Info("[MuteList LOCALCONNECTOR]: enabled");
+            m_logger?.LogInformation("[MuteList LOCALCONNECTOR]: enabled");
         }
 
         public void Close()

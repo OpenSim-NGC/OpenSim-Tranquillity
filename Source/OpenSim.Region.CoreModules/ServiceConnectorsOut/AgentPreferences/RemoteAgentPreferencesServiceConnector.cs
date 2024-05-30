@@ -25,14 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
-using log4net;
+using OpenSim.Server.Base;
+
 using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences
@@ -40,7 +41,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences
     public class RemoteAgentPreferencesServicesConnector : AgentPreferencesServicesConnector,
             ISharedRegionModule, IAgentPreferencesService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private bool m_Enabled = false;
 
@@ -56,6 +57,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences
 
         public new void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteAgentPreferencesServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -65,7 +67,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences
                     IConfig userConfig = source.Configs["AgentPreferencesService"];
                     if (userConfig == null)
                     {
-                        m_log.Error("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
+                        m_logger?.LogError("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
                         return;
                     }
 
@@ -73,7 +75,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences
 
                     base.Initialise(source);
 
-                    m_log.Info("[AGENT PREFERENCES CONNECTOR]: Remote agent preferences enabled");
+                    m_logger?.LogInformation("[AGENT PREFERENCES CONNECTOR]: Remote agent preferences enabled");
                 }
             }
         }

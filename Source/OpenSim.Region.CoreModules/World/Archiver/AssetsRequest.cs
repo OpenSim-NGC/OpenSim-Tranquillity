@@ -25,17 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Threading;
 using System.Timers;
-using log4net;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
-using OpenSim.Framework.Monitoring;
-using OpenSim.Framework.Serialization;
 using OpenSim.Framework.Serialization.External;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.CoreModules.World.Archiver
@@ -45,7 +44,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
     /// </summary>
     class AssetsRequest
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <summary>
         /// Method called when all the necessary assets for an archive request have been received.
@@ -108,6 +107,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             UUID scope, Dictionary<string, object> options,
             AssetsRequestCallback assetsRequestCallback)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<AssetsRequest>>();
             m_assetsArchiver = assetsArchiver;
             m_uuids = uuids;
             m_previousErrorsCount = previousErrorsCount;
@@ -157,7 +157,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                     sbyte assetType = kvp.Value;
                     if (asset != null && assetType == (sbyte)AssetType.Unknown)
                     {
-                        m_log.InfoFormat("[ARCHIVER]: Rewriting broken asset type for {0} to {1}", thiskey, SLUtil.AssetTypeFromCode(assetType));
+                        m_logger?.LogInformation("[ARCHIVER]: Rewriting broken asset type for {0} to {1}", thiskey, SLUtil.AssetTypeFromCode(assetType));
                         asset.Type = assetType;
                     }
 
@@ -172,7 +172,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
 
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[ARCHIVER]: Execute failed with {0}", e);
+                    m_logger?.LogError("[ARCHIVER]: Execute failed with {0}", e);
                 }
             }
 
@@ -180,11 +180,11 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             int totalerrors = m_notFoundAssetUuids.Count + m_previousErrorsCount;
 
             if(m_timeout)
-                m_log.DebugFormat("[ARCHIVER]: Aborted because AssetService request timeout. Successfully added {0} assets", m_foundAssetUuids.Count);
+                m_logger?.LogDebug("[ARCHIVER]: Aborted because AssetService request timeout. Successfully added {0} assets", m_foundAssetUuids.Count);
             else if(totalerrors == 0)
-                m_log.DebugFormat("[ARCHIVER]: Successfully added all {0} assets", m_foundAssetUuids.Count);
+                m_logger?.LogDebug("[ARCHIVER]: Successfully added all {0} assets", m_foundAssetUuids.Count);
             else
-                m_log.DebugFormat("[ARCHIVER]: Successfully added {0} assets ({1} of total possible assets requested were not found, were damaged or were not assets)",
+                m_logger?.LogDebug("[ARCHIVER]: Successfully added {0} assets ({1} of total possible assets requested were not found, were damaged or were not assets)",
                             m_foundAssetUuids.Count, totalerrors);
 
             GC.Collect();
@@ -213,7 +213,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat(
+                m_logger?.LogError(
                     "[ARCHIVER]: Terminating archive creation since asset requster callback failed with {0}", e);
             }
         }
@@ -222,7 +222,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
         {
             if (asset.Type == (sbyte)AssetType.Object && asset.Data != null && m_options.ContainsKey("home"))
             {
-                //m_log.DebugFormat("[ARCHIVER]: Rewriting object data for {0}", asset.ID);
+                //m_logger?.LogDebug("[ARCHIVER]: Rewriting object data for {0}", asset.ID);
                 string xml = ExternalRepresentationUtils.RewriteSOP(Utils.BytesToString(asset.Data), string.Empty, m_options["home"].ToString(), m_userAccountService, m_scopeID);
                 asset.Data = Utils.StringToBytes(xml);
             }

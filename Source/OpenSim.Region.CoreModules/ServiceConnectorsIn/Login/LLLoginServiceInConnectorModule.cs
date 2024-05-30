@@ -25,20 +25,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Handlers.Login;
+using OpenSim.Server.Base;
 
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Login
 {
     public class LLLoginServiceInConnectorModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private static bool m_Enabled = false;
         private static bool m_Registered = false;
 
@@ -49,6 +51,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Login
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LLLoginServiceInConnectorModule>>();
             m_Config = config;
 
             IConfig moduleConfig = config.Configs["Modules"];
@@ -57,7 +60,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Login
                 m_Enabled = moduleConfig.GetBoolean("LLLoginServiceInConnector", false);
                 if (m_Enabled)
                 {
-                    m_log.Info("[LLLOGIN IN CONNECTOR]: LLLoginerviceInConnector enabled");
+                    m_logger?.LogInformation("[LLLOGIN IN CONNECTOR]: LLLoginerviceInConnector enabled");
                 }
 
             }
@@ -69,7 +72,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Login
             if (!m_Enabled)
                 return;
 
-            m_log.Info("[LLLOGIN IN CONNECTOR]: Starting...");
+            m_logger?.LogInformation("[LLLOGIN IN CONNECTOR]: Starting...");
         }
 
         public void Close()

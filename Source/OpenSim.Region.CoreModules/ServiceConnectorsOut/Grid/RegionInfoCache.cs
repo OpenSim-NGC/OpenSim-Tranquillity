@@ -24,22 +24,26 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Threading;
+
 using System.Runtime.InteropServices;
-using System.Collections.Generic;
-using OpenSim.Framework;
-using OpenMetaverse;
-using log4net;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using Timer = System.Threading.Timer;
 using ReaderWriterLockSlim = System.Threading.ReaderWriterLockSlim;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using OpenSim.Framework;
+using OpenSim.Server.Base;
+using GridRegion = OpenSim.Services.Interfaces.GridRegion;
+
+using OpenMetaverse;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
 {
     public class RegionInfoCache
     {
-        // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        // private static ILogger? m_logger;
+
         private const int CACHE_EXPIRATION_SECONDS = 120; // 2 minutes  opensim regions change a lot
         private const int CACHE_PURGE_TIME = 60000; // milliseconds
         public const ulong HANDLEMASK = 0xffffff00ffffff00ul;

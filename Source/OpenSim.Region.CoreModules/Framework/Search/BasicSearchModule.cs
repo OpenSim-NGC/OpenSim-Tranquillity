@@ -24,15 +24,18 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
 
 using OpenMetaverse;
-using log4net;
+
 using Nini.Config;
 
 using DirFindFlags = OpenMetaverse.DirectoryManager.DirFindFlags;
@@ -41,7 +44,7 @@ namespace OpenSim.Region.CoreModules.Framework.Search
 {
     public class BasicSearchModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected bool m_Enabled;
         protected List<Scene> m_Scenes = new List<Scene>();
@@ -55,11 +58,12 @@ namespace OpenSim.Region.CoreModules.Framework.Search
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<BasicSearchModule>>();
             string umanmod = config.Configs["Modules"].GetString("SearchModule", Name);
             if (umanmod == Name)
             {
                 m_Enabled = true;
-                m_log.DebugFormat("[BASIC SEARCH MODULE]: {0} is enabled", Name);
+                m_logger?.LogDebug("[BASIC SEARCH MODULE]: {0} is enabled", Name);
             }
         }
 
@@ -111,7 +115,7 @@ namespace OpenSim.Region.CoreModules.Framework.Search
 
                 // No Groups Service Connector, then group search won't work...
                 if (m_GroupsService == null)
-                    m_log.Warn("[BASIC SEARCH MODULE]: Could not get IGroupsModule");
+                    m_logger?.LogWarning("[BASIC SEARCH MODULE]: Could not get IGroupsModule");
             }
         }
 
@@ -200,7 +204,7 @@ namespace OpenSim.Region.CoreModules.Framework.Search
             {
                 if (m_GroupsService == null)
                 {
-                    m_log.Warn("[BASIC SEARCH MODULE]: Groups service is not available. Unable to search groups.");
+                    m_logger?.LogWarning("[BASIC SEARCH MODULE]: Groups service is not available. Unable to search groups.");
                     remoteClient.SendAlertMessage("Groups search is not enabled");
                     return;
                 }

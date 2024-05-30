@@ -28,20 +28,25 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using Nini.Config;
-using OpenMetaverse;
-using OpenMetaverse.Imaging;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using log4net;
-using System.Reflection;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+using OpenMetaverse.Imaging;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture
 {
     public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private const int ALL_SIDES = -1;
 
@@ -86,6 +91,7 @@ namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture
         /// </summary>
         public DynamicTextureModule()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DynamicTextureModule>>();
             m_reuseableDynamicTextures = new Cache(CacheMedium.Memory, CacheStrategy.Conservative);
             m_reuseableDynamicTextures.DefaultTTL = new TimeSpan(24, 0, 0);
         }
@@ -330,6 +336,7 @@ namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DynamicTextureModule>>();
             IConfig texturesConfig = config.Configs["Textures"];
             if (texturesConfig != null)
             {
@@ -387,7 +394,7 @@ namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture
 
         public class DynamicTextureUpdater
         {
-            private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+            private static ILogger? m_logger;
 
             public bool BlendWithOldTexture = false;
             public string BodyData;
@@ -404,6 +411,7 @@ namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture
 
             public DynamicTextureUpdater()
             {
+                m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DynamicTextureUpdater>>();
                 BodyData = null;
             }
 
@@ -571,7 +579,7 @@ namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture
                     }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat(
+                        m_logger?.LogError(
                         "[DYNAMICTEXTUREMODULE]: OpenJpeg Encode Failed.  Exception {0}{1}",
                             e.Message, e.StackTrace);
                     }
@@ -601,7 +609,7 @@ namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture
                     }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat(
+                        m_logger?.LogError(
                         "[DYNAMICTEXTUREMODULE]: OpenJpeg Encode Failed.  Exception {0}{1}",
                             e.Message, e.StackTrace);
                     }

@@ -26,19 +26,23 @@
  */
 
 using System.Reflection;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 
+using Nini.Config;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Inventory
 {
     public class InventoryServiceInConnectorModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private static bool m_Enabled = false;
 
         private IConfiguration m_Config;
@@ -48,6 +52,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Inventory
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<InventoryServiceInConnectorModule>>();
             m_Config = config;
             IConfig moduleConfig = config.Configs["Modules"];
             if (moduleConfig != null)
@@ -55,7 +60,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Inventory
                 m_Enabled = moduleConfig.GetBoolean("InventoryServiceInConnector", false);
                 if (m_Enabled)
                 {
-                    m_log.Info("[INVENTORY IN CONNECTOR]: Inventory Service In Connector enabled");
+                    m_logger?.LogInformation("[INVENTORY IN CONNECTOR]: Inventory Service In Connector enabled");
                 }
             }
         }
@@ -87,7 +92,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Inventory
             {
                 m_Registered = true;
 
-                m_log.Info("[RegionInventoryService]: Starting...");
+                m_logger?.LogInformation("[RegionInventoryService]: Starting...");
 
                 Object[] args = new Object[] { m_Config, MainServer.Instance, "HGInventoryService" };
 

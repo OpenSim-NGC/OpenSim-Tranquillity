@@ -25,16 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
 using System.Xml;
-using log4net;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
+using OpenMetaverse;
 
 namespace OpenSim.Region.CoreModules.World.Archiver
 {
@@ -43,7 +44,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
     /// </summary>
     public class AssetsDearchiver
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <summary>
         /// Store for asset data we received before we get the metadata
@@ -62,6 +63,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
 
         public AssetsDearchiver(IAssetService cache)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<AssetsDearchiver>>();
             m_cache = cache;
         }
 
@@ -106,7 +108,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                 AssetMetadata metadata = new();
 
                 string filename = reader.ReadElementString("filename");
-                m_log.Debug($"[DEARCHIVER]: Reading node {filename}");
+                m_logger?.LogDebug($"[DEARCHIVER]: Reading node {filename}");
 
                 metadata.Name = reader.ReadElementString("name");
                 metadata.Description = reader.ReadElementString("description");
@@ -120,7 +122,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                 reader.Read();
             }
 
-            m_log.Debug($"[DEARCHIVER]: Resolved {m_metadata.Count} items of asset metadata");
+            m_logger?.LogDebug($"[DEARCHIVER]: Resolved {m_metadata.Count} items of asset metadata");
 
             ResolvePendingAssetData();
         }
@@ -154,7 +156,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                     filename = filename.Remove(filename.Length - extension.Length);
                 }
 
-                m_log.Debug($"[ARCHIVER]: Importing asset {filename}");
+                m_logger?.LogDebug($"[ARCHIVER]: Importing asset {filename}");
 
                 AssetBase asset = new(new UUID(filename), metadata.Name, metadata.AssetType, UUID.ZeroString)
                 {
@@ -166,7 +168,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             }
             else
             {
-                m_log.Error(
+                m_logger?.LogError(
                     $"[DEARCHIVER]: Tried to dearchive data with filename {assetPath} without any corresponding metadata");
             }
         }

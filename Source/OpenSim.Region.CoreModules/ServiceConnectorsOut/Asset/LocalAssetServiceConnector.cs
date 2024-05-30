@@ -25,20 +25,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Nini.Config;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
-using OpenSim.Server.Base;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
 {
     public class LocalAssetServicesConnector : ISharedRegionModule, IAssetService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IAssetCache m_Cache = null;
 
@@ -58,6 +60,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalAssetServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -67,29 +70,29 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
                     IConfig assetConfig = source.Configs["AssetService"];
                     if (assetConfig == null)
                     {
-                        m_log.Error("[LOCAL ASSET SERVICES CONNECTOR]: AssetService missing from OpenSim.ini");
+                        m_logger?.LogError("[LOCAL ASSET SERVICES CONNECTOR]: AssetService missing from OpenSim.ini");
                         return;
                     }
 
                     string serviceDll = assetConfig.GetString("LocalServiceModule", string.Empty);
                     if (string.IsNullOrEmpty(serviceDll))
                     {
-                        m_log.Error("[LOCAL ASSET SERVICES CONNECTOR]: No LocalServiceModule named in section AssetService");
+                        m_logger?.LogError("[LOCAL ASSET SERVICES CONNECTOR]: No LocalServiceModule named in section AssetService");
                         return;
                     }
 
-                    //m_log.DebugFormat("[LOCAL ASSET SERVICES CONNECTOR]: Loading asset service at {0}", serviceDll);
+                    //m_logger?.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Loading asset service at {0}", serviceDll);
 
                     object[] args = new object[] { source };
                     m_AssetService = ServerUtils.LoadPlugin<IAssetService>(serviceDll, args);
 
                     if (m_AssetService == null)
                     {
-                        m_log.Error("[LOCAL ASSET SERVICES CONNECTOR]: Fail to load asset service " + serviceDll);
+                        m_logger?.LogError("[LOCAL ASSET SERVICES CONNECTOR]: Fail to load asset service " + serviceDll);
                         return;
                     }
                     m_Enabled = true;
-                    m_log.Info("[LOCAL ASSET SERVICES CONNECTOR]: Local asset connector enabled");
+                    m_logger?.LogInformation("[LOCAL ASSET SERVICES CONNECTOR]: Local asset connector enabled");
                 }
             }
         }
@@ -128,10 +131,10 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
             }
 
             if (m_Cache == null)
-                m_log.DebugFormat("[LOCAL ASSET SERVICES CONNECTOR]: Enabled asset connector with caching for region {0}",
+                m_logger?.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Enabled asset connector with caching for region {0}",
                     scene.RegionInfo.RegionName);
             else
-                m_log.DebugFormat("[LOCAL ASSET SERVICES CONNECTOR]: Enabled asset connector without caching for region {0}",
+                m_logger?.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Enabled asset connector without caching for region {0}",
                     scene.RegionInfo.RegionName);
         }
 
@@ -169,7 +172,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
 
         public AssetBase GetCached(string id)
         {
-//            m_log.DebugFormat("[LOCAL ASSET SERVICES CONNECTOR]: Cache request for {0}", id);
+//            m_logger?.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Cache request for {0}", id);
 
             AssetBase asset = null;
             if (m_Cache != null)
@@ -203,7 +206,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
 
         public byte[] GetData(string id)
         {
-//            m_log.DebugFormat("[LOCAL ASSET SERVICES CONNECTOR]: Requesting data for asset {0}", id);
+//            m_logger?.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Requesting data for asset {0}", id);
 
             AssetBase asset = null;
 
@@ -229,7 +232,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
 
         public bool Get(string id, object sender, AssetRetrieved handler)
         {
-//            m_log.DebugFormat("[LOCAL ASSET SERVICES CONNECTOR]: Asynchronously requesting asset {0}", id);
+//            m_logger?.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Asynchronously requesting asset {0}", id);
 
             if (m_Cache != null)
             {

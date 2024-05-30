@@ -24,14 +24,19 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
@@ -39,7 +44,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
 {
     public class LocalSimulationConnectorModule : ISharedRegionModule, ISimulationService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <summary>
         /// Map region ID to scene.
@@ -55,6 +60,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
 
         public void Initialise(IConfiguration configSource)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalSimulationConnectorModule>>();
             IConfig moduleConfig = configSource.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -65,7 +71,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
 
                     m_ModuleEnabled = true;
 
-                    m_log.Info("[LOCAL SIMULATION CONNECTOR]: Local simulation enabled.");
+                    m_logger?.LogInformation("[LOCAL SIMULATION CONNECTOR]: Local simulation enabled.");
                 }
             }
         }
@@ -125,7 +131,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
                 if (m_scenes.ContainsKey(scene.RegionInfo.RegionID))
                     m_scenes.Remove(scene.RegionInfo.RegionID);
                 else
-                    m_log.WarnFormat(
+                    m_logger?.LogWarning(
                         "[LOCAL SIMULATION CONNECTOR]: Tried to remove region {0} but it was not present",
                         scene.RegionInfo.RegionName);
             }
@@ -142,7 +148,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
                 if (!m_scenes.ContainsKey(scene.RegionInfo.RegionID))
                     m_scenes[scene.RegionInfo.RegionID] = scene;
                 else
-                    m_log.WarnFormat(
+                    m_logger?.LogWarning(
                         "[LOCAL SIMULATION CONNECTOR]: Tried to add region {0} but it is already present",
                         scene.RegionInfo.RegionName);
             }
@@ -164,7 +170,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
                 // than making it obvious and fixable.  Need to see if the error message comes up in practice.
                 Scene s = m_scenes.Values.ToArray()[0];
 
-                m_log.ErrorFormat(
+                m_logger?.LogError(
                     "[LOCAL SIMULATION CONNECTOR]: Region with id {0} not found.  Returning {1} {2} instead",
                     regionId, s.RegionInfo.RegionName, s.RegionInfo.RegionID);
 
@@ -186,13 +192,13 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
             if (destination == null)
             {
                 reason = "Given destination was null";
-                m_log.DebugFormat("[LOCAL SIMULATION CONNECTOR]: CreateAgent was given a null destination");
+                m_logger?.LogDebug("[LOCAL SIMULATION CONNECTOR]: CreateAgent was given a null destination");
                 return false;
             }
 
             if (m_scenes.TryGetValue(destination.RegionID, out Scene destScene))
             {
-                //m_log.DebugFormat("[LOCAL SIMULATION CONNECTOR]: Found region {0} to send SendCreateChildAgent", destination.RegionName);
+                //m_logger?.LogDebug("[LOCAL SIMULATION CONNECTOR]: Found region {0} to send SendCreateChildAgent", destination.RegionName);
                 return destScene.NewUserConnection(aCircuit, teleportFlags, source, out reason);
             }
 
@@ -207,14 +213,14 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
 
             if (m_scenes.ContainsKey(destination.RegionID))
             {
-//                    m_log.DebugFormat(
+//                    m_logger?.LogDebug(
 //                        "[LOCAL SIMULATION CONNECTOR]: Found region {0} {1} to send AgentUpdate",
 //                        destination.RegionName, destination.RegionID);
 
                 return m_scenes[destination.RegionID].IncomingUpdateChildAgent(cAgentData);
             }
 
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[LOCAL COMMS]: Did not find region {0} {1} for ChildAgentUpdate",
 //                destination.RegionName, destination.RegionID);
 
@@ -248,7 +254,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
 
             if (m_scenes.ContainsKey(destination.RegionID))
             {
-//                    m_log.DebugFormat(
+//                    m_logger?.LogDebug(
 //                        "[LOCAL SIMULATION CONNECTOR]: Found region {0} {1} to send AgentUpdate",
 //                        s.RegionInfo.RegionName, destination.RegionHandle);
                 uint sizeX = m_scenes[destination.RegionID].RegionInfo.RegionSizeX;
@@ -259,7 +265,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
                 if (ctx.OutboundVersion < 0.3f && (sizeX != 256 || sizeY != 256))
                 {
                     reason = "Destination is a variable-sized region, and source is an old simulator. Consider upgrading.";
-                    m_log.DebugFormat("[LOCAL SIMULATION CONNECTOR]: Request to access this variable-sized region from older simulator was denied");
+                    m_logger?.LogDebug("[LOCAL SIMULATION CONNECTOR]: Request to access this variable-sized region from older simulator was denied");
                     return false;
 
                 }
@@ -275,7 +281,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
         {
             if (m_scenes.ContainsKey(originId))
             {
-//                    m_log.DebugFormat(
+//                    m_logger?.LogDebug(
 //                        "[LOCAL SIMULATION CONNECTOR]: Found region {0} {1} to send AgentUpdate",
 //                        s.RegionInfo.RegionName, destination.RegionHandle);
 
@@ -294,7 +300,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
 
             if (m_scenes.ContainsKey(destination.RegionID))
             {
-//                    m_log.DebugFormat(
+//                    m_logger?.LogDebug(
 //                        "[LOCAL SIMULATION CONNECTOR]: Found region {0} {1} to send AgentUpdate",
 //                        s.RegionInfo.RegionName, destination.RegionHandle);
 
@@ -316,7 +322,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
 
             if (m_scenes.ContainsKey(destination.RegionID))
             {
-//                    m_log.DebugFormat(
+//                    m_logger?.LogDebug(
 //                        "[LOCAL SIMULATION CONNECTOR]: Found region {0} {1} to send AgentUpdate",
 //                        s.RegionInfo.RegionName, destination.RegionHandle);
 

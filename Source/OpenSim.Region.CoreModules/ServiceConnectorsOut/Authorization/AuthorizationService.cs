@@ -25,14 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
-using System;
-using System.Reflection;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 {
@@ -45,9 +48,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
             DisallowForeigners = 2, /* Only local people */
         }
 
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IUserManagement m_UserManagement;
         private Scene m_Scene;
@@ -56,6 +57,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 
         public AuthorizationService(IConfig config, Scene scene)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<AuthorizationService>>();
             m_Scene = scene;
             m_UserManagement = scene.RequestModuleInterface<IUserManagement>();
 
@@ -70,10 +72,10 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
                     }
                     catch (ArgumentException)
                     {
-                        m_log.WarnFormat("[AuthorizationService]: {0} is not a valid access flag", accessStr);
+                        m_logger?.LogWarning("[AuthorizationService]: {0} is not a valid access flag", accessStr);
                     }
                 }
-                m_log.DebugFormat("[AuthorizationService]: Region {0} access restrictions: {1}", m_Scene.RegionInfo.RegionName, m_accessValue);
+                m_logger?.LogDebug("[AuthorizationService]: Region {0} access restrictions: {1}", m_Scene.RegionInfo.RegionName, m_accessValue);
             }
 
         }
@@ -84,7 +86,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
             // This should not happen
             if (m_Scene.RegionInfo.RegionID.ToString() != regionID)
             {
-                m_log.WarnFormat("[AuthorizationService]: Service for region {0} received request to authorize for region {1}",
+                m_logger?.LogWarning("[AuthorizationService]: Service for region {0} received request to authorize for region {1}",
                     m_Scene.RegionInfo.RegionID, regionID);
                 message = string.Format("Region {0} received request to authorize for region {1}", m_Scene.RegionInfo.RegionID, regionID);
                 return false;

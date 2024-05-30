@@ -28,16 +28,23 @@
 using System.Collections;
 using System.Net;
 using System.Reflection;
-using log4net;
-using Nini.Config;
-using Nwc.XmlRpc;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nwc.XmlRpc;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 /*****************************************************
  *
@@ -76,7 +83,7 @@ namespace OpenSim.Region.CoreModules.Scripting.XMLRPC
 {
     public class XMLRPCModule : ISharedRegionModule, IXMLRPC
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private string m_name = "XMLRPCModule";
 
@@ -100,6 +107,7 @@ namespace OpenSim.Region.CoreModules.Scripting.XMLRPC
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<XMLRPCModule>>();
             // We need to create these early because the scripts might be calling
             // But since this gets called for every region, we need to make sure they
             // get called only one time (or we lose any open channels)
@@ -211,7 +219,7 @@ namespace OpenSim.Region.CoreModules.Scripting.XMLRPC
             // This should no longer happen, but the check is reasonable anyway
             if (null == m_openChannels)
             {
-                m_log.Warn("[XML RPC MODULE]: Attempt to open channel before initialization is complete");
+                m_logger?.LogWarning("[XML RPC MODULE]: Attempt to open channel before initialization is complete");
                 return newChannel;
             }
 
@@ -298,7 +306,7 @@ namespace OpenSim.Region.CoreModules.Scripting.XMLRPC
             }
             else
             {
-                m_log.Warn("[XML RPC MODULE]: Channel or message_id not found");
+                m_logger?.LogWarning("[XML RPC MODULE]: Channel or message_id not found");
             }
         }
 
@@ -359,7 +367,7 @@ namespace OpenSim.Region.CoreModules.Scripting.XMLRPC
                 }
                 else
                 {
-                    m_log.Error("[XML RPC MODULE]: UNABLE TO REMOVE COMPLETED REQUEST");
+                    m_logger?.LogError("[XML RPC MODULE]: UNABLE TO REMOVE COMPLETED REQUEST");
                 }
             }
         }
@@ -603,7 +611,7 @@ namespace OpenSim.Region.CoreModules.Scripting.XMLRPC
 
     public class SendRemoteDataRequest: IServiceRequest
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         public string Channel;
         public string DestURL;
@@ -640,6 +648,7 @@ namespace OpenSim.Region.CoreModules.Scripting.XMLRPC
 
         public SendRemoteDataRequest(uint localID, UUID itemID, string channel, string dest, int idata, string sdata)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SendRemoteDataRequest>>();
             this.Channel = channel;
             DestURL = dest;
             this.Idata = idata;
@@ -722,8 +731,8 @@ namespace OpenSim.Region.CoreModules.Scripting.XMLRPC
             catch (Exception we)
             {
                 Sdata = we.Message;
-                m_log.Warn("[SendRemoteDataRequest]: Request failed");
-                m_log.Warn(we.StackTrace);
+                m_logger?.LogWarning("[SendRemoteDataRequest]: Request failed");
+                m_logger?.LogWarning(we.StackTrace);
             }
             finally
             {

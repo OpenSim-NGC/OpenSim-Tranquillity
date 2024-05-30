@@ -30,8 +30,8 @@ using Microsoft.Extensions.Logging;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
+using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 

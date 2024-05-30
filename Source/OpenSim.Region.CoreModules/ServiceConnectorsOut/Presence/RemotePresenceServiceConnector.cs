@@ -24,18 +24,21 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 using OpenSim.Services.Connectors;
-using log4net;
+
 using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence
 {
     public class RemotePresenceServicesConnector : BasePresenceServiceConnector, ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         #region ISharedRegionModule
 
@@ -46,6 +49,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemotePresenceServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -58,7 +62,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence
 
                     m_PresenceDetector = new PresenceDetector(this);
 
-                    m_log.Info("[REMOTE PRESENCE CONNECTOR]: Remote presence enabled");
+                    m_logger?.LogInformation("[REMOTE PRESENCE CONNECTOR]: Remote presence enabled");
                 }
             }
         }

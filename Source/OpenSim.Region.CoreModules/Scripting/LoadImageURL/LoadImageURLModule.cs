@@ -27,20 +27,25 @@
 
 using System.Drawing;
 using System.Net;
-using Nini.Config;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse.Imaging;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using log4net;
-using System.Reflection;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Scripting.LoadImageURL
 {
     public class LoadImageURLModule : ISharedRegionModule, IDynamicTextureRender
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private string m_name = "LoadImageURL";
         private Scene m_scene;
@@ -105,6 +110,7 @@ namespace OpenSim.Region.CoreModules.Scripting.LoadImageURL
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LoadImageURLModule>>();
             m_outboundUrlFilter = new OutboundUrlFilter("Script dynamic texture image module", config);
             string proxyurl = config.Configs["Startup"].GetString("HttpProxy");
             if(!string.IsNullOrEmpty(proxyurl))
@@ -164,7 +170,7 @@ namespace OpenSim.Region.CoreModules.Scripting.LoadImageURL
         {
             if (m_textureManager is null)
             {
-                m_log.WarnFormat("[LOADIMAGEURLMODULE]: No texture manager. Can't function.");
+                m_logger?.LogWarning("[LOADIMAGEURLMODULE]: No texture manager. Can't function.");
                 return false;
             }
 
@@ -250,12 +256,12 @@ namespace OpenSim.Region.CoreModules.Scripting.LoadImageURL
                         }
                         catch (Exception)
                         {
-                            m_log.Error("[LOADIMAGEURLMODULE]: OpenJpeg Conversion Failed.  Empty byte data returned!");
+                            m_logger?.LogError("[LOADIMAGEURLMODULE]: OpenJpeg Conversion Failed.  Empty byte data returned!");
                         }
                     }
                     else
                     {
-                        m_log.WarnFormat("[LOADIMAGEURLMODULE] No data returned");
+                        m_logger?.LogWarning("[LOADIMAGEURLMODULE] No data returned");
                     }
                 }
             }
@@ -264,7 +270,7 @@ namespace OpenSim.Region.CoreModules.Scripting.LoadImageURL
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[LOADIMAGEURLMODULE]: unexpected exception {0}", e.Message);
+                m_logger?.LogError("[LOADIMAGEURLMODULE]: unexpected exception {0}", e.Message);
             }
             finally
             {
@@ -284,7 +290,7 @@ namespace OpenSim.Region.CoreModules.Scripting.LoadImageURL
                     }
                     else
                     {
-                        m_log.DebugFormat("[LOADIMAGEURLMODULE]: Returning {0} bytes of image data for request {1}",
+                        m_logger?.LogDebug("[LOADIMAGEURLMODULE]: Returning {0} bytes of image data for request {1}",
                                           imageJ2000.Length, state.RequestID);
 
                         m_textureManager.ReturnData(

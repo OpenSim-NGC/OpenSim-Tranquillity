@@ -25,21 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Security;
 using System.Text;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
-using OpenSim.Region.CoreModules.Framework.InterfaceCommander;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.Framework.Scenes;
-using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Estate
 {
@@ -48,7 +44,7 @@ namespace OpenSim.Region.CoreModules.World.Estate
     /// </summary>
     public class EstateManagementCommands
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected EstateManagementModule m_module;
 
@@ -59,6 +55,7 @@ namespace OpenSim.Region.CoreModules.World.Estate
 
         public void Initialise()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EstateManagementCommands>>();
 //            m_log.DebugFormat("[ESTATE MODULE]: Setting up estate commands for region {0}", m_module.Scene.RegionInfo.RegionName);
 
             m_module.Scene.AddCommand("Regions", m_module, "set terrain texture",
@@ -102,7 +99,7 @@ namespace OpenSim.Region.CoreModules.World.Estate
                     int corner = int.Parse(num);
                     UUID texture = UUID.Parse(uuid);
 
-                    m_log.Debug("[ESTATEMODULE]: Setting terrain textures for " + m_module.Scene.RegionInfo.RegionName +
+                    m_logger?.LogDebug("[ESTATEMODULE]: Setting terrain textures for " + m_module.Scene.RegionInfo.RegionName +
                                 string.Format(" (C#{0} = {1})", corner, texture));
 
                     switch (corner)
@@ -140,7 +137,7 @@ namespace OpenSim.Region.CoreModules.World.Estate
                 {
                     double selectedheight = double.Parse(heightstring);
 
-                    m_log.Debug("[ESTATEMODULE]: Setting water height in " + m_module.Scene.RegionInfo.RegionName + " to " +
+                    m_logger?.LogDebug("[ESTATEMODULE]: Setting water height in " + m_module.Scene.RegionInfo.RegionName + " to " +
                                 string.Format(" {0}", selectedheight));
                     m_module.Scene.RegionInfo.RegionSettings.WaterHeight = selectedheight;
 
@@ -166,7 +163,7 @@ namespace OpenSim.Region.CoreModules.World.Estate
                     float lowValue = float.Parse(min, Culture.NumberFormatInfo);
                     float highValue = float.Parse(max, Culture.NumberFormatInfo);
 
-                    m_log.Debug("[ESTATEMODULE]: Setting terrain heights " + m_module.Scene.RegionInfo.RegionName +
+                    m_logger?.LogDebug("[ESTATEMODULE]: Setting terrain heights " + m_module.Scene.RegionInfo.RegionName +
                                 string.Format(" (C{0}, {1}-{2}", corner, lowValue, highValue));
 
                     switch (corner)

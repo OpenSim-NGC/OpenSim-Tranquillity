@@ -25,23 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System.Reflection;
-using Nini.Config;
-using OpenSim.Services.Connectors;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+using OpenSim.Services.Connectors;
 using OpenSim.Services.Interfaces;
+
 using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 {
     public class RemoteAuthorizationServicesConnector :
             AuthorizationServicesConnector, ISharedRegionModule, IAuthorizationService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private bool m_Enabled = false;
         private List<Scene> m_scenes = new List<Scene>();
@@ -58,6 +60,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 
         public override void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteAuthorizationServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -67,7 +70,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
                     IConfig authorizationConfig = source.Configs["AuthorizationService"];
                     if (authorizationConfig == null)
                     {
-                        m_log.Info("[REMOTE AUTHORIZATION CONNECTOR]: AuthorizationService missing from OpenSim.ini");
+                        m_logger?.LogInformation("[REMOTE AUTHORIZATION CONNECTOR]: AuthorizationService missing from OpenSim.ini");
                         return;
                     }
 
@@ -75,7 +78,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 
                     base.Initialise(source);
 
-                    m_log.Info("[REMOTE AUTHORIZATION CONNECTOR]: Remote authorization enabled");
+                    m_logger?.LogInformation("[REMOTE AUTHORIZATION CONNECTOR]: Remote authorization enabled");
                 }
             }
         }
@@ -110,14 +113,14 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
             if (!m_Enabled)
                 return;
 
-            m_log.InfoFormat("[REMOTE AUTHORIZATION CONNECTOR]: Enabled remote authorization for region {0}", scene.RegionInfo.RegionName);
+            m_logger?.LogInformation("[REMOTE AUTHORIZATION CONNECTOR]: Enabled remote authorization for region {0}", scene.RegionInfo.RegionName);
 
         }
 
         public bool IsAuthorizedForRegion(
              string userID, string firstName, string lastName, string regionID, out string message)
         {
-            m_log.InfoFormat(
+            m_logger?.LogInformation(
                 "[REMOTE AUTHORIZATION CONNECTOR]: IsAuthorizedForRegion checking {0} for region {1}", userID, regionID);
 
             bool isAuthorized = true;
@@ -156,7 +159,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
             }
             else
             {
-                m_log.ErrorFormat(
+                m_logger?.LogError(
                     "[REMOTE AUTHORIZATION CONNECTOR] IsAuthorizedForRegion, can't find scene to match region id of {0}",
                     regionID);
             }

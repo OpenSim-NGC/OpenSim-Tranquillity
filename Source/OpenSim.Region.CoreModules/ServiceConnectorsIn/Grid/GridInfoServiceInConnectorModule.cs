@@ -25,19 +25,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Handlers.Grid;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Grid
 {
     public class GridInfoServiceInConnectorModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private static bool m_Enabled = false;
 
         private IConfiguration m_Config;
@@ -47,6 +50,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Grid
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GridInfoServiceInConnectorModule>>();
             m_Config = config;
             IConfig moduleConfig = config.Configs["Modules"];
             if (moduleConfig != null)
@@ -54,7 +58,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Grid
                 m_Enabled = moduleConfig.GetBoolean("GridInfoServiceInConnector", false);
                 if (m_Enabled)
                 {
-                    m_log.Info("[GRIDINFO IN CONNECTOR]: GridInfo Service In Connector enabled");
+                    m_logger?.LogInformation("[GRIDINFO IN CONNECTOR]: GridInfo Service In Connector enabled");
                 }
 
             }
@@ -100,7 +104,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Grid
             {
                 m_Registered = true;
 
-                m_log.Info("[GridInfo]: Starting...");
+                m_logger?.LogInformation("[GridInfo]: Starting...");
 
                 new GridInfoServerInConnector(m_Config, MainServer.Instance, "GridInfoService");
             }

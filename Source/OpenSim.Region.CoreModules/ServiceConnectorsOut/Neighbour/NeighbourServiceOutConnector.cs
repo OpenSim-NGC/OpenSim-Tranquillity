@@ -25,14 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
-using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Services.Connectors;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
+using Nini.Config;
 
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Neighbour
@@ -40,9 +41,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Neighbour
     public class NeighbourServicesOutConnector :
             NeighbourServicesConnector, ISharedRegionModule, INeighbourService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private List<Scene> m_Scenes = new List<Scene>();
         private bool m_Enabled = false;
@@ -59,6 +58,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Neighbour
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<NeighbourServicesOutConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -66,7 +66,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Neighbour
                 if (name == Name)
                 {
                     m_Enabled = true;
-                    m_log.Info("[NEIGHBOUR CONNECTOR]: Neighbour out connector enabled");
+                    m_logger?.LogInformation("[NEIGHBOUR CONNECTOR]: Neighbour out connector enabled");
                 }
             }
         }
@@ -101,7 +101,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Neighbour
                 return;
 
             m_GridService = scene.GridService;
-            m_log.InfoFormat("[NEIGHBOUR CONNECTOR]: Enabled out neighbours for region {0}", scene.RegionInfo.RegionName);
+            m_logger?.LogInformation("[NEIGHBOUR CONNECTOR]: Enabled out neighbours for region {0}", scene.RegionInfo.RegionName);
 
         }
 

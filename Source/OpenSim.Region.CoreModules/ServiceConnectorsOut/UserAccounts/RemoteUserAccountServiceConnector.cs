@@ -25,25 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 using OpenSim.Framework;
 
 using OpenMetaverse;
 
+using Nini.Config;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
 {
     public class RemoteUserAccountServicesConnector : UserAccountServicesConnector,
             ISharedRegionModule, IUserAccountService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private bool m_Enabled = false;
         private UserAccountCache m_Cache;
@@ -60,6 +62,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
 
         public override void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteUserAccountServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -69,7 +72,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
                     IConfig userConfig = source.Configs["UserAccountService"];
                     if (userConfig == null)
                     {
-                        m_log.Error("[USER CONNECTOR]: UserAccountService missing from OpenSim.ini");
+                        m_logger?.LogError("[USER CONNECTOR]: UserAccountService missing from OpenSim.ini");
                         return;
                     }
 
@@ -78,7 +81,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
                     base.Initialise(source);
                     m_Cache = new UserAccountCache();
 
-                    m_log.Info("[USER CONNECTOR]: Remote users enabled");
+                    m_logger?.LogInformation("[USER CONNECTOR]: Remote users enabled");
                 }
             }
         }

@@ -25,16 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using OpenSim.Region.Framework.Scenes;
-using OpenMetaverse;
 using System.Drawing;
-using log4net;
-using System.Reflection;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using OpenMetaverse;
+
+using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Serialization;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.CoreModules.World.Archiver
 {
@@ -43,7 +43,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
     /// </summary>
     public class DearchiveScenesInfo
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <summary>
         /// One region in the archive.
@@ -108,6 +108,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
 
         public DearchiveScenesInfo()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DearchiveScenesInfo>>();
             MultiRegionFormat = false;
         }
 
@@ -179,7 +180,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                 }
                 else
                 {
-                    m_log.WarnFormat("[ARCHIVER]: Not loading archived region {0} because there's no existing region at location {1},{2}",
+                    m_logger?.LogWarning("[ARCHIVER]: Not loading archived region {0} because there's no existing region at location {1},{2}",
                         archivedRegion.Directory, location.X, location.Y);
                 }
             }

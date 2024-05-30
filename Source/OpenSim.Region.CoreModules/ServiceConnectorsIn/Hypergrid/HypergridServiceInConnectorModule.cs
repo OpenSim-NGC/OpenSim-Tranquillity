@@ -26,8 +26,10 @@
  */
 
 using System.Reflection;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
@@ -35,11 +37,13 @@ using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Hypergrid;
 using OpenSim.Services.Interfaces;
 
+using Nini.Config;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Hypergrid
 {
     public class HypergridServiceInConnectorModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private static bool m_Enabled = false;
 
         private IConfiguration m_Config;
@@ -52,6 +56,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Hypergrid
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HypergridServiceInConnectorModule>>();
             m_Config = config;
             IConfig moduleConfig = config.Configs["Modules"];
             if (moduleConfig != null)
@@ -59,7 +64,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Hypergrid
                 m_Enabled = moduleConfig.GetBoolean("HypergridServiceInConnector", false);
                 if (m_Enabled)
                 {
-                    m_log.Info("[HGGRID IN CONNECTOR]: Hypergrid Service In Connector enabled");
+                    m_logger?.LogInformation("[HGGRID IN CONNECTOR]: Hypergrid Service In Connector enabled");
                     IConfig fconfig = config.Configs["FriendsService"];
                     if (fconfig != null)
                     {
@@ -110,7 +115,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Hypergrid
             {
                 m_Registered = true;
 
-                m_log.Info("[HypergridService]: Starting...");
+                m_logger?.LogInformation("[HypergridService]: Starting...");
 
                 ISimulationService simService = scene.RequestModuleInterface<ISimulationService>();
                 IFriendsSimConnector friendsConn = scene.RequestModuleInterface<IFriendsSimConnector>();

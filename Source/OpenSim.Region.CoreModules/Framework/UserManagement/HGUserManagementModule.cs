@@ -24,32 +24,36 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Services.Connectors.Hypergrid;
+using OpenSim.Server.Base;
 
 using OpenMetaverse;
-using log4net;
+
 using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Framework.UserManagement
 {
     public class HGUserManagementModule : UserManagementModule, ISharedRegionModule, IUserManagement
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         #region ISharedRegionModule
 
         public override void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HGUserManagementModule>>();
             string umanmod = config.Configs["Modules"].GetString("UserManagementModule", null);
             if (umanmod == Name)
             {
                 m_Enabled = true;
                 base.Init(config);
-                m_log.DebugFormat("[USER MANAGEMENT MODULE]: {0} is enabled", Name);
+                m_logger?.LogDebug("[USER MANAGEMENT MODULE]: {0} is enabled", Name);
             }
         }
 
@@ -67,7 +71,7 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
                 string[] words = query.Split(new char[] { '@' });
                 if (words.Length != 2)
                 {
-                    m_log.DebugFormat("[USER MANAGEMENT MODULE]: Malformed address {0}", query);
+                    m_logger?.LogDebug("[USER MANAGEMENT MODULE]: Malformed address {0}", query);
                     return;
                 }
 
@@ -118,7 +122,7 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
                         }
                         catch (UriFormatException)
                         {
-                            m_log.DebugFormat("[USER MANAGEMENT MODULE]: Malformed address {0}", uriStr);
+                            m_logger?.LogDebug("[USER MANAGEMENT MODULE]: Malformed address {0}", uriStr);
                             return;
                         }
 
@@ -133,7 +137,7 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
                             }
                             catch (Exception e)
                             {
-                                m_log.Debug("[USER MANAGEMENT MODULE]: GetUUID call failed ", e);
+                                m_logger?.LogDebug("[USER MANAGEMENT MODULE]: GetUUID call failed ", e);
                             }
                         }
 
@@ -145,10 +149,10 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
                             ud.LastName = "@" + words[1];
                             users.Add(ud);
                             AddUser(userID, names[0], names[1], uriStr);
-                            m_log.DebugFormat("[USER MANAGEMENT MODULE]: User {0}@{1} found", words[0], words[1]);
+                            m_logger?.LogDebug("[USER MANAGEMENT MODULE]: User {0}@{1} found", words[0], words[1]);
                         }
                         else
-                            m_log.DebugFormat("[USER MANAGEMENT MODULE]: User {0}@{1} not found", words[0], words[1]);
+                            m_logger?.LogDebug("[USER MANAGEMENT MODULE]: User {0}@{1} not found", words[0], words[1]);
                     }
                 }
             }

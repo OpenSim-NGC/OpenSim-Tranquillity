@@ -25,9 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
@@ -35,13 +35,13 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
+using Nini.Config;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
 {
     public class LocalUserAliasServicesConnector : ISharedRegionModule, IUserAliasService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         public IUserAliasService UserAliasService { get; private set; }
 
@@ -61,6 +61,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalUserAliasServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -70,7 +71,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
                     IConfig userConfig = source.Configs["UserAliasService"];
                     if (userConfig == null)
                     {
-                        m_log.Error("[LOCAL USER ALIAS SERVICE CONNECTOR]: UserAliasService missing from OpenSim.ini");
+                        m_logger?.LogError("[LOCAL USER ALIAS SERVICE CONNECTOR]: UserAliasService missing from OpenSim.ini");
                         return;
                     }
 
@@ -78,7 +79,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
 
                     if (serviceDll.Length == 0)
                     {
-                        m_log.Error("[LOCAL USER ALIAS SERVICE CONNECTOR]: No LocalServiceModule named in section UserAliasService");
+                        m_logger?.LogError("[LOCAL USER ALIAS SERVICE CONNECTOR]: No LocalServiceModule named in section UserAliasService");
                         return;
                     }
 
@@ -87,14 +88,14 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
 
                     if (UserAliasService == null)
                     {
-                        m_log.ErrorFormat(
+                        m_logger?.LogError(
                             "[USER ALIAS SERVICE CONNECTOR]: Cannot load user account alias specified as {0}", serviceDll);
                         return;
                     }
 
                     m_Enabled = true;
 
-                    m_log.Info("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Local user connector enabled");
+                    m_logger?.LogInformation("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Local user connector enabled");
                 }
             }
         }
@@ -130,7 +131,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
             if (!m_Enabled)
                 return;
 
-            m_log.InfoFormat("[LOCAL USER ALIAS SERVICE CONNECTOR]: Enabled local user aliases for region {0}", scene.RegionInfo.RegionName);
+            m_logger?.LogInformation("[LOCAL USER ALIAS SERVICE CONNECTOR]: Enabled local user aliases for region {0}", scene.RegionInfo.RegionName);
         }
 
         #endregion

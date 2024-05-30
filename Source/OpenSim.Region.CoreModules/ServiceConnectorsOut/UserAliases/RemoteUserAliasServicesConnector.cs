@@ -25,23 +25,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 using OpenSim.Framework;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
 {
     public class RemoteUserAliasServicesConnector : UserAliasServicesConnector,
             ISharedRegionModule, IUserAliasService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private bool m_Enabled = false;
 
@@ -57,6 +58,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
 
         public override void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteUserAliasServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -74,7 +76,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
 
                     base.Initialise(source);
 
-                    m_log.Info("[USER CONNECTOR]: Remote user aliases enabled");
+                    m_logger?.LogInformation("[USER CONNECTOR]: Remote user aliases enabled");
                 }
             }
         }

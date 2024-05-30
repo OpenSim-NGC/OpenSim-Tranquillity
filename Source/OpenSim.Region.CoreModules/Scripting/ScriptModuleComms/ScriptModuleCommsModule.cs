@@ -25,20 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Linq.Expressions;
 using System.Reflection;
-using Nini.Config;
-using log4net;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
 using OpenMetaverse;
-using System.Linq.Expressions;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Scripting.ScriptModuleComms
 {
     public class ScriptModuleCommsModule : INonSharedRegionModule, IScriptModuleComms
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private static string LogHeader = "[MODULE COMMS]";
 
         private Dictionary<string,object> m_constants = new Dictionary<string,object>();
@@ -69,6 +74,7 @@ namespace OpenSim.Region.CoreModules.Scripting.ScriptModuleComms
 #region RegionModuleInterface
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<ScriptModuleCommsModule>>();
         }
 
         public void AddRegion(Scene scene)
@@ -85,7 +91,7 @@ namespace OpenSim.Region.CoreModules.Scripting.ScriptModuleComms
             m_scriptModule = scene.RequestModuleInterface<IScriptModule>();
 
             if (m_scriptModule != null)
-                m_log.Info("[MODULE COMMANDS]: Script engine found, module active");
+                m_logger?.LogInformation("[MODULE COMMANDS]: Script engine found, module active");
         }
 
         public string Name
@@ -143,7 +149,7 @@ namespace OpenSim.Region.CoreModules.Scripting.ScriptModuleComms
             MethodInfo mi = GetMethodInfoFromType(target.GetType(), meth, true);
             if (mi == null)
             {
-                m_log.WarnFormat("{0} Failed to register method {1}", LogHeader, meth);
+                m_logger?.LogWarning("{0} Failed to register method {1}", LogHeader, meth);
                 return;
             }
 
@@ -178,7 +184,7 @@ namespace OpenSim.Region.CoreModules.Scripting.ScriptModuleComms
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("{0} Failed to create function signature. Most likely more than 5 parameters. Method={1}. Error={2}",
+                    m_logger?.LogError("{0} Failed to create function signature. Most likely more than 5 parameters. Method={1}. Error={2}",
                         LogHeader, mi.Name, e);
                 }
             }
@@ -209,7 +215,7 @@ namespace OpenSim.Region.CoreModules.Scripting.ScriptModuleComms
             {
                 MethodInfo mi = GetMethodInfoFromType(target, method, false);
                 if (mi == null)
-                    m_log.WarnFormat("[MODULE COMMANDS] Failed to register method {0}", method);
+                    m_logger?.LogWarning("[MODULE COMMANDS] Failed to register method {0}", method);
                 else
                     RegisterScriptInvocation(target, mi);
             }
@@ -268,7 +274,7 @@ namespace OpenSim.Region.CoreModules.Scripting.ScriptModuleComms
                     else if (sid.ReturnType == typeof(void))
                         return "modInvokeN";
 
-                    m_log.WarnFormat("[MODULE COMMANDS] failed to find match for {0} with return type {1}",fname,sid.ReturnType.Name);
+                    m_logger?.LogWarning("[MODULE COMMANDS] failed to find match for {0} with return type {1}",fname,sid.ReturnType.Name);
                 }
             }
 

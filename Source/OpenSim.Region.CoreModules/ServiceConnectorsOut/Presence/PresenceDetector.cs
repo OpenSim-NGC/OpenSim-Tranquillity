@@ -24,26 +24,29 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using log4net;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
+using OpenMetaverse;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence
 {
     public class PresenceDetector
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IPresenceService m_PresenceService;
         private Scene m_aScene;
 
         public PresenceDetector(IPresenceService presenceservice)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PresenceDetector>>();
             m_PresenceService = presenceservice;
         }
 

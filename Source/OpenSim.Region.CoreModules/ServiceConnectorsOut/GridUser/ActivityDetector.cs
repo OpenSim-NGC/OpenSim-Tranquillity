@@ -24,29 +24,29 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-using log4net;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
 {
     public class ActivityDetector
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IGridUserService m_GridUserService;
 
         public ActivityDetector(IGridUserService guservice)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<ActivityDetector>>();
             m_GridUserService = guservice;
-            m_log.DebugFormat("[ACTIVITY DETECTOR]: starting ");
+            m_logger?.LogDebug("[ACTIVITY DETECTOR]: starting ");
         }
 
         public void AddRegion(Scene scene)
@@ -82,7 +82,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
         public void DoOnMakeRootAgent(ScenePresence sp)
         {
             string userid;
-            //m_log.DebugFormat("[ACTIVITY DETECTOR]: Detected root presence {0} in {1}", userid, sp.Scene.RegionInfo.RegionName);
+            //m_logger?.LogDebug("[ACTIVITY DETECTOR]: Detected root presence {0} in {1}", userid, sp.Scene.RegionInfo.RegionName);
             if (sp.Scene.UserManagementModule.GetUserUUI(sp.UUID, out userid))
             {
                 /* we only setposition on known agents that have a valid lookup */

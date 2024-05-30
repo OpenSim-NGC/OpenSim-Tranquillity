@@ -25,18 +25,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Nini.Config;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 {
     public class LocalAuthorizationServicesConnector : INonSharedRegionModule, IAuthorizationService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IAuthorizationService m_AuthorizationService;
         private Scene m_Scene;
@@ -56,7 +59,8 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 
         public void Initialise(IConfiguration source)
         {
-            m_log.Info("[AUTHORIZATION CONNECTOR]: Initialise");
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalAuthorizationServicesConnector>>();
+            m_logger?.LogInformation("[AUTHORIZATION CONNECTOR]: Initialise");
 
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
@@ -66,7 +70,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
                 {
                     m_Enabled = true;
                     m_AuthorizationConfig = source.Configs["AuthorizationService"];
-                    m_log.Info("[AUTHORIZATION CONNECTOR]: Local authorization connector enabled");
+                    m_logger?.LogInformation("[AUTHORIZATION CONNECTOR]: Local authorization connector enabled");
                 }
             }
         }
@@ -99,7 +103,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 
             m_AuthorizationService = new AuthorizationService(m_AuthorizationConfig, scene);
 
-            m_log.InfoFormat(
+            m_logger?.LogInformation(
                 "[AUTHORIZATION CONNECTOR]: Enabled local authorization for region {0}",
                 scene.RegionInfo.RegionName);
         }

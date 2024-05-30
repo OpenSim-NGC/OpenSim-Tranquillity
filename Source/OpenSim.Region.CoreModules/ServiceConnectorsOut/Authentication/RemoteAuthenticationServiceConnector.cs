@@ -25,22 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
 {
     public class RemoteAuthenticationServicesConnector : AuthenticationServicesConnector,
             ISharedRegionModule, IAuthenticationService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private bool m_Enabled = false;
 
@@ -56,6 +57,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
 
         public override void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteAuthenticationServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -65,7 +67,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
                     IConfig userConfig = source.Configs["AuthenticationService"];
                     if (userConfig == null)
                     {
-                        m_log.Error("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
+                        m_logger?.LogError("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
                         return;
                     }
 
@@ -73,7 +75,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
 
                     base.Initialise(source);
 
-                    m_log.Info("[AUTH CONNECTOR]: Remote Authentication enabled");
+                    m_logger?.LogInformation("[AUTH CONNECTOR]: Remote Authentication enabled");
                 }
             }
         }

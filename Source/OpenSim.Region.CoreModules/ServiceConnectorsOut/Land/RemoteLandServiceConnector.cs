@@ -25,15 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System.Reflection;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Services.Connectors;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
 using OpenMetaverse;
+
+using Nini.Config;
 
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
@@ -41,9 +45,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
     public class RemoteLandServicesConnector :
             LandServicesConnector, ISharedRegionModule, ILandService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private bool m_Enabled = false;
         private LocalLandServicesConnector m_LocalService;
@@ -60,6 +62,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteLandServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -70,7 +73,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
 
                     m_Enabled = true;
 
-                    m_log.Info("[LAND CONNECTOR]: Remote Land connector enabled");
+                    m_logger?.LogInformation("[LAND CONNECTOR]: Remote Land connector enabled");
                 }
             }
         }

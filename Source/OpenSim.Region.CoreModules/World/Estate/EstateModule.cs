@@ -25,21 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Estate
 {
     public class EstateModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected List<Scene> m_Scenes = new List<Scene>();
         protected bool m_InInfoUpdate = false;
@@ -61,6 +65,7 @@ namespace OpenSim.Region.CoreModules.World.Estate
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EstateModule>>();
             uint port = MainServer.Instance.Port;
 
             IConfig estateConfig = config.Configs["Estates"];

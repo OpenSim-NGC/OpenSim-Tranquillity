@@ -25,15 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Simulation;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
@@ -41,7 +45,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
 {
     public class RemoteSimulationConnectorModule : ISharedRegionModule, ISimulationService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private bool initialized = false;
         protected bool m_enabled = false;
@@ -56,6 +60,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
 
         public virtual void Initialise(IConfiguration configSource)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteSimulationConnectorModule>>();
             IConfig moduleConfig = configSource.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -70,7 +75,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
 
                     m_enabled = true;
 
-                    m_log.Info("[REMOTE SIMULATION CONNECTOR]: Remote simulation enabled.");
+                    m_logger?.LogInformation("[REMOTE SIMULATION CONNECTOR]: Remote simulation enabled.");
                 }
             }
         }
@@ -156,7 +161,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
             if (destination == null)
             {
                 reason = "Given destination was null";
-                m_log.DebugFormat("[REMOTE SIMULATION CONNECTOR]: CreateAgent was given a null destination");
+                m_logger?.LogDebug("[REMOTE SIMULATION CONNECTOR]: CreateAgent was given a null destination");
                 return false;
             }
 

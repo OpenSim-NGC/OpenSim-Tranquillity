@@ -25,25 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using OpenMetaverse;
 
 using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Server.Base;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 
-using OpenMetaverse;
-using log4net;
 
 namespace OpenSim.Region.CoreModules.World.Estate
 {
     public class EstateConnector
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected EstateModule m_EstateModule;
         private string token;
@@ -51,6 +49,7 @@ namespace OpenSim.Region.CoreModules.World.Estate
 
         public EstateConnector(EstateModule module, string _token, uint _port)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EstateConnector>>();
             m_EstateModule = module;
             token = _token;
             port = _port;
@@ -187,7 +186,7 @@ namespace OpenSim.Region.CoreModules.World.Estate
         private bool Call(GridRegion region, Dictionary<string, object> sendData)
         {
             string reqString = ServerUtils.BuildQueryString(sendData);
-            // m_log.DebugFormat("[ESTATE CONNECTOR]: queryString = {0}", reqString);
+            // m_logger?.LogDebug("[ESTATE CONNECTOR]: queryString = {0}", reqString);
             try
             {
                 //string url = "";
@@ -207,11 +206,11 @@ namespace OpenSim.Region.CoreModules.World.Estate
                         return indx > 0;
                 }
                 else
-                    m_log.DebugFormat("[ESTATE CONNECTOR]: received empty reply");
+                    m_logger?.LogDebug("[ESTATE CONNECTOR]: received empty reply");
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[ESTATE CONNECTOR]: Exception when contacting remote sim: {0}", e.Message);
+                m_logger?.LogDebug("[ESTATE CONNECTOR]: Exception when contacting remote sim: {0}", e.Message);
             }
 
             return false;

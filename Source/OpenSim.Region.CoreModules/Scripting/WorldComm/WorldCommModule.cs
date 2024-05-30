@@ -28,16 +28,17 @@
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
-using Nini.Config;
-
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 
-// using log4net;
-// using System.Reflection;
+using OpenMetaverse;
+
+using Nini.Config;
 
 
 /*****************************************************
@@ -89,7 +90,7 @@ namespace OpenSim.Region.CoreModules.Scripting.WorldComm
 {
     public class WorldCommModule : IWorldComm, INonSharedRegionModule
     {
-        // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private const int DEBUG_CHANNEL = 0x7fffffff;
 
@@ -108,6 +109,7 @@ namespace OpenSim.Region.CoreModules.Scripting.WorldComm
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<WorldCommModule>>();
             // wrap this in a try block so that defaults will work if
             // the config file doesn't specify otherwise.
             try
@@ -372,7 +374,7 @@ namespace OpenSim.Region.CoreModules.Scripting.WorldComm
         public void DeliverMessage(ChatTypeEnum type, int channel,
                 string name, UUID id, string msg, Vector3 position)
         {
-            // m_log.DebugFormat("[WorldComm] got[2] type {0}, channel {1}, name {2}, id {3}, msg {4}",
+            // m_logger?.LogDebug("[WorldComm] got[2] type {0}, channel {1}, name {2}, id {3}, msg {4}",
             //                   type, channel, name, id, msg);
 
             // validate type and set range

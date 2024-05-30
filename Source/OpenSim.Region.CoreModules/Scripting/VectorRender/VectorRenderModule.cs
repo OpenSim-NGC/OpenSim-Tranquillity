@@ -29,13 +29,18 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.Net;
-using Nini.Config;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse.Imaging;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using log4net;
-using System.Reflection;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 //using Cairo;
 
@@ -48,7 +53,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
 //        private static byte[] s_asset1Data;
 //        private static byte[] s_asset2Data;
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private static object thisLock = new object();
         private static Graphics m_graph = null; // just to get chars sizes
 
@@ -59,6 +64,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
 
         public VectorRenderModule()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<VectorRenderModule>>();
         }
 
         #region IDynamicTextureRender Members
@@ -134,12 +140,13 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<VectorRenderModule>>();
             IConfig cfg = config.Configs["VectorRender"];
             if (null != cfg)
             {
                 m_fontName = cfg.GetString("font_name", m_fontName);
             }
-            m_log.DebugFormat("[VECTORRENDERMODULE]: using font \"{0}\" for text rendering.", m_fontName);
+            m_logger?.LogDebug("[VECTORRENDERMODULE]: using font \"{0}\" for text rendering.", m_fontName);
 
             // We won't dispose of these explicitly since this module is only removed when the entire simulator
             // is shut down.
@@ -392,7 +399,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_logger?.LogError(
                         "[VECTORRENDERMODULE]: OpenJpeg Encode Failed.  Exception {0}{1}",
                         e.Message, e.StackTrace);
                 }
@@ -503,7 +510,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                 {
                     string nextLine = line.TrimStart();
 
-//                    m_log.DebugFormat("[VECTOR RENDER MODULE]: Processing line '{0}'", nextLine);
+//                    m_logger?.LogDebug("[VECTOR RENDER MODULE]: Processing line '{0}'", nextLine);
 
                     if (nextLine.StartsWith("Text") && nextLine.Length > 5)
                     {
@@ -853,7 +860,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                     PointF point = new PointF(x, y);
                     points[i / 2] = point;
 
-//                    m_log.DebugFormat("[VECTOR RENDER MODULE]: Got point {0}", points[i / 2]);
+//                    m_logger?.LogDebug("[VECTOR RENDER MODULE]: Got point {0}", points[i / 2]);
                 }
             }
         }

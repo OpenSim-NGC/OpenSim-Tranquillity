@@ -25,22 +25,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Nini.Config;
-using System.Reflection;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
 using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
 {
     public class LocalLandServicesConnector : ISharedRegionModule, ILandService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         private List<Scene> m_Scenes = new List<Scene>();
 
@@ -48,9 +47,10 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
 
         public LocalLandServicesConnector()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalLandServicesConnector>>();
         }
 
-        public LocalLandServicesConnector(List<Scene> scenes)
+        public LocalLandServicesConnector(List<Scene> scenes) : this()
         {
             m_Scenes = scenes;
         }
@@ -69,6 +69,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalLandServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -76,7 +77,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
                 if (name == Name)
                 {
                     m_Enabled = true;
-                    m_log.Info("[LAND CONNECTOR]: Local land connector enabled");
+                    m_logger?.LogInformation("[LAND CONNECTOR]: Local land connector enabled");
                 }
             }
         }

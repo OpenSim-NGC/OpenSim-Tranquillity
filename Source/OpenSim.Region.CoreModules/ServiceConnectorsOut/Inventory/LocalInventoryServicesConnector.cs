@@ -25,24 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Nini.Config;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Server.Base;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+
 using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 {
     public class LocalInventoryServicesConnector : ISharedRegionModule, IInventoryService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <summary>
         /// Scene used by this module.  This currently needs to be publicly settable for HGInventoryBroker.
@@ -78,6 +79,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalInventoryServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -87,7 +89,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
                     IConfig inventoryConfig = source.Configs["InventoryService"];
                     if (inventoryConfig == null)
                     {
-                        m_log.Error("[LOCAL INVENTORY SERVICES CONNECTOR]: InventoryService missing from OpenSim.ini");
+                        m_logger?.LogError("[LOCAL INVENTORY SERVICES CONNECTOR]: InventoryService missing from OpenSim.ini");
                         return;
                     }
 
@@ -95,23 +97,23 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 
                     if (serviceDll.Length == 0)
                     {
-                        m_log.Error("[LOCAL INVENTORY SERVICES CONNECTOR]: No LocalServiceModule named in section InventoryService");
+                        m_logger?.LogError("[LOCAL INVENTORY SERVICES CONNECTOR]: No LocalServiceModule named in section InventoryService");
                         return;
                     }
 
                     Object[] args = new Object[] { source };
-                    m_log.DebugFormat("[LOCAL INVENTORY SERVICES CONNECTOR]: Service dll = {0}", serviceDll);
+                    m_logger?.LogDebug("[LOCAL INVENTORY SERVICES CONNECTOR]: Service dll = {0}", serviceDll);
 
                     m_InventoryService = ServerUtils.LoadPlugin<IInventoryService>(serviceDll, args);
 
                     if (m_InventoryService == null)
                     {
-                        m_log.Error("[LOCAL INVENTORY SERVICES CONNECTOR]: Can't load inventory service");
+                        m_logger?.LogError("[LOCAL INVENTORY SERVICES CONNECTOR]: Can't load inventory service");
                         throw new Exception("Unable to proceed. Please make sure your ini files in config-include are updated according to .example's");
                     }
 
                     m_Enabled = true;
-                    m_log.Info("[LOCAL INVENTORY SERVICES CONNECTOR]: Local inventory connector enabled");
+                    m_logger?.LogInformation("[LOCAL INVENTORY SERVICES CONNECTOR]: Local inventory connector enabled");
                 }
             }
         }
@@ -254,7 +256,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 
         public bool AddItem(InventoryItemBase item)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[LOCAL INVENTORY SERVICES CONNECTOR]: Adding inventory item {0} to user {1} folder {2}",
 //                item.Name, item.Owner, item.Folder);
 
@@ -288,7 +290,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 
         public InventoryItemBase GetItem(UUID principalID, UUID itemID)
         {
-//            m_log.DebugFormat("[LOCAL INVENTORY SERVICES CONNECTOR]: Requesting inventory item {0}", item.ID);
+//            m_logger?.LogDebug("[LOCAL INVENTORY SERVICES CONNECTOR]: Requesting inventory item {0}", item.ID);
 
 //            UUID requestedItemId = item.ID;
 

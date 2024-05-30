@@ -25,9 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using System.Reflection;
-using log4net;
-using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -36,13 +37,13 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
+using Nini.Config;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar
 {
     public class LocalAvatarServicesConnector : ISharedRegionModule, IAvatarService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IAvatarService m_AvatarService;
 
@@ -62,6 +63,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalAvatarServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -71,7 +73,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar
                     IConfig userConfig = source.Configs["AvatarService"];
                     if (userConfig == null)
                     {
-                        m_log.Error("[AVATAR CONNECTOR]: AvatarService missing from OpenSim.ini");
+                        m_logger?.LogError("[AVATAR CONNECTOR]: AvatarService missing from OpenSim.ini");
                         return;
                     }
 
@@ -80,7 +82,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar
 
                     if (serviceDll.Length == 0)
                     {
-                        m_log.Error("[AVATAR CONNECTOR]: No LocalServiceModule named in section AvatarService");
+                        m_logger?.LogError("[AVATAR CONNECTOR]: No LocalServiceModule named in section AvatarService");
                         return;
                     }
 
@@ -91,11 +93,11 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar
 
                     if (m_AvatarService == null)
                     {
-                        m_log.Error("[AVATAR CONNECTOR]: Can't load user account service");
+                        m_logger?.LogError("[AVATAR CONNECTOR]: Can't load user account service");
                         return;
                     }
                     m_Enabled = true;
-                    m_log.Info("[AVATAR CONNECTOR]: Local avatar connector enabled");
+                    m_logger?.LogInformation("[AVATAR CONNECTOR]: Local avatar connector enabled");
                 }
             }
         }

@@ -26,14 +26,19 @@
  */
 
 using System.Drawing;
-using System.Reflection;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenMetaverse.Imaging;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.LegacyMap
 {
@@ -59,8 +64,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
 
     public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private Scene m_scene;
         private IConfiguration m_config;
@@ -121,7 +125,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                     }
                     catch (Exception)
                     {
-                        m_log.ErrorFormat(
+                        m_logger?.LogError(
                             "[MAPTILE]: Failed to load Static map image texture file: {0} for {1}",
                             m_scene.RegionInfo.MaptileStaticFile, m_scene.Name);
                         //mapbmp = new Bitmap((int)m_scene.Heightmap.Width, (int)m_scene.Heightmap.Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
@@ -129,7 +133,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                     }
 
                     if (mapbmp != null)
-                        m_log.DebugFormat(
+                        m_logger?.LogDebug(
                             "[MAPTILE]: Static map image texture file {0} found for {1}",
                             m_scene.RegionInfo.MaptileStaticFile, m_scene.Name);
                 }
@@ -154,7 +158,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
             }
             catch (Exception e) // LEGIT: Catching problems caused by OpenJPEG p/invoke
             {
-                m_log.Error("Failed generating terrain map: " + e);
+                m_logger?.LogError("Failed generating terrain map: " + e);
             }
 
             return null;
@@ -166,6 +170,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MapImageModule>>();
             m_config = source;
 
             if (Util.GetConfigVarFromSections<string>(
@@ -256,11 +261,11 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
 
             if (asset != null)
             {
-                m_log.DebugFormat("[MAPTILE]: Static map image texture {0} found for {1}", id, m_scene.Name);
+                m_logger?.LogDebug("[MAPTILE]: Static map image texture {0} found for {1}", id, m_scene.Name);
             }
             else
             {
-                m_log.WarnFormat("[MAPTILE]: Static map image texture {0} not found for {1}", id, m_scene.Name);
+                m_logger?.LogWarning("[MAPTILE]: Static map image texture {0} not found for {1}", id, m_scene.Name);
                 return null;
             }
 
@@ -276,17 +281,17 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
             }
             catch (DllNotFoundException)
             {
-                m_log.ErrorFormat("[MAPTILE]: OpenJpeg is not installed correctly on this system.   Asset Data is empty for {0}", id);
+                m_logger?.LogError("[MAPTILE]: OpenJpeg is not installed correctly on this system.   Asset Data is empty for {0}", id);
 
             }
             catch (IndexOutOfRangeException)
             {
-                m_log.ErrorFormat("[MAPTILE]: OpenJpeg was unable to decode this.   Asset Data is empty for {0}", id);
+                m_logger?.LogError("[MAPTILE]: OpenJpeg was unable to decode this.   Asset Data is empty for {0}", id);
 
             }
             catch (Exception)
             {
-                m_log.ErrorFormat("[MAPTILE]: OpenJpeg was unable to decode this.   Asset Data is empty for {0}", id);
+                m_logger?.LogError("[MAPTILE]: OpenJpeg was unable to decode this.   Asset Data is empty for {0}", id);
 
             }
             return null;
@@ -298,7 +303,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
             int tc = 0;
             ITerrainChannel hm = whichScene.Heightmap;
             tc = Environment.TickCount;
-            m_log.Debug("[MAPTILE]: Generating Maptile Step 2: Object Volume Profile");
+            m_logger?.LogDebug("[MAPTILE]: Generating Maptile Step 2: Object Volume Profile");
             EntityBase[] objs = whichScene.GetEntities();
             List<float> z_sortheights = new List<float>();
             List<uint> z_localIDs = new List<uint>();
@@ -623,7 +628,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                     ds.brush.Dispose();
             }
 
-            m_log.Debug("[MAPTILE]: Generating Maptile Step 2: Done in " + (Environment.TickCount - tc) + " ms");
+            m_logger?.LogDebug("[MAPTILE]: Generating Maptile Step 2: Done in " + (Environment.TickCount - tc) + " ms");
 
             return mapbmp;
         }

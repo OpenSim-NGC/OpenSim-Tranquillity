@@ -25,9 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
@@ -36,12 +36,14 @@ using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
 
+using Nini.Config;
+
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Neighbour
 {
     public class NeighbourServiceInConnectorModule : ISharedRegionModule, INeighbourService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private static bool m_Enabled = false;
         private static bool m_Registered = false;
 
@@ -52,6 +54,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Neighbour
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<NeighbourServiceInConnectorModule>>();
             m_Config = config;
 
             IConfig moduleConfig = config.Configs["Modules"];
@@ -60,7 +63,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Neighbour
                 m_Enabled = moduleConfig.GetBoolean("NeighbourServiceInConnector", false);
                 if (m_Enabled)
                 {
-                    m_log.Info("[NEIGHBOUR IN CONNECTOR]: NeighbourServiceInConnector enabled");
+                    m_logger?.LogInformation("[NEIGHBOUR IN CONNECTOR]: NeighbourServiceInConnector enabled");
                 }
 
             }
@@ -72,7 +75,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Neighbour
             if (!m_Enabled)
                 return;
 
-//            m_log.Info("[NEIGHBOUR IN CONNECTOR]: Starting...");
+//            m_logger?.LogInformation("[NEIGHBOUR IN CONNECTOR]: Starting...");
         }
 
         public void Close()

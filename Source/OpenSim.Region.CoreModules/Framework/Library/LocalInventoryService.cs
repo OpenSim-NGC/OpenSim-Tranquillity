@@ -24,27 +24,26 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
-
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
 
 using OpenMetaverse;
-using log4net;
 
 namespace OpenSim.Region.CoreModules.Framework.Library
 {
     public class LocalInventoryService : IInventoryService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private InventoryFolderImpl m_Library;
 
         public LocalInventoryService(InventoryFolderImpl lib)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalInventoryService>>();
             m_Library = lib;
         }
 
@@ -83,7 +82,7 @@ namespace OpenSim.Region.CoreModules.Framework.Library
             inv.Folders = folder.RequestListOfFolders();
             inv.Items = folder.RequestListOfItems();
 
-            m_log.DebugFormat("[LIBRARY MODULE]: Got content for folder {0}", folder.Name);
+            m_logger?.LogDebug("[LIBRARY MODULE]: Got content for folder {0}", folder.Name);
             return inv;
         }
 
@@ -117,14 +116,14 @@ namespace OpenSim.Region.CoreModules.Framework.Library
         /// <returns>true if the folder was successfully added</returns>
         public bool AddFolder(InventoryFolderBase folder)
         {
-            //m_log.DebugFormat("[LIBRARY MODULE]: Adding folder {0} ({1}) to {2}", folder.Name, folder.ID, folder.ParentID);
+            //m_logger?.LogDebug("[LIBRARY MODULE]: Adding folder {0} ({1}) to {2}", folder.Name, folder.ID, folder.ParentID);
             InventoryFolderImpl parent = m_Library;
             if (m_Library.ID != folder.ParentID)
                 parent = m_Library.FindFolder(folder.ParentID);
 
             if (parent == null)
             {
-                m_log.DebugFormat("[LIBRARY MODULE]: could not add folder {0} because parent folder {1} not found", folder.Name, folder.ParentID);
+                m_logger?.LogDebug("[LIBRARY MODULE]: could not add folder {0} because parent folder {1} not found", folder.Name, folder.ParentID);
                 return false;
             }
 
@@ -140,14 +139,14 @@ namespace OpenSim.Region.CoreModules.Framework.Library
         /// <returns>true if the item was successfully added</returns>
         public bool AddItem(InventoryItemBase item)
         {
-            //m_log.DebugFormat("[LIBRARY MODULE]: Adding item {0} to {1}", item.Name, item.Folder);
+            //m_logger?.LogDebug("[LIBRARY MODULE]: Adding item {0} to {1}", item.Name, item.Folder);
             InventoryFolderImpl folder = m_Library;
             if (m_Library.ID != item.Folder)
                 folder = m_Library.FindFolder(item.Folder);
 
             if (folder == null)
             {
-                m_log.DebugFormat("[LIBRARY MODULE]: could not add item {0} because folder {1} not found", item.Name, item.Folder);
+                m_logger?.LogDebug("[LIBRARY MODULE]: could not add item {0} because folder {1} not found", item.Name, item.Folder);
                 return false;
             }
 

@@ -25,27 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Xml;
 
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
-using OpenSim.Server.Base;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 
 using OpenMetaverse;
-using log4net;
 
 namespace OpenSim.Region.CoreModules.World.Estate
 {
     public class EstateSimpleRequestHandler :SimpleStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected EstateModule m_EstateModule;
         protected Object m_RequestLock = new Object();
@@ -53,6 +51,7 @@ namespace OpenSim.Region.CoreModules.World.Estate
 
         public EstateSimpleRequestHandler(EstateModule fmodule, string _token) : base("/estate")
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EstateSimpleRequestHandler>>();
             m_EstateModule = fmodule;
             token = _token;
         }
@@ -138,7 +137,7 @@ namespace OpenSim.Region.CoreModules.World.Estate
             }
             catch (Exception e)
             {
-                m_log.Debug("[ESTATE]: Exception {0}" + e.ToString());
+                m_logger?.LogDebug("[ESTATE]: Exception {0}" + e.ToString());
             }
 
             httpResponse.RawBuffer = FailureResult();

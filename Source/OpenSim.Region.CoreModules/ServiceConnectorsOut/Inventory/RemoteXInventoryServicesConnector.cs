@@ -25,22 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System.Reflection;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Services.Connectors;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
 using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 {
     public class RemoteXInventoryServicesConnector : ISharedRegionModule, IInventoryService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_logger;
 
         /// <summary>
         /// Scene used by this module.  This currently needs to be publicly settable for HGInventoryBroker.
@@ -60,7 +63,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
                     m_UserManager = Scene.RequestModuleInterface<IUserManagement>();
 
                     if (m_UserManager == null)
-                        m_log.ErrorFormat(
+                        m_logger?.LogError(
                             "[XINVENTORY CONNECTOR]: Could not retrieve IUserManagement module from {0}",
                             Scene.RegionInfo.RegionName);
                 }
@@ -81,14 +84,15 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 
         public RemoteXInventoryServicesConnector()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteXInventoryServicesConnector>>();
         }
 
-        public RemoteXInventoryServicesConnector(string url)
+        public RemoteXInventoryServicesConnector(string url) : this()
         {
             m_RemoteConnector = new XInventoryServicesConnector(url);
         }
 
-        public RemoteXInventoryServicesConnector(IConfiguration source)
+        public RemoteXInventoryServicesConnector(IConfiguration source) : this()
         {
             Init(source);
         }
@@ -102,6 +106,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteXInventoryServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -111,7 +116,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
                     Init(source);
                     m_Enabled = true;
 
-                    m_log.Info("[XINVENTORY CONNECTOR]: Remote XInventory enabled");
+                    m_logger?.LogInformation("[XINVENTORY CONNECTOR]: Remote XInventory enabled");
                 }
             }
         }
@@ -149,7 +154,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
             if (!m_Enabled)
                 return;
 
-            m_log.InfoFormat("[XINVENTORY CONNECTOR]: Enabled remote XInventory for region {0}", scene.RegionInfo.RegionName);
+            m_logger?.LogInformation("[XINVENTORY CONNECTOR]: Enabled remote XInventory for region {0}", scene.RegionInfo.RegionName);
 
         }
 
@@ -289,10 +294,10 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 
         public  InventoryItemBase GetItem(UUID userID, UUID itemID)
         {
-            //m_log.DebugFormat("[XINVENTORY CONNECTOR]: GetItem {0}", item.ID);
+            //m_logger?.LogDebug("[XINVENTORY CONNECTOR]: GetItem {0}", item.ID);
 
             if (m_RemoteConnector == null)
-                m_log.DebugFormat("[XINVENTORY CONNECTOR]: connector stub is null!!!");
+                m_logger?.LogDebug("[XINVENTORY CONNECTOR]: connector stub is null!!!");
             return m_RemoteConnector.GetItem(userID, itemID);
         }
 
@@ -306,7 +311,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 
         public  InventoryFolderBase GetFolder(UUID userID, UUID folderID)
         {
-            //m_log.DebugFormat("[XINVENTORY CONNECTOR]: GetFolder {0}", folder.ID);
+            //m_logger?.LogDebug("[XINVENTORY CONNECTOR]: GetFolder {0}", folder.ID);
 
             return m_RemoteConnector.GetFolder(userID, folderID);
         }

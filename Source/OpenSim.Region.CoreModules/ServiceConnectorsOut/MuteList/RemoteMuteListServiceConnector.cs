@@ -24,22 +24,26 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 
 using OpenMetaverse;
-using log4net;
+
 using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
 {
     public class RemoteMuteListServicesConnector : ISharedRegionModule, IMuteListService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         #region ISharedRegionModule
 
@@ -59,6 +63,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteMuteListServicesConnector>>();
            // only active for core mute lists module
             IConfig moduleConfig = source.Configs["Messaging"];
             if (moduleConfig == null)
@@ -93,7 +98,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
                 return;
 
             scene.RegisterModuleInterface<IMuteListService>(this);
-            m_log.InfoFormat("[MUTELIST CONNECTOR]: Enabled for region {0}", scene.RegionInfo.RegionName);
+            m_logger?.LogInformation("[MUTELIST CONNECTOR]: Enabled for region {0}", scene.RegionInfo.RegionName);
         }
 
         public void RemoveRegion(Scene scene)

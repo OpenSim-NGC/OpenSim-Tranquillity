@@ -25,22 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Scenes;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Framework.ServiceThrottle
 {
     public class ServiceThrottleModule : ISharedRegionModule, IServiceThrottleModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private readonly List<Scene> m_scenes = new List<Scene>();
         private JobEngine m_processorJobEngine;
@@ -49,6 +52,7 @@ namespace OpenSim.Region.CoreModules.Framework.ServiceThrottle
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<ServiceThrottleModule>>();
             m_processorJobEngine = new JobEngine("ServiceThrottle","ServiceThrottle", 5000, 2);
             m_processorJobEngine.Start();
         }

@@ -28,14 +28,22 @@
 using System.Net.Security;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
-using log4net;
-using MailKit.Net.Smtp;
-using MimeKit;
-using Nini.Config;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using MailKit.Net.Smtp;
+
+using MimeKit;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Scripting.EmailModules
 {
@@ -50,7 +58,7 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
         //
         // Log
         //
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         //
         // Module vars
@@ -111,6 +119,7 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EmailModule>>();
             IConfig startupConfig = config.Configs["Startup"];
             if(startupConfig == null)
                 return;
@@ -155,7 +164,7 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                     OSHHTPHost hosttmp = new OSHHTPHost(SMTP_SERVER_HOSTNAME, true);
                     if(!hosttmp.IsResolvedHost)
                     {
-                        m_log.ErrorFormat("[EMAIL]: could not resolve SMTP_SERVER_HOSTNAME {0}", SMTP_SERVER_HOSTNAME);
+                        m_logger?.LogError("[EMAIL]: could not resolve SMTP_SERVER_HOSTNAME {0}", SMTP_SERVER_HOSTNAME);
                         return;
                     }
 
@@ -166,7 +175,7 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                     m_HostName = SMTPConfig.GetString("host_domain_header_from", m_HostName);
                     if (!string.IsNullOrEmpty(smtpfrom) && !MailboxAddress.TryParse(m_mailParseOptions, smtpfrom, out SMTP_MAIL_FROM))
                     {
-                        m_log.ErrorFormat("[EMAIL]: Invalid SMTP_SERVER_FROM {0}", smtpfrom);
+                        m_logger?.LogError("[EMAIL]: Invalid SMTP_SERVER_FROM {0}", smtpfrom);
                         return;
                     }
 
@@ -183,20 +192,20 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                 else
                 {
                     m_SMTP_SslPolicyErrorsMask = ~SslPolicyErrors.None;
-                    m_log.Warn("[EMAIL]: SMTP disabled, set enableEmailSMTP to enable");
+                    m_logger?.LogWarning("[EMAIL]: SMTP disabled, set enableEmailSMTP to enable");
                 }
 
                 m_MaxEmailSize = SMTPConfig.GetInt("email_max_size", m_MaxEmailSize);
                 if(m_MaxEmailSize < 256 || m_MaxEmailSize > 1000000)
                 {
-                    m_log.Warn("[EMAIL]: email_max_size out of range [256, 1000000], Changed to default 4096");
+                    m_logger?.LogWarning("[EMAIL]: email_max_size out of range [256, 1000000], Changed to default 4096");
                     m_MaxEmailSize = 4096;
                 }
 
             }
             catch (Exception e)
             {
-                m_log.Error("[EMAIL]: DefaultEmailModule not configured: " + e.Message);
+                m_logger?.LogError("[EMAIL]: DefaultEmailModule not configured: " + e.Message);
                 return;
             }
 
@@ -227,7 +236,7 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                 m_Scenes[scene.RegionInfo.RegionHandle] = scene;
             }
 
-            m_log.Info("[EMAIL]: Activated DefaultEmailModule");
+            m_logger?.LogInformation("[EMAIL]: Activated DefaultEmailModule");
         }
 
         public void RemoveRegion(Scene scene)
@@ -410,13 +419,13 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
 
             if (!MailboxAddress.TryParse(address, out MailboxAddress mailTo))
             {
-                m_log.ErrorFormat("[EMAIL]: invalid TO email address {0}",address);
+                m_logger?.LogError("[EMAIL]: invalid TO email address {0}",address);
                 return;
             }
 
             if ((subject.Length + body.Length) > m_MaxEmailSize)
             {
-                m_log.Error("[EMAIL]: subject + body larger than limit of " + m_MaxEmailSize + " bytes");
+                m_logger?.LogError("[EMAIL]: subject + body larger than limit of " + m_MaxEmailSize + " bytes");
                 return;
             }
 
@@ -505,11 +514,11 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                     }
 
                     //Log
-                    m_log.Info("[EMAIL]: EMail sent to: " + address + " from object: " + objectID.ToString() + "@" + m_HostName);
+                    m_logger?.LogInformation("[EMAIL]: EMail sent to: " + address + " from object: " + objectID.ToString() + "@" + m_HostName);
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[EMAIL]: DefaultEmailModule Exception: " + e.Message);
+                    m_logger?.LogError("[EMAIL]: DefaultEmailModule Exception: " + e.Message);
                 }
             }
             else

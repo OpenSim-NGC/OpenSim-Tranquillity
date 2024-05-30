@@ -25,9 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
@@ -35,11 +35,13 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
+using Nini.Config;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
 {
     public class LocalGridUserServicesConnector : ISharedRegionModule, IGridUserService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IGridUserService m_GridUserService;
 
@@ -61,6 +63,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalGridUserServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -70,7 +73,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
                     IConfig userConfig = source.Configs["GridUserService"];
                     if (userConfig == null)
                     {
-                        m_log.Error("[LOCAL GRID USER SERVICE CONNECTOR]: GridUserService missing from OpenSim.ini");
+                        m_logger?.LogError("[LOCAL GRID USER SERVICE CONNECTOR]: GridUserService missing from OpenSim.ini");
                         return;
                     }
 
@@ -78,7 +81,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
 
                     if (serviceDll.Length == 0)
                     {
-                        m_log.Error("[LOCAL GRID USER SERVICE CONNECTOR]: No LocalServiceModule named in section GridUserService");
+                        m_logger?.LogError("[LOCAL GRID USER SERVICE CONNECTOR]: No LocalServiceModule named in section GridUserService");
                         return;
                     }
 
@@ -87,7 +90,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
 
                     if (m_GridUserService == null)
                     {
-                        m_log.ErrorFormat(
+                        m_logger?.LogError(
                             "[LOCAL GRID USER SERVICE CONNECTOR]: Cannot load user account service specified as {0}", serviceDll);
                         return;
                     }
@@ -136,7 +139,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
             if (!m_Enabled)
                 return;
 
-            m_log.InfoFormat("[LOCAL GRID USER SERVICE CONNECTOR]: Enabled local grid user for region {0}", scene.RegionInfo.RegionName);
+            m_logger?.LogInformation("[LOCAL GRID USER SERVICE CONNECTOR]: Enabled local grid user for region {0}", scene.RegionInfo.RegionName);
         }
 
         #endregion

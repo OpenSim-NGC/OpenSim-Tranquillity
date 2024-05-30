@@ -26,9 +26,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Nini.Config;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers;
 using OpenSim.Region.Framework.Interfaces;
@@ -36,13 +36,17 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
+
 using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Profile
 {
     public class LocalUserProfilesServicesConnector : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private Dictionary<UUID, Scene> regions = new Dictionary<UUID, Scene>();
 
@@ -76,12 +80,12 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Profile
 
         public LocalUserProfilesServicesConnector()
         {
-            //m_log.Debug("[LOCAL USERPROFILES SERVICE CONNECTOR]: LocalUserProfileServicesConnector no params");
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalUserProfilesServicesConnector>>();
         }
 
-        public LocalUserProfilesServicesConnector(IConfiguration source)
+        public LocalUserProfilesServicesConnector(IConfiguration source) : this()
         {
-            //m_log.Debug("[LOCAL USERPROFILES SERVICE CONNECTOR]: LocalUserProfileServicesConnector instantiated directly.");
+            //m_logger?.LogDebug("[LOCAL USERPROFILES SERVICE CONNECTOR]: LocalUserProfileServicesConnector instantiated directly.");
             InitialiseService(source);
         }
 
@@ -95,7 +99,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Profile
             IConfig config = source.Configs[ConfigName];
             if (config == null)
             {
-                //m_log.Error("[LOCAL USERPROFILES SERVICE CONNECTOR]: UserProfilesService missing from OpenSim.ini");
+                //m_logger?.LogError("[LOCAL USERPROFILES SERVICE CONNECTOR]: UserProfilesService missing from OpenSim.ini");
                 return;
             }
 
@@ -111,7 +115,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Profile
 
             if (serviceDll.Length == 0)
             {
-                m_log.Error("[LOCAL USERPROFILES SERVICE CONNECTOR]: No LocalServiceModule named in section UserProfilesService");
+                m_logger?.LogError("[LOCAL USERPROFILES SERVICE CONNECTOR]: No LocalServiceModule named in section UserProfilesService");
                 return;
             }
 
@@ -120,7 +124,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Profile
 
             if (ServiceModule == null)
             {
-                m_log.Error("[LOCAL USERPROFILES SERVICE CONNECTOR]: Can't load user profiles service");
+                m_logger?.LogError("[LOCAL USERPROFILES SERVICE CONNECTOR]: Can't load user profiles service");
                 return;
             }
 
@@ -163,6 +167,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Profile
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalUserProfilesServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -170,7 +175,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Profile
                 if (name == Name)
                 {
                     InitialiseService(source);
-                    m_log.Info("[LOCAL USERPROFILES SERVICE CONNECTOR]: Local user profiles connector enabled");
+                    m_logger?.LogInformation("[LOCAL USERPROFILES SERVICE CONNECTOR]: Local user profiles connector enabled");
                 }
             }
         }

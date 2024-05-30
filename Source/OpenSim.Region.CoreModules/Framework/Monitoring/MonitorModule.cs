@@ -27,8 +27,10 @@
 
 using System.Net;
 using System.Reflection;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Framework.Servers;
@@ -37,6 +39,9 @@ using OpenSim.Region.CoreModules.Framework.Monitoring.Alerts;
 using OpenSim.Region.CoreModules.Framework.Monitoring.Monitors;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Framework.Monitoring
 {
@@ -59,7 +64,7 @@ namespace OpenSim.Region.CoreModules.Framework.Monitoring
         private readonly List<IMonitor> m_staticMonitors = new List<IMonitor>();
 
         private readonly List<IAlert> m_alerts = new List<IAlert>();
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         public MonitorModule()
         {
@@ -70,6 +75,7 @@ namespace OpenSim.Region.CoreModules.Framework.Monitoring
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MonitorModule>>();
             IConfig cnfg = source.Configs["Monitoring"];
 
             if (cnfg != null)
@@ -389,7 +395,7 @@ namespace OpenSim.Region.CoreModules.Framework.Monitoring
 
         void OnTriggerAlert(System.Type reporter, string reason, bool fatal)
         {
-            m_log.Error("[Monitor] " + reporter.Name + " for " + m_scene.RegionInfo.RegionName + " reports " + reason + " (Fatal: " + fatal + ")");
+            m_logger?.LogError("[Monitor] " + reporter.Name + " for " + m_scene.RegionInfo.RegionName + " reports " + reason + " (Fatal: " + fatal + ")");
         }
 
         private List<Stat> registeredStats = new List<Stat>();

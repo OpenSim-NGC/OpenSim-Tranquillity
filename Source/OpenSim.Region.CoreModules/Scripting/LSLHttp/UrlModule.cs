@@ -27,17 +27,22 @@
 
 using System.Collections;
 using System.Collections.Specialized;
-using System.Reflection;
 using System.Text;
 using System.Net;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
 {
@@ -77,7 +82,7 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
     /// </summary>
     public class UrlModule : ISharedRegionModule, IUrlModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected readonly Dictionary<UUID, UrlData> m_RequestMap = new();
         protected readonly Dictionary<string, UrlData> m_UrlMap = new();
@@ -116,6 +121,7 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<UrlModule>>();
             IConfig networkConfig = config.Configs["Network"];
             m_enabled = false;
 
@@ -134,14 +140,14 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
             else
             {
                 m_ErrorStr = "[Network] configuration missing, HTTP listener for LSL disabled";
-                m_log.Warn("[URL MODULE]: " + m_ErrorStr);
+                m_logger?.LogWarning("[URL MODULE]: " + m_ErrorStr);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(ExternalHostNameForLSL))
             {
                 m_ErrorStr = "ExternalHostNameForLSL not defined in configuration, HTTP listener for LSL disabled";
-                m_log.Warn("[URL MODULE]: " + m_ErrorStr);
+                m_logger?.LogWarning("[URL MODULE]: " + m_ErrorStr);
                 return;
             }
 
@@ -149,7 +155,7 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
             if (ia == null)
             {
                 m_ErrorStr = "Could not resolve ExternalHostNameForLSL, HTTP listener for LSL disabled";
-                m_log.Warn("[URL MODULE]: " + m_ErrorStr);
+                m_logger?.LogWarning("[URL MODULE]: " + m_ErrorStr);
                 return;
             }
 
@@ -382,7 +388,7 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
                 }
                 else
                 {
-                    m_log.Info("[HttpRequestHandler] There is no http-in request with id " + request.ToString());
+                    m_logger?.LogInformation("[HttpRequestHandler] There is no http-in request with id " + request.ToString());
                 }
             }
         }
@@ -425,7 +431,7 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
                 }
                 else
                 {
-                    m_log.Info("[HttpRequestHandler] There is no http-in request with id " + request.ToString());
+                    m_logger?.LogInformation("[HttpRequestHandler] There is no http-in request with id " + request.ToString());
                 }
             }
         }
@@ -441,7 +447,7 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
                 }
                 else
                 {
-                    m_log.Warn("[HttpRequestHandler] There was no http-in request with id " + requestId);
+                    m_logger?.LogWarning("[HttpRequestHandler] There was no http-in request with id " + requestId);
                 }
             }
             return string.Empty;
@@ -724,7 +730,7 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
 
                     if (!m_UrlMap.TryGetValue(urlkey, out UrlData url))
                     {
-                            //m_log.Warn("[HttpRequestHandler]: http-in request failed; no such url: "+urlkey.ToString());
+                            //m_logger?.LogWarning("[HttpRequestHandler]: http-in request failed; no such url: "+urlkey.ToString());
                             request.InputStream.Dispose();
                             return errorResponse(request, (int)HttpStatusCode.NotFound);
                     }
@@ -809,9 +815,9 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
                 catch (Exception we)
                 {
                     //Hashtable response = new Hashtable();
-                    m_log.Warn("[HttpRequestHandler]: http-in request failed");
-                    m_log.Warn(we.Message);
-                    m_log.Warn(we.StackTrace);
+                    m_logger?.LogWarning("[HttpRequestHandler]: http-in request failed");
+                    m_logger?.LogWarning(we.Message);
+                    m_logger?.LogWarning(we.StackTrace);
                 }
 
                 return errorResponse(request, (int)HttpStatusCode.BadRequest);

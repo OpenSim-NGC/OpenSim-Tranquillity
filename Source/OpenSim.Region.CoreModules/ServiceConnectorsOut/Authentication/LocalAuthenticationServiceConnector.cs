@@ -25,9 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
@@ -35,13 +35,13 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
+using Nini.Config;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
 {
     public class LocalAuthenticationServicesConnector : ISharedRegionModule, IAuthenticationService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IAuthenticationService m_AuthenticationService;
 
@@ -61,6 +61,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalAuthenticationServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -70,7 +71,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
                     IConfig userConfig = source.Configs["AuthenticationService"];
                     if (userConfig == null)
                     {
-                        m_log.Error("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
+                        m_logger?.LogError("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
                         return;
                     }
 
@@ -79,7 +80,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
 
                     if (serviceDll.Length == 0)
                     {
-                        m_log.Error("[AUTH CONNECTOR]: No LocalServiceModule named in section AuthenticationService");
+                        m_logger?.LogError("[AUTH CONNECTOR]: No LocalServiceModule named in section AuthenticationService");
                         return;
                     }
 
@@ -90,11 +91,11 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
 
                     if (m_AuthenticationService == null)
                     {
-                        m_log.Error("[AUTH CONNECTOR]: Can't load Authentication service");
+                        m_logger?.LogError("[AUTH CONNECTOR]: Can't load Authentication service");
                         return;
                     }
                     m_Enabled = true;
-                    m_log.Info("[AUTH CONNECTOR]: Local Authentication connector enabled");
+                    m_logger?.LogInformation("[AUTH CONNECTOR]: Local Authentication connector enabled");
                 }
             }
         }

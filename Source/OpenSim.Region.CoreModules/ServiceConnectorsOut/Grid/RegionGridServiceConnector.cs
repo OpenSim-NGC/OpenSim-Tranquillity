@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System.Reflection;
-using Nini.Config;
-using OpenMetaverse;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
@@ -37,11 +35,15 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
+using OpenMetaverse;
+
+using Nini.Config;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
 {
     public class RegionGridServicesConnector : ISharedRegionModule, IGridService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private bool m_Enabled = false;
         private GridInfo m_ThisGridInfo;
@@ -53,9 +55,10 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
 
         public RegionGridServicesConnector()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RegionGridServicesConnector>>();
         }
 
-        public RegionGridServicesConnector(IConfiguration source)
+        public RegionGridServicesConnector(IConfiguration source) : this()
         {
             InitialiseServices(source);
         }
@@ -74,6 +77,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RegionGridServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -84,9 +88,9 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
                     {
                         m_Enabled = true;
                         if(m_RemoteGridService == null)
-                            m_log.Info("[REGION GRID CONNECTOR]: enabled in Standalone mode");
+                            m_logger?.LogInformation("[REGION GRID CONNECTOR]: enabled in Standalone mode");
                         else
-                            m_log.Info("[REGION GRID CONNECTOR]: enabled in Grid mode");
+                            m_logger?.LogInformation("[REGION GRID CONNECTOR]: enabled in Grid mode");
                     }
                 }
             }
@@ -97,14 +101,14 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
             IConfig gridConfig = source.Configs["GridService"];
             if (gridConfig == null)
             {
-                m_log.Error("[REGION GRID CONNECTOR]: GridService missing from OpenSim.ini");
+                m_logger?.LogError("[REGION GRID CONNECTOR]: GridService missing from OpenSim.ini");
                 return false;
             }
 
             string serviceDll = gridConfig.GetString("LocalServiceModule", string.Empty);
             if (string.IsNullOrWhiteSpace(serviceDll))
             {
-                m_log.Error("[REGION GRID CONNECTOR]: No LocalServiceModule named in section GridService");
+                m_logger?.LogError("[REGION GRID CONNECTOR]: No LocalServiceModule named in section GridService");
                 return false;
             }
             
@@ -113,7 +117,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
 
             if (m_LocalGridService == null)
             {
-                m_log.Error("[REGION GRID CONNECTOR]: failed to load LocalServiceModule");
+                m_logger?.LogError("[REGION GRID CONNECTOR]: failed to load LocalServiceModule");
                 return false;
             }
 
@@ -123,7 +127,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
                 m_RemoteGridService = ServerUtils.LoadPlugin<IGridService>(networkConnector, args);
                 if (m_RemoteGridService == null)
                 {
-                    m_log.Error("[REGION GRID CONNECTOR]: failed to load NetworkConnector");
+                    m_logger?.LogError("[REGION GRID CONNECTOR]: failed to load NetworkConnector");
                     return false;
                 }
             }
@@ -280,7 +284,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
                 {
     //                uint regionX = Util.WorldToRegionLoc((uint)x);
     //                uint regionY = Util.WorldToRegionLoc((uint)y);
-    //                m_log.WarnFormat("[REMOTE GRID CONNECTOR]: Requested region {0}-{1} not found", regionX, regionY);
+    //                m_logger?.LogWarning("[REMOTE GRID CONNECTOR]: Requested region {0}-{1} not found", regionX, regionY);
                 }
                 else
                 {
@@ -322,9 +326,9 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
             {
                 rinfo = m_RemoteGridService.GetDefaultRegions(UUID.Zero)[0];
                 if (rinfo == null)
-                    m_log.Warn("[REMOTE GRID CONNECTOR] returned null default region");
+                    m_logger?.LogWarning("[REMOTE GRID CONNECTOR] returned null default region");
                 else
-                    m_log.WarnFormat("[REMOTE GRID CONNECTOR] returned default region {0}", rinfo.RegionName);
+                    m_logger?.LogWarning("[REMOTE GRID CONNECTOR] returned default region {0}", rinfo.RegionName);
             }
 
             m_RegionInfoCache.Cache(scopeID, rinfo);
@@ -353,10 +357,10 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
             {
                 List<GridRegion> grinfos = m_RemoteGridService.GetDefaultRegions(scopeID);
                 if (grinfos == null || grinfos.Count == 0)
-                    m_log.Info("[REMOTE GRID CONNECTOR] returned no default regions");
+                    m_logger?.LogInformation("[REMOTE GRID CONNECTOR] returned no default regions");
                 else
                 {
-                    m_log.InfoFormat("[REMOTE GRID CONNECTOR] returned default regions {0}, ...", grinfos[0].RegionName);
+                    m_logger?.LogInformation("[REMOTE GRID CONNECTOR] returned default regions {0}, ...", grinfos[0].RegionName);
                     // only return first
                     grinfo = new List<GridRegion>() { grinfos[0] };
                 }

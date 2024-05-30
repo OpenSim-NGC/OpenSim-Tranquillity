@@ -25,23 +25,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Nini.Config;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
-using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
+using OpenMetaverse;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
 {
     public class RegionAssetConnector : ISharedRegionModule, IAssetService
     {
-        private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private bool m_Enabled = false;
 
@@ -75,9 +76,12 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
             get { return "RegionAssetConnector"; }
         }
 
-        public RegionAssetConnector() {}
+        public RegionAssetConnector()
+        {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RegionAssetConnector>>();
+        }
 
-        public RegionAssetConnector(IConfiguration config)
+        public RegionAssetConnector(IConfiguration config) : this()
         {
             Initialise(config);
         }
@@ -93,14 +97,14 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
                     IConfig assetConfig = source.Configs["AssetService"];
                     if (assetConfig == null)
                     {
-                        m_log.Error("[REGIONASSETCONNECTOR]: AssetService missing from configuration files");
+                        m_logger?.LogError("[REGIONASSETCONNECTOR]: AssetService missing from configuration files");
                         throw new Exception("Region asset connector init error");
                     }
 
                     string localGridConnector = assetConfig.GetString("LocalGridAssetService", string.Empty);
                     if(string.IsNullOrEmpty(localGridConnector))
                     {
-                        m_log.Error("[REGIONASSETCONNECTOR]: LocalGridAssetService missing from configuration files");
+                        m_logger?.LogError("[REGIONASSETCONNECTOR]: LocalGridAssetService missing from configuration files");
                         throw new Exception("Region asset connector init error");
                     }
 
@@ -109,7 +113,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
                     m_localConnector = ServerUtils.LoadPlugin<IAssetService>(localGridConnector, args);
                     if (m_localConnector == null)
                     {
-                        m_log.Error("[REGIONASSETCONNECTOR]: Fail to load local asset service " + localGridConnector);
+                        m_logger?.LogError("[REGIONASSETCONNECTOR]: Fail to load local asset service " + localGridConnector);
                         throw new Exception("Region asset connector init error");
                     }
 
@@ -119,7 +123,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
                         m_HGConnector = ServerUtils.LoadPlugin<IAssetService>(HGConnector, args);
                         if (m_HGConnector == null)
                         {
-                            m_log.Error("[REGIONASSETCONNECTOR]: Fail to load HG asset service " + HGConnector);
+                            m_logger?.LogError("[REGIONASSETCONNECTOR]: Fail to load HG asset service " + HGConnector);
                             throw new Exception("Region asset connector init error");
                         }
                         IConfig hgConfig = source.Configs["HGAssetService"];
@@ -130,7 +134,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
                     m_localRequestsQueue = new ObjectJobEngine(AssetRequestProcessor, "GetAssetsWorkers", 2000, 2);
                     m_remoteRequestsQueue = new ObjectJobEngine(AssetRequestProcessor, "GetRemoteAssetsWorkers", 2000, 2);
                     m_Enabled = true;
-                    m_log.Info("[REGIONASSETCONNECTOR]: enabled");
+                    m_logger?.LogInformation("[REGIONASSETCONNECTOR]: enabled");
                 }
             }
         }
@@ -181,16 +185,16 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
             if(m_HGConnector == null)
             {
                 if (m_Cache != null)
-                    m_log.InfoFormat("[REGIONASSETCONNECTOR]: active with cache for region {0}", scene.RegionInfo.RegionName);
+                    m_logger?.LogInformation("[REGIONASSETCONNECTOR]: active with cache for region {0}", scene.RegionInfo.RegionName);
                 else
-                    m_log.InfoFormat("[REGIONASSETCONNECTOR]: active  without cache for region {0}", scene.RegionInfo.RegionName);
+                    m_logger?.LogInformation("[REGIONASSETCONNECTOR]: active  without cache for region {0}", scene.RegionInfo.RegionName);
             }
             else
             {
                 if (m_Cache != null)
-                    m_log.InfoFormat("[REGIONASSETCONNECTOR]: active with HG and cache for region {0}", scene.RegionInfo.RegionName);
+                    m_logger?.LogInformation("[REGIONASSETCONNECTOR]: active with HG and cache for region {0}", scene.RegionInfo.RegionName);
                 else
-                    m_log.InfoFormat("[REGIONASSETCONNECTOR]: active with HG and without cache for region {0}", scene.RegionInfo.RegionName);
+                    m_logger?.LogInformation("[REGIONASSETCONNECTOR]: active with HG and without cache for region {0}", scene.RegionInfo.RegionName);
             }
         }
 

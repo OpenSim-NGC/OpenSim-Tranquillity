@@ -25,22 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar
 {
     public class RemoteAvatarServicesConnector : AvatarServicesConnector,
             ISharedRegionModule, IAvatarService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private bool m_Enabled = false;
 
@@ -56,6 +57,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar
 
         public override void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteAvatarServicesConnector>>();
             IConfig moduleConfig = source.Configs["Modules"];
             if (moduleConfig != null)
             {
@@ -73,7 +75,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar
 
                     base.Initialise(source);
 
-                    m_log.Info("[AVATAR CONNECTOR]: Remote avatars enabled");
+                    m_logger?.LogInformation("[AVATAR CONNECTOR]: Remote avatars enabled");
                 }
             }
         }
