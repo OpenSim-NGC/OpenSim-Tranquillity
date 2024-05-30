@@ -693,6 +693,17 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int OBJECT_TEXT_COLOR = 48;
         public const int OBJECT_TEXT_ALPHA = 49;
 
+        // Return objects By* command return errors
+        public const int ERR_GENERIC = -1;
+        public const int ERR_PARCEL_PERMISSIONS = -2;
+        public const int ERR_MALFORMED_PARAMS = -3;
+        public const int ERR_RUNTIME_PERMISSIONS = -4;
+        public const int ERR_THROTTLED = -5;
+
+        public const int OBJECT_RETURN_PARCEL = 1;
+        public const int OBJECT_RETURN_PARCEL_OWNER = 2;
+        public const int OBJECT_RETURN_REGION = 4;
+
 
         // Pathfinding types
         //ApiDesc not supported

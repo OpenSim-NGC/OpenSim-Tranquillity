@@ -51,6 +51,7 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -4617,6 +4618,156 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 //This delay should only occur when giving inventory to avatars.
                 ScriptSleep(m_sleepMsOnGiveInventory);
             }
+
+        public LSL_Integer llReturnObjectsByID(LSL_List objects)
+        {
+            if ((m_item.PermsMask & ScriptBaseClass.PERMISSION_RETURN_OBJECTS) == 0)
+            {
+                llShout(ScriptBaseClass.DEBUG_CHANNEL, "Permission not granted: PERMISSION_RETURN_OBJECTS");
+                return ScriptBaseClass.ERR_RUNTIME_PERMISSIONS;
+            }
+            
+            // SL Throttle : Max parcel land impact capacity region wide per hour
+            // TODO: Make a config option to customize the throttle
+            // The throttle likely should be a multiplier on capacity
+
+            int count=0;
+            var parcel = World.LandChannel.GetLandObject(m_host.GetWorldPosition());
+            List<SceneObjectGroup> sogs = new List<SceneObjectGroup>();
+            
+            for(int i=0;i<objects.Length;i++)
+            {
+                try
+                {
+
+                    // get the ID from the list
+                    string id = objects.GetStringItem(i);
+                    var sop = World.GetSceneObjectPart(UUID.Parse(id));
+                    var objParcel = World.LandChannel.GetLandObject(sop.GetWorldPosition());
+
+                    
+                    if (objParcel == null) continue; // Object no longer exists, skip
+                    
+                    if (IsEstateOwnerOrManager(m_host.OwnerID) || parcel.LandData.OwnerID.Equals(m_host.OwnerID))
+                    {
+                        var sog = World.GetSceneObjectGroup(UUID.Parse(id));
+                        if (IsEstateOwnerOrManager(m_host.OwnerID))
+                        {
+                            count++;
+                            sogs.Add(sog);
+                        }
+                        else
+                        {
+                            // If not estate manager or owner, return can only happen for the parcel the object is on
+                            bool canEstateReturn = IsEstateOwnerOrManager(sog.OwnerID);
+                            
+                            if (objParcel.LocalID == parcel.LocalID && !canEstateReturn)
+                            {
+                                count++;
+                                sogs.Add(sog);
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    llShout(ScriptBaseClass.DEBUG_CHANNEL, $"Error while trying to return object {i}");
+                }
+            }
+            
+            if(sogs==null) m_log.Info($"SOGS is null");
+            m_log.Info($"SOG List Count {sogs.Count}");
+
+            if(sogs.Count>0)
+                World.returnObjects(sogs.ToArray(), null);
+
+            return new LSL_Integer(count);
+        }
+
+        public LSL_Integer llReturnObjectsByOwner(string owner, int scope)
+        {
+            if ((m_item.PermsMask & ScriptBaseClass.PERMISSION_RETURN_OBJECTS) == 0)
+            {
+                llShout(ScriptBaseClass.DEBUG_CHANNEL, "Permission not granted: PERMISSION_RETURN_OBJECTS");
+                return ScriptBaseClass.ERR_RUNTIME_PERMISSIONS;
+            }
+            // TODO: Add throttle via a config option
+            //Throttled at max parcel land impact capacity region-wide per hour. -SL Wiki
+
+            List<SceneObjectGroup> lSogs = new();
+            var parcel = World.LandChannel.GetLandObject(m_host.GetWorldPosition());
+            if (parcel.LandData.OwnerID.Equals(m_host.OwnerID) || IsEstateOwnerOrManager(m_host.OwnerID))
+            {
+                if (IsEstateOwnerOrManager(m_host.OwnerID))
+                {
+                    int count = 0;
+                    if (scope == ScriptBaseClass.OBJECT_RETURN_REGION)
+                    {
+
+                        foreach (SceneObjectGroup sog in World.GetSceneObjectGroups())
+                        {
+                            if (sog.OwnerID.ToString() == owner && !IsEstateOwnerOrManager(sog.OwnerID))
+                            {
+                                count++;
+                                lSogs.Add(sog);
+
+                            }
+                        }
+                    } else if (scope == ScriptBaseClass.OBJECT_RETURN_PARCEL)
+                    {
+                        var sogs = parcel.GetSceneObjectGroups();
+                        foreach (var sog in sogs)
+                        {
+                            if (sog is SceneObjectGroup sogx)
+                            {
+                                
+                                // If owner of SOG is [owner], return it.
+                                if (sogx.OwnerID.ToString() == owner && !IsEstateOwnerOrManager(sog.OwnerID))
+                                {
+                                    count++;
+                                    lSogs.Add(sogx);
+                                }
+                            }
+                        }
+                    } else if (scope == ScriptBaseClass.OBJECT_RETURN_PARCEL_OWNER)
+                    {
+                        var parcels = World.LandChannel.AllParcels();
+                        foreach (var iParcel in parcels)
+                        {
+                            if (iParcel.OwnerID == m_host.OwnerID || IsEstateOwnerOrManager(m_host.OwnerID))
+                            {
+                                var sogs = iParcel.GetSceneObjectGroups();
+                                foreach (var isog in sogs)
+                                {
+                                    if (isog is SceneObjectGroup sog)
+                                    {
+                                        if (sog.OwnerID.ToString() == owner && !IsEstateOwnerOrManager(sog.OwnerID))
+                                        {
+                                            count++;
+                                            lSogs.Add(sog);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if(lSogs.Count>0)
+                        World.returnObjects(lSogs.ToArray(), null);
+
+                    return count;
+                }
+                else
+                {
+                    return ScriptBaseClass.ERR_PARCEL_PERMISSIONS;
+                }
+            }
+            else
+            {
+                return ScriptBaseClass.ERR_PARCEL_PERMISSIONS;
+            }
+            
+        }
 
         [DebuggerNonUserCode]
         public void llRemoveInventory(string name)
@@ -16662,14 +16813,22 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return 0;
         }
 
+        public bool IsEstateOwnerOrManager(UUID owner)
+        {
+            
+            EstateSettings estate = World.RegionInfo.EstateSettings;
+            if (!estate.IsEstateOwner(m_host.OwnerID) || !estate.IsEstateManagerOrOwner(m_host.OwnerID))
+                return false;
+            return true;
+        }
+
         public LSL_Integer llManageEstateAccess(int action, string avatar)
         {
             if (!UUID.TryParse(avatar, out UUID id) || id.IsZero())
                 return 0;
 
+            if (!IsEstateOwnerOrManager(m_host.OwnerID)) return 0;
             EstateSettings estate = World.RegionInfo.EstateSettings;
-            if (!estate.IsEstateOwner(m_host.OwnerID) || !estate.IsEstateManagerOrOwner(m_host.OwnerID))
-                return 0;
 
             UserAccount account = m_userAccountService.GetUserAccount(RegionScopeID, id);
             bool isAccount = account is not null;

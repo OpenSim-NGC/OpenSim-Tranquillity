@@ -161,7 +161,7 @@ namespace OpenSim.Server.Base
             }
             else
             {
-                XmlConfigurator.Configure(new FileInfo("Robust.exe.config"));
+                XmlConfigurator.Configure(new FileInfo("Robust.dll.config"));
             }
 
             RegisterCommonAppenders(startupConfig);

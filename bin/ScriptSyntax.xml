@@ -1,4 +1,4 @@
-9a2d5a5e-484a-40b0-82bc-092443b08ff7
+4bb6b867-9eec-492d-8ea6-7fe898c37841
 <llsd><map><key>llsd-lsl-syntax-version</key><integer>2</integer>
 <key>controls</key>
 <map>
@@ -1025,6 +1025,41 @@
   <key>type</key><string>integer</string>
   <key>value</key><string>5</string>
  </map>
+ <key>ERR_GENERIC</key>
+ <map>
+  <key>type</key>
+  <string>integer</string>
+  <key>value</key>
+  <string>-1</string>
+ </map>
+ <key>ERR_PARCEL_PERMISSIONS</key>
+ <map>
+  <key>type</key>
+  <string>integer</string>
+  <key>value</key>
+  <string>-2</string>
+ </map>
+ <key>ERR_MALFORMED_PARAMS</key>
+ <map>
+  <key>type</key>
+  <string>integer</string>
+  <key>value</key>
+  <string>-3</string>
+ </map>
+ <key>ERR_RUNTIME_PERMISSIONS</key>
+ <map>
+  <key>type</key>
+  <string>integer</string>
+  <key>value</key>
+  <string>-4</string>
+ </map>
+ <key>ERR_THROTTLED</key>
+ <map>
+  <key>type</key>
+  <string>integer</string>
+  <key>value</key>
+  <string>-5</string>
+ </map>
  <key>FALSE</key><map>
   <key>type</key><string>integer</string>
   <key>value</key><string>0</string>
@@ -1696,6 +1731,27 @@
  <key>OBJECT_VELOCITY</key><map>
   <key>type</key><string>integer</string>
   <key>value</key><string>5</string>
+ </map>
+ <key>OBJECT_RETURN_PARCEL</key>
+ <map>
+  <key>type</key>
+  <string>integer</string>
+  <key>value</key>
+  <string>1</string>
+ </map>
+ <key>OBJECT_RETURN_PARCEL_OWNER</key>
+ <map>
+  <key>type</key>
+  <string>integer</string>
+  <key>value</key>
+  <string>2</string>
+ </map>
+ <key>OBJECT_RETURN_REGION</key>
+ <map>
+  <key>type</key>
+  <string>integer</string>
+  <key>value</key>
+  <string>4</string>
  </map>
  <key>OPT_AVATAR</key><map>
   <key>type</key><string>integer</string>
@@ -6105,6 +6161,41 @@
   <key>return</key><string>key</string>
   <key>arguments</key><array>
    <map><key>id</key><map><key>type</key><string>key</string></map></map>
+  </array>
+ </map>
+ <key>llReturnObjectsByID</key>
+ <map>
+  <key>return</key>
+  <string>integer</string>
+  <key>arguments</key>
+  <array>
+    <map>
+      <key>objects</key>
+      <map>
+        <key>type</key>
+        <string>list</string>
+      </map>
+    </map>
+  </array>
+ </map>
+ <key>llReturnObjectsByOwner</key>
+ <map>
+  <key>return</key>
+  <string>integer</string>
+  <key>arguments</key>
+  <array>
+    <map>
+      <key>owner</key>
+      <map>
+        <key>type</key>
+        <string>key</string>
+      </map>
+      <key>scope</key>
+      <map>
+        <key>type</key>
+        <string>integer</string>
+      </map>
+    </map>
   </array>
  </map>
  <key>llResetAnimationOverride</key>
