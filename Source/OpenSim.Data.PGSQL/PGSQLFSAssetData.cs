@@ -186,8 +186,8 @@ namespace OpenSim.Data.PGSQL
             }
             catch(Exception e)
             {
-                m_log.Error("[PGSQL FSASSETS] Failed to store asset with ID " + meta.ID);
-                m_log.Error(e.ToString());
+                m_logger?.LogError("[PGSQL FSASSETS] Failed to store asset with ID " + meta.ID);
+                m_logger?.LogError(e.ToString());
                 return false;
             }
         }
@@ -307,7 +307,7 @@ namespace OpenSim.Data.PGSQL
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PGSQL FSASSETS]: Error importing assets: {0}",
+                m_logger?.LogError("[PGSQL FSASSETS]: Error importing assets: {0}",
                         e.Message.ToString());
                 return;
             }
