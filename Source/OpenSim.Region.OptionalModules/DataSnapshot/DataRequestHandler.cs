@@ -26,16 +26,19 @@
 *
 */
 
-using System.Collections;
 using System.Net;
-using System.Reflection;
 using System.Xml;
-using log4net;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.OptionalModules.DataSnapshot
 {
@@ -43,11 +46,12 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
     {
 //        private Scene m_scene = null;
         private DataSnapshotManager m_externalData = null;
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private ExpiringCache<string, int> throotleGen = new ExpiringCache<string, int>();
 
         public DataRequestHandler(Scene scene, DataSnapshotManager externalData)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DataRequestHandler>>();
 //            m_scene = scene;
             m_externalData = externalData;
 
@@ -56,7 +60,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
             // Register validation callback handler
             MainServer.UnSecureInstance.AddGloblaMethodHandler("validate", OnValidate);
 
-            m_log.Info("[DATASNAPSHOT]: Set up snapshot service");
+            m_logger?.LogInformation("[DATASNAPSHOT]: Set up snapshot service");
         }
 
         public void OnGetSnapshot(IOSHttpRequest req, IOSHttpResponse resp)
@@ -74,7 +78,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
                     resp.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
                     resp.StatusDescription = "Please try again later";
                     resp.ContentType = "text/plain";
-                    m_log.Debug("[DATASNAPSHOT] Collection request spam. reply try later");
+                    m_logger?.LogDebug("[DATASNAPSHOT] Collection request spam. reply try later");
                     return;
                 }
 
@@ -82,16 +86,16 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
             }
 
             if(string.IsNullOrWhiteSpace(snapObj))
-                m_log.DebugFormat("[DATASNAPSHOT] Received collection request for all");
+                m_logger?.LogDebug("[DATASNAPSHOT] Received collection request for all");
             else
-               m_log.DebugFormat("[DATASNAPSHOT] Received collection request for {0}", snapObj);
+               m_logger?.LogDebug("[DATASNAPSHOT] Received collection request for {0}", snapObj);
 
             XmlDocument response = m_externalData.GetSnapshot(snapObj);
             if(response == null)
             {
                 resp.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
                 resp.ContentType = "text/plain";
-                m_log.Debug("[DATASNAPSHOT] Collection request spam. reply try later");
+                m_logger?.LogDebug("[DATASNAPSHOT] Collection request spam. reply try later");
                 return;
             }
 
@@ -102,7 +106,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
 
         public void OnValidate(IOSHttpRequest req, IOSHttpResponse resp)
         {
-            m_log.Debug("[DATASNAPSHOT] Received validation request");
+            m_logger?.LogDebug("[DATASNAPSHOT] Received validation request");
             resp.ContentType = "text/xml";
             resp.StatusCode = (int)HttpStatusCode.Forbidden;
 

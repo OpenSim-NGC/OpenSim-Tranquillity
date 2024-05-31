@@ -25,21 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
-using log4net;
-using Nini.Config;
 using OpenMetaverse;
 
+using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Framework;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.World.NPC
 {
     public class NPCModule : INPCModule, ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private readonly Dictionary<UUID, NPCAvatar> m_avatars = new Dictionary<UUID, NPCAvatar>();
         private NPCOptionsFlags m_NPCOptionFlags;
@@ -52,6 +54,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<NPCModule>>();
             IConfig config = source.Configs["NPC"];
 
             Enabled = (config != null && config.GetBoolean("Enabled", true));
@@ -178,7 +181,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             }
             catch (Exception e)
             {
-                m_log.Info("[NPC MODULE]: exception creating NPC avatar: " + e.ToString());
+                m_logger?.LogInformation("[NPC MODULE]: exception creating NPC avatar: " + e.ToString());
                 return UUID.Zero;
             }
 
@@ -186,7 +189,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             uint circuit = (uint)Random.Shared.Next(0, int.MaxValue);
             npcAvatar.CircuitCode = circuit;
 
-            //m_log.DebugFormat(
+            //m_logger?.LogDebug(
             //    "[NPC MODULE]: Creating NPC {0} {1} {2}, owner={3}, senseAsAgent={4} at {5} in {6}",
             //    firstname, lastname, npcAvatar.AgentId, owner, senseAsAgent, position, scene.RegionInfo.RegionName);
 
@@ -204,7 +207,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             for (int i = 0;
                     i < acd.Appearance.Texture.FaceTextures.Length; i++)
             {
-                m_log.DebugFormat(
+                m_logger?.LogDebug(
                         "[NPC MODULE]: NPC avatar {0} has texture id {1} : {2}",
                         acd.AgentID, i,
                         acd.Appearance.Texture.FaceTextures[i]);
@@ -223,11 +226,11 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                     sp.CompleteMovement(npcAvatar, false);
                     sp.Grouptitle = groupTitle;
                     m_avatars.Add(agentID, npcAvatar);
-                    //m_log.DebugFormat("[NPC MODULE]: Created NPC {0} {1}", npcAvatar.AgentId, sp.Name);
+                    //m_logger?.LogDebug("[NPC MODULE]: Created NPC {0} {1}", npcAvatar.AgentId, sp.Name);
                 }
             }
 
-//            m_log.DebugFormat("[NPC MODULE]: Created NPC with id {0}", npcAvatar.AgentId);
+//            m_logger?.LogDebug("[NPC MODULE]: Created NPC with id {0}", npcAvatar.AgentId);
 
             return agentID;
         }
@@ -245,7 +248,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                         if (sp.IsSatOnObject || sp.SitGround)
                             return false;
 
-                    //m_log.DebugFormat(
+                    //m_logger?.LogDebug(
                     //        "[NPC MODULE]: Moving {0} to {1} in {2}, noFly {3}, landAtTarget {4}",
                     //        sp.Name, pos, scene.RegionInfo.RegionName,
                     //        noFly, landAtTarget);
@@ -412,7 +415,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 if (m_avatars.TryGetValue(agentID, out av))
                 {
                     /*
-                    m_log.DebugFormat("[NPC MODULE]: Found {0} {1} to remove",
+                    m_logger?.LogDebug("[NPC MODULE]: Found {0} {1} to remove",
                             agentID, av.Name);
                     */
                     doRemove = true;
@@ -426,12 +429,12 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 {
                     m_avatars.Remove(agentID);
                 }
-                m_log.DebugFormat("[NPC MODULE]: Removed NPC {0} {1}",
+                m_logger?.LogDebug("[NPC MODULE]: Removed NPC {0} {1}",
                         agentID, av.Name);
                 return true;
             }
             /*
-            m_log.DebugFormat("[NPC MODULE]: Could not find {0} to remove",
+            m_logger?.LogDebug("[NPC MODULE]: Could not find {0} to remove",
                     agentID);
             */
             return false;

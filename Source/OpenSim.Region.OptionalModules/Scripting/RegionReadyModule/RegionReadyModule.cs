@@ -25,23 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
 using System.Runtime;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Scripting.RegionReady
 {
     public class RegionReadyModule : IRegionReadyModule, INonSharedRegionModule
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IConfig m_config = null;
         private bool m_firstEmptyCompileQueue;
@@ -63,6 +67,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.RegionReady
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RegionReadyModule>>();
             m_config = config.Configs["RegionReady"];
             if (m_config != null)
             {
@@ -92,7 +97,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.RegionReady
 
             m_scene.EventManager.OnOarFileLoaded += OnOarFileLoaded;
 
-            m_log.DebugFormat("[RegionReady]: Enabled for region {0}", scene.RegionInfo.RegionName);
+            m_logger?.LogDebug("[RegionReady]: Enabled for region {0}", scene.RegionInfo.RegionName);
 
             if (m_disable_logins)
             {
@@ -144,7 +149,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.RegionReady
 
         void OnEmptyScriptCompileQueue(int numScriptsFailed, string message)
         {
-            m_log.DebugFormat("[RegionReady]: Script compile queue empty!");
+            m_logger?.LogDebug("[RegionReady]: Script compile queue empty!");
 
             if (m_firstEmptyCompileQueue || m_oarFileLoading)
             {
@@ -162,7 +167,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.RegionReady
                 m_oarFileLoading = false;
                 m_scene.Backup(false);
 
-                m_log.DebugFormat("[RegionReady]: Region \"{0}\" is ready: \"{1}\" on channel {2}",
+                m_logger?.LogDebug("[RegionReady]: Region \"{0}\" is ready: \"{1}\" on channel {2}",
                                  m_scene.RegionInfo.RegionName, c.Message, m_channelNotify);
 
                 m_scene.EventManager.TriggerOnChatBroadcast(this, c);
@@ -181,7 +186,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.RegionReady
             }
             else
             {
-                m_log.WarnFormat("[RegionReady]: Oar file load errors: {0}", message);
+                m_logger?.LogWarning("[RegionReady]: Oar file load errors: {0}", message);
                 m_lastOarLoadedOk = false;
             }
         }
@@ -268,7 +273,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.RegionReady
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[RegionReady]: Exception thrown on alert: {0}", e.Message);
+                m_logger?.LogWarning("[RegionReady]: Exception thrown on alert: {0}", e.Message);
                 return;
             }
 
@@ -293,7 +298,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.RegionReady
             }
             catch(Exception e)
             {
-                m_log.WarnFormat("[RegionReady]: Exception thrown sending alert: {0}", e.Message);
+                m_logger?.LogWarning("[RegionReady]: Exception thrown sending alert: {0}", e.Message);
             }
             finally
             {

@@ -27,19 +27,24 @@
 
 using System.Collections;
 using System.Net;
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using Nwc.XmlRpc;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
+using Nwc.XmlRpc;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.World.MoneyModule
 {
@@ -55,7 +60,7 @@ namespace OpenSim.Region.OptionalModules.World.MoneyModule
     /// </summary>
     public class SampleMoneyModule : IMoneyModule, ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <summary>
         /// Where Stipends come from and Fees go to.
@@ -123,6 +128,7 @@ namespace OpenSim.Region.OptionalModules.World.MoneyModule
         /// <param name="config">Configuration source.</param>
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SampleMoneyModule>>();
             m_gConfig = config;
             ReadConfigAndPopulate();
         }
@@ -385,7 +391,7 @@ namespace OpenSim.Region.OptionalModules.World.MoneyModule
             }
             else
             {
-                m_log.ErrorFormat(
+                m_logger?.LogError(
                     "[MONEY]: Could not resolve user {0}",
                     agentID);
             }

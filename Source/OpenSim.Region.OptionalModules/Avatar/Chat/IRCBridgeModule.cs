@@ -27,19 +27,24 @@
 
 using System.Collections;
 using System.Net;
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using Nwc.XmlRpc;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nwc.XmlRpc;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Avatar.Chat
 {
     public class IRCBridgeModule : INonSharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         internal static bool Enabled = false;
         internal static IConfig m_config = null;
@@ -64,16 +69,17 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<IRCBridgeModule>>();
             m_config = config.Configs["IRC"];
             if (m_config == null)
             {
-                //                m_log.InfoFormat("[IRC-Bridge] module not configured");
+                //                m_logger?.LogInformation("[IRC-Bridge] module not configured");
                 return;
             }
 
             if (!m_config.GetBoolean("enabled", false))
             {
-                //                m_log.InfoFormat("[IRC-Bridge] module disabled in configuration");
+                //                m_logger?.LogInformation("[IRC-Bridge] module disabled in configuration");
                 m_config = null;
                 return;
             }
@@ -85,7 +91,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
 
             Enabled = true;
 
-            m_log.InfoFormat("[IRC-Bridge]: Module is enabled");
+            m_logger?.LogInformation("[IRC-Bridge]: Module is enabled");
         }
 
         public void AddRegion(Scene scene)
@@ -94,7 +100,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             {
                 try
                 {
-                    m_log.InfoFormat("[IRC-Bridge] Connecting region {0}", scene.RegionInfo.RegionName);
+                    m_logger?.LogInformation("[IRC-Bridge] Connecting region {0}", scene.RegionInfo.RegionName);
 
                     if (!String.IsNullOrEmpty(m_password))
                         MainServer.Instance.AddXmlRPCHandler("irc_admin", XmlRpcAdminMethod, false);
@@ -106,8 +112,8 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("[IRC-Bridge] Region {0} not connected to IRC : {1}", scene.RegionInfo.RegionName, e.Message);
-                    m_log.Debug(e);
+                    m_logger?.LogWarning("[IRC-Bridge] Region {0} not connected to IRC : {1}", scene.RegionInfo.RegionName, e.Message);
+                    m_logger?.LogDebug("{0}", e);
                 }
             }
             else
@@ -147,7 +153,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
 
         public static XmlRpcResponse XmlRpcAdminMethod(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            m_log.Debug("[IRC-Bridge]: XML RPC Admin Entry");
+            m_logger?.LogDebug("[IRC-Bridge]: XML RPC Admin Entry");
 
             XmlRpcResponse response = new XmlRpcResponse();
             Hashtable responseData = new Hashtable();
@@ -192,7 +198,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[IRC-Bridge] XML RPC Admin request failed : {0}", e.Message);
+                m_logger?.LogError("[IRC-Bridge] XML RPC Admin request failed : {0}", e.Message);
 
                 responseData["success"] = "false";
                 responseData["error"] = e.Message;
@@ -202,7 +208,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                 response.Value = responseData;
             }
 
-            m_log.Debug("[IRC-Bridge]: XML RPC Admin Exit");
+            m_logger?.LogDebug("[IRC-Bridge]: XML RPC Admin Exit");
 
             return response;
         }

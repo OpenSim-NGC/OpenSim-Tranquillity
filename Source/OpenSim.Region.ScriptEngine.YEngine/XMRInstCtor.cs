@@ -25,24 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Threading;
-using System.Reflection;
 using System.Collections;
-using System.Collections.Generic;
-using System.Security.Policy;
-using System.IO;
 using System.Xml;
 using System.Text;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Shared.Api;
-using OpenSim.Region.ScriptEngine.Shared.ScriptBase;
-using OpenSim.Region.ScriptEngine.Yengine;
-using OpenSim.Region.Framework.Scenes;
-using log4net;
+using OpenSim.Server.Base;
 
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
@@ -74,6 +70,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
         public void Initialize(Yengine engine, string scriptBasePath,
                                int stackSize, int heapSize, ArrayList errors)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<XMRInstance>>();
             if(stackSize < 16384)
                 stackSize = 16384;
             if(heapSize < 16384)
@@ -299,7 +296,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
          */
         private string FetchSource(string cameFrom)
         {
-            m_log.Debug("[YEngine]: fetching source " + cameFrom);
+            m_logger?.LogDebug("[YEngine]: fetching source " + cameFrom);
             if(!cameFrom.StartsWith("asset://"))
                 throw new Exception("unable to retrieve source from " + cameFrom);
 
@@ -1057,8 +1054,8 @@ namespace OpenSim.Region.ScriptEngine.Yengine
                 }
                 catch(Exception e)
                 {
-                    m_log.Warn("[YEngine]: RestoreDetectParams bad XML: " + detxml.ToString());
-                    m_log.Warn("[YEngine]: ... " + e.ToString());
+                    m_logger?.LogWarning("[YEngine]: RestoreDetectParams bad XML: " + detxml.ToString());
+                    m_logger?.LogWarning("[YEngine]: ... " + e.ToString());
                 }
             }
 

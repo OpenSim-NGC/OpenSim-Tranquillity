@@ -26,18 +26,22 @@
  */
 
 using System.Net;
-using System.Reflection;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView
 {
     public class IRCStackModule : INonSharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IRCServer m_server;
         private int m_Port;
@@ -48,6 +52,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<IRCStackModule>>();
             if (null != source.Configs["IRCd"] &&
                 source.Configs["IRCd"].GetBoolean("Enabled", false))
             {
@@ -96,9 +101,9 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView
 
         void user_OnIRCReady(IRCClientView cv)
         {
-            m_log.Info("[IRCd] Adding user...");
+            m_logger?.LogInformation("[IRCd] Adding user...");
             cv.Start();
-            m_log.Info("[IRCd] Added user to Scene");
+            m_logger?.LogInformation("[IRCd] Added user to Scene");
         }
 
     }

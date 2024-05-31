@@ -25,24 +25,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
-using System.Collections.Generic;
-using log4net;
-using Nini.Config;
-using OpenSim.Framework;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework.Servers;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 
+using Nini.Config;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Freeswitch
 {
     public class FreeswitchServiceInConnectorModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private static bool m_Enabled = false;
 
         private IConfiguration m_Config;
@@ -52,6 +50,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Freeswitch
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<FreeswitchServiceInConnectorModule>>();
             m_Config = config;
             IConfig moduleConfig = config.Configs["Modules"];
             if (moduleConfig != null)
@@ -59,7 +58,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Freeswitch
                 m_Enabled = moduleConfig.GetBoolean("FreeswitchServiceInConnector", false);
                 if (m_Enabled)
                 {
-                    m_log.Info("[FREESWITCH IN CONNECTOR]: FreeswitchServiceInConnector enabled");
+                    m_logger?.LogInformation("[FREESWITCH IN CONNECTOR]: FreeswitchServiceInConnector enabled");
                 }
 
             }
@@ -92,7 +91,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Freeswitch
             {
                 m_Registered = true;
 
-                m_log.Info("[RegionFreeswitchService]: Starting...");
+                m_logger?.LogInformation("[RegionFreeswitchService]: Starting...");
 
                 Object[] args = new Object[] { m_Config, MainServer.Instance };
 

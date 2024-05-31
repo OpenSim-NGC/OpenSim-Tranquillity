@@ -24,16 +24,21 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
 using System.Text;
-using log4net;
-using Nini.Config;
+using System.Text.RegularExpressions;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Scripting;
-using System.Text.RegularExpressions;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
@@ -41,8 +46,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
 {
     public class JsonStoreScriptModule  : INonSharedRegionModule
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IConfig m_config = null;
         private bool m_enabled = false;
@@ -74,12 +78,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
         // -----------------------------------------------------------------
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<JsonStoreScriptModule>>();
             try
             {
                 if ((m_config = config.Configs["JsonStore"]) == null)
                 {
                     // There is no configuration, the module is disabled
-                    // m_log.InfoFormat("[JsonStoreScripts] no configuration info");
+                    // m_logger?.LogInformation("[JsonStoreScripts] no configuration info");
                     return;
                 }
 
@@ -87,12 +92,12 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[JsonStoreScripts]: initialization error: {0}", e.Message);
+                m_logger?.LogError("[JsonStoreScripts]: initialization error: {0}", e.Message);
                 return;
             }
 
             if (m_enabled)
-                m_log.DebugFormat("[JsonStoreScripts]: module is enabled");
+                m_logger?.LogDebug("[JsonStoreScripts]: module is enabled");
         }
 
         // -----------------------------------------------------------------
@@ -169,7 +174,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
                 m_comms = m_scene.RequestModuleInterface<IScriptModuleComms>();
                 if (m_comms == null)
                 {
-                    m_log.ErrorFormat("[JsonStoreScripts]: ScriptModuleComms interface not defined");
+                    m_logger?.LogError("[JsonStoreScripts]: ScriptModuleComms interface not defined");
                     m_enabled = false;
                     return;
                 }
@@ -177,7 +182,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
                 m_store = m_scene.RequestModuleInterface<IJsonStoreModule>();
                 if (m_store == null)
                 {
-                    m_log.ErrorFormat("[JsonStoreScripts]: JsonModule interface not defined");
+                    m_logger?.LogError("[JsonStoreScripts]: JsonModule interface not defined");
                     m_enabled = false;
                     return;
                 }
@@ -190,7 +195,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
                 catch (Exception e)
                 {
                     // See http://opensimulator.org/mantis/view.php?id=5971 for more information
-                    m_log.WarnFormat("[JsonStoreScripts]: script method registration failed; {0}", e.Message);
+                    m_logger?.LogWarning("[JsonStoreScripts]: script method registration failed; {0}", e.Message);
                     m_enabled = false;
                 }
             }
@@ -504,7 +509,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
         // -----------------------------------------------------------------
         protected void GenerateRuntimeError(string msg)
         {
-            m_log.InfoFormat("[JsonStore] runtime error: {0}",msg);
+            m_logger?.LogInformation("[JsonStore] runtime error: {0}",msg);
             throw new Exception("JsonStore Runtime Error: " + msg);
         }
 
@@ -532,7 +537,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.InfoFormat("[JsonStoreScripts]: unable to retrieve value; {0}",e.ToString());
+                m_logger?.LogInformation("[JsonStoreScripts]: unable to retrieve value; {0}",e.ToString());
             }
 
             DispatchValue(scriptID,reqID,String.Empty);
@@ -553,7 +558,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.InfoFormat("[JsonStoreScripts]: unable to retrieve value; {0}",e.ToString());
+                m_logger?.LogInformation("[JsonStoreScripts]: unable to retrieve value; {0}",e.ToString());
             }
 
             DispatchValue(scriptID,reqID,String.Empty);
@@ -582,7 +587,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             if (a.Type != (sbyte)AssetType.Notecard)
                 GenerateRuntimeError(String.Format("Invalid notecard asset {0}", assetID));
 
-            m_log.DebugFormat("[JsonStoreScripts]: read notecard in context {0}",storeID);
+            m_logger?.LogDebug("[JsonStoreScripts]: read notecard in context {0}",storeID);
 
             try
             {
@@ -602,7 +607,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[JsonStoreScripts]: Json parsing failed; {0}", e.Message);
+                m_logger?.LogWarning("[JsonStoreScripts]: Json parsing failed; {0}", e.Message);
             }
 
             GenerateRuntimeError(String.Format("Json parsing failed for {0}", assetID));

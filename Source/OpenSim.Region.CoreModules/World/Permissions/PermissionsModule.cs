@@ -26,22 +26,27 @@
  */
 
 using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
-using OpenSim.Framework;
 
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using OpenMetaverse;
+
+using OpenSim.Framework;
+using PermissionMask = OpenSim.Framework.PermissionMask;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
-using PermissionMask = OpenSim.Framework.PermissionMask;
+using Nini.Config;
+
 
 namespace OpenSim.Region.CoreModules.World.Permissions
 {
     public class DefaultPermissionsModule : INonSharedRegionModule, IPermissionsModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected Scene m_scene;
         protected ScenePermissions scenePermissions;
@@ -142,6 +147,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DefaultPermissionsModule>>();
             string permissionModules = Util.GetConfigVarFromSections<string>(config, "permissionmodules",
                 new string[] { "Startup", "Permissions" }, "DefaultPermissionsModule");
 
@@ -178,9 +184,9 @@ namespace OpenSim.Region.CoreModules.World.Permissions
                 = ParseUserSetConfigSetting(config, "allowed_script_editors", m_allowedScriptEditors);
 
             if (m_bypassPermissions)
-                m_log.Info("[PERMISSIONS]: serverside_object_permissions = false in ini file so disabling all region service permission checks");
+                m_logger?.LogInformation("[PERMISSIONS]: serverside_object_permissions = false in ini file so disabling all region service permission checks");
             else
-                m_log.Debug("[PERMISSIONS]: Enabling all region service permission checks");
+                m_logger?.LogDebug("[PERMISSIONS]: Enabling all region service permission checks");
 
             string grant = Util.GetConfigVarFromSections<string>(config, "GrantLSL",
                 new string[] { "Startup", "Permissions" }, string.Empty);
@@ -455,7 +461,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
 
                 m_bypassPermissions = val;
 
-                m_log.InfoFormat(
+                m_logger?.LogInformation(
                     "[PERMISSIONS]: Set permissions bypass to {0} for {1}",
                     m_bypassPermissions, m_scene.RegionInfo.RegionName);
             }
@@ -471,7 +477,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
 
             if (!m_bypassPermissions)
             {
-                m_log.Error("[PERMISSIONS] Permissions can't be forced unless they are bypassed first");
+                m_logger?.LogError("[PERMISSIONS] Permissions can't be forced unless they are bypassed first");
                 return;
             }
 
@@ -482,7 +488,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
 
                 m_bypassPermissionsValue = val;
 
-                m_log.InfoFormat("[PERMISSIONS] Forced permissions to {0} in {1}", m_bypassPermissionsValue, m_scene.RegionInfo.RegionName);
+                m_logger?.LogInformation("[PERMISSIONS] Forced permissions to {0} in {1}", m_bypassPermissionsValue, m_scene.RegionInfo.RegionName);
             }
         }
 
@@ -501,7 +507,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
 
                 m_debugPermissions = val;
 
-                m_log.InfoFormat("[PERMISSIONS] Set permissions debugging to {0} in {1}", m_debugPermissions, m_scene.RegionInfo.RegionName);
+                m_logger?.LogInformation("[PERMISSIONS] Set permissions debugging to {0} in {1}", m_debugPermissions, m_scene.RegionInfo.RegionName);
             }
         }
 
@@ -516,7 +522,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
         protected void DebugPermissionInformation(string permissionCalled)
         {
             if (m_debugPermissions)
-                m_log.Debug("[PERMISSIONS]: " + permissionCalled + " was called from " + m_scene.RegionInfo.RegionName);
+                m_logger?.LogDebug("[PERMISSIONS]: " + permissionCalled + " was called from " + m_scene.RegionInfo.RegionName);
         }
 
         /// <summary>
@@ -599,12 +605,12 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             }
             catch
             {
-                m_log.ErrorFormat(
+                m_logger?.LogError(
                     "[PERMISSIONS]: {0} is not a valid {1} value, setting to {2}",
                     rawSetting, settingName, userSet);
             }
 
-            m_log.DebugFormat("[PERMISSIONS]: {0} {1}", settingName, userSet);
+            m_logger?.LogDebug("[PERMISSIONS]: {0} {1}", settingName, userSet);
 
             return userSet;
         }
@@ -1792,7 +1798,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             if (m_bypassPermissions)
                 return m_bypassPermissionsValue;
 
-//            m_log.DebugFormat("[PERMISSIONS MODULE]: Checking rez object at {0} in {1}", objectPosition, m_scene.Name);
+//            m_logger?.LogDebug("[PERMISSIONS MODULE]: Checking rez object at {0} in {1}", objectPosition, m_scene.Name);
 
             ILandObject parcel = m_scene.LandChannel.GetLandObject(objectPosition.X, objectPosition.Y);
             if (parcel is null || parcel.LandData is null)
@@ -2543,7 +2549,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
 
         private bool CanCompileScript(UUID ownerUUID, int scriptType)
         {
-             //m_log.DebugFormat("check if {0} is allowed to compile {1}", ownerUUID, scriptType);
+             //m_logger?.LogDebug("check if {0} is allowed to compile {1}", ownerUUID, scriptType);
             return scriptType switch
                     {
                 0 => GrantLSL.Count == 0 || GrantLSL.ContainsKey(ownerUUID.ToString()),
@@ -2557,7 +2563,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
 
         private bool CanControlPrimMedia(UUID agentID, UUID primID, int face)
         {
-            //m_log.DebugFormat(
+            //m_logger?.LogDebug(
             //    "[PERMISSONS]: Performing CanControlPrimMedia check with agentID {0}, primID {1}, face {2}",
             //     agentID, primID, face);
 
@@ -2574,7 +2580,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             if (me is null)
                 return true;
 
-            //m_log.DebugFormat(
+            //m_logger?.LogDebug(
             //    "[PERMISSIONS]: Checking CanControlPrimMedia for {0} on {1} face {2} with control permissions {3}",
             //     agentID, primID, face, me.ControlPermissions);
 
@@ -2590,7 +2596,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
 
         private bool CanInteractWithPrimMedia(UUID agentID, UUID primID, int face)
         {
-            //m_log.DebugFormat(
+            //m_logger?.LogDebug(
             //    "[PERMISSONS]: Performing CanInteractWithPrimMedia check with agentID {0}, primID {1}, face {2}",
             //    agentID, primID, face);
 
@@ -2607,7 +2613,7 @@ namespace OpenSim.Region.CoreModules.World.Permissions
             if (me is null)
                 return true;
 
-            //m_log.DebugFormat(
+            //m_logger?.LogDebug(
             //    "[PERMISSIONS]: Checking CanInteractWithPrimMedia for {0} on {1} face {2} with interact permissions {3}",
             //    agentID, primID, face, me.InteractPermissions);
 

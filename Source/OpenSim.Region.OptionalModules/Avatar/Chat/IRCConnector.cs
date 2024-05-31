@@ -25,21 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Timers;
-using System.Collections.Generic;
-using System.IO;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Text.RegularExpressions;
-using System.Threading;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
-using log4net;
-using Nini.Config;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Avatar.Chat
 {
@@ -48,7 +47,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
 
         #region Global (static) state
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         // Local constants
 
@@ -79,12 +78,13 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
 
         static IRCConnector()
         {
-            m_log.DebugFormat("[IRC-Connector]: Static initialization started");
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<IRCConnector>>();
+            m_logger?.LogDebug("[IRC-Connector]: Static initialization started");
             m_watchdog = new System.Timers.Timer(WD_INTERVAL);
             m_watchdog.Elapsed += new ElapsedEventHandler(WatchdogHandler);
             m_watchdog.AutoReset = true;
             m_watchdog.Start();
-            m_log.DebugFormat("[IRC-Connector]: Static initialization complete");
+            m_logger?.LogDebug("[IRC-Connector]: Static initialization complete");
         }
 
         #endregion
@@ -236,7 +236,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             else
                 m_nick = m_baseNick;
 
-            m_log.InfoFormat("[IRC-Connector-{0}]: Initialization complete", idn);
+            m_logger?.LogInformation("[IRC-Connector-{0}]: Initialization complete", idn);
 
         }
 
@@ -270,7 +270,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
 
         public void Close()
         {
-            m_log.InfoFormat("[IRC-Connector-{0}] Closing", idn);
+            m_logger?.LogInformation("[IRC-Connector-{0}] Closing", idn);
 
             lock (msyncConnect)
             {
@@ -282,7 +282,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
 
                     if (Connected)
                     {
-                        m_log.DebugFormat("[IRC-Connector-{0}] Closing interface", idn);
+                        m_logger?.LogDebug("[IRC-Connector-{0}] Closing interface", idn);
 
                         // Cleanup the IRC session
 
@@ -311,7 +311,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                 }
             }
 
-            m_log.InfoFormat("[IRC-Connector-{0}] Closed", idn);
+            m_logger?.LogInformation("[IRC-Connector-{0}] Closed", idn);
 
         }
 
@@ -330,7 +330,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             if(_icc_ < ICCD_PERIOD)
                 return;
 
-            m_log.DebugFormat("[IRC-Connector-{0}]: Connection request for {1} on {2}:{3}", idn, m_nick, m_server, m_ircChannel);
+            m_logger?.LogDebug("[IRC-Connector-{0}]: Connection request for {1} on {2}:{3}", idn, m_nick, m_server, m_ircChannel);
 
             _icc_ = 0;
 
@@ -349,7 +349,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                     m_reader = new StreamReader(m_stream);
                     m_writer = new StreamWriter(m_stream);
 
-                    m_log.InfoFormat("[IRC-Connector-{0}]: Connected to {1}:{2}", idn, m_server, m_port);
+                    m_logger?.LogInformation("[IRC-Connector-{0}]: Connected to {1}:{2}", idn, m_server, m_port);
 
                     WorkManager.StartThread(ListenerRun, "IRCConnectionListenerThread", false, false);
 
@@ -363,7 +363,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[IRC-Connector-{0}] cannot connect {1} to {2}:{3}: {4}",
+                    m_logger?.LogError("[IRC-Connector-{0}] cannot connect {1} to {2}:{3}: {4}",
                                       idn, m_nick, m_server, m_port, e.Message);
                     // It might seem reasonable to reset connected and pending status here
                     // Seeing as we know that the login has failed, but if we do that, then
@@ -381,7 +381,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
 
         public void Reconnect()
         {
-            m_log.DebugFormat("[IRC-Connector-{0}]: Reconnect request for {1} on {2}:{3}", idn, m_nick, m_server, m_ircChannel);
+            m_logger?.LogDebug("[IRC-Connector-{0}]: Reconnect request for {1} on {2}:{3}", idn, m_nick, m_server, m_ircChannel);
 
             // Don't do this if a Connect is in progress...
 
@@ -391,7 +391,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                 if (m_connected)
                 {
 
-                    m_log.InfoFormat("[IRC-Connector-{0}] Resetting connector", idn);
+                    m_logger?.LogInformation("[IRC-Connector-{0}] Resetting connector", idn);
 
                     // Mark as disconnected. This will allow the listener thread
                     // to exit if still in-flight.
@@ -428,7 +428,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
         public void PrivMsg(string pattern, string from, string region, string msg)
         {
 
-            // m_log.DebugFormat("[IRC-Connector-{0}] PrivMsg to IRC from {1}: <{2}>", idn, from,
+            // m_logger?.LogDebug("[IRC-Connector-{0}] PrivMsg to IRC from {1}: <{2}>", idn, from,
             //     String.Format(pattern, m_ircChannel, from, region, msg));
 
             // One message to the IRC server
@@ -437,17 +437,17 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             {
                 m_writer.WriteLine(pattern, m_ircChannel, from, region, msg);
                 m_writer.Flush();
-                // m_log.DebugFormat("[IRC-Connector-{0}]: PrivMsg from {1} in {2}: {3}", idn, from, region, msg);
+                // m_logger?.LogDebug("[IRC-Connector-{0}]: PrivMsg from {1} in {2}: {3}", idn, from, region, msg);
             }
             catch (IOException)
             {
-                m_log.ErrorFormat("[IRC-Connector-{0}]: PrivMsg I/O Error: disconnected from IRC server", idn);
+                m_logger?.LogError("[IRC-Connector-{0}]: PrivMsg I/O Error: disconnected from IRC server", idn);
                 Reconnect();
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[IRC-Connector-{0}]: PrivMsg exception : {1}", idn, ex.Message);
-                m_log.Debug(ex);
+                m_logger?.LogError("[IRC-Connector-{0}]: PrivMsg exception : {1}", idn, ex.Message);
+                m_logger?.LogDebug("{0}", ex);
             }
 
         }
@@ -455,23 +455,23 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
         public void Send(string msg)
         {
 
-            // m_log.DebugFormat("[IRC-Connector-{0}] Send to IRC : <{1}>", idn,  msg);
+            // m_logger?.LogDebug("[IRC-Connector-{0}] Send to IRC : <{1}>", idn,  msg);
 
             try
             {
                 m_writer.WriteLine(msg);
                 m_writer.Flush();
-                // m_log.DebugFormat("[IRC-Connector-{0}] Sent command string: {1}", idn, msg);
+                // m_logger?.LogDebug("[IRC-Connector-{0}] Sent command string: {1}", idn, msg);
             }
             catch (IOException)
             {
-                m_log.ErrorFormat("[IRC-Connector-{0}] Disconnected from IRC server.(Send)", idn);
+                m_logger?.LogError("[IRC-Connector-{0}] Disconnected from IRC server.(Send)", idn);
                 Reconnect();
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[IRC-Connector-{0}] Send exception trap: {0}", idn, ex.Message);
-                m_log.Debug(ex);
+                m_logger?.LogError("[IRC-Connector-{0}] Send exception trap: {0}", idn, ex.Message);
+                m_logger?.LogDebug("{0}", ex);
             }
 
         }
@@ -525,8 +525,8 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             }
             catch (Exception /*e*/)
             {
-                // m_log.ErrorFormat("[IRC-Connector-{0}]: ListenerRun exception trap: {1}", idn, e.Message);
-                // m_log.Debug(e);
+                // m_logger?.LogError("[IRC-Connector-{0}]: ListenerRun exception trap: {1}", idn, e.Message);
+                // m_logger?.LogDebug(e);
             }
 
             // This is potentially circular, but harmless if so.
@@ -547,7 +547,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             //examines IRC commands and extracts any private messages
             // which will then be reboadcast in the Sim
 
-            // m_log.InfoFormat("[IRC-Connector-{0}]: ExtractMsg: {1}", idn, input);
+            // m_logger?.LogInformation("[IRC-Connector-{0}]: ExtractMsg: {1}", idn, input);
 
             Dictionary<string, string> result = null;
             MatchCollection matches = RE.Matches(input);
@@ -587,7 +587,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             }
             catch (Exception ex) // IRC gate should not crash Sim
             {
-                m_log.ErrorFormat("[IRC-Connector-{0}]: BroadcastSim Exception Trap: {1}\n{2}", idn, ex.Message, ex.StackTrace);
+                m_logger?.LogError("[IRC-Connector-{0}]: BroadcastSim Exception Trap: {1}\n{2}", idn, ex.Message, ex.StackTrace);
             }
         }
 
@@ -620,7 +620,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             cmd = commArgs[0];
             parms = commArgs[1];
 
-            // m_log.DebugFormat("[IRC-Connector-{0}] prefix = <{1}> cmd = <{2}>", idn, pfx, cmd);
+            // m_logger?.LogDebug("[IRC-Connector-{0}] prefix = <{1}> cmd = <{2}>", idn, pfx, cmd);
 
             switch (cmd)
             {
@@ -634,7 +634,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                     break;
                 case "004": // Server information
 
-                    m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                    m_logger?.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                     commArgs = parms.Split(CS_SPACE);
                     c_server = commArgs[1];
                     m_server = c_server;
@@ -644,7 +644,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
 
                     m_writer.WriteLine(String.Format("JOIN {0}", m_ircChannel));
                     m_writer.Flush();
-                    m_log.InfoFormat("[IRC-Connector-{0}]: sent request to join {1} ", idn, m_ircChannel);
+                    m_logger?.LogInformation("[IRC-Connector-{0}]: sent request to join {1} ", idn, m_ircChannel);
 
                     break;
                 case "005": // Server information
@@ -663,10 +663,10 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                 case "366": // End-of-Name list marker
                 case "372": // MOTD body
                 case "375": // MOTD start
-                    // m_log.InfoFormat("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE,2)[1]);
+                    // m_logger?.LogInformation("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE,2)[1]);
                     break;
                 case "376": // MOTD end
-                    // m_log.InfoFormat("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE,2)[1]);
+                    // m_logger?.LogInformation("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE,2)[1]);
                     motd = true;
                     break;
                 case "451": // Not registered
@@ -674,7 +674,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                 case "433": // Nickname in use
                     // Gen a new name
                     m_nick = m_baseNick + Random.Shared.Next(1, 99);
-                    m_log.ErrorFormat("[IRC-Connector-{0}]: [{1}] IRC SERVER reports NicknameInUse, trying {2}", idn, cmd, m_nick);
+                    m_logger?.LogError("[IRC-Connector-{0}]: [{1}] IRC SERVER reports NicknameInUse, trying {2}", idn, cmd, m_nick);
                     // Retry
                     m_writer.WriteLine(String.Format("NICK {0}", m_nick));
                     m_writer.Flush();
@@ -684,8 +684,8 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                     m_writer.Flush();
                     break;
                 case "479": // Bad channel name, etc. This will never work, so disable the connection
-                    m_log.ErrorFormat("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE, 2)[1]);
-                    m_log.ErrorFormat("[IRC-Connector-{0}] [{1}] Connector disabled", idn, cmd);
+                    m_logger?.LogError("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE, 2)[1]);
+                    m_logger?.LogError("[IRC-Connector-{0}] [{1}] Connector disabled", idn, cmd);
                     m_enabled = false;
                     m_connected = false;
                     m_pending = false;
@@ -694,14 +694,14 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                     // m_log.WarnFormat("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE,2)[1]);
                     break;
                 case "ERROR":
-                    m_log.ErrorFormat("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE, 2)[1]);
+                    m_logger?.LogError("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE, 2)[1]);
                     if (parms.Contains("reconnect too fast"))
                         ICCD_PERIOD++;
                     m_pending = false;
                     Reconnect();
                     break;
                 case "PING":
-                    m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                    m_logger?.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                     m_writer.WriteLine(String.Format("PONG {0}", parms));
                     m_writer.Flush();
                     break;
@@ -709,35 +709,35 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                     break;
                 case "JOIN":
 
-                    m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                    m_logger?.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                     eventIrcJoin(pfx, cmd, parms);
                     break;
                 case "PART":
-                    m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                    m_logger?.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                     eventIrcPart(pfx, cmd, parms);
                     break;
                 case "MODE":
-                    m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                    m_logger?.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                     eventIrcMode(pfx, cmd, parms);
                     break;
                 case "NICK":
-                    m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                    m_logger?.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                     eventIrcNickChange(pfx, cmd, parms);
                     break;
                 case "KICK":
-                    m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                    m_logger?.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                     eventIrcKick(pfx, cmd, parms);
                     break;
                 case "QUIT":
-                    m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                    m_logger?.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                     eventIrcQuit(pfx, cmd, parms);
                     break;
                 default:
-                    m_log.DebugFormat("[IRC-Connector-{0}] Command '{1}' ignored, parms = {2}", idn, cmd, parms);
+                    m_logger?.LogDebug("[IRC-Connector-{0}] Command '{1}' ignored, parms = {2}", idn, cmd, parms);
                     break;
             }
 
-            // m_log.DebugFormat("[IRC-Connector-{0}] prefix = <{1}> cmd = <{2}> complete", idn, pfx, cmd);
+            // m_logger?.LogDebug("[IRC-Connector-{0}] prefix = <{1}> cmd = <{2}> complete", idn, pfx, cmd);
 
         }
 
@@ -752,11 +752,11 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
 
             if(IrcChannel == m_ircChannel)
             {
-                m_log.InfoFormat("[IRC-Connector-{0}] Joined requested channel {1} at {2}", idn, IrcChannel,m_server);
+                m_logger?.LogInformation("[IRC-Connector-{0}] Joined requested channel {1} at {2}", idn, IrcChannel,m_server);
                 m_pending = false;
             }
             else
-                m_log.InfoFormat("[IRC-Connector-{0}] Joined unknown channel {1} at {2}", idn, IrcChannel,m_server);
+                m_logger?.LogInformation("[IRC-Connector-{0}] Joined unknown channel {1} at {2}", idn, IrcChannel,m_server);
             BroadcastSim(IrcUser, "/me joins {0}", IrcChannel);
         }
 
@@ -766,7 +766,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             string IrcUser = prefix.Split('!')[0];
             string IrcChannel = args[0];
 
-            m_log.DebugFormat("[IRC-Connector-{0}] Event: IRCPart {1}:{2}", idn, m_server, m_ircChannel);
+            m_logger?.LogDebug("[IRC-Connector-{0}] Event: IRCPart {1}:{2}", idn, m_server, m_ircChannel);
             BroadcastSim(IrcUser, "/me parts {0}", IrcChannel);
         }
 
@@ -775,7 +775,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             string[] args = parms.Split(CS_SPACE, 2);
             string UserMode = args[1];
 
-            m_log.DebugFormat("[IRC-Connector-{0}] Event: IRCMode {1}:{2}", idn, m_server, m_ircChannel);
+            m_logger?.LogDebug("[IRC-Connector-{0}] Event: IRCMode {1}:{2}", idn, m_server, m_ircChannel);
             if (UserMode.Substring(0, 1) == ":")
             {
                 UserMode = UserMode.Remove(0, 1);
@@ -788,7 +788,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             string UserOldNick = prefix.Split('!')[0];
             string UserNewNick = args[0].Remove(0, 1);
 
-            m_log.DebugFormat("[IRC-Connector-{0}] Event: IRCNickChange {1}:{2}", idn, m_server, m_ircChannel);
+            m_logger?.LogDebug("[IRC-Connector-{0}] Event: IRCNickChange {1}:{2}", idn, m_server, m_ircChannel);
             BroadcastSim(UserOldNick, "/me is now known as {0}", UserNewNick);
         }
 
@@ -800,7 +800,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             string UserKicked = args[1];
             string KickMessage = args[2];
 
-            m_log.DebugFormat("[IRC-Connector-{0}] Event: IRCKick {1}:{2}", idn, m_server, m_ircChannel);
+            m_logger?.LogDebug("[IRC-Connector-{0}] Event: IRCKick {1}:{2}", idn, m_server, m_ircChannel);
             BroadcastSim(UserKicker, "/me kicks kicks {0} off {1} saying \"{2}\"", UserKicked, IrcChannel, KickMessage);
 
             if (UserKicked == m_nick)
@@ -815,7 +815,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             string IrcUser = prefix.Split('!')[0];
             string QuitMessage = parms;
 
-            m_log.DebugFormat("[IRC-Connector-{0}] Event: IRCQuit {1}:{2}", idn, m_server, m_ircChannel);
+            m_logger?.LogDebug("[IRC-Connector-{0}] Event: IRCQuit {1}:{2}", idn, m_server, m_ircChannel);
             BroadcastSim(IrcUser, "/me quits saying \"{0}\"", QuitMessage);
         }
 
@@ -830,7 +830,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
         protected static void WatchdogHandler(Object source, ElapsedEventArgs args)
         {
 
-            // m_log.InfoFormat("[IRC-Watchdog] Status scan, pdk = {0}, icc = {1}", _pdk_, _icc_);
+            // m_logger?.LogInformation("[IRC-Watchdog] Status scan, pdk = {0}, icc = {1}", _pdk_, _icc_);
 
             _pdk_ = (_pdk_ + 1) % PING_PERIOD;    // cycle the ping trigger
             _icc_++;    // increment the inter-consecutive-connect-delay counter
@@ -839,7 +839,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                 foreach (IRCConnector connector in m_connectors)
                 {
 
-                    // m_log.InfoFormat("[IRC-Watchdog] Scanning {0}", connector);
+                    // m_logger?.LogInformation("[IRC-Watchdog] Scanning {0}", connector);
 
                     if (connector.Enabled)
                     {
@@ -847,12 +847,12 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                         {
                             try
                             {
-                                // m_log.DebugFormat("[IRC-Watchdog] Connecting {1}:{2}", connector.idn, connector.m_server, connector.m_ircChannel);
+                                // m_logger?.LogDebug("[IRC-Watchdog] Connecting {1}:{2}", connector.idn, connector.m_server, connector.m_ircChannel);
                                 connector.Connect();
                             }
                             catch (Exception e)
                             {
-                                m_log.ErrorFormat("[IRC-Watchdog] Exception on connector {0}: {1} ", connector.idn, e.Message);
+                                m_logger?.LogError("[IRC-Watchdog] Exception on connector {0}: {1} ", connector.idn, e.Message);
                             }
                         }
                         else
@@ -862,7 +862,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                             {
                                 if (connector.m_timeout == 0)
                                 {
-                                    m_log.ErrorFormat("[IRC-Watchdog] Login timed-out for connector {0}, reconnecting", connector.idn);
+                                    m_logger?.LogError("[IRC-Watchdog] Login timed-out for connector {0}, reconnecting", connector.idn);
                                     connector.Reconnect();
                                 }
                                 else
@@ -882,8 +882,8 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                                 }
                                 catch (Exception e)
                                 {
-                                    m_log.ErrorFormat("[IRC-PingRun] Exception on connector {0}: {1} ", connector.idn, e.Message);
-                                    m_log.Debug(e);
+                                    m_logger?.LogError("[IRC-PingRun] Exception on connector {0}: {1} ", connector.idn, e.Message);
+                                    m_logger?.LogDebug(e);
                                     connector.Reconnect();
                                 }
                             }
@@ -892,7 +892,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                     }
                 }
 
-            // m_log.InfoFormat("[IRC-Watchdog] Status scan completed");
+            // m_logger?.LogInformation("[IRC-Watchdog] Status scan completed");
 
         }
 

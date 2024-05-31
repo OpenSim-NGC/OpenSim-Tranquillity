@@ -26,10 +26,10 @@
  */
 
 using System.Net;
-using System.Reflection;
 using System.Text;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenMetaverse;
 using static OpenMetaverse.Primitive;
@@ -41,14 +41,17 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSimAssetType = OpenSim.Framework.SLUtil.OpenSimAssetType;
+using OpenSim.Server.Base;
 
 using Ionic.Zlib;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Materials
 {
     public class MaterialsModule : INonSharedRegionModule, IMaterialsModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         public string Name { get { return "MaterialsModule"; } }
 
@@ -71,6 +74,7 @@ namespace OpenSim.Region.OptionalModules.Materials
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MaterialsModule>>();
             m_enabled = true; // default is enabled
 
             IConfig config = source.Configs["Materials"];
@@ -327,7 +331,7 @@ namespace OpenSim.Region.OptionalModules.Materials
                         }
                         catch (Exception e)
                         {
-                            m_log.Warn("[Materials]: exception decoding persisted legacy material: " + e.ToString());
+                            m_logger?.LogWarning("[Materials]: exception decoding persisted legacy material: " + e.ToString());
                         }
                     }
                 }
@@ -353,7 +357,7 @@ namespace OpenSim.Region.OptionalModules.Materials
             if (te.DefaultTexture is not null)
                 facechanged = GetStoredMaterialInFace(part, te.DefaultTexture);
             else
-                m_log.WarnFormat(
+                m_logger?.LogWarning(
                     "[Materials]: Default texture for part {0} (part of object {1}) in {2} unexpectedly null.  Ignoring.",
                     part.Name, part.ParentGroup.Name, m_scene.Name);
 
@@ -407,7 +411,7 @@ namespace OpenSim.Region.OptionalModules.Materials
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("[Materials]: cannot decode material asset {0}: {1}", id, e.Message);
+                    m_logger?.LogWarning("[Materials]: cannot decode material asset {0}: {1}", id, e.Message);
                     return false;
                 }
 
@@ -516,7 +520,7 @@ namespace OpenSim.Region.OptionalModules.Materials
                                     }
                                     else
                                     {
-                                        m_log.Warn("[Materials]: request for unknown material ID: " + id.ToString());
+                                        m_logger?.LogWarning("[Materials]: request for unknown material ID: " + id.ToString());
 
                                         // Theoretically we could try to load the material from the assets service,
                                         // but that shouldn't be necessary because the viewer should only request
@@ -527,7 +531,7 @@ namespace OpenSim.Region.OptionalModules.Materials
                             }
                             catch (Exception e)
                             {
-                                m_log.Error("Error getting materials in response to viewer request", e);
+                                m_logger?.LogError("Error getting materials in response to viewer request", e);
                                 continue;
                             }
                         }
@@ -535,7 +539,7 @@ namespace OpenSim.Region.OptionalModules.Materials
                 }
                 catch (Exception e)
                 {
-                    m_log.Warn("[Materials]: exception decoding zipped CAP payload ", e);
+                    m_logger?.LogWarning("[Materials]: exception decoding zipped CAP payload ", e);
                     response.StatusCode = (int)HttpStatusCode.BadRequest;
                     return;
                 }
@@ -590,14 +594,14 @@ namespace OpenSim.Region.OptionalModules.Materials
                                     }
                                     catch (Exception e)
                                     {
-                                        m_log.Warn("[Materials]: cannot decode \"ID\" from matsMap: " + e.Message);
+                                        m_logger?.LogWarning("[Materials]: cannot decode \"ID\" from matsMap: " + e.Message);
                                         continue;
                                     }
 
                                     SceneObjectPart sop = m_scene.GetSceneObjectPart(primLocalID);
                                     if (sop is null)
                                     {
-                                        m_log.WarnFormat("[Materials]: SOP not found for localId: {0}", primLocalID.ToString());
+                                        m_logger?.LogWarning("[Materials]: SOP not found for localId: {0}", primLocalID.ToString());
                                         continue;
                                     }
 
@@ -605,7 +609,7 @@ namespace OpenSim.Region.OptionalModules.Materials
                                     {
                                         if(!errorReported.Contains(primLocalID))
                                         {
-                                            m_log.WarnFormat("[Materials]: User {0} can't edit object {1} {2}", agentID, sop.Name, sop.UUID);
+                                            m_logger?.LogWarning("[Materials]: User {0} can't edit object {1} {2}", agentID, sop.Name, sop.UUID);
                                             errorReported.Add(primLocalID);
                                         }
                                         continue;
@@ -618,14 +622,14 @@ namespace OpenSim.Region.OptionalModules.Materials
                                     }
                                     catch (Exception e)
                                     {
-                                        m_log.Warn("[Materials]: cannot decode \"Material\" from matsMap: " + e.Message);
+                                        m_logger?.LogWarning("[Materials]: cannot decode \"Material\" from matsMap: " + e.Message);
                                         continue;
                                     }
 
                                     Primitive.TextureEntry te = new(sop.Shape.TextureEntry, 0, sop.Shape.TextureEntry.Length);
                                     if (te is null)
                                     {
-                                        m_log.WarnFormat("[Materials]: Error in TextureEntry for SOP {0} {1}", sop.Name, sop.UUID);
+                                        m_logger?.LogWarning("[Materials]: Error in TextureEntry for SOP {0} {1}", sop.Name, sop.UUID);
                                         continue;
                                     }
 
@@ -710,7 +714,7 @@ namespace OpenSim.Region.OptionalModules.Materials
                             }
                             catch (Exception e)
                             {
-                                m_log.Warn("[Materials]: exception processing received material ", e);
+                                m_logger?.LogWarning("[Materials]: exception processing received material ", e);
                                 response.StatusCode = (int)HttpStatusCode.BadRequest;
                                 return;
                             }
@@ -719,7 +723,7 @@ namespace OpenSim.Region.OptionalModules.Materials
                 }
                 catch (Exception e)
                 {
-                    m_log.Warn("[Materials]: exception decoding zipped CAP payload ", e);
+                    m_logger?.LogWarning("[Materials]: exception decoding zipped CAP payload ", e);
                     response.StatusCode = (int)HttpStatusCode.BadRequest;
                     return;
                 }

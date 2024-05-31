@@ -25,10 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Nini.Config;
+using System;
+using System.Collections;
+using System.Collections.Concurrent;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Security.Cryptography;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -36,17 +45,9 @@ using OpenSim.Region.Framework.Scenes.Scripting;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.ScriptBase;
+using OpenSim.Server.Base;
 using OpenSim.Services.Connectors.Hypergrid;
 using OpenSim.Services.Interfaces;
-using System;
-using System.Collections;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
-using System.Security.Cryptography;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
@@ -57,6 +58,8 @@ using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 using TPFlags = OpenSim.Framework.Constants.TeleportFlags;
+
+using Nini.Config;
 
 #pragma warning disable IDE1006
 
@@ -139,7 +142,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         public const string GridInfoServiceConfigSectionName = "GridInfoService";
 
         // shared things
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private static readonly object m_OSSLLock = new();
         private static bool m_doneSharedInit = false;
@@ -163,6 +166,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         protected IGroupsModule m_groupsModule = null;
         public void Initialize(IScriptEngine scriptEngine, SceneObjectPart host, TaskInventoryItem item)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<OSSL_Api>>();
             //private init
             m_ScriptEngine = scriptEngine;
             m_host = host;
@@ -409,7 +413,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                                 }
                             }
                             if (error)
-                                m_log.WarnFormat("[OSSLENABLE]: error parsing line Allow_{0} = {1}", function, ownerPerm);
+                                m_logger?.LogWarning("[OSSLENABLE]: error parsing line Allow_{0} = {1}", function, ownerPerm);
                         }
                         error = false;
                         if (!string.IsNullOrWhiteSpace(creatorPerm))
@@ -433,7 +437,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                                 }
                             }
                             if (error)
-                                m_log.WarnFormat("[OSSLENABLE]: error parsing line Creators_{0} = {1}", function, creatorPerm);
+                                m_logger?.LogWarning("[OSSLENABLE]: error parsing line Creators_{0} = {1}", function, creatorPerm);
                         }
                         // both empty fallback as disabled
                     }
@@ -4215,7 +4219,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             if (newItem is null)
             {
-                m_log.ErrorFormat(
+                m_logger?.LogError(
                     "[OSSL API]: Could not create user inventory item {0} for {1}, attach point {2} in {3}: {4}",
                     itemName, m_host.Name, attachmentPoint, World.Name, message);
                 m_LSL_Api.llSay(0, message);

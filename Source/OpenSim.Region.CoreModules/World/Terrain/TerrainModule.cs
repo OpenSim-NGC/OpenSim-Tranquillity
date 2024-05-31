@@ -24,11 +24,12 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 using System.Reflection;
 using System.Net;
 
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenMetaverse;
 
@@ -41,6 +42,9 @@ using OpenSim.Region.CoreModules.World.Terrain.FloodBrushes;
 using OpenSim.Region.CoreModules.World.Terrain.PaintBrushes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Terrain
 {
@@ -63,7 +67,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
 
         #endregion
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
 #pragma warning disable 414
         private static readonly string LogHeader = "[TERRAIN MODULE]";
@@ -226,6 +230,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
         /// <param name="config">Config for the region</param>
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<TerrainModule>>();
             IConfig terrainConfig = config.Configs["Terrain"];
             if (terrainConfig != null)
             {
@@ -360,37 +365,37 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                                 throw new ArgumentException(String.Format("wrong size, use a file with size {0} x {1}",
                                                                           m_scene.RegionInfo.RegionSizeX, m_scene.RegionInfo.RegionSizeY));
                             }
-                            m_log.DebugFormat("[TERRAIN]: Loaded terrain, wd/ht: {0}/{1}", channel.Width, channel.Height);
+                            m_logger?.LogDebug("[TERRAIN]: Loaded terrain, wd/ht: {0}/{1}", channel.Width, channel.Height);
                             m_scene.Heightmap = channel;
                             m_channel = channel;
                             UpdateBakedMap();
                         }
                         catch(NotImplementedException)
                         {
-                            m_log.Error("[TERRAIN]: Unable to load heightmap, the " + loader.Value +
+                            m_logger?.LogError("[TERRAIN]: Unable to load heightmap, the " + loader.Value +
                                         " parser does not support file loading. (May be save only)");
                             throw new TerrainException(String.Format("unable to load heightmap: parser {0} does not support loading", loader.Value));
                         }
                         catch(FileNotFoundException)
                         {
-                            m_log.Error(
+                            m_logger?.LogError(
                                 "[TERRAIN]: Unable to load heightmap, file not found. (A directory permissions error may also cause this)");
                             throw new TerrainException(
                                 String.Format("unable to load heightmap: file {0} not found (or permissions do not allow access", filename));
                         }
                         catch(ArgumentException e)
                         {
-                            m_log.ErrorFormat("[TERRAIN]: Unable to load heightmap: {0}", e.Message);
+                            m_logger?.LogError("[TERRAIN]: Unable to load heightmap: {0}", e.Message);
                             throw new TerrainException(
                                 String.Format("Unable to load heightmap: {0}", e.Message));
                         }
                     }
-                    m_log.Info("[TERRAIN]: File (" + filename + ") loaded successfully");
+                    m_logger?.LogInformation("[TERRAIN]: File (" + filename + ") loaded successfully");
                     return;
                 }
             }
 
-            m_log.Error("[TERRAIN]: Unable to load heightmap, no file loader available for that format.");
+            m_logger?.LogError("[TERRAIN]: Unable to load heightmap, no file loader available for that format.");
             throw new TerrainException(String.Format("unable to load heightmap from file {0}: no loader available for that format", filename));
         }
 
@@ -407,17 +412,17 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                     if (filename.EndsWith(loader.Key))
                     {
                         loader.Value.SaveFile(filename, m_channel);
-                        m_log.InfoFormat("[TERRAIN]: Saved terrain from {0} to {1}", m_scene.RegionInfo.RegionName, filename);
+                        m_logger?.LogInformation("[TERRAIN]: Saved terrain from {0} to {1}", m_scene.RegionInfo.RegionName, filename);
                         return;
                     }
                 }
             }
             catch(IOException ioe)
             {
-                m_log.Error(String.Format("[TERRAIN]: Unable to save to {0}, {1}", filename, ioe.Message));
+                m_logger?.LogError(String.Format("[TERRAIN]: Unable to save to {0}, {1}", filename, ioe.Message));
             }
 
-            m_log.ErrorFormat(
+            m_logger?.LogError(
                 "[TERRAIN]: Could not save terrain from {0} to {1}.  Valid file extensions are {2}",
                 m_scene.RegionInfo.RegionName, filename, m_supportedFileExtensions);
         }
@@ -459,17 +464,17 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                         }
                         catch(NotImplementedException)
                         {
-                            m_log.Error("[TERRAIN]: Unable to load heightmap, the " + loader.Value +
+                            m_logger?.LogError("[TERRAIN]: Unable to load heightmap, the " + loader.Value +
                                         " parser does not support file loading. (May be save only)");
                             throw new TerrainException(String.Format("unable to load heightmap: parser {0} does not support loading", loader.Value));
                         }
                     }
 
-                    m_log.Info("[TERRAIN]: File (" + filename + ") loaded successfully");
+                    m_logger?.LogInformation("[TERRAIN]: File (" + filename + ") loaded successfully");
                     return;
                 }
             }
-            m_log.Error("[TERRAIN]: Unable to load heightmap, no file loader available for that format.");
+            m_logger?.LogError("[TERRAIN]: Unable to load heightmap, no file loader available for that format.");
             throw new TerrainException(String.Format("unable to load heightmap from file {0}: no loader available for that format", filename));
         }
 
@@ -490,17 +495,17 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                         }
                         catch (NotImplementedException)
                         {
-                            m_log.Error("[TERRAIN]: Unable to load heightmap, the " + loader.Value +
+                            m_logger?.LogError("[TERRAIN]: Unable to load heightmap, the " + loader.Value +
                                         " parser does not support file loading. (May be save only)");
                             throw new TerrainException(String.Format("unable to load heightmap: parser {0} does not support loading", loader.Value));
                         }
                     }
 
-                    m_log.Info("[TERRAIN]: File (" + filename + ") loaded successfully");
+                    m_logger?.LogInformation("[TERRAIN]: File (" + filename + ") loaded successfully");
                     return;
                 }
             }
-            m_log.Error("[TERRAIN]: Unable to load heightmap, no file loader available for that format.");
+            m_logger?.LogError("[TERRAIN]: Unable to load heightmap, no file loader available for that format.");
             throw new TerrainException(String.Format("unable to load heightmap from file {0}: no loader available for that format", filename));
         }
 
@@ -585,7 +590,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
             }
             catch(NotImplementedException)
             {
-                m_log.Error("Unable to save to " + filename + ", saving of this file format has not been implemented.");
+                m_logger?.LogError("Unable to save to " + filename + ", saving of this file format has not been implemented.");
                 throw new TerrainException(String.Format("Unable to save heightmap: saving of this file format not implemented"));
             }
         }
@@ -648,7 +653,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
             string[] files = Directory.GetFiles(plugineffectsPath);
             foreach(string file in files)
             {
-                m_log.Info("Loading effects in " + file);
+                m_logger?.LogInformation("Loading effects in " + file);
                 try
                 {
                     Assembly library = Assembly.LoadFrom(file);
@@ -681,7 +686,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                     {
                         ITerrainLoader terLoader = (ITerrainLoader)Activator.CreateInstance(library.GetType(pluginType.ToString()));
                         m_loaders[terLoader.FileExtension] = terLoader;
-                        m_log.Info("L ... " + typeName);
+                        m_logger?.LogInformation("L ... " + typeName);
                     }
                 }
                 catch(AmbiguousMatchException)
@@ -697,12 +702,12 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                 if (!m_plugineffects.ContainsKey(pluginName))
                 {
                     m_plugineffects.Add(pluginName, effect);
-                    m_log.Info("E ... " + pluginName);
+                    m_logger?.LogInformation("E ... " + pluginName);
                 }
                 else
                 {
                     m_plugineffects[pluginName] = effect;
-                    m_log.Info("E ... " + pluginName + " (Replaced)");
+                    m_logger?.LogInformation("E ... " + pluginName + " (Replaced)");
                 }
             }
         }
@@ -1145,7 +1150,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                         List<PatchesToSend> toSend = GetModifiedPatchesInViewDistance(pups);
                         if (toSend.Count > 0)
                         {
-                            // m_log.DebugFormat("{0} CheckSendingPatchesToClient: sending {1} patches to {2} in region {3}",
+                            // m_logger?.LogDebug("{0} CheckSendingPatchesToClient: sending {1} patches to {2} in region {3}",
                             //                     LogHeader, toSend.Count, pups.Presence.Name, m_scene.RegionInfo.RegionName);
                             // Sort the patches to send by the distance from the presence
                             toSend.Sort();
@@ -1320,7 +1325,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
             {
                 NextModifyTerrainTime = double.MaxValue; // block it
 
-                //m_log.DebugFormat("brushs {0} seconds {1} height {2}, parcel {3}", brushSize, seconds, height, parcelLocalID);
+                //m_logger?.LogDebug("brushs {0} seconds {1} height {2}, parcel {3}", brushSize, seconds, height, parcelLocalID);
                 bool god = m_scene.Permissions.IsGod(user);
                 bool allowed = false;
                 if (north == south && east == west)
@@ -1373,7 +1378,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                     }
                     else
                     {
-                        m_log.Debug("Unknown terrain brush type " + action);
+                        m_logger?.LogDebug("Unknown terrain brush type " + action);
                     }
                 }
                 else
@@ -1465,7 +1470,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                     }
                     else
                     {
-                        m_log.Debug("Unknown terrain flood type " + action);
+                        m_logger?.LogDebug("Unknown terrain flood type " + action);
                     }
                 }
             }
@@ -1488,7 +1493,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
 
         protected void client_OnUnackedTerrain(IClientAPI client, int patchX, int patchY)
         {
-            //m_log.Debug("Terrain packet unacked, resending patch: " + patchX + " , " + patchY);
+            //m_logger?.LogDebug("Terrain packet unacked, resending patch: " + patchX + " , " + patchY);
             // SendLayerData does not use the heightmap parameter. This kludge is so as to not change IClientAPI.
             client.SendLayerData(new int[]{patchX, patchY});
         }
@@ -1586,7 +1591,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
 
             // determine desired scaling factor
             float desiredRange = desiredMax - desiredMin;
-            //m_log.InfoFormat("Desired {0}, {1} = {2}", new Object[] { desiredMin, desiredMax, desiredRange });
+            //m_logger?.LogInformation("Desired {0}, {1} = {2}", new Object[] { desiredMin, desiredMax, desiredRange });
 
             if (desiredRange == 0d)
             {
@@ -1621,8 +1626,8 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                 float currRange = currMax - currMin;
                 float scale = desiredRange / currRange;
 
-                //m_log.InfoFormat("Current {0}, {1} = {2}", new Object[] { currMin, currMax, currRange });
-                //m_log.InfoFormat("Scale = {0}", scale);
+                //m_logger?.LogInformation("Current {0}, {1} = {2}", new Object[] { currMin, currMax, currRange });
+                //m_logger?.LogInformation("Scale = {0}", scale);
 
                 // scale the heightmap accordingly
                 for(int x = 0; x < width; x++)
@@ -1935,7 +1940,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain
                 if (result.Length == 0)
                 {
                     result = "Modified terrain";
-                    m_log.DebugFormat("Performed terrain operation {0}", operationType);
+                    m_logger?.LogDebug("Performed terrain operation {0}", operationType);
                 }
             }
             else

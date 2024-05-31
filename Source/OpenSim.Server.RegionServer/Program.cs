@@ -27,24 +27,20 @@
 
 using System.CommandLine;
 
-using log4net.Config;
-using Nini.Config;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
+
 using Autofac.Extensions.DependencyInjection;
 using Autofac;
 
 using OpenSim.ApplicationPlugins.LoadRegions;
 using OpenSim.ApplicationPlugins.RegionModulesController;
 using OpenSim.ApplicationPlugins.RemoteController;
-
+using OpenSim.Groups;
 using OpenSim.Region.OptionalModules;
 using OpenSim.Region.CoreModules;
 using OpenSim.Region.Framework;
-
-using OpenSim.Services.SimulationService;
-using OpenSim.Services.EstateService;
 using OpenSim.Region.PhysicsModule.BasicPhysics;
 using OpenSim.Region.ClientStack.LindenUDP;
 using OpenSim.Region.ClientStack.Linden;
@@ -53,14 +49,10 @@ using OpenSim.Region.PhysicsModule.POS;
 using OpenSim.Region.PhysicsModule.BulletS;
 using OpenSim.Region.PhysicsModule.ubOde;
 using OpenSim.Region.PhysicsModule.ubOdeMeshing;
-using OpenSim.Region.CoreModules.Framework.Search;
-using OpenSimSearch.Modules.OpenSearch;
-using OpenSim.Groups;
-using Gloebit.GloebitMoneyModule;
 using OpenSim.Region.ScriptEngine.Yengine;
 using OpenSim.Server.Common;
-using ConfigurationSubstitution;
 
+using ConfigurationSubstitution;
 
 namespace OpenSim.Server.RegionServer
 {

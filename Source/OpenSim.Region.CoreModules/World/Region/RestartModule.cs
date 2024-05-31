@@ -25,23 +25,26 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
 using System.Timers;
-using log4net;
-using Nini.Config;
+using Timer = System.Timers.Timer;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 
-using Timer = System.Timers.Timer;
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Region
 {
     public class RestartModule : INonSharedRegionModule, IRestartModule
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected Scene m_Scene;
         protected Timer m_CountdownTimer = null;
@@ -58,6 +61,7 @@ namespace OpenSim.Region.CoreModules.World.Region
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RestartModule>>();
             IConfig restartConfig = config.Configs["RestartModule"];
             if (restartConfig != null)
             {
@@ -238,7 +242,7 @@ namespace OpenSim.Region.CoreModules.World.Region
             }
             else
             {
-                m_log.WarnFormat(
+                m_logger?.LogWarning(
                     "[RESTART MODULE]: Tried to set restart timer to {0} in {1}, which is not a valid interval",
                     intervalSeconds, m_Scene.Name);
             }
@@ -357,7 +361,7 @@ namespace OpenSim.Region.CoreModules.World.Region
 
         int CountAgents()
         {
-            m_log.Info("[RESTART MODULE]: Counting affected avatars");
+            m_logger?.LogInformation("[RESTART MODULE]: Counting affected avatars");
             int agents = 0;
 
             if (m_rebootAll)
@@ -380,7 +384,7 @@ namespace OpenSim.Region.CoreModules.World.Region
                 }
             }
 
-            m_log.InfoFormat("[RESTART MODULE]: Avatars in region: {0}", agents);
+            m_logger?.LogInformation("[RESTART MODULE]: Avatars in region: {0}", agents);
 
             return agents;
         }

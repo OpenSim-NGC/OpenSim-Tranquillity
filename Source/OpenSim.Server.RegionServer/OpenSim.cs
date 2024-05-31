@@ -25,14 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using log4net.Core;
+using System.Collections;
+using System.Net;
+using System.Reflection;
+using System.Runtime;
+using System.Text;
+using System.Text.RegularExpressions;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using NDesk.Options;
-using Nini.Config;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Console;
 using OpenSim.Framework.Monitoring;
@@ -41,12 +46,10 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
-using System.Collections;
-using System.Net;
-using System.Reflection;
-using System.Runtime;
-using System.Text;
-using System.Text.RegularExpressions;
+
+using NDesk.Options;
+
+using Nini.Config;
 
 namespace OpenSim.Server.RegionServer
 {
@@ -60,7 +63,7 @@ namespace OpenSim.Server.RegionServer
         protected bool m_gui = false;
         protected string m_shutdownCommandsFile;
         protected string m_startupCommandsFile;
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         /// <summary>
         /// Prompt to use for simulator command line.
@@ -81,6 +84,7 @@ namespace OpenSim.Server.RegionServer
 
         public OpenSim(IServiceProvider provider, IConfiguration configSource) : base(configSource)
         {
+            m_logger ??= base.ServiceProvider.GetRequiredService<ILogger<OpenSim>>();
             _configuration = configSource;
             _provider = provider;
         }
@@ -134,9 +138,9 @@ namespace OpenSim.Server.RegionServer
             if (Util.FireAndForgetMethod == FireAndForgetMethod.SmartThreadPool)
                 Util.InitThreadPool(stpMinThreads, stpMaxThreads);
 
-            m_log.Info("[OPENSIM MAIN]: Using async_call_method " + Util.FireAndForgetMethod);
+            m_logger?.LogInformation("[OPENSIM MAIN]: Using async_call_method " + Util.FireAndForgetMethod);
 
-            m_log.InfoFormat("[OPENSIM MAIN] Running GC in {0} mode", GCSettings.IsServerGC ? "server" : "workstation");
+            m_logger?.LogInformation("[OPENSIM MAIN] Running GC in {0} mode", GCSettings.IsServerGC ? "server" : "workstation");
         }
 
         protected override void ShutdownSpecific()
@@ -160,14 +164,14 @@ namespace OpenSim.Server.RegionServer
         /// </summary>
         protected override void StartupSpecific()
         {
-            m_log.Info("====================================================================");
-            m_log.Info("========================= STARTING OPENSIM =========================");
-            m_log.Info("====================================================================");
+            m_logger?.LogInformation("====================================================================");
+            m_logger?.LogInformation("========================= STARTING OPENSIM =========================");
+            m_logger?.LogInformation("====================================================================");
 
-            //m_log.InfoFormat("[OPENSIM MAIN]: GC Is Server GC: {0}", GCSettings.IsServerGC.ToString());
+            //m_logger?.LogInformation("[OPENSIM MAIN]: GC Is Server GC: {0}", GCSettings.IsServerGC.ToString());
             // http://msdn.microsoft.com/en-us/library/bb384202.aspx
             //GCSettings.LatencyMode = GCLatencyMode.Batch;
-            //m_log.InfoFormat("[OPENSIM MAIN]: GC Latency Mode: {0}", GCSettings.LatencyMode.ToString());
+            //m_logger?.LogInformation("[OPENSIM MAIN]: GC Latency Mode: {0}", GCSettings.LatencyMode.ToString());
 
             var _config = _provider.GetRequiredService<IConfiguration>();
             var _logger = _provider.GetRequiredService<ILogger<OpenSim>>();
@@ -219,7 +223,7 @@ namespace OpenSim.Server.RegionServer
                 string urlBase = String.Format("/{0}/", managedStatsURI);
                 StatsManager.StatsPassword = managedStatsPassword;
                 MainServer.Instance.AddHTTPHandler(urlBase, StatsManager.HandleStatsRequest);
-                m_log.InfoFormat("[OPENSIM] Enabling remote managed stats fetch. URL = {0}", urlBase);
+                m_logger?.LogInformation("[OPENSIM] Enabling remote managed stats fetch. URL = {0}", urlBase);
             }
 
             MethodInfo mi = m_console.GetType().GetMethod("SetServer", BindingFlags.Public | BindingFlags.Instance, null, new Type[] { typeof(BaseHttpServer) }, null);
@@ -247,7 +251,7 @@ namespace OpenSim.Server.RegionServer
             //Run Startup Commands
             if (String.IsNullOrEmpty(m_startupCommandsFile))
             {
-                m_log.Info("[STARTUP]: No startup command script specified. Moving on...");
+                m_logger?.LogInformation("[STARTUP]: No startup command script specified. Moving on...");
             }
             else
             {
@@ -1122,7 +1126,7 @@ namespace OpenSim.Server.RegionServer
                     string currentLine;
                     while ((currentLine = readFile.ReadLine()) != null)
                     {
-                        m_log.Info("[!]" + currentLine);
+                        m_logger?.LogInformation("[!]" + currentLine);
                     }
                 }
             }

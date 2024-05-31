@@ -26,21 +26,23 @@
  */
 
 
-using System.Reflection;
-using log4net;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Nini.Config;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using Microsoft.Extensions.DependencyInjection;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Wind
 {
     public class WindModule : IWindModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private uint m_frame = 0;
         private int m_dataVersion = 0;
@@ -70,6 +72,7 @@ namespace OpenSim.Region.CoreModules.World.Wind
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<WindModule>>();
             m_windConfig = config.Configs["Wind"];
 //            string desiredWindPlugin = m_dWindPluginName;
 
@@ -88,7 +91,7 @@ namespace OpenSim.Region.CoreModules.World.Wind
 
             if (m_enabled)
             {
-                m_log.InfoFormat("[WIND] Enabled with an update rate of {0} frames.", m_frameUpdateRate);
+                m_logger?.LogInformation("[WIND] Enabled with an update rate of {0} frames.", m_frameUpdateRate);
 
             }
 
@@ -104,12 +107,12 @@ namespace OpenSim.Region.CoreModules.World.Wind
 
             using (var scope = _serviceProvider.CreateScope())
             {
-                m_log.InfoFormat($"[REGIONMODULES]: Initializing ISharedRegionModules");
+                m_logger?.LogInformation($"[REGIONMODULES]: Initializing ISharedRegionModules");
 
                 var windPlugins = scope.ServiceProvider.GetServices<IWindModelPlugin>();
                 foreach (var windPlugin in windPlugins)
                 {
-                    m_log.InfoFormat($"[WIND] Found Plugin: {windPlugin.Name}");
+                    m_logger?.LogInformation($"[WIND] Found Plugin: {windPlugin.Name}");
                     m_availableWindPlugins.Add(windPlugin.Name, windPlugin);
                 }
             }
@@ -119,7 +122,7 @@ namespace OpenSim.Region.CoreModules.World.Wind
             {
                 m_activeWindPlugin = m_availableWindPlugins[m_dWindPluginName];
 
-                m_log.InfoFormat("[WIND] {0} plugin found, initializing.", m_dWindPluginName);
+                m_logger?.LogInformation("[WIND] {0} plugin found, initializing.", m_dWindPluginName);
 
                 if (m_windConfig != null)
                 {
@@ -131,8 +134,8 @@ namespace OpenSim.Region.CoreModules.World.Wind
             // if the plug-in wasn't found, default to no wind.
             if (m_activeWindPlugin == null)
             {
-                m_log.ErrorFormat("[WIND] Could not find specified wind plug-in: {0}", m_dWindPluginName);
-                m_log.ErrorFormat("[WIND] Defaulting to no wind.");
+                m_logger?.LogError("[WIND] Could not find specified wind plug-in: {0}", m_dWindPluginName);
+                m_logger?.LogError("[WIND] Defaulting to no wind.");
             }
 
             // This one puts an entry in the main help screen

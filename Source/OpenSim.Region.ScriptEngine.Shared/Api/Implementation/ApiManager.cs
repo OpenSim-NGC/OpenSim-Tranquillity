@@ -25,18 +25,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
-using log4net;
+// using Microsoft.Extensions.DependencyInjection;
+// using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.ScriptEngine.Interfaces;
+// using OpenSim.Server.Base;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Api
 {
     public class ApiManager
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        // private static ILogger? m_logger;
 
         private Dictionary<string,Type> m_Apis = new Dictionary<string,Type>();
 
@@ -63,7 +63,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 }
             }
 
-//            m_log.DebugFormat("[API MANAGER]: Found {0} apis", m_Apis.Keys.Count);
+//            m_logger.LogDebug("[API MANAGER]: Found {0} apis", m_Apis.Keys.Count);
 
             return new List<string>(m_Apis.Keys).ToArray();
         }

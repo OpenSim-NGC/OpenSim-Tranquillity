@@ -26,15 +26,18 @@
  */
 
 using System.Diagnostics;
-using System.Reflection;
 using System.Timers;
 using System.Text.RegularExpressions;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.World.AutoBackup
 {
@@ -91,8 +94,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
     /// </remarks>
     public class AutoBackupModule : ISharedRegionModule
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private readonly AutoBackupModuleState m_defaultState = new AutoBackupModuleState();
         private readonly Dictionary<IScene, AutoBackupModuleState> m_states =
             new Dictionary<IScene, AutoBackupModuleState>(1);
@@ -142,6 +144,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
         /// <param name="source">The input config source for OpenSim.ini.</param>
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<AutoBackupModule>>();
             // Determine if we have been enabled at all in OpenSim.ini -- this is part and parcel of being an optional module
             m_configSource = source;
             IConfig moduleConfig = source.Configs["AutoBackupModule"];
@@ -159,10 +162,10 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
             if(!m_enabled)
                 return;
 
-            m_log.Debug("[AUTO BACKUP]: Default config:");
-            m_log.Debug(m_defaultState.ToString());
+            m_logger?.LogDebug("[AUTO BACKUP]: Default config:");
+            m_logger?.LogDebug(m_defaultState.ToString());
 
-            m_log.Info("[AUTO BACKUP]: AutoBackupModule enabled");
+            m_logger?.LogInformation("[AUTO BACKUP]: AutoBackupModule enabled");
             m_masterTimer = new System.Timers.Timer();
             m_masterTimer.Interval = m_baseInterval;
             m_masterTimer.Elapsed += HandleElapsed;
@@ -236,14 +239,14 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
             AutoBackupModuleState abms = ParseConfig(scene);
             if(abms == null)
             {
-                m_log.Debug("[AUTO BACKUP]: Config for " + scene.RegionInfo.RegionName);
-                m_log.Debug("DEFAULT");
+                m_logger?.LogDebug("[AUTO BACKUP]: Config for " + scene.RegionInfo.RegionName);
+                m_logger?.LogDebug("DEFAULT");
                 abms = new AutoBackupModuleState(m_defaultState);
             }
             else
             {
-                m_log.Debug("[AUTO BACKUP]: Config for " + scene.RegionInfo.RegionName);
-                m_log.Debug(abms.ToString());
+                m_logger?.LogDebug("[AUTO BACKUP]: Config for " + scene.RegionInfo.RegionName);
+                m_logger?.LogDebug(abms.ToString());
             }
 
             m_states.Add(scene, abms);
@@ -342,7 +345,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
                 catch (Exception e)
                 {
                     m_enabled = false;
-                    m_log.WarnFormat("[AUTO BACKUP]: Error accessing backup folder {0}. Module disabled. {1}",
+                    m_logger?.LogWarning("[AUTO BACKUP]: Error accessing backup folder {0}. Module disabled. {1}",
                             backupDir, e);
                     return;
                 }
@@ -371,7 +374,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
                 tmpNamingType = NamingType.Overwrite;
             else
             {
-                m_log.Warn("Unknown naming type specified for Default");
+                m_logger?.LogWarning("Unknown naming type specified for Default");
                 tmpNamingType = NamingType.Time;
             }
             m_defaultState.NamingType = tmpNamingType;
@@ -420,7 +423,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
                 tmpNamingType = NamingType.Overwrite;
             else
             {
-                m_log.Warn("Unknown naming type specified for region " + sRegionName + ": " +
+                m_logger?.LogWarning("Unknown naming type specified for region " + sRegionName + ": " +
                            stmpNamingType);
                 tmpNamingType = NamingType.Time;
             }
@@ -470,7 +473,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
             if (!scene.Ready)
             {
                 // We won't backup a region that isn't operating normally.
-                m_log.Warn("[AUTO BACKUP]: Not backing up region " + scene.RegionInfo.RegionName +
+                m_logger?.LogWarning("[AUTO BACKUP]: Not backing up region " + scene.RegionInfo.RegionName +
                            " because its status is " + scene.RegionStatus);
                 return;
             }
@@ -493,12 +496,12 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
                                                 state.NamingType);
             if (savePath == null)
             {
-                m_log.Warn("[AUTO BACKUP]: savePath is null in HandleElapsed");
+                m_logger?.LogWarning("[AUTO BACKUP]: savePath is null in HandleElapsed");
                 return;
             }
 
             Guid guid = Guid.NewGuid();
-            m_log.Info("[AUTO BACKUP]: Backing up region " + scene.RegionInfo.RegionName);
+            m_logger?.LogInformation("[AUTO BACKUP]: Backing up region " + scene.RegionInfo.RegionName);
 
             // Must pass options, even if dictionary is empty!
             Dictionary<string, object> options = new Dictionary<string, object>();
@@ -520,7 +523,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
             }
             catch (Exception Ex)
             {
-                m_log.Error("[AUTO BACKUP]: Error reading backup folder " + m_backupDir + ": " + Ex.Message);
+                m_logger?.LogError("[AUTO BACKUP]: Error reading backup folder " + m_backupDir + ": " + Ex.Message);
                 return;
             }
 
@@ -536,7 +539,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
                 }
                 catch (Exception Ex)
                 {
-                    m_log.Error("[AUTO BACKUP]: Error deleting old backup file '" + file + "': " + Ex.Message);
+                    m_logger?.LogError("[AUTO BACKUP]: Error deleting old backup file '" + file + "': " + Ex.Message);
                 }
             }
         }
@@ -596,7 +599,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
             }
             catch (Exception e)
             {
-                m_log.Warn(
+                m_logger?.LogWarning(
                     "Exception encountered when trying to run script for oar backup " + savePath, e);
             }
         }
@@ -608,7 +611,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
         /// <param name="e"></param>
         private static void HandleProcErrorDataReceived(object sender, DataReceivedEventArgs e)
         {
-            m_log.Warn("ExecuteScript hook " + ((Process) sender).ProcessName +
+            m_logger?.LogWarning("ExecuteScript hook " + ((Process) sender).ProcessName +
                        " is yacking on stderr: " + e.Data);
         }
 
@@ -655,7 +658,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
                     path = new FileInfo(GetNextFile(baseDir, regionName));
                     return path.FullName;
                 default:
-                    m_log.Warn("VERY BAD: Unhandled case element " + naming);
+                    m_logger?.LogWarning("VERY BAD: Unhandled case element " + naming);
                     break;
             }
 
@@ -698,7 +701,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
                         }
                         catch (FormatException fe)
                         {
-                            m_log.Warn(
+                            m_logger?.LogWarning(
                                 "[AUTO BACKUP]: Error: Can't parse long value from file name to determine next OAR backup file number!",
                                 fe);
                             subtract++;

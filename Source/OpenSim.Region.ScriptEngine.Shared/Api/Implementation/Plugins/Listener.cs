@@ -25,20 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.CoreModules.Scripting.WorldComm;
-using OpenSim.Region.ScriptEngine.Interfaces;
-using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Shared.Api;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
 {
     public class Listener
     {
-        // private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        // private static ILogger? m_logger;
 
         public AsyncCommandManager m_CmdManager;
 

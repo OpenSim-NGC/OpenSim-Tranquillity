@@ -24,22 +24,25 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.WorldMap
 {
     public class MapSearchModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         IGridService m_gridservice = null;
         UUID m_stupidScope = UUID.Zero;
@@ -47,6 +50,7 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
         #region ISharedRegionModule Members
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MapSearchModule>>();
         }
 
         public void AddRegion(Scene scene)

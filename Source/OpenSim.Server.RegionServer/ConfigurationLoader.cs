@@ -25,11 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Nini.Config;
-using OpenSim.Framework;
 using System.Reflection;
 using System.Xml;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Server.RegionServer
 {
@@ -56,8 +60,12 @@ namespace OpenSim.Server.RegionServer
         /// </summary>
         public NetworkServersInfo NetworkServersInfo { get; set; } = new NetworkServersInfo();
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
+
+        static ConfigurationLoader() {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<ConfigurationLoader>>();
+        }
         /// <summary>
         /// Loads the region configuration
         /// </summary>
@@ -97,7 +105,7 @@ namespace OpenSim.Server.RegionServer
                     }
                     else
                     {
-                        m_log.ErrorFormat("Master ini file {0} not found", Path.GetFullPath(masterFilePath));
+                        m_logger?.LogError("Master ini file {0} not found", Path.GetFullPath(masterFilePath));
                         Environment.Exit(1);
                     }
                 }
@@ -131,7 +139,7 @@ namespace OpenSim.Server.RegionServer
 
             m_config = new IniConfigSource();
 
-            m_log.Info("[CONFIG]: Reading configuration settings");
+            m_logger?.LogInformation("[CONFIG]: Reading configuration settings");
 
             for (int i = 0; i < sources.Count; i++)
             {
@@ -148,7 +156,7 @@ namespace OpenSim.Server.RegionServer
 
             if (Directory.Exists(iniDirPath))
             {
-                m_log.InfoFormat("[CONFIG]: Searching folder {0} for config ini files", iniDirPath);
+                m_logger?.LogInformation("[CONFIG]: Searching folder {0} for config ini files", iniDirPath);
                 List<string> overrideSources = new List<string>();
 
                 string[] fileEntries = Directory.GetFiles(iniDirName);
@@ -183,19 +191,19 @@ namespace OpenSim.Server.RegionServer
 
             if (sources.Count == 0)
             {
-                m_log.FatalFormat("[CONFIG]: Could not load any configuration");
+                m_logger?.LogCritical("[CONFIG]: Could not load any configuration");
                 Environment.Exit(1);
             }
             else if (!iniFileExists)
             {
-                m_log.FatalFormat("[CONFIG]: Could not load any configuration");
-                m_log.FatalFormat("[CONFIG]: Configuration exists, but there was an error loading it!");
+                m_logger?.LogCritical("[CONFIG]: Could not load any configuration");
+                m_logger?.LogCritical("[CONFIG]: Configuration exists, but there was an error loading it!");
                 Environment.Exit(1);
             }
 
             //// Merge OpSys env vars
             ///XXX
-            //m_log.Info("[CONFIG]: Loading environment variables for Config");
+            //m_logger?.LogInformation("[CONFIG]: Loading environment variables for Config");
             //Util.MergeEnvironmentToConfig(m_config.Source);
 
             // Make sure command line options take precedence
@@ -267,7 +275,7 @@ namespace OpenSim.Server.RegionServer
                             // If the include path contains no wildcards, then warn the user that it wasn't found.
                             if (wildcardIndex == -1 && paths.Length == 0)
                             {
-                                m_log.WarnFormat("[CONFIG]: Could not find include file {0}", path);
+                                m_logger?.LogWarning("[CONFIG]: Could not find include file {0}", path);
                             }
                             else
                             {
@@ -307,14 +315,14 @@ namespace OpenSim.Server.RegionServer
 
             if (!IsUri(iniPath))
             {
-                m_log.InfoFormat("[CONFIG]: Reading configuration file {0}", Path.GetFullPath(iniPath));
+                m_logger?.LogInformation("[CONFIG]: Reading configuration file {0}", Path.GetFullPath(iniPath));
 
                 configSource.Merge(new IniConfigSource(iniPath));
                 success = true;
             }
             else
             {
-                m_log.InfoFormat("[CONFIG]: {0} is a http:// URI, fetching ...", iniPath);
+                m_logger?.LogInformation("[CONFIG]: {0} is a http:// URI, fetching ...", iniPath);
 
                 // The ini file path is a http URI
                 // Try to read it
@@ -328,7 +336,7 @@ namespace OpenSim.Server.RegionServer
                 }
                 catch (Exception e)
                 {
-                    m_log.FatalFormat("[CONFIG]: Exception reading config from URI {0}\n" + e.ToString(), iniPath);
+                    m_logger?.LogCritical("[CONFIG]: Exception reading config from URI {0}\n" + e.ToString(), iniPath);
                     Environment.Exit(1);
                 }
             }

@@ -25,19 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Vegetation
 {
     public class VegetationModule : INonSharedRegionModule, IVegetationModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected Scene m_scene;
 
@@ -46,6 +50,7 @@ namespace OpenSim.Region.CoreModules.World.Vegetation
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<VegetationModule>>();
         }
 
         public void AddRegion(Scene scene)
@@ -89,7 +94,7 @@ namespace OpenSim.Region.CoreModules.World.Vegetation
         {
             if (Array.IndexOf(creationCapabilities, (PCode)shape.PCode) < 0)
             {
-                m_log.DebugFormat("[VEGETATION]: PCode {0} not handled by {1}", shape.PCode, Name);
+                m_logger?.LogDebug("[VEGETATION]: PCode {0} not handled by {1}", shape.PCode, Name);
                 return null;
             }
 

@@ -25,16 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Xml;
-using log4net;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.OptionalModules.DataSnapshot.Interfaces;
-using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.OptionalModules.DataSnapshot.Providers
 {
@@ -42,7 +43,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot.Providers
     {
         private Scene m_scene = null;
         // private DataSnapshotManager m_parent = null;
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private bool m_stale = true;
 
         private static UUID m_DefaultImage = new UUID("89556747-24cb-43ed-920b-47caed15465f");
@@ -51,6 +52,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot.Providers
 
         public void Initialize(Scene scene, DataSnapshotManager parent)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteMuteListServicesConnector>>();
             m_scene = scene;
             // m_parent = parent;
 
@@ -97,7 +99,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot.Providers
 
         public XmlNode RequestSnapshotData(XmlDocument nodeFactory)
         {
-            m_log.Debug("[DATASNAPSHOT]: Generating object data for scene " + m_scene.RegionInfo.RegionName);
+            m_logger?.LogDebug("[DATASNAPSHOT]: Generating object data for scene " + m_scene.RegionInfo.RegionName);
 
             XmlNode parent = nodeFactory.CreateNode(XmlNodeType.Element, "objectdata", "");
             XmlNode node;
@@ -110,7 +112,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot.Providers
                 {
                     SceneObjectGroup obj = (SceneObjectGroup)entity;
 
-//                    m_log.Debug("[DATASNAPSHOT]: Found object " + obj.Name + " in scene");
+//                    m_logger?.LogDebug("[DATASNAPSHOT]: Found object " + obj.Name + " in scene");
 
                     // libomv will complain about PrimFlags.JointWheel
                     // being obsolete, so we...
@@ -151,7 +153,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot.Providers
                         else
                         {
                             // Something is wrong with this object. Let's not list it.
-                            m_log.WarnFormat("[DATASNAPSHOT]: Bad data for object {0} ({1}) in region {2}", obj.Name, obj.UUID, m_scene.RegionInfo.RegionName);
+                            m_logger?.LogWarning("[DATASNAPSHOT]: Bad data for object {0} ({1}) in region {2}", obj.Name, obj.UUID, m_scene.RegionInfo.RegionName);
                             continue;
                         }
 

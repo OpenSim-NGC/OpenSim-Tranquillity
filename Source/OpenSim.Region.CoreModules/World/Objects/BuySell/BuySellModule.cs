@@ -25,22 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenSim.Framework;
+using PermissionMask = OpenSim.Framework.PermissionMask;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
+using OpenSim.Server.Base;
 
-using PermissionMask = OpenSim.Framework.PermissionMask;
+using Nini.Config;
+
 
 namespace OpenSim.Region.CoreModules.World.Objects.BuySell
 {
     public class BuySellModule : IBuySellModule, INonSharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected Scene m_scene = null;
         protected IDialogModule m_dialogModule;
@@ -48,7 +51,10 @@ namespace OpenSim.Region.CoreModules.World.Objects.BuySell
         public string Name { get { return "Object BuySell Module"; } }
         public Type ReplaceableInterface { get { return null; } }
 
-        public void Initialise(IConfiguration source) {}
+        public void Initialise(IConfiguration source)
+        {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<BuySellModule>>();
+        }
 
         public void AddRegion(Scene scene)
         {

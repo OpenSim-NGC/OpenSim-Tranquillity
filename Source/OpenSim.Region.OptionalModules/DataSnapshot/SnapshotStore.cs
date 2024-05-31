@@ -25,31 +25,32 @@
 * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
-using log4net;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.OptionalModules.DataSnapshot.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.OptionalModules.DataSnapshot
 {
     public class SnapshotStore
     {
         #region Class Members
+        private static ILogger? m_logger;
         private String m_directory = "unyuu"; //not an attempt at adding RM references to core SVN, honest
         private Dictionary<Scene, bool> m_scenes = null;
         private List<IDataSnapshotProvider> m_providers = null;
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private Dictionary<String, String> m_gridinfo = null;
         private bool m_cacheEnabled = true;
         #endregion
 
         public SnapshotStore(string directory, Dictionary<String, String> gridinfo) {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SnapshotStore>>();
             m_directory = directory;
             m_scenes = new Dictionary<Scene, bool>();
             m_providers = new List<IDataSnapshotProvider>();
@@ -57,23 +58,23 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
 
             if (Directory.Exists(m_directory))
             {
-                m_log.Info("[DATASNAPSHOT]: Response and fragment cache directory already exists.");
+                m_logger?.LogInformation("[DATASNAPSHOT]: Response and fragment cache directory already exists.");
             }
             else
             {
                 // Try to create the directory.
-                m_log.Info("[DATASNAPSHOT]: Creating directory " + m_directory);
+                m_logger?.LogInformation("[DATASNAPSHOT]: Creating directory " + m_directory);
                 try
                 {
                     Directory.CreateDirectory(m_directory);
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[DATASNAPSHOT]: Failed to create directory " + m_directory, e);
+                    m_logger?.LogError("[DATASNAPSHOT]: Failed to create directory " + m_directory, e);
 
                     //This isn't a horrible problem, just disable cacheing.
                     m_cacheEnabled = false;
-                    m_log.Error("[DATASNAPSHOT]: Could not create directory, response cache has been disabled.");
+                    m_logger?.LogError("[DATASNAPSHOT]: Could not create directory, response cache has been disabled.");
                 }
             }
         }
@@ -114,7 +115,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
                     }
                     catch (Exception e)
                     {
-                        m_log.WarnFormat("[DATASNAPSHOT]: Exception on writing to file {0}: {1}", path, e.Message);
+                        m_logger?.LogWarning("[DATASNAPSHOT]: Exception on writing to file {0}: {1}", path, e.Message);
                     }
 
                 }
@@ -123,7 +124,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
                 provider.Stale = false;
                 m_scenes[provider.GetParentScene] = true;
 
-                m_log.Debug("[DATASNAPSHOT]: Generated fragment response for provider type " + provider.Name);
+                m_logger?.LogDebug("[DATASNAPSHOT]: Generated fragment response for provider type " + provider.Name);
             }
             else
             {
@@ -137,7 +138,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
                     data = factory.ImportNode(node, true);
                 }
 
-                m_log.Debug("[DATASNAPSHOT]: Retrieved fragment response for provider type " + provider.Name);
+                m_logger?.LogDebug("[DATASNAPSHOT]: Retrieved fragment response for provider type " + provider.Name);
             }
 
             return data;
@@ -147,7 +148,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
         #region Response storage
         public XmlNode GetScene(Scene scene, XmlDocument factory)
         {
-            m_log.Debug("[DATASNAPSHOT]: Data requested for scene " + scene.RegionInfo.RegionName);
+            m_logger?.LogDebug("[DATASNAPSHOT]: Data requested for scene " + scene.RegionInfo.RegionName);
 
             if (!m_scenes.ContainsKey(scene)) {
                 m_scenes.Add(scene, true); //stale by default
@@ -157,7 +158,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
 
             if (!m_scenes[scene])
             {
-                m_log.Debug("[DATASNAPSHOT]: Attempting to retrieve snapshot from cache.");
+                m_logger?.LogDebug("[DATASNAPSHOT]: Attempting to retrieve snapshot from cache.");
                 //get snapshot from cache
                 String path = DataFileNameScene(scene);
 
@@ -171,11 +172,11 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
                     regionElement = factory.ImportNode(node, true);
                 }
 
-                m_log.Debug("[DATASNAPSHOT]: Obtained snapshot from cache for " + scene.RegionInfo.RegionName);
+                m_logger?.LogDebug("[DATASNAPSHOT]: Obtained snapshot from cache for " + scene.RegionInfo.RegionName);
             }
             else
             {
-                m_log.Debug("[DATASNAPSHOT]: Attempting to generate snapshot.");
+                m_logger?.LogDebug("[DATASNAPSHOT]: Attempting to generate snapshot.");
                 //make snapshot
                 regionElement = MakeRegionNode(scene, factory);
 
@@ -209,12 +210,12 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("[DATASNAPSHOT]: Exception on writing to file {0}: {1}", path, e.Message);
+                    m_logger?.LogWarning("[DATASNAPSHOT]: Exception on writing to file {0}: {1}", path, e.Message);
                 }
 
                 m_scenes[scene] = false;
 
-                m_log.Debug("[DATASNAPSHOT]: Generated new snapshot for " + scene.RegionInfo.RegionName);
+                m_logger?.LogDebug("[DATASNAPSHOT]: Generated new snapshot for " + scene.RegionInfo.RegionName);
             }
 
             return regionElement;
@@ -279,7 +280,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
 
             docElement.AppendChild(infoblock);
 
-            m_log.Debug("[DATASNAPSHOT]: Generated region node");
+            m_logger?.LogDebug("[DATASNAPSHOT]: Generated region node");
             return docElement;
         }
 
@@ -309,7 +310,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
                 griddata.AppendChild(childnode);
             }
 
-            m_log.Debug("[DATASNAPSHOT]: Got grid snapshot data");
+            m_logger?.LogDebug("[DATASNAPSHOT]: Got grid snapshot data");
 
             return griddata;
         }

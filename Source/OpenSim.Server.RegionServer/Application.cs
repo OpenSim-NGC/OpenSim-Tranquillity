@@ -25,15 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using log4net.Config;
-using Nini.Config;
-using OpenSim.Framework;
-using System.Configuration;
 using System.Net;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using static Org.BouncyCastle.Math.EC.ECCurve;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using OpenSim.Framework;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Server.RegionServer
 {
@@ -60,7 +61,7 @@ namespace OpenSim.Server.RegionServer
         /// <summary>
         /// Text Console Logger
         /// </summary>
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private static bool _IsHandlingException = false;
 
@@ -72,6 +73,7 @@ namespace OpenSim.Server.RegionServer
         
         public static void Configure(string[] args)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger>();
             // Add the arguments supplied when running the application to the configuration
             var configSource = new ArgvConfigSource(args);
 
@@ -83,15 +85,15 @@ namespace OpenSim.Server.RegionServer
             if (!string.IsNullOrEmpty(logConfigFile))
             {
                 XmlConfigurator.Configure(new System.IO.FileInfo(logConfigFile));
-                m_log.InfoFormat("[OPENSIM MAIN]: configured log4net using \"{0}\" as configuration file", logConfigFile);
+                m_logger?.LogInformation("[OPENSIM MAIN]: configured log4net using \"{0}\" as configuration file", logConfigFile);
             }
             else
             {
                 XmlConfigurator.Configure(new System.IO.FileInfo("OpenSim.exe.config"));
-                m_log.Info("[OPENSIM MAIN]: configured log4net using default OpenSim.exe.config");
+                m_logger?.LogInformation("[OPENSIM MAIN]: configured log4net using default OpenSim.exe.config");
             }
 
-            m_log.InfoFormat("[OPENSIM MAIN]: System Locale is {0}", System.Threading.Thread.CurrentThread.CurrentCulture);
+            m_logger?.LogInformation("[OPENSIM MAIN]: System Locale is {0}", System.Threading.Thread.CurrentThread.CurrentCulture);
 
             configSource.Alias.AddAlias("On", true);
             configSource.Alias.AddAlias("Off", false);
@@ -153,22 +155,22 @@ namespace OpenSim.Server.RegionServer
             int iocpThreadsMax = 2000; // may need further adjustment to match other CLR
 
             System.Threading.ThreadPool.GetMinThreads(out int currentMinWorkerThreads, out int currentMinIocpThreads);
-            m_log.InfoFormat(
+            m_logger?.LogInformation(
                 "[OPENSIM MAIN]: Runtime gave us {0} min worker threads and {1} min IOCP threads",
                 currentMinWorkerThreads, currentMinIocpThreads);
 
             System.Threading.ThreadPool.GetMaxThreads(out int workerThreads, out int iocpThreads);
-            m_log.InfoFormat("[OPENSIM MAIN]: Runtime gave us {0} max worker threads and {1} max IOCP threads", workerThreads, iocpThreads);
+            m_logger?.LogInformation("[OPENSIM MAIN]: Runtime gave us {0} max worker threads and {1} max IOCP threads", workerThreads, iocpThreads);
 
             if (workerThreads < workerThreadsMin)
             {
                 workerThreads = workerThreadsMin;
-                m_log.InfoFormat("[OPENSIM MAIN]: Bumping up max worker threads to {0}", workerThreads);
+                m_logger?.LogInformation("[OPENSIM MAIN]: Bumping up max worker threads to {0}", workerThreads);
             }
             if (workerThreads > workerThreadsMax)
             {
                 workerThreads = workerThreadsMax;
-                m_log.InfoFormat("[OPENSIM MAIN]: Limiting max worker threads to {0}", workerThreads);
+                m_logger?.LogInformation("[OPENSIM MAIN]: Limiting max worker threads to {0}", workerThreads);
             }
 
             // Increase the number of IOCP threads available.
@@ -176,24 +178,24 @@ namespace OpenSim.Server.RegionServer
             if (iocpThreads < iocpThreadsMin)
             {
                 iocpThreads = iocpThreadsMin;
-                m_log.InfoFormat("[OPENSIM MAIN]: Bumping up max IOCP threads to {0}", iocpThreads);
+                m_logger?.LogInformation("[OPENSIM MAIN]: Bumping up max IOCP threads to {0}", iocpThreads);
             }
             // Make sure we don't overallocate IOCP threads and thrash system resources
             if (iocpThreads > iocpThreadsMax)
             {
                 iocpThreads = iocpThreadsMax;
-                m_log.InfoFormat("[OPENSIM MAIN]: Limiting max IOCP completion threads to {0}", iocpThreads);
+                m_logger?.LogInformation("[OPENSIM MAIN]: Limiting max IOCP completion threads to {0}", iocpThreads);
             }
             // set the resulting worker and IO completion thread counts back to ThreadPool
             if (System.Threading.ThreadPool.SetMaxThreads(workerThreads, iocpThreads))
             {
-                m_log.InfoFormat(
+                m_logger?.LogInformation(
                     "[OPENSIM MAIN]: Threadpool set to {0} max worker threads and {1} max IOCP threads",
                     workerThreads, iocpThreads);
             }
             else
             {
-                m_log.Warn("[OPENSIM MAIN]: Threadpool reconfiguration failed, runtime defaults still in effect.");
+                m_logger?.LogWarning("[OPENSIM MAIN]: Threadpool reconfiguration failed, runtime defaults still in effect.");
             }
 
             // Check if the system is compatible with OpenSimulator.
@@ -201,11 +203,11 @@ namespace OpenSim.Server.RegionServer
             string supported = String.Empty;
             if (Util.IsEnvironmentSupported(ref supported))
             {
-                m_log.Info("[OPENSIM MAIN]: Environment is supported by OpenSimulator.");
+                m_logger?.LogInformation("[OPENSIM MAIN]: Environment is supported by OpenSimulator.");
             }
             else
             {
-                m_log.Warn("[OPENSIM MAIN]: Environment is not supported by OpenSimulator (" + supported + ")\n");
+                m_logger?.LogWarning("[OPENSIM MAIN]: Environment is not supported by OpenSimulator (" + supported + ")\n");
             }
 
             /* Start Up the Simulator */
@@ -221,7 +223,7 @@ namespace OpenSim.Server.RegionServer
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("Command error: {0}", e);
+                    m_logger?.LogError("Command error: {0}", e);
                 }
             }
         }
@@ -259,7 +261,7 @@ namespace OpenSim.Server.RegionServer
             msg += "\r\n";
             msg += "Application is terminating: " + e.IsTerminating.ToString() + "\r\n";
 
-            m_log.ErrorFormat("[APPLICATION]: {0}", msg);
+            m_logger?.LogError("[APPLICATION]: {0}", msg);
 
             if (m_saveCrashDumps)
             {
@@ -280,7 +282,7 @@ namespace OpenSim.Server.RegionServer
                 }
                 catch (Exception e2)
                 {
-                    m_log.ErrorFormat("[CRASH LOGGER CRASHED]: {0}", e2);
+                    m_logger?.LogError("[CRASH LOGGER CRASHED]: {0}", e2);
                 }
             }
 

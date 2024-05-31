@@ -25,26 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Xml;
-
-using OpenSim.Framework;
-using OpenSim.Server.Base;
-using OpenSim.Framework.Servers.HttpServer;
-using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.Framework.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenMetaverse;
-using log4net;
+
+using OpenSim.Server.Base;
+using OpenSim.Framework.Servers.HttpServer;
 
 namespace OpenSim.Region.OptionalModules.World.WorldView
 {
     public class WorldViewRequestHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected WorldViewModule m_WorldViewModule;
         protected Object m_RequestLock = new Object();
@@ -52,6 +45,7 @@ namespace OpenSim.Region.OptionalModules.World.WorldView
         public WorldViewRequestHandler(WorldViewModule fmodule, string rid)
                 : base("GET", "/worldview/" + rid)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<WorldViewRequestHandler>>();
             m_WorldViewModule = fmodule;
         }
 
@@ -79,7 +73,7 @@ namespace OpenSim.Region.OptionalModules.World.WorldView
             }
             catch (Exception e)
             {
-                m_log.Debug("[WORLDVIEW]: Exception: " + e.ToString());
+                m_logger?.LogDebug("[WORLDVIEW]: Exception: " + e.ToString());
             }
 
             return Array.Empty<byte>();

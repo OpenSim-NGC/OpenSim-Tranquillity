@@ -25,19 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 using System.Reflection;
-using log4net;
+using System.Text.RegularExpressions;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using System.Text.RegularExpressions;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
 {
     public class JsonStore
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected virtual OSD ValueStore { get; set; }
 
@@ -114,6 +118,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
         // -----------------------------------------------------------------
         public JsonStore()
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<JsonStore>>();
             StringSpace = 0;
             m_TakeStore = new List<TakeValueCallbackClass>();
             m_ReadStore = new List<TakeValueCallbackClass>();
@@ -467,7 +472,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
 
             // Shouldn't get here if the path was checked correctly
-            m_log.WarnFormat("[JsonStore] invalid path expression");
+            m_logger?.LogWarning("[JsonStore] invalid path expression");
             return false;
         }
 
@@ -562,7 +567,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             {
                 if (rmap.Type != OSDType.Array)
                 {
-                    m_log.WarnFormat("[JsonStore] wrong type for key {2}, expecting {0}, got {1}",OSDType.Array,rmap.Type,pkey);
+                    m_logger?.LogWarning("[JsonStore] wrong type for key {2}, expecting {0}, got {1}",OSDType.Array,rmap.Type,pkey);
                     return null;
                 }
 
@@ -586,7 +591,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             {
                 if (rmap.Type != OSDType.Map)
                 {
-                    m_log.WarnFormat("[JsonStore] wrong type for key {2}, expecting {0}, got {1}",OSDType.Map,rmap.Type,pkey);
+                    m_logger?.LogWarning("[JsonStore] wrong type for key {2}, expecting {0}, got {1}",OSDType.Map,rmap.Type,pkey);
                     return null;
                 }
 
@@ -603,7 +608,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
 
             // Shouldn't get here if the path was checked correctly
-            m_log.WarnFormat("[JsonStore] Path type (unknown) does not match the structure");
+            m_logger?.LogWarning("[JsonStore] Path type (unknown) does not match the structure");
             return null;
         }
 

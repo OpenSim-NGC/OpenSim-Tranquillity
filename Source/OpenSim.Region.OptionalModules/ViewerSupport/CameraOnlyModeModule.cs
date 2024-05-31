@@ -25,23 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+using OSDMap = OpenMetaverse.StructuredData.OSDMap;
+
+using TeleportFlags = OpenSim.Framework.Constants.TeleportFlags;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
-using Nini.Config;
-using log4net;
+using OpenSim.Server.Base;
 
-using OSDMap = OpenMetaverse.StructuredData.OSDMap;
-using TeleportFlags = OpenSim.Framework.Constants.TeleportFlags;
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.ViewerSupport
 {
     public class CameraOnlyModeModule : INonSharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private Scene m_scene;
         private SimulatorFeaturesHelper m_Helper;
@@ -60,6 +62,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<CameraOnlyModeModule>>();
             IConfig moduleConfig = config.Configs["CameraOnlyModeModule"];
             if (moduleConfig != null)
             {
@@ -67,7 +70,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
                 if (m_Enabled)
                 {
                     m_UserLevel = moduleConfig.GetInt("UserLevel", 0);
-                    m_log.Info("[CAMERA-ONLY MODE]: CameraOnlyModeModule enabled");
+                    m_logger?.LogInformation("[CAMERA-ONLY MODE]: CameraOnlyModeModule enabled");
                 }
 
             }
@@ -112,7 +115,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
             if (!m_Enabled)
                 return;
 
-            m_log.DebugFormat("[CAMERA-ONLY MODE]: OnSimulatorFeaturesRequest in {0}", m_scene.RegionInfo.RegionName);
+            m_logger?.LogDebug("[CAMERA-ONLY MODE]: OnSimulatorFeaturesRequest in {0}", m_scene.RegionInfo.RegionName);
             if (m_Helper.UserLevel(agentID) <= m_UserLevel)
             {
                 if (!features.TryGetValue("OpenSimExtras", out OSD extrasMap))
@@ -122,10 +125,10 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
                 }
 
                 ((OSDMap)extrasMap)["camera-only-mode"] = OSDMap.FromString("true");
-                m_log.DebugFormat("[CAMERA-ONLY MODE]: Sent in {0}", m_scene.RegionInfo.RegionName);
+                m_logger?.LogDebug("[CAMERA-ONLY MODE]: Sent in {0}", m_scene.RegionInfo.RegionName);
             }
             else
-                m_log.DebugFormat("[CAMERA-ONLY MODE]: NOT Sending camera-only-mode in {0}", m_scene.RegionInfo.RegionName);
+                m_logger?.LogDebug("[CAMERA-ONLY MODE]: NOT Sending camera-only-mode in {0}", m_scene.RegionInfo.RegionName);
         }
 
         private void DetachAttachments(UUID agentID)
@@ -143,7 +146,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
                 {
                     foreach (SceneObjectGroup sog in attachs)
                     {
-                        m_log.DebugFormat("[CAMERA-ONLY MODE]: Forcibly detaching attach {0} from {1} in {2}",
+                        m_logger?.LogDebug("[CAMERA-ONLY MODE]: Forcibly detaching attach {0} from {1} in {2}",
                             sog.Name, sp.Name, m_scene.RegionInfo.RegionName);
 
                         m_scene.AttachmentsModule.DetachSingleAttachmentToInv(sp, sog);

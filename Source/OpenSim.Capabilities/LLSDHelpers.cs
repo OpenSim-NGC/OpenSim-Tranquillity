@@ -25,19 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.IO;
 using System.Reflection;
 using System.Xml;
+
 using OpenMetaverse;
 
 namespace OpenSim.Framework.Capabilities
 {
     public class LLSDHelpers
     {
-//        private static readonly log4net.ILog m_log
-//            = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+//        private static ILogger? m_logger;
 
         public static string SerialiseLLSDReply(object obj)
         {
@@ -49,7 +47,7 @@ namespace OpenSim.Framework.Capabilities
                 SerializeOSDType(writer, obj);
                 writer.WriteEndElement();
                 writer.Flush();
-            //m_log.DebugFormat("[LLSD Helpers]: Generated serialized LLSD reply {0}", sw.ToString());
+            //m_logger?.LogDebug("[LLSD Helpers]: Generated serialized LLSD reply {0}", sw.ToString());
 
                 return sw.ToString();
             }
@@ -63,7 +61,7 @@ namespace OpenSim.Framework.Capabilities
                 writer.Formatting = Formatting.None;
                 SerializeOSDType(writer, obj);
                 writer.Flush();
-            //m_log.DebugFormat("[LLSD Helpers]: Generated serialized LLSD reply {0}", sw.ToString());
+            //m_logger?.LogDebug("[LLSD Helpers]: Generated serialized LLSD reply {0}", sw.ToString());
 
                 return sw.ToString();
             }

@@ -26,29 +26,32 @@
  */
 
 using System.Collections;
-using System.Reflection;
+using System.Data.SQLite;
 using System.Text;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+using OSD = OpenMetaverse.StructuredData.OSD;
+using OSDMap = OpenMetaverse.StructuredData.OSDMap;
+
 using OpenSim.Framework;
+using Caps = OpenSim.Framework.Capabilities.Caps;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using System.Data.SQLite;
+using OpenSim.Server.Base;
 
-using Caps = OpenSim.Framework.Capabilities.Caps;
-using OSD = OpenMetaverse.StructuredData.OSD;
-using OSDMap = OpenMetaverse.StructuredData.OSDMap;
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.UserStatistics
 {
     public class WebStatsModule : ISharedRegionModule
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private static SQLiteConnection dbConn;
 
@@ -72,6 +75,7 @@ namespace OpenSim.Region.OptionalModules.UserStatistics
 
         public virtual void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<WebStatsModule>>();
             IConfig cnfg = config.Configs["WebStats"];
 
             if (cnfg != null)
@@ -473,7 +477,7 @@ namespace OpenSim.Region.OptionalModules.UserStatistics
                 {
                     if (!m_sessions.ContainsKey(agentID))
                     {
-                        m_log.WarnFormat("[WEB STATS MODULE]: no session for stat disclosure for agent {0}", agentID);
+                        m_logger?.LogWarning("[WEB STATS MODULE]: no session for stat disclosure for agent {0}", agentID);
                         return new UserSession();
                     }
 

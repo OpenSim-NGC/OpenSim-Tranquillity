@@ -25,12 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using OpenMetaverse;
+
 using OpenSim.Framework;
-//using log4net;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
@@ -38,7 +35,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
 {
     public class SensorRepeat
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        // private static ILogger? m_logger;
 
         /// <summary>
         /// Used by one-off and repeated sensors
@@ -492,7 +489,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
 
             Action<ScenePresence> senseEntity = new(presence =>
             {
-                //m_log.DebugFormat(
+                //m_logger?.LogDebug(
                 //    "[SENSOR REPEAT]: Inspecting scene presence {0}, type {1} on sensor sweep for {2}, type {3}",
                 //    presence.Name, presence.PresenceType, ts.name, ts.type);
 
@@ -501,7 +498,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
                     INPC npcData = m_npcModule.GetNPC(presence.UUID, presence.Scene);
                     if (npcData is null || !npcData.SenseAsAgent)
                     {
-                        //m_log.DebugFormat(
+                        //m_logger?.LogDebug(
                         //    "[SENSOR REPEAT]: Discarding NPC {0} from agent sense sweep for script item id {1}",
                         //    presence.Name, ts.itemID);
                         return;
@@ -519,7 +516,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
                         INPC npcData = m_npcModule.GetNPC(presence.UUID, presence.Scene);
                         if (npcData is not null && npcData.SenseAsAgent)
                         {
-                            //m_log.DebugFormat(
+                            //m_logger?.LogDebug(
                             //    "[SENSOR REPEAT]: Discarding NPC {0} from non-agent sense sweep for script item id {1}",
                             //    presence.Name, ts.itemID);
                             return;

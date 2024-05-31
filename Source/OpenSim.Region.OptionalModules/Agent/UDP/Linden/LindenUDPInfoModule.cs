@@ -25,16 +25,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
 using System.Text;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.ClientStack.LindenUDP;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Agent.UDP.Linden
 {
@@ -46,7 +51,7 @@ namespace OpenSim.Region.OptionalModules.Agent.UDP.Linden
     /// </remarks>
     public class LindenUDPInfoModule : ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected Dictionary<UUID, Scene> m_scenes = new();
 
@@ -56,6 +61,7 @@ namespace OpenSim.Region.OptionalModules.Agent.UDP.Linden
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LindenUDPInfoModule>>();
         }
 
         public void PostInitialise()
@@ -508,12 +514,12 @@ namespace OpenSim.Region.OptionalModules.Agent.UDP.Linden
 
         private void PrintRequests(string type, Dictionary<string, int> sortedDict, int sum)
         {
-            m_log.InfoFormat("[INFO]:");
-            m_log.InfoFormat("[INFO]: {0,25}", type);
+            m_logger?.LogInformation("[INFO]:");
+            m_logger?.LogInformation("[INFO]: {0,25}", type);
             foreach (KeyValuePair<string, int> kvp in sortedDict.Take(12))
-                m_log.InfoFormat("[INFO]: {0,25} {1,-6}", kvp.Key, kvp.Value);
-            m_log.InfoFormat("[INFO]: {0,25}", "...");
-            m_log.InfoFormat("[INFO]: {0,25} {1,-6}", "Total", sum);
+                m_logger?.LogInformation("[INFO]: {0,25} {1,-6}", kvp.Key, kvp.Value);
+            m_logger?.LogInformation("[INFO]: {0,25}", "...");
+            m_logger?.LogInformation("[INFO]: {0,25} {1,-6}", "Total", sum);
         }
     }
 }

@@ -25,13 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.PrimLimitsModule
 {
@@ -44,7 +48,7 @@ namespace OpenSim.Region.OptionalModules.PrimLimitsModule
     public class PrimLimitsModule : INonSharedRegionModule
     {
         protected IDialogModule m_dialogModule;
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private bool m_enabled;
 
         private Scene m_scene;
@@ -54,6 +58,7 @@ namespace OpenSim.Region.OptionalModules.PrimLimitsModule
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PrimLimitsModule>>();
             string permissionModules = Util.GetConfigVarFromSections<string>(config, "permissionmodules",
                 new string[] { "Startup", "Permissions" }, "DefaultPermissionsModule");
 
@@ -62,7 +67,7 @@ namespace OpenSim.Region.OptionalModules.PrimLimitsModule
             if(!modules.Contains("PrimLimitsModule"))
                 return;
 
-            m_log.DebugFormat("[PRIM LIMITS]: Initialized module");
+            m_logger?.LogDebug("[PRIM LIMITS]: Initialized module");
             m_enabled = true;
         }
 
@@ -81,7 +86,7 @@ namespace OpenSim.Region.OptionalModules.PrimLimitsModule
             scene.Permissions.OnObjectEnterWithScripts += CanObjectEnterWithScripts;
             scene.Permissions.OnDuplicateObject += CanDuplicateObject;
 
-            m_log.DebugFormat("[PRIM LIMITS]: Region {0} added", scene.RegionInfo.RegionName);
+            m_logger?.LogDebug("[PRIM LIMITS]: Region {0} added", scene.RegionInfo.RegionName);
         }
 
         public void RemoveRegion(Scene scene)

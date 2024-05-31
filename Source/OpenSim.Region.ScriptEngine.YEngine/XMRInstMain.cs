@@ -25,17 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Threading;
-using System.Reflection;
 using System.Collections;
-using System.Collections.Generic;
+
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.Framework.Scenes;
-using log4net;
 
 // This class exists in the main app domain
 //
@@ -85,8 +84,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
         public static readonly DetectParams[] zeroDetectParams = new DetectParams[0];
         public static readonly object[] zeroObjectArray = new object[0];
 
-        public static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         public XMRInstance m_NextInst;  // used by XMRInstQueue
         public XMRInstance m_PrevInst;

@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Net;
 using System.Text;
 using System.Xml;
@@ -41,8 +39,7 @@ namespace OpenSim.Framework.Servers.HttpServer
     /// </summary>
     public class RestObjectPosterResponse<TResponse>
     {
-//        private static readonly log4net.ILog m_log
-//            = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+//        private static ILogger? m_logger;
 
         public ReturnResponse<TResponse> ResponseCallback;
 
@@ -94,7 +91,7 @@ namespace OpenSim.Framework.Servers.HttpServer
 
                 // This is currently a bad debug stanza since it gobbles us the response...
 //                StreamReader reader = new StreamReader(stream);
-//                m_log.DebugFormat("[REST OBJECT POSTER RESPONSE]: Received {0}", reader.ReadToEnd());
+//                m_logger?.LogDebug("[REST OBJECT POSTER RESPONSE]: Received {0}", reader.ReadToEnd());
 
                 deserial = (TResponse) deserializer.Deserialize(stream);
 

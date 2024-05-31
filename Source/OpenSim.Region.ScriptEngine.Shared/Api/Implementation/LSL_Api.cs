@@ -25,12 +25,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Nini.Config;
+using System.Collections;
+using System.Collections.Specialized;
+using System.Diagnostics;
+using System.Drawing;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.RegularExpressions;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.Assets;
 using OpenMetaverse.Packets;
 using OpenMetaverse.Rendering;
+
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.Land;
 using OpenSim.Region.Framework.Interfaces;
@@ -38,24 +50,13 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Animation;
 using OpenSim.Region.Framework.Scenes.Scripting;
 using OpenSim.Region.Framework.Scenes.Serialization;
-using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.ScriptBase;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Hypergrid;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.Diagnostics;
-using System.Drawing;
-using System.Globalization;
-using System.Reflection;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
+
 using AssetLandmark = OpenSim.Framework.AssetLandmark;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
@@ -70,7 +71,8 @@ using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
 using PrimType = OpenSim.Region.Framework.Scenes.PrimType;
 using RegionFlags = OpenSim.Framework.RegionFlags;
 using RegionInfo = OpenSim.Framework.RegionInfo;
-using System.Runtime.CompilerServices;
+
+using Nini.Config;
 
 #pragma warning disable IDE1006
 
@@ -81,7 +83,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
     /// </summary>
     public class LSL_Api : MarshalByRefObject, ILSL_Api, IScriptApi
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private int m_llRequestAgentDataCacheTimeout;
         public int LlRequestAgentDataCacheTimeoutMs
@@ -386,6 +388,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public void Initialize(IScriptEngine scriptEngine, SceneObjectPart host, TaskInventoryItem item)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LSL_Api>>();
             m_lastSayShoutCheck = DateTime.UtcNow;
 
             m_ScriptEngine = scriptEngine;
@@ -3484,7 +3487,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public virtual void llSleep(double sec)
         {
-//            m_log.Info("llSleep snoozing " + sec + "s.");
+//            m_logger?.LogInformation("llSleep snoozing " + sec + "s.");
 
             Sleep((int)(sec * 1000));
         }
@@ -15154,7 +15157,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             if (ossl != null)
             {
                 ossl.CheckThreatLevel(ThreatLevel.High, "print");
-                m_log.Info("LSL print():" + str);
+                m_logger?.LogInformation("LSL print():" + str);
             }
         }
 

@@ -25,38 +25,28 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
-using System.Reflection;
-using System.Text;
-using System.Collections.Generic;
-using System.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenMetaverse;
-using OpenMetaverse.StructuredData;
-using OpenSim;
-using OpenSim.Region;
-using OpenSim.Region.Framework;
+
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Framework;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-//using OpenSim.Framework.Capabilities;
+
 using Nini.Config;
-using log4net;
-using OSDMap = OpenMetaverse.StructuredData.OSDMap;
-using TeleportFlags = OpenSim.Framework.Constants.TeleportFlags;
 
 namespace OpenSim.Region.OptionalModules.ViewerSupport
 {
     public class SimulatorFeaturesHelper
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private Scene m_scene;
 
         public SimulatorFeaturesHelper(Scene scene)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SimulatorFeaturesHelper>>();
             m_scene = scene;
         }
 

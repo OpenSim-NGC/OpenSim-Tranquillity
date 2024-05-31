@@ -25,18 +25,19 @@
 * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Xml;
-using log4net;
-using OpenMetaverse;
-using OpenSim.Framework;
 
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using OpenMetaverse;
+
+using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.Land;
 using OpenSim.Region.OptionalModules.DataSnapshot.Interfaces;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.OptionalModules.DataSnapshot.Providers
@@ -46,7 +47,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot.Providers
         private Scene m_scene = null;
         private DataSnapshotManager m_parent = null;
         //private Dictionary<int, Land> m_landIndexed = new Dictionary<int, Land>();
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private bool m_stale = true;
 
         #region Dead code
@@ -106,6 +107,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot.Providers
 
         public void Initialize(Scene scene, DataSnapshotManager parent)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LandSnapshot>>();
             m_scene = scene;
             m_parent = parent;
 
@@ -404,7 +406,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot.Providers
         // another, smaller rectangular parcel). Both will have the same initial coordinates.
         private void findPointInParcel(ILandObject land, ref uint refX, ref uint refY)
         {
-            m_log.DebugFormat("[DATASNAPSHOT] trying {0}, {1}", refX, refY);
+            m_logger?.LogDebug("[DATASNAPSHOT] trying {0}, {1}", refX, refY);
             // the point we started with already is in the parcel
             if (land.ContainsPoint((int)refX, (int)refY)) return;
 

@@ -25,20 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
-using OpenSim.Framework;
+
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.ScriptEngine.Interfaces;
-using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
 using ScriptTimer=OpenSim.Region.ScriptEngine.Shared.Api.Plugins.ScriptTimer;
-using System.Reflection;
-using log4net;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Api
 {
@@ -47,7 +44,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
     /// </summary>
     public class AsyncCommandManager
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private static Thread cmdHandlerThread;
         private static int cmdHandlerThreadCycleSleepms;
@@ -144,6 +141,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public AsyncCommandManager(IScriptEngine _ScriptEngine)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<AsyncCommandManager>>();
             m_ScriptEngine = _ScriptEngine;
 
             // If there is more than one scene in the simulator or multiple script engines are used on the same region
@@ -237,7 +235,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[ASYNC COMMAND MANAGER]: Exception in command handler pass: ", e);
+                    m_logger?.LogError("[ASYNC COMMAND MANAGER]: Exception in command handler pass: ", e);
                 }
             }
         }

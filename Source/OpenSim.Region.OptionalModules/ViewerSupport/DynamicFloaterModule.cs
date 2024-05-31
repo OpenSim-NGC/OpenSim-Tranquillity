@@ -25,19 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
+using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Framework;
+using OpenSim.Server.Base;
+
 using Nini.Config;
-using log4net;
 
 namespace OpenSim.Region.OptionalModules.ViewerSupport
 {
     public class DynamicFloaterModule : INonSharedRegionModule, IDynamicFloaterModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private Scene m_scene;
 
@@ -55,6 +59,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DynamicFloaterModule>>();
         }
 
         public void Close()

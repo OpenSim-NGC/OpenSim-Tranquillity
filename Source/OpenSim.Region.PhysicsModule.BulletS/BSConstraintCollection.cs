@@ -24,17 +24,16 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.Text;
-using log4net;
-using OpenMetaverse;
+// using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+// using OpenSim.Server.Base;
 
 namespace OpenSim.Region.PhysicsModule.BulletS
 {
     public sealed class BSConstraintCollection : IDisposable
     {
-        // private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         // private static readonly string LogHeader = "[CONSTRAINT COLLECTION]";
 
         delegate bool ConstraintAction(BSConstraint constrain);
@@ -44,6 +43,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
 
         public BSConstraintCollection(BulletWorld world)
         {
+            // m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<BSConstraintCollection>>();
             m_world = world;
             m_constraints = new List<BSConstraint>();
         }

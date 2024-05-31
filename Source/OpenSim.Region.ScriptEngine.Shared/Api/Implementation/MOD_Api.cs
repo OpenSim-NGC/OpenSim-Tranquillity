@@ -25,23 +25,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
-using System.Collections;
-using System.Collections.Generic;
-using System.Threading;
-using log4net;
+// using Microsoft.Extensions.DependencyInjection;
+// using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
-using Nini.Config;
-using OpenSim;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
 using OpenSim.Region.ScriptEngine.Shared.ScriptBase;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
+// using OpenSim.Server.Base;
 
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
@@ -51,12 +46,14 @@ using LSL_Rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
 using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
 
+using Nini.Config;
+
 namespace OpenSim.Region.ScriptEngine.Shared.Api
 {
     [Serializable]
     public class MOD_Api : MarshalByRefObject, IMOD_Api, IScriptApi
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        // private static ILogger? m_logger;
 
         internal IScriptEngine m_ScriptEngine;
         internal SceneObjectPart m_host;
@@ -68,6 +65,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         public void Initialize(
             IScriptEngine scriptEngine, SceneObjectPart host, TaskInventoryItem item)
         {
+            // m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MOD_Api>>();
             m_ScriptEngine = scriptEngine;
             m_host = host;
             m_item = item;
@@ -121,7 +119,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         /// <returns>string result of the invocation</returns>
         public void modInvokeN(string fname, params object[] parms)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -136,7 +134,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_String modInvokeS(string fname, params object[] parms)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -152,7 +150,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_Integer modInvokeI(string fname, params object[] parms)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -168,7 +166,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_Float modInvokeF(string fname, params object[] parms)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -184,7 +182,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_Key modInvokeK(string fname, params object[] parms)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -200,7 +198,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_Vector modInvokeV(string fname, params object[] parms)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -216,7 +214,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_Rotation modInvokeR(string fname, params object[] parms)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -232,7 +230,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_List modInvokeL(string fname, params object[] parms)
         {
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -299,7 +297,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 return "";
             }
 
-//            m_log.DebugFormat(
+//            m_logger?.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),

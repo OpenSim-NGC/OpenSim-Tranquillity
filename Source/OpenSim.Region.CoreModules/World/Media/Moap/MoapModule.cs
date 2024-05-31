@@ -26,25 +26,30 @@
  */
 
 using System.Net;
-using System.Reflection;
-using log4net;
-using Nini.Config;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.Messages.Linden;
+
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Media.Moap
 {
     public class MoapModule : INonSharedRegionModule, IMoapModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         public string Name { get { return "MoapModule"; } }
         public Type ReplaceableInterface { get { return null; } }
@@ -61,6 +66,7 @@ namespace OpenSim.Region.CoreModules.World.Media.Moap
 
         public void Initialise(IConfiguration configSource)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MoapModule>>();
             IConfig config = configSource.Configs["MediaOnAPrim"];
 
             if (config != null && !config.GetBoolean("Enabled", false))
@@ -260,7 +266,7 @@ namespace OpenSim.Region.CoreModules.World.Media.Moap
                 }
                 else
                 {
-                    m_log.ErrorFormat(
+                    m_logger?.LogError(
                         "[MOAP]: ObjectMediaMessage has unrecognized ObjectMediaBlock of {0}",
                         omm.Request.GetType());
                 }
@@ -285,7 +291,7 @@ namespace OpenSim.Region.CoreModules.World.Media.Moap
 
             if (null == part)
             {
-                m_log.WarnFormat(
+                m_logger?.LogWarning(
                     "[MOAP]: Received a GET ObjectMediaRequest for prim {0} but this doesn't exist in region {1}",
                     primId, m_scene.RegionInfo.RegionName);
                 return string.Empty;
@@ -352,7 +358,7 @@ namespace OpenSim.Region.CoreModules.World.Media.Moap
 
             if (null == part)
             {
-                m_log.WarnFormat(
+                m_logger?.LogWarning(
                     "[MOAP]: Received an UPDATE ObjectMediaRequest for prim {0} but this doesn't exist in region {1}",
                     primId, m_scene.RegionInfo.RegionName);
                 return false;
@@ -369,7 +375,7 @@ namespace OpenSim.Region.CoreModules.World.Media.Moap
 
             if (omu.FaceMedia.Length > part.GetNumberOfSides())
             {
-                m_log.WarnFormat(
+                m_logger?.LogWarning(
                     "[MOAP]: Received {0} media entries from client for prim {1} {2} but this prim has only {3} faces.  Dropping request.",
                     omu.FaceMedia.Length, part.Name, part.UUID, part.GetNumberOfSides());
                 return false;
@@ -478,7 +484,7 @@ namespace OpenSim.Region.CoreModules.World.Media.Moap
                 {
                     if (null == part)
                     {
-                        m_log.WarnFormat(
+                        m_logger?.LogWarning(
                             "[MOAP]: Received an ObjectMediaNavigateMessage for prim {0} but this doesn't exist in region {1}",
                             primId, m_scene.RegionInfo.RegionName);
                     }

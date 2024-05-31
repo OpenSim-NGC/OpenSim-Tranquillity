@@ -24,19 +24,22 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
 {
     public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private IConfig m_config = null;
         private bool m_enabled = false;
@@ -70,12 +73,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
         // -----------------------------------------------------------------
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<JsonStoreModule>>();
             try
             {
                 if ((m_config = config.Configs["JsonStore"]) == null)
                 {
                     // There is no configuration, the module is disabled
-                    // m_log.InfoFormat("[JsonStore] no configuration info");
+                    // m_logger?.LogInformation("[JsonStore] no configuration info");
                     return;
                 }
 
@@ -87,12 +91,12 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.Error("[JsonStore]: initialization error: {0}", e);
+                m_logger?.LogError("[JsonStore]: initialization error: {0}", e);
                 return;
             }
 
             if (m_enabled)
-                m_log.DebugFormat("[JsonStore]: module is enabled");
+                m_logger?.LogDebug("[JsonStore]: module is enabled");
         }
 
         // -----------------------------------------------------------------
@@ -214,7 +218,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             SceneObjectPart sop = m_scene.GetSceneObjectPart(objectID);
             if (sop == null)
             {
-                m_log.ErrorFormat("[JsonStore] unable to attach to unknown object; {0}", objectID);
+                m_logger?.LogError("[JsonStore] unable to attach to unknown object; {0}", objectID);
                 return false;
             }
 
@@ -251,7 +255,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception)
             {
-                m_log.ErrorFormat("[JsonStore]: Unable to initialize store from {0}", value);
+                m_logger?.LogError("[JsonStore]: Unable to initialize store from {0}", value);
                 return false;
             }
 
@@ -301,7 +305,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             {
                 if (! m_JsonValueStore.TryGetValue(storeID,out map))
                 {
-                    m_log.InfoFormat("[JsonStore] Missing store {0}",storeID);
+                    m_logger?.LogInformation("[JsonStore] Missing store {0}",storeID);
                     return JsonStoreNodeType.Undefined;
                 }
             }
@@ -313,7 +317,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.Error(string.Format("[JsonStore]: Path test failed for {0} in {1}", path, storeID), e);
+                m_logger?.LogError(string.Format("[JsonStore]: Path test failed for {0} in {1}", path, storeID), e);
             }
 
             return JsonStoreNodeType.Undefined;
@@ -333,7 +337,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             {
                 if (! m_JsonValueStore.TryGetValue(storeID,out map))
                 {
-                    m_log.InfoFormat("[JsonStore] Missing store {0}",storeID);
+                    m_logger?.LogInformation("[JsonStore] Missing store {0}",storeID);
                     return JsonStoreValueType.Undefined;
                 }
             }
@@ -345,7 +349,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.Error(string.Format("[JsonStore]: Path test failed for {0} in {1}", path, storeID), e);
+                m_logger?.LogError(string.Format("[JsonStore]: Path test failed for {0} in {1}", path, storeID), e);
             }
 
             return JsonStoreValueType.Undefined;
@@ -365,7 +369,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             {
                 if (! m_JsonValueStore.TryGetValue(storeID,out map))
                 {
-                    m_log.InfoFormat("[JsonStore] Missing store {0}",storeID);
+                    m_logger?.LogInformation("[JsonStore] Missing store {0}",storeID);
                     return false;
                 }
             }
@@ -376,7 +380,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
                 {
                     if (map.StringSpace > m_maxStringSpace)
                     {
-                        m_log.WarnFormat("[JsonStore] {0} exceeded string size; {1} bytes used of {2} limit",
+                        m_logger?.LogWarning("[JsonStore] {0} exceeded string size; {1} bytes used of {2} limit",
                                          storeID,map.StringSpace,m_maxStringSpace);
                         return false;
                     }
@@ -386,7 +390,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.Error(string.Format("[JsonStore]: Unable to assign {0} to {1} in {2}", value, path, storeID), e);
+                m_logger?.LogError(string.Format("[JsonStore]: Unable to assign {0} to {1} in {2}", value, path, storeID), e);
             }
 
             return false;
@@ -406,7 +410,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             {
                 if (! m_JsonValueStore.TryGetValue(storeID,out map))
                 {
-                    m_log.InfoFormat("[JsonStore] Missing store {0}",storeID);
+                    m_logger?.LogInformation("[JsonStore] Missing store {0}",storeID);
                     return false;
                 }
             }
@@ -418,7 +422,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.Error(string.Format("[JsonStore]: Unable to remove {0} in {1}", path, storeID), e);
+                m_logger?.LogError(string.Format("[JsonStore]: Unable to remove {0} in {1}", path, storeID), e);
             }
 
             return false;
@@ -449,7 +453,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.Error("[JsonStore]: unable to retrieve value", e);
+                m_logger?.LogError("[JsonStore]: unable to retrieve value", e);
             }
 
             return -1;
@@ -482,7 +486,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.Error("[JsonStore]: unable to retrieve value", e);
+                m_logger?.LogError("[JsonStore]: unable to retrieve value", e);
             }
 
             return false;
@@ -521,7 +525,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.Error("[JsonStore] unable to retrieve value", e);
+                m_logger?.LogError("[JsonStore] unable to retrieve value", e);
             }
 
             cback(String.Empty);
@@ -560,7 +564,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             }
             catch (Exception e)
             {
-                m_log.Error("[JsonStore]: unable to retrieve value", e);
+                m_logger?.LogError("[JsonStore]: unable to retrieve value", e);
             }
 
             cback(String.Empty);

@@ -25,14 +25,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
-using log4net;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.CoreModules.World.Warp3DMap
@@ -66,7 +70,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
 
         #endregion Constants
 
-        private static readonly ILog m_log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType.Name);
+        private static ILogger? m_logger;
         private static string LogHeader = "[WARP3D TERRAIN SPLAT]";
 
         /// <summary>
@@ -79,6 +83,10 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         /// <remarks>Based on the algorithm described at http://opensimulator.org/wiki/Terrain_Splatting
         /// Note we create a 256x256 dimension texture even if the actual terrain is larger.
         /// </remarks>
+
+        static TerrainSplat() {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger>();
+        }
 
         public static Bitmap Splat(ITerrainChannel terrain, UUID[] textureIDs,
                 float[] startHeights, float[] heightRanges,
@@ -135,7 +143,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                             }
                             catch(Exception ex)
                             {
-                                m_log.Warn("Failed to decode cached terrain patch texture" + textureIDs[i] + "): " + ex.Message);
+                                m_logger?.LogWarning("Failed to decode cached terrain patch texture" + textureIDs[i] + "): " + ex.Message);
                             }
                         }
 
@@ -151,7 +159,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                                 }
                                 catch(Exception ex)
                                 {
-                                    m_log.Warn("Failed to decode terrain texture " + asset.ID + ": " + ex.Message);
+                                    m_logger?.LogWarning("Failed to decode terrain texture " + asset.ID + ": " + ex.Message);
                                 }
                             }
 
@@ -243,7 +251,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                     {
                         if(detailTexture[i] == null)
                         {
-                            m_log.DebugFormat("{0} Missing terrain texture for layer {1}. Filling with solid default color", LogHeader, i);
+                            m_logger?.LogDebug("{0} Missing terrain texture for layer {1}. Filling with solid default color", LogHeader, i);
 
                             // Create a solid color texture for this layer
                             detailTexture[i] = new Bitmap(16, 16, PixelFormat.Format24bppRgb);

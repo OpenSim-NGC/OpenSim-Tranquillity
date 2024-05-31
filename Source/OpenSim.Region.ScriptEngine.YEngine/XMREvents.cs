@@ -25,17 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Interfaces;
-using log4net;
 
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
@@ -57,7 +52,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
 
         private void InitEvents()
         {
-            m_log.Info("[YEngine] Hooking up to server events");
+            m_logger?.LogInformation("[YEngine] Hooking up to server events");
             EventManager eManager = this.World.EventManager;
             eManager.OnAttach += attach;
             eManager.OnObjectGrab += touch_start;

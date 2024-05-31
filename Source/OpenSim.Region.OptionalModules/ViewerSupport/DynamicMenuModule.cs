@@ -26,24 +26,28 @@
  */
 
 using System.Net;
-using System.Reflection;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+using OSDMap = OpenMetaverse.StructuredData.OSDMap;
+
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Framework;
-using OpenSim.Framework.Servers.HttpServer;
-using Nini.Config;
-using log4net;
-
 using Caps = OpenSim.Framework.Capabilities.Caps;
-using OSDMap = OpenMetaverse.StructuredData.OSDMap;
+using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.ViewerSupport
 {
     public class DynamicMenuModule : INonSharedRegionModule, IDynamicMenuModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private class MenuItemData
         {
@@ -71,6 +75,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DynamicMenuModule>>();
         }
 
         public void Close()
@@ -257,8 +262,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
 
     public class MenuActionHandler : SimpleOSDMapHandler
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private UUID m_agentID;
         private Scene m_scene;
@@ -267,6 +271,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
         public MenuActionHandler(string path, string name, UUID agentID, DynamicMenuModule module, Scene scene)
                 :base("POST", path)
         {
+            // m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MenuActionHandler>>();
             m_agentID = agentID;
             m_scene = scene;
             m_module = module;

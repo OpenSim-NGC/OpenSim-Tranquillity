@@ -25,15 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
 using netcd;
 using netcd.Serialization;
 using netcd.Advanced;
 using netcd.Advanced.Requests;
+
+using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Framework.Monitoring
 {
@@ -43,7 +47,7 @@ namespace OpenSim.Region.OptionalModules.Framework.Monitoring
     /// </summary>
     public class EtcdMonitoringModule : INonSharedRegionModule, IEtcdModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         protected Scene m_scene;
         protected IEtcdClient m_client;
@@ -63,6 +67,7 @@ namespace OpenSim.Region.OptionalModules.Framework.Monitoring
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EtcdMonitoringModule>>();
             if (source.Configs["Etcd"] == null)
                 return;
 
@@ -89,11 +94,11 @@ namespace OpenSim.Region.OptionalModules.Framework.Monitoring
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[ETCD]: Error initializing connection: " + e.ToString());
+                m_logger?.LogDebug("[ETCD]: Error initializing connection: " + e.ToString());
                 return;
             }
 
-            m_log.DebugFormat("[ETCD]: Etcd module configured");
+            m_logger?.LogDebug("[ETCD]: Etcd module configured");
             m_enabled = true;
         }
 
@@ -112,7 +117,7 @@ namespace OpenSim.Region.OptionalModules.Framework.Monitoring
                 if (m_appendRegionID)
                     m_etcdBasePath += m_scene.RegionInfo.RegionID.ToString() + "/";
 
-                m_log.DebugFormat("[ETCD]: Using base path {0} for all keys", m_etcdBasePath);
+                m_logger?.LogDebug("[ETCD]: Using base path {0} for all keys", m_etcdBasePath);
 
                 try
                 {
@@ -120,7 +125,7 @@ namespace OpenSim.Region.OptionalModules.Framework.Monitoring
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("Exception trying to create base path {0}: " + e.ToString(), m_etcdBasePath);
+                    m_logger?.LogError("Exception trying to create base path {0}: " + e.ToString(), m_etcdBasePath);
                 }
 
                 scene.RegisterModuleInterface<IEtcdModule>(this);
@@ -149,7 +154,7 @@ namespace OpenSim.Region.OptionalModules.Framework.Monitoring
 
             if (resp.ErrorCode.HasValue)
             {
-                m_log.DebugFormat("[ETCD]: Error {0} ({1}) storing {2} => {3}", resp.Cause, (int)resp.ErrorCode, m_etcdBasePath + k, v);
+                m_logger?.LogDebug("[ETCD]: Error {0} ({1}) storing {2} => {3}", resp.Cause, (int)resp.ErrorCode, m_etcdBasePath + k, v);
 
                 return false;
             }
@@ -166,7 +171,7 @@ namespace OpenSim.Region.OptionalModules.Framework.Monitoring
 
             if (resp.ErrorCode.HasValue)
             {
-                m_log.DebugFormat("[ETCD]: Error {0} ({1}) getting {2}", resp.Cause, (int)resp.ErrorCode, m_etcdBasePath + k);
+                m_logger?.LogDebug("[ETCD]: Error {0} ({1}) getting {2}", resp.Cause, (int)resp.ErrorCode, m_etcdBasePath + k);
 
                 return String.Empty;
             }

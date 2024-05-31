@@ -25,17 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
-using System.Text;
-using System.Threading;
-using log4net;
-using OpenSim.Framework;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 {
@@ -46,6 +44,8 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
     /// </summary>
     class IRCServer
     {
+        private static ILogger? m_logger;
+
         public event OnNewIRCUserDelegate OnNewIRCClient;
 
         private readonly TcpListener m_listener;
@@ -54,6 +54,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 
         public IRCServer(IPAddress listener, int port, Scene baseScene)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<IRCServer>>();
             m_listener = new TcpListener(listener, port);
 
             m_listener.Start(50);

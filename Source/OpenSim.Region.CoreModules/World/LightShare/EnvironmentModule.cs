@@ -26,15 +26,20 @@
  */
 
 using System.Net;
-using System.Reflection;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-using log4net;
+
 using Nini.Config;
 
 using Caps = OpenSim.Framework.Capabilities.Caps;
@@ -47,7 +52,7 @@ namespace OpenSim.Region.CoreModules.World.LightShare
 {
     public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private Scene m_scene = null;
         private UUID regionID = UUID.Zero;
@@ -75,6 +80,7 @@ namespace OpenSim.Region.CoreModules.World.LightShare
         #region INonSharedRegionModule
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EnvironmentModule>>();
             IConfig config = source.Configs["ClientStack.LindenCaps"];
 
             if (config is null)
@@ -82,14 +88,14 @@ namespace OpenSim.Region.CoreModules.World.LightShare
 
             if (!config.GetString("Cap_EnvironmentSettings", string.Empty).Equals("localhost"))
             {
-                m_log.InfoFormat("[{0}]: Module is disabled.", Name);
+                m_logger?.LogInformation("[{0}]: Module is disabled.", Name);
                 return;
             }
 
             Enabled = true;
 
 
-            m_log.InfoFormat("[{0}]: Module is enabled.", Name);
+            m_logger?.LogInformation("[{0}]: Module is enabled.", Name);
         }
 
         public void Close()
@@ -164,7 +170,7 @@ namespace OpenSim.Region.CoreModules.World.LightShare
                     catch (Exception e)
                     {
                         m_DefaultEnv = null;
-                        m_log.Warn(string.Format("[Environment {0}] failed to decode default environment asset ", m_scene.Name), e);
+                        m_logger?.LogWarning(string.Format("[Environment {0}] failed to decode default environment asset ", m_scene.Name), e);
                     }
                 }
             }
@@ -181,7 +187,7 @@ namespace OpenSim.Region.CoreModules.World.LightShare
                     {
                         VEnv.FromWLOSD(oenv);
                         StoreOnRegion(VEnv);
-                        m_log.Info($"[Environment {m_scene.Name}] migrated WindLight environment settings to EEP");
+                        m_logger?.LogInformation($"[Environment {m_scene.Name}] migrated WindLight environment settings to EEP");
                     }
                     else
                     {
@@ -192,7 +198,7 @@ namespace OpenSim.Region.CoreModules.World.LightShare
                 }
                 catch (Exception e)
                 {
-                    m_log.Error($"[Environment {m_scene.Name}] failed to load initial Environment {e.Message}");
+                    m_logger?.LogError($"[Environment {m_scene.Name}] failed to load initial Environment {e.Message}");
                     scene.RegionEnvironment = null;
                     m_regionEnvVersion = -1;
                 }
@@ -244,7 +250,7 @@ namespace OpenSim.Region.CoreModules.World.LightShare
             }
             catch (Exception e)
             {
-                m_log.Error($"[Environment {m_scene.Name}] failed to store Environment {e.Message}");
+                m_logger?.LogError($"[Environment {m_scene.Name}] failed to store Environment {e.Message}");
             }
         }
 
@@ -342,7 +348,7 @@ namespace OpenSim.Region.CoreModules.World.LightShare
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[{0}]: Unable to convert environment to lightShare, Exception: {1} - {2}",
+                m_logger?.LogError("[{0}]: Unable to convert environment to lightShare, Exception: {1} - {2}",
                     Name, e.Message, e.StackTrace);
             }
             return ls ?? new RegionLightShareData();
@@ -618,13 +624,13 @@ namespace OpenSim.Region.CoreModules.World.LightShare
                         if(lchannel is null)
                         {
                             StoreOnRegion(VEnv);
-                            m_log.InfoFormat("[{0}]: ExtEnvironment region {1} settings from agentID {2} saved",
+                            m_logger?.LogInformation("[{0}]: ExtEnvironment region {1} settings from agentID {2} saved",
                                 Name, caps.RegionName, agentID);
                         }
                         else
                         {
                             lchannel.StoreEnvironment(VEnv);
-                            m_log.InfoFormat("[{0}]: ExtEnvironment parcel {1} of region {2}  settings from agentID {3} saved",
+                            m_logger?.LogInformation("[{0}]: ExtEnvironment parcel {1} of region {2}  settings from agentID {3} saved",
                                 Name, parcel, caps.RegionName, agentID);
                         }
 
@@ -641,7 +647,7 @@ namespace OpenSim.Region.CoreModules.World.LightShare
 
                     WindlightRefresh(0);
 
-                    m_log.InfoFormat("[{0}]: ExtEnvironment region {1} settings from agentID {2} saved",
+                    m_logger?.LogInformation("[{0}]: ExtEnvironment region {1} settings from agentID {2} saved",
                                                     Name, caps.RegionName, agentID);
 
                     LLSDxmlEncode2.AddMap(sb);
@@ -656,7 +662,7 @@ namespace OpenSim.Region.CoreModules.World.LightShare
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[{0}]: ExtEnvironment settings not saved for region {1}, Exception: {2} - {3}",
+                m_logger?.LogError("[{0}]: ExtEnvironment settings not saved for region {1}, Exception: {2} - {3}",
                     Name, caps.RegionName, e.Message, e.StackTrace);
 
                 success = false;
@@ -762,13 +768,13 @@ namespace OpenSim.Region.CoreModules.World.LightShare
 
                 WindlightRefresh(0);
 
-                m_log.InfoFormat("[{0}]: New Environment settings has been saved from agentID {1} in region {2}",
+                m_logger?.LogInformation("[{0}]: New Environment settings has been saved from agentID {1} in region {2}",
                     Name, agentID, m_scene.Name);
                 success = true;
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[{0}]: Environment settings has not been saved for region {1}, Exception: {2} - {3}",
+                m_logger?.LogError("[{0}]: Environment settings has not been saved for region {1}, Exception: {2} - {3}",
                     Name, m_scene.Name, e.Message, e.StackTrace);
 
                 success = false;

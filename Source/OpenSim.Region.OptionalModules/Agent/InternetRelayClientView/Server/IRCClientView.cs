@@ -25,21 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
-using System.Text;
-using System.Threading;
-using log4net;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.Packets;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Client;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 {
@@ -49,7 +48,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
     {
         public event OnIRCClientReadyDelegate OnIRCReady;
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private readonly TcpClient m_client;
         private readonly Scene m_scene;
@@ -72,6 +71,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 
         public IRCClientView(TcpClient client, Scene scene)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<IRCClientView>>();
             m_client = client;
             m_scene = scene;
 
@@ -85,7 +85,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 
         private void SendCommand(string command)
         {
-            m_log.Info("[IRCd] Sending >>> " + command);
+            m_logger?.LogInformation("[IRCd] Sending >>> " + command);
 
             byte[] buf = Util.UTF8.GetBytes(command + "\r\n");
 
@@ -94,7 +94,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 
         private void SendComplete(IAsyncResult result)
         {
-            m_log.Info("[IRCd] Send Complete.");
+            m_logger?.LogInformation("[IRCd] Send Complete.");
         }
 
         private string IrcRegionName
@@ -125,7 +125,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
                         // Remove from buffer
                         strbuf = strbuf.Remove(0, message.Length);
 
-                        m_log.Info("[IRCd] Recieving <<< " + message);
+                        m_logger?.LogInformation("[IRCd] Recieving <<< " + message);
                         message = message.Trim();
 
                         // Extract command sequence
@@ -134,12 +134,12 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
                     }
                     else
                     {
-                        //m_log.Info("[IRCd] Recieved data, but not enough to make a message. BufLen is " + strbuf.Length +
+                        //m_logger?.LogInformation("[IRCd] Recieved data, but not enough to make a message. BufLen is " + strbuf.Length +
                         //           "[" + strbuf + "]");
                         if (strbuf.Length == 0)
                         {
                             m_connected = false;
-                            m_log.Info("[IRCd] Buffer zero, closing...");
+                            m_logger?.LogInformation("[IRCd] Buffer zero, closing...");
                             if (OnDisconnectUser != null)
                                 OnDisconnectUser();
                         }
@@ -154,14 +154,14 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
                 if (OnDisconnectUser != null)
                     OnDisconnectUser();
 
-                m_log.Warn("[IRCd] Disconnected client.");
+                m_logger?.LogWarning("[IRCd] Disconnected client.");
             }
             catch (SocketException)
             {
                 if (OnDisconnectUser != null)
                     OnDisconnectUser();
 
-                m_log.Warn("[IRCd] Disconnected client.");
+                m_logger?.LogWarning("[IRCd] Disconnected client.");
             }
 
             Watchdog.RemoveThread();
@@ -169,7 +169,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 
         private void ProcessInMessage(string message, string command)
         {
-            m_log.Info("[IRCd] Processing [MSG:" + message + "] [COM:" + command + "]");
+            m_logger?.LogInformation("[IRCd] Processing [MSG:" + message + "] [COM:" + command + "]");
             if (command != null)
             {
                 switch (command)
@@ -469,7 +469,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 
             if (msgs.Length < 2)
             {
-                m_log.Warn("[IRCd] Dropped msg: " + msg);
+                m_logger?.LogWarning("[IRCd] Dropped msg: " + msg);
                 return null;
             }
 
@@ -938,7 +938,7 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
 
         public void SendRegionHandshake()
         {
-            m_log.Info("[IRCd ClientStack] Completing Handshake to Region");
+            m_logger?.LogInformation("[IRCd ClientStack] Completing Handshake to Region");
 
             if (OnRegionHandShakeReply != null)
             {

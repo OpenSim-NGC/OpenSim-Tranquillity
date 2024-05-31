@@ -27,17 +27,10 @@
 
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.Reflection;
 using System.Runtime;
 
-using CSJ2K;
-using Nini.Config;
-using log4net;
-using Warp3D;
-
-using OpenSim.Framework;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using OpenMetaverse;
 using OpenMetaverse.Assets;
@@ -45,7 +38,17 @@ using OpenMetaverse.Imaging;
 using OpenMetaverse.Rendering;
 using OpenMetaverse.StructuredData;
 
+using OpenSim.Framework;
+using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Warp3D;
 using WarpRenderer = Warp3D.Warp3D;
+
+using CSJ2K;
+
+using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Warp3DMap
 {
@@ -54,7 +57,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         private static readonly Color4 WATER_COLOR = new Color4(29, 72, 96, 216);
 //        private static readonly Color4 WATER_COLOR = new Color4(29, 72, 96, 128);
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
 #pragma warning disable 414
         private static string LogHeader = "[WARP 3D IMAGE MODULE]";
@@ -85,6 +88,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
 
         public void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<Warp3DImageModule>>();
             string[] configSections = new string[] { "Map", "Startup" };
 
             if (Util.GetConfigVarFromSections<string>(
@@ -138,9 +142,9 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
 
             List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
             if (renderers.Count > 0)
-                m_log.Info("[MAPTILE]: Loaded prim mesher " + renderers[0]);
+                m_logger?.LogInformation("[MAPTILE]: Loaded prim mesher " + renderers[0]);
             else
-                m_log.Info("[MAPTILE]: No prim mesher loaded, prim rendering will be disabled");
+                m_logger?.LogInformation("[MAPTILE]: No prim mesher loaded, prim rendering will be disabled");
 
             m_scene.RegisterModuleInterface<IMapImageGenerator>(this);
         }
@@ -289,7 +293,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             catch (Exception e)
             {
                 // JPEG2000 encoder failed
-                m_log.Error("[WARP 3D IMAGE MODULE]: Failed generating terrain map: ", e);
+                m_logger?.LogError("[WARP 3D IMAGE MODULE]: Failed generating terrain map: ", e);
             }
 
             return null;
@@ -536,7 +540,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                     }
                     else
                     {
-                        m_log.WarnFormat("[Warp3D] failed to get mesh or sculpt asset {0} of prim {1} at {2}",
+                        m_logger?.LogWarning("[Warp3D] failed to get mesh or sculpt asset {0} of prim {1} at {2}",
                             omvPrim.Sculpt.SculptTexture.ToString(), prim.Name, prim.GetWorldPosition().ToString());
                     }
                 }
@@ -790,11 +794,11 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("[Warp3D]: Failed to decode texture {0} for prim {1} at {2}, exception {3}", id.ToString(), sop.Name, sop.GetWorldPosition().ToString(), e.Message);
+                    m_logger?.LogWarning("[Warp3D]: Failed to decode texture {0} for prim {1} at {2}, exception {3}", id.ToString(), sop.Name, sop.GetWorldPosition().ToString(), e.Message);
                 }
             }
             else
-                m_log.WarnFormat("[Warp3D]: missing texture {0} data for prim {1} at {2}",
+                m_logger?.LogWarning("[Warp3D]: missing texture {0} data for prim {1} at {2}",
                     id.ToString(), sop.Name, sop.GetWorldPosition().ToString());
 
             m_warpTextures[id] = ret;
@@ -904,7 +908,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat(
+                m_logger?.LogWarning(
                     "[WARP 3D IMAGE MODULE]: Error decoding JPEG2000 texture {0} ({1} bytes): {2}",
                     textureID, j2kData.Length, ex.Message);
 

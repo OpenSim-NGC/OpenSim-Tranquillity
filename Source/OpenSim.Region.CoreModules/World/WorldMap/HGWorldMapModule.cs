@@ -25,22 +25,26 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.WorldMap;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+
+using Nini.Config;
 
 
 namespace OpenSim.Region.CoreModules.World.Land
 {
     public class HGWorldMapModule : WorldMapModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         // Remember the map area that each client has been exposed to in this region
         private Dictionary<UUID, List<MapBlockData>> m_SeenMapBlocks = new Dictionary<UUID, List<MapBlockData>>();
@@ -53,6 +57,7 @@ namespace OpenSim.Region.CoreModules.World.Land
 
         public override void Initialise(IConfiguration source)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HGWorldMapModule>>();
             string[] configSections = new string[] { "Map", "Startup" };
             if (Util.GetConfigVarFromSections<string>(
                 source, "WorldMapModule", configSections, "WorldMap") == "HGWorldMap")
@@ -136,7 +141,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                         b.Access = (byte)SimAccess.Down;
                     }
 
-                    m_log.DebugFormat("[HG MAP]: Resetting {0} blocks", mapBlocks.Count);
+                    m_logger?.LogDebug("[HG MAP]: Resetting {0} blocks", mapBlocks.Count);
                     sp.ControllingClient.SendMapBlock(mapBlocks, 0);
                     m_SeenMapBlocks.Remove(clientID);
                 }

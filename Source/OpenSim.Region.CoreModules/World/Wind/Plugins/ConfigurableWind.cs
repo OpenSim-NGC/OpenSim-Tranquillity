@@ -25,18 +25,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-
-using log4net;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Region.CoreModules.World.Wind.Plugins
 {
     class ConfigurableWind : IWindModelPlugin
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
 
         private Vector2[] m_windSpeeds = new Vector2[16 * 16];
         //private Random m_rndnums = new Random(Environment.TickCount);
@@ -63,7 +63,7 @@ namespace OpenSim.Region.CoreModules.World.Wind.Plugins
 
         public void Initialise()
         {
-
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<ConfigurableWind>>();
         }
 
         #endregion
@@ -218,11 +218,11 @@ namespace OpenSim.Region.CoreModules.World.Wind.Plugins
 
         private void LogSettings()
         {
-            m_log.InfoFormat("[ConfigurableWind] Average Strength   : {0}", m_avgStrength);
-            m_log.InfoFormat("[ConfigurableWind] Average Direction  : {0}", m_avgDirection);
-            m_log.InfoFormat("[ConfigurableWind] Varience Strength  : {0}", m_varStrength);
-            m_log.InfoFormat("[ConfigurableWind] Varience Direction : {0}", m_varDirection);
-            m_log.InfoFormat("[ConfigurableWind] Rate Change        : {0}", m_rateChange);
+            m_logger?.LogInformation("[ConfigurableWind] Average Strength   : {0}", m_avgStrength);
+            m_logger?.LogInformation("[ConfigurableWind] Average Direction  : {0}", m_avgDirection);
+            m_logger?.LogInformation("[ConfigurableWind] Varience Strength  : {0}", m_varStrength);
+            m_logger?.LogInformation("[ConfigurableWind] Varience Direction : {0}", m_varDirection);
+            m_logger?.LogInformation("[ConfigurableWind] Rate Change        : {0}", m_rateChange);
         }
 
         #region IWindModelPlugin Members

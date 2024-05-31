@@ -25,14 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 
 using Nini.Config;
-using log4net;
 
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
@@ -40,7 +43,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
 {
     public class SpecialUIModule : INonSharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger? m_logger;
         private const string VIEWER_SUPPORT_DIR = "ViewerSupport";
 
         private Scene m_scene;
@@ -60,6 +63,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
 
         public void Initialise(IConfiguration config)
         {
+            m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SpecialUIModule>>();
             IConfig moduleConfig = config.Configs["SpecialUIModule"];
             if (moduleConfig != null)
             {
@@ -67,7 +71,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
                 if (m_Enabled)
                 {
                     m_UserLevel = moduleConfig.GetInt("UserLevel", 0);
-                    m_log.Info("[SPECIAL UI]: SpecialUIModule enabled");
+                    m_logger?.LogInformation("[SPECIAL UI]: SpecialUIModule enabled");
                 }
 
             }
@@ -103,7 +107,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
 
         private void OnSimulatorFeaturesRequest(UUID agentID, ref OSDMap features)
         {
-            m_log.DebugFormat("[SPECIAL UI]: OnSimulatorFeaturesRequest in {0}", m_scene.RegionInfo.RegionName);
+            m_logger?.LogDebug("[SPECIAL UI]: OnSimulatorFeaturesRequest in {0}", m_scene.RegionInfo.RegionName);
             if (m_Helper.UserLevel(agentID) <= m_UserLevel)
             {
                 OSD extrasMap;
@@ -119,7 +123,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
                     specialUI["toolbar"] = OSDMap.FromString(s.ReadToEnd());
                     ((OSDMap)extrasMap)["special-ui"] = specialUI;
                 }
-                m_log.DebugFormat("[SPECIAL UI]: Sending panel_toolbar.xml in {0}", m_scene.RegionInfo.RegionName);
+                m_logger?.LogDebug("[SPECIAL UI]: Sending panel_toolbar.xml in {0}", m_scene.RegionInfo.RegionName);
 
                 if (Directory.Exists(Path.Combine(VIEWER_SUPPORT_DIR, "Floaters")))
                 {
@@ -136,11 +140,11 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
                         }
                     }
                     specialUI["floaters"] = floaters;
-                    m_log.DebugFormat("[SPECIAL UI]: Sending {0} floaters", n);
+                    m_logger?.LogDebug("[SPECIAL UI]: Sending {0} floaters", n);
                 }
             }
             else
-                m_log.DebugFormat("[SPECIAL UI]: NOT Sending panel_toolbar.xml in {0}", m_scene.RegionInfo.RegionName);
+                m_logger?.LogDebug("[SPECIAL UI]: NOT Sending panel_toolbar.xml in {0}", m_scene.RegionInfo.RegionName);
 
         }
 
