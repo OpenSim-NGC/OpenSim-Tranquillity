@@ -205,7 +205,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void TestCreateChildScenePresence()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             LocalSimulationConnectorModule lsc = new LocalSimulationConnectorModule();
 
@@ -261,7 +261,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void TestChildAgentEstablishedInNeighbour()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
 //            UUID agent1Id = UUID.Parse("00000000-0000-0000-0000-000000000001");
 

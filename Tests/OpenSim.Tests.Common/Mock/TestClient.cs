@@ -25,14 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Net;
-using System.Reflection;
-using System.Threading;
-using log4net;
+
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.Packets;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -42,7 +41,7 @@ namespace OpenSim.Tests.Common
 {
     public class TestClient : IClientAPI, IClientCore
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<TestClient>();
 
         EventWaitHandle wh = new EventWaitHandle (false, EventResetMode.AutoReset, "Crossing");
 
@@ -703,7 +702,7 @@ namespace OpenSim.Tests.Common
             ulong regionHandle, byte simAccess, IPEndPoint regionExternalEndPoint,
             uint locationID, uint flags, string capsURL)
         {
-            m_log.DebugFormat(
+            m_logger?.LogDebug(
                 "[TEST CLIENT]: Received SendRegionTeleport for {0} {1} on {2}", m_firstName, m_lastName, m_scene.Name);
 
             CapsSeedUrl = capsURL;
@@ -715,7 +714,7 @@ namespace OpenSim.Tests.Common
 
         public virtual void SendTeleportFailed(string reason)
         {
-            m_log.DebugFormat(
+            m_logger?.LogDebug(
                 "[TEST CLIENT]: Teleport failed for {0} {1} on {2} with reason {3}",
                 m_firstName, m_lastName, m_scene.Name, reason);
         }

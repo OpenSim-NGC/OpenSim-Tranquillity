@@ -25,23 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Threading;
-using Nini.Config;
-using NUnit.Framework;
 using OpenMetaverse;
-using OpenSim.Data;
+
 using OpenSim.Framework;
-using OpenSim.Framework.Serialization;
-using OpenSim.Framework.Serialization.External;
 using OpenSim.Region.CoreModules.Avatar.Inventory.Archiver;
-using OpenSim.Region.CoreModules.Framework.InventoryAccess;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.Framework.Scenes.Serialization;
-using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Framework.InventoryAccess.Tests
@@ -85,7 +73,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess.Tests
         {
 /*
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             // Create asset
             SceneObjectGroup object1 = SceneHelpers.CreateSceneObject(1, m_userId, "Object1", 0x20);
@@ -143,7 +131,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess.Tests
         public void TestRezObject()
         {
             TestHelpers.InMethod();
-            //log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             // Create asset
             SceneObjectGroup object1 = SceneHelpers.CreateSceneObject(1, m_userId, "My Little Dog Object", 0x40);

@@ -30,9 +30,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 
-using Nini.Config;
-using log4net;
-using NUnit.Framework;
 
 using OpenSim.Server;
 

@@ -25,16 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
-using System.Net;
-using System.Reflection;
-using System.Threading;
-using log4net.Config;
-using Nini.Config;
-using NUnit.Framework;
 using OpenMetaverse;
-using OpenMetaverse.Packets;
+
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.Agent.TextureSender;
 using OpenSim.Region.Framework.Scenes;

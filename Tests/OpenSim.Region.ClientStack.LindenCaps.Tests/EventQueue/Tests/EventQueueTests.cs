@@ -25,21 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Net;
 using System.Text;
-using log4net.Config;
-using Nini.Config;
-using NUnit.Framework;
+
 using OpenMetaverse;
-using OpenMetaverse.Packets;
 using OpenMetaverse.StructuredData;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
-using OpenSim.Region.ClientStack.Linden;
 using OpenSim.Region.CoreModules.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.OptionalModules.World.NPC;
@@ -88,7 +83,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
         public void TestAddForClient()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             SceneHelpers.AddScenePresence(m_scene, TestHelpers.ParseTail(0x1));
 
@@ -115,7 +110,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
         public void TestEnqueueMessage()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             ScenePresence sp = SceneHelpers.AddScenePresence(m_scene, TestHelpers.ParseTail(0x1));
 

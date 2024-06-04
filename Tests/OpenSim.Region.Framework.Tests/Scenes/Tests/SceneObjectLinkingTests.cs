@@ -25,22 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using NUnit.Framework;
-using OpenMetaverse;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
-using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
-using log4net;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
     [TestFixture]
     public class SceneObjectLinkingTests : OpenSimTestCase
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<SceneObjectLinkingTests>();
 
         /// <summary>
         /// Links to self should be ignored.
@@ -104,10 +99,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             if (debugtest)
             {
-                m_log.Debug("parts: " + grp1.Parts.Length);
-                m_log.Debug("Group1: Pos:"+grp1.AbsolutePosition+", Rot:"+grp1.GroupRotation);
-                m_log.Debug("Group1: Prim1: OffsetPosition:"+ part1.OffsetPosition+", OffsetRotation:"+part1.RotationOffset);
-                m_log.Debug("Group1: Prim2: OffsetPosition:"+part2.OffsetPosition+", OffsetRotation:"+part2.RotationOffset);
+                m_logger?.LogDebug("parts: " + grp1.Parts.Length);
+                m_logger?.LogDebug("Group1: Pos:"+grp1.AbsolutePosition+", Rot:"+grp1.GroupRotation);
+                m_logger?.LogDebug("Group1: Prim1: OffsetPosition:"+ part1.OffsetPosition+", OffsetRotation:"+part1.RotationOffset);
+                m_logger?.LogDebug("Group1: Prim2: OffsetPosition:"+part2.OffsetPosition+", OffsetRotation:"+part2.RotationOffset);
             }
 
             // root part should have no offset position or rotation
@@ -127,13 +122,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Vector3 rotEuler1 = new Vector3(roll * Utils.RAD_TO_DEG, pitch * Utils.RAD_TO_DEG, yaw * Utils.RAD_TO_DEG);
 
             if (debugtest)
-                m_log.Debug(rotEuler1);
+                m_logger?.LogDebug(rotEuler1);
 
             part2.RotationOffset.GetEulerAngles(out roll, out pitch, out yaw);
             Vector3 rotEuler2 = new Vector3(roll * Utils.RAD_TO_DEG, pitch * Utils.RAD_TO_DEG, yaw * Utils.RAD_TO_DEG);
 
             if (debugtest)
-                m_log.Debug(rotEuler2);
+                m_logger?.LogDebug(rotEuler2);
 
             Assert.That(rotEuler2.ApproxEquals(new Vector3(-180, 0, 0), 0.001f) || rotEuler2.ApproxEquals(new Vector3(180, 0, 0), 0.001f),
                 "Not exactly sure what this is asserting...");
@@ -142,7 +137,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneObjectGroup grp3 = grp1.DelinkFromGroup(part2.LocalId);
 
             if (debugtest)
-                m_log.Debug("Group2: Prim2: OffsetPosition:" + part2.AbsolutePosition + ", OffsetRotation:" + part2.RotationOffset);
+                m_logger?.LogDebug("Group2: Prim2: OffsetPosition:" + part2.AbsolutePosition + ", OffsetRotation:" + part2.RotationOffset);
 
             Assert.That(grp1.Parts.Length, Is.EqualTo(1), "Group 1 still contained part2 after delink.");
             Assert.That(part2.AbsolutePosition == Vector3.Zero, "The absolute position should be zero");
@@ -205,16 +200,16 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             if (debugtest)
             {
-                m_log.Debug("--------After Link-------");
-                m_log.Debug("Group1: parts:" + grp1.Parts.Length);
-                m_log.Debug("Group1: Pos:"+grp1.AbsolutePosition+", Rot:"+grp1.GroupRotation);
-                m_log.Debug("Group1: Prim1: OffsetPosition:" + part1.OffsetPosition + ", OffsetRotation:" + part1.RotationOffset);
-                m_log.Debug("Group1: Prim2: OffsetPosition:"+part2.OffsetPosition+", OffsetRotation:"+ part2.RotationOffset);
+                m_logger?.LogDebug("--------After Link-------");
+                m_logger?.LogDebug("Group1: parts:" + grp1.Parts.Length);
+                m_logger?.LogDebug("Group1: Pos:"+grp1.AbsolutePosition+", Rot:"+grp1.GroupRotation);
+                m_logger?.LogDebug("Group1: Prim1: OffsetPosition:" + part1.OffsetPosition + ", OffsetRotation:" + part1.RotationOffset);
+                m_logger?.LogDebug("Group1: Prim2: OffsetPosition:"+part2.OffsetPosition+", OffsetRotation:"+ part2.RotationOffset);
 
-                m_log.Debug("Group3: parts:" + grp3.Parts.Length);
-                m_log.Debug("Group3: Pos:"+grp3.AbsolutePosition+", Rot:"+grp3.GroupRotation);
-                m_log.Debug("Group3: Prim1: OffsetPosition:"+part3.OffsetPosition+", OffsetRotation:"+part3.RotationOffset);
-                m_log.Debug("Group3: Prim2: OffsetPosition:"+part4.OffsetPosition+", OffsetRotation:"+part4.RotationOffset);
+                m_logger?.LogDebug("Group3: parts:" + grp3.Parts.Length);
+                m_logger?.LogDebug("Group3: Pos:"+grp3.AbsolutePosition+", Rot:"+grp3.GroupRotation);
+                m_logger?.LogDebug("Group3: Prim1: OffsetPosition:"+part3.OffsetPosition+", OffsetRotation:"+part3.RotationOffset);
+                m_logger?.LogDebug("Group3: Prim2: OffsetPosition:"+part4.OffsetPosition+", OffsetRotation:"+part4.RotationOffset);
             }
 
             // Required for linking
@@ -238,13 +233,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Vector3 rotEuler1 = new Vector3(roll * Utils.RAD_TO_DEG, pitch * Utils.RAD_TO_DEG, yaw * Utils.RAD_TO_DEG);
 
             if (debugtest)
-                m_log.Debug(rotEuler1);
+                m_logger?.LogDebug(rotEuler1);
 
             part2.RotationOffset.GetEulerAngles(out roll, out pitch, out yaw);
             Vector3 rotEuler2 = new Vector3(roll * Utils.RAD_TO_DEG, pitch * Utils.RAD_TO_DEG, yaw * Utils.RAD_TO_DEG);
 
             if (debugtest)
-                m_log.Debug(rotEuler2);
+                m_logger?.LogDebug(rotEuler2);
 
             Assert.That(rotEuler2.ApproxEquals(new Vector3(-180, 0, 0), 0.001f) || rotEuler2.ApproxEquals(new Vector3(180, 0, 0), 0.001f),
                 "Not sure what this assertion is all about...");
@@ -258,16 +253,16 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             if (debugtest)
             {
-                m_log.Debug("--------After De-Link-------");
-                m_log.Debug("Group1: parts:" + grp1.Parts.Length);
-                m_log.Debug("Group1: Pos:" + grp1.AbsolutePosition + ", Rot:" + grp1.GroupRotation);
-                m_log.Debug("Group1: Prim1: OffsetPosition:" + part1.OffsetPosition + ", OffsetRotation:" + part1.RotationOffset);
-                m_log.Debug("Group1: Prim2: OffsetPosition:" + part2.OffsetPosition + ", OffsetRotation:" + part2.RotationOffset);
+                m_logger?.LogDebug("--------After De-Link-------");
+                m_logger?.LogDebug("Group1: parts:" + grp1.Parts.Length);
+                m_logger?.LogDebug("Group1: Pos:" + grp1.AbsolutePosition + ", Rot:" + grp1.GroupRotation);
+                m_logger?.LogDebug("Group1: Prim1: OffsetPosition:" + part1.OffsetPosition + ", OffsetRotation:" + part1.RotationOffset);
+                m_logger?.LogDebug("Group1: Prim2: OffsetPosition:" + part2.OffsetPosition + ", OffsetRotation:" + part2.RotationOffset);
 
-                m_log.Debug("Group3: parts:" + grp3.Parts.Length);
-                m_log.Debug("Group3: Pos:" + grp3.AbsolutePosition + ", Rot:" + grp3.GroupRotation);
-                m_log.Debug("Group3: Prim1: OffsetPosition:" + part3.OffsetPosition + ", OffsetRotation:" + part3.RotationOffset);
-                m_log.Debug("Group3: Prim2: OffsetPosition:" + part4.OffsetPosition + ", OffsetRotation:" + part4.RotationOffset);
+                m_logger?.LogDebug("Group3: parts:" + grp3.Parts.Length);
+                m_logger?.LogDebug("Group3: Pos:" + grp3.AbsolutePosition + ", Rot:" + grp3.GroupRotation);
+                m_logger?.LogDebug("Group3: Prim1: OffsetPosition:" + part3.OffsetPosition + ", OffsetRotation:" + part3.RotationOffset);
+                m_logger?.LogDebug("Group3: Prim2: OffsetPosition:" + part4.OffsetPosition + ", OffsetRotation:" + part4.RotationOffset);
             }
 
             Assert.That(part2.AbsolutePosition == Vector3.Zero, "Badness 1");
@@ -287,7 +282,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void TestNewSceneObjectLinkPersistence()
         {
             TestHelpers.InMethod();
-            //log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             TestScene scene = new SceneHelpers().SetupScene();
 
@@ -326,7 +321,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void TestDelinkPersistence()
         {
             TestHelpers.InMethod();
-            //log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             TestScene scene = new SceneHelpers().SetupScene();
 

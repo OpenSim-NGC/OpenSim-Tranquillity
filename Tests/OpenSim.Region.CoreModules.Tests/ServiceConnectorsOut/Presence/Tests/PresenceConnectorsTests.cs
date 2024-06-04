@@ -25,18 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Threading;
-using log4net.Config;
-using NUnit.Framework;
 using OpenMetaverse;
-using OpenSim.Framework;
-using Nini.Config;
-using OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence;
-using OpenSim.Region.Framework.Scenes;
+
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
 using OpenSim.Tests.Common;
 

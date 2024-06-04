@@ -25,12 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
-using NUnit.Framework;
 using OpenMetaverse;
-using OpenSim.Framework;
-using OpenSim.Region.Framework.Scenes;
+
 using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
@@ -48,7 +44,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void TestResizeSceneObject()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             Scene scene = new SceneHelpers().SetupScene();
             SceneObjectGroup g1 = SceneHelpers.AddSceneObject(scene);
@@ -71,7 +67,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void TestResizeSceneObjectPart()
         {
             TestHelpers.InMethod();
-            //log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             Scene scene = new SceneHelpers().SetupScene();
             UUID owner = UUID.Random();

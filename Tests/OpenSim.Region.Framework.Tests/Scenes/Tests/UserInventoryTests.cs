@@ -25,17 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Text;
-using System.Threading;
-using System.Timers;
-using Timer=System.Timers.Timer;
-using Nini.Config;
-using NUnit.Framework;
 using OpenMetaverse;
-using OpenMetaverse.Assets;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.CoreModules.Framework.InventoryAccess;
@@ -83,7 +74,7 @@ namespace OpenSim.Region.Framework.Tests
         public void TestGiveInventoryItem()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             Scene scene = new SceneHelpers().SetupScene();
             UserAccount user1 = UserAccountHelpers.CreateUserWithInventory(scene, TestHelpers.ParseTail(1001));

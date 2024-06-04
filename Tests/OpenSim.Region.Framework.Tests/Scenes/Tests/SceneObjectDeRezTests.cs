@@ -25,18 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using Nini.Config;
-using NUnit.Framework;
-using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.Framework.EntityTransfer;
 using OpenSim.Region.CoreModules.Framework.InventoryAccess;
 using OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation;
 using OpenSim.Region.CoreModules.World.Permissions;
-using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
 
@@ -165,7 +158,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void TestDeRezSceneObjectNotOwner()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             UUID userId = UUID.Parse("10000000-0000-0000-0000-000000000001");
             UUID objectOwnerId = UUID.Parse("20000000-0000-0000-0000-000000000001");

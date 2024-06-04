@@ -25,13 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using Nini.Config;
-using NUnit.Framework;
 using OpenMetaverse;
+
 using OpenSim.Framework;
-using OpenSim.Region.CoreModules.Asset;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 
@@ -150,7 +146,7 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
         public void TestSaveBakedTextures()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             UUID userId = TestHelpers.ParseTail(0x1);
             UUID eyesTextureId = TestHelpers.ParseTail(0x2);

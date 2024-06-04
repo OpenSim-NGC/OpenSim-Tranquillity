@@ -25,13 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Diagnostics;
-using System.Reflection;
-using log4net;
-using NUnit.Framework;
 using OpenMetaverse;
-using OpenSim.Framework;
+
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 
@@ -59,7 +54,7 @@ namespace OpenSim.Tests.Performance
 //        public void Test0000Clean()
 //        {
 //            TestHelpers.InMethod();
-////            log4net.Config.XmlConfigurator.Configure();
+////           TestHelpers.EnableLogging();
 //
 //            TestAddObjects(200000);
 //        }
@@ -68,7 +63,7 @@ namespace OpenSim.Tests.Performance
         public void Test_0001_10K_1PrimObjects()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             TestAddObjects(1, 10000);
         }
@@ -77,7 +72,7 @@ namespace OpenSim.Tests.Performance
         public void Test_0002_100K_1PrimObjects()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             TestAddObjects(1, 100000);
         }
@@ -86,7 +81,7 @@ namespace OpenSim.Tests.Performance
         public void Test_0003_200K_1PrimObjects()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             TestAddObjects(1, 200000);
         }
@@ -95,7 +90,7 @@ namespace OpenSim.Tests.Performance
         public void Test_0011_100_100PrimObjects()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             TestAddObjects(100, 100);
         }
@@ -104,7 +99,7 @@ namespace OpenSim.Tests.Performance
         public void Test_0012_1K_100PrimObjects()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             TestAddObjects(100, 1000);
         }
@@ -113,7 +108,7 @@ namespace OpenSim.Tests.Performance
         public void Test_0013_2K_100PrimObjects()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             TestAddObjects(100, 2000);
         }

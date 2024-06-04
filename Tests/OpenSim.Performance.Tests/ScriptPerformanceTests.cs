@@ -25,20 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Reflection;
-using System.Threading;
-using log4net;
-using Nini.Config;
-using NUnit.Framework;
-using OpenMetaverse;
-using OpenSim.Framework;
-using OpenSim.Region.CoreModules.Scripting.WorldComm;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.ScriptEngine.XEngine;
 using OpenSim.Tests.Common;
 
 namespace OpenSim.Tests.Performance
@@ -104,7 +90,7 @@ namespace OpenSim.Tests.Performance
         public void TestCompileAndStart100Scripts()
         {
             TestHelpers.InMethod();
-            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             TestCompileAndStartScripts(100);
         }

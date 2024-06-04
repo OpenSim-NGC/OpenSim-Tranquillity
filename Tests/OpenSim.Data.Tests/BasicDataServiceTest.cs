@@ -25,19 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
-using System.Collections.Generic;
-using log4net.Config;
-using NUnit.Framework;
-using NUnit.Framework.Constraints;
-using OpenMetaverse;
-using OpenSim.Framework;
-using OpenSim.Tests.Common;
-using log4net;
 using System.Data;
 using System.Data.Common;
-using System.Reflection;
+
+using Microsoft.Extensions.Logging;
+
+using OpenSim.Framework;
+using OpenSim.Tests.Common;
 
 namespace OpenSim.Data.Tests
 {
@@ -64,7 +58,7 @@ namespace OpenSim.Data.Tests
         // Later:  apparently it's not, but does it matter here?
 //        protected static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        protected ILog m_log;  // doesn't matter here that it's not static, init to correct type in instance .ctor
+        protected ILogger m_logger;  // doesn't matter here that it's not static, init to correct type in instance .ctor
 
         public BasicDataServiceTest()
             : this("")
@@ -75,8 +69,7 @@ namespace OpenSim.Data.Tests
         {
             m_connStr = !String.IsNullOrEmpty(conn) ? conn : DefaultTestConns.Get(typeof(TConn));
 
-            m_log = LogManager.GetLogger(this.GetType());
-            TestLogging.LogToConsole();    // TODO: Is that right?
+            m_logger ??= LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<BasicDataServiceTest<TConn, TService>>();
         }
 
         /// <summary>
@@ -113,7 +106,7 @@ namespace OpenSim.Data.Tests
             if (String.IsNullOrEmpty(m_connStr))
             {
                 string msg = String.Format("Connection string for {0} is not defined, ignoring tests", typeof(TConn).Name);
-                m_log.Warn(msg);
+                m_logger?.LogWarning(msg);
                 Assert.Ignore(msg);
             }
 
@@ -129,7 +122,7 @@ namespace OpenSim.Data.Tests
                 catch
                 {
                     string msg = String.Format("{0} is unable to connect to the database, ignoring tests", typeof(TConn).Name);
-                    m_log.Warn(msg);
+                    m_logger?.LogWarning(msg);
                     Assert.Ignore(msg);
                 }
             }
@@ -145,7 +138,7 @@ namespace OpenSim.Data.Tests
             }
             catch (Exception e)
             {
-                m_log.Error(e.ToString());
+                m_logger?.LogError(e.ToString());
                 Assert.Ignore();
             }
         }

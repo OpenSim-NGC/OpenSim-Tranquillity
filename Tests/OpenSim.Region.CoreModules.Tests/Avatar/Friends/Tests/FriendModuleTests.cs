@@ -25,14 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using Nini.Config;
-using NUnit.Framework;
 using OpenMetaverse;
-using OpenSim.Data.Null;
+
 using OpenSim.Framework;
-using OpenSim.Region.CoreModules.Avatar.Friends;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 
@@ -86,7 +81,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
         public void TestLoginWithNoFriends()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             UUID userId = TestHelpers.ParseTail(0x1);
 
@@ -100,7 +95,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
         public void TestLoginWithOfflineFriends()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             UUID user1Id = TestHelpers.ParseTail(0x1);
             UUID user2Id = TestHelpers.ParseTail(0x2);
@@ -136,7 +131,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
         public void TestLoginWithOnlineFriends()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             UUID user1Id = TestHelpers.ParseTail(0x1);
             UUID user2Id = TestHelpers.ParseTail(0x2);
@@ -170,7 +165,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
         public void TestAddFriendshipWhileOnline()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             UUID userId = TestHelpers.ParseTail(0x1);
             UUID user2Id = TestHelpers.ParseTail(0x2);
@@ -190,7 +185,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
         public void TestRemoveFriendshipWhileOnline()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             UUID user1Id = TestHelpers.ParseTail(0x1);
             UUID user2Id = TestHelpers.ParseTail(0x2);

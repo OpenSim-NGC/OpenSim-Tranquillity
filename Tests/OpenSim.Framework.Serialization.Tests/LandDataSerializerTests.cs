@@ -25,12 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenMetaverse.StructuredData;
-using NUnit.Framework;
-using OpenSim.Framework;
+
 using OpenSim.Framework.Serialization.External;
 using OpenSim.Tests.Common;
 
@@ -119,7 +115,7 @@ namespace OpenSim.Framework.Serialization.Tests
         public void TestLandDataDeserializeNoAccessLists()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             Dictionary<string, object> options = new Dictionary<string, object>();
             LandData ld = LandDataSerializer.Deserialize(LandDataSerializer.Serialize(this.land, options));
@@ -150,7 +146,7 @@ namespace OpenSim.Framework.Serialization.Tests
         public void TestLandDataDeserializeWithAccessLists()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             LandData ld = LandDataSerializer.Deserialize(LandDataSerializerTest.preSerializedWithParcelAccessList);
             Assert.That(ld != null,

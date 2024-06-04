@@ -25,21 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
-using System.Threading;
-using log4net.Config;
-using NUnit.Framework;
-using OpenMetaverse;
-using OpenMetaverse.Assets;
+
 using OpenSim.Framework;
-using OpenSim.Region.CoreModules.Scripting.HttpRequest;
-using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Scripting.HttpRequest.Tests

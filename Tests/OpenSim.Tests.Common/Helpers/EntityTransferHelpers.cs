@@ -25,30 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Net;
-using System.Reflection;
-using System.Text;
-using System.Threading;
-using log4net;
-using Nini.Config;
-using NUnit.Framework;
-using OpenMetaverse;
-using OpenSim.Framework;
+using Microsoft.Extensions.Logging;
 
-using OpenSim.Framework.Servers;
-using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.CoreModules.Framework;
-using OpenSim.Tests.Common;
 
 namespace OpenSim.Tests.Common
 {
     public static class EntityTransferHelpers
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger("EntityTransferHelpers");
 
         /// <summary>
         /// Set up correct handling of the InformClientOfNeighbour call from the source region that triggers the
@@ -70,7 +56,7 @@ namespace OpenSim.Tests.Common
                 uint x, y;
                 Util.RegionHandleToRegionLoc(neighbourHandle, out x, out y);
 
-                m_log.DebugFormat(
+                m_logger?.LogDebug(
                     "[TEST CLIENT]: Processing inform client of neighbour located at {0},{1} at {2}",
                     x, y, neighbourExternalEndPoint);
 
@@ -103,7 +89,7 @@ namespace OpenSim.Tests.Common
                 uint x, y;
                 Util.RegionHandleToRegionLoc(regionHandle, out x, out y);
 
-                m_log.DebugFormat(
+                m_logger?.LogDebug(
                     "[TEST CLIENT]: Processing send region teleport for destination at {0},{1} at {2}",
                     x, y, regionExternalEndPoint);
 

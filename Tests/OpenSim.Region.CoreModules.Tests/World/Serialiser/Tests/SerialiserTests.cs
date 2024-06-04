@@ -25,18 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using System.Xml;
-using log4net.Config;
-using NUnit.Framework;
+
 using OpenMetaverse;
+using OpenMetaverse.StructuredData;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Tests.Common;
-using OpenMetaverse.StructuredData;
 
 namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
 {
@@ -661,7 +658,7 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
         public void TestDeserializeBadFloatsXml()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             SceneObjectGroup so = SceneObjectSerializer.FromOriginalXmlFormat(ObjectWithBadFloatsXml);
             SceneObjectPart rootPart = so.RootPart;
@@ -687,7 +684,7 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
         public void TestSerializeXml()
         {
             TestHelpers.InMethod();
-            //log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             string rpName = "My Little Donkey";
             UUID rpUuid = UUID.Parse("00000000-0000-0000-0000-000000000964");
@@ -779,7 +776,7 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
         public void TestDeserializeXml2()
         {
             TestHelpers.InMethod();
-            //log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             SceneObjectGroup so = m_serialiserModule.DeserializeGroupFromXml2(ObjectWithNoPartsXml2);
             SceneObjectPart rootPart = so.RootPart;
@@ -797,7 +794,7 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
         public void TestSerializeXml2()
         {
             TestHelpers.InMethod();
-            //log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             string rpName = "My Little Pony";
             UUID rpUuid = UUID.Parse("00000000-0000-0000-0000-000000000064");

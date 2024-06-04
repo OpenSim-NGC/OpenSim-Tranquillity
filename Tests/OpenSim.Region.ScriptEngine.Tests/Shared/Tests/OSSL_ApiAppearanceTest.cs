@@ -29,12 +29,11 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
-using log4net;
-using Nini.Config;
-using NUnit.Framework;
+
 using OpenMetaverse;
 using OpenMetaverse.Assets;
 using OpenMetaverse.StructuredData;
+
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.Avatar.AvatarFactory;
 using OpenSim.Region.OptionalModules.World.NPC;
@@ -86,7 +85,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         public void TestOsOwnerSaveAppearance()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             UUID userId = TestHelpers.ParseTail(0x1);
             float newHeight = 1.9f;
@@ -126,7 +125,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         public void TestOsAgentSaveAppearance()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             UUID ownerId = TestHelpers.ParseTail(0x1);
             UUID nonOwnerId = TestHelpers.ParseTail(0x2);
@@ -162,6 +161,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             Assert.That(savedAppearance.AvatarHeight, Is.EqualTo(sp.Appearance.AvatarHeight));
         }
-    }
         */
+    }
 }

@@ -25,21 +25,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
-using System.Runtime.Caching;
-using Nini.Config;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using log4net;
 
 namespace OpenSim.Tests.Common
 {
     public class TestsAssetCache : ISharedRegionModule, IAssetCache
     {
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<TestsAssetCache>();
 
         private bool m_Enabled;
         public MemoryCache m_Cache;

@@ -29,8 +29,6 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
-using log4net;
-using Nini.Config;
 using NUnit.Framework;
 using OpenMetaverse;
 using OpenMetaverse.Assets;
@@ -92,7 +90,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         public void TestLlGiveInventoryO2OSameOwner()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             UUID userId = TestHelpers.ParseTail(0x1);
             string inventoryItemName = "item1";
@@ -129,7 +127,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         public void TestLlGiveInventoryO2ODifferentOwners()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             UUID user1Id = TestHelpers.ParseTail(0x1);
             UUID user2Id = TestHelpers.ParseTail(0x2);

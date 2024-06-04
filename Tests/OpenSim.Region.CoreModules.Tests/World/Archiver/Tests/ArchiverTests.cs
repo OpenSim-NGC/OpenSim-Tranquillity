@@ -25,18 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
-using System.Threading;
-using log4net.Config;
-using Nini.Config;
-using NUnit.Framework;
 using OpenMetaverse;
 using OpenMetaverse.Assets;
+
 using OpenSim.Framework;
-using OpenSim.Framework.Serialization;
 using OpenSim.Framework.Serialization.External;
 using OpenSim.Region.CoreModules.World.Land;
 using OpenSim.Region.CoreModules.World.Serialiser;
@@ -49,7 +42,6 @@ using ArchiveConstants = OpenSim.Framework.Serialization.ArchiveConstants;
 using TarArchiveReader = OpenSim.Framework.Serialization.TarArchiveReader;
 using TarArchiveWriter = OpenSim.Framework.Serialization.TarArchiveWriter;
 using RegionSettings = OpenSim.Framework.RegionSettings;
-using OpenSim.Region.Framework.Interfaces;
 
 namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 {
@@ -184,7 +176,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         public void TestSaveOar()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//              TestHelpers.EnableLogging();
 
             SceneObjectGroup sog1;
             SceneObjectGroup sog2;
@@ -259,7 +251,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         public void TestSaveOarNoAssets()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//              TestHelpers.EnableLogging();
 
             SceneObjectPart part1 = CreateSceneObjectPart1();
             SceneObjectGroup sog1 = new SceneObjectGroup(part1);
@@ -341,7 +333,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         public void TestLoadOar()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//              TestHelpers.EnableLogging();
 
             MemoryStream archiveWriteStream = new MemoryStream();
             TarArchiveWriter tar = new TarArchiveWriter(archiveWriteStream);
@@ -468,7 +460,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         public void TestLoadPublishedOar()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//              TestHelpers.EnableLogging();
 
             SceneObjectPart part1 = CreateSceneObjectPart1();
             SceneObjectGroup sog1 = new SceneObjectGroup(part1);
@@ -613,7 +605,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         public void TestLoadOarRegionSettings()
         {
             TestHelpers.InMethod();
-            //log4net.Config.XmlConfigurator.Configure();
+//              TestHelpers.EnableLogging();
 
             MemoryStream archiveWriteStream = new MemoryStream();
             TarArchiveWriter tar = new TarArchiveWriter(archiveWriteStream);

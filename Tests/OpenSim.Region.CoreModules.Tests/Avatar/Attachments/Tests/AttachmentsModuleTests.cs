@@ -577,7 +577,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments.Tests
         public void TestDetachAttachmentToGround()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             Scene scene = CreateTestScene();
             UserAccount ua1 = UserAccountHelpers.CreateUserWithInventory(scene, 0x1);
@@ -711,7 +711,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments.Tests
         public void TestRemoveAttachmentsOnAvatarExit()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             Scene scene = CreateTestScene();
             UserAccount ua1 = UserAccountHelpers.CreateUserWithInventory(scene, 0x1);

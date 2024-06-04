@@ -25,13 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using NUnit.Framework;
+
 using OpenMetaverse;
 using OpenSim.Framework;
 
@@ -39,11 +34,9 @@ using OpenSim.Region.CoreModules.Avatar.Attachments;
 using OpenSim.Region.CoreModules.Avatar.AvatarFactory;
 using OpenSim.Region.CoreModules.Framework.InventoryAccess;
 using OpenSim.Region.CoreModules.Framework.UserManagement;
-using OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.OptionalModules.World.NPC;
-using OpenSim.Services.AvatarService;
 using OpenSim.Tests.Common;
 
 namespace OpenSim.Tests.Performance
@@ -105,7 +98,7 @@ namespace OpenSim.Tests.Performance
         public void Test_0001_AddRemove100NPCs()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             TestAddRemoveNPCs(100);
         }
@@ -114,7 +107,7 @@ namespace OpenSim.Tests.Performance
         public void Test_0002_AddRemove1000NPCs()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             TestAddRemoveNPCs(1000);
         }
@@ -123,7 +116,7 @@ namespace OpenSim.Tests.Performance
         public void Test_0003_AddRemove2000NPCs()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             TestAddRemoveNPCs(2000);
         }

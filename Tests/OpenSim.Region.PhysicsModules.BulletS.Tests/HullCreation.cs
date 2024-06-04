@@ -25,17 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-using NUnit.Framework;
-using log4net;
-
 using OpenSim.Framework;
-using OpenSim.Region.PhysicsModule.BulletS;
-using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Tests.Common;
 
 using OpenMetaverse;

@@ -25,18 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using Nini.Config;
-using NUnit.Framework;
 using OpenMetaverse;
-using OpenSim.Framework;
-using OpenSim.Framework.Servers;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation;
+
 using OpenSim.Tests.Common;
-using System.Threading;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
@@ -57,7 +48,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void TestSitOutsideRangeNoTarget()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             // More than 10 meters away from 0, 0, 0 (default part position)
             Vector3 startPos = new Vector3(10.1f, 0, 0);
@@ -78,7 +69,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void TestSitWithinRangeNoTarget()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             // Less than 10 meters away from 0, 0, 0 (default part position)
             Vector3 startPos = new Vector3(9.9f, 0, 0);
@@ -108,7 +99,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void TestSitAndStandWithNoSitTarget()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             // Make sure we're within range to sit
             Vector3 startPos = new Vector3(1, 1, 1);
@@ -137,7 +128,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void TestSitAndStandWithNoSitTargetChildPrim()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             // Make sure we're within range to sit
             Vector3 startPos = new Vector3(1, 1, 1);
@@ -168,7 +159,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         {
 /*  sit position math as changed, this needs to be fixed later
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             // If a prim has a sit target then we can sit from any distance away
             Vector3 startPos = new Vector3(128, 128, 30);
@@ -231,7 +222,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         public void TestSitAndStandOnGround()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             // If a prim has a sit target then we can sit from any distance away
 //            Vector3 startPos = new Vector3(128, 128, 30);

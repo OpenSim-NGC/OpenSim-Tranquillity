@@ -25,20 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.IO;
 using System.Text.RegularExpressions;
-using log4net;
-using log4net.Config;
-using NUnit.Framework;
+
 using OpenMetaverse;
-using OpenSim.Capabilities.Handlers;
+
 using OpenSim.Framework;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
 
 namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests

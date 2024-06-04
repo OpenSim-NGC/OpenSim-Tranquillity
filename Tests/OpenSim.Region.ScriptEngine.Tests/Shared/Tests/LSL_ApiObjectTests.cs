@@ -29,12 +29,10 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
-using log4net;
-using Nini.Config;
-using NUnit.Framework;
+
 using OpenMetaverse;
-using OpenMetaverse.Assets;
 using OpenMetaverse.StructuredData;
+
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.Avatar.AvatarFactory;
 using OpenSim.Region.OptionalModules.World.NPC;

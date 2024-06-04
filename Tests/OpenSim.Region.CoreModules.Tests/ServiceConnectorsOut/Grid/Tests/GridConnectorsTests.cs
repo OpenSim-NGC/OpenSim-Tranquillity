@@ -25,18 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Threading;
-using log4net.Config;
-using Nini.Config;
-using NUnit.Framework;
 using OpenMetaverse;
 
 using OpenSim.Framework;
-using OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid;
 using OpenSim.Region.Framework.Scenes;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Tests.Common;
@@ -74,7 +65,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid.Tests
         public void TestRegisterRegion()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
+//            TestHelpers.EnableLogging();
 
             // Create 4 regions
             GridRegion r1 = new GridRegion();
