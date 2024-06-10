@@ -25,16 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Net;
-using System.Collections.Generic;
-using Nini.Config;
-using OpenMetaverse;
-using OpenSim.Data.Null;
-using OpenSim.Framework;
 
+using OpenMetaverse;
+
+using OpenSim.Framework;
 using OpenSim.Framework.Console;
-using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.CoreModules.Avatar.Gods;
@@ -45,10 +41,12 @@ using OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid;
 using OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts;
 using OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence;
 using OpenSim.Region.PhysicsModule.BasicPhysics;
+using OpenSim.Region.PhysicsModule.SharedBase;
 using OpenSim.Services.Interfaces;
-using OpenSim.Server.Base;
 
 using BaseServerUtils = OpenSim.Server.Base.ServerUtils;
+
+using Nini.Config;
 
 namespace OpenSim.Tests.Common
 {

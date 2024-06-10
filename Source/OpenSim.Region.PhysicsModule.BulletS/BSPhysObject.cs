@@ -292,7 +292,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             set {
                 RawRotationalVelocity = value;
                 Util.ClampV(RawRotationalVelocity, BSParam.MaxAngularVelocity);
-                // m_log.DebugFormat("{0}: RotationalVelocity={1}", LogHeader, _rotationalVelocity);
+                // m_logger?.LogDebug("{0}: RotationalVelocity={1}", LogHeader, _rotationalVelocity);
                 PhysScene.TaintedObject(LocalID, TypeName + ".setRotationalVelocity", delegate()
                 {
                     ForceRotationalVelocity = RawRotationalVelocity;

@@ -31,7 +31,7 @@ using NUnit.Framework;
 
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModule.BulletS;
-using OpenSim.Region.PhysicsModules.SharedBase;
+using OpenSim.Region.PhysicsModule.SharedBase;
 using OpenSim.Tests.Common;
 
 using OpenMetaverse;

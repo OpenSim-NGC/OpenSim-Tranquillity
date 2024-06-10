@@ -25,10 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Reflection;
 using System.Runtime.InteropServices;
 
-using OpenSim.Framework;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
+
+using OpenSim.Framework;
 
 namespace OpenSim.Region.PhysicsModule.SharedBase
 {
@@ -167,7 +171,7 @@ namespace OpenSim.Region.PhysicsModule.SharedBase
 
     public abstract class PhysicsActor
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        protected static ILogger? m_logger;
 
         public delegate void RequestTerseUpdate();
         public delegate void CollisionUpdate(EventArgs e);
@@ -190,6 +194,16 @@ namespace OpenSim.Region.PhysicsModule.SharedBase
 
         public event OutOfBounds OnOutOfBounds;
 #pragma warning restore 67
+
+        public PhysicsActor()
+        {
+            // This base class is responsible for creating the logger.
+            // This parameterless constructor will be called by derived classes if they do not have a constructor.
+            // TODO: There needs to be some Reflection magic to create the logger for the derived class.
+            // Type baseClassType = MethodBase.GetCurrentMethod()?.DeclaringType ?? typeof(PhysicsActor);
+            // m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<baseClassType>>();
+            // m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PhysicsActor>>();
+        }
 
 
         public CameraData TryGetCameraData()
