@@ -24,9 +24,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.Text;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 
 namespace OpenSim.Region.PhysicsModule.BulletS
@@ -134,7 +133,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                 }
                 else
                 {
-                    m_world.physicsScene.Logger.ErrorFormat("{0} CalculateTransforms failed. A={1}, B={2}", LogHeader, Body1.ID, Body2.ID);
+                    m_world.physicsScene.Logger?.LogError("{0} CalculateTransforms failed. A={1}, B={2}", LogHeader, Body1.ID, Body2.ID);
                 }
             }
             return ret;

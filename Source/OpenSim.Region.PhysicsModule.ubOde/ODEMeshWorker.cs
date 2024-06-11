@@ -108,7 +108,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             Util.FireAndForget(DoCacheExpire, null, "OdeCacheExpire", false);
             lock(m_threadLock)
             {
-                workQueue ??= new ObjectJobEngine(DoWork, "OdeMeshWorker");
+                workQueue ??= new ObjectJobEngine(m_logger, DoWork, "OdeMeshWorker");
             }
         }
 

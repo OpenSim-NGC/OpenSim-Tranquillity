@@ -24,6 +24,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModule.SharedBase;
 
@@ -312,7 +315,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
         // TODO: redo terrain implementation selection to allow other base types than heightMap.
         private BSTerrainPhys BuildPhysicalTerrain(Vector3 terrainRegionBase, uint id, float[] heightMap, Vector3 minCoords, Vector3 maxCoords)
         {
-            m_physicsScene.Logger.DebugFormat("{0} Terrain for {1}/{2} created with {3}",
+            m_physicsScene.Logger?.LogDebug("{0} Terrain for {1}/{2} created with {3}",
                                                 LogHeader, m_physicsScene.RegionName, terrainRegionBase,
                                                 (BSTerrainPhys.TerrainImplementation)BSParam.TerrainImplementation);
             BSTerrainPhys newTerrainPhys = null;
@@ -327,7 +330,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                                                 heightMap, minCoords, maxCoords);
                     break;
                 default:
-                    m_physicsScene.Logger.ErrorFormat("{0} Bad terrain implementation specified. Type={1}/{2},Region={3}/{4}",
+                    m_physicsScene.Logger?.LogError("{0} Bad terrain implementation specified. Type={1}/{2},Region={3}/{4}",
                                                 LogHeader,
                                                 (int)BSParam.TerrainImplementation,
                                                 BSParam.TerrainImplementation,
@@ -434,7 +437,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             }
             else
             {
-                m_physicsScene.Logger.ErrorFormat("{0} GetTerrainHeightAtXY: terrain not found: region={1}, x={2}, y={3}",
+                m_physicsScene.Logger?.LogError("{0} GetTerrainHeightAtXY: terrain not found: region={1}, x={2}, y={3}",
                         LogHeader, m_physicsScene.RegionName, tX, tY);
                 DetailLog("{0},BSTerrainManager.GetTerrainHeightAtXYZ,terrainNotFound,pos={1},base={2}",
                                     BSScene.DetailLogZero, pos, terrainBaseXYZ);
@@ -456,7 +459,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             }
             else
             {
-                m_physicsScene.Logger.ErrorFormat("{0} GetWaterHeightAtXY: terrain not found: pos={1}, terrainBase={2}, height={3}",
+                m_physicsScene.Logger?.LogError("{0} GetWaterHeightAtXY: terrain not found: pos={1}, terrainBase={2}, height={3}",
                         LogHeader, m_physicsScene.RegionName, pos, terrainBaseXYZ, ret);
             }
             return ret;

@@ -27,6 +27,8 @@
 
 using OMV = OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModule.SharedBase;
 
@@ -75,7 +77,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                            OMV.Quaternion rotation, PrimitiveBaseShape pbs, bool pisPhysical)
                 : base(parent_scene, localID, primName, "BSPrim")
         {
-            // m_log.DebugFormat("{0}: BSPrim creation of {1}, id={2}", LogHeader, primName, localID);
+            // m_logger?.LogDebug("{0}: BSPrim creation of {1}, id={2}", LogHeader, primName, localID);
             _physicsActorType = (int)ActorTypes.Prim;
             RawPosition = pos;
             _size = size;
@@ -109,7 +111,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
         // called when this prim is being destroyed and we should free all the resources
         public override void Destroy()
         {
-            // m_log.DebugFormat("{0}: Destroy, id={1}", LogHeader, LocalID);
+            // m_logger?.LogDebug("{0}: Destroy, id={1}", LogHeader, LocalID);
             IsInitialized = false;
 
             base.Destroy();
@@ -228,7 +230,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             }
             else if (CrossingFailures == BSParam.CrossingFailuresBeforeOutOfBounds)
             {
-                m_log.WarnFormat("{0} Too many crossing failures for {1}", LogHeader, Name);
+                m_logger?.LogWarning("{0} Too many crossing failures for {1}", LogHeader, Name);
             }
             return;
         }
@@ -1038,7 +1040,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                 // Verify the previous code created the correct shape for this type of thing.
                 if ((bodyType & CollisionObjectTypes.CO_RIGID_BODY) == 0)
                 {
-                    m_log.ErrorFormat("{0} MakeSolid: physical body of wrong type for solidity. id={1}, type={2}", LogHeader, LocalID, bodyType);
+                    m_logger?.LogError("{0} MakeSolid: physical body of wrong type for solidity. id={1}, type={2}", LogHeader, LocalID, bodyType);
                 }
                 CurrentCollisionFlags = PhysScene.PE.RemoveFromCollisionFlags(PhysBody, CollisionFlags.CF_NO_CONTACT_RESPONSE);
             }
@@ -1046,7 +1048,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             {
                 if ((bodyType & CollisionObjectTypes.CO_GHOST_OBJECT) == 0)
                 {
-                    m_log.ErrorFormat("{0} MakeSolid: physical body of wrong type for non-solidness. id={1}, type={2}", LogHeader, LocalID, bodyType);
+                    m_logger?.LogError("{0} MakeSolid: physical body of wrong type for non-solidness. id={1}, type={2}", LogHeader, LocalID, bodyType);
                 }
                 CurrentCollisionFlags = PhysScene.PE.AddToCollisionFlags(PhysBody, CollisionFlags.CF_NO_CONTACT_RESPONSE);
 
@@ -1079,7 +1081,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             }
             else
             {
-                m_log.ErrorFormat("{0} Attempt to add physical object without body. id={1}", LogHeader, LocalID);
+                m_logger?.LogError("{0} Attempt to add physical object without body. id={1}", LogHeader, LocalID);
                 DetailLog("{0},BSPrim.AddObjectToPhysicalWorld,addObjectWithoutBody,cType={1}", LocalID, PhysBody.collisionType);
             }
         }
@@ -1122,7 +1124,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
         public override bool Kinematic {
             get { return _kinematic; }
             set { _kinematic = value;
-                // m_log.DebugFormat("{0}: Kinematic={1}", LogHeader, _kinematic);
+                // m_logger?.LogDebug("{0}: Kinematic={1}", LogHeader, _kinematic);
             }
         }
         public override float Buoyancy {
@@ -1248,7 +1250,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                 }
                 else
                 {
-                    m_log.WarnFormat("{0}: AddForce: Got a NaN force applied to a prim. LocalID={1}", LogHeader, LocalID);
+                    m_logger?.LogWarning("{0}: AddForce: Got a NaN force applied to a prim. LocalID={1}", LogHeader, LocalID);
                     return;
                 }
             }
@@ -1276,7 +1278,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                 }
                 else
                 {
-                    m_log.WarnFormat("{0}: AddForceImpulse: Got a NaN impulse applied to a prim. LocalID={1}", LogHeader, LocalID);
+                    m_logger?.LogWarning("{0}: AddForceImpulse: Got a NaN impulse applied to a prim. LocalID={1}", LogHeader, LocalID);
                     return;
                 }
             }
@@ -1300,7 +1302,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             }
             else
             {
-                m_log.WarnFormat("{0}: Got a NaN force applied to a prim. LocalID={1}", LogHeader, LocalID);
+                m_logger?.LogWarning("{0}: Got a NaN force applied to a prim. LocalID={1}", LogHeader, LocalID);
                 return;
             }
         }
@@ -1722,7 +1724,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                             index += 3;
                             break;
                         default:
-                            m_log.WarnFormat("{0} SetSxisLockLimitsExtension. Unknown op={1}", LogHeader, funct);
+                            m_logger?.LogWarning("{0} SetSxisLockLimitsExtension. Unknown op={1}", LogHeader, funct);
                             index += 1;
                             break;
                     }
@@ -1732,7 +1734,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("{0} SetSxisLockLimitsExtension exception in object {1}: {2}", LogHeader, this.Name, e);
+                m_logger?.LogWarning("{0} SetSxisLockLimitsExtension exception in object {1}: {2}", LogHeader, this.Name, e);
                 ret = null;
             }
             return ret;    // not implemented yet
@@ -1752,7 +1754,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("{0} DisableDeactivationExtension exception in object {1}: {2}", LogHeader, this.Name, e);
+                m_logger?.LogWarning("{0} DisableDeactivationExtension exception in object {1}: {2}", LogHeader, this.Name, e);
                 ret = null;
             }
             return ret;    // not implemented yet

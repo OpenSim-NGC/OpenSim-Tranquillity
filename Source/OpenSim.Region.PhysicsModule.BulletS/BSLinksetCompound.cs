@@ -24,11 +24,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-using OpenSim.Framework;
+using Microsoft.Extensions.Logging;
 
 using OMV = OpenMetaverse;
 
@@ -428,8 +425,8 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                                         LinksetRoot.LocalID, cPrim.LinksetChildIndex, childShape, offsetPos, offsetRot);
                         // Output an annoying warning. It should only happen once but if it keeps coming out,
                         //    the user knows there is something wrong and will report it.
-                        m_physicsScene.Logger.WarnFormat("{0} Linkset rebuild warning. If this happens more than one or two times, please report in Mantis 7191", LogHeader);
-                        m_physicsScene.Logger.WarnFormat("{0} pName={1}, childIdx={2}, shape={3}",
+                        m_physicsScene.Logger?.LogWarning("{0} Linkset rebuild warning. If this happens more than one or two times, please report in Mantis 7191", LogHeader);
+                        m_physicsScene.Logger?.LogWarning("{0} pName={1}, childIdx={2}, shape={3}",
                                         LogHeader, LinksetRoot.Name, cPrim.LinksetChildIndex, childShape);
 	
                         // This causes the loop to bail on building the rest of this linkset.

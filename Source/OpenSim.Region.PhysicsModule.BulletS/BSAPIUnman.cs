@@ -24,14 +24,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security;
-using System.Text;
 
-using OpenSim.Framework;
+using Microsoft.Extensions.Logging;
 
 using OpenMetaverse;
 
@@ -141,6 +137,8 @@ namespace OpenSim.Region.PhysicsModule.BulletS
         public override string BulletEngineName { get { return "BulletUnmanaged"; } }
         public override string BulletEngineVersion { get; protected set; }
 
+        private readonly string LogHeader = "BSAPIUnman";
+
         public BSAPIUnman(string paramName, BSScene physScene)
         {
             DllmapConfigHelper.RegisterAssembly(typeof(BSAPIUnman).Assembly);
@@ -160,9 +158,9 @@ namespace OpenSim.Region.PhysicsModule.BulletS
 
             // If Debug logging level, enable logging from the unmanaged code
             m_DebugLogCallbackHandle = null;
-            if (BSScene.m_log.IsDebugEnabled && PhysicsScene.PhysicsLogging.Enabled)
+            if (PhysicsScene.Logger.IsEnabled(LogLevel.Debug) && PhysicsScene.PhysicsLogging.Enabled)
             {
-                BSScene.m_log.DebugFormat("{0}: Initialize: Setting debug callback for unmanaged code", BSScene.LogHeader);
+                PhysicsScene.Logger?.LogDebug("{0}: Initialize: Setting debug callback for unmanaged code", LogHeader);
                 if (PhysicsScene.PhysicsLogging.Enabled)
                     // The handle is saved in a variable to make sure it doesn't get freed after this call
                     m_DebugLogCallbackHandle = new BSAPICPP.DebugLogCallback(BulletLoggerPhysLog);
@@ -176,19 +174,19 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             {
 
                 BulletEngineVersion = Marshal.PtrToStringAnsi(BSAPICPP.GetVersion2());
-                BSScene.m_log.DebugFormat("{0}: Initialize: GetVersionInfo returned {1}", BSScene.LogHeader, BulletEngineVersion);
+                PhysicsScene.Logger?.LogDebug("{0}: Initialize: GetVersionInfo returned {1}", LogHeader, BulletEngineVersion);
                 string legacyValue = BSParam.VersionLegacyValue;
                 if (BulletEngineVersion.Equals(legacyValue))
                 {
                     // The old version of BulletSim returned a static string for the version.
                     // Convert that old static string into what is probably the correct version information.
                     BulletEngineVersion = BSParam.VersionLegacyReplacement;
-                    BSScene.m_log.DebugFormat("{0}: Initialize: BulletSim version converted from legacy {1} to {2}",
-                        BSScene.LogHeader, legacyValue, BulletEngineVersion);
+                    PhysicsScene.Logger?.LogDebug("{0}: Initialize: BulletSim version converted from legacy {1} to {2}",
+                        LogHeader, legacyValue, BulletEngineVersion);
                 }
             }
             catch (Exception e) {
-                BSScene.m_log.DebugFormat("{0}: Initialize: Could not fetch Bullet version info. Exception: {1}", BSScene.LogHeader, e);
+                PhysicsScene.Logger?.LogDebug("{0}: Initialize: Could not fetch Bullet version info. Exception: {1}", LogHeader, e);
             }
 
             // Call the unmanaged code with the buffers and other information
@@ -202,7 +200,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
         // Called directly from unmanaged code so don't do much
         private void BulletLogger(string msg)
         {
-            BSScene.m_log.Debug("[BULLETS UNMANAGED]:" + msg);
+            PhysicsScene.Logger?.LogDebug("[BULLETS UNMANAGED]:" + msg);
         }
 
         // Called directly from unmanaged code so don't do much

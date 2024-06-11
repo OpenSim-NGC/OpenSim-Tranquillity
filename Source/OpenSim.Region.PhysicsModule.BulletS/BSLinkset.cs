@@ -24,9 +24,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.Text;
+
+using Microsoft.Extensions.Logging;
 
 using OMV = OpenMetaverse;
 
@@ -64,7 +63,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             }
             if (ret == null)
             {
-                physScene.Logger.ErrorFormat("[BULLETSIM LINKSET] Factory could not create linkset. Parent name={1}, ID={2}", parent.Name, parent.LocalID);
+                physScene.Logger?.LogError("[BULLETSIM LINKSET] Factory could not create linkset. Parent name={1}, ID={2}", parent.Name, parent.LocalID);
             }
             return ret;
         }

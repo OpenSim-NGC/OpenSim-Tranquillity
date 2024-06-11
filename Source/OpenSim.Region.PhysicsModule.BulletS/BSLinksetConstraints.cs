@@ -24,9 +24,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.Text;
+
+using Microsoft.Extensions.Logging;
 
 using OMV = OpenMetaverse;
 
@@ -800,12 +799,12 @@ namespace OpenSim.Region.PhysicsModule.BulletS
                                     }
                                     catch (InvalidCastException e)
                                     {
-                                        m_physicsScene.Logger.WarnFormat("{0} value of wrong type in physSetLinksetParams: {1}, err={2}",
+                                        m_physicsScene.Logger?.LogWarning("{0} value of wrong type in physSetLinksetParams: {1}, err={2}",
                                                             LogHeader, errMsg, e);
                                     }
                                     catch (Exception e)
                                     {
-                                        m_physicsScene.Logger.WarnFormat("{0} bad parameters in physSetLinksetParams: {1}", LogHeader, e);
+                                        m_physicsScene.Logger?.LogWarning("{0} bad parameters in physSetLinksetParams: {1}", LogHeader, e);
                                     }
                                 }
                             }

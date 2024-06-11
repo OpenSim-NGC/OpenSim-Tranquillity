@@ -24,7 +24,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Reflection;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -738,7 +737,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             }
             else
             {
-                m_log.WarnFormat("{0}: Got a NaN force applied to a character. LocalID={1}", LogHeader, LocalID);
+                m_logger?.LogWarning("{0}: Got a NaN force applied to a character. LocalID={1}", LogHeader, LocalID);
                 return;
             }
         }
