@@ -24,6 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 {
@@ -51,11 +50,11 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MuteListModule>>();
-            IConfig cnf = config.Configs["Messaging"];
+            IConfigurationSection cnf = config.GetSection("Messaging");
             if (cnf == null)
                 return;
 
-            if (cnf.GetString("MuteListModule", "None") != "MuteListModule")
+            if (cnf.GetValue<string>("MuteListModule", "None") != "MuteListModule")
                 return;
 
             m_Enabled = true;

@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Scripting.XmlRpcGridRouterModule
 {
@@ -61,15 +60,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.XmlRpcGridRouterModule
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<XmlRpcGridRouter>>();
-            IConfig startupConfig = config.Configs["XMLRPC"];
-            if (startupConfig == null)
-                return;
+            IConfigurationSection startupConfig = config.GetSection("XMLRPC");
 
-            if (startupConfig.GetString("XmlRpcRouterModule",
+            if (startupConfig.GetValue<string>("XmlRpcRouterModule",
                     "XmlRpcRouterModule") == "XmlRpcGridRouterModule")
             {
-                m_ServerURI = startupConfig.GetString("XmlRpcHubURI", String.Empty);
-                if (m_ServerURI.Length == 0)
+                m_ServerURI = startupConfig.GetValue<string>("XmlRpcHubURI", String.Empty);
+                if (String.IsNullOrEmpty(m_ServerURI))
                 {
                     m_logger?.LogError("[XMLRPC GRID ROUTER] Module configured but no URI given. Disabling");
                     return;

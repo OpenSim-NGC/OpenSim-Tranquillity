@@ -29,6 +29,7 @@ using System.Diagnostics;
 using System.Timers;
 using System.Text.RegularExpressions;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -36,8 +37,6 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.World.AutoBackup
 {
@@ -147,14 +146,14 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<AutoBackupModule>>();
             // Determine if we have been enabled at all in OpenSim.ini -- this is part and parcel of being an optional module
             m_configSource = source;
-            IConfig moduleConfig = source.Configs["AutoBackupModule"];
+            IConfigurationSection moduleConfig = source.GetSection("AutoBackupModule");
             if (moduleConfig == null)
             {
                 m_enabled = false;
                 return;
             }
 
-            m_enabled = moduleConfig.GetBoolean("AutoBackupModuleEnabled", false);
+            m_enabled = moduleConfig.GetValue<bool>("AutoBackupModuleEnabled", false);
             if(!m_enabled)
                 return;
 
@@ -329,11 +328,11 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
                     MainConsole.Instance.Output("No such region {0}. Nothing to backup", name);
         }
 
-        private void ParseDefaultConfig(IConfig config)
+        private void ParseDefaultConfig(IConfigurationSection config)
         {          
 
             m_backupDir = ".";
-            string backupDir = config.GetString("AutoBackupDir", ".");
+            string backupDir = config.GetValue<string>("AutoBackupDir", ".");
             if (backupDir != ".")
             {
                 try
@@ -352,19 +351,19 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
             }
             m_backupDir = backupDir;
 
-            double interval = config.GetDouble("AutoBackupInterval", 720);
+            double interval = config.GetValue<double>("AutoBackupInterval", 720);
             interval *= 60000.0;
             m_baseInterval = interval;
 
             // How long to keep backup files in days, 0 Disables this feature
-            m_KeepFilesForDays = config.GetInt("AutoBackupKeepFilesForDays",m_KeepFilesForDays);
+            m_KeepFilesForDays = config.GetValue<int>("AutoBackupKeepFilesForDays",m_KeepFilesForDays);
 
-            m_defaultState.Enabled = config.GetBoolean("AutoBackup", m_defaultState.Enabled);
+            m_defaultState.Enabled = config.GetValue<bool>("AutoBackup", m_defaultState.Enabled);
 
-            m_defaultState.SkipAssets = config.GetBoolean("AutoBackupSkipAssets",m_defaultState.SkipAssets);
+            m_defaultState.SkipAssets = config.GetValue<bool>("AutoBackupSkipAssets",m_defaultState.SkipAssets);
 
             // Set file naming algorithm
-            string stmpNamingType = config.GetString("AutoBackupNaming", m_defaultState.NamingType.ToString());
+            string stmpNamingType = config.GetValue<string>("AutoBackupNaming", m_defaultState.NamingType.ToString());
             NamingType tmpNamingType;
             if (stmpNamingType.Equals("Time", StringComparison.CurrentCultureIgnoreCase))
                 tmpNamingType = NamingType.Time;
@@ -379,7 +378,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
             }
             m_defaultState.NamingType = tmpNamingType;
 
-            m_defaultState.Script = config.GetString("AutoBackupScript", m_defaultState.Script);
+            m_defaultState.Script = config.GetValue<string>("AutoBackupScript", m_defaultState.Script);
 
         }
 
@@ -390,7 +389,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
         /// <param name="scene">The scene to look at.</param>
         /// <param name="parseDefault">Whether this call is intended to figure out what we consider the "default" config (applied to all regions unless overridden by per-region settings).</param>
         /// <returns>An AutoBackupModuleState contains most information you should need to know relevant to auto-backup, as applicable to a single region.</returns>
-        private AutoBackupModuleState ParseConfig(IScene scene)
+        private AutoBackupModuleState? ParseConfig(IScene scene)
         {
             if(scene == null)
                 return null;
@@ -401,19 +400,19 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
             sRegionName = scene.RegionInfo.RegionName;
 
             // Read the config settings and set variables.
-            IConfig regionConfig = scene.Config.Configs[sRegionName];
-            if (regionConfig == null)
+            IConfigurationSection regionConfig = scene.Config.GetSection(sRegionName);
+            if (!regionConfig.GetChildren().Any())
                 return null;
 
             state = new AutoBackupModuleState();
 
-            state.Enabled = regionConfig.GetBoolean("AutoBackup", m_defaultState.Enabled);
+            state.Enabled = regionConfig.GetValue<bool>("AutoBackup", m_defaultState.Enabled);
 
             // Included Option To Skip Assets
-            state.SkipAssets = regionConfig.GetBoolean("AutoBackupSkipAssets", m_defaultState.SkipAssets);
+            state.SkipAssets = regionConfig.GetValue<bool>("AutoBackupSkipAssets", m_defaultState.SkipAssets);
 
             // Set file naming algorithm
-            string stmpNamingType = regionConfig.GetString("AutoBackupNaming", m_defaultState.NamingType.ToString());
+            string stmpNamingType = regionConfig.GetValue<string>("AutoBackupNaming", m_defaultState.NamingType.ToString());
             NamingType tmpNamingType;
             if (stmpNamingType.Equals("Time", StringComparison.CurrentCultureIgnoreCase))
                 tmpNamingType = NamingType.Time;
@@ -429,7 +428,7 @@ namespace OpenSim.Region.OptionalModules.World.AutoBackup
             }
             m_defaultState.NamingType = tmpNamingType;
 
-            state.Script = regionConfig.GetString("AutoBackupScript", m_defaultState.Script);
+            state.Script = regionConfig.GetValue<string>("AutoBackupScript", m_defaultState.Script);
             return state;
         }
 

@@ -26,6 +26,7 @@
  */
 
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -35,8 +36,6 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Wind
 {
@@ -53,7 +52,7 @@ namespace OpenSim.Region.CoreModules.World.Wind
         private bool m_inUpdate = false;
 
         private bool m_enabled = false;
-        private IConfig m_windConfig;
+        private IConfigurationSection m_windConfig;
         private IWindModelPlugin m_activeWindPlugin = null;
         private string m_dWindPluginName = "SimpleRandomWind";
         private Dictionary<string, IWindModelPlugin> m_availableWindPlugins = new Dictionary<string, IWindModelPlugin>();
@@ -73,20 +72,17 @@ namespace OpenSim.Region.CoreModules.World.Wind
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<WindModule>>();
-            m_windConfig = config.Configs["Wind"];
+            m_windConfig = config.GetSection("Wind");
 //            string desiredWindPlugin = m_dWindPluginName;
 
-            if (m_windConfig != null)
+            if (m_windConfig.GetChildren().Any())
             {
-                m_enabled = m_windConfig.GetBoolean("enabled", true);
+                m_enabled = m_windConfig.GetValue<bool>("enabled", true);
 
-                m_frameUpdateRate = m_windConfig.GetInt("wind_update_rate", 150);
+                m_frameUpdateRate = m_windConfig.GetValue<int>("wind_update_rate", 150);
 
                 // Determine which wind model plugin is desired
-                if (m_windConfig.Contains("wind_plugin"))
-                {
-                    m_dWindPluginName = m_windConfig.GetString("wind_plugin", m_dWindPluginName);
-                }
+                m_dWindPluginName = m_windConfig.GetValue<string>("wind_plugin", m_dWindPluginName);
             }
 
             if (m_enabled)

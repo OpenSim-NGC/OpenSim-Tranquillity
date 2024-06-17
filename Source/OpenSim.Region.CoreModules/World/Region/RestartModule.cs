@@ -28,6 +28,7 @@
 using System.Timers;
 using Timer = System.Timers.Timer;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -37,8 +38,6 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Region
 {
@@ -62,14 +61,13 @@ namespace OpenSim.Region.CoreModules.World.Region
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RestartModule>>();
-            IConfig restartConfig = config.Configs["RestartModule"];
-            if (restartConfig != null)
-            {
-                m_MarkerPath = restartConfig.GetString("MarkerPath", String.Empty);
-            }
-            IConfig startupConfig = config.Configs["Startup"];
-            m_shortCircuitDelays = startupConfig.GetBoolean("SkipDelayOnEmptyRegion", false);
-            m_rebootAll = startupConfig.GetBoolean("InworldRestartShutsDown", false);
+
+            IConfigurationSection restartConfig = config.GetSection("RestartModule");
+            m_MarkerPath = restartConfig.GetValue<string>("MarkerPath", String.Empty);
+
+            IConfigurationSection startupConfig = config.GetSection("Startup");
+            m_shortCircuitDelays = startupConfig.GetValue<bool>("SkipDelayOnEmptyRegion", false);
+            m_rebootAll = startupConfig.GetValue<bool>("InworldRestartShutsDown", false);
         }
 
         public void AddRegion(Scene scene)

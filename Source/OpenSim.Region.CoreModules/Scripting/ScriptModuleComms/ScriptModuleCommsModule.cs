@@ -28,6 +28,7 @@
 using System.Linq.Expressions;
 using System.Reflection;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -36,8 +37,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Scripting.ScriptModuleComms
 {

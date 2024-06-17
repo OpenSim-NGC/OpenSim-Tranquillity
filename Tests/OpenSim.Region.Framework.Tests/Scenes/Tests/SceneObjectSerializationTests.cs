@@ -31,7 +31,6 @@ using System.Reflection;
 using System.Threading;
 using System.Xml;
 using System.Linq;
-using Nini.Config;
 using NUnit.Framework;
 using OpenMetaverse;
 using OpenSim.Framework;

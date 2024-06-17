@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
 {
@@ -62,22 +61,22 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalUserAliasServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("UserAliasServices", "");
+                string name = moduleConfig.GetValue<string>("UserAliasServices", "");
                 if (name == Name)
                 {
-                    IConfig userConfig = source.Configs["UserAliasService"];
+                    IConfigurationSection userConfig = source.GetSection("UserAliasService");
                     if (userConfig == null)
                     {
                         m_logger?.LogError("[LOCAL USER ALIAS SERVICE CONNECTOR]: UserAliasService missing from OpenSim.ini");
                         return;
                     }
 
-                    string serviceDll = userConfig.GetString("LocalServiceModule", String.Empty);
+                    string? serviceDll = userConfig.GetValue<string>("LocalServiceModule", String.Empty);
 
-                    if (serviceDll.Length == 0)
+                    if (String.IsNullOrEmpty(serviceDll))
                     {
                         m_logger?.LogError("[LOCAL USER ALIAS SERVICE CONNECTOR]: No LocalServiceModule named in section UserAliasService");
                         return;

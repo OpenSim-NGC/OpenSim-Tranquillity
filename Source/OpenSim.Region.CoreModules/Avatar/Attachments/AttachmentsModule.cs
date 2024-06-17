@@ -28,6 +28,7 @@
 using System.Text;
 using System.Xml;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -41,8 +42,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Attachments
 {
@@ -70,11 +69,11 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<AttachmentsModule>>();
 
-            IConfig config = source.Configs["Attachments"];
+            IConfigurationSection config = source.GetSection("Attachments");
             if (config is not null)
             {
-                Enabled = config.GetBoolean("Enabled", true);
-                m_wearReplacesAllOption = config.GetBoolean("WearReplacesAll", true);
+                Enabled = config.GetValue<bool>("Enabled", true);
+                m_wearReplacesAllOption = config.GetValue<bool>("WearReplacesAll", true);
             }
             else
             {

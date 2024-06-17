@@ -25,20 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
-using System.Collections;
-using System.Collections.Generic;
-using System.Threading;
+using Microsoft.Extensions.Configuration;
+
 using OpenMetaverse;
-using Nini.Config;
-using OpenSim;
+
 using OpenSim.Framework;
-using OpenSim.Region.CoreModules.World.LightShare;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
 using OpenSim.Region.ScriptEngine.Shared.ScriptBase;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
@@ -60,7 +53,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         internal SceneObjectPart m_host;
         internal bool m_LSFunctionsEnabled = false;
         internal IScriptModuleComms m_comms = null;
-        internal IConfig m_osslconfig;
+        internal IConfigurationSection m_osslconfig;
         internal IEnvironmentModule m_environment = null;
 
         public void Initialize(IScriptEngine scriptEngine, SceneObjectPart host, TaskInventoryItem item)
@@ -68,11 +61,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             m_ScriptEngine = scriptEngine;
             m_host = host;
 
-            m_osslconfig = m_ScriptEngine.ConfigSource.Configs["OSSL"];
+            m_osslconfig = m_ScriptEngine.ConfigSource.GetSection("OSSL");
             if(m_osslconfig == null)
                 m_osslconfig = m_ScriptEngine.Config;
 
-            if (m_osslconfig.GetBoolean("AllowLightShareFunctions", false))
+            if (m_osslconfig.GetValue<bool>("AllowLightShareFunctions", false))
                 m_LSFunctionsEnabled = true;
 
             m_comms = m_ScriptEngine.World.RequestModuleInterface<IScriptModuleComms>();

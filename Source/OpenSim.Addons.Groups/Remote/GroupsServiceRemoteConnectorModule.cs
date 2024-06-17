@@ -38,8 +38,6 @@ using OpenSim.Server.Base;
 
 using OpenMetaverse;
 
-using Nini.Config;
-
 namespace OpenSim.Groups
 {
     public class GroupsServiceRemoteConnectorModule : ISharedRegionModule, IGroupsServicesConnector
@@ -78,12 +76,12 @@ namespace OpenSim.Groups
 
         public void Initialise(IConfiguration config)
         {
-            IConfig groupsConfig = config.Configs["Groups"];
-            if (groupsConfig == null)
+            IConfigurationSection groupsConfig = config.GetSection("Groups");
+            if (!groupsConfig.GetChildren().Any())
                 return;
 
-            if ((groupsConfig.GetBoolean("Enabled", false) == false)
-                    || (groupsConfig.GetString("ServicesConnectorModule", string.Empty) != Name))
+            if ((groupsConfig.GetValue<bool>("Enabled", false) == false)
+                    || (groupsConfig.GetValue<string>("ServicesConnectorModule", string.Empty) != Name))
             {
                 return;
             }

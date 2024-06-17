@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -36,9 +37,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
-
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
 {
@@ -63,11 +61,11 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteLandServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("LandServices", "");
-                if (name == Name)
+                string name = moduleConfig.GetValue<string>("LandServices", "");
+                if (!String.IsNullOrEmpty(name) && name == Name)
                 {
                     m_LocalService = new LocalLandServicesConnector();
 

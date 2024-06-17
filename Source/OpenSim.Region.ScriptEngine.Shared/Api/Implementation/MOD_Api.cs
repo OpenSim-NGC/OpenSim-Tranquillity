@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 // using Microsoft.Extensions.DependencyInjection;
 // using Microsoft.Extensions.Logging;
 
@@ -46,8 +47,6 @@ using LSL_Rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
 using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
 
-using Nini.Config;
-
 namespace OpenSim.Region.ScriptEngine.Shared.Api
 {
     [Serializable]
@@ -60,7 +59,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         internal TaskInventoryItem m_item;
         internal bool m_MODFunctionsEnabled = false;
         internal IScriptModuleComms m_comms = null;
-        internal IConfig m_osslconfig;
+        internal IConfigurationSection m_osslconfig;
 
         public void Initialize(
             IScriptEngine scriptEngine, SceneObjectPart host, TaskInventoryItem item)
@@ -71,11 +70,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             m_item = item;
 
             
-            m_osslconfig = m_ScriptEngine.ConfigSource.Configs["OSSL"];
-            if(m_osslconfig == null)
+            m_osslconfig = m_ScriptEngine.ConfigSource.GetSection("OSSL");
+            if(!m_osslconfig.GetChildren().Any())
                 m_osslconfig = m_ScriptEngine.Config;
 
-            if (m_osslconfig.GetBoolean("AllowMODFunctions", false))
+            if (m_osslconfig.GetValue<bool>("AllowMODFunctions", false))
                 m_MODFunctionsEnabled = true;
 
             m_comms = m_ScriptEngine.World.RequestModuleInterface<IScriptModuleComms>();

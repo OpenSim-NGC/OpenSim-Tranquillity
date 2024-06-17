@@ -237,7 +237,6 @@ This software uses components from the following developers:
 * DotNetOpenMail v0.5.8b (http://dotnetopenmail.sourceforge.net)
 * Prototype JavaScript Framework ajax (http://www.prototypejs.org/)
 * C5 GENERIC COLLECTION LIBRARY FOR C#/CLI
-* Nini (http://nini.sourceforge.net/)
 * GlynnTucker.Cache (http://gtcache.sourceforge.net/)
 * NDesk.Options 0.2.1 (http://www.ndesk.org/Options)
 * Json.NET 3.5 Release 6.  The binary used is actually Newtonsoft.Json.Net20.dll for Mono 2.4 compatability (http://james.newtonking.com/projects/json-net.aspx)

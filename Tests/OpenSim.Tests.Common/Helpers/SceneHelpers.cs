@@ -46,8 +46,6 @@ using OpenSim.Services.Interfaces;
 
 using BaseServerUtils = OpenSim.Server.Base.ServerUtils;
 
-using Nini.Config;
-
 namespace OpenSim.Tests.Common
 {
     /// <summary>

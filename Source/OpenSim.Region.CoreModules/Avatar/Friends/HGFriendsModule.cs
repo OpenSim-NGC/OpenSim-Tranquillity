@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -33,15 +34,13 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Hypergrid;
+using OpenSim.Server.Base;
 
 using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 using OpenMetaverse;
-
-using Nini.Config;
-using OpenSim.Server.Base;
 
 namespace OpenSim.Region.CoreModules.Avatar.Friends
 {
@@ -94,10 +93,10 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends
             base.InitModule(config);
 
             // Additionally to the base method
-            IConfig friendsConfig = config.Configs["HGFriendsModule"];
+            IConfigurationSection friendsConfig = config.GetSection("HGFriendsModule");
             if (friendsConfig != null)
             {
-                m_levelHGFriends = friendsConfig.GetInt("LevelHGFriends", 0);
+                m_levelHGFriends = friendsConfig.GetValue<int>("LevelHGFriends", 0);
 
                 // TODO: read in all config variables pertaining to
                 // HG friendship permissions

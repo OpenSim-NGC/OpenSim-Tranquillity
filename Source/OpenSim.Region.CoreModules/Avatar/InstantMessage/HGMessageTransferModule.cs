@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -38,8 +39,6 @@ using OpenSim.Server.Handlers.Hypergrid;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 {
@@ -70,8 +69,8 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HGMessageTransferModule>>();
 
-            IConfig cnf = config.Configs["Messaging"];
-            if (cnf != null && cnf.GetString("MessageTransferModule", "MessageTransferModule") != Name)
+            IConfigurationSection cnf = config.GetSection("Messaging");
+            if (cnf != null && cnf.GetValue<string>("MessageTransferModule", "MessageTransferModule") != Name)
             {
                 m_logger?.LogDebug("[HG MESSAGE TRANSFER]: Disabled by configuration");
                 return;

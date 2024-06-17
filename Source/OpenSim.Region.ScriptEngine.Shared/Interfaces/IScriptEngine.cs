@@ -27,13 +27,13 @@
 
 using System.Reflection;
 
+using Microsoft.Extensions.Configuration;
+
 using OpenMetaverse;
 
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
-
-using Nini.Config;
 
 namespace OpenSim.Region.ScriptEngine.Interfaces
 {
@@ -72,7 +72,7 @@ namespace OpenSim.Region.ScriptEngine.Interfaces
         void SetState(UUID itemID, string newState);
         void ApiResetScript(UUID itemID);
         void ResetScript(UUID itemID);
-        IConfig Config { get; }
+        IConfiguration Config { get; }
         IConfiguration ConfigSource { get; }
         string ScriptEngineName { get; }
         string ScriptEnginePath { get; }

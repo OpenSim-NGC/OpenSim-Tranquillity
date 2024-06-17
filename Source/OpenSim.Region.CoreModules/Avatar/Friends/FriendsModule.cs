@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -41,8 +42,6 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Friends
 {
@@ -155,10 +154,10 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<FriendsModule>>();
 
-            IConfig moduleConfig = config.Configs["Modules"];
+            IConfigurationSection moduleConfig = config.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("FriendsModule", "FriendsModule");
+                string name = moduleConfig.GetValue<string>("FriendsModule", "FriendsModule");
                 if (name == Name)
                 {
                     InitModule(config);
@@ -171,12 +170,12 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends
 
         protected virtual void InitModule(IConfiguration config)
         {
-            IConfig friendsConfig = config.Configs["Friends"];
+            IConfigurationSection friendsConfig = config.GetSection("Friends");
             if (friendsConfig != null)
             {
-                int mPort = friendsConfig.GetInt("Port", 0);
+                int mPort = friendsConfig.GetValue<int>("Port", 0);
 
-                string connector = friendsConfig.GetString("Connector", String.Empty);
+                string connector = friendsConfig.GetValue<string>("Connector", String.Empty);
                 Object[] args = new Object[] { config };
 
                 m_FriendsService = ServerUtils.LoadPlugin<IFriendsService>(connector, args);
@@ -608,7 +607,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends
                 }
                 else
                 {
-                    m_log.WarnFormat("[FRIENDS]: Error parsing friend ID {0}", friend.Friend);
+                    m_logger.LogWarning("[FRIENDS]: Error parsing friend ID {0}", friend.Friend);
                 }
             }
 
@@ -770,7 +769,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends
                     if (region is not null)
                         m_FriendsSimConnector.FriendshipDenied(region, client.AgentId, client.Name, friendID);
                     else
-                        m_log.WarnFormat("[FRIENDS]: Could not find region {0} in locating {1}", friendSession.RegionID, friendID);
+                        m_logger.LogWarning("[FRIENDS]: Could not find region {0} in locating {1}", friendSession.RegionID, friendID);
                 }
             }
         }

@@ -25,8 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -39,9 +38,6 @@ using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
-
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Land
 {
@@ -61,17 +57,12 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Land
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LandServiceInConnectorModule>>();
             m_Config = config;
 
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+            IConfigurationSection moduleConfig = config.GetSection("Modules");
+            m_Enabled = moduleConfig.GetValue<bool>("LandServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("LandServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_logger?.LogInformation("[LAND IN CONNECTOR]: LandServiceInConnector enabled");
-                }
-
+                m_logger?.LogInformation("[LAND IN CONNECTOR]: LandServiceInConnector enabled");
             }
-
         }
 
         public void PostInitialise()

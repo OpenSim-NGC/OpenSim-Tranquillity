@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -35,8 +36,6 @@ using OpenSim.Services.Connectors.Hypergrid;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
@@ -58,9 +57,9 @@ namespace OpenSim.Region.CoreModules.Avatar.Lure
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HGLureModule>>();
-            if (config.Configs["Messaging"] != null)
+            if (config.GetSection("Messaging") != null)
             {
-                if (config.Configs["Messaging"].GetString("LureModule", string.Empty) == "HGLureModule")
+                if (config.GetSection("Messaging").GetValue<string>("LureModule", string.Empty) == "HGLureModule")
                 {
                     m_Enabled = true;
                 }

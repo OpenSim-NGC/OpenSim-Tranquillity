@@ -28,6 +28,7 @@
 using System.Collections;
 using System.Text;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -39,8 +40,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using Nwc.XmlRpc;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
 {
@@ -149,56 +148,50 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<XmlRpcGroupsServicesConnectorModule>>();
-            IConfig groupsConfig = config.Configs["Groups"];
 
-            if (groupsConfig == null)
-            {
-                // Do not run this module by default.
+            IConfigurationSection groupsConfig = config.GetSection("Groups");
+            var enabled = config.GetValue<bool>("Enabled", false);
+            // m_connectorEnabled is set to true if all initialization succeeds
+            if (!enabled)
                 return;
+
+            // if groups aren't enabled, we're not needed.
+            // if we're not specified as the connector to use, then we're not wanted
+            if ((groupsConfig.GetValue<string>("ServicesConnectorModule", "XmlRpcGroupsServicesConnector") != Name))
+            {
+                return;
+            }
+
+            m_logger?.LogDebug("[XMLRPC-GROUPS-CONNECTOR]: Initializing {0}", this.Name);
+
+            m_groupsServerURI = groupsConfig.GetValue<string>("GroupsServerURI", string.Empty);
+            if (string.IsNullOrEmpty(m_groupsServerURI))
+            {
+                m_logger?.LogError("Please specify a valid URL for GroupsServerURI in OpenSim.ini, [Groups]");
+                return;
+            }
+
+            m_disableKeepAlive = groupsConfig.GetValue<bool>("XmlRpcDisableKeepAlive", true);
+
+            m_groupReadKey = groupsConfig.GetValue<string>("XmlRpcServiceReadKey", string.Empty);
+            m_groupWriteKey = groupsConfig.GetValue<string>("XmlRpcServiceWriteKey", string.Empty);
+
+            m_cacheTimeout = groupsConfig.GetValue<int>("GroupsCacheTimeout", 30);
+
+            if (m_cacheTimeout == 0)
+            {
+                m_logger?.LogWarning("[XMLRPC-GROUPS-CONNECTOR]: Groups Cache Disabled.");
             }
             else
             {
-                // if groups aren't enabled, we're not needed.
-                // if we're not specified as the connector to use, then we're not wanted
-                if ((groupsConfig.GetBoolean("Enabled", false) == false)
-                    || (groupsConfig.GetString("ServicesConnectorModule", "XmlRpcGroupsServicesConnector") != Name))
-                {
-                    m_connectorEnabled = false;
-                    return;
-                }
-
-                m_logger?.LogDebug("[XMLRPC-GROUPS-CONNECTOR]: Initializing {0}", this.Name);
-
-                m_groupsServerURI = groupsConfig.GetString("GroupsServerURI", string.Empty);
-                if (string.IsNullOrEmpty(m_groupsServerURI))
-                {
-                    m_logger?.LogError("Please specify a valid URL for GroupsServerURI in OpenSim.ini, [Groups]");
-                    m_connectorEnabled = false;
-                    return;
-                }
-
-                m_disableKeepAlive = groupsConfig.GetBoolean("XmlRpcDisableKeepAlive", true);
-
-                m_groupReadKey = groupsConfig.GetString("XmlRpcServiceReadKey", string.Empty);
-                m_groupWriteKey = groupsConfig.GetString("XmlRpcServiceWriteKey", string.Empty);
-
-                m_cacheTimeout = groupsConfig.GetInt("GroupsCacheTimeout", 30);
-
-                if (m_cacheTimeout == 0)
-                {
-                    m_logger?.LogWarning("[XMLRPC-GROUPS-CONNECTOR]: Groups Cache Disabled.");
-                }
-                else
-                {
-                    m_logger?.LogInformation("[XMLRPC-GROUPS-CONNECTOR]: Groups Cache Timeout set to {0}.", m_cacheTimeout);
-                }
-
-                m_debugEnabled = groupsConfig.GetBoolean("DebugEnabled", false);
-
-                // If we got all the config options we need, lets start'er'up
-                m_memoryCache = new ExpiringCache<string, XmlRpcResponse>();
-                m_connectorEnabled = true;
+                m_logger?.LogInformation("[XMLRPC-GROUPS-CONNECTOR]: Groups Cache Timeout set to {0}.", m_cacheTimeout);
             }
+
+            m_debugEnabled = groupsConfig.GetValue<bool>("DebugEnabled", false);
+
+            // If we got all the config options we need, lets start'er'up
+            m_memoryCache = new ExpiringCache<string, XmlRpcResponse>();
+            m_connectorEnabled = true;
         }
 
         public void Close()

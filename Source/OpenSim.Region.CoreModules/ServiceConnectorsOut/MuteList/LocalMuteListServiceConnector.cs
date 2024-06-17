@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -35,8 +36,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
 {
@@ -65,33 +64,31 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalMuteListServicesConnector>>();
             // only active for core mute lists module
-            IConfig moduleConfig = source.Configs["Messaging"];
+            IConfigurationSection moduleConfig = source.GetSection("Messaging");
             if (moduleConfig == null)
                 return;
 
-            if (moduleConfig.GetString("MuteListModule", "None") != "MuteListModule")
+            if (moduleConfig.GetValue<string>("MuteListModule", "None") != "MuteListModule")
                 return;
 
-            moduleConfig = source.Configs["Modules"];
+            moduleConfig = source.GetSection("Modules");
 
             if (moduleConfig == null)
                 return;
 
-            string name = moduleConfig.GetString("MuteListService", "");
+            string name = moduleConfig.GetValue<string>("MuteListService", "");
             if(name != Name)
                 return;
 
-            IConfig userConfig = source.Configs["MuteListService"];
+            IConfigurationSection userConfig = source.GetSection("MuteListService");
             if (userConfig == null)
             {
                 m_logger?.LogError("[MuteList LOCALCONNECTOR]: MuteListService missing from configuration");
                 return;
             }
 
-            string serviceDll = userConfig.GetString("LocalServiceModule",
-                    String.Empty);
-
-            if (serviceDll.Length == 0)
+            string serviceDll = userConfig.GetValue<string>("LocalServiceModule", String.Empty);
+            if (String.IsNullOrEmpty(serviceDll))
             {
                 m_logger?.LogError("[MuteList LOCALCONNECTOR]: No LocalServiceModule named in section MuteListService");
                 return;

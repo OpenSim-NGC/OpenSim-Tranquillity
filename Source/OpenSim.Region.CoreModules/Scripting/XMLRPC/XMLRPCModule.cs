@@ -29,6 +29,7 @@ using System.Collections;
 using System.Net;
 using System.Reflection;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -43,8 +44,6 @@ using OpenSim.Server.Base;
 using Nwc.XmlRpc;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 /*****************************************************
  *
@@ -115,16 +114,9 @@ namespace OpenSim.Region.CoreModules.Scripting.XMLRPC
             m_rpcPending = new Dictionary<UUID, RPCRequestInfo>();
             m_rpcPendingResponses = new Dictionary<UUID, RPCRequestInfo>();
             m_pendingSRDResponses = new Dictionary<UUID, SendRemoteDataRequest>();
-            if (config.Configs["XMLRPC"] != null)
-            {
-                try
-                {
-                    m_remoteDataPort = config.Configs["XMLRPC"].GetInt("XmlRpcPort", m_remoteDataPort);
-                }
-                catch (Exception)
-                {
-                }
-            }
+
+            IConfigurationSection xmlrpcConfig = config.GetSection("XMLRPC");
+            m_remoteDataPort = xmlrpcConfig.GetValue<int>("XmlRpcPort", m_remoteDataPort);
         }
 
         public void PostInitialise()

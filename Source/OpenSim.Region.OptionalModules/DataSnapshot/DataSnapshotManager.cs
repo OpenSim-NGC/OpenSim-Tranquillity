@@ -30,6 +30,7 @@ using System.Reflection;
 using System.Text;
 using System.Xml;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -40,8 +41,6 @@ using OpenSim.Region.OptionalModules.DataSnapshot.Interfaces;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.DataSnapshot
 {
@@ -102,6 +101,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DataSnapshotManager>>();
+
             if (!m_configLoaded)
             {
                 m_configLoaded = true;
@@ -111,23 +111,23 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
                 {
                     try
                     {
-                        m_enabled = config.Configs["DataSnapshot"].GetBoolean("index_sims", m_enabled);
+                        IConfigurationSection dsConfig = config.GetSection("DataSnapshot");
+
+                        m_enabled = dsConfig.GetValue<bool>("index_sims", m_enabled);
                         string gatekeeper = Util.GetConfigVarFromSections<string>(config, "GatekeeperURI",
                             new string[] { "Startup", "Hypergrid", "GridService" }, String.Empty);
                         // Legacy. Remove soon!
                         if (string.IsNullOrEmpty(gatekeeper))
                         {
-                            IConfig conf = config.Configs["GridService"];
-                            if (conf != null)
-                                gatekeeper = conf.GetString("Gatekeeper", gatekeeper);
+                            IConfigurationSection gsConfig = config.GetSection("GridService");
+                            gatekeeper = gsConfig.GetValue<string>("Gatekeeper", gatekeeper);
                         }
                         if (!string.IsNullOrEmpty(gatekeeper))
                             m_gridinfo.Add("gatekeeperURL", gatekeeper);
 
-                        m_gridinfo.Add(
-                            "name", config.Configs["DataSnapshot"].GetString("gridname", "the lost continent of hippo"));
+                        m_gridinfo.Add( "name", dsConfig.GetValue<string>("gridname", "the lost continent of hippo"));
 
-                        m_exposure_level = config.Configs["DataSnapshot"].GetString("data_exposure", m_exposure_level);
+                        m_exposure_level = dsConfig.GetValue<string>("data_exposure", m_exposure_level);
                         m_exposure_level = m_exposure_level.ToLower();
                         if(m_exposure_level !="all" && m_exposure_level != "minimum")
                         {
@@ -135,14 +135,14 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
                             m_exposure_level = "minimum";
                         }
 
-                        m_period = config.Configs["DataSnapshot"].GetInt("default_snapshot_period", m_period);
-                        m_maxStales = config.Configs["DataSnapshot"].GetInt("max_changes_before_update", m_maxStales);
-                        m_snapsDir = config.Configs["DataSnapshot"].GetString("snapshot_cache_directory", m_snapsDir);
-                        m_listener_port = config.Configs["Network"].GetString("http_listener_port", m_listener_port);
+                        m_period = dsConfig.GetValue<int>("default_snapshot_period", m_period);
+                        m_maxStales = dsConfig.GetValue<int>("max_changes_before_update", m_maxStales);
+                        m_snapsDir = dsConfig.GetValue<string>("snapshot_cache_directory", m_snapsDir);
+                        m_listener_port = dsConfig.GetValue<string>("http_listener_port", m_listener_port);
 
-                        m_dataServices = config.Configs["DataSnapshot"].GetString("data_services", m_dataServices);
+                        m_dataServices = dsConfig.GetValue<string>("data_services", m_dataServices);
                         // New way of spec'ing data services, one per line
-                        AddDataServicesVars(config.Configs["DataSnapshot"]);
+                        AddDataServicesVars(dsConfig);
 
                         m_lastUpdate = Environment.TickCount;
                     }
@@ -289,11 +289,22 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
             return null;
         }
 
-        private void AddDataServicesVars(IConfig config)
+        private void AddDataServicesVars(IConfiguration config)
         {
             // Make sure the services given this way aren't in m_dataServices already
             List<string> servs = new List<string>(m_dataServices.Split(new char[] { ';' }));
 
+            StringBuilder sb = new StringBuilder();
+
+            // For all the parameter values that start with "DATA_SRV_", append to the buffer if not already in m_dataServices
+            config.GetChildren().Where(child => child.Key.StartsWith("DATA_SRV_")).ToList().ForEach(child =>
+            {
+                string keyValue = config.GetValue<string>(child.Key, string.Empty).Trim();
+                if (!servs.Contains(keyValue))
+                    sb.Append(keyValue).Append(";");
+            });
+
+            /* RA 202406: original code
             StringBuilder sb = new StringBuilder();
             string[] keys = config.GetKeys();
 
@@ -302,11 +313,12 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
                 IEnumerable<string> serviceKeys = keys.Where(value => value.StartsWith("DATA_SRV_"));
                 foreach (string serviceKey in serviceKeys)
                 {
-                    string keyValue = config.GetString(serviceKey, string.Empty).Trim();
+                    string keyValue = config.GetValue<string>(serviceKey, string.Empty).Trim();
                     if (!servs.Contains(keyValue))
                         sb.Append(keyValue).Append(";");
                 }
             }
+            */
 
             m_dataServices = (m_dataServices == "noservices") ? sb.ToString() : sb.Append(m_dataServices).ToString();
         }
@@ -430,7 +442,7 @@ namespace OpenSim.Region.OptionalModules.DataSnapshot
                     }
 
                     // This is not quite working, so...
-                    // string responseStr = Util.UTF8.GetString(response);
+                    // string responseStr = Util.UTF8.GetValue<string>(response);
                     m_logger?.LogInformation("[DATASNAPSHOT]: data service " + url + " notified. Secret: " + m_Secret);
                 }
             }

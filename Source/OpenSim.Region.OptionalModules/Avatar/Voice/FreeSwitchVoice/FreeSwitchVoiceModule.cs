@@ -32,12 +32,13 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Web;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
-
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
@@ -47,9 +48,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-
-using Nini.Config;
-
 
 namespace OpenSim.Region.OptionalModules.Avatar.Voice.FreeSwitchVoice
 {
@@ -90,27 +88,25 @@ namespace OpenSim.Region.OptionalModules.Avatar.Voice.FreeSwitchVoice
         private readonly Dictionary<string, string> m_UUIDName = new Dictionary<string, string>();
         private Dictionary<string, string> m_ParcelAddress = new Dictionary<string, string>();
 
-        private IConfig m_Config;
+        private IConfigurationSection m_Config;
 
         private IFreeswitchService m_FreeswitchService;
 
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<FreeSwitchVoiceModule>>();
-            m_Config = config.Configs["FreeSwitchVoice"];
 
-            if (m_Config == null)
-                return;
+            m_Config = config.GetSection("FreeSwitchVoice");
+            m_Enabled = m_Config.GetValue<bool>("Enabled", false);
 
-            if (!m_Config.GetBoolean("Enabled", false))
+            if (!m_Enabled)
                 return;
 
             try
             {
-                string serviceDll = m_Config.GetString("LocalServiceModule",
-                        String.Empty);
+                string serviceDll = m_Config.GetValue<string>("LocalServiceModule", String.Empty);
 
-                if (serviceDll.Length == 0)
+                if (String.IsNullOrEmpty(serviceDll))
                 {
                     m_logger?.LogError("[FreeSwitchVoice]: No LocalServiceModule named in section FreeSwitchVoice.  Not starting.");
                     return;

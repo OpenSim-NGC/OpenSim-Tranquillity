@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.World.NPC
 {
@@ -55,25 +54,26 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<NPCModule>>();
-            IConfig config = source.Configs["NPC"];
+            IConfigurationSection config = source.GetSection("NPC");
 
-            Enabled = (config != null && config.GetBoolean("Enabled", true));
+            Enabled = config.GetValue<bool>("Enabled", true);
+
             m_NPCOptionFlags = NPCOptionsFlags.None;
             if(Enabled)
             {
-                if(config.GetBoolean("AllowNotOwned", true))
+                if(config.GetValue<bool>("AllowNotOwned", true))
                     m_NPCOptionFlags |= NPCOptionsFlags.AllowNotOwned;
 
-                if(config.GetBoolean("AllowSenseAsAvatar", true))
+                if(config.GetValue<bool>("AllowSenseAsAvatar", true))
                     m_NPCOptionFlags |= NPCOptionsFlags.AllowSenseAsAvatar;
 
-                if(config.GetBoolean("AllowCloneOtherAvatars", true))
+                if(config.GetValue<bool>("AllowCloneOtherAvatars", true))
                     m_NPCOptionFlags |= NPCOptionsFlags.AllowCloneOtherAvatars;
 
-                if(config.GetBoolean("NoNPCGroup", true))
+                if(config.GetValue<bool>("NoNPCGroup", true))
                     m_NPCOptionFlags |= NPCOptionsFlags.NoNPCGroup;
 
-                m_MaxNumberNPCperScene = config.GetInt("MaxNumberNPCsPerScene", m_MaxNumberNPCperScene);
+                m_MaxNumberNPCperScene = config.GetValue<int>("MaxNumberNPCsPerScene", m_MaxNumberNPCperScene);
             }
         }
 

@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -36,8 +37,6 @@ using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
 {
@@ -78,11 +77,11 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RegionGridServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("GridServices", string.Empty);
-                if (name == Name)
+                string name = moduleConfig.GetValue<string>("GridServices", string.Empty);
+                if (!String.IsNullOrEmpty(name) && name == Name)
                 {
                     if(InitialiseServices(source))
                     {
@@ -98,15 +97,15 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
 
         private bool InitialiseServices(IConfiguration source)
         {
-            IConfig gridConfig = source.Configs["GridService"];
+            IConfigurationSection gridConfig = source.GetSection("GridService");
             if (gridConfig == null)
             {
                 m_logger?.LogError("[REGION GRID CONNECTOR]: GridService missing from OpenSim.ini");
                 return false;
             }
 
-            string serviceDll = gridConfig.GetString("LocalServiceModule", string.Empty);
-            if (string.IsNullOrWhiteSpace(serviceDll))
+            string? serviceDll = gridConfig.GetValue<string>("LocalServiceModule", string.Empty);
+            if (String.IsNullOrEmpty(serviceDll))
             {
                 m_logger?.LogError("[REGION GRID CONNECTOR]: No LocalServiceModule named in section GridService");
                 return false;
@@ -121,7 +120,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid
                 return false;
             }
 
-            string networkConnector = gridConfig.GetString("NetworkConnector", string.Empty);
+            string networkConnector = gridConfig.GetValue<string>("NetworkConnector", string.Empty);
             if (!string.IsNullOrWhiteSpace(networkConnector))
             {
                 m_RemoteGridService = ServerUtils.LoadPlugin<IGridService>(networkConnector, args);

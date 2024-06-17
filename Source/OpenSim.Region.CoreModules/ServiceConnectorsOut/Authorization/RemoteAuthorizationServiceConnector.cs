@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -35,8 +36,6 @@ using OpenSim.Services.Connectors;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 {
@@ -61,13 +60,13 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
         public override void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteAuthorizationServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("AuthorizationServices", "");
-                if (name == Name)
+                string name = moduleConfig.GetValue<string>("AuthorizationServices", "");
+                if (!String.IsNullOrEmpty(name) && name == Name)
                 {
-                    IConfig authorizationConfig = source.Configs["AuthorizationService"];
+                    IConfigurationSection authorizationConfig = source.GetSection("AuthorizationService");
                     if (authorizationConfig == null)
                     {
                         m_logger?.LogInformation("[REMOTE AUTHORIZATION CONNECTOR]: AuthorizationService missing from OpenSim.ini");

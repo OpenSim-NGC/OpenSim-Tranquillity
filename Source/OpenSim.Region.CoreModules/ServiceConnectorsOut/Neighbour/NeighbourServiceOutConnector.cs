@@ -25,16 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Services.Connectors;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-
-using Nini.Config;
-
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Neighbour
 {
@@ -59,11 +59,11 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Neighbour
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<NeighbourServicesOutConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("NeighbourServices");
-                if (name == Name)
+                string name = moduleConfig.GetValue<string>("NeighbourServices");
+                if (!String.IsNullOrEmpty(name) && name == Name)
                 {
                     m_Enabled = true;
                     m_logger?.LogInformation("[NEIGHBOUR CONNECTOR]: Neighbour out connector enabled");

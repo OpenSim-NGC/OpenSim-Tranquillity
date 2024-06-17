@@ -25,13 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Simulation
 {
@@ -50,15 +52,12 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Simulation
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SimulationServiceInConnectorModule>>();
             m_Config = config;
 
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+            IConfigurationSection moduleConfig = config.GetSection("Modules");
+            m_Enabled = moduleConfig.GetValue<bool>("SimulationServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("SimulationServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_logger?.LogInformation("[SIM SERVICE]: SimulationService IN connector enabled");
+                m_logger?.LogInformation("[SIM SERVICE]: SimulationService IN connector enabled");
 
-                }
             }
 
         }

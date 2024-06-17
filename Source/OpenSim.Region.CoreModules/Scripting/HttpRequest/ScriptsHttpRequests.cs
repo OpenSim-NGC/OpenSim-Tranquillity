@@ -28,14 +28,17 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Security;
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
-using Nini.Config;
+
+using Microsoft.Extensions.Configuration;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using System.Security.Authentication;
 
 /*****************************************************
  *
@@ -97,11 +100,11 @@ namespace OpenSim.Region.CoreModules.Scripting.HttpRequest
                 if (m_jobEngine is null)
                 {
                     WebProxy proxy = null;
-                    string proxyurl = config.Configs["Startup"].GetString("HttpProxy");
+                    string proxyurl = config.GetSection("Startup").GetValue<string>("HttpProxy");
                     if (!string.IsNullOrEmpty(proxyurl))
                     {
                         string[] proxyexceptsArray = null;
-                        string proxyexcepts = config.Configs["Startup"].GetString("HttpProxyExceptions");
+                        string proxyexcepts = config.GetSection("Startup").GetValue<string>("HttpProxyExceptions");
                         if (!string.IsNullOrEmpty(proxyexcepts))
                         {
                             proxyexceptsArray = proxyexcepts.Split(';');
@@ -113,21 +116,21 @@ namespace OpenSim.Region.CoreModules.Scripting.HttpRequest
                                 new WebProxy(proxyurl, true, proxyexceptsArray);
                     }
 
-                    m_HttpBodyMaxLenMAX = config.Configs["Network"].GetInt("HttpBodyMaxLenMAX", m_HttpBodyMaxLenMAX);
+                    m_HttpBodyMaxLenMAX = config.GetSection("Network").GetValue<int>("HttpBodyMaxLenMAX", m_HttpBodyMaxLenMAX);
 
                     m_outboundUrlFilter = new OutboundUrlFilter("Script HTTP request module", config);
 
                     int maxThreads = 8;
-                    IConfig httpConfig = config.Configs["ScriptsHttpRequestModule"];
+                    IConfigurationSection httpConfig = config.GetSection("ScriptsHttpRequestModule");
                     int httpTimeout = 30000;
                     if (httpConfig is not null)
                     {
-                        maxThreads = httpConfig.GetInt("MaxPoolThreads", maxThreads);
-                        m_primBurst = httpConfig.GetFloat("PrimRequestsBurst", m_primBurst);
-                        m_primPerSec = httpConfig.GetFloat("PrimRequestsPerSec", m_primPerSec);
-                        m_primOwnerBurst = httpConfig.GetFloat("PrimOwnerRequestsBurst", m_primOwnerBurst);
-                        m_primOwnerPerSec = httpConfig.GetFloat("PrimOwnerRequestsPerSec", m_primOwnerPerSec);
-                        httpTimeout = httpConfig.GetInt("RequestsTimeOut", httpTimeout);
+                        maxThreads = httpConfig.GetValue<int>("MaxPoolThreads", maxThreads);
+                        m_primBurst = httpConfig.GetValue<float>("PrimRequestsBurst", m_primBurst);
+                        m_primPerSec = httpConfig.GetValue<float>("PrimRequestsPerSec", m_primPerSec);
+                        m_primOwnerBurst = httpConfig.GetValue<float>("PrimOwnerRequestsBurst", m_primOwnerBurst);
+                        m_primOwnerPerSec = httpConfig.GetValue<float>("PrimOwnerRequestsPerSec", m_primOwnerPerSec);
+                        httpTimeout = httpConfig.GetValue<int>("RequestsTimeOut", httpTimeout);
                         if (httpTimeout > 60000)
                             httpTimeout = 60000;
                         else if (httpTimeout < 200)
@@ -654,7 +657,7 @@ namespace OpenSim.Region.CoreModules.Scripting.HttpRequest
 
                         if (totalBodyBytes > 0)
                 {
-                    string tempString = Util.UTF8.GetString(buf, 0, totalBodyBytes);
+                    string tempString = Util.UTF8.GetValue<string>(buf, 0, totalBodyBytes);
                     ResponseBody = tempString.Replace("\r", "");
                 }
                         }

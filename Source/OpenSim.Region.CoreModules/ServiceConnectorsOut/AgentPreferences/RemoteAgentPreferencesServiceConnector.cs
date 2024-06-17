@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -33,8 +34,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences
 {
@@ -58,25 +57,23 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences
         public new void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteAgentPreferencesServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
+            string? name = moduleConfig.GetValue<string>("AgentPreferencesServices", "");
+            if (!String.IsNullOrEmpty(name) && name == Name)
             {
-                string name = moduleConfig.GetString("AgentPreferencesServices", "");
-                if (name == Name)
+                IConfigurationSection userConfig = source.GetSection("AgentPreferencesService");
+                if (userConfig == null)
                 {
-                    IConfig userConfig = source.Configs["AgentPreferencesService"];
-                    if (userConfig == null)
-                    {
-                        m_logger?.LogError("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    m_Enabled = true;
-
-                    base.Initialise(source);
-
-                    m_logger?.LogInformation("[AGENT PREFERENCES CONNECTOR]: Remote agent preferences enabled");
+                    m_logger?.LogError("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
+                    return;
                 }
+
+                m_Enabled = true;
+
+                base.Initialise(source);
+
+                m_logger?.LogInformation("[AGENT PREFERENCES CONNECTOR]: Remote agent preferences enabled");
             }
         }
 

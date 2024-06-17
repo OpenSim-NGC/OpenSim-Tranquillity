@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -33,8 +34,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
 {
@@ -58,13 +57,13 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
         public override void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteAuthenticationServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("AuthenticationServices", "");
-                if (name == Name)
+                string name = moduleConfig.GetValue<string>("AuthenticationServices", "");
+                if (!String.IsNullOrEmpty(name) && name == Name)
                 {
-                    IConfig userConfig = source.Configs["AuthenticationService"];
+                    IConfigurationSection userConfig = source.GetSection("AuthenticationService");
                     if (userConfig == null)
                     {
                         m_logger?.LogError("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");

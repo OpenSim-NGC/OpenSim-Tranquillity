@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -36,9 +37,6 @@ using OpenSim.Region.CoreModules.World.WorldMap;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
-
 
 namespace OpenSim.Region.CoreModules.World.Land
 {
@@ -58,6 +56,7 @@ namespace OpenSim.Region.CoreModules.World.Land
         public override void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HGWorldMapModule>>();
+
             string[] configSections = new string[] { "Map", "Startup" };
             if (Util.GetConfigVarFromSections<string>(
                 source, "WorldMapModule", configSections, "WorldMap") == "HGWorldMap")

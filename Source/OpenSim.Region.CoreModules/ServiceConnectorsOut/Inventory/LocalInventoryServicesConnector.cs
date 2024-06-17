@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -36,8 +37,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 {
@@ -80,22 +79,22 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalInventoryServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("InventoryServices", "");
+                string name = moduleConfig.GetValue<string>("InventoryServices", "");
                 if (name == Name)
                 {
-                    IConfig inventoryConfig = source.Configs["InventoryService"];
+                    IConfigurationSection inventoryConfig = source.GetSection("InventoryService");
                     if (inventoryConfig == null)
                     {
                         m_logger?.LogError("[LOCAL INVENTORY SERVICES CONNECTOR]: InventoryService missing from OpenSim.ini");
                         return;
                     }
 
-                    string serviceDll = inventoryConfig.GetString("LocalServiceModule", String.Empty);
+                    string serviceDll = inventoryConfig.GetValue<string>("LocalServiceModule", String.Empty);
 
-                    if (serviceDll.Length == 0)
+                    if (String.IsNullOrEmpty(serviceDll))
                     {
                         m_logger?.LogError("[LOCAL INVENTORY SERVICES CONNECTOR]: No LocalServiceModule named in section InventoryService");
                         return;

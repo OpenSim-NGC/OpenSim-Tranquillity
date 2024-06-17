@@ -25,6 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -32,8 +36,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
 {
@@ -70,11 +72,11 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalLandServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("LandServices", this.Name);
-                if (name == Name)
+                string name = moduleConfig.GetValue<string>("LandServices", this.Name);
+                if (!String.IsNullOrEmpty(name) && name == Name)
                 {
                     m_Enabled = true;
                     m_logger?.LogInformation("[LAND CONNECTOR]: Local land connector enabled");

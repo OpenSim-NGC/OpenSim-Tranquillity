@@ -1891,12 +1891,15 @@ namespace OpenSim.Framework
         /// <returns></returns>
         public static T GetConfigVarFromSections<T>(IConfiguration config, string varname, string[] sections, object val)
         {
+            T configVal = (T)val;
             foreach (string section in sections.AsSpan())
             {
                 var cnf = config.GetSection(section);
-                if (cnf.Exists() is false)
+                if (!cnf.GetChildren().Any())
                     continue;
 
+                configVal = cnf.GetValue<T>(varname, configVal);
+                /*
                 if (typeof(T) == typeof(String))
                     val = cnf.GetValue<string>(varname, (string)val);
                 else if (typeof(T) == typeof(Boolean))
@@ -1909,9 +1912,10 @@ namespace OpenSim.Framework
                     val = cnf.GetValue<double>(varname, (double)val);
                 //else
                 //    m_log.ErrorFormat($"[UTIL]: Unhandled type {typeof(T)}");
+                */
             }
 
-            return (T)val;
+            return configVal;
         }
 
 /* XXX

@@ -30,8 +30,6 @@ using System.IO;
 using System.Collections.Generic;
 using System.Text;
 
-using Nini.Config;
-
 using OpenSim.Framework;
 using OpenSim.Region;
 using OpenSim.Region.PhysicsModule.SharedBase;

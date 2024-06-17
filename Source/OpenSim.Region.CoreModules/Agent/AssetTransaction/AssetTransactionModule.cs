@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -33,8 +34,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
 {
@@ -57,10 +56,10 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
 
         public void Initialise(IConfiguration source)
         {
-            IConfig sconfig = source.Configs["Startup"];
+            IConfigurationSection sconfig = source.GetSection("Startup");
             if (sconfig != null)
             {
-                m_levelUpload = sconfig.GetInt("LevelUpload", 0);
+                m_levelUpload = sconfig.GetValue<int>("LevelUpload", 0);
             }
         }
 

@@ -27,6 +27,7 @@
 
 using System.Runtime;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -39,15 +40,13 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
-using Nini.Config;
-
 namespace OpenSim.Region.OptionalModules.Scripting.RegionReady
 {
     public class RegionReadyModule : IRegionReadyModule, INonSharedRegionModule
     {
         private static ILogger? m_logger;
 
-        private IConfig m_config = null;
+        private IConfigurationSection m_config = null;
         private bool m_firstEmptyCompileQueue;
         private bool m_oarFileLoading;
         private bool m_lastOarLoadedOk;
@@ -68,17 +67,15 @@ namespace OpenSim.Region.OptionalModules.Scripting.RegionReady
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RegionReadyModule>>();
-            m_config = config.Configs["RegionReady"];
-            if (m_config != null)
-            {
-                m_enabled = m_config.GetBoolean("enabled", false);
 
-                if (m_enabled)
-                {
-                    m_channelNotify = m_config.GetInt("channel_notify", m_channelNotify);
-                    m_disable_logins = m_config.GetBoolean("login_disable", false);
-                    m_uri = m_config.GetString("alert_uri",string.Empty);
-                }
+            m_config = config.GetSection("RegionReady");
+            m_enabled = m_config.GetValue<bool>("enabled", false);
+
+            if (m_enabled)
+            {
+                m_channelNotify = m_config.GetValue<int>("channel_notify", m_channelNotify);
+                m_disable_logins = m_config.GetValue<bool>("login_disable", false);
+                m_uri = m_config.GetValue<string>("alert_uri",string.Empty);
             }
         }
 

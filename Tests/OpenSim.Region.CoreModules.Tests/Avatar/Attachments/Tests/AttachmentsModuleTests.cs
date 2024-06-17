@@ -33,7 +33,6 @@ using System.Threading;
 using System.Timers;
 using System.Xml;
 using Timer=System.Timers.Timer;
-using Nini.Config;
 using NUnit.Framework;
 using OpenMetaverse;
 using OpenSim.Framework;

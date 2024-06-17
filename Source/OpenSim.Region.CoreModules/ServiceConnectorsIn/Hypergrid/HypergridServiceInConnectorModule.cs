@@ -25,8 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -37,16 +36,14 @@ using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Hypergrid;
 using OpenSim.Services.Interfaces;
 
-using Nini.Config;
-
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Hypergrid
 {
     public class HypergridServiceInConnectorModule : ISharedRegionModule
     {
         private static ILogger? m_logger;
         private static bool m_Enabled = false;
+        private static IConfiguration m_Config = null;
 
-        private IConfiguration m_Config;
         private bool m_Registered = false;
         private string m_LocalServiceDll = string.Empty;
         private GatekeeperServiceInConnector m_HypergridHandler;
@@ -58,21 +55,17 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Hypergrid
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HypergridServiceInConnectorModule>>();
             m_Config = config;
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+
+            IConfigurationSection moduleConfig = m_Config.GetSection("Modules");
+            m_Enabled = moduleConfig.GetValue<bool>("HypergridServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("HypergridServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_logger?.LogInformation("[HGGRID IN CONNECTOR]: Hypergrid Service In Connector enabled");
-                    IConfig fconfig = config.Configs["FriendsService"];
-                    if (fconfig != null)
-                    {
-                        m_LocalServiceDll = fconfig.GetString("LocalServiceModule", m_LocalServiceDll);
-                        if (m_LocalServiceDll.Length == 0)
-                            m_log.WarnFormat("[HGGRID IN CONNECTOR]: Friends LocalServiceModule config missing");
-                    }
-                }
+                m_logger?.LogInformation("[HGGRID IN CONNECTOR]: Hypergrid Service In Connector enabled");
+
+                IConfigurationSection fconfig = m_Config.GetSection("FriendsService");
+                m_LocalServiceDll = fconfig.GetValue<string>("LocalServiceModule", m_LocalServiceDll);
+                if (String.IsNullOrEmpty(m_LocalServiceDll))
+                    m_logger?.LogWarning("[HGGRID IN CONNECTOR]: Friends LocalServiceModule config missing");
             }
         }
 

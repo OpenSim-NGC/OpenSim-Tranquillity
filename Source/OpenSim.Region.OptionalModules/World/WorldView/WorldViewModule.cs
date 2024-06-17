@@ -28,6 +28,7 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -38,8 +39,6 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.World.WorldView
 {
@@ -53,11 +52,9 @@ namespace OpenSim.Region.OptionalModules.World.WorldView
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<WorldViewModule>>();
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig == null)
-                return;
+            IConfigurationSection moduleConfig = config.GetSection("Modules");
 
-            if (moduleConfig.GetString("WorldViewModule", String.Empty) != Name)
+            if (moduleConfig.GetValue<string>("WorldViewModule", String.Empty) != Name)
                 return;
 
             m_Enabled = true;

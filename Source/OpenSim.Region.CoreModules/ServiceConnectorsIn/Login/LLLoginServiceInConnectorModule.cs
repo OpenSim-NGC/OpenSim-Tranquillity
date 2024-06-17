@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -33,8 +34,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Handlers.Login;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Login
 {
@@ -54,17 +53,12 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Login
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LLLoginServiceInConnectorModule>>();
             m_Config = config;
 
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+            IConfigurationSection moduleConfig = config.GetSection("Modules");
+            m_Enabled = moduleConfig.GetValue<bool>("LLLoginServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("LLLoginServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_logger?.LogInformation("[LLLOGIN IN CONNECTOR]: LLLoginerviceInConnector enabled");
-                }
-
+                m_logger?.LogInformation("[LLLOGIN IN CONNECTOR]: LLLoginerviceInConnector enabled");
             }
-
         }
 
         public void PostInitialise()

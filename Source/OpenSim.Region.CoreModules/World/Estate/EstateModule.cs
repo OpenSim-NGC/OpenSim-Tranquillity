@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -36,8 +37,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Estate
 {
@@ -68,17 +67,17 @@ namespace OpenSim.Region.CoreModules.World.Estate
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EstateModule>>();
             uint port = MainServer.Instance.Port;
 
-            IConfig estateConfig = config.Configs["Estates"];
+            IConfigurationSection estateConfig = config.GetSection("Estates");
             if (estateConfig != null)
             {
-                if (estateConfig.GetString("EstateCommunicationsHandler", Name) == Name)
+                if (estateConfig.GetValue<string>("EstateCommunicationsHandler", Name) == Name)
                     m_enabled = true;
                 else
                     return;
 
-                port = (uint)estateConfig.GetInt("Port", 0);
+                port = (uint)estateConfig.GetValue<int>("Port", 0);
                 // this will need to came from somewhere else
-                token = estateConfig.GetString("Token", token);
+                token = estateConfig.GetValue<string>("Token", token);
             }
             else
             {

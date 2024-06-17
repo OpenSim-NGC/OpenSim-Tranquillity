@@ -26,27 +26,18 @@
  */
 
 
-using System;
-using System.IO;
 using System.Collections;
-using System.Collections.Generic;
-using System.Text;
+using System.IO.Compression;
+
+using Microsoft.Extensions.Configuration;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-
-using OpenSim.Framework;
-using OpenSim.Region.Framework;
-using OpenSim.Region.Framework.Scenes;
-using OpenSim.Framework.Capabilities;
-
-using System.IO.Compression;
-
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
-using Nini.Config;
-using Microsoft.Extensions.Configuration;
+using OpenSim.Region.Framework.Scenes;
+using OpenSim.Framework.Capabilities;
 
 namespace OpenSim.Region.ClientStack.Linden
 {

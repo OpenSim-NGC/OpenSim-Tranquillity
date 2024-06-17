@@ -28,6 +28,7 @@
 using System.Net;
 using System.Text;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -44,8 +45,6 @@ using OpenSimAssetType = OpenSim.Framework.SLUtil.OpenSimAssetType;
 using OpenSim.Server.Base;
 
 using Ionic.Zlib;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Materials
 {
@@ -77,15 +76,12 @@ namespace OpenSim.Region.OptionalModules.Materials
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MaterialsModule>>();
             m_enabled = true; // default is enabled
 
-            IConfig config = source.Configs["Materials"];
-            if (config is not null)
-            {
-                m_enabled = config.GetBoolean("enable_materials", m_enabled);
-                m_maxMaterialsPerTransaction = config.GetInt("MaxMaterialsPerTransaction", m_maxMaterialsPerTransaction);
-            }
+            IConfigurationSection config = source.GetSection("Materials");
+            m_enabled = config.GetValue<bool>("enable_materials", m_enabled);
+            m_maxMaterialsPerTransaction = config.GetValue<int>("MaxMaterialsPerTransaction", m_maxMaterialsPerTransaction);
 
             if (m_enabled)
-                m_log.DebugFormat("[Materials]: Initialized");
+                m_logger?.LogDebug("[Materials]: Initialized");
         }
 
         public void Close()

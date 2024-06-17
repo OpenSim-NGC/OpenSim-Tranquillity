@@ -34,8 +34,11 @@ using System.Reflection.Emit;
 using System.Text;
 using System.Timers;
 using System.Xml;
+
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 
 using OpenSim.Framework;
@@ -56,8 +59,6 @@ using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
 using SceneScriptEvents = OpenSim.Region.Framework.Scenes.scriptEvents;
 
-using Nini.Config;
-
 namespace OpenSim.Region.ScriptEngine.Yengine
 {
     public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModule
@@ -76,7 +77,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
         public bool m_ScriptDebugSaveIL;
         public Scene m_Scene;
         private IConfiguration m_ConfigSource;
-        private IConfig m_Config;
+        private IConfiguration m_Config;
         private string m_ScriptBasePath;
         private bool m_Enabled = false;
         public bool m_StartProcessing = false;
@@ -185,27 +186,27 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             ////}
 
             m_Enabled = false;
-            m_Config = config.Configs["YEngine"];
-            if(m_Config == null)
+            m_Config = config.GetSection("YEngine");
+            if(!m_Config.GetChildren().Any())
             {
                 m_logger?.LogInformation("[YEngine]: no config, assuming disabled");
                 return;
             }
-            m_Enabled = m_Config.GetBoolean("Enabled", false);
+            m_Enabled = m_Config.GetValue<bool>("Enabled", false);
             m_logger?.LogInformation("[YEngine]: config enabled={0}", m_Enabled);
             if(!m_Enabled)
                 return;
 
-            numThreadScriptWorkers = m_Config.GetInt("NumThreadScriptWorkers", 2);
-            string priority = m_Config.GetString("Priority", "Normal");
-            m_TraceCalls = m_Config.GetBoolean("TraceCalls", false);
-            m_Verbose = m_Config.GetBoolean("Verbose", false);
-            m_ScriptDebug = m_Config.GetBoolean("ScriptDebug", false);
-            m_ScriptDebugSaveSource = m_Config.GetBoolean("ScriptDebugSaveSource", false);
-            m_ScriptDebugSaveIL = m_Config.GetBoolean("ScriptDebugSaveIL", false);
+            numThreadScriptWorkers = m_Config.GetValue<int>("NumThreadScriptWorkers", 2);
+            string priority = m_Config.GetValue<string>("Priority", "Normal");
+            m_TraceCalls = m_Config.GetValue<bool>("TraceCalls", false);
+            m_Verbose = m_Config.GetValue<bool>("Verbose", false);
+            m_ScriptDebug = m_Config.GetValue<bool>("ScriptDebug", false);
+            m_ScriptDebugSaveSource = m_Config.GetValue<bool>("ScriptDebugSaveSource", false);
+            m_ScriptDebugSaveIL = m_Config.GetValue<bool>("ScriptDebugSaveIL", false);
 
-            m_StackSize = m_Config.GetInt("ScriptStackSize", 2048) << 10;
-            m_HeapSize = m_Config.GetInt("ScriptHeapSize", 1024) << 10;
+            m_StackSize = m_Config.GetValue<int>("ScriptStackSize", 2048) << 10;
+            m_HeapSize = m_Config.GetValue<int>("ScriptHeapSize", 1024) << 10;
 
             // Verify that our ScriptEventCode's match OpenSim's scriptEvent's.
             bool err = false;
@@ -262,7 +263,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
                     break;
             }
 
-            m_MaintenanceInterval = m_Config.GetInt("MaintenanceInterval", 10);
+            m_MaintenanceInterval = m_Config.GetValue<int>("MaintenanceInterval", 10);
 
             if(m_MaintenanceInterval > 0)
             {
@@ -290,10 +291,10 @@ namespace OpenSim.Region.ScriptEngine.Yengine
 
             m_Scene.RegisterModuleInterface<IScriptModule>(this);
 
-            m_ScriptBasePath = m_Config.GetString("ScriptEnginesPath");
+            m_ScriptBasePath = m_Config.GetValue<string>("ScriptEnginesPath");
             //look for old
             if (string.IsNullOrWhiteSpace(m_ScriptBasePath))
-                m_ScriptBasePath = m_Config.GetString("ScriptBasePath");
+                m_ScriptBasePath = m_Config.GetValue<string>("ScriptBasePath");
             if (string.IsNullOrWhiteSpace(m_ScriptBasePath))
                 m_ScriptBasePath = "ScriptEngines";
 
@@ -1046,7 +1047,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             }
         }
 
-        public IConfig Config
+        public IConfiguration Config
         {
             get
             {

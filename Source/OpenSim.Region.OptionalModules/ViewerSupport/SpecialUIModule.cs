@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
@@ -64,16 +63,13 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SpecialUIModule>>();
-            IConfig moduleConfig = config.Configs["SpecialUIModule"];
-            if (moduleConfig != null)
-            {
-                m_Enabled = moduleConfig.GetBoolean("enabled", false);
-                if (m_Enabled)
-                {
-                    m_UserLevel = moduleConfig.GetInt("UserLevel", 0);
-                    m_logger?.LogInformation("[SPECIAL UI]: SpecialUIModule enabled");
-                }
 
+            IConfigurationSection moduleConfig = config.GetSection("SpecialUIModule");
+            m_Enabled = moduleConfig.GetValue<bool>("enabled", false);
+            if (m_Enabled)
+            {
+                m_UserLevel = moduleConfig.GetValue<int>("UserLevel", 0);
+                m_logger?.LogInformation("[SPECIAL UI]: SpecialUIModule enabled");
             }
         }
 

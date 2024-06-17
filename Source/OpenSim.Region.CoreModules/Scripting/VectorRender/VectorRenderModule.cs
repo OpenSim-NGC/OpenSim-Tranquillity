@@ -30,6 +30,7 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -39,8 +40,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 //using Cairo;
 
@@ -109,7 +108,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
         {
             if (m_textureManager == null)
             {
-                m_log.Warn("[VECTORRENDERMODULE]: No texture manager. Can't function");
+                m_logger.LogWarning("[VECTORRENDERMODULE]: No texture manager. Can't function");
                 return false;
             }
             // XXX: This isn't actually being done asynchronously!
@@ -141,10 +140,10 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<VectorRenderModule>>();
-            IConfig cfg = config.Configs["VectorRender"];
+            IConfigurationSection cfg = config.GetSection("VectorRender");
             if (null != cfg)
             {
-                m_fontName = cfg.GetString("font_name", m_fontName);
+                m_fontName = cfg.GetValue<string>("font_name", m_fontName);
             }
             m_logger?.LogDebug("[VECTORRENDERMODULE]: using font \"{0}\" for text rendering.", m_fontName);
 

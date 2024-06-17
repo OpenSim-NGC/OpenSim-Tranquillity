@@ -29,6 +29,7 @@ using System.Collections;
 using System.Data.SQLite;
 using System.Text;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -44,8 +45,6 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.UserStatistics
 {
@@ -76,10 +75,9 @@ namespace OpenSim.Region.OptionalModules.UserStatistics
         public virtual void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<WebStatsModule>>();
-            IConfig cnfg = config.Configs["WebStats"];
 
-            if (cnfg != null)
-                enabled = cnfg.GetBoolean("enabled", false);
+            IConfigurationSection cnfg = config.GetSection("WebStats");
+            enabled = cnfg.GetValue<bool>("enabled", false);
         }
 
         public virtual void PostInitialise()

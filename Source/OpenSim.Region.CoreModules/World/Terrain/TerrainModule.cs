@@ -28,6 +28,7 @@
 using System.Reflection;
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -43,8 +44,6 @@ using OpenSim.Region.CoreModules.World.Terrain.PaintBrushes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Terrain
 {
@@ -231,11 +230,11 @@ namespace OpenSim.Region.CoreModules.World.Terrain
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<TerrainModule>>();
-            IConfig terrainConfig = config.Configs["Terrain"];
-            if (terrainConfig != null)
+            IConfigurationSection terrainConfig = config.GetSection("Terrain");
+            if (terrainConfig.GetChildren().Any())
             {
-                m_InitialTerrain = terrainConfig.GetString("InitialTerrain", m_InitialTerrain);
-                m_sendTerrainUpdatesByViewDistance = terrainConfig.GetBoolean("SendTerrainUpdatesByViewDistance",m_sendTerrainUpdatesByViewDistance);
+                m_InitialTerrain = terrainConfig.GetValue<string>("InitialTerrain", m_InitialTerrain);
+                m_sendTerrainUpdatesByViewDistance = terrainConfig.GetValue<bool>("SendTerrainUpdatesByViewDistance",m_sendTerrainUpdatesByViewDistance);
             }
         }
 

@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -35,8 +36,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer
 {
@@ -56,11 +55,11 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<InventoryTransferModule>>();
 
-            if (config.Configs["Messaging"] != null)
+            if (config.GetSection("Messaging") != null)
             {
                 // Allow disabling this module in config
                 //
-                if (config.Configs["Messaging"].GetString(
+                if (config.GetSection("Messaging").GetValue<string>(
                         "InventoryTransferModule", "InventoryTransferModule") !=
                         "InventoryTransferModule")
                 {
@@ -90,7 +89,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer
                 m_TransferModule = m_Scenelist[0].RequestModuleInterface<IMessageTransferModule>();
                 if (m_TransferModule == null)
                 {
-                    m_log.Error("[INVENTORY TRANSFER]: No Message transfer module found, transfers will be local only");
+                    m_logger.LogError("[INVENTORY TRANSFER]: No Message transfer module found, transfers will be local only");
                     m_Enabled = false;
 
 //                    m_Scenelist.Clear();

@@ -29,6 +29,7 @@ using System.Timers;
 using System.Drawing;
 using System.Drawing.Imaging;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -39,8 +40,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MapImage
 {
@@ -76,27 +75,27 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MapImage
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteLandServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("MapImageService", "");
+                string name = moduleConfig.GetValue<string>("MapImageService", "");
                 if (name != Name)
                     return;
             }
 
-            IConfig config = source.Configs["MapImageService"];
+            IConfigurationSection config = source.GetSection("MapImageService");
             if (config == null)
                 return;
 
-            int refreshminutes = Convert.ToInt32(config.GetString("RefreshTime"));
+            int refreshminutes = Convert.ToInt32(config.GetValue<string>("RefreshTime"));
             if (refreshminutes < 0)
             {
                 m_logger?.LogWarning("[MAP IMAGE SERVICE MODULE]: Negative refresh time given in config. Module disabled.");
                 return;
             }
 
-            string service = config.GetString("LocalServiceModule", string.Empty);
-            if (service.Length == 0)
+            string service = config.GetValue<string>("LocalServiceModule", string.Empty);
+            if (String.IsNullOrEmpty(service))
             {
                 m_logger?.LogWarning("[MAP IMAGE SERVICE MODULE]: No service dll given in config. Unable to proceed.");
                 return;

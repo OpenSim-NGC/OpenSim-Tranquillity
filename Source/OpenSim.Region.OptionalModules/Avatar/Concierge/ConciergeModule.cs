@@ -30,6 +30,7 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -43,8 +44,6 @@ using OpenSim.Region.CoreModules.Avatar.Chat;
 using OpenSim.Server.Base;
 
 using Nwc.XmlRpc;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Avatar.Concierge
 {
@@ -77,21 +76,19 @@ namespace OpenSim.Region.OptionalModules.Avatar.Concierge
         public override void Initialise(IConfiguration configSource)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<ConciergeModule>>();
-            IConfig config = configSource.Configs["Concierge"];
 
-            if (config == null)
+            IConfigurationSection conciergeConfig = configSource.GetSection("Concierge");
+            m_enabled = conciergeConfig.GetValue<bool>("enabled", false);
+
+            if (!m_enabled)
                 return;
-
-            if (!config.GetBoolean("enabled", false))
-                return;
-
-            m_enabled = true;
 
             // check whether ChatModule has been disabled: if yes,
             // then we'll "stand in"
             try
             {
-                if (configSource.Configs["Chat"] == null)
+                var chatConfig = configSource.GetSection("Chat");
+                if (!chatConfig.GetChildren().Any())
                 {
                     // if Chat module has not been configured it's
                     // enabled by default, so we are not going to
@@ -100,7 +97,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Concierge
                 }
                 else
                 {
-                    m_replacingChatModule  = !configSource.Configs["Chat"].GetBoolean("enabled", true);
+                    m_replacingChatModule  = !chatConfig.GetValue<bool>("enabled", true);
                 }
             }
             catch (Exception)
@@ -111,21 +108,21 @@ namespace OpenSim.Region.OptionalModules.Avatar.Concierge
             m_logger?.LogInformation("[Concierge] {0} ChatModule", m_replacingChatModule ? "replacing" : "not replacing");
 
             // take note of concierge channel and of identity
-            m_conciergeChannel = configSource.Configs["Concierge"].GetInt("concierge_channel", m_conciergeChannel);
-            m_whoami = config.GetString("whoami", "conferencier");
-            m_welcomes = config.GetString("welcomes", m_welcomes);
-            m_announceEntering = config.GetString("announce_entering", m_announceEntering);
-            m_announceLeaving = config.GetString("announce_leaving", m_announceLeaving);
-            m_xmlRpcPassword = config.GetString("password", m_xmlRpcPassword);
-            m_brokerURI = config.GetString("broker", m_brokerURI);
-            m_brokerUpdateTimeout = config.GetInt("broker_timeout", m_brokerUpdateTimeout);
+            m_conciergeChannel = conciergeConfig.GetValue<int>("concierge_channel", m_conciergeChannel);
+            m_whoami = conciergeConfig.GetValue<string>("whoami", "conferencier");
+            m_welcomes = conciergeConfig.GetValue<string>("welcomes", m_welcomes);
+            m_announceEntering = conciergeConfig.GetValue<string>("announce_entering", m_announceEntering);
+            m_announceLeaving = conciergeConfig.GetValue<string>("announce_leaving", m_announceLeaving);
+            m_xmlRpcPassword = conciergeConfig.GetValue<string>("password", m_xmlRpcPassword);
+            m_brokerURI = conciergeConfig.GetValue<string>("broker", m_brokerURI);
+            m_brokerUpdateTimeout = conciergeConfig.GetValue<int>("broker_timeout", m_brokerUpdateTimeout);
 
             m_logger?.LogInformation("[Concierge] reporting as \"{0}\" to our users", m_whoami);
 
             // calculate regions Regex
             if (m_regions == null)
             {
-                string regions = config.GetString("regions", String.Empty);
+                string regions = conciergeConfig.GetValue<string>("regions", String.Empty);
                 if (!String.IsNullOrEmpty(regions))
                 {
                     m_regions = new Regex(@regions, RegexOptions.Compiled | RegexOptions.IgnoreCase);

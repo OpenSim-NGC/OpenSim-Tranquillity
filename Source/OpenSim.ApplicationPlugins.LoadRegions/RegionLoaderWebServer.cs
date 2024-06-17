@@ -28,13 +28,12 @@
 using System.Net;
 using System.Xml;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.ApplicationPlugins.LoadRegions
 {
@@ -62,9 +61,9 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
             }
             else
             {
-                IConfig startupConfig = (IConfig)m_configSource.Configs["Startup"];
-                string url = startupConfig.GetString("regionload_webserver_url", String.Empty).Trim();
-                bool allowRegionless = startupConfig.GetBoolean("allow_regionless", false);
+                IConfigurationSection startupConfig = m_configSource.GetSection("Startup");
+                string url = startupConfig.GetValue<string>("regionload_webserver_url", String.Empty).Trim();
+                bool allowRegionless = startupConfig.GetValue<bool>("allow_regionless", false);
 
                 if (url.Length == 0)
                 {

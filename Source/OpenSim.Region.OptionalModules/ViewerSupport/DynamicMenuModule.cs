@@ -27,6 +27,7 @@
 
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -40,8 +41,6 @@ using OpenSim.Framework;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.ViewerSupport
 {

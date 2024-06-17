@@ -28,14 +28,18 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
-using NDesk.Options;
-using Nini.Config;
+
+using Microsoft.Extensions.Configuration;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Console;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
+
+using NDesk.Options;
 
 namespace OpenSim.Region.CoreModules.World.Objects.Commands
 {

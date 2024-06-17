@@ -30,6 +30,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Timers;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -41,8 +42,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Asset
 {
@@ -135,11 +134,11 @@ namespace OpenSim.Region.CoreModules.Asset
 
         public void Initialise(IConfiguration source)
         {
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
 
             if (moduleConfig is not null)
             {
-                string name = moduleConfig.GetString("AssetCaching", string.Empty);
+                string name = moduleConfig.GetValue<string>("AssetCaching", string.Empty);
 
                 if (name == Name)
                 {
@@ -148,7 +147,7 @@ namespace OpenSim.Region.CoreModules.Asset
 
                     m_logger.LogInformation($"[FLOTSAM ASSET CACHE]: {this.Name} enabled");
 
-                    IConfig assetConfig = source.Configs["AssetCache"];
+                    IConfigurationSection assetConfig = source.GetSection("AssetCache");
                     if (assetConfig is null)
                     {
                         m_logger.LogDebug(
@@ -156,31 +155,31 @@ namespace OpenSim.Region.CoreModules.Asset
                     }
                     else
                     {
-                        m_FileCacheEnabled = assetConfig.GetBoolean("FileCacheEnabled", m_FileCacheEnabled);
-                        m_CacheDirectory = assetConfig.GetString("CacheDirectory", m_CacheDirectory);
+                        m_FileCacheEnabled = assetConfig.GetValue<bool>("FileCacheEnabled", m_FileCacheEnabled);
+                        m_CacheDirectory = assetConfig.GetValue<string>("CacheDirectory", m_CacheDirectory);
                         m_CacheDirectory = Path.GetFullPath(m_CacheDirectory);
 
-                        m_MemoryCacheEnabled = assetConfig.GetBoolean("MemoryCacheEnabled", m_MemoryCacheEnabled);
-                        m_MemoryExpiration = assetConfig.GetDouble("MemoryCacheTimeout", m_MemoryExpiration);
+                        m_MemoryCacheEnabled = assetConfig.GetValue<bool>("MemoryCacheEnabled", m_MemoryCacheEnabled);
+                        m_MemoryExpiration = assetConfig.GetValue<double>("MemoryCacheTimeout", m_MemoryExpiration);
                         m_MemoryExpiration *= 3600.0; // config in hours to seconds
 
-                        m_negativeCacheEnabled = assetConfig.GetBoolean("NegativeCacheEnabled", m_negativeCacheEnabled);
-                        m_negativeExpiration = assetConfig.GetInt("NegativeCacheTimeout", m_negativeExpiration);
+                        m_negativeCacheEnabled = assetConfig.GetValue<bool>("NegativeCacheEnabled", m_negativeCacheEnabled);
+                        m_negativeExpiration = assetConfig.GetValue<int>("NegativeCacheTimeout", m_negativeExpiration);
 
-                        m_updateFileTimeOnCacheHit = assetConfig.GetBoolean("UpdateFileTimeOnCacheHit", m_updateFileTimeOnCacheHit);
+                        m_updateFileTimeOnCacheHit = assetConfig.GetValue<bool>("UpdateFileTimeOnCacheHit", m_updateFileTimeOnCacheHit);
                         m_updateFileTimeOnCacheHit &= m_FileCacheEnabled;
 
-                        m_LogLevel = assetConfig.GetInt("LogLevel", m_LogLevel);
-                        m_HitRateDisplay = (ulong)assetConfig.GetLong("HitRateDisplay", (long)m_HitRateDisplay);
+                        m_LogLevel = assetConfig.GetValue<int>("LogLevel", m_LogLevel);
+                        m_HitRateDisplay = (ulong)assetConfig.GetValue<long>("HitRateDisplay", (long)m_HitRateDisplay);
 
-                        m_FileExpiration = TimeSpan.FromHours(assetConfig.GetDouble("FileCacheTimeout", m_DefaultFileExpiration));
+                        m_FileExpiration = TimeSpan.FromHours(assetConfig.GetValue<double>("FileCacheTimeout", m_DefaultFileExpiration));
                         m_FileExpirationCleanupTimer = TimeSpan.FromHours(
-                                assetConfig.GetDouble("FileCleanupTimer", m_FileExpirationCleanupTimer.TotalHours));
+                                assetConfig.GetValue<double>("FileCleanupTimer", m_FileExpirationCleanupTimer.TotalHours));
 
-                        m_CacheDirectoryTiers = assetConfig.GetInt("CacheDirectoryTiers", m_CacheDirectoryTiers);
-                        m_CacheDirectoryTierLen = assetConfig.GetInt("CacheDirectoryTierLength", m_CacheDirectoryTierLen);
+                        m_CacheDirectoryTiers = assetConfig.GetValue<int>("CacheDirectoryTiers", m_CacheDirectoryTiers);
+                        m_CacheDirectoryTierLen = assetConfig.GetValue<int>("CacheDirectoryTierLength", m_CacheDirectoryTierLen);
 
-                        m_CacheWarnAt = assetConfig.GetInt("CacheWarnAt", m_CacheWarnAt);
+                        m_CacheWarnAt = assetConfig.GetValue<int>("CacheWarnAt", m_CacheWarnAt);
                     }
 
                     if(m_updateFileTimeOnCacheHit)
@@ -203,11 +202,11 @@ namespace OpenSim.Region.CoreModules.Asset
 
                     m_negativeExpiration *= 1000;
 
-                    assetConfig = source.Configs["AssetService"];
+                    assetConfig = source.GetSection("AssetService");
                     if(assetConfig is not null)
                     {
-                        m_assetLoader = assetConfig.GetString("DefaultAssetLoader", string.Empty);
-                        m_assetLoaderArgs = assetConfig.GetString("AssetLoaderArgs", string.Empty);
+                        m_assetLoader = assetConfig.GetValue<string>("DefaultAssetLoader", string.Empty);
+                        m_assetLoaderArgs = assetConfig.GetValue<string>("AssetLoaderArgs", string.Empty);
                         if (string.IsNullOrWhiteSpace(m_assetLoaderArgs))
                             m_assetLoader = string.Empty;
                     }

@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -36,8 +37,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Simulation;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
@@ -61,11 +60,11 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
         public virtual void Initialise(IConfiguration configSource)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteSimulationConnectorModule>>();
-            IConfig moduleConfig = configSource.Configs["Modules"];
+            IConfigurationSection moduleConfig = configSource.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("SimulationServices", "");
-                if (name == Name)
+                string name = moduleConfig.GetValue<string>("SimulationServices", "");
+                if (!String.IsNullOrEmpty(name) && name == Name)
                 {
                     m_localBackend = new LocalSimulationConnectorModule();
 

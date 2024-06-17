@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -36,8 +37,6 @@ using netcd;
 using netcd.Serialization;
 using netcd.Advanced;
 using netcd.Advanced.Requests;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Framework.Monitoring
 {
@@ -68,17 +67,14 @@ namespace OpenSim.Region.OptionalModules.Framework.Monitoring
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EtcdMonitoringModule>>();
-            if (source.Configs["Etcd"] == null)
+
+            IConfigurationSection etcdConfig = source.GetSection("Etcd");
+            string etcdUrls = etcdConfig.GetValue<string>("EtcdUrls", String.Empty);
+            if (!etcdConfig.GetChildren().Any() && String.IsNullOrEmpty(etcdUrls))
                 return;
 
-            IConfig etcdConfig = source.Configs["Etcd"];
-
-            string etcdUrls = etcdConfig.GetString("EtcdUrls", String.Empty);
-            if (etcdUrls.Length == 0)
-                return;
-
-            m_etcdBasePath = etcdConfig.GetString("BasePath", m_etcdBasePath);
-            m_appendRegionID = etcdConfig.GetBoolean("AppendRegionID", m_appendRegionID);
+            m_etcdBasePath = etcdConfig.GetValue<string>("BasePath", m_etcdBasePath);
+            m_appendRegionID = etcdConfig.GetValue<bool>("AppendRegionID", m_appendRegionID);
 
             if (!m_etcdBasePath.EndsWith("/"))
                 m_etcdBasePath += "/";

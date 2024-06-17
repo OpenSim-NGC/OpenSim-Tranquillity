@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
 {
@@ -68,22 +67,21 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalUserAccountServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("UserAccountServices", "");
-                if (name == Name)
+                string name = moduleConfig.GetValue<string>("UserAccountServices", "");
+                if (!String.IsNullOrEmpty(name) && name == Name)
                 {
-                    IConfig userConfig = source.Configs["UserAccountService"];
+                    IConfigurationSection userConfig = source.GetSection("UserAccountService");
                     if (userConfig == null)
                     {
                         m_logger?.LogError("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: UserAccountService missing from OpenSim.ini");
                         return;
                     }
 
-                    string serviceDll = userConfig.GetString("LocalServiceModule", String.Empty);
-
-                    if (serviceDll.Length == 0)
+                    string serviceDll = userConfig.GetValue<string>("LocalServiceModule", String.Empty);
+                    if (String.IsNullOrEmpty(serviceDll))
                     {
                         m_logger?.LogError("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: No LocalServiceModule named in section UserService");
                         return;

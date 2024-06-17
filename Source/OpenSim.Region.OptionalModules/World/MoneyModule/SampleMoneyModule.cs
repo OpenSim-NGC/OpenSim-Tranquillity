@@ -28,6 +28,7 @@
 using System.Collections;
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -43,8 +44,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using Nwc.XmlRpc;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.World.MoneyModule
 {
@@ -255,11 +254,11 @@ namespace OpenSim.Region.OptionalModules.World.MoneyModule
         {
             // we are enabled by default
 
-            IConfig economyConfig = m_gConfig.Configs["Economy"];
+            IConfigurationSection economyConfig = m_gConfig.GetSection("Economy");
 
-            var mmodule = economyConfig?.GetString("economymodule", "");
+            var mmodule = economyConfig?.GetValue<string>("economymodule", "");
             if (String.IsNullOrEmpty(mmodule))
-                mmodule = economyConfig?.GetString("EconomyModule", "");
+                mmodule = economyConfig?.GetValue<string>("EconomyModule", "");
 
             if (!string.IsNullOrEmpty(mmodule) && mmodule != Name)
             {
@@ -271,22 +270,22 @@ namespace OpenSim.Region.OptionalModules.World.MoneyModule
             if(economyConfig == null)
                 return;
 
-            PriceEnergyUnit = economyConfig.GetInt("PriceEnergyUnit", 0);
-            PriceObjectClaim = economyConfig.GetInt("PriceObjectClaim", 0);
-            PricePublicObjectDecay = economyConfig.GetInt("PricePublicObjectDecay", 4);
-            PricePublicObjectDelete = economyConfig.GetInt("PricePublicObjectDelete", 0);
-            PriceParcelClaim = economyConfig.GetInt("PriceParcelClaim", 0);
-            PriceParcelClaimFactor = economyConfig.GetFloat("PriceParcelClaimFactor", 1f);
-            PriceUpload = economyConfig.GetInt("PriceUpload", 0);
-            PriceRentLight = economyConfig.GetInt("PriceRentLight", 0);
-            TeleportMinPrice = economyConfig.GetInt("TeleportMinPrice", 0);
-            TeleportPriceExponent = economyConfig.GetFloat("TeleportPriceExponent", 2f);
-            EnergyEfficiency = economyConfig.GetFloat("EnergyEfficiency", 1);
-            PriceObjectRent = economyConfig.GetFloat("PriceObjectRent", 0);
-            PriceObjectScaleFactor = economyConfig.GetFloat("PriceObjectScaleFactor", 10);
-            PriceParcelRent = economyConfig.GetInt("PriceParcelRent", 0);
-            PriceGroupCreate = economyConfig.GetInt("PriceGroupCreate", -1);
-            m_sellEnabled = economyConfig.GetBoolean("SellEnabled", true);
+            PriceEnergyUnit = economyConfig.GetValue<int>("PriceEnergyUnit", 0);
+            PriceObjectClaim = economyConfig.GetValue<int>("PriceObjectClaim", 0);
+            PricePublicObjectDecay = economyConfig.GetValue<int>("PricePublicObjectDecay", 4);
+            PricePublicObjectDelete = economyConfig.GetValue<int>("PricePublicObjectDelete", 0);
+            PriceParcelClaim = economyConfig.GetValue<int>("PriceParcelClaim", 0);
+            PriceParcelClaimFactor = economyConfig.GetValue<float>("PriceParcelClaimFactor", 1f);
+            PriceUpload = economyConfig.GetValue<int>("PriceUpload", 0);
+            PriceRentLight = economyConfig.GetValue<int>("PriceRentLight", 0);
+            TeleportMinPrice = economyConfig.GetValue<int>("TeleportMinPrice", 0);
+            TeleportPriceExponent = economyConfig.GetValue<float>("TeleportPriceExponent", 2f);
+            EnergyEfficiency = economyConfig.GetValue<float>("EnergyEfficiency", 1);
+            PriceObjectRent = economyConfig.GetValue<float>("PriceObjectRent", 0);
+            PriceObjectScaleFactor = economyConfig.GetValue<float>("PriceObjectScaleFactor", 10);
+            PriceParcelRent = economyConfig.GetValue<int>("PriceParcelRent", 0);
+            PriceGroupCreate = economyConfig.GetValue<int>("PriceGroupCreate", -1);
+            m_sellEnabled = economyConfig.GetValue<bool>("SellEnabled", true);
         }
 
         private void GetClientFunds(IClientAPI client)

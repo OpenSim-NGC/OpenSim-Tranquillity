@@ -27,6 +27,7 @@
 
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -42,8 +43,6 @@ using OpenSim.Server.Base;
 
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Media.Moap
 {
@@ -67,9 +66,9 @@ namespace OpenSim.Region.CoreModules.World.Media.Moap
         public void Initialise(IConfiguration configSource)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MoapModule>>();
-            IConfig config = configSource.Configs["MediaOnAPrim"];
+            IConfigurationSection config = configSource.GetSection("MediaOnAPrim");
 
-            if (config != null && !config.GetBoolean("Enabled", false))
+            if (config.GetChildren().Any() && !config.GetValue<bool>("Enabled", false))
                 m_isEnabled = false;
 //            else
 //                m_log.Debug("[MOAP]: Initialised module.")l

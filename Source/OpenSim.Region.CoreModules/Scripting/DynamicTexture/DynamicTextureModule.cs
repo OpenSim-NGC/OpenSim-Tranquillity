@@ -29,6 +29,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -39,8 +40,6 @@ using OpenSim.Server.Base;
 
 using OpenMetaverse;
 using OpenMetaverse.Imaging;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture
 {
@@ -337,11 +336,11 @@ namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<DynamicTextureModule>>();
-            IConfig texturesConfig = config.Configs["Textures"];
-            if (texturesConfig != null)
+            IConfigurationSection texturesConfig = config.GetSection("Textures");
+            if (texturesConfig is not null)
             {
-                ReuseTextures = texturesConfig.GetBoolean("ReuseDynamicTextures", false);
-                ReuseLowDataTextures = texturesConfig.GetBoolean("ReuseDynamicLowDataTextures", false);
+                ReuseTextures = texturesConfig.GetValue<bool>("ReuseDynamicTextures", false);
+                ReuseLowDataTextures = texturesConfig.GetValue<bool>("ReuseDynamicLowDataTextures", false);
 
                 if (ReuseTextures)
                 {

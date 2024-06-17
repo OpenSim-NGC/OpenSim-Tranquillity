@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -33,8 +34,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
 {
@@ -61,39 +60,36 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalAssetServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            IConfigurationSectioni moduleConfig = source.GetSection("Modules");
+            string name = moduleConfig.GetValue<string>("AssetServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("AssetServices", "");
-                if (name == Name)
+                IConfigurationSection assetConfig = source.GetSection("AssetService");
+                if (assetConfig == null)
                 {
-                    IConfig assetConfig = source.Configs["AssetService"];
-                    if (assetConfig == null)
-                    {
-                        m_logger?.LogError("[LOCAL ASSET SERVICES CONNECTOR]: AssetService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    string serviceDll = assetConfig.GetString("LocalServiceModule", string.Empty);
-                    if (string.IsNullOrEmpty(serviceDll))
-                    {
-                        m_logger?.LogError("[LOCAL ASSET SERVICES CONNECTOR]: No LocalServiceModule named in section AssetService");
-                        return;
-                    }
-
-                    //m_logger?.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Loading asset service at {0}", serviceDll);
-
-                    object[] args = new object[] { source };
-                    m_AssetService = ServerUtils.LoadPlugin<IAssetService>(serviceDll, args);
-
-                    if (m_AssetService == null)
-                    {
-                        m_logger?.LogError("[LOCAL ASSET SERVICES CONNECTOR]: Fail to load asset service " + serviceDll);
-                        return;
-                    }
-                    m_Enabled = true;
-                    m_logger?.LogInformation("[LOCAL ASSET SERVICES CONNECTOR]: Local asset connector enabled");
+                    m_logger?.LogError("[LOCAL ASSET SERVICES CONNECTOR]: AssetService missing from OpenSim.ini");
+                    return;
                 }
+
+                string serviceDll = assetConfig.GetValue<string>("LocalServiceModule", string.Empty);
+                if (string.IsNullOrEmpty(serviceDll))
+                {
+                    m_logger?.LogError("[LOCAL ASSET SERVICES CONNECTOR]: No LocalServiceModule named in section AssetService");
+                    return;
+                }
+
+                //m_logger?.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Loading asset service at {0}", serviceDll);
+
+                object[] args = new object[] { source };
+                m_AssetService = ServerUtils.LoadPlugin<IAssetService>(serviceDll, args);
+
+                if (m_AssetService == null)
+                {
+                    m_logger?.LogError("[LOCAL ASSET SERVICES CONNECTOR]: Fail to load asset service " + serviceDll);
+                    return;
+                }
+                m_Enabled = true;
+                m_logger?.LogInformation("[LOCAL ASSET SERVICES CONNECTOR]: Local asset connector enabled");
             }
         }
 

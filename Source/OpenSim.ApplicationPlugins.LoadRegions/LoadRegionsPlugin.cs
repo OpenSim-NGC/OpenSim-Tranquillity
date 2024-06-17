@@ -25,10 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework;
-using Microsoft.Extensions.Logging;
-using Nini.Config;
 
 namespace OpenSim.ApplicationPlugins.LoadRegions
 {
@@ -85,7 +86,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
             IEstateLoader estateLoader = null;
             IRegionLoader regionLoader;
 
-            if (_configuration.Configs["Startup"].GetString("region_info_source", "filesystem") == "filesystem")
+            if (_configuration.GetSection("Startup").GetValue<string>("region_info_source", "filesystem") == "filesystem")
             {
                 _logger.LogInformation("[LOAD REGIONS PLUGIN]: Loading region configurations from filesystem");
 

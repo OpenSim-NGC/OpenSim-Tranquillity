@@ -27,6 +27,7 @@
 
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -42,8 +43,6 @@ using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Gods
 {

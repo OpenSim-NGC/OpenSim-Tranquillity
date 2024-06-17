@@ -26,8 +26,8 @@
  */
 
 using System.Net;
-using System.Reflection;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -41,8 +41,6 @@ using OpenSim.Server.Base;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
 {
@@ -245,10 +243,10 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
         public virtual void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EntityTransferModule>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("EntityTransferModule", "");
+                string name = moduleConfig.GetValue<string>("EntityTransferModule", "");
                 if (name == Name)
                 {
                     InitialiseCommon(source);
@@ -263,14 +261,14 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
         /// <param name="source"></param>
         protected virtual void InitialiseCommon(IConfiguration source)
         {
-            IConfig transferConfig = source.Configs["EntityTransfer"];
+            IConfigurationSection transferConfig = source.GetSection("EntityTransfer");
             if (transferConfig != null)
             {
                 DisableInterRegionTeleportCancellation
-                    = transferConfig.GetBoolean("DisableInterRegionTeleportCancellation", false);
+                    = transferConfig.GetValue<bool>("DisableInterRegionTeleportCancellation", false);
 
                 WaitForAgentArrivedAtDestination
-                    = transferConfig.GetBoolean("wait_for_callback", WaitForAgentArrivedAtDestination);
+                    = transferConfig.GetValue<bool>("wait_for_callback", WaitForAgentArrivedAtDestination);
             }
 
             m_entityTransferStateMachine = new EntityTransferStateMachine(this);

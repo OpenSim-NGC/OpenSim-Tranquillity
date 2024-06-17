@@ -25,15 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.ApplicationPlugins.LoadRegions
 {
@@ -56,9 +53,9 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
 
             try
             {
-                IConfig startupConfig = (IConfig)m_configSource.Configs["Startup"];
-                regionConfigPath = startupConfig.GetString("regionload_regionsdir", regionConfigPath).Trim();
-                allowRegionless = startupConfig.GetBoolean("allow_regionless", false);
+                IConfigurationSection startupConfig = m_configSource.GetSection("Startup");
+                regionConfigPath = startupConfig.GetValue<string>("regionload_regionsdir", regionConfigPath).Trim();
+                allowRegionless = startupConfig.GetValue<bool>("allow_regionless", false);
             }
             catch (Exception)
             {
@@ -89,11 +86,11 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
             {
                 m_logger?.LogInformation("[REGION LOADER FILE SYSTEM]: Loading config file {0}", file);
 
-                IConfiguration source = new IniConfigSource(file);
+                IConfiguration source = new ConfigurationBuilder().AddIniFile(file).Build();
 
-                foreach (IConfig config in source.Configs)
+                foreach (IConfigurationSection config in source.GetChildren())
                 {
-                    RegionInfo regionInfo = new RegionInfo("REGION CONFIG #" + (i + 1), file, false, m_configSource, config.Name);
+                    RegionInfo regionInfo = new RegionInfo("REGION CONFIG #" + (i + 1), file, false, m_configSource, config.Key);
                     regionInfos.Add(regionInfo);
 
                     m_logger?.LogInformation("[REGION LOADER FILE SYSTEM]: Loaded config for region {0}", regionInfo.RegionName);

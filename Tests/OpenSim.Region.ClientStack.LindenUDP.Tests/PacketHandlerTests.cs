@@ -25,11 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using NUnit.Framework;
-using OpenMetaverse;
-using OpenMetaverse.Packets;
-using OpenSim.Framework;
 using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.ClientStack.LindenUDP.Tests

@@ -25,8 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
+using Microsoft.Extensions.Configuration;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -53,13 +55,12 @@ namespace OpenSim.Region.CoreModules.World.Land
         {
             m_Config = source;
 
-            IConfig DwellConfig = m_Config.Configs ["Dwell"];
-
-            if (DwellConfig == null) {
+            IConfigurationSection DwellConfig = m_Config.GetSection("Dwell");
+            if (!DwellConfig.GetChildren().Any()) {
                 m_Enabled = false;
                 return;
             }
-            m_Enabled = (DwellConfig.GetString ("DwellModule", "DefaultDwellModule") == "DefaultDwellModule");
+            m_Enabled = (DwellConfig.GetValue<string>("DwellModule", "DefaultDwellModule") == "DefaultDwellModule");
         }
 
         public void AddRegion(Scene scene)

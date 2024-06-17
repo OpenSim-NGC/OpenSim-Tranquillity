@@ -29,6 +29,7 @@ using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -40,8 +41,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.BakedTextures
 {
@@ -60,11 +59,11 @@ namespace OpenSim.Region.CoreModules.Avatar.BakedTextures
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<XBakesModule>>();
 
-            IConfig config = configSource.Configs["XBakes"];
+            IConfigurationSection config = configSource.GetSection("XBakes");
             if (config == null)
                 return;
 
-            m_URL = config.GetString("URL", String.Empty);
+            m_URL = config.GetValue<string>("URL", String.Empty);
             if (m_URL.Length == 0)
                 return;
 

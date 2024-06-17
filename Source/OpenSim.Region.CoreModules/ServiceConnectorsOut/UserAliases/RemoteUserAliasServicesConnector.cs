@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 using OpenSim.Framework;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
 {
@@ -59,16 +58,16 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
         public override void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteUserAliasServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("UserAliasServices", "");
-                if (name == Name)
+                string name = moduleConfig.GetValue<string>("UserAliasServices", "");
+                if (!String.IsNullOrEmpty(name) && name == Name)
                 {
-                    IConfig userConfig = source.Configs["UserAliasService"];
+                    IConfigurationSection userConfig = source.GetSection("UserAliasService");
                     if (userConfig == null)
                     {
-                        m_log.Error("[USER CONNECTOR]: UserAliasService missing from OpenSim.ini");
+                        m_logger?.LogError("[USER CONNECTOR]: UserAliasService missing from OpenSim.ini");
                         return;
                     }
 

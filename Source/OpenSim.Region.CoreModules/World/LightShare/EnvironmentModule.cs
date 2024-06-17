@@ -27,6 +27,7 @@
 
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -39,8 +40,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-
-using Nini.Config;
 
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
@@ -81,12 +80,12 @@ namespace OpenSim.Region.CoreModules.World.LightShare
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EnvironmentModule>>();
-            IConfig config = source.Configs["ClientStack.LindenCaps"];
+            IConfigurationSection config = source.GetSection("ClientStack.LindenCaps");
 
-            if (config is null)
+            if (!config.GetChildren().Any())
                 return;
 
-            if (!config.GetString("Cap_EnvironmentSettings", string.Empty).Equals("localhost"))
+            if (!config.GetValue<string>("Cap_EnvironmentSettings", string.Empty).Equals("localhost"))
             {
                 m_logger?.LogInformation("[{0}]: Module is disabled.", Name);
                 return;

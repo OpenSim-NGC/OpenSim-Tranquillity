@@ -70,6 +70,7 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -84,8 +85,6 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;                     // TODO: turn transactionData into a dictionary of <string, object> and remove this.
-
-using Nini.Config;
 
 using Nwc.XmlRpc;
 
@@ -215,11 +214,11 @@ namespace Gloebit.GloebitMoneyModule
 
             m_logger.LogInformation("[GLOEBITMONEYMODULE] Initialising.");
 
-            IConfig economyConfig = config.Configs["Economy"];
+            IConfigurationSection economyConfig = config.GetSection("Economy");
 
-            var mmodule = economyConfig?.GetString("economymodule", "");
+            var mmodule = economyConfig?.GetValue("economymodule", "");
             if (String.IsNullOrEmpty(mmodule))
-                mmodule = economyConfig?.GetString("EconomyModule", "");
+                mmodule = economyConfig?.GetValue("EconomyModule", "");
 
             if ((string.IsNullOrEmpty(mmodule) == false) && ((mmodule == Name) || (mmodule == "Gloebit")))
             {
@@ -238,7 +237,7 @@ namespace Gloebit.GloebitMoneyModule
             string[] sections = { "Economy", "Gloebit" };
             foreach (var section in sections) 
             {
-                IConfig sec_config = config.Configs[section];
+                IConfigurationSection sec_config = config.GetSection(section);
 
                 if (null == sec_config) 
                 {
@@ -250,8 +249,8 @@ namespace Gloebit.GloebitMoneyModule
             }
             
             // Load Grid info from GridInfoService if Standalone and GridInfo if Robust
-            IConfig standalone_config = config.Configs["GridInfoService"];
-            IConfig robust_config = config.Configs["GridInfo"];
+            IConfigurationSection standalone_config = config.GetSection("GridInfoService");
+            IConfigurationSection robust_config = config.GetSection("GridInfo");
 
             if (standalone_config == null && robust_config == null) 
             {
@@ -290,8 +289,8 @@ namespace Gloebit.GloebitMoneyModule
                 // GLBSpecificStorageProvider wasn't specified so fall back to using the global
                 // DatabaseService settings
                 m_logger.LogInformation("[GLOEBITMONEYMODULE] using default StorageProvider and ConnectionString from DatabaseService");
-                m_dbProvider = config.Configs["DatabaseService"].GetString("StorageProvider");
-                m_dbConnectionString = config.Configs["DatabaseService"].GetString("ConnectionString");
+                m_dbProvider = config.GetSection("DatabaseService")>.GetValue<string>("StorageProvider");
+                m_dbConnectionString = config.GetSection("DatabaseService")?.GetValue<string>("ConnectionString");
             } 
             else 
             {
@@ -338,28 +337,28 @@ namespace Gloebit.GloebitMoneyModule
         /// </summary>
         /// <param name="config"></param>
         /// <param name="section"></param>
-        private void ReadConfigAndPopulate(IConfig config, string section)
+        private void ReadConfigAndPopulate(IConfigurationSection config, string section)
         {
             /********** [Economy] ************/
             if (section == "Economy") 
             {
                 /*** Get OpenSim built in pricing configuration info ***/
-                PriceEnergyUnit = config.GetInt("PriceEnergyUnit", 100);
-                PriceObjectClaim = config.GetInt("PriceObjectClaim", 10);
-                PricePublicObjectDecay = config.GetInt("PricePublicObjectDecay", 4);
-                PricePublicObjectDelete = config.GetInt("PricePublicObjectDelete", 4);
-                PriceParcelClaim = config.GetInt("PriceParcelClaim", 1);
-                PriceParcelClaimFactor = config.GetFloat("PriceParcelClaimFactor", 1f);
-                PriceUpload = config.GetInt("PriceUpload", 0);
-                PriceRentLight = config.GetInt("PriceRentLight", 5);
-                TeleportMinPrice = config.GetInt("TeleportMinPrice", 2);
-                TeleportPriceExponent = config.GetFloat("TeleportPriceExponent", 2f);
-                EnergyEfficiency = config.GetFloat("EnergyEfficiency", 1);
-                PriceObjectRent = config.GetFloat("PriceObjectRent", 1);
-                PriceObjectScaleFactor = config.GetFloat("PriceObjectScaleFactor", 10);
-                PriceParcelRent = config.GetInt("PriceParcelRent", 1);
-                PriceGroupCreate = config.GetInt("PriceGroupCreate", -1);
-                m_sellEnabled = config.GetBoolean("SellEnabled", true);
+                PriceEnergyUnit = config.GetValue<int>("PriceEnergyUnit", 100);
+                PriceObjectClaim = config.GetValue<int>("PriceObjectClaim", 10);
+                PricePublicObjectDecay = config.GetValue<int>("PricePublicObjectDecay", 4);
+                PricePublicObjectDelete = config.GetValue<int>("PricePublicObjectDelete", 4);
+                PriceParcelClaim = config.GetValue<int>("PriceParcelClaim", 1);
+                PriceParcelClaimFactor = config.GetValue<float>("PriceParcelClaimFactor", 1f);
+                PriceUpload = config.GetValue<int>("PriceUpload", 0);
+                PriceRentLight = config.GetValue<int>("PriceRentLight", 5);
+                TeleportMinPrice = config.GetValue<int>("TeleportMinPrice", 2);
+                TeleportPriceExponent = config.GetValue<float>("TeleportPriceExponent", 2f);
+                EnergyEfficiency = config.GetValue<float>("EnergyEfficiency", 1);
+                PriceObjectRent = config.GetValue<float>("PriceObjectRent", 1);
+                PriceObjectScaleFactor = config.GetValue<float>("PriceObjectScaleFactor", 10);
+                PriceParcelRent = config.GetValue<int>("PriceParcelRent", 1);
+                PriceGroupCreate = config.GetValue<int>("PriceGroupCreate", -1);
+                m_sellEnabled = config.GetValue<bool>("SellEnabled", true);
             }
             
             /********** [Gloebit] ************/
@@ -367,8 +366,8 @@ namespace Gloebit.GloebitMoneyModule
             {
                 /*** Get GloebitMoneyModule configuration details ***/
                 // Get region/grid owner contact details for transaction failure contact instructions.
-                string ownerName = config.GetString("GLBOwnerName", "region or grid owner");
-                string ownerEmail = config.GetString("GLBOwnerEmail", null);
+                string ownerName = config.GetValue<string>("GLBOwnerName", "region or grid owner");
+                string ownerEmail = config.GetValue<string>("GLBOwnerEmail", null);
                 m_contactOwner = ownerName;
                 if (!String.IsNullOrEmpty(ownerEmail)) 
                 {
@@ -376,14 +375,14 @@ namespace Gloebit.GloebitMoneyModule
                 }
 
                 // Should we disable adding info to OpenSimExtras map
-                m_disablePerSimCurrencyExtras = config.GetBoolean("DisablePerSimCurrencyExtras", false);
+                m_disablePerSimCurrencyExtras = config.GetValue<bool>("DisablePerSimCurrencyExtras", false);
                 
                 // Should we send new session IMs informing user how to auth or purchase gloebits
-                m_showNewSessionPurchaseIM = config.GetBoolean("GLBShowNewSessionPurchaseIM", false);
-                m_showNewSessionAuthIM = config.GetBoolean("GLBShowNewSessionAuthIM", true);
+                m_showNewSessionPurchaseIM = config.GetValue<bool>("GLBShowNewSessionPurchaseIM", false);
+                m_showNewSessionAuthIM = config.GetValue<bool>("GLBShowNewSessionAuthIM", true);
                 
                 // Should we send a welcome message informing user that Gloebit is enabled
-                m_showWelcomeMessage = config.GetBoolean("GLBShowWelcomeMessage", true);
+                m_showWelcomeMessage = config.GetValue<bool>("GLBShowWelcomeMessage", true);
                 string nsms_msg = "\n\t";
                 nsms_msg = String.Format("{0}Welcome Message: {1},\tTo modify, set GLBShowWelcomeMessage in [Gloebit] section of config\n\t", nsms_msg, m_showWelcomeMessage);
                 nsms_msg = String.Format("{0}Auth Message: {1},\tTo modify, set GLBShowNewSessionAuthIM in [Gloebit] section of config\n\t", nsms_msg, m_showNewSessionAuthIM);
@@ -393,15 +392,15 @@ namespace Gloebit.GloebitMoneyModule
                 
                 // If version cannot be detected override workflow selection via config
                 // Currently not documented because last resort if all version checking fails
-                m_forceNewLandPassFlow = config.GetBoolean("GLBNewLandPassFlow", false);
-                m_forceNewHTTPFlow = config.GetBoolean("GLBNewHTTPFlow", false);
+                m_forceNewLandPassFlow = config.GetValue<bool>("GLBNewLandPassFlow", false);
+                m_forceNewHTTPFlow = config.GetValue<bool>("GLBNewHTTPFlow", false);
                 
                 // Are we using custom db connection info
-                m_dbProvider = config.GetString("GLBSpecificStorageProvider");
-                m_dbConnectionString = config.GetString("GLBSpecificConnectionString");
+                m_dbProvider = config.GetValue<string>("GLBSpecificStorageProvider");
+                m_dbConnectionString = config.GetValue<string>("GLBSpecificConnectionString");
                 
                 /*** Get Gloebit API configuration details ***/
-                string envString = config.GetString("GLBEnvironment", "sandbox");
+                string envString = config.GetValue<string>("GLBEnvironment", "sandbox");
                 switch(envString) 
                 {
                     case "sandbox":
@@ -414,8 +413,8 @@ namespace Gloebit.GloebitMoneyModule
                         break;
                     case "custom":
                         m_environment = GLBEnv.Custom;
-                        m_apiUrl = config.GetString("GLBApiUrl", SANDBOX_URL);
-                        string overrideBaseURIStr = config.GetString("GLBCallbackBaseURI", null);
+                        m_apiUrl = config.GetValue<string>("GLBApiUrl", SANDBOX_URL);
+                        string overrideBaseURIStr = config.GetValue<string>("GLBCallbackBaseURI", null);
                         if(overrideBaseURIStr != null) {
                             m_overrideBaseURI = new Uri(overrideBaseURIStr);
                         }
@@ -428,9 +427,9 @@ namespace Gloebit.GloebitMoneyModule
                         break;
                 }
                 
-                m_keyAlias = config.GetString("GLBKeyAlias", null);
-                m_key = config.GetString("GLBKey", null);
-                m_secret = config.GetString("GLBSecret", null);
+                m_keyAlias = config.GetValue<string>("GLBKeyAlias", null);
+                m_key = config.GetValue<string>("GLBKey", null);
+                m_secret = config.GetValue<string>("GLBSecret", null);
             }
 
             /********** [GridInfoService] ************/
@@ -438,7 +437,9 @@ namespace Gloebit.GloebitMoneyModule
             {
                 // If we're here, this is a standalone mode grid
                 /*** Grab the grid info locally ***/
-                setGridInfo(config.GetString("gridname", m_gridname), config.GetString("gridnick", m_gridnick), config.GetString("economy", null));
+                setGridInfo(config.GetValue<string>("gridname", m_gridname),
+                            config.GetValue<string>("gridnick", m_gridnick),
+                            config.GetValue<string>("economy", null));
             }
             
             /********** [GridInfo] ************/
@@ -446,7 +447,7 @@ namespace Gloebit.GloebitMoneyModule
             {
                 // If we're here, this is a robust mode grid
                 /*** Grab the grid info via the grid info uri ***/
-                string gridInfoURI = config.GetString("GridInfoURI", null);
+                string gridInfoURI = config.GetValue<string>("GridInfoURI", null);
                 // TODO: Should we store the info url?
                 m_logger.LogInformation("[GLOEBITMONEYMODULE] GRID INFO URL = {0}", gridInfoURI);
             

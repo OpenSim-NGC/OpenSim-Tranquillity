@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -33,8 +34,6 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Groups
 {
@@ -50,8 +49,9 @@ namespace OpenSim.Groups
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GroupsServiceRemoteConnector>>();
 
-            IConfig groupsConfig = config.Configs["Groups"];
-            string url = groupsConfig.GetString("GroupsServerURI", string.Empty);
+            IConfigurationSection groupsConfig = config.GetSection("Groups");
+
+            string url = groupsConfig.GetValue<string>("GroupsServerURI", string.Empty);
             if (!Uri.IsWellFormedUriString(url, UriKind.Absolute))
                 throw new Exception(string.Format("[Groups.RemoteConnector]: Malformed groups server URL {0}. Fix it or disable the Groups feature.", url));
 

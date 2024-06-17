@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 {
@@ -61,20 +60,20 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<OfflineMessageModule>>();
-            IConfig cnf = config.Configs["Messaging"];
+            IConfigurationSection cnf = config.GetSection("Messaging");
             if (cnf == null)
             {
                 enabled = false;
                 return;
             }
-            if (cnf != null && cnf.GetString("OfflineMessageModule", "None") !=
+            if (cnf != null && cnf.GetValue<string>("OfflineMessageModule", "None") !=
                     "OfflineMessageModule")
             {
                 enabled = false;
                 return;
             }
 
-            m_RestURL = cnf.GetString("OfflineMessageURL", "");
+            m_RestURL = cnf.GetValue<string>("OfflineMessageURL", "");
             if (m_RestURL.Length == 0)
             {
                 m_logger?.LogError("[OFFLINE MESSAGING] Module was enabled, but no URL is given, disabling");
@@ -82,8 +81,8 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
                 return;
             }
 
-            m_ForwardOfflineGroupMessages = cnf.GetBoolean("ForwardOfflineGroupMessages", m_ForwardOfflineGroupMessages);
-            m_UseNewAvnCode = cnf.GetBoolean("UseNewAvnCode", m_UseNewAvnCode);
+            m_ForwardOfflineGroupMessages = cnf.GetValue<bool>("ForwardOfflineGroupMessages", m_ForwardOfflineGroupMessages);
+            m_UseNewAvnCode = cnf.GetValue<bool>("UseNewAvnCode", m_UseNewAvnCode);
         }
 
         public void AddRegion(Scene scene)

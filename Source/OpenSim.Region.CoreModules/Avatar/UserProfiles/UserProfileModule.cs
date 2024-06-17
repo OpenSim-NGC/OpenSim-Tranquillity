@@ -27,8 +27,8 @@
 
 using System.Collections.Concurrent;
 using System.Globalization;
-using System.Reflection;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -44,9 +44,6 @@ using OpenSim.Server.Base;
 
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
-
-using Nini.Config;
-
 
 namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
 {
@@ -274,7 +271,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             Config = source;
             ReplaceableInterface = typeof(IProfileModule);
 
-            IConfig profileConfig = Config.Configs["UserProfiles"];
+            IConfigurationSection profileConfig = Config.GetSection("UserProfiles");
 
             if (profileConfig is null)
             {
@@ -285,7 +282,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
 
             // If we find ProfileURL then we configure for FULL support
             // else we setup for BASIC support
-            ProfileServerUri = profileConfig.GetString("ProfileServiceURL", "");
+            ProfileServerUri = profileConfig.GetValue<string>("ProfileServiceURL", "");
             if (string.IsNullOrEmpty(ProfileServerUri))
             {
                 Enabled = false;
@@ -295,13 +292,13 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             OSHTTPURI tmp = new(ProfileServerUri, true);
             if (!tmp.IsResolvedHost)
             {
-                m_log.ErrorFormat("[UserProfileModule: {0}", tmp.IsValidHost ?  "Could not resolve ProfileServiceURL" : "ProfileServiceURL is a invalid host");
+                m_logger?.LogError("[UserProfileModule: {0}", tmp.IsValidHost ?  "Could not resolve ProfileServiceURL" : "ProfileServiceURL is a invalid host");
                 throw new Exception("UserProfileModule init error");
             }
 
             ProfileServerUri = tmp.URI;
 
-            m_allowUserProfileWebURLs = profileConfig.GetBoolean("AllowUserProfileWebURLs", m_allowUserProfileWebURLs);
+            m_allowUserProfileWebURLs = profileConfig.GetValue<bool>("AllowUserProfileWebURLs", m_allowUserProfileWebURLs);
 
             m_logger?.LogDebug("[UserProfileModule]: Full Profiles Enabled");
             ReplaceableInterface = null;

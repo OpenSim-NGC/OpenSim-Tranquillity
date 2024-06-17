@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -37,8 +37,6 @@ using OpenSim.Services.Connectors;
 using OpenSim.Framework;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
 {
@@ -63,13 +61,13 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
         public override void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteUserAccountServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("UserAccountServices", "");
+                string name = moduleConfig.GetValue<string>("UserAccountServices", "");
                 if (name == Name)
                 {
-                    IConfig userConfig = source.Configs["UserAccountService"];
+                    IConfigurationSection userConfig = source.GetSection("UserAccountService");
                     if (userConfig == null)
                     {
                         m_logger?.LogError("[USER CONNECTOR]: UserAccountService missing from OpenSim.ini");

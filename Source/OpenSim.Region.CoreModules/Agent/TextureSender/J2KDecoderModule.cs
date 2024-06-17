@@ -28,20 +28,19 @@
 using System.Drawing;
 using System.Text;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Services.Interfaces;
+using OpenSim.Server.Base;
 
 using OpenMetaverse;
 using OpenMetaverse.Imaging;
 
 using CSJ2K;
-using Nini.Config;
-using OpenSim.Server.Base;
 
 namespace OpenSim.Region.CoreModules.Agent.TextureSender
 {
@@ -84,10 +83,10 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
 
         public void Initialise(IConfiguration source)
         {
-            IConfig startupConfig = source.Configs["Startup"];
+            IConfigurationSection startupConfig = source.GetSection("Startup");
             if (startupConfig != null)
             {
-                m_useCSJ2K = startupConfig.GetBoolean("UseCSJ2K", m_useCSJ2K);
+                m_useCSJ2K = startupConfig.GetValue<bool>("UseCSJ2K", m_useCSJ2K);
             }
         }
 

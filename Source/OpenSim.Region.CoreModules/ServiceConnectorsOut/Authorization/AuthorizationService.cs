@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 {
@@ -55,7 +54,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 
         AccessFlags m_accessValue = AccessFlags.None;
 
-        public AuthorizationService(IConfig config, Scene scene)
+        public AuthorizationService(IConfiguration config, Scene scene)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<AuthorizationService>>();
             m_Scene = scene;
@@ -63,8 +62,8 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 
             if (config != null)
             {
-                string accessStr = config.GetString("Region_" + scene.RegionInfo.RegionName.Replace(' ', '_'), String.Empty);
-                if (accessStr != string.Empty)
+                string accessStr = config.GetValue<string>("Region_" + scene.RegionInfo.RegionName.Replace(' ', '_'), String.Empty);
+                if (!String.IsNullOrEmpty(accessStr))
                 {
                     try
                     {

@@ -27,6 +27,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -38,8 +39,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Scripting;
 using OpenSim.Server.Base;
 
-using Nini.Config;
-
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
@@ -48,7 +47,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
     {
         private static ILogger? m_logger;
 
-        private IConfig m_config = null;
+        private IConfigurationSection m_config = null;
         private bool m_enabled = false;
         private Scene m_scene = null;
 
@@ -81,14 +80,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<JsonStoreScriptModule>>();
             try
             {
-                if ((m_config = config.Configs["JsonStore"]) == null)
-                {
-                    // There is no configuration, the module is disabled
-                    // m_logger?.LogInformation("[JsonStoreScripts] no configuration info");
+                m_config = config.GetSection("JsonStore");
+                m_enabled = m_config.GetValue<bool>("Enabled", m_enabled);
+                if (!m_enabled)
                     return;
-                }
-
-                m_enabled = m_config.GetBoolean("Enabled", m_enabled);
             }
             catch (Exception e)
             {

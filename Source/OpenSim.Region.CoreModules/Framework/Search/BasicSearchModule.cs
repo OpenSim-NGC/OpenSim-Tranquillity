@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -35,8 +36,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 using DirFindFlags = OpenMetaverse.DirectoryManager.DirFindFlags;
 
@@ -59,7 +58,7 @@ namespace OpenSim.Region.CoreModules.Framework.Search
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<BasicSearchModule>>();
-            string umanmod = config.Configs["Modules"].GetString("SearchModule", Name);
+            string umanmod = config.GetSection("Modules").GetValue<string>("SearchModule", Name);
             if (umanmod == Name)
             {
                 m_Enabled = true;

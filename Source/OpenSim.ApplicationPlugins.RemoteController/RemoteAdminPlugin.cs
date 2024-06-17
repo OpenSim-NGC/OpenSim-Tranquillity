@@ -31,6 +31,7 @@ using System.Net;
 using System.Timers;
 using System.Xml;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
@@ -44,8 +45,6 @@ using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
 using Nwc.XmlRpc;
-
-using Nini.Config;
 
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using RegionInfo = OpenSim.Framework.RegionInfo;
@@ -105,19 +104,14 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
             try
             {
-                if (_configuration.Configs["RemoteAdmin"] == null ||
-                    !_configuration.Configs["RemoteAdmin"].GetBoolean("enabled", false))
+                var config = _configuration.GetSection("RemoteAdmin");
+                if (config.GetValue<bool>("enabled", false))
                 {
-                    // No config or disabled
-                }
-                else
-                {
-                    var config = _configuration.Configs["RemoteAdmin"];
                     m_logger.LogDebug("[RADMIN]: Remote Admin Plugin Enabled");
-                    m_requiredPassword = config.GetString("access_password", String.Empty);
-                    int port = config.GetInt("port", 0);
+                    m_requiredPassword = config.GetValue<string>("access_password", String.Empty);
+                    int port = config.GetValue<int>("port", 0);
 
-                    string accessIP = config.GetString("access_ip_addresses", String.Empty);
+                    string accessIP = config.GetValue<string>("access_ip_addresses", String.Empty);
                     m_accessIP = new HashSet<string>();
 
                     if (accessIP != String.Empty)
@@ -133,7 +127,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     }
 
                     m_application = openSim;
-                    string bind_ip_address = config.GetString("bind_ip_address", "0.0.0.0");
+                    string bind_ip_address = config.GetValue<string>("bind_ip_address", "0.0.0.0");
                     IPAddress ipaddr = IPAddress.Parse(bind_ip_address);
                     m_httpServer = MainServer.GetHttpServer((uint)port, ipaddr);
 
@@ -183,7 +177,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     availableMethods["admin_get_agent_count"] = (req, ep) => InvokeXmlRpcMethod(req, ep, XmlRpcGetAgentCount);
 
                     // Either enable full remote functionality or just selected features
-                    string enabledMethods = config.GetString("enabled_methods", "all");
+                    string enabledMethods = config.GetValue<string>("enabled_methods", "all");
 
                     // To get this, you must explicitly specify "all" or
                     // mention it in a whitelist. It won't be available
@@ -284,10 +278,10 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 Scene rebootedScene = null;
                 bool restartAll = false;
 
-                IConfig startupConfig = _configuration.Configs["Startup"];
+                IConfigurationSection startupConfig = _configuration.GetSection("Startup");
                 if (startupConfig != null)
                 {
-                    if (startupConfig.GetBoolean("InworldRestartShutsDown", false))
+                    if (startupConfig.GetValue<bool>("InworldRestartShutsDown", false))
                     {
                         rebootedScene = m_application.SceneManager.CurrentOrFirstScene;
                         restartAll = true;
@@ -366,7 +360,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     notice = false;
                 }
 
-                if (startupConfig.GetBoolean("SkipDelayOnEmptyRegion", false))
+                if (startupConfig.GetValue<bool>("SkipDelayOnEmptyRegion", false))
                 {
                     m_logger.LogInformation("[RADMIN]: Counting affected avatars");
                     int agents = 0;
@@ -699,11 +693,11 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
             lock (m_requestLock)
             {
-                var config = _configuration.Configs["RemoteAdmin"];
+                var config = _configuration.GetSection("RemoteAdmin");
 
-                int m_regionLimit = config.GetInt("region_limit", 0);
-                bool m_enableVoiceForNewRegions = config.GetBoolean("create_region_enable_voice", false);
-                bool m_publicAccess = config.GetBoolean("create_region_public", true);
+                int m_regionLimit = config.GetValue<int>("region_limit", 0);
+                bool m_enableVoiceForNewRegions = config.GetValue<bool>("create_region_enable_voice", false);
+                bool m_publicAccess = config.GetValue<bool>("create_region_public", true);
 
                 CheckStringParameters(requestData, responseData, new string[]
                                                    {
@@ -785,8 +779,8 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     try
                     {
                         // OpenSim.ini can specify a different regions dir
-                        IConfig startupConfig = (IConfig)_configuration.Configs["Startup"];
-                        regionConfigPath = startupConfig.GetString("regionload_regionsdir", regionConfigPath).Trim();
+                        IConfigurationSection startupConfig = _configuration.GetSection("Startup");
+                        regionConfigPath = startupConfig.GetValue<string>("regionload_regionsdir", regionConfigPath).Trim();
                     }
                     catch (Exception)
                     {
@@ -809,7 +803,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     {
                         regionIniPath = Path.Combine(regionConfigPath,
                                                         String.Format(
-                                                            config.GetString("region_file_template", "{0}x{1}-{2}.ini"),
+                                                            config.GetValue<string>("region_file_template", "{0}x{1}-{2}.ini"),
                                                             region.RegionLocX.ToString(),
                                                             region.RegionLocY.ToString(),
                                                             regionID.ToString(),
@@ -2717,11 +2711,11 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         {
             m_logger.LogDebug("[RADMIN]: updateUserAppearance");
 
-            var config = _configuration.Configs["RemoteAdmin"];
+            var config = _configuration.GetSection("RemoteAdmin");
 
-            string defaultMale = config.GetString("default_male", "Default Male");
-            string defaultFemale = config.GetString("default_female", "Default Female");
-            string defaultNeutral = config.GetString("default_female", "Default Default");
+            string defaultMale = config.GetValue<string>("default_male", "Default Male");
+            string defaultFemale = config.GetValue<string>("default_female", "Default Female");
+            string defaultNeutral = config.GetValue<string>("default_female", "Default Default");
             string model = String.Empty;
 
             // Has a gender preference been supplied?
@@ -2809,8 +2803,8 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 return;
 
             // Simple appearance copy or copy Clothing and Bodyparts folders?
-            var config = _configuration.Configs["RemoteAdmin"];
-            bool copyFolders = config.GetBoolean("copy_folders", false);
+            var config = _configuration.GetSection("RemoteAdmin");
+            bool copyFolders = config.GetValue<bool>("copy_folders", false);
 
             if (!copyFolders)
             {
@@ -3157,12 +3151,12 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             try
             {
                 string defaultAppearanceFileName = null;
-                var config = _configuration.Configs["RemoteAdmin"];
+                var config = _configuration.GetSection("RemoteAdmin");
 
                 //config may be null if RemoteAdmin configuration secition is missing or disabled in OpenSim.ini
                 if (config != null)
                 {
-                    defaultAppearanceFileName = config.GetString("default_appearance", "default_appearance.xml");
+                    defaultAppearanceFileName = config.GetValue<string>("default_appearance", "default_appearance.xml");
                 }
 
                 if (File.Exists(defaultAppearanceFileName))

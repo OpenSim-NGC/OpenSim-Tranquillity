@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.ViewerSupport
 {
@@ -52,21 +51,18 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GodNamesModule>>();
-            IConfig moduleConfig = config.Configs["GodNames"];
+            IConfigurationSection moduleConfig = config.GetSection("GodNames");
 
-            if (moduleConfig == null) {
-                return;
-            }
-
-            if (!moduleConfig.GetBoolean("Enabled", false)) {
+            m_enabled = moduleConfig.GetValue<bool>("Enabled", false);
+            if (!m_enabled) {
                 m_logger?.LogInformation("[GODNAMES]: Addon is disabled");
                 return;
             }
 
             m_logger?.LogInformation("[GODNAMES]: Enabled");
             m_enabled = true;
-            string conf_str = moduleConfig.GetString("FullNames", String.Empty);
-            if (conf_str != String.Empty)
+            string conf_str = moduleConfig.GetValue<string>("FullNames", String.Empty);
+            if (!String.IsNullOrEmpty(conf_str))
             {
                 foreach (string strl in conf_str.Split(',')) {
                     string strlan = strl.Trim(" \t".ToCharArray());
@@ -75,8 +71,8 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
                 }
             }
 
-            conf_str = moduleConfig.GetString("Surnames", String.Empty);
-            if (conf_str != String.Empty)
+            conf_str = moduleConfig.GetValue<string>("Surnames", String.Empty);
+            if (!String.IsNullOrEmpty(conf_str))
             {
                 foreach (string strl in conf_str.Split(',')) {
                     string strlan = strl.Trim(" \t".ToCharArray());

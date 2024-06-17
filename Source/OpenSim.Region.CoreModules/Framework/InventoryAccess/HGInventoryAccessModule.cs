@@ -25,8 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -38,7 +37,6 @@ using OpenSim.Server.Base;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 using OpenMetaverse;
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 {
@@ -77,10 +75,10 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
         public override void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HGInventoryAccessModule>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("InventoryAccessModule", "");
+                string name = moduleConfig.GetValue<string>("InventoryAccessModule", "");
                 if (name == Name)
                 {
                     m_Enabled = true;
@@ -89,13 +87,13 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 
                     m_logger?.LogInformation("[HG INVENTORY ACCESS MODULE]: {0} enabled.", Name);
 
-                    IConfig thisModuleConfig = source.Configs["HGInventoryAccessModule"];
+                    IConfigurationSection thisModuleConfig = source.GetSection("HGInventoryAccessModule");
                     if (thisModuleConfig != null)
                     {
-                        m_OutboundPermission = thisModuleConfig.GetBoolean("OutboundPermission", true);
-                        m_RestrictInventoryAccessAbroad = thisModuleConfig.GetBoolean("RestrictInventoryAccessAbroad", true);
-                        m_CheckSeparateAssets = thisModuleConfig.GetBoolean("CheckSeparateAssets", false);
-                        m_LocalAssetsURL = thisModuleConfig.GetString("RegionHGAssetServerURI", string.Empty);
+                        m_OutboundPermission = thisModuleConfig.GetValue<bool>("OutboundPermission", true);
+                        m_RestrictInventoryAccessAbroad = thisModuleConfig.GetValue<bool>("RestrictInventoryAccessAbroad", true);
+                        m_CheckSeparateAssets = thisModuleConfig.GetValue<bool>("CheckSeparateAssets", false);
+                        m_LocalAssetsURL = thisModuleConfig.GetValue<string>("RegionHGAssetServerURI", string.Empty);
                         m_LocalAssetsURL = m_LocalAssetsURL.Trim(new char[] { '/' });
 
                     }

@@ -26,8 +26,11 @@
  */
 
 using System.Text.RegularExpressions;
-using Nini.Config;
+
+using Microsoft.Extensions.Configuration;
+
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;

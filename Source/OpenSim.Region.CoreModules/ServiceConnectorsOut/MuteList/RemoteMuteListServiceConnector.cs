@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -36,8 +37,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
 {
@@ -65,18 +64,18 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RemoteMuteListServicesConnector>>();
            // only active for core mute lists module
-            IConfig moduleConfig = source.Configs["Messaging"];
+            IConfigurationSection moduleConfig = source.GetSection("Messaging");
             if (moduleConfig == null)
                 return;
 
-            if (moduleConfig.GetString("MuteListModule", "None") != "MuteListModule")
+            if (moduleConfig.GetValue<string>("MuteListModule", "None") != "MuteListModule")
                 return;
             
-            moduleConfig = source.Configs["Modules"];
+            moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("MuteListService", "");
-                if (name == Name)
+                string name = moduleConfig.GetValue<string>("MuteListService", "");
+                if (!String.IsNullOrEmpty(name) && name == Name)
                 {
                     m_remoteConnector = new MuteListServicesConnector(source);
                     m_Enabled = true;

@@ -26,7 +26,9 @@
  */
 
 using System.Text;
-using Nini.Config;
+
+using Microsoft.Extensions.Configuration;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Console;
 using OpenSim.Region.Framework.Interfaces;

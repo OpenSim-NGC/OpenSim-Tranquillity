@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Services.Connectors.Hypergrid;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Framework.UserManagement
 {
@@ -48,8 +47,8 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
         public override void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HGUserManagementModule>>();
-            string umanmod = config.Configs["Modules"].GetString("UserManagementModule", null);
-            if (umanmod == Name)
+            string? umanmod = config?.GetSection("Modules")?.GetValue<string>("UserManagementModule", "");
+            if (!String.IsNullOrEmpty(umanmod) && umanmod == Name)
             {
                 m_Enabled = true;
                 base.Init(config);

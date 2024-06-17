@@ -31,7 +31,6 @@ using System.Net;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
-using Nini.Config;
 using NUnit.Framework;
 using OpenMetaverse;
 using OpenSim.Framework;

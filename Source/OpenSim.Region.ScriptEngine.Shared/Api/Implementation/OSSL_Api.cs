@@ -32,6 +32,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -58,8 +59,6 @@ using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 using TPFlags = OpenSim.Framework.Constants.TeleportFlags;
-
-using Nini.Config;
 
 #pragma warning disable IDE1006
 
@@ -183,21 +182,22 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 if(m_doneSharedInit)
                     return;
 
-                m_osslconfig = m_ScriptEngine.ConfigSource.Configs["OSSL"];
-                m_osslconfig ??= m_ScriptEngine.Config;
+                m_osslconfig = m_ScriptEngine.ConfigSource.GetSection("OSSL");
+                if (!m_osslconfig.GetChildren().Any())
+                    m_osslconfig ??= m_ScriptEngine.Config;
 
-                if (m_osslconfig.GetBoolean("AllowOSFunctions", true))
+                if (m_osslconfig.GetValue<bool>("AllowOSFunctions", true))
                 {
                     m_OSFunctionsEnabled = true;
                     // m_log.Warn("[OSSL] OSSL FUNCTIONS ENABLED");
                 }
 
-                m_PermissionErrortoOwner = m_osslconfig.GetBoolean("PermissionErrorToOwner", m_PermissionErrortoOwner);
+                m_PermissionErrortoOwner = m_osslconfig.GetValue<bool>("PermissionErrorToOwner", m_PermissionErrortoOwner);
 
-                m_ScriptDelayFactor =  m_ScriptEngine.Config.GetFloat("ScriptDelayFactor", 1.0f);
-                m_ScriptDistanceFactor = m_ScriptEngine.Config.GetFloat("ScriptDistanceLimitFactor", 1.0f);
+                m_ScriptDelayFactor =  m_ScriptEngine.Config.GetValue<float>("ScriptDelayFactor", 1.0f);
+                m_ScriptDistanceFactor = m_ScriptEngine.Config.GetValue<float>("ScriptDistanceLimitFactor", 1.0f);
 
-                string risk = m_osslconfig.GetString("OSFunctionThreatLevel", "VeryLow");
+                string risk = m_osslconfig.GetValue<string>("OSFunctionThreatLevel", "VeryLow");
                 switch (risk)
                 {
                 case "NoAccess":
@@ -338,8 +338,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             {
                 perms = new FunctionPerms();
 
-                string ownerPerm = m_osslconfig.GetString("Allow_" + function, "");
-                string creatorPerm = m_osslconfig.GetString("Creators_" + function, "");
+                string ownerPerm = m_osslconfig.GetValue<string>("Allow_" + function, "");
+                string creatorPerm = m_osslconfig.GetValue<string>("Creators_" + function, "");
                 if (string.IsNullOrWhiteSpace(ownerPerm) && string.IsNullOrWhiteSpace(creatorPerm))
                 {
                     // Default Threat level check
@@ -2554,10 +2554,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             IConfiguration config = m_ScriptEngine.ConfigSource;
             string url = null;
 
-            IConfig gridInfoConfig = config.Configs["GridInfo"];
-
-            if (gridInfoConfig is not null)
-                url = gridInfoConfig.GetString("GridInfoURI", String.Empty);
+            IConfigurationSection gridInfoConfig = config.GetSection("GridInfo");
+            url = gridInfoConfig.GetValue<string>("GridInfoURI", String.Empty);
 
             if (string.IsNullOrEmpty(url))
                 return "Configuration Error!";
@@ -2613,11 +2611,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         {
             CheckThreatLevel(ThreatLevel.Moderate, "osGetGridLoginURI");
 
-            string loginURI = string.Empty;
             IConfiguration config = m_ScriptEngine.ConfigSource;
-
-            if (config.Configs[GridInfoServiceConfigSectionName] != null)
-                loginURI = config.Configs[GridInfoServiceConfigSectionName].GetString("login", loginURI);
+            string loginURI = config.GetSection(GridInfoServiceConfigSectionName).GetValue<string>("login", string.Empty);
 
             if (string.IsNullOrEmpty(loginURI))
                 loginURI = GridUserInfo(InfoType.Login);
@@ -2643,11 +2638,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         {
             CheckThreatLevel(ThreatLevel.Moderate, "osGetGridCustom");
 
-            string retval = string.Empty;
             IConfiguration config = m_ScriptEngine.ConfigSource;
-
-            if (config.Configs[GridInfoServiceConfigSectionName] != null)
-                retval = config.Configs[GridInfoServiceConfigSectionName].GetString(key, retval);
+            string retval = config.GetSection(GridInfoServiceConfigSectionName).GetValue<string>(key, string.Empty);
 
             if (string.IsNullOrEmpty(retval))
                 retval = GridUserInfo(InfoType.Custom, key);

@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Chat
 {
@@ -58,28 +57,28 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat
         protected List<string> FreezeCache = new List<string>();
         protected string m_adminPrefix = "";
         protected object m_syncy = new object();
-        protected IConfig m_config;
+        protected IConfigurationSection m_config;
 
         #region ISharedRegionModule Members
         public virtual void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<ChatModule>>();
 
-            m_config = config.Configs["Chat"];
+            m_config = config.GetSection("Chat");
 
             if (m_config != null)
             {
-                if (!m_config.GetBoolean("enabled", true))
+                if (!m_config.GetValue<bool>("enabled", true))
                 {
-                    m_log.Info("[CHAT]: plugin disabled by configuration");
+                    m_logger.LogInformation("[CHAT]: plugin disabled by configuration");
                     m_enabled = false;
                     return;
                 }
 
-                m_whisperdistance = m_config.GetInt("whisper_distance", m_whisperdistance);
-                m_saydistance = m_config.GetInt("say_distance", m_saydistance);
-                m_shoutdistance = m_config.GetInt("shout_distance", m_shoutdistance);
-                m_adminPrefix = m_config.GetString("admin_prefix", "");
+                m_whisperdistance = m_config.GetValue<int>("whisper_distance", m_whisperdistance);
+                m_saydistance = m_config.GetValue<int>("say_distance", m_saydistance);
+                m_shoutdistance = m_config.GetValue<int>("shout_distance", m_shoutdistance);
+                m_adminPrefix = m_config.GetValue<string>("admin_prefix", "");
 
             }
             m_saydistanceSQ = m_saydistance * m_saydistance;

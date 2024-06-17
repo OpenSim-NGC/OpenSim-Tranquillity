@@ -26,15 +26,13 @@
  */
 
 using System.Net;
-using System.Reflection;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Server.RegionServer
 {

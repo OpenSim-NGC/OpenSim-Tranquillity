@@ -27,6 +27,7 @@
 
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -43,8 +44,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.UserAccountService;
-
-using Nini.Config;
 
 namespace OpenSim.Server.RegionServer
 {
@@ -490,11 +489,12 @@ namespace OpenSim.Server.RegionServer
             //##
 
             // Default Estate
-            if (Config.Configs[ESTATE_SECTION_NAME] != null)
+            IConfigurationSection estateConfig = Config.GetSection(ESTATE_SECTION_NAME);
+            if (estateConfig.GetChildren().Any())
             {
-                string defaultEstateName = Config.Configs[ESTATE_SECTION_NAME].GetString("DefaultEstateName", null);
+                string? defaultEstateName = estateConfig.GetValue<string>("DefaultEstateName", null);
 
-                if (defaultEstateName != null)
+                if (!String.IsNullOrEmpty(defaultEstateName))
                 {
                     bool defaultEstateJoined = false;
                     if (estatesByName.TryGetValue(defaultEstateName, out EstateSettings defaultEstate))
@@ -709,8 +709,8 @@ namespace OpenSim.Server.RegionServer
         {
             // Called from base.StartUp()
 
-            IConfig startupConfig = Config.Configs["Startup"];
-            if (startupConfig == null || startupConfig.GetBoolean("JobEngineEnabled", true))
+            IConfigurationSection startupConfig = Config.GetSection("Startup");
+            if (startupConfig.GetValue<bool>("JobEngineEnabled", true))
                 WorkManager.JobEngine.Start();
 
             if (NetServersInfo.HttpUsesSSL)
@@ -749,18 +749,12 @@ namespace OpenSim.Server.RegionServer
 
         protected virtual void ReadExtraConfigSettings()
         {
-            IConfig networkConfig = Config.Configs["Network"];
-            if (networkConfig != null)
-            {
-                proxyUrl = networkConfig.GetString("proxy_url", "");
-                proxyOffset = Int32.Parse(networkConfig.GetString("proxy_offset", "0"));
-            }
+            IConfigurationSection networkConfig = Config.GetSection("Network");
+            proxyUrl = networkConfig.GetValue<string>("proxy_url", "");
+            proxyOffset = Int32.Parse(networkConfig.GetValue<string>("proxy_offset", "0"));
 
-            IConfig startupConfig = Config.Configs["Startup"];
-            if (startupConfig != null)
-            {
-                Util.LogOverloads = startupConfig.GetBoolean("LogOverloads", true);
-            }
+            IConfigurationSection startupConfig = Config.GetSection("Startup");
+            Util.LogOverloads = startupConfig.GetValue<bool>("LogOverloads", true);
         }
 
         /// <summary>
@@ -830,43 +824,43 @@ namespace OpenSim.Server.RegionServer
         /// </summary>
         protected override void StartupSpecific()
         {
-            IConfig startupConfig = Config.Configs["Startup"];
-            if (startupConfig != null)
+            IConfigurationSection startupConfig = Config.GetSection("Startup");
+            if (startupConfig.GetChildren().Any())
             {
                 // refuse to run MegaRegions
-                if (startupConfig.GetBoolean("CombineContiguousRegions", false))
+                if (startupConfig.GetValue<bool>("CombineContiguousRegions", false))
                 {
                     m_logger?.LogCritical("CombineContiguousRegions (MegaRegions) option is no longer suported. Use a older version to save region contents as OAR, then import into a fresh install of this new version");
                     throw new Exception("CombineContiguousRegions not suported");
                 }
 
-                string pidFile = startupConfig.GetString("PIDFile", String.Empty);
+                string pidFile = startupConfig.GetValue<string>("PIDFile", String.Empty);
                 if (pidFile != String.Empty)
                     CreatePIDFile(pidFile);
 
-                userStatsURI = startupConfig.GetString("Stats_URI", String.Empty);
+                userStatsURI = startupConfig.GetValue<string>("Stats_URI", String.Empty);
 
-                m_securePermissionsLoading = startupConfig.GetBoolean("SecurePermissionsLoading", true);
+                m_securePermissionsLoading = startupConfig.GetValue<bool>("SecurePermissionsLoading", true);
 
                 string permissionModules = Util.GetConfigVarFromSections<string>(Config, "permissionmodules",
                     new string[] { "Startup", "Permissions" }, "DefaultPermissionsModule");
 
                 m_permsModules = new List<string>(permissionModules.Split(',').Select(m => m.Trim()));
 
-                managedStatsURI = startupConfig.GetString("ManagedStatsRemoteFetchURI", String.Empty);
-                managedStatsPassword = startupConfig.GetString("ManagedStatsRemoteFetchPassword", String.Empty);
+                managedStatsURI = startupConfig.GetValue<string>("ManagedStatsRemoteFetchURI", String.Empty);
+                managedStatsPassword = startupConfig.GetValue<string>("ManagedStatsRemoteFetchPassword", String.Empty);
             }
 
             /*
             ** Load the simulation data service
             **/
-            IConfig simDataConfig = Config.Configs["SimulationDataStore"];
+            IConfigurationSection simDataConfig = Config.GetSection("SimulationDataStore");
             if (simDataConfig == null)
             {
                 throw new Exception($"Configuration file is missing the [SimulationDataStore] section.  Have you copied OpenSim.ini.example to OpenSim.ini to reference config-include/ files?");
             }
 
-            string module = simDataConfig.GetString("LocalServiceModule", String.Empty);
+            string module = simDataConfig.GetValue<string>("LocalServiceModule", String.Empty);
             if (String.IsNullOrEmpty(module))
             {
                 throw new Exception($"Configuration file is missing the LocalServiceModule parameter in the [SimulationDataStore] section.");
@@ -1018,10 +1012,11 @@ namespace OpenSim.Server.RegionServer
             string estateOwnerPassword = null;
             string rawEstateOwnerUuid = null;
 
-            if (Config.Configs[ESTATE_SECTION_NAME] != null)
+            IConfigurationSection estateConfig = Config.GetSection(ESTATE_SECTION_NAME);
+            if (estateConfig.GetChildren().Any())
             {
                 string defaultEstateOwnerName
-                    = Config.Configs[ESTATE_SECTION_NAME].GetString("DefaultEstateOwnerName", "").Trim();
+                    = estateConfig.GetValue<string>("DefaultEstateOwnerName", "").Trim();
                 string[] ownerNames = defaultEstateOwnerName.Split(' ');
 
                 if (ownerNames.Length >= 2)
@@ -1031,9 +1026,9 @@ namespace OpenSim.Server.RegionServer
                 }
 
                 // Info to be used only on Standalone Mode
-                rawEstateOwnerUuid = Config.Configs[ESTATE_SECTION_NAME].GetString("DefaultEstateOwnerUUID", null);
-                estateOwnerEMail = Config.Configs[ESTATE_SECTION_NAME].GetString("DefaultEstateOwnerEMail", null);
-                estateOwnerPassword = Config.Configs[ESTATE_SECTION_NAME].GetString("DefaultEstateOwnerPassword", null);
+                rawEstateOwnerUuid = estateConfig.GetValue<string>("DefaultEstateOwnerUUID", null);
+                estateOwnerEMail = estateConfig.GetValue<string>("DefaultEstateOwnerEMail", null);
+                estateOwnerPassword = estateConfig.GetValue<string>("DefaultEstateOwnerPassword", null);
             }
 
             MainConsole.Instance.Output("Estate {0} has no owner set.", regionInfo.EstateSettings.EstateName);

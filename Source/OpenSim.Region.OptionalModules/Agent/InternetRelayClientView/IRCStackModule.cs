@@ -27,6 +27,7 @@
 
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView
 {
@@ -53,12 +52,10 @@ namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<IRCStackModule>>();
-            if (null != source.Configs["IRCd"] &&
-                source.Configs["IRCd"].GetBoolean("Enabled", false))
-            {
-                m_Enabled = true;
-                m_Port = source.Configs["IRCd"].GetInt("Port", 6666);
-            }
+
+            var config = source.GetSection("IRCd");
+            m_Enabled = config.GetValue<bool>("Enabled", false);
+            m_Port = config.GetValue<int>("Port", 6666);
         }
 
         public void AddRegion(Scene scene)

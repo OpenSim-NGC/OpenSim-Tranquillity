@@ -25,15 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
 using System.Xml;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Server.RegionServer
 {
@@ -77,11 +76,11 @@ namespace OpenSim.Server.RegionServer
         {
             bool iniFileExists = false;
 
-            IConfig startupConfig = argvSource.Configs["Startup"];
+            IConfigurationSection startupConfig = argvSource.GetSection("Startup");
 
             List<string> sources = new List<string>();
 
-            string masterFileName = startupConfig.GetString("inimaster", "OpenSimDefaults.ini");
+            string masterFileName = startupConfig.GetValue<string>("inimaster", "OpenSimDefaults.ini");
 
             if (masterFileName == "none")
                 masterFileName = String.Empty;
@@ -111,7 +110,7 @@ namespace OpenSim.Server.RegionServer
                 }
             }
 
-            string iniFileName = startupConfig.GetString("inifile", "OpenSim.ini");
+            string iniFileName = startupConfig.GetValue<string>("inifile", "OpenSim.ini");
 
             if (IsUri(iniFileName))
             {
@@ -151,7 +150,7 @@ namespace OpenSim.Server.RegionServer
             }
 
             // Override distro settings with contents of inidirectory
-            string iniDirName = startupConfig.GetString("inidirectory", "config");
+            string iniDirName = startupConfig.GetValue<string>("inidirectory", "config");
             string iniDirPath = Path.Combine(Util.configDir(), iniDirName);
 
             if (Directory.Exists(iniDirPath))
@@ -221,14 +220,14 @@ namespace OpenSim.Server.RegionServer
         /// </summary>
         protected virtual void ReadConfigSettings()
         {
-            IConfig startupConfig = m_config.Configs["Startup"];
+            IConfigurationSection startupConfig = m_config.GetSection("Startup");
             if (startupConfig != null)
             {
-                ConfigSettings.PhysicsEngine = startupConfig.GetString("physics");
-                ConfigSettings.MeshEngineName = startupConfig.GetString("meshing");
+                ConfigSettings.PhysicsEngine = startupConfig.GetValue<string>("physics");
+                ConfigSettings.MeshEngineName = startupConfig.GetValue<string>("meshing");
 
                 ConfigSettings.ClientstackDll
-                    = startupConfig.GetString("clientstack_plugin", "OpenSim.Region.ClientStack.LindenUDP.dll");
+                    = startupConfig.GetValue<string>("clientstack_plugin", "OpenSim.Region.ClientStack.LindenUDP.dll");
             }
 
             NetworkServersInfo.loadFromConfiguration(m_config);
@@ -240,7 +239,7 @@ namespace OpenSim.Server.RegionServer
         /// <param name="sources">List of URL strings or filename strings</param>
         private void AddIncludes(IConfiguration configSource, List<string> sources)
         {
-            //loop over config sources
+            /* TODO: The Includes- stuff needs to be re-implemented
             foreach (IConfig config in configSource.Configs)
             {
                 // Look for Include-* in the key name
@@ -250,7 +249,7 @@ namespace OpenSim.Server.RegionServer
                     if (k.StartsWith("Include-"))
                     {
                         // read the config file to be included.
-                        string file = config.GetString(k);
+                        string file = config.GetValue<string>(k);
                         if (IsUri(file))
                         {
                             if (!sources.Contains(file))
@@ -289,6 +288,7 @@ namespace OpenSim.Server.RegionServer
                     }
                 }
             }
+            */
         }
 
         /// <summary>

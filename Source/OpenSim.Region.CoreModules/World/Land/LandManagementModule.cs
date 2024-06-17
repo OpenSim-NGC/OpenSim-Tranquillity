@@ -29,6 +29,7 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -49,8 +50,6 @@ using Caps = OpenSim.Framework.Capabilities.Caps;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Land
 {
@@ -136,20 +135,22 @@ namespace OpenSim.Region.CoreModules.World.Land
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LandManagementModule>>();
+
             shouldLimitParcelLayerInfoToViewDistance = true;
             parcelLayerViewDistance = 128;
-            IConfig landManagementConfig = source.Configs["LandManagement"];
-            if (landManagementConfig is not null)
+
+            IConfigurationSection landManagementConfig = source.GetSection("LandManagement");
+            if (landManagementConfig.GetChildren().Any())
             {
-                shouldLimitParcelLayerInfoToViewDistance = landManagementConfig.GetBoolean("LimitParcelLayerUpdateDistance", shouldLimitParcelLayerInfoToViewDistance);
-                parcelLayerViewDistance = landManagementConfig.GetInt("ParcelLayerViewDistance", parcelLayerViewDistance);
-                DefaultGodParcelGroup = new UUID(landManagementConfig.GetString("DefaultAdministratorGroupUUID", UUID.Zero.ToString()));
-                DefaultGodParcelName = landManagementConfig.GetString("DefaultAdministratorParcelName", "Admin Parcel");
-                DefaultGodParcelOwner = new UUID(landManagementConfig.GetString("DefaultAdministratorOwnerUUID", UUID.Zero.ToString()));
-                bool disablebans = landManagementConfig.GetBoolean("DisableParcelBans", !m_allowedForcefulBans);
+                shouldLimitParcelLayerInfoToViewDistance = landManagementConfig.GetValue<bool>("LimitParcelLayerUpdateDistance", shouldLimitParcelLayerInfoToViewDistance);
+                parcelLayerViewDistance = landManagementConfig.GetValue<int>("ParcelLayerViewDistance", parcelLayerViewDistance);
+                DefaultGodParcelGroup = new UUID(landManagementConfig.GetValue<string>("DefaultAdministratorGroupUUID", UUID.Zero.ToString()));
+                DefaultGodParcelName = landManagementConfig.GetValue<string>("DefaultAdministratorParcelName", "Admin Parcel");
+                DefaultGodParcelOwner = new UUID(landManagementConfig.GetValue<string>("DefaultAdministratorOwnerUUID", UUID.Zero.ToString()));
+                bool disablebans = landManagementConfig.GetValue<bool>("DisableParcelBans", !m_allowedForcefulBans);
                 m_allowedForcefulBans = !disablebans;
-                m_showBansLines = landManagementConfig.GetBoolean("ShowParcelBansLines", m_showBansLines);
-                m_BanLineSafeHeight = landManagementConfig.GetFloat("BanLineSafeHeight", m_BanLineSafeHeight);
+                m_showBansLines = landManagementConfig.GetValue<bool>("ShowParcelBansLines", m_showBansLines);
+                m_BanLineSafeHeight = landManagementConfig.GetValue<float>("BanLineSafeHeight", m_BanLineSafeHeight);
                 if(!m_allowedForcefulBans)
                     m_showBansLines = false;
             }

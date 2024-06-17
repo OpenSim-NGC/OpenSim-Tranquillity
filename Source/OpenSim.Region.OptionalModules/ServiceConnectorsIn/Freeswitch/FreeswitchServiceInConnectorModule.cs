@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -33,8 +34,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Freeswitch
 {
@@ -52,10 +51,10 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Freeswitch
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<FreeswitchServiceInConnectorModule>>();
             m_Config = config;
-            IConfig moduleConfig = config.Configs["Modules"];
+            IConfigurationSection moduleConfig = config.GetSection("Modules");
             if (moduleConfig != null)
             {
-                m_Enabled = moduleConfig.GetBoolean("FreeswitchServiceInConnector", false);
+                m_Enabled = moduleConfig.GetValue<bool>("FreeswitchServiceInConnector", false);
                 if (m_Enabled)
                 {
                     m_logger?.LogInformation("[FREESWITCH IN CONNECTOR]: FreeswitchServiceInConnector enabled");

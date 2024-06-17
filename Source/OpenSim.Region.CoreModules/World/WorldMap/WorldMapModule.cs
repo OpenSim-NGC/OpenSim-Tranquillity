@@ -30,6 +30,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -51,8 +52,6 @@ using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.WorldMap
 {

@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -36,9 +37,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
-
 
 namespace OpenSim.Region.CoreModules.Avatar.Friends
 {
@@ -53,9 +51,9 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<CallingCardModule>>();
 
-            IConfig ccConfig = source.Configs["XCallingCard"];
+            IConfigurationSection ccConfig = source.GetSection("XCallingCard");
             if (ccConfig != null)
-                m_Enabled = ccConfig.GetBoolean("Enabled", true);
+                m_Enabled = ccConfig.GetValue<bool>("Enabled", true);
         }
 
         public void AddRegion(Scene scene)

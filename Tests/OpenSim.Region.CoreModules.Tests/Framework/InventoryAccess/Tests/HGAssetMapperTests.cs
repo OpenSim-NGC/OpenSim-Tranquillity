@@ -28,7 +28,6 @@
 using System;
 using System.Threading;
 using System.Xml;
-using Nini.Config;
 using NUnit.Framework;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -143,6 +142,6 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess.Tests
 //            Console.WriteLine("HERE");
             Assert.IsTrue(chatEvent.WaitOne(60000), "Chat event in HGAssetMapperTests.RezScript not received");
         }
-    }
         */
+    }
 }

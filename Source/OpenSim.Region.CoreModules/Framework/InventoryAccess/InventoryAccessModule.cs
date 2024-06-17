@@ -26,8 +26,8 @@
  */
 
 using System.Globalization;
-using System.Reflection;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -41,8 +41,6 @@ using OpenSim.Server.Base;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
 {
@@ -81,10 +79,10 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
         public virtual void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<BasicInventoryAccessModule>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig is not null)
             {
-                string name = moduleConfig.GetString("InventoryAccessModule", string.Empty);
+                string name = moduleConfig.GetValue<string>("InventoryAccessModule", string.Empty);
                 if (name == Name)
                 {
                     m_Enabled = true;
@@ -102,8 +100,8 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
         /// <param name="source"></param>
         protected virtual void InitialiseCommon(IConfiguration source)
         {
-            IConfig inventoryConfig = source.Configs["Inventory"];
-            CoalesceMultipleObjectsToInventory = inventoryConfig is null || inventoryConfig.GetBoolean("CoalesceMultipleObjectsToInventory", true);
+            IConfigurationSection inventoryConfig = source.GetSection("Inventory");
+            CoalesceMultipleObjectsToInventory = inventoryConfig is null || inventoryConfig.GetValue<bool>("CoalesceMultipleObjectsToInventory", true);
         }
 
         public virtual void PostInitialise()

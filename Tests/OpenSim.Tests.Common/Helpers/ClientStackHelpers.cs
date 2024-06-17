@@ -27,7 +27,6 @@
 
 using System;
 using System.Net;
-using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
 using OpenSim.Framework;

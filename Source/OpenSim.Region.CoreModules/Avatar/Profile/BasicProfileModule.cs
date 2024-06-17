@@ -25,8 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 using System.Globalization;
-using System.Reflection;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -37,8 +37,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Profile
 {
@@ -57,7 +55,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Profile
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<BasicProfileModule>>();
-            if(config.Configs["UserProfiles"] != null)
+            if(config.GetSection("UserProfiles") != null)
                 return;
 
             m_logger?.LogDebug("[PROFILE MODULE]: Basic Profile Module enabled");

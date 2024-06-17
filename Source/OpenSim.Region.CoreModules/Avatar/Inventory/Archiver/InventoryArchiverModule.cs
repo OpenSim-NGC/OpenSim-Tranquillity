@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -37,8 +38,6 @@ using OpenSim.Server.Base;
 using OpenMetaverse;
 
 using NDesk.Options;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
 {

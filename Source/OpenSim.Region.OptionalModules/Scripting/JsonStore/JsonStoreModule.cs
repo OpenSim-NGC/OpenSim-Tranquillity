@@ -24,6 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -33,15 +34,13 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 
-using Nini.Config;
-
 namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
 {
     public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
     {
         private static ILogger? m_logger;
 
-        private IConfig m_config = null;
+        private IConfigurationSection m_config = null;
         private bool m_enabled = false;
         private bool m_enableObjectStore = false;
         private int m_maxStringSpace = Int32.MaxValue;
@@ -76,16 +75,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<JsonStoreModule>>();
             try
             {
-                if ((m_config = config.Configs["JsonStore"]) == null)
-                {
-                    // There is no configuration, the module is disabled
-                    // m_logger?.LogInformation("[JsonStore] no configuration info");
+                m_config = config.GetSection("JsonStore");
+                m_enabled = m_config.GetValue<bool>("Enabled", m_enabled);
+                if (!m_enabled)
                     return;
-                }
 
-                m_enabled = m_config.GetBoolean("Enabled", m_enabled);
-                m_enableObjectStore = m_config.GetBoolean("EnableObjectStore", m_enableObjectStore);
-                m_maxStringSpace = m_config.GetInt("MaxStringSpace", m_maxStringSpace);
+                m_enableObjectStore = m_config.GetValue<bool>("EnableObjectStore", m_enableObjectStore);
+                m_maxStringSpace = m_config.GetValue<int>("MaxStringSpace", m_maxStringSpace);
                 if (m_maxStringSpace == 0)
                     m_maxStringSpace = Int32.MaxValue;
             }

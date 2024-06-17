@@ -26,12 +26,15 @@
  */
 
 using System.Text.RegularExpressions;
-using NDesk.Options;
-using Nini.Config;
+
+using Microsoft.Extensions.Configuration;
+
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using NDesk.Options;
 
 namespace OpenSim.Region.OptionalModules.Avatar.SitStand
 {

@@ -28,6 +28,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -37,9 +38,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
-
 
 /*****************************************************
  *
@@ -114,11 +112,14 @@ namespace OpenSim.Region.CoreModules.Scripting.WorldComm
             // the config file doesn't specify otherwise.
             try
             {
-                m_whisperdistance = config.Configs["Chat"].GetInt("whisper_distance", m_whisperdistance);
-                m_saydistance = config.Configs["Chat"].GetInt("say_distance", m_saydistance);
-                m_shoutdistance = config.Configs["Chat"].GetInt("shout_distance", m_shoutdistance);
-                m_maxlisteners = config.Configs["LL-Functions"].GetInt("max_listens_per_region", m_maxlisteners);
-                m_maxhandles = config.Configs["LL-Functions"].GetInt("max_listens_per_script", m_maxhandles);
+                IConfigurationSection chatConfig = config.GetSection("Chat");
+                m_whisperdistance = chatConfig.GetValue<int>("whisper_distance", m_whisperdistance);
+                m_saydistance = chatConfig.GetValue<int>("say_distance", m_saydistance);
+                m_shoutdistance = chatConfig.GetValue<int>("shout_distance", m_shoutdistance);
+
+                IConfigurationSection llFunctionsConfig = config.GetSection("LL-Functions");
+                m_maxlisteners = llFunctionsConfig.GetValue<int>("max_listens_per_region", m_maxlisteners);
+                m_maxhandles = llFunctionsConfig.GetValue<int>("max_listens_per_script", m_maxhandles);
             }
             catch (Exception)
             {

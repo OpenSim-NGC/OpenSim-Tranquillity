@@ -30,6 +30,7 @@ using System.Security;
 using System.Timers;
 using Timer = System.Timers.Timer;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -42,8 +43,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Estate
 {
@@ -86,13 +85,13 @@ namespace OpenSim.Region.CoreModules.World.Estate
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EstateManagementModule>>();
             AllowRegionRestartFromClient = true;
 
-            IConfig config = source.Configs["EstateManagement"];
+            IConfigurationSection config = source.GetSection("EstateManagement");
 
-            if (config != null)
+            if (config.GetChildren().Any())
             {
-                AllowRegionRestartFromClient = config.GetBoolean("AllowRegionRestartFromClient", true);
-                m_ignoreEstateMinorAccessControl = config.GetBoolean("IgnoreEstateMinorAccessControl", true);
-                m_ignoreEstatePaymentAccessControl = config.GetBoolean("IgnoreEstatePaymentAccessControl", true);
+                AllowRegionRestartFromClient = config.GetValue<bool>("AllowRegionRestartFromClient", true);
+                m_ignoreEstateMinorAccessControl = config.GetValue<bool>("IgnoreEstateMinorAccessControl", true);
+                m_ignoreEstatePaymentAccessControl = config.GetValue<bool>("IgnoreEstatePaymentAccessControl", true);
             }
         }
 

@@ -54,7 +54,6 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="8.0.0" />
-    <PackageReference Include="RawScape.Nini" Version="1.0.0" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />

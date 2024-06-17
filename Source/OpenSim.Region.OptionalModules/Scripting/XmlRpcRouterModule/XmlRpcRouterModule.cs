@@ -25,7 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
+using Microsoft.Extensions.Configuration;
+
 using OpenMetaverse;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -43,11 +44,9 @@ namespace OpenSim.Region.OptionalModules.Scripting.XmlRpcRouterModule
 
         public void Initialise(IConfiguration config)
         {
-            IConfig startupConfig = config.Configs["XMLRPC"];
-            if (startupConfig == null)
-                return;
+            IConfigurationSection startupConfig = config.GetSection("XMLRPC");
 
-            if (startupConfig.GetString("XmlRpcRouterModule",
+            if (startupConfig.GetValue<string>("XmlRpcRouterModule",
                     "XmlRpcRouterModule") == "XmlRpcRouterModule")
                 m_Enabled = true;
         }

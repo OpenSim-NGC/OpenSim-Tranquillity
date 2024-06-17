@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
+
 using OpenMetaverse;
 
 using OpenSim.Region.Framework.Interfaces;
@@ -65,14 +67,11 @@ namespace OpenSim.Region.CoreModules.World.Wind.Plugins
 
         #region IWindModelPlugin Members
 
-        public void WindConfig(OpenSim.Region.Framework.Scenes.Scene scene, Nini.Config.IConfig windConfig)
+        public void WindConfig(OpenSim.Region.Framework.Scenes.Scene scene, IConfiguration windConfig)
         {
-            if (windConfig != null)
+            if (windConfig.GetChildren().Any())
             {
-                if (windConfig.Contains("strength"))
-                {
-                    m_strength = windConfig.GetFloat("strength", 1.0F);
-                }
+                m_strength = windConfig.GetValue<float>("strength", 1.0F);
             }
         }
 

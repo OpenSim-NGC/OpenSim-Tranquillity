@@ -27,6 +27,7 @@
 
 using System.Collections.Concurrent;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -37,8 +38,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 {
@@ -74,7 +73,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
                     m_UserManagement = m_Scenes[0].RequestModuleInterface<IUserManagement>();
 
                     if (m_UserManagement == null)
-                        m_log.ErrorFormat(
+                        m_logger?.LogError(
                             "[HG INVENTORY CONNECTOR]: Could not retrieve IUserManagement module from {0}",
                             m_Scenes[0].RegionInfo.RegionName);
                 }
@@ -96,22 +95,21 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HGInventoryBroker>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("InventoryServices", string.Empty);
+                string name = moduleConfig.GetValue<string>("InventoryServices", string.Empty);
                 if (name == Name)
                 {
-                    IConfig inventoryConfig = source.Configs["InventoryService"];
+                    IConfigurationSection inventoryConfig = source.GetSection("InventoryService");
                     if (inventoryConfig == null)
                     {
                         m_logger?.LogError("[HG INVENTORY CONNECTOR]: InventoryService missing from OpenSim.ini");
                         return;
                     }
 
-                    string localDll = inventoryConfig.GetString("LocalGridInventoryService", string.Empty);
- 
-                    if (localDll.Length == 0)
+                    string localDll = inventoryConfig.GetValue<string>("LocalGridInventoryService", string.Empty);
+                    if (String.IsNullOrEmpty(localDll))
                     {
                         m_logger?.LogError("[HG INVENTORY CONNECTOR]: No LocalGridInventoryService named in section InventoryService");
                         //return;

@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -37,8 +38,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Base;
 
-using Nini.Config;
-
 namespace OpenSim.Region.OptionalModules.ViewerSupport
 {
     public class CameraOnlyModeModule : INonSharedRegionModule
@@ -47,7 +46,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
 
         private Scene m_scene;
         private SimulatorFeaturesHelper m_Helper;
-        private bool m_Enabled;
+        private bool m_Enabled = false;
         private int m_UserLevel;
 
         public string Name
@@ -63,16 +62,12 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<CameraOnlyModeModule>>();
-            IConfig moduleConfig = config.Configs["CameraOnlyModeModule"];
-            if (moduleConfig != null)
+            IConfigurationSection moduleConfig = config.GetSection("CameraOnlyModeModule");
+            m_Enabled = moduleConfig.GetValue<bool>("enabled", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("enabled", false);
-                if (m_Enabled)
-                {
-                    m_UserLevel = moduleConfig.GetInt("UserLevel", 0);
-                    m_logger?.LogInformation("[CAMERA-ONLY MODE]: CameraOnlyModeModule enabled");
-                }
-
+                m_UserLevel = moduleConfig.GetValue<int>("UserLevel", 0);
+                m_logger?.LogInformation("[CAMERA-ONLY MODE]: CameraOnlyModeModule enabled");
             }
         }
 

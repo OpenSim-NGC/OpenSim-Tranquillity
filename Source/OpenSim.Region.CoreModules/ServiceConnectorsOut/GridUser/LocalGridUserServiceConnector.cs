@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
 {
@@ -64,22 +63,21 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalGridUserServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("GridUserServices", "");
+                string name = moduleConfig.GetValue<string>("GridUserServices", "");
                 if (name == Name)
                 {
-                    IConfig userConfig = source.Configs["GridUserService"];
+                    IConfigurationSection userConfig = source.GetSection("GridUserService");
                     if (userConfig == null)
                     {
                         m_logger?.LogError("[LOCAL GRID USER SERVICE CONNECTOR]: GridUserService missing from OpenSim.ini");
                         return;
                     }
 
-                    string serviceDll = userConfig.GetString("LocalServiceModule", String.Empty);
-
-                    if (serviceDll.Length == 0)
+                    string serviceDll = userConfig.GetValue<string>("LocalServiceModule", String.Empty);
+                    if (String.IsNullOrEmpty(serviceDll))
                     {
                         m_logger?.LogError("[LOCAL GRID USER SERVICE CONNECTOR]: No LocalServiceModule named in section GridUserService");
                         return;
@@ -99,7 +97,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
 
                     m_Enabled = true;
 
-                    m_log.Info("[LOCAL GRID USER SERVICE CONNECTOR]: Local grid user connector enabled");
+                    m_logger.LogInformation("[LOCAL GRID USER SERVICE CONNECTOR]: Local grid user connector enabled");
                 }
             }
         }

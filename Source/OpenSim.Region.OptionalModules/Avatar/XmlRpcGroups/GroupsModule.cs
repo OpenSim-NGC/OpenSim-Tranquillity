@@ -27,6 +27,7 @@
 
 using System.Text;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -39,8 +40,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
 {
@@ -92,31 +91,24 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GroupsModule>>();
-            IConfig groupsConfig = config.Configs["Groups"];
 
-            if (groupsConfig == null)
+            IConfigurationSection groupsConfig = config.GetSection("Groups");
+            m_groupsEnabled = groupsConfig.GetValue<bool>("Enabled", false);
+
+            if (!m_groupsEnabled)
+                return;
+
+            if (groupsConfig.GetValue<string>("Module", "Default") != Name)
             {
-                // Do not run this module by default.
+                m_groupsEnabled = false;
                 return;
             }
-            else
-            {
-                m_groupsEnabled = groupsConfig.GetBoolean("Enabled", false);
-                if (!m_groupsEnabled)
-                    return;
 
-                if (groupsConfig.GetString("Module", "Default") != Name)
-                {
-                    m_groupsEnabled = false;
-                    return;
-                }
+            m_logger?.LogInformation("[xmlGROUPS]: Initializing {0}", this.Name);
 
-                m_logger?.LogInformation("[xmlGROUPS]: Initializing {0}", this.Name);
-
-                m_groupNoticesEnabled   = groupsConfig.GetBoolean("NoticesEnabled", true);
-                m_debugEnabled          = groupsConfig.GetBoolean("DebugEnabled", false);
-                m_levelGroupCreate      = groupsConfig.GetInt("LevelGroupCreate", 0);
-            }
+            m_groupNoticesEnabled   = groupsConfig.GetValue<bool>("NoticesEnabled", true);
+            m_debugEnabled          = groupsConfig.GetValue<bool>("DebugEnabled", false);
+            m_levelGroupCreate      = groupsConfig.GetValue<int>("LevelGroupCreate", 0);
         }
 
         public void AddRegion(Scene scene)

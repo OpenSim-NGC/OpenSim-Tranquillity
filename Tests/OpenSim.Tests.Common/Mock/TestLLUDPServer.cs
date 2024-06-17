@@ -29,8 +29,9 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using Nini.Config;
+
 using OpenMetaverse.Packets;
+
 using OpenSim.Framework;
 using OpenSim.Region.ClientStack.LindenUDP;
 

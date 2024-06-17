@@ -24,6 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -32,15 +33,13 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 
-using Nini.Config;
-
 namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
 {
     public class JsonStoreCommandsModule  : INonSharedRegionModule
     {
         private static ILogger? m_logger;
 
-        private IConfig m_config = null;
+        private IConfigurationSection m_config = null;
         private bool m_enabled = false;
 
         private Scene m_scene = null;
@@ -64,21 +63,15 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
         /// Initialise this shared module
         /// </summary>
         /// <param name="scene">this region is getting initialised</param>
-        /// <param name="source">nini config, we are not using this</param>
+        /// <param name="source">config, we are not using this</param>
         // -----------------------------------------------------------------
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<JsonStoreCommandsModule>>();
             try
             {
-                if ((m_config = config.Configs["JsonStore"]) == null)
-                {
-                    // There is no configuration, the module is disabled
-                    // m_log.InfoFormat("[JsonStore] no configuration info");
-                    return;
-                }
-
-                m_enabled = m_config.GetBoolean("Enabled", m_enabled);
+                m_config = config.GetSection("JsonStore");
+                m_enabled = m_config.GetValue<bool>("Enabled", m_enabled);
             }
             catch (Exception e)
             {

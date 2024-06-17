@@ -28,6 +28,7 @@
 using System.Collections;
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -38,8 +39,6 @@ using OpenSim.Server.Base;
 
 using Nwc.XmlRpc;
 
-using Nini.Config;
-
 namespace OpenSim.Region.OptionalModules.Avatar.Chat
 {
     public class IRCBridgeModule : INonSharedRegionModule
@@ -47,7 +46,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
         private static ILogger? m_logger;
 
         internal static bool Enabled = false;
-        internal static IConfig m_config = null;
+        internal static IConfigurationSection m_config = null;
 
         internal static List<ChannelState> m_channels = new List<ChannelState>();
         internal static List<RegionState> m_regions = new List<RegionState>();
@@ -70,26 +69,19 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<IRCBridgeModule>>();
-            m_config = config.Configs["IRC"];
-            if (m_config == null)
-            {
-                //                m_logger?.LogInformation("[IRC-Bridge] module not configured");
-                return;
-            }
 
-            if (!m_config.GetBoolean("enabled", false))
+            m_config = config.GetSection("IRC");
+            Enabled = m_config.GetValue<bool>("enabled", false);
+
+            if (!Enabled)
             {
                 //                m_logger?.LogInformation("[IRC-Bridge] module disabled in configuration");
                 m_config = null;
                 return;
             }
 
-            if (config.Configs["RemoteAdmin"] != null)
-            {
-                m_password = config.Configs["RemoteAdmin"].GetString("access_password", m_password);
-            }
-
-            Enabled = true;
+            var remoteAdmin = config.GetSection("RemoteAdmin");
+            m_password = remoteAdmin.GetValue<string>("access_password", m_password);
 
             m_logger?.LogInformation("[IRC-Bridge]: Module is enabled");
         }

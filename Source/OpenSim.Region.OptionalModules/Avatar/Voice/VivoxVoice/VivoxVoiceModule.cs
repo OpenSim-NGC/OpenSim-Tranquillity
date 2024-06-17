@@ -28,6 +28,7 @@
 using System.Net;
 using System.Xml;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -40,8 +41,6 @@ using Caps = OpenSim.Framework.Capabilities.Caps;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Avatar.Voice.VivoxVoice
 {
@@ -102,7 +101,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Voice.VivoxVoice
         private static Dictionary<string,string> m_parents = new Dictionary<string,string>();
         private static bool m_dumpXml;
 
-        private IConfig m_config;
+        private IConfigurationSection m_config;
 
         private object m_Lock;
 
@@ -111,12 +110,11 @@ namespace OpenSim.Region.OptionalModules.Avatar.Voice.VivoxVoice
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<VivoxVoiceModule>>();
             MainConsole.Instance.Commands.AddCommand("vivox", false, "vivox debug", "vivox debug <on>|<off>", "Set vivox debugging", HandleDebug);
 
-            m_config = config.Configs["VivoxVoice"];
+            m_config = config.GetSection("VivoxVoice");
+            var enabled = m_config.GetValue<bool>("enabled", false);
+            // m_pluginEnabled is set to true if all the initialization steps succeed
 
-            if (null == m_config)
-                return;
-
-            if (!m_config.GetBoolean("enabled", false))
+            if (!enabled)
                 return;
 
             m_Lock = new object();
@@ -124,19 +122,19 @@ namespace OpenSim.Region.OptionalModules.Avatar.Voice.VivoxVoice
             try
             {
                 // retrieve configuration variables
-                m_vivoxServer = m_config.GetString("vivox_server", String.Empty);
-                m_vivoxSipUri = m_config.GetString("vivox_sip_uri", String.Empty);
-                m_vivoxAdminUser = m_config.GetString("vivox_admin_user", String.Empty);
-                m_vivoxAdminPassword = m_config.GetString("vivox_admin_password", String.Empty);
+                m_vivoxServer = m_config.GetValue<string>("vivox_server", String.Empty);
+                m_vivoxSipUri = m_config.GetValue<string>("vivox_sip_uri", String.Empty);
+                m_vivoxAdminUser = m_config.GetValue<string>("vivox_admin_user", String.Empty);
+                m_vivoxAdminPassword = m_config.GetValue<string>("vivox_admin_password", String.Empty);
 
-                m_vivoxChannelDistanceModel = m_config.GetInt("vivox_channel_distance_model", CHAN_DIST_DEFAULT);
-                m_vivoxChannelRollOff = m_config.GetDouble("vivox_channel_roll_off", CHAN_ROLL_OFF_DEFAULT);
-                m_vivoxChannelMaximumRange = m_config.GetInt("vivox_channel_max_range", CHAN_MAX_RANGE_DEFAULT);
-                m_vivoxChannelMode = m_config.GetString("vivox_channel_mode", CHAN_MODE_DEFAULT).ToLower();
-                m_vivoxChannelType = m_config.GetString("vivox_channel_type", CHAN_TYPE_DEFAULT).ToLower();
-                m_vivoxChannelClampingDistance = m_config.GetInt("vivox_channel_clamping_distance",
+                m_vivoxChannelDistanceModel = m_config.GetValue<int>("vivox_channel_distance_model", CHAN_DIST_DEFAULT);
+                m_vivoxChannelRollOff = m_config.GetValue<double>("vivox_channel_roll_off", CHAN_ROLL_OFF_DEFAULT);
+                m_vivoxChannelMaximumRange = m_config.GetValue<int>("vivox_channel_max_range", CHAN_MAX_RANGE_DEFAULT);
+                m_vivoxChannelMode = m_config.GetValue<string>("vivox_channel_mode", CHAN_MODE_DEFAULT).ToLower();
+                m_vivoxChannelType = m_config.GetValue<string>("vivox_channel_type", CHAN_TYPE_DEFAULT).ToLower();
+                m_vivoxChannelClampingDistance = m_config.GetValue<int>("vivox_channel_clamping_distance",
                                                                               CHAN_CLAMPING_DISTANCE_DEFAULT);
-                m_dumpXml = m_config.GetBoolean("dump_xml", false);
+                m_dumpXml = m_config.GetValue<bool>("dump_xml", false);
 
                 // Validate against constraints and default if necessary
                 if (m_vivoxChannelRollOff < CHAN_ROLL_OFF_MIN || m_vivoxChannelRollOff > CHAN_ROLL_OFF_MAX)

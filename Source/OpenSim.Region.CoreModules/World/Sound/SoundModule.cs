@@ -26,7 +26,8 @@
  */
 using System.Reflection;
 
-using Nini.Config;
+using Microsoft.Extensions.Configuration;
+
 using OpenMetaverse;
 
 using OpenSim.Framework;
@@ -61,19 +62,18 @@ namespace OpenSim.Region.CoreModules.World.Sound
 
         public void Initialise(IConfiguration configSource)
         {
-            IConfig config = configSource.Configs["Sounds"];
-
-            if (config == null)
+            IConfigurationSection config = configSource.GetSection("Sounds");
+            if (!config.GetChildren().Any())
             {
                 Enabled = true;
                 MaxDistance = 100.0f;
             }
             else
             {
-                Enabled = config.GetString("Module", "OpenSim.Region.CoreModules.dll:SoundModule") ==
+                Enabled = config.GetValue<string>("Module", "OpenSim.Region.CoreModules.dll:SoundModule") ==
                         Path.GetFileName(Assembly.GetExecutingAssembly().Location)
                         + ":" + MethodBase.GetCurrentMethod().DeclaringType.Name;
-                MaxDistance = config.GetFloat("MaxDistance", 100.0f);
+                MaxDistance = config.GetValue<float>("MaxDistance", 100.0f);
             }
         }
 

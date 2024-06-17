@@ -25,8 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -36,8 +35,6 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Groups
 {
@@ -59,10 +56,10 @@ namespace OpenSim.Groups
 
             m_logger.LogDebug("[Groups.RobustConnector]: Starting with config name {0}", m_ConfigName);
 
-            IConfig groupsConfig = config.Configs[m_ConfigName];
-            if (groupsConfig != null)
+            IConfigurationSection groupsConfig = config.GetSection(m_ConfigName);
+            if (groupsConfig.GetChildren().Any())
             {
-                key = groupsConfig.GetString("SecretKey", string.Empty);
+                key = groupsConfig.GetValue<string>("SecretKey", string.Empty);
                 m_logger.LogDebug("[Groups.RobustConnector]: Starting with secret key {0}", key);
             }
 //            else

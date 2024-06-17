@@ -25,8 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 
 using OpenSim.Region.Framework.Interfaces;
@@ -79,18 +81,18 @@ namespace OpenSim.Region.CoreModules.World.Wind.Plugins
 
         #region IWindModelPlugin Members
 
-        public void WindConfig(OpenSim.Region.Framework.Scenes.Scene scene, Nini.Config.IConfig windConfig)
+        public void WindConfig(OpenSim.Region.Framework.Scenes.Scene scene, IConfiguration windConfig)
         {
             if (windConfig != null)
             {
                 // Uses strength value if avg_strength not specified
-                m_avgStrength = windConfig.GetFloat("strength", 5.0F);
-                m_avgStrength = windConfig.GetFloat("avg_strength", 5.0F);
+                m_avgStrength = windConfig.GetValue<float>("strength", 5.0F);
+                m_avgStrength = windConfig.GetValue<float>("avg_strength", 5.0F);
 
-                m_avgDirection = windConfig.GetFloat("avg_direction", 0.0F);
-                m_varStrength  = windConfig.GetFloat("var_strength", 5.0F);
-                m_varDirection = windConfig.GetFloat("var_direction", 30.0F);
-                m_rateChange   = windConfig.GetFloat("rate_change", 1.0F);
+                m_avgDirection = windConfig.GetValue<float>("avg_direction", 0.0F);
+                m_varStrength  = windConfig.GetValue<float>("var_strength", 5.0F);
+                m_varDirection = windConfig.GetValue<float>("var_direction", 30.0F);
+                m_rateChange   = windConfig.GetValue<float>("rate_change", 1.0F);
 
                 LogSettings();
             }

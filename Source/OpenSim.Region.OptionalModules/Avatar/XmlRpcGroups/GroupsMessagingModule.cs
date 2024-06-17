@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -37,8 +38,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
 {
@@ -54,8 +53,8 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
         private IGroupsServicesConnector m_groupData = null;
 
         // Config Options
-        private bool m_groupMessagingEnabled;
-        private bool m_debugEnabled;
+        private bool m_groupMessagingEnabled = false;
+        private bool m_debugEnabled = false;
 
         /// <summary>
         /// If enabled, module only tries to send group IMs to online users by querying cached presence information.
@@ -83,38 +82,31 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GroupsMessagingModule>>();
-            IConfig groupsConfig = config.Configs["Groups"];
+            IConfigurationSection groupsConfig = config.GetSection("Groups");
+            var enabled = groupsConfig.GetValue<bool>("Enabled", false);
 
-            if (groupsConfig == null)
+            if (!enabled)
+                return;
+
+            // if groups aren't enabled, we're not needed.
+            // if we're not specified as the connector to use, then we're not wanted
+            if (groupsConfig.GetValue<string>("MessagingModule", "") != Name)
             {
-                // Do not run this module by default.
+                m_groupMessagingEnabled = false;
                 return;
             }
-            else
-            {
-                // if groups aren't enabled, we're not needed.
-                // if we're not specified as the connector to use, then we're not wanted
-                if ((groupsConfig.GetBoolean("Enabled", false) == false)
-                     || (groupsConfig.GetString("MessagingModule", "") != Name))
-                {
-                    m_groupMessagingEnabled = false;
-                    return;
-                }
 
-                m_groupMessagingEnabled = groupsConfig.GetBoolean("MessagingEnabled", true);
+            m_groupMessagingEnabled = groupsConfig.GetValue<bool>("MessagingEnabled", true);
 
-                if (!m_groupMessagingEnabled)
-                {
-                    return;
-                }
+            if (!m_groupMessagingEnabled)
+                return;
 
-                m_messageOnlineAgentsOnly = groupsConfig.GetBoolean("MessageOnlineUsersOnly", false);
+            m_messageOnlineAgentsOnly = groupsConfig.GetValue<bool>("MessageOnlineUsersOnly", false);
 
-                if (m_messageOnlineAgentsOnly)
-                     m_usersOnlineCache = new ExpiringCache<UUID, PresenceInfo[]>();
+            if (m_messageOnlineAgentsOnly)
+                 m_usersOnlineCache = new ExpiringCache<UUID, PresenceInfo[]>();
 
-                m_debugEnabled = groupsConfig.GetBoolean("MessagingDebugEnabled", m_debugEnabled);
-            }
+            m_debugEnabled = groupsConfig.GetValue<bool>("MessagingDebugEnabled", m_debugEnabled);
 
             m_logger?.LogInformation(
                 "[GROUPS-MESSAGING]: GroupsMessagingModule enabled with MessageOnlineOnly = {0}, DebugEnabled = {1}",

@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 {
@@ -57,9 +56,9 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
         public virtual void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<InstantMessageModule>>();
-            if (config.Configs["Messaging"] != null)
+            if (config.GetSection("Messaging") != null)
             {
-                if (config.Configs["Messaging"].GetString(
+                if (config.GetSection("Messaging").GetValue<string>(
                         "InstantMessageModule", "InstantMessageModule") !=
                         "InstantMessageModule")
                     return;

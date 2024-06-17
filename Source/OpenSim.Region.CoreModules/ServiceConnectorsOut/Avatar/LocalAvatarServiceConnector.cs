@@ -25,10 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-using System.Reflection;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -36,8 +36,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar
 {
@@ -64,23 +62,21 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalAvatarServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("AvatarServices", "");
+                string name = moduleConfig.GetValue<string>("AvatarServices", "");
                 if (name == Name)
                 {
-                    IConfig userConfig = source.Configs["AvatarService"];
+                    IConfigurationSection userConfig = source.GetSection("AvatarService");
                     if (userConfig == null)
                     {
                         m_logger?.LogError("[AVATAR CONNECTOR]: AvatarService missing from OpenSim.ini");
                         return;
                     }
 
-                    string serviceDll = userConfig.GetString("LocalServiceModule",
-                            String.Empty);
-
-                    if (serviceDll.Length == 0)
+                    string? serviceDll = userConfig.GetValue<string>("LocalServiceModule", String.Empty);
+                    if (String.IsNullOrEmpty(serviceDll))
                     {
                         m_logger?.LogError("[AVATAR CONNECTOR]: No LocalServiceModule named in section AvatarService");
                         return;

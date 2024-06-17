@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -35,9 +36,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
-
-using Nini.Config;
-
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Neighbour
 {
@@ -57,17 +55,12 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Neighbour
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<NeighbourServiceInConnectorModule>>();
             m_Config = config;
 
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+            IConfigurationSection moduleConfig = config.GetSection("Modules");
+            m_Enabled = moduleConfig.GetValue<bool>("NeighbourServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("NeighbourServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_logger?.LogInformation("[NEIGHBOUR IN CONNECTOR]: NeighbourServiceInConnector enabled");
-                }
-
+                m_logger?.LogInformation("[NEIGHBOUR IN CONNECTOR]: NeighbourServiceInConnector enabled");
             }
-
         }
 
         public void PostInitialise()

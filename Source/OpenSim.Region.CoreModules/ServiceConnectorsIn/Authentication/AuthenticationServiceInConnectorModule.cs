@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Handlers.Authentication;
 using OpenSim.Server.Base;
 
-using Nini.Config;
-
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Authentication
 {
     public class AuthenticationServiceInConnectorModule : ISharedRegionModule
@@ -43,7 +42,6 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Authentication
         private static ILogger? m_logger;
         private static bool m_Enabled = false;
 
-        private IConfiguration m_Config;
         bool m_Registered = false;
 
         #region Region Module interface
@@ -51,18 +49,13 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Authentication
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<AuthenticationServiceInConnectorModule>>();
-            m_Config = config;
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+
+            IConfigurationSection moduleConfig = config.GetSection("Modules");
+            m_Enabled = moduleConfig.GetValue<bool>("AuthenticationServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("AuthenticationServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_logger?.LogInformation("[AUTHENTICATION IN CONNECTOR]: Authentication Service In Connector enabled");
-                }
-
+                m_logger?.LogInformation("[AUTHENTICATION IN CONNECTOR]: Authentication Service In Connector enabled");
             }
-
         }
 
         public void PostInitialise()

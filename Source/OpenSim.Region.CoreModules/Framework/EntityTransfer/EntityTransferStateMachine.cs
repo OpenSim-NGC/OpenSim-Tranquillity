@@ -32,8 +32,6 @@ using OpenSim.Server.Base;
 
 using OpenMetaverse;
 
-using Nini.Config;
-
 namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
 {
     /// <summary>

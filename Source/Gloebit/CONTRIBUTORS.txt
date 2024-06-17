@@ -12,7 +12,6 @@ software at it's earliest stages.
 
 This software uses components from the following developers:
 * Microsoft .NET C# (https://docs.microsoft.com/en-us/dotnet/csharp/)
-* Nini (http://nini.sourceforge.net/)
 * XmlRpcCS (http://xmlrpccs.sf.net/)
 * Mono (https://www.mono-project.com/
 * LibOpenMetaverse (http://lib.openmetaverse.org/))

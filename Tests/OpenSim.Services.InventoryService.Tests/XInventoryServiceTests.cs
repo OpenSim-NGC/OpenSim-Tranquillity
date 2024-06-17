@@ -26,7 +26,6 @@
  */
 
 using System;
-using Nini.Config;
 using NUnit.Framework;
 using OpenMetaverse;
 using OpenSim.Framework;

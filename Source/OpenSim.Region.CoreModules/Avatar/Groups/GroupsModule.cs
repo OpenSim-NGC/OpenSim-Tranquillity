@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.Groups
 {
@@ -64,7 +63,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Groups
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GroupsModule>>();
-            IConfig groupsConfig = config.Configs["Groups"];
+            IConfigurationSection groupsConfig = config.GetSection("Groups");
 
             if (groupsConfig == null)
             {
@@ -72,14 +71,14 @@ namespace OpenSim.Region.CoreModules.Avatar.Groups
             }
             else
             {
-                m_Enabled = groupsConfig.GetBoolean("Enabled", false);
+                m_Enabled = groupsConfig.GetValue<bool>("Enabled", false);
                 if (!m_Enabled)
                 {
                     m_logger?.LogInformation("[GROUPS]: Groups disabled in configuration");
                     return;
                 }
 
-                if (groupsConfig.GetString("Module", "Default") != "Default")
+                if (groupsConfig.GetValue<string>("Module", "Default") != "Default")
                 {
                     m_Enabled = false;
                     return;

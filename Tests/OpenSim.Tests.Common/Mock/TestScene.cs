@@ -30,8 +30,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-using Nini.Config;
-
 namespace OpenSim.Tests.Common
 {
     public class TestScene : Scene

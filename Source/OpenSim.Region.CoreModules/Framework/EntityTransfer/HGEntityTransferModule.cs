@@ -25,8 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -38,8 +37,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
@@ -122,22 +119,22 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
         public override void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<HGEntityTransferModule>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
 
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("EntityTransferModule", "");
+                string name = moduleConfig.GetValue<string>("EntityTransferModule", "");
                 if (name == Name)
                 {
-                    IConfig transferConfig = source.Configs["EntityTransfer"];
+                    IConfigurationSection transferConfig = source.GetSection("EntityTransfer");
                     if (transferConfig != null)
                     {
-                        m_levelHGTeleport = transferConfig.GetInt("LevelHGTeleport", 0);
+                        m_levelHGTeleport = transferConfig.GetValue<int>("LevelHGTeleport", 0);
 
-                        m_RestrictAppearanceAbroad = transferConfig.GetBoolean("RestrictAppearanceAbroad", false);
+                        m_RestrictAppearanceAbroad = transferConfig.GetValue<bool>("RestrictAppearanceAbroad", false);
                         if (m_RestrictAppearanceAbroad)
                         {
-                            m_AccountName = transferConfig.GetString("AccountForAppearance", string.Empty);
+                            m_AccountName = transferConfig.GetValue<string>("AccountForAppearance", string.Empty);
                             if (m_AccountName.Length == 0)
                                 m_logger?.LogWarning("[HG ENTITY TRANSFER MODULE]: RestrictAppearanceAbroad is on, but no account has been given for avatar appearance!");
                         }

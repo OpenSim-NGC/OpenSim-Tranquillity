@@ -29,7 +29,6 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using Mono.Addins;
-using Nini.Config;
 using NUnit.Framework;
 using OpenMetaverse;
 using OpenSim;

@@ -26,7 +26,9 @@
  */
 
 using System.Drawing;
-using Nini.Config;
+
+using Microsoft.Extensions.Configuration;
+
 using OpenSim.Region.Framework.Scenes;
 
 namespace OpenSim.Region.CoreModules.World.LegacyMap

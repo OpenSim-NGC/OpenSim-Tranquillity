@@ -26,7 +26,6 @@
  */
 
 using System.IO;
-using Nini.Config;
 using NUnit.Framework;
 using OpenSim.Framework;
 using OpenSim.Tests.Common;

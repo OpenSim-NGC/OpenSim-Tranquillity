@@ -27,6 +27,7 @@
 using System.Collections;
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -42,8 +43,6 @@ using OpenSim.Server.Base;
 using OpenMetaverse;
 
 using Nwc.XmlRpc;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 {
@@ -74,15 +73,15 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
         public virtual void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<MessageTransferModule>>();
-            IConfig cnf = config.Configs["Messaging"];
+            IConfigurationSection cnf = config.GetSection("Messaging");
             if (cnf != null)
             {
-                if (cnf.GetString("MessageTransferModule", "MessageTransferModule") != "MessageTransferModule")
+                if (cnf.GetValue<string>("MessageTransferModule", "MessageTransferModule") != "MessageTransferModule")
                 {
                     return;
                 }
 
-                m_MessageKey = cnf.GetString("MessageKey", String.Empty);
+                m_MessageKey = cnf.GetValue<string>("MessageKey", String.Empty);
             }
             m_logger?.LogDebug("[MESSAGE TRANSFER]: Module enabled");
             m_Enabled = true;

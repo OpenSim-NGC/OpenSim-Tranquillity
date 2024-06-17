@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
 {
@@ -62,23 +61,21 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalAuthenticationServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("AuthenticationServices", "");
-                if (name == Name)
+                string name = moduleConfig.GetValue<string>("AuthenticationServices", "");
+                if (!String.IsNullOrEmpty(name) && name == Name)
                 {
-                    IConfig userConfig = source.Configs["AuthenticationService"];
+                    IConfigurationSection userConfig = source.GetSection("AuthenticationService");
                     if (userConfig == null)
                     {
                         m_logger?.LogError("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
                         return;
                     }
 
-                    string serviceDll = userConfig.GetString("LocalServiceModule",
-                            String.Empty);
-
-                    if (serviceDll.Length == 0)
+                    string serviceDll = userConfig.GetValue<string>("LocalServiceModule", String.Empty);
+                    if (String.IsNullOrEmpty(serviceDll))
                     {
                         m_logger?.LogError("[AUTH CONNECTOR]: No LocalServiceModule named in section AuthenticationService");
                         return;

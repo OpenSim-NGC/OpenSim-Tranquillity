@@ -26,9 +26,9 @@
  */
 
 using System.Collections.Concurrent;
-using System.Text;
 using System.Timers;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -40,8 +40,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
@@ -75,12 +73,12 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
 
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<AvatarFactoryModule>>();
 
-            IConfig appearanceConfig = config.Configs["Appearance"];
+            IConfigurationSection appearanceConfig = config.GetSection("Appearance");
             if (appearanceConfig != null)
             {
-                m_savetime = Convert.ToInt32(appearanceConfig.GetString("DelayBeforeAppearanceSave",Convert.ToString(m_savetime)));
-                m_sendtime = Convert.ToInt32(appearanceConfig.GetString("DelayBeforeAppearanceSend",Convert.ToString(m_sendtime)));
-                m_reusetextures = appearanceConfig.GetBoolean("ReuseTextures",m_reusetextures);
+                m_savetime = appearanceConfig.GetValue<int>("DelayBeforeAppearanceSave", m_savetime);
+                m_sendtime = appearanceConfig.GetValue<int>("DelayBeforeAppearanceSend", m_sendtime);
+                m_reusetextures = appearanceConfig.GetValue<bool>("ReuseTextures", m_reusetextures);
 
                 // m_log.InfoFormat("[AVFACTORY] configured for {0} save and {1} send",m_savetime,m_sendtime);
             }

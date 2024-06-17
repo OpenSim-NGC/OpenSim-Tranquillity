@@ -26,9 +26,9 @@
  */
 
 using System.Net.Security;
-using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -42,8 +42,6 @@ using OpenMetaverse;
 using MailKit.Net.Smtp;
 
 using MimeKit;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Scripting.EmailModules
 {
@@ -120,29 +118,29 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<EmailModule>>();
-            IConfig startupConfig = config.Configs["Startup"];
+            IConfigurationSection startupConfig = config.GetSection("Startup");
             if(startupConfig == null)
                 return;
 
-            if(startupConfig.GetString("emailmodule", "DefaultEmailModule") != "DefaultEmailModule")
+            if(startupConfig.GetValue<string>("emailmodule", "DefaultEmailModule") != "DefaultEmailModule")
                 return;
 
             //Load SMTP SERVER config
             try
             {
-                IConfig SMTPConfig = config.Configs["SMTP"];
+                IConfigurationSection SMTPConfig = config.GetSection("SMTP");
                 if (SMTPConfig  == null)
                     return;
 
-                if(!SMTPConfig.GetBoolean("enabled", false))
+                if(!SMTPConfig.GetValue<bool>("enabled", false))
                     return;
 
-                m_enableEmailToExternalObjects = SMTPConfig.GetBoolean("enableEmailToExternalObjects", m_enableEmailToExternalObjects);
-                m_enableEmailToSMTP = SMTPConfig.GetBoolean("enableEmailToSMTP", m_enableEmailToSMTP);
+                m_enableEmailToExternalObjects = SMTPConfig.GetValue<bool>("enableEmailToExternalObjects", m_enableEmailToExternalObjects);
+                m_enableEmailToSMTP = SMTPConfig.GetValue<bool>("enableEmailToSMTP", m_enableEmailToSMTP);
 
-                m_MailsToPrimAddressPerHour = SMTPConfig.GetInt("MailsToPrimAddressPerHour", m_MailsToPrimAddressPerHour);
+                m_MailsToPrimAddressPerHour = SMTPConfig.GetValue<int>("MailsToPrimAddressPerHour", m_MailsToPrimAddressPerHour);
                 m_MailsToPrimAddressRate = m_MailsToPrimAddressPerHour / 3600.0;
-                m_MailsFromOwnerPerHour = SMTPConfig.GetInt("MailsFromOwnerPerHour", m_MailsFromOwnerPerHour);
+                m_MailsFromOwnerPerHour = SMTPConfig.GetValue<int>("MailsFromOwnerPerHour", m_MailsFromOwnerPerHour);
                 m_MailsFromOwnerRate = m_MailsFromOwnerPerHour / 3600.0;
 
                 m_mailParseOptions = new ParserOptions()
@@ -150,17 +148,17 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                     AllowAddressesWithoutDomain = false,
                 };
 
-                m_InterObjectHostname = SMTPConfig.GetString("internal_object_host", m_InterObjectHostname);
+                m_InterObjectHostname = SMTPConfig.GetValue<string>("internal_object_host", m_InterObjectHostname);
                 m_checkSpecName = !m_InterObjectHostname.Equals("lsl.secondlife.com");
 
                 if (m_enableEmailToSMTP)
                 {
-                    m_SMTP_MailsPerDay = SMTPConfig.GetInt("SMTP_MailsPerDay", m_SMTP_MailsPerDay);
+                    m_SMTP_MailsPerDay = SMTPConfig.GetValue<int>("SMTP_MailsPerDay", m_SMTP_MailsPerDay);
                     m_SMTP_MailsRate = m_SMTP_MailsPerDay / 86400.0;
-                    m_MailsToSMTPAddressPerHour = SMTPConfig.GetInt("MailsToSMTPAddressPerHour", m_MailsToPrimAddressPerHour);
+                    m_MailsToSMTPAddressPerHour = SMTPConfig.GetValue<int>("MailsToSMTPAddressPerHour", m_MailsToPrimAddressPerHour);
                     m_MailsToSMTPAddressRate = m_MailsToPrimAddressPerHour / 3600.0;
 
-                    SMTP_SERVER_HOSTNAME = SMTPConfig.GetString("SMTP_SERVER_HOSTNAME", SMTP_SERVER_HOSTNAME);
+                    SMTP_SERVER_HOSTNAME = SMTPConfig.GetValue<string>("SMTP_SERVER_HOSTNAME", SMTP_SERVER_HOSTNAME);
                     OSHHTPHost hosttmp = new OSHHTPHost(SMTP_SERVER_HOSTNAME, true);
                     if(!hosttmp.IsResolvedHost)
                     {
@@ -168,22 +166,22 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                         return;
                     }
 
-                    SMTP_SERVER_PORT = SMTPConfig.GetInt("SMTP_SERVER_PORT", SMTP_SERVER_PORT);
-                    SMTP_SERVER_TLS = SMTPConfig.GetBoolean("SMTP_SERVER_TLS", SMTP_SERVER_TLS);
+                    SMTP_SERVER_PORT = SMTPConfig.GetValue<int>("SMTP_SERVER_PORT", SMTP_SERVER_PORT);
+                    SMTP_SERVER_TLS = SMTPConfig.GetValue<bool>("SMTP_SERVER_TLS", SMTP_SERVER_TLS);
 
-                    string smtpfrom = SMTPConfig.GetString("SMTP_SERVER_FROM", string.Empty);
-                    m_HostName = SMTPConfig.GetString("host_domain_header_from", m_HostName);
+                    string smtpfrom = SMTPConfig.GetValue<string>("SMTP_SERVER_FROM", string.Empty);
+                    m_HostName = SMTPConfig.GetValue<string>("host_domain_header_from", m_HostName);
                     if (!string.IsNullOrEmpty(smtpfrom) && !MailboxAddress.TryParse(m_mailParseOptions, smtpfrom, out SMTP_MAIL_FROM))
                     {
                         m_logger?.LogError("[EMAIL]: Invalid SMTP_SERVER_FROM {0}", smtpfrom);
                         return;
                     }
 
-                    SMTP_SERVER_LOGIN = SMTPConfig.GetString("SMTP_SERVER_LOGIN", SMTP_SERVER_LOGIN);
-                    SMTP_SERVER_PASSWORD = SMTPConfig.GetString("SMTP_SERVER_PASSWORD", SMTP_SERVER_PASSWORD);
+                    SMTP_SERVER_LOGIN = SMTPConfig.GetValue<string>("SMTP_SERVER_LOGIN", SMTP_SERVER_LOGIN);
+                    SMTP_SERVER_PASSWORD = SMTPConfig.GetValue<string>("SMTP_SERVER_PASSWORD", SMTP_SERVER_PASSWORD);
 
-                    bool VerifyCertChain = SMTPConfig.GetBoolean("SMTP_VerifyCertChain", true);
-                    bool VerifyCertNames = SMTPConfig.GetBoolean("SMTP_VerifyCertNames", true);
+                    bool VerifyCertChain = SMTPConfig.GetValue<bool>("SMTP_VerifyCertChain", true);
+                    bool VerifyCertNames = SMTPConfig.GetValue<bool>("SMTP_VerifyCertNames", true);
                     m_SMTP_SslPolicyErrorsMask = VerifyCertChain ? 0 : SslPolicyErrors.RemoteCertificateChainErrors;
                     if (!VerifyCertNames)
                         m_SMTP_SslPolicyErrorsMask |= SslPolicyErrors.RemoteCertificateNameMismatch;
@@ -195,7 +193,7 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                     m_logger?.LogWarning("[EMAIL]: SMTP disabled, set enableEmailSMTP to enable");
                 }
 
-                m_MaxEmailSize = SMTPConfig.GetInt("email_max_size", m_MaxEmailSize);
+                m_MaxEmailSize = SMTPConfig.GetValue<int>("email_max_size", m_MaxEmailSize);
                 if(m_MaxEmailSize < 256 || m_MaxEmailSize > 1000000)
                 {
                     m_logger?.LogWarning("[EMAIL]: email_max_size out of range [256, 1000000], Changed to default 4096");

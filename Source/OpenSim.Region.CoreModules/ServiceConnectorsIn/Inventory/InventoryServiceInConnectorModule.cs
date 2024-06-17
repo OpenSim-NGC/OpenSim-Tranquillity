@@ -25,8 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -35,8 +34,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Inventory
 {
@@ -54,14 +51,12 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Inventory
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<InventoryServiceInConnectorModule>>();
             m_Config = config;
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+
+            IConfigurationSection moduleConfig = config.GetSection("Modules");
+            m_Enabled = moduleConfig.GetValue<bool>("InventoryServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("InventoryServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_logger?.LogInformation("[INVENTORY IN CONNECTOR]: Inventory Service In Connector enabled");
-                }
+                m_logger?.LogInformation("[INVENTORY IN CONNECTOR]: Inventory Service In Connector enabled");
             }
         }
 

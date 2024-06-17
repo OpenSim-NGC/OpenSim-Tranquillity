@@ -35,8 +35,6 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Server.Base;
 
-using Nini.Config;
-
 namespace OpenSim.Region.CoreModules.World.Estate
 {
     /// <summary>

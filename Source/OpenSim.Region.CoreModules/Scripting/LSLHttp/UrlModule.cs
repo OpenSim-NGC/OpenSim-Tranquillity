@@ -30,6 +30,7 @@ using System.Collections.Specialized;
 using System.Text;
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -41,8 +42,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
 {
@@ -122,20 +121,20 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<UrlModule>>();
-            IConfig networkConfig = config.Configs["Network"];
+            IConfigurationSection? networkConfig = config.GetSection("Network");
             m_enabled = false;
 
             if (networkConfig != null)
             {
-                m_lsl_shard = networkConfig.GetString("shard", m_lsl_shard);
-                m_lsl_user_agent = networkConfig.GetString("user_agent", m_lsl_user_agent);
+                m_lsl_shard = networkConfig.GetValue<string>("shard", m_lsl_shard);
+                m_lsl_user_agent = networkConfig.GetValue<string>("user_agent", m_lsl_user_agent);
 
-                ExternalHostNameForLSL = config.Configs["Network"].GetString("ExternalHostNameForLSL", null);
+                ExternalHostNameForLSL = networkConfig.GetValue<string>("ExternalHostNameForLSL", null);
 
-                bool ssl_enabled = config.Configs["Network"].GetBoolean("https_listener", false);
+                bool ssl_enabled = networkConfig.GetValue<bool>("https_listener", false);
 
                 if (ssl_enabled)
-                    m_HttpsPort = (uint)config.Configs["Network"].GetInt("https_port", (int)m_HttpsPort);
+                    m_HttpsPort = (uint)networkConfig.GetValue<int>("https_port", (int)m_HttpsPort);
             }
             else
             {
@@ -162,10 +161,10 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
             m_enabled = true;
             m_ErrorStr = String.Empty;
 
-            IConfig llFunctionsConfig = config.Configs["LL-Functions"];
+            IConfigurationSection llFunctionsConfig = config.GetSection("LL-Functions");
 
             if (llFunctionsConfig != null)
-                TotalUrls = llFunctionsConfig.GetInt("max_external_urls_per_simulator", DefaultTotalUrls);
+                TotalUrls = llFunctionsConfig.GetValue<int>("max_external_urls_per_simulator", DefaultTotalUrls);
             else
                 TotalUrls = DefaultTotalUrls;
         }

@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -32,8 +33,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 {
@@ -43,7 +42,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
 
         private IAuthorizationService m_AuthorizationService;
         private Scene m_Scene;
-        private IConfig m_AuthorizationConfig;
+        private IConfigurationSection? m_AuthorizationConfig;
 
         private bool m_Enabled = false;
 
@@ -62,14 +61,14 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalAuthorizationServicesConnector>>();
             m_logger?.LogInformation("[AUTHORIZATION CONNECTOR]: Initialise");
 
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("AuthorizationServices", string.Empty);
-                if (name == Name)
+                string name = moduleConfig.GetValue<string>("AuthorizationServices", string.Empty);
+                if (!String.IsNullOrEmpty(name) && name == Name)
                 {
                     m_Enabled = true;
-                    m_AuthorizationConfig = source.Configs["AuthorizationService"];
+                    m_AuthorizationConfig = source.GetSection("AuthorizationService");
                     m_logger?.LogInformation("[AUTHORIZATION CONNECTOR]: Local authorization connector enabled");
                 }
             }

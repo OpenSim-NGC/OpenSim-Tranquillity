@@ -29,6 +29,7 @@ using System.Timers;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -37,8 +38,6 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Avatar.Chat
 {
@@ -883,7 +882,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
                                 catch (Exception e)
                                 {
                                     m_logger?.LogError("[IRC-PingRun] Exception on connector {0}: {1} ", connector.idn, e.Message);
-                                    m_logger?.LogDebug(e);
+                                    m_logger?.LogDebug(e.ToString());
                                     connector.Reconnect();
                                 }
                             }

@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -33,8 +34,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Serialiser
 {
@@ -57,11 +56,9 @@ namespace OpenSim.Region.CoreModules.World.Serialiser
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<SerialiserModule>>();
-            IConfig config = source.Configs["Serialiser"];
-            if (config != null)
-            {
-                m_savedir = config.GetString("save_dir", m_savedir);
-            }
+
+            IConfigurationSection config = source.GetSection("Serialiser");
+            m_savedir = config.GetValue<string>("save_dir", m_savedir);
 
             m_logger?.LogInformation("[Serialiser] Enabled, using save dir \"{0}\"", m_savedir);
         }

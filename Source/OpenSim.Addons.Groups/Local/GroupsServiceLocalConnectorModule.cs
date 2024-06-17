@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -37,8 +35,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Groups
 {
@@ -77,12 +73,12 @@ namespace OpenSim.Groups
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GroupsServiceLocalConnectorModule>>();
 
-            IConfig groupsConfig = config.Configs["Groups"];
-            if (groupsConfig == null)
+            IConfigurationSection groupsConfig = config.GetSection("Groups");
+            if (!groupsConfig.GetChildren().Any())
                 return;
 
-            if ((groupsConfig.GetBoolean("Enabled", false) == false)
-                    || (groupsConfig.GetString("ServicesConnectorModule", string.Empty) != Name))
+            if ((groupsConfig.GetValue<bool>("Enabled", false) == false)
+                    || (groupsConfig.GetValue<string>("ServicesConnectorModule", string.Empty) != Name))
             {
                 return;
             }

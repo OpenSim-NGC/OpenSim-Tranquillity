@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -35,8 +36,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
 {
@@ -88,20 +87,20 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
 
         public void Initialise(IConfiguration source)
         {
-            IConfig moduleConfig = source.Configs["Modules"];
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
             if (moduleConfig != null)
             {
-                string name = moduleConfig.GetString("AssetServices", "");
+                string name = moduleConfig.GetValue<string>("AssetServices", "");
                 if (name == Name)
                 {
-                    IConfig assetConfig = source.Configs["AssetService"];
+                    IConfigurationSection assetConfig = source.GetSection("AssetService");
                     if (assetConfig == null)
                     {
                         m_logger?.LogError("[REGIONASSETCONNECTOR]: AssetService missing from configuration files");
                         throw new Exception("Region asset connector init error");
                     }
 
-                    string localGridConnector = assetConfig.GetString("LocalGridAssetService", string.Empty);
+                    string localGridConnector = assetConfig.GetValue<string>("LocalGridAssetService", string.Empty);
                     if(string.IsNullOrEmpty(localGridConnector))
                     {
                         m_logger?.LogError("[REGIONASSETCONNECTOR]: LocalGridAssetService missing from configuration files");
@@ -117,7 +116,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
                         throw new Exception("Region asset connector init error");
                     }
 
-                    string HGConnector = assetConfig.GetString("HypergridAssetService", string.Empty);
+                    string HGConnector = assetConfig.GetValue<string>("HypergridAssetService", string.Empty);
                     if(!string.IsNullOrEmpty(HGConnector))
                     {
                         m_HGConnector = ServerUtils.LoadPlugin<IAssetService>(HGConnector, args);
@@ -126,9 +125,9 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
                             m_logger?.LogError("[REGIONASSETCONNECTOR]: Fail to load HG asset service " + HGConnector);
                             throw new Exception("Region asset connector init error");
                         }
-                        IConfig hgConfig = source.Configs["HGAssetService"];
-                        if (hgConfig != null)
-                            m_AssetPerms = new AssetPermissions(hgConfig);
+
+                        IConfigurationSection hgConfig = source.GetSection("HGAssetService");
+                        m_AssetPerms = new AssetPermissions(hgConfig);
                     }
 
                     m_localRequestsQueue = new ObjectJobEngine(AssetRequestProcessor, "GetAssetsWorkers", 2000, 2);

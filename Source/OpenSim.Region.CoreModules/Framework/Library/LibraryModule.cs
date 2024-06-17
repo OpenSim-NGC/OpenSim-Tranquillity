@@ -24,6 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -35,8 +36,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
@@ -58,13 +57,13 @@ namespace OpenSim.Region.CoreModules.Framework.Library
         public void Initialise(IConfiguration config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LibraryModule>>();
-            m_Enabled = config.Configs["Modules"].GetBoolean("LibraryModule", m_Enabled);
+            m_Enabled = config.GetSection("Modules").GetValue<bool>("LibraryModule", m_Enabled);
             if (m_Enabled)
             {
-                IConfig libConfig = config.Configs["LibraryService"];
+                IConfigurationSection libConfig = config.GetSection("LibraryService");
                 if (libConfig != null)
                 {
-                    string dllName = libConfig.GetString("LocalServiceModule", string.Empty);
+                    string dllName = libConfig.GetValue<string>("LocalServiceModule", string.Empty);
                     m_logger?.LogDebug("[LIBRARY MODULE]: Library service dll is " + dllName);
                     if (dllName != string.Empty)
                     {

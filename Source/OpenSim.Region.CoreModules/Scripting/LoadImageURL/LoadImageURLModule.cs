@@ -28,6 +28,7 @@
 using System.Drawing;
 using System.Net;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -38,8 +39,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.Scripting.LoadImageURL
 {
@@ -112,10 +111,10 @@ namespace OpenSim.Region.CoreModules.Scripting.LoadImageURL
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LoadImageURLModule>>();
             m_outboundUrlFilter = new OutboundUrlFilter("Script dynamic texture image module", config);
-            string proxyurl = config.Configs["Startup"].GetString("HttpProxy");
+            string? proxyurl = config?.GetSection("Startup")?.GetValue<string>("HttpProxy");
             if(!string.IsNullOrEmpty(proxyurl))
             {
-                string proxyexcepts = config.Configs["Startup"].GetString("HttpProxyExceptions");
+                string? proxyexcepts = config?.GetSection("Startup")?.GetValue<string>("HttpProxyExceptions");
                 if (!string.IsNullOrEmpty(proxyexcepts))
                 {
                     string[] elist = proxyexcepts.Split(';');

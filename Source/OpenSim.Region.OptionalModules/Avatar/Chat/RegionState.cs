@@ -27,6 +27,7 @@
 
 using System.Text.RegularExpressions;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
-
-using Nini.Config;
 
 namespace OpenSim.Region.OptionalModules.Avatar.Chat
 {
@@ -65,7 +64,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
 
         internal ChannelState cs = null; // associated IRC configuration
         internal Scene scene = null; // associated scene
-        internal IConfig config = null; // configuration file reference
+        internal IConfiguration config = null; // configuration file reference
         internal bool enabled = true;
 
         //AgentAlert
@@ -80,7 +79,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
 
         // Setup runtime variable values
 
-        public RegionState(Scene p_scene, IConfig p_config)
+        public RegionState(Scene p_scene, IConfiguration p_config)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<RegionState>>();
             scene = p_scene;
@@ -92,19 +91,21 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat
             LocY = Convert.ToString(scene.RegionInfo.RegionLocY);
             IDK = Convert.ToString(_idk_++);
 
-            showAlert = config.GetBoolean("alert_show", false);
+            showAlert = config.GetValue<bool>("alert_show", false);
             string alertServerInfo = String.Empty;
 
             if (showAlert)
             {
-                bool showAlertServerInfo = config.GetBoolean("alert_show_serverinfo", true);
+                bool showAlertServerInfo = config.GetValue<bool>("alert_show_serverinfo", true);
 
                 if (showAlertServerInfo)
                     alertServerInfo = String.Format("\nServer: {0}\nPort: {1}\nChannel: {2}\n\n",
-                        config.GetString("server", ""), config.GetString("port", ""), config.GetString("channel", ""));
+                                                        config.GetValue<string>("server", ""),
+                                                        config.GetValue<string>("port", ""),
+                                                        config.GetValue<string>("channel", ""));
 
-                string alertPreMessage = config.GetString("alert_msg_pre", "This region is linked to Irc.");
-                string alertPostMessage = config.GetString("alert_msg_post", "Everything you say in public chat can be listened.");
+                string alertPreMessage = config.GetValue<string>("alert_msg_pre", "This region is linked to Irc.");
+                string alertPostMessage = config.GetValue<string>("alert_msg_post", "Everything you say in public chat can be listened.");
 
                 alertMessage = String.Format("{0}\n{1}{2}", alertPreMessage, alertServerInfo, alertPostMessage);
 

@@ -29,6 +29,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -47,8 +48,6 @@ using Warp3D;
 using WarpRenderer = Warp3D.Warp3D;
 
 using CSJ2K;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.World.Warp3DMap
 {

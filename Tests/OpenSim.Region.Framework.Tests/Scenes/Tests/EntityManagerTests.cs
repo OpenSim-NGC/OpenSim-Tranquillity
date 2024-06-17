@@ -30,7 +30,6 @@ using System.Reflection;
 using System.Threading;
 using System.Text;
 using System.Collections.Generic;
-using Nini.Config;
 using NUnit.Framework;
 using OpenMetaverse;
 using OpenSim.Framework;

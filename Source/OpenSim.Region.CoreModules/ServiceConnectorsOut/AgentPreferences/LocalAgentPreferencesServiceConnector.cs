@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,8 +35,6 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-
-using Nini.Config;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences
 {
@@ -61,38 +60,36 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences
         public void Initialise(IConfiguration source)
         {
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<LocalAgentPreferencesServicesConnector>>();
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+
+            IConfigurationSection moduleConfig = source.GetSection("Modules");
+            string? name = moduleConfig.GetValue<string>("AgentPreferencesServices", "");
+            if (!String.IsNullOrEmpty(name) && name == Name)
             {
-                string name = moduleConfig.GetString("AgentPreferencesServices", "");
-                if (name == Name)
+                IConfigurationSection userConfig = source.GetSection("AgentPreferencesService");
+                if (userConfig == null)
                 {
-                    IConfig userConfig = source.Configs["AgentPreferencesService"];
-                    if (userConfig == null)
-                    {
-                        m_logger?.LogError("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    string serviceDll = userConfig.GetString("LocalServiceModule", String.Empty);
-
-                    if (String.IsNullOrEmpty(serviceDll))
-                    {
-                        m_logger?.LogError("[AGENT PREFERENCES CONNECTOR]: No AgentPreferencesModule named in section AgentPreferencesService");
-                        return;
-                    }
-
-                    Object[] args = new Object[] { source };
-                    m_AgentPreferencesService = ServerUtils.LoadPlugin<IAgentPreferencesService>(serviceDll, args);
-
-                    if (m_AgentPreferencesService == null)
-                    {
-                        m_logger?.LogError("[AGENT PREFERENCES CONNECTOR]: Can't load agent preferences service");
-                        return;
-                    }
-                    m_Enabled = true;
-                    m_logger?.LogInformation("[AGENT PREFERENCES CONNECTOR]: Local agent preferences connector enabled");
+                    m_logger?.LogError("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
+                    return;
                 }
+
+                string? serviceDll = userConfig.GetValue<string>("LocalServiceModule", String.Empty);
+
+                if (String.IsNullOrEmpty(serviceDll))
+                {
+                    m_logger?.LogError("[AGENT PREFERENCES CONNECTOR]: No AgentPreferencesModule named in section AgentPreferencesService");
+                    return;
+                }
+
+                Object[] args = new Object[] { source };
+                m_AgentPreferencesService = ServerUtils.LoadPlugin<IAgentPreferencesService>(serviceDll, args);
+
+                if (m_AgentPreferencesService == null)
+                {
+                    m_logger?.LogError("[AGENT PREFERENCES CONNECTOR]: Can't load agent preferences service");
+                    return;
+                }
+                m_Enabled = true;
+                m_logger?.LogInformation("[AGENT PREFERENCES CONNECTOR]: Local agent preferences connector enabled");
             }
         }
 

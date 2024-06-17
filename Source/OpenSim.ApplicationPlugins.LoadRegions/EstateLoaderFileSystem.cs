@@ -25,16 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
 using OpenSim.Region.Framework;
+using OpenSim.Server.Base;
 
 using OpenMetaverse;
 
-using Nini.Config;
-using OpenSim.Server.Base;
 
 namespace OpenSim.ApplicationPlugins.LoadRegions
 {
@@ -62,11 +62,11 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
         {
             string estateConfigPath = Path.Combine(Util.configDir(), "Estates");
 
-            IConfig startupConfig = m_configSource.Configs["Startup"];
+            IConfigurationSection startupConfig = m_configSource.GetSection("Startup");
             if(startupConfig == null)
                 return;
 
-            estateConfigPath = startupConfig.GetString("regionload_estatesdir", estateConfigPath).Trim();
+            estateConfigPath = startupConfig.GetValue<string>("regionload_estatesdir", estateConfigPath).Trim();
             if(string.IsNullOrWhiteSpace(estateConfigPath))
                 return;
 
@@ -97,24 +97,26 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
             foreach (string file in iniFiles)
             {
                 m_logger.LogInformation("[ESTATE LOADER FILE SYSTEM]: Loading config file {0}", file);
-
+                
                 IConfiguration source = null;
-                try
-                {
-                    source = new IniConfigSource(file);
+                try {
+                    source = new ConfigurationBuilder()
+                        .AddIniFile(file)
+                        .Build();
                 }
                 catch
                 {
                     m_logger.LogWarning("[ESTATE LOADER FILE SYSTEM]: failed to parse file {0}", file);
+                    continue;
                 }
 
                 if(source == null)
                     continue;
 
-                foreach (IConfig config in source.Configs)
+                foreach (IConfigurationSection config in source.GetChildren())
                 {
                     // Read Estate Config From Source File
-                    string estateName = config.Name;
+                    string estateName = config.Key;
                     if (string.IsNullOrWhiteSpace(estateName))
                         continue;
 
@@ -124,7 +126,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
                         continue;
                     }
 
-                    string ownerString = config.GetString("Owner", string.Empty);
+                    string ownerString = config.GetValue<string>("Owner", string.Empty);
                     if (string.IsNullOrWhiteSpace(ownerString))
                         continue;
 
@@ -140,7 +142,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
                     //### Should check Estate Owner ID but no Scene object available at this point
 
                     // Does Config Specify EstateID (0 Defaults To AutoIncrement)
-                    int EstateID = config.GetInt("EstateID", 0);
+                    int EstateID = config.GetValue<int>("EstateID", 0);
 
                     if (EstateID > 0)
                     {
