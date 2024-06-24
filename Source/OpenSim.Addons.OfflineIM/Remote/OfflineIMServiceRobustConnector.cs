@@ -40,13 +40,17 @@ using Microsoft.Extensions.Logging;
 
 namespace OpenSim.OfflineIM
 {
-    public class OfflineIMServiceRobustConnector : ServiceConnector, IServiceConnector
+    public class OfflineIMServiceRobustConnector : IServiceConnector
     {
         private IOfflineIMService m_OfflineIMService;
         private static string m_ConfigName = "Messaging";
 
         private readonly IConfiguration m_configuration;
         private readonly ILogger<OfflineIMServiceRobustConnector> m_logger;
+
+        public string ConfigName => m_ConfigName;
+
+        public IHttpServer HttpServer => throw new NotImplementedException();
 
         public OfflineIMServiceRobustConnector(
             IConfiguration configuration, 
@@ -60,8 +64,7 @@ namespace OpenSim.OfflineIM
             IConfiguration configuration, 
             ILogger<OfflineIMServiceRobustConnector> logger,
             IHttpServer server, 
-            string configName) :
-            base(configuration, server, configName)
+            string configName)
         {
             m_configuration = configuration;
             m_logger = logger;
@@ -73,6 +76,11 @@ namespace OpenSim.OfflineIM
             IServiceAuth auth = ServiceAuth.Create(configuration, configName);
 
             server.AddStreamHandler(new OfflineIMServicePostHandler(m_OfflineIMService, auth));
+        }
+
+        public void Initialize(IHttpServer httpServer)
+        {
+            throw new NotImplementedException();
         }
     }
 
@@ -195,8 +203,7 @@ namespace OpenSim.OfflineIM
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 

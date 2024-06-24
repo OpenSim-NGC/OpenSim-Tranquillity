@@ -35,6 +35,7 @@ using System.Timers;
 using System.Xml;
 using System.Xml.Serialization;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenSim.Data;
 using OpenSim.Framework;
@@ -42,7 +43,7 @@ using OpenSim.Services.Interfaces;
 
 namespace OpenSim.OfflineIM
 {
-    public class OfflineIMService : OfflineIMServiceBase, IOfflineIMService
+    public class OfflineIMService : IOfflineIMService
     {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private const int MAX_IM = 25;
@@ -50,10 +51,22 @@ namespace OpenSim.OfflineIM
         private XmlSerializer m_serializer;
         private static bool m_Initialized = false;
 
-        public OfflineIMService(IConfiguration config)
-            : base(config)
+        private readonly IConfiguration m_config;
+        private readonly ILogger m_logger;
+        private readonly IOfflineIMData m_Database;
+
+        public OfflineIMService(
+            IConfiguration config,
+            ILogger<OfflineIMService> logger,
+            IOfflineIMData offlineIMData
+            )
         {
+            m_config = config;
+            m_logger = logger;
+            m_Database = offlineIMData;
+
             m_serializer = new XmlSerializer(typeof(GridInstantMessage));
+            
             if (!m_Initialized)
             {
                 m_Database.DeleteOld();

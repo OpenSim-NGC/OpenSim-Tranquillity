@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
- 
+
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.PhysicsModule.SharedBase;
@@ -33,6 +33,7 @@ using OpenMetaverse;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using OpenSim.Region.PhysicsModule.SharedBase;
 
 namespace OpenSim.Region.PhysicsModule.BulletS
 {

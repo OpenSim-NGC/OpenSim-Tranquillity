@@ -23,7 +23,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using OpenSim.Data.MySQL;
-using OpenSim.Data.PGSQL;
 using OpenSim.Server.Base;
 
 using MySqlConnector;
@@ -40,14 +39,8 @@ namespace Gloebit.GloebitMoneyModule
             m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<GloebitTransactionData>>();
 
             switch (storageProvider) {
-                case "OpenSim.Data.SQLite.dll":
-                    m_impl = new SQLiteImpl(connectionString);
-                    break;
                 case "OpenSim.Data.MySQL.dll":
                     m_impl = new MySQLImpl(connectionString);
-                    break;
-                case "OpenSim.Data.PGSQL.dll":
-                    m_impl = new PGSQLImpl(connectionString);
                     break;
                 default:
                     break;
@@ -64,26 +57,6 @@ namespace Gloebit.GloebitMoneyModule
             GloebitTransaction[] Get(string[] fields, string[] keys);
 
             bool Store(GloebitTransaction txn);
-        }
-
-        private class SQLiteImpl : SQLiteGenericTableHandler<GloebitTransaction>, IGloebitTransactionData {
-            public SQLiteImpl(string connectionString)
-                : base(connectionString, "GloebitTransactions", "GloebitTransactionsSQLite")
-            {
-            }
-            
-            public override bool Store(GloebitTransaction txn)
-            {
-                // remove null datetimes as pgsql throws exceptions on null fields
-                if (txn.enactedTime == null) {
-                    txn.enactedTime = SqlDateTime.MinValue.Value;
-                }
-                if (txn.finishedTime == null) {
-                    txn.finishedTime = SqlDateTime.MinValue.Value;
-                }
-                // call parent
-                return base.Store(txn);
-            }
         }
 
         private class MySQLImpl : MySQLGenericTableHandler<GloebitTransaction>, IGloebitTransactionData {
@@ -153,37 +126,5 @@ namespace Gloebit.GloebitMoneyModule
             }
         }
 
-        private class PGSQLImpl : PGSQLGenericTableHandler<GloebitTransaction>, IGloebitTransactionData {
-            private static ILogger m_logger;
-
-            public PGSQLImpl(string connectionString)
-                : base(connectionString, "GloebitTransactions", "GloebitTransactionsPGSQL")
-            {
-                m_logger ??= OpenSimServer.Instance.ServiceProvider.GetRequiredService<ILogger<PGSQLImpl>>();
-            }
-            
-            public override bool Store(GloebitTransaction txn)
-            {
-		        try {
-                    // remove null datetimes as pgsql throws exceptions on null fields
-                    if (txn.enactedTime == null) {
-                        txn.enactedTime = SqlDateTime.MinValue.Value;
-                    }
-                    if (txn.finishedTime == null) {
-                        txn.finishedTime = SqlDateTime.MinValue.Value;
-                    }
-                    //m_log.InfoFormat("GloebitTransactionData.PGSQLImpl: storing transaction type:{0}, SaleType:{2}, PayerEndingBalance:{3}, cTime:{4}, enactedTime:{5}, finishedTime:{6}", txn.TransactionType, txn.SaleType, txn.PayerEndingBalance, txn.cTime, txn.enactedTime, txn.finishedTime);
-                    // call parent
-                    return base.Store(txn);
-		        } catch(System.OverflowException e) {
-                    m_logger.LogError("GloebitTransactionData.PGSQLImpl: Failure storing transaction type:{0}, SaleType:{1}, PayerEndingBalance:{2}, cTime:{3}, enactedTime:{4}, finishedTime:{5}, stacktrace:{6}", txn.TransactionType, txn.SaleType, txn.PayerEndingBalance, txn.cTime, txn.enactedTime, txn.finishedTime, e);
-		            return false;
-		        } catch(Exception e) {
-                    m_logger.LogDebug("[PGSQL GENERIC TABLE HANDLER]: Failed to store data: {0}", e);
-                    return false;
-                }
-            }
-        }
-        
     }
 }

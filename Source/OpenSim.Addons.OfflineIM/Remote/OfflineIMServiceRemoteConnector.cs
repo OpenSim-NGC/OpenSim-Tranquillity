@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -46,7 +44,7 @@ namespace OpenSim.OfflineIM
         private static ILogger m_logger;
 
         private string m_ServerURI = string.Empty;
-        private IServiceAuth m_Auth;
+        private IServiceAuth? m_Auth;
         private object m_Lock = new object();
 
         public OfflineIMServiceRemoteConnector(string url)
@@ -64,7 +62,7 @@ namespace OpenSim.OfflineIM
             var cnf = config.GetSection("Messaging");
             if (cnf.Exists() is false)
             {
-                m_log.WarnFormat("[OfflineIM.V2.RemoteConnector]: Missing Messaging configuration");
+                m_logger.LogWarning("[OfflineIM.V2.RemoteConnector]: Missing Messaging configuration");
                 return;
             }
 

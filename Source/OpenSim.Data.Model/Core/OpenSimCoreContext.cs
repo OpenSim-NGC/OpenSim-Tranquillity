@@ -446,6 +446,8 @@ public partial class OpenSimCoreContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
+            entity.HasIndex(e => e.AccessTime, "idx_fsassets_access_time");
+            
             entity
                 .ToTable("fsassets")
                 .HasCharSet("utf8mb3")

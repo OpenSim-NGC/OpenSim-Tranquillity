@@ -22,8 +22,6 @@
   <Reference name="MySql.Data" path="../../../bin/"/>
   <Reference name="OpenSim.Data"/>
   <Reference name="OpenSim.Data.MySQL"/>
-  <Reference name="OpenSim.Data.PGSQL"/>
-  <Reference name="OpenSim.Data.SQLite"/>
   <Reference name="OpenSim.Framework"/>
   <Reference name="OpenSim.Framework.Servers"/>
   <Reference name="OpenSim.Framework.Servers.HttpServer"/>

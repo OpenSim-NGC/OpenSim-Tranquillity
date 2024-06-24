@@ -12,5 +12,11 @@
     <Version>0.9.3.0</Version>
     <AssemblyVersion>0.9.3.0</AssemblyVersion>
     <FileVersion>0.9.3.0</FileVersion>
-  </PropertyGroup> 
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Nerdbank.GitVersioning" Condition="!Exists('packages.config')">
+      <PrivateAssets>all</PrivateAssets>
+      <Version>3.6.133</Version>
+    </PackageReference>
+  </ItemGroup>
 </Project>

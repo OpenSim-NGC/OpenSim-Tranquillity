@@ -50,15 +50,8 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\GloebitSubscriptionsMySQL.migrations" />
-    <EmbeddedResource Include="Resources\GloebitSubscriptionsPGSQL.migrations" />
-    <EmbeddedResource Include="Resources\GloebitSubscriptionsSQLite.migrations" />
     <EmbeddedResource Include="Resources\GloebitTransactionsMySQL.migrations" />
-    <EmbeddedResource Include="Resources\GloebitTransactionsPGSQL.migrations" />
-    <EmbeddedResource Include="Resources\GloebitTransactionsSQLite.migrations" />
     <EmbeddedResource Include="Resources\GloebitUsersMySQL.migrations" />
-    <EmbeddedResource Include="Resources\GloebitUsersPGSQL.migrations" />
-    <EmbeddedResource Include="Resources\GloebitUsersSQLite.migrations" />
-    <EmbeddedResource Include="Resources\Gloebit.addin.xml" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="8.0.0" />
