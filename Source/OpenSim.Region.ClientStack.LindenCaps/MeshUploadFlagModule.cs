@@ -64,7 +64,7 @@ namespace OpenSim.Region.ClientStack.Linden
             Enabled = true;
         }
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {
             var config = m_configuration.GetSection("Mesh");
             if (config.Exists() is false)

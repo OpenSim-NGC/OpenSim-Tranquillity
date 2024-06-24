@@ -58,7 +58,7 @@ namespace OpenSim.Region.ClientStack.Linden
 
         public Type ReplaceableInterface { get { return null; } }
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {
         }
 

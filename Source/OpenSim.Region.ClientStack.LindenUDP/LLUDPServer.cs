@@ -70,7 +70,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             get { return null; }
         }
 
-        public virtual void Initialise()
+        public virtual void Initialise(IConfiguration pConfiguration)
         {
         }
 

@@ -25,8 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using Microsoft.Extensions.Configuration;
+
 using OpenSim.Region.Framework.Scenes;
 
 namespace OpenSim.Region.Framework.Interfaces
@@ -58,7 +58,7 @@ namespace OpenSim.Region.Framework.Interfaces
         /// this is called once on each instance, after the instace for the region has been created.
         /// </summary>
         /// </param>
-        void Initialise();
+        void Initialise(IConfiguration pConfiguration);
 
         /// <summary>
         /// This is the inverse to <see cref="Initialise"/>. After a Close(), this instance won't be usable anymore.

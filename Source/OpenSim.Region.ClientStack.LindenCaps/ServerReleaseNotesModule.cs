@@ -61,7 +61,7 @@ namespace OpenSim.Region.ClientStack.Linden
             get { return null; }
         }
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {
             m_enabled = false; // whatever
 

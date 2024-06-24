@@ -74,7 +74,7 @@ namespace OpenSim.Region.PhysicsModule.Meshing
             get { return null; }
         }
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {
             // TODO: Move this out of Startup
             var config = m_configuration.GetSection("Startup");

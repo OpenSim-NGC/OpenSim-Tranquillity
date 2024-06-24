@@ -88,7 +88,7 @@ namespace OpenSim.Region.ClientStack.Linden
             get { return null; }
         }
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {
             var config = m_configuration.GetSection("ClientStack.LindenCaps");
             if (config.Exists() is false)

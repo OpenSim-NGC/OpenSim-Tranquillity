@@ -46,8 +46,9 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             get { return null; }
         }
 
-        public void Initialise( )
+        public void Initialise(IConfiguration pConfiguration)
         {
+            // NOTE: we don't use the configuration passed in, we use the one passed in the constructor
             var config = m_config.GetSection("Startup");
             if (config.Exists() is false)
             {

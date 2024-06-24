@@ -84,7 +84,7 @@ namespace OpenSim.Region.ClientStack.Linden
 
         #region ISharedRegionModule Members
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {          
             var config = m_configuration.GetSection("SimulatorFeatures");
             if (config.Exists() is true)

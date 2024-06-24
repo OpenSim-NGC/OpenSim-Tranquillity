@@ -53,7 +53,7 @@ namespace OpenSim.Region.ClientStack.Linden
             m_logger = logger;
         }
 
-        public void Initialise( )
+        public void Initialise(IConfiguration pConfiguration)
         {
         }
 

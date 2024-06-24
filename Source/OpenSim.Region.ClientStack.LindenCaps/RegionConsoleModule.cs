@@ -61,7 +61,7 @@ namespace OpenSim.Region.ClientStack.Linden
 
         public event ConsoleMessage OnConsoleMessage;
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {
             m_commands.AddCommand( "Help", false, "help", "help [<item>]", "Display help on a particular command or on a list of commands in a category", Help);
         }

@@ -79,7 +79,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
 
         public string Name { get { return this.GetType().Name; } }
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {
             BaseScene = null;
             Enabled = false;

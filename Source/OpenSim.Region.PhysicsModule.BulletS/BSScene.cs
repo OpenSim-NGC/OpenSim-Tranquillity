@@ -222,16 +222,16 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             get { return null; }
         }
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {
             // TODO: Move this out of Startup
             var config = m_configuration.GetSection("Startup");
             if (config.Exists())
             {
-                string physics = config.GetValue("physics", string.Empty);
-                if (physics == Name)
+                string? physics = config.GetValue<string>("physics", string.Empty);
+                if (!String.IsNullOrEmpty(physics) && physics == Name)
                 {
-                    string mesher = config.GetValue("meshing", string.Empty);
+                    string? mesher = config.GetValue<string>("meshing", string.Empty);
                     if (string.IsNullOrEmpty(mesher) || !mesher.Equals("Meshmerizer"))
                     {
                         m_logger.LogError("Opensim.ini meshing option must be set to \"Meshmerizer\"");

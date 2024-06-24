@@ -284,7 +284,7 @@ namespace OpenSim.Region.OptionalModules.Currency
 
         #region ISharedRegionModule interface
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {
             if (m_debug) m_logger.LogInformation($"Initialise:");
 

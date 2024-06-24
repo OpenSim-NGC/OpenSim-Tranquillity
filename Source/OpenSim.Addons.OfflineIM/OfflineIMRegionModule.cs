@@ -55,7 +55,7 @@ namespace OpenSim.OfflineIM
             m_logger = logger;
         }
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {
             var cnf = m_configuration.GetSection("Messaging");
             if (cnf.Exists() is false)

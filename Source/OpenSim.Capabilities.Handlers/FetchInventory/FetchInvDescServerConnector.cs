@@ -86,7 +86,7 @@ namespace OpenSim.Capabilities.Handlers
 
             ExpiringKey<UUID> m_badRequests = new ExpiringKey<UUID>(30000);
 
-            FetchInvDescHandler webFetchHandler = new FetchInvDescHandler(m_InventoryService, m_LibraryService, null);
+            FetchInvDescHandler webFetchHandler = new FetchInvDescHandler(m_logger, m_InventoryService, m_LibraryService, null);
             ISimpleStreamHandler reqHandler
                 = new SimpleStreamHandler("/CAPS/WebFetchInvDesc/", delegate(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
                 { 

@@ -140,7 +140,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
                     m_sharedInstances.Add(module);
 
                     m_logger.LogInformation($"[REGIONMODULES]: Initializing: {module.Name}");                    
-                    module.Initialise();
+                    module.Initialise(m_configuration);
                 }
 
                 m_logger.LogInformation($"[REGIONMODULES]: Initializing INonSharedRegionModules");
@@ -158,7 +158,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
                     m_nonSharedInstances.Add(module);
 
                     m_logger.LogInformation($"[REGIONMODULES]: Initializing: {module.Name}");
-                    module.Initialise();
+                    module.Initialise(m_configuration);
                 }
             }
         }
@@ -409,7 +409,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
                                   scene.RegionInfo.RegionName, module.Name);
 
                 // Initialise the module
-                module.Initialise( );
+                module.Initialise(m_configuration);
 
                 list.Add(module);
             }
@@ -471,7 +471,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
                 m_logger.LogDebug("[REGIONMODULE]: Adding scene {0} to non-shared module {1} (deferred)",
                                   scene.RegionInfo.RegionName, module.Name);
 
-                module.Initialise();
+                module.Initialise(m_configuration);
 
                 list.Add(module);
                 deferredlist.Add(module);

@@ -91,7 +91,7 @@ namespace OpenSim.Region.PhysicsModule.ubODEMeshing
             get { return null; }
         }
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {
             var start_config = m_configuration.GetSection("Startup");
 

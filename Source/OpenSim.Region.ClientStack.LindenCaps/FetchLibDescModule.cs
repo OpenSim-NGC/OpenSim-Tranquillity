@@ -92,7 +92,7 @@ namespace OpenSim.Region.ClientStack.Linden
             ProcessQueuedRequestsAsync = processQueuedResultsAsync;
         }
 
-        public void Initialise()
+        public void Initialise(IConfiguration pConfiguration)
         {
             var config = m_configuration.GetSection("ClientStack.LindenCaps");
             if (config == null)
@@ -135,7 +135,7 @@ namespace OpenSim.Region.ClientStack.Linden
                 m_badRequests = new ExpiringKey<UUID>(30000);
 
             if (ProcessQueuedRequestsAsync && m_workerpool == null)
-                m_workerpool = new ObjectJobEngine(DoInventoryRequests, "LibInventoryWorker", 2000, 2);
+                m_workerpool = new ObjectJobEngine(m_logger, DoInventoryRequests, "LibInventoryWorker", 2000, 2);
         }
 
         public void PostInitialise()
