@@ -19,7 +19,7 @@ public partial class OpenSimSearchContext : DbContext
 
     public virtual DbSet<Hostsregister> Hostsregisters { get; set; }
 
-    public virtual DbSet<Object> Objects { get; set; }
+    public virtual DbSet<SearchObject> Objects { get; set; }
 
     public virtual DbSet<Parcel> Parcels { get; set; }
 
@@ -221,7 +221,7 @@ public partial class OpenSimSearchContext : DbContext
             entity.Property(e => e.Register).HasColumnName("register");
         });
 
-        modelBuilder.Entity<Object>(entity =>
+        modelBuilder.Entity<SearchObject>(entity =>
         {
             entity.HasKey(e => new { e.Objectuuid, e.Parceluuid })
                 .HasName("PRIMARY")

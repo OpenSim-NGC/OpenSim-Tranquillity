@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace OpenSim.Data.Model.Search;
 
-public partial class Object
+public partial class SearchObject
 {
     public string Objectuuid { get; set; }
 

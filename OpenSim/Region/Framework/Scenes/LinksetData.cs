@@ -64,20 +64,14 @@ namespace OpenSim.Region.Framework.Scenes
         {
             lock (linksetDataLock)
             {
-                if ((Data is null) || (Data.Count <= 0))
-                {
-                    return null;
-                }
-                else
-                {
-                    return JsonSerializer.Serialize<LinksetData>(this);
-                }
+                return ((Data is null) || (Data.Count <= 0)) ? 
+                    null : JsonSerializer.Serialize<LinksetData>(this);
             }
         }
    
-        public static LinksetData? DeserializeLinksetData(string data)
+        public static LinksetData DeserializeLinksetData(string data)
         {
-            LinksetData? lsd = null;
+            LinksetData lsd = null;
             
             if (string.IsNullOrWhiteSpace(data) is false)
             {           
