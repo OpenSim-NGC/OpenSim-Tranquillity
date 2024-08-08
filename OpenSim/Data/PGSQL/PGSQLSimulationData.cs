@@ -39,6 +39,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Data;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace OpenSim.Data.PGSQL
 {
