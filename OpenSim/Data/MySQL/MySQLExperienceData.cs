@@ -78,9 +78,7 @@ namespace OpenSim.Data.MySQL
                     cmd.Parameters.AddWithValue("?avatar", agent_id.ToString());
                     cmd.Parameters.AddWithValue("?experience", experience_id.ToString());
 
-                    if (cmd.ExecuteNonQuery() > 0)
-                        return true;
-                    else return false;
+                    return (cmd.ExecuteNonQuery() > 0);
                 }
             }
         }
@@ -97,9 +95,7 @@ namespace OpenSim.Data.MySQL
                     cmd.Parameters.AddWithValue("?experience", experience_id.ToString());
                     cmd.Parameters.AddWithValue("?allow", allow);
 
-                    if (cmd.ExecuteNonQuery() > 0)
-                        return true;
-                    else return false;
+                    return (cmd.ExecuteNonQuery() > 0);
                 }
             }
         }
@@ -191,9 +187,7 @@ namespace OpenSim.Data.MySQL
                     cmd.Parameters.AddWithValue("?maturity", data.maturity);
                     cmd.Parameters.AddWithValue("?properties", data.properties);
 
-                    if (cmd.ExecuteNonQuery() > 0)
-                        return true;
-                    else return false;
+                    return (cmd.ExecuteNonQuery() > 0);
                 }
             }
         }
@@ -308,9 +302,7 @@ namespace OpenSim.Data.MySQL
                     cmd.Parameters.AddWithValue("?key", key);
                     cmd.Parameters.AddWithValue("?value", val);
 
-                    if (cmd.ExecuteNonQuery() > 0)
-                        return true;
-                    else return false;
+                    return (cmd.ExecuteNonQuery() > 0);
                 }
             }
         }
@@ -352,9 +344,7 @@ namespace OpenSim.Data.MySQL
                     cmd.Parameters.AddWithValue("?experience", experience.ToString());
                     cmd.Parameters.AddWithValue("?key", key);
 
-                    if (cmd.ExecuteNonQuery() > 0)
-                        return true;
-                    else return false;
+                    return (cmd.ExecuteNonQuery() > 0);
                 }
             }
         }
