@@ -239,7 +239,13 @@ namespace OpenSim.Framework
                     {
 //                        m_log.DebugFormat("[OUTBOUND URL FILTER]: Found [{0}] in blacklist for {1}", url, Name);
 
-                        // Check blacklist exceptions
+                        // if the endpoint is destined to an LSL script, always allow.
+                        if (url.indexOf("/lslhttp/") != -1)
+                        {
+                            return true;
+                        }
+
+                        // Check blacklist exceptions for non-LSL exceptions
                         allowed
                             = OutboundUrlFilter.IsInNetwork(
                                 addr, url.Port, m_blacklistExceptionNetworks, m_blacklistExceptionEndPoints, Name);
