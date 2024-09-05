@@ -5196,7 +5196,6 @@ namespace OpenSim.Region.Framework.Scenes
                         time += e.GetScriptExecutionTime(ids);
                     }
                 }
-
                 return time;
             }
             catch
