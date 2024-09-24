@@ -161,8 +161,9 @@ namespace OpenSim.Server.Base
             }
             else
             {
-                XmlConfigurator.Configure(new FileInfo("Robust.dll.config"));
-                m_log.Info("[ROBUST]: configured log4net using default Robust.dll.config");
+                var assembleName = System.Reflection.Assembly.GetExecutingAssembly().GetName();
+                XmlConfigurator.Configure(new FileInfo("OpenSim.Server.RobustServer.dll.config"));
+                m_log.Info("[ROBUST]: configured log4net using default OpenSim.Server.RobustServer.dll.config");
             }
 
             RegisterCommonAppenders(startupConfig);

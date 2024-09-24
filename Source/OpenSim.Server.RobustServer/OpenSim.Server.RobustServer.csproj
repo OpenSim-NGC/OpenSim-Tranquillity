@@ -16,6 +16,12 @@
     <Reference Include="OpenMetaverseTypes">
       <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
     </Reference>
+    <Reference Include="XMLRPC">
+      <HintPath>..\..\bin\XMLRPC.dll</HintPath>
+    </Reference>
+    <Reference Include="DotNetOpenId">
+      <HintPath>..\..\bin\DotNetOpenId.dll</HintPath>
+    </Reference>
   </ItemGroup>
   
   <ItemGroup>
@@ -25,6 +31,24 @@
     <ProjectReference Include="..\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
     <ProjectReference Include="..\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
     <ProjectReference Include="..\OpenSim.Server.Handlers\OpenSim.Server.Handlers.csproj" />
+    <ProjectReference Include="..\OpenSim.Services.FSAssetService\OpenSim.Services.FSAssetService.csproj" />
+    <ProjectReference Include="..\OpenSim.Data.MySQL\OpenSim.Data.MySQL.csproj" />
+    <ProjectReference Include="..\OpenSim.Framework.AssetLoader.Filesystem\OpenSim.Framework.AssetLoader.Filesystem.csproj" />
+    <ProjectReference Include="..\OpenSim.Services.LLLoginService\OpenSim.Services.LLLoginService.csproj" />
+  </ItemGroup>
+
+  <!-- This is a hack. System.Drawing needs to be retired. -->
+  <ItemGroup>
+      <None Include="$(SolutionDir)\bin\System.Drawing.Common.dll.win">
+      <TargetPath>%(FileName)%(Extension)</TargetPath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+      <None Include="$(SolutionDir)\bin\System.Drawing.Common.dll.linux">
+      <TargetPath>%(FileName)%(Extension)</TargetPath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

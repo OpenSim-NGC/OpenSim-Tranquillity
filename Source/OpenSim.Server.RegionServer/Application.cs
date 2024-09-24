@@ -99,8 +99,8 @@ namespace OpenSim
             }
             else
             {
-                XmlConfigurator.Configure(new System.IO.FileInfo("OpenSim.dll.config"));
-                m_log.Info("[OPENSIM MAIN]: configured log4net using default OpenSim.dll.config");
+                XmlConfigurator.Configure(new System.IO.FileInfo("OpenSim.Server.RegionServer.dll.config"));
+                m_log.Info("[OPENSIM MAIN]: configured log4net using default OpenSim.Server.RegionServer.dll.config");
             }
 
             // temporay set the platform dependent System.Drawing.Common.dll

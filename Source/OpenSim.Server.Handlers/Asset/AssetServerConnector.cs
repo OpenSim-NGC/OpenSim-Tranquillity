@@ -47,7 +47,7 @@ namespace OpenSim.Server.Handlers.Asset
         public AssetServiceConnector(IConfigSource config, IHttpServer server, string configName) :
                 base(config, server, configName)
         {
-            if (configName != String.Empty)
+            if (string.IsNullOrEmpty(configName) is false)
                 m_ConfigName = configName;
 
             IConfig serverConfig = config.Configs[m_ConfigName];

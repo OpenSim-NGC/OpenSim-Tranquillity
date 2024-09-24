@@ -7,6 +7,7 @@
     <Description>The executable for regions simulator</Description>
     <Copyright>OpenSimulator developers</Copyright>
   </PropertyGroup>
+  
   <ItemGroup>
     <Reference Include="NDesk.Options">
       <HintPath>..\..\bin\NDesk.Options.dll</HintPath>
@@ -27,6 +28,7 @@
       <HintPath>..\..\bin\XMLRPC.dll</HintPath>
     </Reference>
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\OpenSim.Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
@@ -42,21 +44,39 @@
     <ProjectReference Include="..\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
     <ProjectReference Include="..\OpenSim.Services.UserAccountService\OpenSim.Services.UserAccountService.csproj" />
   </ItemGroup>
+
+  <!-- This is a hack. System.Drawing needs to be retired. -->
+  <ItemGroup>
+      <None Include="$(SolutionDir)\bin\System.Drawing.Common.dll.win">
+      <TargetPath>%(FileName)%(Extension)</TargetPath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+      <None Include="$(SolutionDir)\bin\System.Drawing.Common.dll.linux">
+      <TargetPath>%(FileName)%(Extension)</TargetPath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
       <None Include="Data\**\*">
       <TargetPath>%(RecursiveDir)%(FileName)%(Extension)</TargetPath>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
   <ItemGroup>
     <Content Include="Resources/OpenSim.addin.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="log4net" Version="2.0.15" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
 	  <PackageReference Include="Mono.Addins.Setup" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
   </ItemGroup>
+
 </Project>
