@@ -121,19 +121,25 @@ namespace OpenSim.Services.UserAccountService
 
                     MainConsole.Instance.Commands.AddCommand("Users", false,
                             "import users",
-                            "import user [<CSV file>]",
+                            "import users [<CSV file>]",
                             "Import users from a CSV file into OpenSim",
                             HandleImportUsers);
 
                     MainConsole.Instance.Commands.AddCommand("Users", false,
-                            "reset user password",
-                            "reset user password [<first> [<last> [<password>]]]",
-                        "Reset a user password", HandleResetUserPassword);
+                            "update users",
+                            "update users [<CSV file>]",
+                            "Update users from a CSV file into OpenSim",
+                            HandleUpdateUsers);
 
                     MainConsole.Instance.Commands.AddCommand("Users", false,
-                        "reset user email",
-                        "reset user email [<first> [<last> [<email>]]]",
-                        "Reset a user email address", HandleResetUserEmail);
+                            "reset user password",
+                            "reset user password [<first> [<last> [<password>]]]",
+                            "Reset a user password", HandleResetUserPassword);
+
+                    MainConsole.Instance.Commands.AddCommand("Users", false,
+                            "reset user email",
+                            "reset user email [<first> [<last> [<email>]]]",
+                            "Reset a user email address", HandleResetUserEmail);
 
                     MainConsole.Instance.Commands.AddCommand("Users", false,
                             "set user level",
@@ -507,6 +513,44 @@ namespace OpenSim.Services.UserAccountService
                     CreateUser(UUID.Zero, userUUID, firstName, lastName, password, email);
 
                     //set user levels and status  (if needed)
+                    var userAcct = GetUserAccount(UUID.Zero, firstName, lastName);
+                    int rezday = Int32.Parse(sRezday);
+                    userAcct.Created = rezday;
+                    StoreUserAccount(userAcct);
+
+                    userNo++;
+                }
+                MainConsole.Instance.Output("File: {0} loaded,  {1} users added", Path.GetFileName(fileName), userNo);
+            }
+        }
+
+        protected void HandleUpdateUsers(string module, string[] cmd)
+        {
+            string fileName = "users.csv";
+
+            int userNo = 0;
+            string firstName;
+            string lastName;
+            string sRezday;
+
+            fileName = "Imports/" + fileName;
+
+            // good to go...
+            using (var rd = new StreamReader(fileName))
+            {
+                while (!rd.EndOfStream)
+                {
+                    var userInfo = rd.ReadLine().Split(',');
+                    if (userInfo.Length < 5)
+                    {
+                        MainConsole.Instance.Output("[User Load]: Insufficient details; Skipping " + userInfo);
+                        continue;
+                    }
+
+                    firstName = userInfo[1];
+                    lastName = userInfo[2];
+                    sRezday = userInfo[5];
+
                     var userAcct = GetUserAccount(UUID.Zero, firstName, lastName);
                     int rezday = Int32.Parse(sRezday);
                     userAcct.Created = rezday;
