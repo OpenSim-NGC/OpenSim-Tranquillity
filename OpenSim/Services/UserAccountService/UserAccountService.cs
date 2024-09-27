@@ -517,7 +517,6 @@ namespace OpenSim.Services.UserAccountService
                     int rezday = Int32.Parse(sRezday);
                     userAcct.Created = rezday;
                     StoreUserAccount(userAcct);
-                    MainConsole.Instance.Output("[USER UPDATE]: User " + firstName + " " + lastName + " has been updated");
 
                     userNo++;
                 }
@@ -556,6 +555,7 @@ namespace OpenSim.Services.UserAccountService
                     int rezday = Int32.Parse(sRezday);
                     userAcct.Created = rezday;
                     StoreUserAccount(userAcct);
+                    MainConsole.Instance.Output("[USER UPDATE]: User " + firstName + " " + lastName + " has been updated");
 
                     userNo++;
                 }
