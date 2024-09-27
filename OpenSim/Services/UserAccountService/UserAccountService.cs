@@ -120,6 +120,12 @@ namespace OpenSim.Services.UserAccountService
                             "Create a new user", HandleCreateUser);
 
                     MainConsole.Instance.Commands.AddCommand("Users", false,
+                            "import users",
+                            "import user [<CSV file>]",
+                            "Import users from a CSV file into OpenSim",
+                            HandleImportUsers);
+
+                    MainConsole.Instance.Commands.AddCommand("Users", false,
                             "reset user password",
                             "reset user password [<first> [<last> [<password>]]]",
                         "Reset a user password", HandleResetUserPassword);
@@ -463,6 +469,53 @@ namespace OpenSim.Services.UserAccountService
                 throw new Exception(string.Format("ID {0} is not a valid UUID", rawPrincipalId));
 
             CreateUser(UUID.Zero, principalId, firstName, lastName, password, email, model);
+        }
+
+        protected void HandleImportUsers(string module, string[] cmd)
+        {
+            string fileName = "users.csv";
+
+            int userNo = 0;
+            string firstName;
+            string lastName;
+            string email;
+            string password;
+            string sRezday;
+            UUID userUUID;
+
+            fileName = "Imports/" + fileName;
+
+            // good to go...
+            using (var rd = new StreamReader(fileName))
+            {
+                while (!rd.EndOfStream)
+                {
+                    var userInfo = rd.ReadLine().Split(',');
+                    if (userInfo.Length < 5)
+                    {
+                        MainConsole.Instance.Output("[User Load]: Insufficient details; Skipping " + userInfo);
+                        continue;
+                    }
+
+                    userUUID = (UUID)userInfo[0];
+                    firstName = userInfo[1];
+                    lastName = userInfo[2];
+                    password = userInfo[3];
+                    email = userInfo.Length > 4 ? userInfo[4] : "";
+                    sRezday = userInfo[5];
+
+                    CreateUser(UUID.Zero, userUUID, firstName, lastName, password, email);
+
+                    //set user levels and status  (if needed)
+                    var userAcct = GetUserAccount(UUID.Zero, firstName, lastName);
+                    int rezday = Int32.Parse(sRezday);
+                    userAcct.Created = rezday;
+                    StoreUserAccount(userAcct);
+
+                    userNo++;
+                }
+                MainConsole.Instance.Output("File: {0} loaded,  {1} users added", Path.GetFileName(fileName), userNo);
+            }
         }
 
         protected void HandleShowAccount(string module, string[] cmdparams)
