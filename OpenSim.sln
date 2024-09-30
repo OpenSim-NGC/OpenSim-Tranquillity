@@ -6,13 +6,14 @@ MinimumVisualStudioVersion = 10.0.40219.1
 
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartThreadPool", "ThirdParty\SmartThreadPool\SmartThreadPool.csproj", "{8C618053-0000-0000-0000-000000000000}"
 EndProject
+
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Tests.Common", "Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj", "{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}"
 EndProject
+
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Source", "Source", "{E886CEB5-B01D-411F-A7A0-72AA1B71761D}"
 EndProject
-
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.Gloebit", "Source\OpenSim.Addons.Gloebit\OpenSim.Addons.Gloebit.csproj", "{4C8A6BF4-0000-0000-0000-000000000000}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.Groups", "Source\OpenSim.Addons.Groups\OpenSim.Addons.Groups.csproj", "{77DEC20C-0000-0000-0000-000000000000}"

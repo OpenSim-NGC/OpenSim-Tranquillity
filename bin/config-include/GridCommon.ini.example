@@ -158,6 +158,12 @@
     ;
     UserAccountServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
 
+[UserAliasService]
+    ;
+    ; Change this to your grid-wide user accounts server
+    ;
+    UserAliasServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
+
 [GridUserService]
     ;
     ; Change this to your grid-wide user server
@@ -236,7 +242,7 @@
     MuteListServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
 
 [ExperienceService]
-    LocalServiceModule = "OpenSim.Services.Connectors.dll:RemoteExperienceServiceConnector"
+    LocalServiceModule = "OpenSim.Services.Connectors.dll:RemoteExperienceServicesConnector"
 
     ;
     ; Change this to your grid-wide experience server

@@ -5246,7 +5246,6 @@ namespace OpenSim.Region.Framework.Scenes
             { 
                 return false;
             }
-
         }
 
         /// <summary>
