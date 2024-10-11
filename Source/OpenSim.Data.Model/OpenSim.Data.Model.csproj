@@ -10,6 +10,7 @@
     <PackageDescription>Dotnet EF Core Definitions for OpenSim Database Models</PackageDescription>
     <RepositoryUrl>https://github.com/OpenSim-NGC/OpenSim-Sasquatch</RepositoryUrl>
     <Copyright>Copyright (c) Utopia Skye, LLC 2024</Copyright>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
   
   <ItemGroup>
