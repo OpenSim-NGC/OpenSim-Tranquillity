@@ -8,19 +8,15 @@
   <ItemGroup>
     <Reference Include="BulletXNA.dll">
       <HintPath>..\..\bin\BulletXNA.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="Nini.dll">
       <HintPath>..\..\bin\Nini.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverse">
       <HintPath>..\..\bin\OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverseTypes">
       <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
     </Reference>
   </ItemGroup>
 

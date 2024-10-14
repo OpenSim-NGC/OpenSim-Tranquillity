@@ -1,6 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
-
-<Addin id="OpenSim" isroot="true" version="0.5">
+<Addin id="OpenSim" isroot="true" version="0.9.3">
 	<Runtime>
 		<Import assembly="OpenSim.Framework.dll"/>
 		<Import assembly="OpenSim.Region.Framework.dll"/>

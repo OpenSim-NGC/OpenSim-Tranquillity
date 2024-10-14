@@ -9,31 +9,24 @@
   <ItemGroup>
     <Reference Include="NDesk.Options">
       <HintPath>..\..\bin\NDesk.Options.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="netcd">
       <HintPath>..\..\bin\netcd.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="Nini">
       <HintPath>..\..\bin\Nini.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverse">
       <HintPath>..\..\bin\OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverse.StructuredData">
       <HintPath>..\..\bin\OpenMetaverse.StructuredData.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverseTypes">
       <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="XMLRPC">
       <HintPath>..\..\bin\XMLRPC.dll</HintPath>
-      <Private>False</Private>
     </Reference>
   </ItemGroup>
   

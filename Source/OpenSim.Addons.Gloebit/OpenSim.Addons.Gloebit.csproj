@@ -5,23 +5,18 @@
   <ItemGroup>
     <Reference Include="Nini">
       <HintPath>..\..\bin\Nini.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverse">
       <HintPath>..\..\bin\OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverse.StructuredData">
       <HintPath>..\..\bin\OpenMetaverse.StructuredData.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverseTypes">
       <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="XMLRPC">
       <HintPath>..\..\bin\XMLRPC.dll</HintPath>
-      <Private>False</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -37,8 +32,7 @@
     <ProjectReference Include="..\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj" />
     <ProjectReference Include="..\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
     <ProjectReference Include="..\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
-    <ProjectReference Include="..\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
-    
+    <ProjectReference Include="..\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />    
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\GloebitSubscriptionsMySQL.migrations" />
