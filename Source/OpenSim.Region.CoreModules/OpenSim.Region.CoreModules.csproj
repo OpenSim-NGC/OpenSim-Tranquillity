@@ -63,4 +63,5 @@
     <PackageReference Include="MySqlConnector" Version="2.3.7" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
   </ItemGroup>
+
 </Project>
