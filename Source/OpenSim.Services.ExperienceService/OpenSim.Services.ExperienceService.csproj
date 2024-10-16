@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Nini">
+      <HintPath>..\..\bin\Nini.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenMetaverse">
+      <HintPath>..\..\bin\OpenMetaverse.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenMetaverseTypes">
+      <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenSim.Data\OpenSim.Data.csproj" />
+    <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="..\OpenSim.Services.Base\OpenSim.Services.Base.csproj" />
+    <ProjectReference Include="..\OpenSim.Services.Connectors\OpenSim.Services.Connectors.csproj" />
+    <ProjectReference Include="..\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
+  </ItemGroup>
+
+</Project>

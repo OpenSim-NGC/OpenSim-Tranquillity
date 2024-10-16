@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyTitle>OpenSim.Framework.Console</AssemblyTitle>
+    <Company>http://opensimulator.org</Company>
+    <Product>ServerConsole</Product>
+    <Copyright>Copyright (c) OpenSimulator.org Developers</Copyright>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.0.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Nini">
+      <HintPath>..\..\bin\Nini.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenMetaverseTypes">
+      <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
+  </ItemGroup>
+</Project>

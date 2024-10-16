@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyTitle>OpenSim.Region.ScriptEngine.YEngine</AssemblyTitle>
+    <Company>http://opensimulator.org</Company>
+    <Product>OpenSim</Product>
+    <Copyright>OpenSimulator developers</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.0.1" />
+    <PackageReference Include="Mono.Addins" Version="1.4.1" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Nini">
+      <HintPath>..\..\bin\Nini.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenMetaverse">
+      <HintPath>..\..\bin\OpenMetaverse.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenMetaverse.StructuredData">
+      <HintPath>..\..\bin\OpenMetaverse.StructuredData.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenMetaverseTypes">
+      <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="..\OpenSim.Framework.Monitoring\OpenSim.Framework.Monitoring.csproj" />
+    <ProjectReference Include="..\OpenSim.Region.ClientStack.LindenCaps\OpenSim.Region.ClientStack.LindenCaps.csproj" />
+    <ProjectReference Include="..\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj" />
+    <ProjectReference Include="..\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="..\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
+    <ProjectReference Include="..\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
+  </ItemGroup>
+  
+</Project>

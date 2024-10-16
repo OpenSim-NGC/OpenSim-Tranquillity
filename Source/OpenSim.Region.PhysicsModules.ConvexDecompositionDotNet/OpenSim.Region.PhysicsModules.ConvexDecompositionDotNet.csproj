@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyTitle>OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet</AssemblyTitle>
+    <Company>Intel Corporation</Company>
+    <Product>OpenSim</Product>
+    <Copyright>Copyright © Intel Corporation 2010</Copyright>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
+  </ItemGroup>
+
+</Project>

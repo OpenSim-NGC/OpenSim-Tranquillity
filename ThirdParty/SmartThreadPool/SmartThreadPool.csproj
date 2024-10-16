@@ -3,11 +3,12 @@
     <TargetFramework>net8.0</TargetFramework>
     <AssemblyTitle>Amib.Threading</AssemblyTitle>
     <Product>Amib.Threading</Product>
-    <Description>Smart Thread Pool</Description>
+    <!-- <Description>Smart Thread Pool</Description>
     <AssemblyVersion>2.2.3.0</AssemblyVersion>
-    <FileVersion>2.2.3.0</FileVersion>
+    <FileVersion>2.2.3.0</FileVersion> -->
   </PropertyGroup>
+  
   <ItemGroup>
-    <PackageReference Include="log4net" Version="2.0.15" />
+    <PackageReference Include="log4net" Version="3.0.1" />
   </ItemGroup>
 </Project>

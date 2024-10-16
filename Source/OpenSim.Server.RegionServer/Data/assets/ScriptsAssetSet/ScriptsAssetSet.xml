@@ -1,0 +1,108 @@
+<Nini>
+  <Section Name="llAddToLandBanList">
+    <Key Name="assetID" Value="7ceba3f1-b1a0-11dc-8314-0800200c9a66" />
+    <Key Name="name" Value="llAddToLandBanList" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="llAddToLandBanList.lsl" />
+  </Section>
+  <Section Name="llAddToLandPassList">
+    <Key Name="assetID" Value="609047e7-b390-11dc-8314-0800200c9a66" />
+    <Key Name="name" Value="llAddToLandPassList" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="llAddToLandPassList.lsl" />
+  </Section>
+  <Section Name="llAdjustSoundVolume">
+    <Key Name="assetID" Value="56df4bcd-b393-11dc-8314-0800200c9a66" />
+    <Key Name="name" Value="llAdjustSoundVolume" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="llAdjustSoundVolume.lsl" />
+  </Section>
+  <Section Name="llAllowInventoryDrop">
+    <Key Name="assetID" Value="54d6962d-b394-11dc-8314-0800200c9a66" />
+    <Key Name="name" Value="llAllowInventoryDrop" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="llAllowInventoryDrop.lsl" />
+  </Section>
+  <Section Name="llAngleBetween">
+    <Key Name="assetID" Value="6b341609-b34e-11dc-8314-0800200c9a66" />
+    <Key Name="name" Value="llAngleBetween" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="llAngleBetween.lsl" />
+  </Section>
+  <Section Name="llApplyImpulse">
+    <Key Name="assetID" Value="714ec679-b419-11dc-8314-0800200c9a66" />
+    <Key Name="name" Value="llApplyImpulse" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="llApplyImpulse.lsl" />
+  </Section>
+  <Section Name="llAvatarOnSitTarget">
+    <Key Name="assetID" Value="579fc821-b426-11dc-8314-0800200c9a66" />
+    <Key Name="name" Value="llAvatarOnSitTarget" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="llAvatarOnSitTarget.lsl" />
+  </Section>
+  <Section Name="llRemoveFromLandBanList">
+    <Key Name="assetID" Value="299b2101-b392-11dc-8314-0800200c9a66" />
+    <Key Name="name" Value="llRemoveFromLandBanList" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="llRemoveFromLandBanList.lsl" />
+  </Section>
+  <Section Name="llRemoveFromLandPassList">
+    <Key Name="assetID" Value="299b2103-b392-11dc-8314-0800200c9a66" />
+    <Key Name="name" Value="llRemoveFromLandPassList" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="llRemoveFromLandPassList.lsl" />
+  </Section>
+  <Section Name="llResetLandBanList">
+    <Key Name="assetID" Value="366ac8e7-b391-11dc-8314-0800200c9a66" />
+    <Key Name="name" Value="llResetLandBanList" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="llResetLandBanList.lsl" />
+  </Section>
+  <Section Name="llSetParcelMusicURL">
+    <Key Name="assetID" Value="3603a4f8-b360-11dc-8314-0800200c9a66" />
+    <Key Name="name" Value="llSetParcelMusicURL" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="llSetParcelMusicURL.lsl" />
+  </Section>
+  <Section Name="osTextBoard">
+    <Key Name="assetID" Value="2ddcb059-20c5-d169-4c42-673f16d3284b" />
+    <Key Name="name" Value="osTextBoard" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="osTextBoard.lsl" />
+  </Section>
+  <Section Name="osWeatherMap">
+    <Key Name="assetID" Value="d63ad3ec-b687-6c38-410d-31ba3e50ce4d" />
+    <Key Name="name" Value="osWeatherMap" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="osWeatherMap.lsl" />
+  </Section>
+  <Section Name="GrafittiBoard">
+    <Key Name="assetID" Value="81305ee4-8caa-9e0a-69a4-76ed57df0c8f" />
+    <Key Name="name" Value="GrafittiBoard" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="GrafittiBoard.lsl" />
+  </Section>
+
+  <Section Name="DefaultSay">
+    <Key Name="assetID" Value="c5f02401-f08b-4519-952c-fdab017c10b7" />
+    <Key Name="name" Value="DefaultSay" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="DefaultSay.lsl" />
+  </Section>
+
+  <Section Name="DefaultScript">
+    <Key Name="assetID" Value="2074003b-8d5f-40e5-8b20-581c1c50aedb" />
+    <Key Name="name" Value="DefaultScript" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="DefaultScript.lsl" />
+  </Section>
+  
+  <Section Name="DefaultSayAndTouch">
+    <Key Name="assetID" Value="9267e689-4f37-4ce5-b2c2-455ee2e1ab12" />
+    <Key Name="name" Value="DefaultSayAndTouch" />
+    <Key Name="assetType" Value="10" />
+    <Key Name="fileName" Value="DefaultSayAndTouch.lsl" />
+  </Section>
+
+</Nini>

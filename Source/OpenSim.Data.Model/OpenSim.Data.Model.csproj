@@ -1,30 +1,35 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <OutputType>Library</OutputType>
     <TargetFramework>net8.0</TargetFramework>
-    <UserSecretsId>5af6ba03-92b0-40d9-b129-45a5c6788134</UserSecretsId>
-    <AssemblyTitle>OpenSim.Data.Model</AssemblyTitle>
-    <Product>OpenSim.Data.Model</Product>
+    <PackageId>OpenSim.Data.Model</PackageId>
+    <Version>0.9.3</Version>
+    <Authors>Michael Dickson</Authors>
+    <Company>Utopia Skye LLC, NGC Project</Company>
+    <PackageDescription>Dotnet EF Core Definitions for OpenSim Database Models</PackageDescription>
+    <RepositoryUrl>https://github.com/OpenSim-NGC/OpenSim-Sasquatch</RepositoryUrl>
     <Copyright>Copyright (c) Utopia Skye, LLC 2024</Copyright>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
   
   <ItemGroup>
 	<PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
-	<PackageReference Include="MediatR" Version="12.2.0" />
-	<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.3" />
-	<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.3" />
-	<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.3">
+	<PackageReference Include="MediatR" Version="12.4.1" />
+	<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.10" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
 	  <PrivateAssets>all</PrivateAssets>
 	  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 	</PackageReference>
-	<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.3" PrivateAssets="All" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
-	<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
-	<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
-    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
-	<PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.2" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.10" PrivateAssets="All" />
+  <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+	<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.1" />
+  <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="8.0.1" />
+  <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.1" />
+	<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
+  <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
+	<PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.6" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,9 @@
+
+version: '3.4'
+
+services:
+  opensimserverregionserver:
+    image: opensimserverregionserver
+    build:
+      context: .
+      dockerfile: Source/OpenSim.Server.RegionServer/Dockerfile

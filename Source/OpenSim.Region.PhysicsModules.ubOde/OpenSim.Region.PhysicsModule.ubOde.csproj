@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyTitle>OpenSim.Region.PhysicsModule.ubOde</AssemblyTitle>
+    <Company>http://opensimulator.org</Company>
+    <Product>ubOde</Product>
+    <Description>Ubit Variation of ODE</Description>
+    <Copyright>Copyright (c) OpenSimulator.org Developers 2007-2009</Copyright>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.0.1" />
+    <PackageReference Include="Mono.Addins" Version="1.4.1" />
+    <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Reference Include="Nini">
+      <HintPath>..\..\bin\Nini.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenMetaverse">
+      <HintPath>..\..\bin\OpenMetaverse.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenMetaverseTypes">
+      <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="..\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="..\OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet\OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet.csproj" />
+    <ProjectReference Include="..\OpenSim.Region.PhysicsModules.SharedBase\OpenSim.Region.PhysicsModules.SharedBase.csproj" />
+  </ItemGroup>
+  
+</Project>

@@ -1,161 +1,153 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31229.75
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35303.130
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gloebit", "addon-modules\Gloebit\GloebitMoneyModule\Gloebit.csproj", "{4C8A6BF4-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim", "OpenSim\Region\Application\OpenSim.csproj", "{AC9EB8AB-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.Groups", "OpenSim\Addons\Groups\OpenSim.Addons.Groups.csproj", "{77DEC20C-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.OfflineIM", "OpenSim\Addons\OfflineIM\OpenSim.Addons.OfflineIM.csproj", "{E6B51395-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.ApplicationPlugins.LoadRegions", "OpenSim\ApplicationPlugins\LoadRegions\OpenSim.ApplicationPlugins.LoadRegions.csproj", "{E4BEC9DC-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.ApplicationPlugins.RegionModulesController", "OpenSim\ApplicationPlugins\RegionModulesController\OpenSim.ApplicationPlugins.RegionModulesController.csproj", "{9EC3C654-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.ApplicationPlugins.RemoteController", "OpenSim\ApplicationPlugins\RemoteController\OpenSim.ApplicationPlugins.RemoteController.csproj", "{B6A4EEC3-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Capabilities", "OpenSim\Capabilities\OpenSim.Capabilities.csproj", "{FF56527B-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Capabilities.Handlers", "OpenSim\Capabilities\Handlers\OpenSim.Capabilities.Handlers.csproj", "{002BDDF6-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.ConsoleClient", "OpenSim\ConsoleClient\OpenSim.ConsoleClient.csproj", "{CB348113-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data", "OpenSim\Data\OpenSim.Data.csproj", "{7E218E2D-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.MySQL", "OpenSim\Data\MySQL\OpenSim.Data.MySQL.csproj", "{1E894ECD-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.Null", "OpenSim\Data\Null\OpenSim.Data.Null.csproj", "{8D314DCC-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.PGSQL", "OpenSim\Data\PGSQL\OpenSim.Data.PGSQL.csproj", "{10024C78-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.SQLite", "OpenSim\Data\SQLite\OpenSim.Data.SQLite.csproj", "{675096A5-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework", "OpenSim\Framework\OpenSim.Framework.csproj", "{BCCDBB55-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.AssetLoader.Filesystem", "OpenSim\Framework\AssetLoader\Filesystem\OpenSim.Framework.AssetLoader.Filesystem.csproj", "{384A4FAB-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Console", "OpenSim\Framework\Console\OpenSim.Framework.Console.csproj", "{0ED8EBE8-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Monitoring", "OpenSim\Framework\Monitoring\OpenSim.Framework.Monitoring.csproj", "{69AB1BC7-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Serialization", "OpenSim\Framework\Serialization\OpenSim.Framework.Serialization.csproj", "{BD63E665-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Servers", "OpenSim\Framework\Servers\OpenSim.Framework.Servers.csproj", "{726D540D-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Servers.HttpServer", "OpenSim\Framework\Servers\HttpServer\OpenSim.Framework.Servers.HttpServer.csproj", "{159EC5C2-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ClientStack.LindenCaps", "OpenSim\Region\ClientStack\Linden\Caps\OpenSim.Region.ClientStack.LindenCaps.csproj", "{574BCA63-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ClientStack.LindenUDP", "OpenSim\Region\ClientStack\Linden\UDP\OpenSim.Region.ClientStack.LindenUDP.csproj", "{E7F1E4AB-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.CoreModules", "OpenSim\Region\CoreModules\OpenSim.Region.CoreModules.csproj", "{B60B8DCD-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.Framework", "OpenSim\Region\Framework\OpenSim.Region.Framework.csproj", "{C98F6D97-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.OptionalModules", "OpenSim\Region\OptionalModules\OpenSim.Region.OptionalModules.csproj", "{BAF8E8F2-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.BasicPhysics", "OpenSim\Region\PhysicsModules\BasicPhysics\OpenSim.Region.PhysicsModule.BasicPhysics.csproj", "{BAC989A5-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.BulletS", "OpenSim\Region\PhysicsModules\BulletS\OpenSim.Region.PhysicsModule.BulletS.csproj", "{223BC46D-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.Meshing", "OpenSim\Region\PhysicsModules\Meshing\OpenSim.Region.PhysicsModule.Meshing.csproj", "{5ECE503F-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.POS", "OpenSim\Region\PhysicsModules\POS\OpenSim.Region.PhysicsModule.POS.csproj", "{2400666E-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.ubOde", "OpenSim\Region\PhysicsModules\ubOde\OpenSim.Region.PhysicsModule.ubOde.csproj", "{AC52DE31-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.ubOdeMeshing", "OpenSim\Region\PhysicsModules\ubOdeMeshing\OpenSim.Region.PhysicsModule.ubOdeMeshing.csproj", "{E7DA5126-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet", "OpenSim\Region\PhysicsModules\ConvexDecompositionDotNet\OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet.csproj", "{A1CC4ADF-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.SharedBase", "OpenSim\Region\PhysicsModules\SharedBase\OpenSim.Region.PhysicsModules.SharedBase.csproj", "{EFA63A0B-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine.Shared", "OpenSim\Region\ScriptEngine\Shared\OpenSim.Region.ScriptEngine.Shared.csproj", "{F93F91AD-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine.Shared.Api", "OpenSim\Region\ScriptEngine\Shared\Api\Implementation\OpenSim.Region.ScriptEngine.Shared.Api.csproj", "{C18E3417-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine.Shared.Api.Runtime", "OpenSim\Region\ScriptEngine\Shared\Api\Runtime\OpenSim.Region.ScriptEngine.Shared.Api.Runtime.csproj", "{FC92C9C9-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine.Shared.CodeTools", "OpenSim\Region\ScriptEngine\Shared\CodeTools\OpenSim.Region.ScriptEngine.Shared.CodeTools.csproj", "{1A7CAB35-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine.Shared.Instance", "OpenSim\Region\ScriptEngine\Shared\Instance\OpenSim.Region.ScriptEngine.Shared.Instance.csproj", "{B185E548-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine.YEngine", "OpenSim\Region\ScriptEngine\YEngine\OpenSim.Region.ScriptEngine.YEngine.csproj", "{798B4867-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.Base", "OpenSim\Server\Base\OpenSim.Server.Base.csproj", "{2E0569BB-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.Handlers", "OpenSim\Server\Handlers\OpenSim.Server.Handlers.csproj", "{ED041501-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.AssetService", "OpenSim\Services\AssetService\OpenSim.Services.AssetService.csproj", "{7FDD1B76-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.AuthenticationService", "OpenSim\Services\AuthenticationService\OpenSim.Services.AuthenticationService.csproj", "{76495B84-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.AuthorizationService", "OpenSim\Services\AuthorizationService\OpenSim.Services.AuthorizationService.csproj", "{60CDDAF3-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.AvatarService", "OpenSim\Services\AvatarService\OpenSim.Services.AvatarService.csproj", "{77095B91-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.Base", "OpenSim\Services\Base\OpenSim.Services.Base.csproj", "{A54AE47C-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.Connectors", "OpenSim\Services\Connectors\OpenSim.Services.Connectors.csproj", "{B16DF9C1-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.EstateService", "OpenSim\Services\EstateService\OpenSim.Services.EstateService.csproj", "{8020C608-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.FreeswitchService", "OpenSim\Services\FreeswitchService\OpenSim.Services.FreeswitchService.csproj", "{78D8DF46-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.FriendsService", "OpenSim\Services\Friends\OpenSim.Services.FriendsService.csproj", "{CDF575DD-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.FSAssetService", "OpenSim\Services\FSAssetService\OpenSim.Services.FSAssetService.csproj", "{327D1745-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.GridService", "OpenSim\Services\GridService\OpenSim.Services.GridService.csproj", "{D3312580-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.HypergridService", "OpenSim\Services\HypergridService\OpenSim.Services.HypergridService.csproj", "{CD92222C-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.Interfaces", "OpenSim\Services\Interfaces\OpenSim.Services.Interfaces.csproj", "{08ECE473-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.InventoryService", "OpenSim\Services\InventoryService\OpenSim.Services.InventoryService.csproj", "{0066981A-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.LLLoginService", "OpenSim\Services\LLLoginService\OpenSim.Services.LLLoginService.csproj", "{84F83E53-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.MapImageService", "OpenSim\Services\MapImageService\OpenSim.Services.MapImageService.csproj", "{B03715E7-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.MuteListService", "OpenSim\Services\MuteListService\OpenSim.Services.MuteListService.csproj", "{456B7ED3-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.PresenceService", "OpenSim\Services\PresenceService\OpenSim.Services.PresenceService.csproj", "{9A29E8CD-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.SimulationService", "OpenSim\Services\SimulationService\OpenSim.Services.SimulationService.csproj", "{CB1C903F-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.UserAccountService", "OpenSim\Services\UserAccountService\OpenSim.Services.UserAccountService.csproj", "{C87C3128-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.UserProfilesService", "OpenSim\Services\UserProfilesService\OpenSim.Services.UserProfilesService.csproj", "{B4C57E7D-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSimMutelist.Modules", "addon-modules\OpenSimMutelist\Modules\OpenSimMutelist.Modules.csproj", "{87C4E6E3-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSimSearch.Modules", "addon-modules\OpenSimSearch\Modules\OpenSimSearch.Modules.csproj", "{BE5D1132-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "pCampBot", "OpenSim\Tools\pCampBot\pCampBot.csproj", "{AF52AEDC-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Robust", "OpenSim\Server\Robust.csproj", "{6E64F01D-0000-0000-0000-000000000000}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartThreadPool", "ThirdParty\SmartThreadPool\SmartThreadPool.csproj", "{8C618053-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.MySQL.MoneyData", "addon-modules\OpenSim.Data.MySQL.MoneyData\OpenSim.Data.MySQL.MoneyData\OpenSim.Data.MySQL.MoneyData.csproj", "{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.OptionalModules.Currency", "addon-modules\OpenSim.Region.OptionalModules.Currency\OpenSim.Region.OptionalModules.Currency\OpenSim.Region.OptionalModules.Currency.csproj", "{2B6DD15C-0B5D-41CA-B713-71B60147114D}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.MoneyServer", "addon-modules\OpenSim.Server.MoneyServer\OpenSim.Server.MoneyServer\OpenSim.Server.MoneyServer.csproj", "{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Services.ExperienceService", "OpenSim\Services\ExperienceService\OpenSim.Services.ExperienceService.csproj", "{186509B6-EF90-431A-9034-75A1221E4120}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Tests.Common", "Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj", "{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Tests.Common", "Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj", "{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Source", "Source", "{E886CEB5-B01D-411F-A7A0-72AA1B71761D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Data.Model", "Source\OpenSim.Data.Model\OpenSim.Data.Model.csproj", "{B120B128-D6C6-40B6-9D83-4F1F7D921109}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.Gloebit", "Source\OpenSim.Addons.Gloebit\OpenSim.Addons.Gloebit.csproj", "{4C8A6BF4-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.Groups", "Source\OpenSim.Addons.Groups\OpenSim.Addons.Groups.csproj", "{77DEC20C-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.Mutelist", "Source\OpenSim.Addons.Mutelist\OpenSim.Addons.Mutelist.csproj", "{87C4E6E3-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.Search", "Source\OpenSim.Addons.Search\OpenSim.Addons.Search.csproj", "{BE5D1132-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.OfflineIM", "Source\OpenSim.Addons.OfflineIM\OpenSim.Addons.OfflineIM.csproj", "{E6B51395-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.ApplicationPlugins.LoadRegions", "Source\OpenSim.ApplicationPlugins.LoadRegions\OpenSim.ApplicationPlugins.LoadRegions.csproj", "{E4BEC9DC-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.ApplicationPlugins.RegionModulesController", "Source\OpenSim.ApplicationPlugins.RegionModulesController\OpenSim.ApplicationPlugins.RegionModulesController.csproj", "{9EC3C654-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.ApplicationPlugins.RemoteController", "Source\OpenSim.ApplicationPlugins.RemoteController\OpenSim.ApplicationPlugins.RemoteController.csproj", "{B6A4EEC3-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Capabilities", "Source\OpenSim.Capabilities\OpenSim.Capabilities.csproj", "{FF56527B-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Capabilities.Handlers", "Source\OpenSim.Capabilities.Handlers\OpenSim.Capabilities.Handlers.csproj", "{002BDDF6-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.ConsoleClient", "Source\OpenSim.ConsoleClient\OpenSim.ConsoleClient.csproj", "{CB348113-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data", "Source\OpenSim.Data\OpenSim.Data.csproj", "{7E218E2D-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.Model", "Source\OpenSim.Data.Model\OpenSim.Data.Model.csproj", "{B120B128-D6C6-40B6-9D83-4F1F7D921109}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.MySQL", "Source\OpenSim.Data.MySQL\OpenSim.Data.MySQL.csproj", "{1E894ECD-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.MySQL.MoneyData", "Source\OpenSim.Data.MySQL.MoneyData\OpenSim.Data.MySQL.MoneyData.csproj", "{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.Null", "Source\OpenSim.Data.Null\OpenSim.Data.Null.csproj", "{8D314DCC-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.PGSQL", "Source\OpenSim.Data.PGSQL\OpenSim.Data.PGSQL.csproj", "{10024C78-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.SQLite", "Source\OpenSim.Data.SQLite\OpenSim.Data.SQLite.csproj", "{675096A5-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework", "Source\OpenSim.Framework\OpenSim.Framework.csproj", "{BCCDBB55-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.AssetLoader.Filesystem", "Source\OpenSim.Framework.AssetLoader.Filesystem\OpenSim.Framework.AssetLoader.Filesystem.csproj", "{384A4FAB-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Console", "Source\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj", "{0ED8EBE8-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Monitoring", "Source\OpenSim.Framework.Monitoring\OpenSim.Framework.Monitoring.csproj", "{69AB1BC7-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Serialization", "Source\OpenSim.Framework.Serialization\OpenSim.Framework.Serialization.csproj", "{BD63E665-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Servers", "Source\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj", "{726D540D-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Servers.HttpServer", "Source\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj", "{159EC5C2-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ClientStack.LindenCaps", "Source\OpenSim.Region.ClientStack.LindenCaps\OpenSim.Region.ClientStack.LindenCaps.csproj", "{574BCA63-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ClientStack.LindenUDP", "Source\OpenSim.Region.ClientStack.LindenUDP\OpenSim.Region.ClientStack.LindenUDP.csproj", "{E7F1E4AB-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.CoreModules", "Source\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj", "{B60B8DCD-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.Framework", "Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj", "{C98F6D97-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.OptionalModules", "Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj", "{BAF8E8F2-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.OptionalModules.Currency", "Source\OpenSim.Region.OptionalModules.Currency\OpenSim.Region.OptionalModules.Currency.csproj", "{2B6DD15C-0B5D-41CA-B713-71B60147114D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.BasicPhysics", "Source\OpenSim.Region.PhysicsModules.BasicPhysics\OpenSim.Region.PhysicsModule.BasicPhysics.csproj", "{BAC989A5-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.BulletS", "Source\OpenSim.Region.PhysicsModules.BulletS\OpenSim.Region.PhysicsModule.BulletS.csproj", "{223BC46D-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.Meshing", "Source\OpenSim.Region.PhysicsModules.Meshing\OpenSim.Region.PhysicsModule.Meshing.csproj", "{5ECE503F-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.POS", "Source\OpenSim.Region.PhysicsModules.POS\OpenSim.Region.PhysicsModule.POS.csproj", "{2400666E-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.ubOde", "Source\OpenSim.Region.PhysicsModules.ubOde\OpenSim.Region.PhysicsModule.ubOde.csproj", "{AC52DE31-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.ubOdeMeshing", "Source\OpenSim.Region.PhysicsModules.ubOdeMeshing\OpenSim.Region.PhysicsModule.ubOdeMeshing.csproj", "{E7DA5126-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet", "Source\OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet\OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet.csproj", "{A1CC4ADF-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.SharedBase", "Source\OpenSim.Region.PhysicsModules.SharedBase\OpenSim.Region.PhysicsModules.SharedBase.csproj", "{EFA63A0B-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine.Shared", "Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj", "{F93F91AD-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine.YEngine", "Source\OpenSim.Region.ScriptEngine.YEngine\OpenSim.Region.ScriptEngine.YEngine.csproj", "{798B4867-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.Base", "Source\OpenSim.Server.Base\OpenSim.Server.Base.csproj", "{2E0569BB-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.Handlers", "Source\OpenSim.Server.Handlers\OpenSim.Server.Handlers.csproj", "{ED041501-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.MoneyServer", "Source\OpenSim.Server.MoneyServer\OpenSim.Server.MoneyServer.csproj", "{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.RegionServer", "Source\OpenSim.Server.RegionServer\OpenSim.Server.RegionServer.csproj", "{AC9EB8AB-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.RobustServer", "Source\OpenSim.Server.RobustServer\OpenSim.Server.RobustServer.csproj", "{6E64F01D-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.AISv3", "Source\OpenSim.Services.AISv3\OpenSim.Services.AISv3.csproj", "{3258E822-A183-4455-816D-3240333E6A2A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.AssetService", "Source\OpenSim.Services.AssetService\OpenSim.Services.AssetService.csproj", "{7FDD1B76-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.AuthenticationService", "Source\OpenSim.Services.AuthenticationService\OpenSim.Services.AuthenticationService.csproj", "{76495B84-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.AuthorizationService", "Source\OpenSim.Services.AuthorizationService\OpenSim.Services.AuthorizationService.csproj", "{60CDDAF3-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.AvatarService", "Source\OpenSim.Services.AvatarService\OpenSim.Services.AvatarService.csproj", "{77095B91-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.Base", "Source\OpenSim.Services.Base\OpenSim.Services.Base.csproj", "{A54AE47C-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.Connectors", "Source\OpenSim.Services.Connectors\OpenSim.Services.Connectors.csproj", "{B16DF9C1-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.EstateService", "Source\OpenSim.Services.EstateService\OpenSim.Services.EstateService.csproj", "{8020C608-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.ExperienceService", "Source\OpenSim.Services.ExperienceService\OpenSim.Services.ExperienceService.csproj", "{186509B6-EF90-431A-9034-75A1221E4120}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.FreeswitchService", "Source\OpenSim.Services.FreeswitchService\OpenSim.Services.FreeswitchService.csproj", "{78D8DF46-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.FriendsService", "Source\OpenSim.Services.FriendsService\OpenSim.Services.FriendsService.csproj", "{CDF575DD-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.FSAssetService", "Source\OpenSim.Services.FSAssetService\OpenSim.Services.FSAssetService.csproj", "{327D1745-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.GridService", "Source\OpenSim.Services.GridService\OpenSim.Services.GridService.csproj", "{D3312580-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.HypergridService", "Source\OpenSim.Services.HypergridService\OpenSim.Services.HypergridService.csproj", "{CD92222C-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.Interfaces", "Source\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj", "{08ECE473-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.InventoryService", "Source\OpenSim.Services.InventoryService\OpenSim.Services.InventoryService.csproj", "{0066981A-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.LLLoginService", "Source\OpenSim.Services.LLLoginService\OpenSim.Services.LLLoginService.csproj", "{84F83E53-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.MapImageService", "Source\OpenSim.Services.MapImageService\OpenSim.Services.MapImageService.csproj", "{B03715E7-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.MuteListService", "Source\OpenSim.Services.MuteListService\OpenSim.Services.MuteListService.csproj", "{456B7ED3-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.PresenceService", "Source\OpenSim.Services.PresenceService\OpenSim.Services.PresenceService.csproj", "{9A29E8CD-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.SimulationService", "Source\OpenSim.Services.SimulationService\OpenSim.Services.SimulationService.csproj", "{CB1C903F-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.UserAccountService", "Source\OpenSim.Services.UserAccountService\OpenSim.Services.UserAccountService.csproj", "{C87C3128-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.UserProfilesService", "Source\OpenSim.Services.UserProfilesService\OpenSim.Services.UserProfilesService.csproj", "{B4C57E7D-0000-0000-0000-000000000000}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -163,18 +155,30 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8C618053-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C618053-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C618053-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C618053-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4C8A6BF4-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4C8A6BF4-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C8A6BF4-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4C8A6BF4-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{AC9EB8AB-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{AC9EB8AB-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{AC9EB8AB-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{AC9EB8AB-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
 		{77DEC20C-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{77DEC20C-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{77DEC20C-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{77DEC20C-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{87C4E6E3-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{87C4E6E3-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{87C4E6E3-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{87C4E6E3-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BE5D1132-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BE5D1132-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BE5D1132-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BE5D1132-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
 		{E6B51395-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{E6B51395-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E6B51395-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -207,10 +211,18 @@ Global
 		{7E218E2D-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7E218E2D-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7E218E2D-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B120B128-D6C6-40B6-9D83-4F1F7D921109}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B120B128-D6C6-40B6-9D83-4F1F7D921109}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B120B128-D6C6-40B6-9D83-4F1F7D921109}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B120B128-D6C6-40B6-9D83-4F1F7D921109}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1E894ECD-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1E894ECD-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1E894ECD-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1E894ECD-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}.Release|Any CPU.Build.0 = Release|Any CPU
 		{8D314DCC-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8D314DCC-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8D314DCC-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -271,6 +283,10 @@ Global
 		{BAF8E8F2-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BAF8E8F2-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BAF8E8F2-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2B6DD15C-0B5D-41CA-B713-71B60147114D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2B6DD15C-0B5D-41CA-B713-71B60147114D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2B6DD15C-0B5D-41CA-B713-71B60147114D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2B6DD15C-0B5D-41CA-B713-71B60147114D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BAC989A5-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BAC989A5-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BAC989A5-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -307,22 +323,6 @@ Global
 		{F93F91AD-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F93F91AD-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F93F91AD-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C18E3417-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C18E3417-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C18E3417-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C18E3417-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FC92C9C9-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FC92C9C9-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FC92C9C9-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FC92C9C9-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1A7CAB35-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1A7CAB35-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1A7CAB35-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1A7CAB35-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B185E548-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B185E548-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B185E548-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B185E548-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
 		{798B4867-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{798B4867-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{798B4867-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -335,6 +335,22 @@ Global
 		{ED041501-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ED041501-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ED041501-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AC9EB8AB-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AC9EB8AB-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AC9EB8AB-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AC9EB8AB-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6E64F01D-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E64F01D-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E64F01D-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E64F01D-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3258E822-A183-4455-816D-3240333E6A2A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3258E822-A183-4455-816D-3240333E6A2A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3258E822-A183-4455-816D-3240333E6A2A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3258E822-A183-4455-816D-3240333E6A2A}.Release|Any CPU.Build.0 = Release|Any CPU
 		{7FDD1B76-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{7FDD1B76-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7FDD1B76-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -363,6 +379,10 @@ Global
 		{8020C608-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8020C608-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8020C608-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{186509B6-EF90-431A-9034-75A1221E4120}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{186509B6-EF90-431A-9034-75A1221E4120}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{186509B6-EF90-431A-9034-75A1221E4120}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{186509B6-EF90-431A-9034-75A1221E4120}.Release|Any CPU.Build.0 = Release|Any CPU
 		{78D8DF46-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{78D8DF46-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{78D8DF46-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -419,57 +439,82 @@ Global
 		{B4C57E7D-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B4C57E7D-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B4C57E7D-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{87C4E6E3-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{87C4E6E3-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{87C4E6E3-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{87C4E6E3-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BE5D1132-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BE5D1132-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BE5D1132-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BE5D1132-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{AF52AEDC-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{AF52AEDC-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{AF52AEDC-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{AF52AEDC-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6E64F01D-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6E64F01D-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6E64F01D-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6E64F01D-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{8C618053-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8C618053-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8C618053-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8C618053-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2B6DD15C-0B5D-41CA-B713-71B60147114D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2B6DD15C-0B5D-41CA-B713-71B60147114D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2B6DD15C-0B5D-41CA-B713-71B60147114D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2B6DD15C-0B5D-41CA-B713-71B60147114D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}.Release|Any CPU.Build.0 = Release|Any CPU
-		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B120B128-D6C6-40B6-9D83-4F1F7D921109}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B120B128-D6C6-40B6-9D83-4F1F7D921109}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B120B128-D6C6-40B6-9D83-4F1F7D921109}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B120B128-D6C6-40B6-9D83-4F1F7D921109}.Release|Any CPU.Build.0 = Release|Any CPU
-		{186509B6-EF90-431A-9034-75A1221E4120}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{186509B6-EF90-431A-9034-75A1221E4120}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{186509B6-EF90-431A-9034-75A1221E4120}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{186509B6-EF90-431A-9034-75A1221E4120}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{8C618053-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
+		{4C8A6BF4-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{77DEC20C-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{87C4E6E3-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{BE5D1132-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{E6B51395-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{E4BEC9DC-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{9EC3C654-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{B6A4EEC3-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{FF56527B-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{002BDDF6-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{CB348113-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{7E218E2D-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{B120B128-D6C6-40B6-9D83-4F1F7D921109} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{1E894ECD-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{8D314DCC-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{10024C78-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{675096A5-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{BCCDBB55-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{384A4FAB-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{0ED8EBE8-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{69AB1BC7-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{BD63E665-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{726D540D-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{159EC5C2-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{574BCA63-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{E7F1E4AB-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{B60B8DCD-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{C98F6D97-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{BAF8E8F2-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{2B6DD15C-0B5D-41CA-B713-71B60147114D} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{BAC989A5-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{223BC46D-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{5ECE503F-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{2400666E-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{AC52DE31-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{E7DA5126-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{A1CC4ADF-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{EFA63A0B-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{F93F91AD-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{798B4867-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{2E0569BB-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{ED041501-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{AC9EB8AB-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{6E64F01D-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{3258E822-A183-4455-816D-3240333E6A2A} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{7FDD1B76-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{76495B84-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{60CDDAF3-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{77095B91-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{A54AE47C-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{B16DF9C1-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{8020C608-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{186509B6-EF90-431A-9034-75A1221E4120} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{78D8DF46-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{CDF575DD-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{327D1745-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{D3312580-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{CD92222C-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{08ECE473-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{0066981A-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{84F83E53-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{B03715E7-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{456B7ED3-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{9A29E8CD-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{CB1C903F-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{C87C3128-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{B4C57E7D-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A40AD54B-8BC7-41E4-B241-19B59EA65D2A}
