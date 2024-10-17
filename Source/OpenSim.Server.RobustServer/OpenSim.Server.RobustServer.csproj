@@ -37,20 +37,6 @@
     <ProjectReference Include="..\OpenSim.Services.LLLoginService\OpenSim.Services.LLLoginService.csproj" />
   </ItemGroup>
 
-  <!-- This is a hack. System.Drawing needs to be retired. -->
-  <ItemGroup>
-      <None Include="$(SolutionDir)\bin\System.Drawing.Common.dll.win">
-      <TargetPath>%(FileName)%(Extension)</TargetPath>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-      <None Include="$(SolutionDir)\bin\System.Drawing.Common.dll.linux">
-      <TargetPath>%(FileName)%(Extension)</TargetPath>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
   <ItemGroup>
       <None Include="Data\**\*">
       <TargetPath>%(RecursiveDir)%(FileName)%(Extension)</TargetPath>
@@ -61,7 +47,7 @@
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.0.1" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
-	  <PackageReference Include="Mono.Addins.Setup" Version="1.4.1" />
+	<PackageReference Include="Mono.Addins.Setup" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
   </ItemGroup>
 </Project>

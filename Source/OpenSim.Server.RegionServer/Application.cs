@@ -73,8 +73,6 @@ namespace OpenSim
             // First line, hook the appdomain to the crash reporter
             AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
 
-            System.AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
-
             Culture.SetCurrentCulture();
             Culture.SetDefaultCurrentCulture();
 
@@ -103,30 +101,8 @@ namespace OpenSim
                 m_log.Info("[OPENSIM MAIN]: configured log4net using default OpenSim.Server.RegionServer.dll.config");
             }
 
-            // temporay set the platform dependent System.Drawing.Common.dll
-            string targetdll = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
-                        "System.Drawing.Common.dll");
-            string src = targetdll + (Util.IsWindows() ? ".win" : ".linux");
-            try
-            {
-                if (!File.Exists(targetdll))
-                    File.Copy(src, targetdll);
-                else
-                {
-                    FileInfo targetInfo = new(targetdll);
-                    FileInfo srcInfo = new(src);
-                    if(targetInfo.Length != srcInfo.Length)
-                        File.Copy(src, targetdll, true);
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.Error("Failed to copy System.Drawing.Common.dll for current platform" + e.Message);
-                throw;
-            }
+            m_log.InfoFormat("[OPENSIM MAIN]: System Locale is {0}", System.Threading.Thread.CurrentThread.CurrentCulture);
 
-            m_log.InfoFormat(
-                "[OPENSIM MAIN]: System Locale is {0}", System.Threading.Thread.CurrentThread.CurrentCulture);
             if(!Util.IsWindows())
             {
                 string monoThreadsPerCpu = System.Environment.GetEnvironmentVariable("MONO_THREADS_PER_CPU");

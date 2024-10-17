@@ -45,20 +45,6 @@
     <ProjectReference Include="..\OpenSim.Services.UserAccountService\OpenSim.Services.UserAccountService.csproj" />
   </ItemGroup>
 
-  <!-- This is a hack. System.Drawing needs to be retired. -->
-  <ItemGroup>
-      <None Include="$(SolutionDir)\bin\System.Drawing.Common.dll.win">
-      <TargetPath>%(FileName)%(Extension)</TargetPath>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-      <None Include="$(SolutionDir)\bin\System.Drawing.Common.dll.linux">
-      <TargetPath>%(FileName)%(Extension)</TargetPath>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
   <ItemGroup>
       <None Include="Data\**\*">
       <TargetPath>%(RecursiveDir)%(FileName)%(Extension)</TargetPath>
