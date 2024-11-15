@@ -547,7 +547,7 @@ namespace OpenSim.Server.Base
             {
                 try
                 {
-                    using XmlReader xr = XmlReader.Create(new StringReader(data), ParseXmlStringResponseXmlReaderSettings, ParseXmlResponseXmlParserContext)
+                    using XmlReader xr = XmlReader.Create(new StringReader(data), ParseXmlStringResponseXmlReaderSettings, ParseXmlResponseXmlParserContext);
                     {
                         if (xr.ReadToFollowing("ServerResponse"))
                             return ScanXmlResponse(xr);
