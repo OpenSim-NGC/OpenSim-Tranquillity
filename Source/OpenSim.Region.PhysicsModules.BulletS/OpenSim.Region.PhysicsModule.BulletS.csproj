@@ -7,16 +7,16 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="BulletXNA.dll">
-      <HintPath>..\..\bin\BulletXNA.dll</HintPath>
+      <HintPath>..\..\Library\BulletXNA.dll</HintPath>
     </Reference>
     <Reference Include="Nini.dll">
-      <HintPath>..\..\bin\Nini.dll</HintPath>
+      <HintPath>..\..\Library\Nini.dll</HintPath>
     </Reference>
     <Reference Include="OpenMetaverse">
-      <HintPath>..\..\bin\OpenMetaverse.dll</HintPath>
+      <HintPath>..\..\Library\OpenMetaverse.dll</HintPath>
     </Reference>
     <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
+      <HintPath>..\..\Library\OpenMetaverseTypes.dll</HintPath>
     </Reference>
   </ItemGroup>
 

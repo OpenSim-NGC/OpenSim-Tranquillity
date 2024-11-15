@@ -14,10 +14,10 @@
   
   <ItemGroup>
     <Reference Include="Nini">
-      <HintPath>..\..\bin\Nini.dll</HintPath>
+      <HintPath>..\..\Library\Nini.dll</HintPath>
     </Reference>
     <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
+      <HintPath>..\..\Library\OpenMetaverseTypes.dll</HintPath>
     </Reference>
   </ItemGroup>
 
