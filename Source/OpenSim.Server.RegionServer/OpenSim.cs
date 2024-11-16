@@ -126,9 +126,6 @@ namespace OpenSim
                 try { ServicePointManager.DnsRefreshTimeout = dnsTimeout; } catch { }
             }
 
-            if (Util.FireAndForgetMethod == FireAndForgetMethod.SmartThreadPool)
-                Util.InitThreadPool(stpMinThreads, stpMaxThreads);
-
             m_log.Info("[OPENSIM MAIN]: Using async_call_method " + Util.FireAndForgetMethod);
 
             m_log.InfoFormat("[OPENSIM MAIN] Running GC in {0} mode", GCSettings.IsServerGC ? "server":"workstation");

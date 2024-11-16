@@ -188,16 +188,6 @@ namespace OpenSim.Framework.Monitoring
                     s.Value = iocpThreads;
                 });
 
-            if (Util.FireAndForgetMethod == FireAndForgetMethod.SmartThreadPool && Util.GetSmartThreadPoolInfo() != null)
-            {
-                MakeStat("STPMaxThreads", null, "threads", ContainerThreadpool, s => s.Value = Util.GetSmartThreadPoolInfo().MaxThreads);
-                MakeStat("STPMinThreads", null, "threads", ContainerThreadpool, s => s.Value = Util.GetSmartThreadPoolInfo().MinThreads);
-                MakeStat("STPConcurrency", null, "threads", ContainerThreadpool, s => s.Value = Util.GetSmartThreadPoolInfo().MaxConcurrentWorkItems);
-                MakeStat("STPActiveThreads", null, "threads", ContainerThreadpool, s => s.Value = Util.GetSmartThreadPoolInfo().ActiveThreads);
-                MakeStat("STPInUseThreads", null, "threads", ContainerThreadpool, s => s.Value = Util.GetSmartThreadPoolInfo().InUseThreads);
-                MakeStat("STPWorkItemsWaiting", null, "threads", ContainerThreadpool, s => s.Value = Util.GetSmartThreadPoolInfo().WaitingCallbacks);
-            }
-
             MakeStat(
                 "HTTPRequestsMade",
                 "Number of outbound HTTP requests made",

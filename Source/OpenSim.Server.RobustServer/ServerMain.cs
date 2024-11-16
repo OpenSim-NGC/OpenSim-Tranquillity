@@ -216,8 +216,6 @@ namespace OpenSim.Server
 
             m_Server?.Shutdown();
 
-            Util.StopThreadPool();
-
             Environment.Exit(res);
 
             return 0;

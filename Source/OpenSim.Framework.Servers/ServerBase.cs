@@ -890,22 +890,6 @@ namespace OpenSim.Framework.Servers
             int allocatedThreads = 0;
             int inUseThreads = 0;
             int waitingCallbacks = 0;
-
-            if (Util.FireAndForgetMethod == FireAndForgetMethod.SmartThreadPool)
-            {
-                STPInfo stpi = Util.GetSmartThreadPoolInfo();
-
-                // ROBUST currently leaves this the FireAndForgetMethod but never actually initializes the threadpool.
-                if (stpi != null)
-                {
-                    threadPoolUsed = "SmartThreadPool";
-                    maxThreads = stpi.MaxThreads;
-                    minThreads = stpi.MinThreads;
-                    inUseThreads = stpi.InUseThreads;
-                    allocatedThreads = stpi.ActiveThreads;
-                    waitingCallbacks = stpi.WaitingCallbacks;
-                }
-            }
  
             if (threadPoolUsed != null)
             {

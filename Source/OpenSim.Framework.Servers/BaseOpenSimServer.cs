@@ -137,7 +137,6 @@ namespace OpenSim.Framework.Servers
             MainServer.Stop();
 
             Thread.Sleep(500);
-            Util.StopThreadPool();
             WorkManager.Stop();
 
             RemovePIDFile();

@@ -27,9 +27,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\ThirdParty\SmartThreadPool\SmartThreadPool.csproj" />
-  </ItemGroup>
-  <ItemGroup>
     <PackageReference Include="log4net" Version="3.0.1" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.Setup" Version="1.4.1" />

@@ -250,7 +250,6 @@ namespace OpenSim.Server.Base
                 Watchdog.Enabled = false;
                 WorkManager.Stop();
                 RemovePIDFile();
-                Util.StopThreadPool();
 
                 Environment.Exit(0);
             }
