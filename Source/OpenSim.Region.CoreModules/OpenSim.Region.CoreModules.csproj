@@ -50,7 +50,6 @@
     <ProjectReference Include="..\OpenSim.Services.Base\OpenSim.Services.Base.csproj" />
     <ProjectReference Include="..\OpenSim.Services.Connectors\OpenSim.Services.Connectors.csproj" />
     <ProjectReference Include="..\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
-    <ProjectReference Include="..\..\ThirdParty\SmartThreadPool\SmartThreadPool.csproj" />
   </ItemGroup>
 
   <ItemGroup>

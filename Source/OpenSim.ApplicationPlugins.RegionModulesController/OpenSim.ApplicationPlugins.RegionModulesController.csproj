@@ -17,7 +17,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\OpenSim.Server.RegionServer\OpenSim.Server.RegionServer.csproj" />
     <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj" />
     <ProjectReference Include="..\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />

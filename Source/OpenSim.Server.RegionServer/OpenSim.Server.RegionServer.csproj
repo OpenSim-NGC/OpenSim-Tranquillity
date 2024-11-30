@@ -30,6 +30,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../OpenSim.ApplicationPlugins.LoadRegions/OpenSim.ApplicationPlugins.LoadRegions.csproj" />
+    <ProjectReference Include="../OpenSim.ApplicationPlugins.RegionModulesController/OpenSim.ApplicationPlugins.RegionModulesController.csproj" />
+    <ProjectReference Include="../OpenSim.ApplicationPlugins.RemoteController/OpenSim.ApplicationPlugins.RemoteController.csproj" />
     <ProjectReference Include="..\OpenSim.Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
@@ -42,6 +45,7 @@
     <ProjectReference Include="..\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
     <ProjectReference Include="..\OpenSim.Services.Base\OpenSim.Services.Base.csproj" />
     <ProjectReference Include="..\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
+    <ProjectReference Include="..\OpenSim.Services.SimulationService\OpenSim.Services.SimulationService.csproj" />
     <ProjectReference Include="..\OpenSim.Services.UserAccountService\OpenSim.Services.UserAccountService.csproj" />
   </ItemGroup>
 
