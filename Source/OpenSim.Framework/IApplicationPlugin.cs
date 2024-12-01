@@ -25,10 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenSim.Framework;
 using Mono.Addins;
 
-namespace OpenSim
+namespace OpenSim.Framework
 {
     /// <summary>
     /// OpenSimulator Application Plugin framework interface
