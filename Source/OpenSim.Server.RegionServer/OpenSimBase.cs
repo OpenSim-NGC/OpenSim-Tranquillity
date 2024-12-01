@@ -41,6 +41,7 @@ using OpenSim.Framework.Console;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.Monitoring;
+
 using OpenSim.Region.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -55,7 +56,7 @@ namespace OpenSim
     /// <summary>
     /// Common OpenSimulator simulator code
     /// </summary>
-    public class OpenSimBase : RegionApplicationBase
+    public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -118,7 +119,7 @@ namespace OpenSim
         /// <value>
         /// The config information passed into the OpenSimulator region server.
         /// </value>
-        public OpenSimConfigSource ConfigSource { get; private set; }
+        public IConfigSource ConfigSource { get; private set; }
 
         protected EnvConfigSource m_EnvConfigSource = new EnvConfigSource();
 
@@ -154,7 +155,7 @@ namespace OpenSim
         {
             m_configLoader = new ConfigurationLoader();
             ConfigSource = m_configLoader.LoadConfigSettings(configSource, envConfigSource, out m_configSettings, out m_networkServersInfo);
-            Config = ConfigSource.Source;
+            Config = ConfigSource;
             ReadExtraConfigSettings();
         }
 
@@ -1189,10 +1190,5 @@ namespace OpenSim
 
             return true;    // need to update the database
         }
-    }
-
-    public class OpenSimConfigSource
-    {
-        public IConfigSource Source;
     }
 }

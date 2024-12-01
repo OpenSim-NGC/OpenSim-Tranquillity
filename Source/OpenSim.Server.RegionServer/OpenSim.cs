@@ -750,18 +750,18 @@ namespace OpenSim
 
             if (!Path.IsPathRooted(regionFile))
             {
-                string regionsDir = ConfigSource.Source.Configs["Startup"].GetString("regionload_regionsdir", "Regions").Trim();
+                string regionsDir = ConfigSource.Configs["Startup"].GetString("regionload_regionsdir", "Regions").Trim();
                 regionFile = Path.Combine(regionsDir, regionFile);
             }
 
             RegionInfo regInfo;
             if (isXml)
             {
-                regInfo = new RegionInfo(regionName, regionFile, false, ConfigSource.Source);
+                regInfo = new RegionInfo(regionName, regionFile, false, ConfigSource);
             }
             else
             {
-                regInfo = new RegionInfo(regionName, regionFile, false, ConfigSource.Source, regionName);
+                regInfo = new RegionInfo(regionName, regionFile, false, ConfigSource, regionName);
             }
 
             if (SceneManager.TryGetScene(regInfo.RegionID, out Scene existingScene))

@@ -25,9 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using OpenSim.Framework;
+using OpenSim.Region.Framework.Interfaces;
+
 using Mono.Addins;
 
-namespace OpenSim.Framework
+namespace OpenSim.Region.Framework.Interfaces
 {
     /// <summary>
     /// OpenSimulator Application Plugin framework interface
@@ -39,7 +42,7 @@ namespace OpenSim.Framework
         /// Initialize the Plugin
         /// </summary>
         /// <param name="openSim">The Application instance</param>
-        void Initialise(OpenSimBase openSim);
+        void Initialise(IOpenSimBase openSim);
 
         /// <summary>
         /// Called when the application loading is completed
@@ -50,9 +53,9 @@ namespace OpenSim.Framework
 
     public class ApplicationPluginInitialiser : PluginInitialiserBase
     {
-        private OpenSimBase server;
+        private IOpenSimBase server;
 
-        public ApplicationPluginInitialiser(OpenSimBase s)
+        public ApplicationPluginInitialiser(IOpenSimBase s)
         {
             server = s;
         }

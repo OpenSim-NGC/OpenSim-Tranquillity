@@ -65,7 +65,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
         private static Object   m_requestLock = new Object();
         private static Object   m_saveOarLock = new Object();
 
-        private OpenSimBase m_application;
+        private IOpenSimBase m_application;
         private IHttpServer m_httpServer;
         private IConfig m_config;
         private IConfigSource m_configSource;
@@ -92,11 +92,11 @@ namespace OpenSim.ApplicationPlugins.RemoteController
             throw new PluginNotInitialisedException(Name);
         }
 
-        public void Initialise(OpenSimBase openSim)
+        public void Initialise(IOpenSimBase openSim)
         {
             m_openSimVersion = openSim.GetVersionText();
 
-            m_configSource = openSim.ConfigSource.Source;
+            m_configSource = openSim.ConfigSource;
             try
             {
                 if (m_configSource.Configs["RemoteAdmin"] == null ||
