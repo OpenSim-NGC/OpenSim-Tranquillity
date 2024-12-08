@@ -39,10 +39,11 @@ using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
+using log4net.Config;
 
-namespace OpenSim.Server
+namespace OpenSim.Server.RobustServer
 {
-    public class OpenSimServer
+    public class Application
     {
         private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -90,8 +91,11 @@ namespace OpenSim.Server
             }
         }
 
-        public static int Main(string[] args)
+        public static int Start(string[] args)
         {
+            XmlConfigurator.Configure();
+            //Application.Configure(args);
+
             Culture.SetCurrentCulture();
             Culture.SetDefaultCurrentCulture();
 
