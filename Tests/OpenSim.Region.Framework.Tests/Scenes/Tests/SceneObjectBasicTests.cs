@@ -62,8 +62,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 //
 //            ~GcNotify()
 //            {
-//                if (!Environment.HasShutdownStarted &&
-//                    !AppDomain.CurrentDomain.IsFinalizingForUnload())
+//                if (!Environment.HasShutdownStarted)
 //                {
 //                    Console.WriteLine("GcNotify called");
 //                    gcEvent.Set();

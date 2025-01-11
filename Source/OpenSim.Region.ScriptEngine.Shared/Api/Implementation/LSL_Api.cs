@@ -79,7 +79,7 @@ using OpenMetaverse.StructuredData;
 namespace OpenSim.Region.ScriptEngine.Shared.Api
 {
     /// <summary>
-    /// Contains all LSL ll-functions. This class will be in Default AppDomain.
+    /// Contains all LSL ll-functions.
     /// </summary>
     public class LSL_Api : ILSL_Api, IScriptApi
     {

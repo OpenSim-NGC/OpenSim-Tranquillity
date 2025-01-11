@@ -60,7 +60,6 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess.Tests
             IConfig xEngineConfig = configSource.AddConfig("XEngine");
             xEngineConfig.Set("Enabled", "true");
             xEngineConfig.Set("StartDelay", "0");
-            xEngineConfig.Set("AppDomainLoading", "false");
 
             string homeUrl = "http://hg.HomeTestPostAssetRewriteGrid.com";
             string foreignUrl = "http://hg.ForeignTestPostAssetRewriteGrid.com";

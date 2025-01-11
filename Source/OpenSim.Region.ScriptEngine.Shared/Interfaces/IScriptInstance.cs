@@ -126,7 +126,6 @@ namespace OpenSim.Region.ScriptEngine.Interfaces
         SceneObjectPart Part { get; }
 
         IScriptEngine Engine { get; }
-        UUID AppDomain { get; set; }
         string PrimName { get; }
         string ScriptName { get; }
         UUID ItemID { get; }
