@@ -39,7 +39,8 @@ using OpenMetaverse;
 using Mono.Addins;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.Servers;
-using OpenMetaverse.StructuredData; // LitJson is hidden on this
+using OpenMetaverse.StructuredData;
+using System.Runtime.Loader; // LitJson is hidden on this
 
 [assembly:AddinRoot("Robust", OpenSim.VersionInfo.AssemblyVersionNumber)]
 namespace OpenSim.Server.Base
@@ -270,7 +271,20 @@ namespace OpenSim.Server.Base
 
             try
             {
-                Assembly pluginAssembly = Assembly.LoadFrom(dllName);
+                // Could create our own context here. It will fall bacl
+                // to this loader if an Assembly isnt found.
+                var loadContext = AssemblyLoadContext.Default;
+                var pluginAssembly = loadContext.LoadFromAssemblyPath(dllName);
+
+                if (pluginAssembly is not null)
+                {
+                    m_log.InfoFormat($"Loaded assembly: {pluginAssembly.FullName} from {loadContext.Name}");
+                }
+                else
+                {
+                    m_log.ErrorFormat($"Assembly {dllName} not found or could not be loaded");
+                    return null;
+                }
 
                 foreach (Type pluginType in pluginAssembly.GetTypes())
                 {
