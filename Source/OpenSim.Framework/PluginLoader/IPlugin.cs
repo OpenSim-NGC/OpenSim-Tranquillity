@@ -27,7 +27,7 @@
 
 using System;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework.PluginLoader
 {
     /// <summary>
     /// Exception thrown if Initialise has been called, but failed.

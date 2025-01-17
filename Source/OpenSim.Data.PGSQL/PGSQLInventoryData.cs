@@ -32,6 +32,7 @@ using System.Reflection;
 using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
+using OpenSim.Framework.PluginLoader;
 using Npgsql;
 
 namespace OpenSim.Data.PGSQL

@@ -35,6 +35,7 @@ using System.Collections.Generic;
 using log4net;
 using Nini.Config;
 using OpenSim.Framework;
+using OpenSim.Framework.AssemblyLoader;
 using OpenMetaverse;
 using Mono.Addins;
 using OpenSim.Framework.Servers.HttpServer;
@@ -271,9 +272,7 @@ namespace OpenSim.Server.Base
 
             try
             {
-                // Could create our own context here. It will fall bacl
-                // to this loader if an Assembly isnt found.
-                var loadContext = AssemblyLoadContext.Default;
+                var loadContext = new OpenSimAssemblyLoadContext();
                 var pluginAssembly = loadContext.LoadFromAssemblyPath(dllName);
 
                 if (pluginAssembly is not null)
