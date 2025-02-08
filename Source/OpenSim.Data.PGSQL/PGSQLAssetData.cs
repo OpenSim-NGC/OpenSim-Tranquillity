@@ -32,6 +32,7 @@ using System.Collections.Generic;
 using OpenMetaverse;
 using log4net;
 using OpenSim.Framework;
+using OpenSim.Framework.PluginLoader;
 using Npgsql;
 using NpgsqlTypes;
 

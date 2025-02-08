@@ -30,6 +30,7 @@ using System.Collections.Generic;
 
 using Nini.Config;
 using OpenSim.Framework;
+using OpenSim.Framework.PluginLoader;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
 

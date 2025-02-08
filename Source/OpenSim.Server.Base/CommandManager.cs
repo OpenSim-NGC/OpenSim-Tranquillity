@@ -36,6 +36,7 @@ using Mono.Addins.Setup;
 using Mono.Addins;
 using Mono.Addins.Description;
 using OpenSim.Framework;
+using OpenSim.Framework.PluginLoader;
 
 namespace OpenSim.Server.Base
 {

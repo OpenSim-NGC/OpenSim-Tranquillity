@@ -33,6 +33,7 @@ using log4net;
 using OpenMetaverse;
 using Mono.Addins;
 using OpenSim.Framework;
+using OpenSim.Framework.PluginLoader;
 using OpenSim.Region.CoreModules.Agent.AssetTransaction;
 using OpenSim.Region.CoreModules.Avatar.InstantMessage;
 using OpenSim.Region.CoreModules.Scripting.DynamicTexture;

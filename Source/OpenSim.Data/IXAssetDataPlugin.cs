@@ -28,6 +28,7 @@
 using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
+using OpenSim.Framework.PluginLoader;
 
 namespace OpenSim.Data
 {
