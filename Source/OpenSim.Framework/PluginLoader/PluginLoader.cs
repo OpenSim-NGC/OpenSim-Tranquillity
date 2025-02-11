@@ -32,7 +32,7 @@ using System.Reflection;
 using log4net;
 using Mono.Addins;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework.PluginLoader
 {
     /// <summary>
     /// Exception thrown if an incorrect number of plugins are loaded

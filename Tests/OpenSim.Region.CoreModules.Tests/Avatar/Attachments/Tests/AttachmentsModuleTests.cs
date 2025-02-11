@@ -145,10 +145,6 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments.Tests
             xEngineConfig.Set("Enabled", "true");
             xEngineConfig.Set("StartDelay", "0");
 
-            // These tests will not run with AppDomainLoading = true, at least on mono.  For unknown reasons, the call
-            // to AssemblyResolver.OnAssemblyResolve fails.
-            xEngineConfig.Set("AppDomainLoading", "false");
-
             modules.Add(new XEngine());
 
             // Necessary to stop serialization complaining

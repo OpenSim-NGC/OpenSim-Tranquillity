@@ -70,9 +70,6 @@ namespace OpenSim
         //could move our main function into OpenSimMain and kill this class
         public static void Start(string[] args)
         {
-            // First line, hook the appdomain to the crash reporter
-            AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
-
             Culture.SetCurrentCulture();
             Culture.SetDefaultCurrentCulture();
 

@@ -51,8 +51,6 @@ namespace OpenSim.Tests.Performance
         [SetUp]
         public void Init()
         {
-            //AppDomain.CurrentDomain.SetData("APPBASE", Environment.CurrentDirectory + "/bin");
-//            Console.WriteLine(AppDomain.CurrentDomain.BaseDirectory);
             m_xEngine = new XEngine();
 
             // Necessary to stop serialization complaining
@@ -65,10 +63,6 @@ namespace OpenSim.Tests.Performance
 
             IConfig xEngineConfig = configSource.AddConfig("XEngine");
             xEngineConfig.Set("Enabled", "true");
-
-            // These tests will not run with AppDomainLoading = true, at least on mono.  For unknown reasons, the call
-            // to AssemblyResolver.OnAssemblyResolve fails.
-            xEngineConfig.Set("AppDomainLoading", "false");
 
             m_scene = new SceneHelpers().SetupScene("My Test", UUID.Random(), 1000, 1000, configSource);
             SceneHelpers.SetupSceneModules(m_scene, configSource, m_xEngine, wcModule);

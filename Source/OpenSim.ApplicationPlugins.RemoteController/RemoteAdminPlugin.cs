@@ -43,6 +43,7 @@ using Mono.Addins;
 using OpenSim;
 using OpenSim.Framework;
 using OpenSim.Framework.Console;
+using OpenSim.Framework.PluginLoader;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.CoreModules.World.Terrain;

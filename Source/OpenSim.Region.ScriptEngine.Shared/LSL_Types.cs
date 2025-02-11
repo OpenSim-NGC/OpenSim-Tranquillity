@@ -43,7 +43,6 @@ namespace OpenSim.Region.ScriptEngine.Shared
 {
     public partial class LSL_Types
     {
-        // Types are kept is separate .dll to avoid having to add whatever .dll it is in it to script AppDomain
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe static bool IsBadNumber(double d)
         {

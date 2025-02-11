@@ -35,11 +35,13 @@ using System.Collections.Generic;
 using log4net;
 using Nini.Config;
 using OpenSim.Framework;
+using OpenSim.Framework.AssemblyLoader;
 using OpenMetaverse;
 using Mono.Addins;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.Servers;
-using OpenMetaverse.StructuredData; // LitJson is hidden on this
+using OpenMetaverse.StructuredData;
+using System.Runtime.Loader; // LitJson is hidden on this
 
 [assembly:AddinRoot("Robust", OpenSim.VersionInfo.AssemblyVersionNumber)]
 namespace OpenSim.Server.Base
@@ -270,7 +272,18 @@ namespace OpenSim.Server.Base
 
             try
             {
-                Assembly pluginAssembly = Assembly.LoadFrom(dllName);
+                var loadContext = new OpenSimAssemblyLoadContext();
+                var pluginAssembly = loadContext.LoadFromAssemblyPath(dllName);
+
+                if (pluginAssembly is not null)
+                {
+                    m_log.InfoFormat($"Loaded assembly: {pluginAssembly.FullName} from {loadContext.Name}");
+                }
+                else
+                {
+                    m_log.ErrorFormat($"Assembly {dllName} not found or could not be loaded");
+                    return null;
+                }
 
                 foreach (Type pluginType in pluginAssembly.GetTypes())
                 {
