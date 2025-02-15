@@ -4,9 +4,11 @@
     <Company>http://opensimulator.org</Company>
     <Product>OpenSim</Product>
     <Copyright>Copyright OpenSimulator developers ©  2012</Copyright>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.0.1" />
+    <PackageReference Include="log4net" Version="3.0.3" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Nini">

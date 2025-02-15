@@ -171,9 +171,6 @@ namespace OpenSim.Framework
             MaxCharactersInDocument = 10_000_000
         };
 
-        // Watchdog timer that aborts threads that have timed-out
-        private static Timer m_threadPoolWatchdog;
-
         // Unix-epoch starts at January 1st 1970, 00:00:00 UTC. And all our times in the server are (or at least should be) in UTC.
         public static readonly DateTime UnixEpoch =
             DateTime.ParseExact("1970-01-01 00:00:00 +0", "yyyy-MM-dd hh:mm:ss z", DateTimeFormatInfo.InvariantInfo).ToUniversalTime();

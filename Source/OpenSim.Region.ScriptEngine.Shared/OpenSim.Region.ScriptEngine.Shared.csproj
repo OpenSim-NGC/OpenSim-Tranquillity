@@ -5,6 +5,8 @@
     <Product>OpenSim</Product>
     <Copyright>OpenSimulator developers</Copyright>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,7 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.0.1" />
+    <PackageReference Include="log4net" Version="3.0.3" />
   </ItemGroup>
 
 </Project>
