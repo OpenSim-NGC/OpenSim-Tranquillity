@@ -5,6 +5,8 @@
     <Product>OpenSim</Product>
     <Copyright>OpenSimulator developers</Copyright>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="C5">
@@ -38,7 +40,7 @@
     <ProjectReference Include="..\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.0.1" />
+    <PackageReference Include="log4net" Version="3.0.3" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
   </ItemGroup>

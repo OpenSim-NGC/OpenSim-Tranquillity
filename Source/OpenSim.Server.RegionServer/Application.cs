@@ -68,7 +68,7 @@ namespace OpenSim
         protected static OpenSimBase m_sim = null;
 
         //could move our main function into OpenSimMain and kill this class
-        public static void Main(string[] args)
+        public static void Start(string[] args)
         {
             Culture.SetCurrentCulture();
             Culture.SetDefaultCurrentCulture();

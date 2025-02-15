@@ -26,21 +26,19 @@
  */
 
 using OpenSim.Framework.PluginLoader;
-using Mono.Addins;
 
-namespace OpenSim
+namespace OpenSim.Region.Framework.Interfaces
 {
     /// <summary>
     /// OpenSimulator Application Plugin framework interface
     /// </summary>
-    [TypeExtensionPoint(NodeName="Plugin", NodeType = typeof(PluginExtensionNode), Path="/OpenSim/Startup")]
     public interface IApplicationPlugin : IPlugin
     {
         /// <summary>
         /// Initialize the Plugin
         /// </summary>
         /// <param name="openSim">The Application instance</param>
-        void Initialise(OpenSimBase openSim);
+        void Initialise(IOpenSimBase openSim);
 
         /// <summary>
         /// Called when the application loading is completed
@@ -51,9 +49,9 @@ namespace OpenSim
 
     public class ApplicationPluginInitialiser : PluginInitialiserBase
     {
-        private OpenSimBase server;
+        private IOpenSimBase server;
 
-        public ApplicationPluginInitialiser(OpenSimBase s)
+        public ApplicationPluginInitialiser(IOpenSimBase s)
         {
             server = s;
         }

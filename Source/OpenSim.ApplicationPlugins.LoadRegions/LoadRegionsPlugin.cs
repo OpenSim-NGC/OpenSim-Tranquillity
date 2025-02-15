@@ -25,25 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Threading;
 using log4net;
-using OpenMetaverse;
-using Mono.Addins;
 using OpenSim.Framework;
 using OpenSim.Framework.PluginLoader;
-using OpenSim.Region.CoreModules.Agent.AssetTransaction;
-using OpenSim.Region.CoreModules.Avatar.InstantMessage;
-using OpenSim.Region.CoreModules.Scripting.DynamicTexture;
-using OpenSim.Region.CoreModules.Scripting.LoadImageURL;
-using OpenSim.Region.CoreModules.Scripting.XMLRPC;
-using OpenSim.Services.Interfaces;
+using OpenSim.Region.Framework.Interfaces;
 
 namespace OpenSim.ApplicationPlugins.LoadRegions
 {
-    [Extension(Path="/OpenSim/Startup", Id="LoadRegions", NodeName="Plugin")]
     public class LoadRegionsPlugin : IApplicationPlugin, IRegionCreator
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
@@ -67,7 +56,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
             get { return m_name; }
         }
 
-        protected OpenSimBase m_openSim;
+        protected IOpenSimBase m_openSim;
 
         public void Initialise()
         {
@@ -75,7 +64,7 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
             throw new PluginNotInitialisedException(Name);
         }
 
-        public void Initialise(OpenSimBase openSim)
+        public void Initialise(IOpenSimBase openSim)
         {
             m_openSim = openSim;
             m_openSim.ApplicationRegistry.RegisterInterface<IRegionCreator>(this);
@@ -87,7 +76,8 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
 
             IEstateLoader estateLoader = null;
             IRegionLoader regionLoader;
-            if (m_openSim.ConfigSource.Source.Configs["Startup"].GetString("region_info_source", "filesystem") == "filesystem")
+
+            if (m_openSim.ConfigSource.Configs["Startup"].GetString("region_info_source", "filesystem") == "filesystem")
             {
                 m_log.Info("[LOAD REGIONS PLUGIN]: Loading region configurations from filesystem");
                 regionLoader = new RegionLoaderFileSystem();
@@ -103,12 +93,12 @@ namespace OpenSim.ApplicationPlugins.LoadRegions
             // Load Estates Before Regions!
             if(estateLoader != null)
             {
-                estateLoader.SetIniConfigSource(m_openSim.ConfigSource.Source);
+                estateLoader.SetIniConfigSource(m_openSim.ConfigSource);
 
                 estateLoader.LoadEstates();
             }
 
-            regionLoader.SetIniConfigSource(m_openSim.ConfigSource.Source);
+            regionLoader.SetIniConfigSource(m_openSim.ConfigSource);
             RegionInfo[] regionsToLoad = regionLoader.LoadRegions();
 
             m_log.Info("[LOAD REGIONS PLUGIN]: Loading specific shared modules...");

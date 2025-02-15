@@ -4,9 +4,11 @@
     <Company>http://opensimulator.org</Company>
     <Product>OpenSim</Product>
     <Copyright>Copyright OpenSimulator developers ©  2012</Copyright>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.0.1" />
+    <PackageReference Include="log4net" Version="3.0.3" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Nini">
@@ -29,7 +31,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\OpenSim.Server.RegionServer\OpenSim.Server.RegionServer.csproj" />
     <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
     <ProjectReference Include="..\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj" />

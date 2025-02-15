@@ -1,3 +1,30 @@
+/*
+ * Copyright (c) Contributors, http://opensimulator.org/
+ * See CONTRIBUTORS.TXT for a full list of copyright holders.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of the OpenSim Project nor the
+ *       names of its contributors may be used to endorse or promote products
+ *       derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE DEVELOPERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 using System.CommandLine;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -7,13 +34,18 @@ using Microsoft.Extensions.Configuration;
 using Autofac.Extensions.DependencyInjection;
 using Autofac;
 
-using ConfigurationSubstitution;
+using OpenSim.ApplicationPlugins.LoadRegions;
+using OpenSim.ApplicationPlugins.RegionModulesController;
+using OpenSim.ApplicationPlugins.RemoteController;
 
-namespace OpenSim.Server.MoneyServer
+using ConfigurationSubstitution;
+using OpenSim.Region.Framework.Interfaces;
+
+namespace OpenSim.Server.RegionServer
 {
     class Program
     {
-        public static IHost MoneyHost { get; private set; }
+        public static IHost RegionHost { get; private set; }
 
         public static async Task<int> Main(string[] args)
         {
@@ -21,19 +53,19 @@ namespace OpenSim.Server.MoneyServer
 
             var logconfigOption = new Option<string>
                 (name: "--logconfig", description: "Instruct log4net to use this file as configuration file.",
-                getDefaultValue: () => "OpenSim.Server.MoneyServer.dll.config");
+                getDefaultValue: () => "OpenSim.Server.RegionServer.dll.config");
             var backgroundOption = new Option<bool>
-                (name: "--background", description: "If true, the MoneyServer will run in the background",
+                (name: "--background", description: "If true, OpenSimulator will run in the background",
                 getDefaultValue: () => false);
             var inifileOption = new Option<List<string>>
                 (name: "--inifile", description: "Specify the location of zero or more .ini file(s) to read.");
             var inimasterOption = new Option<string>
                 (name: "--inimaster", description: "The path to the master ini file.",
-                getDefaultValue: () => "MoneyServer.ini");
+                getDefaultValue: () => "OpenSimDefaults.ini");
             var inidirectoryOption = new Option<string>(
                     name: "--inidirectory", 
-                    description:    "The path to folder for config ini files. The MoneyServer will read all of *.ini files " +
-                                    "in this directory and override MoneyServer.ini settings",
+                    description:    "The path to folder for config ini files.OpenSimulator will read all of *.ini files " +
+                                    "in this directory and override OpenSim.ini settings",
                     getDefaultValue: () => "config");
             var consoleOption = new Option<string>
                 (name: "--console", description: "console type, one of basic, local or rest.", 
@@ -49,7 +81,7 @@ namespace OpenSim.Server.MoneyServer
 
             rootCommand.SetHandler((logconfig, background, inifile, inimaster, inidirectory, console) =>
             {
-                StartMoneyService(args, logconfig, background, inifile, inimaster, inidirectory, console);
+                StartRegion(args, logconfig, background, inifile, inimaster, inidirectory, console);
             },
             logconfigOption,
             backgroundOption, 
@@ -61,7 +93,7 @@ namespace OpenSim.Server.MoneyServer
             return await rootCommand.InvokeAsync(args);
         }
 
-        private static void StartMoneyService(
+        private static void StartRegion(
             string[] args, 
             string logconfig, 
             bool background, 
@@ -105,18 +137,18 @@ namespace OpenSim.Server.MoneyServer
                 //     .As<IConfiguration>()
                 //     .SingleInstance();
 
-                // // Startup Application Plugins
-                // builder.RegisterType<RegionModulesControllerPlugin>()
-                //     .As<IApplicationPlugin>()
-                //     .SingleInstance();
+                // Startup Application Plugins
+                builder.RegisterType<RegionModulesControllerPlugin>()
+                    .As<IApplicationPlugin>()
+                    .SingleInstance();
 
-                // builder.RegisterType<LoadRegionsPlugin>().
-                //     As<IApplicationPlugin>()
-                //     .SingleInstance();
+                builder.RegisterType<LoadRegionsPlugin>().
+                    As<IApplicationPlugin>()
+                    .SingleInstance();
 
-                // builder.RegisterType<RemoteAdminPlugin>()
-                //     .As<IApplicationPlugin>()
-                //     .SingleInstance();
+                builder.RegisterType<RemoteAdminPlugin>()
+                    .As<IApplicationPlugin>()
+                    .SingleInstance();
 
                 // // Data Services
                 // builder.RegisterModule(new SimulationDataServiceModule());
@@ -147,16 +179,13 @@ namespace OpenSim.Server.MoneyServer
                 })
                 .ConfigureServices(services =>
                 {
-                    services.AddHostedService<MoneyService>();
+                    services.AddHostedService<RegionService>();
                     // services.AddHostedService<PidFileService>();
                 });
 
-            MoneyHost = builder.Build();
+            RegionHost = builder.Build();
 
-            //XmlConfigurator.Configure();
-            //Application.Configure(args);
-
-            MoneyHost.Run();
+            RegionHost.Run();
         }
     }
 }
