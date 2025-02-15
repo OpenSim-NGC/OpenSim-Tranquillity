@@ -31,6 +31,7 @@
 	<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
   <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
 	<PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.7" />
+	<PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.1" />
 	<PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 

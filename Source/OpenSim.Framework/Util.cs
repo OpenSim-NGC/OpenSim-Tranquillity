@@ -4581,6 +4581,29 @@ namespace OpenSim.Framework
             m_log.Error($"{message} Failed XML ({length} bytes) = {xml}");
         }
 
+        // public static SKBitmap ResizeImageSolid(SKBitmap image, int width, int height)
+        // {
+        //     SKBitmap result = new SKBitmap(width, height);
+        //
+        //     using (SKCanvas canvas = new SKCanvas(result))
+        //     {
+        //         canvas.Clear(SKColors.Transparent);
+        //
+        //         SKPaint paint = new SKPaint
+        //         {
+        //             FilterQuality = SKFilterQuality.High,
+        //             IsAntialias = true
+        //         };
+        //
+        //         SKRect destRect = new SKRect(0, 0, width, height);
+        //         SKRect srcRect = new SKRect(0, 0, image.Width, image.Height);
+        //
+        //         canvas.DrawBitmap(image, srcRect, destRect, paint);
+        //     }
+        //     
+        //     return result;
+        // }
+
         /// <summary>
         /// Performs a high quality image resize
         /// </summary>
