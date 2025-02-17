@@ -30,7 +30,7 @@ using System;
 using System.Xml;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.DataSnapshot.Interfaces
+namespace OpenSim.Region.OptionalModules.DataSnapshot.Interfaces
 {
     public delegate void ProviderStale(IDataSnapshotProvider provider);
 

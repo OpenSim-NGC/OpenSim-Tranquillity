@@ -33,7 +33,7 @@ using System.Data.SQLite;
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.UserStatistics
+namespace OpenSim.Region.OptionalModules.UserStatistics
 {
     public class Sessions_Report : IStatsController
     {

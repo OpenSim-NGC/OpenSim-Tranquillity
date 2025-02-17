@@ -1,28 +1,10 @@
 /*
- * Copyright (c) Contributors, http://opensimulator.org/
- * See CONTRIBUTORS.TXT for a full list of copyright holders.
+ * Copyright (c) 2025, Tranquillity - OpenSimulator NGC
+ * Utopia Skye LLC
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the OpenSim Project nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE DEVELOPERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * This Source Code Form is subject to the terms of the
+ * Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
 using System.CommandLine;
@@ -40,6 +22,7 @@ using OpenSim.ApplicationPlugins.RemoteController;
 
 using ConfigurationSubstitution;
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Server.RegionServer
 {
@@ -128,63 +111,33 @@ namespace OpenSim.Server.RegionServer
             });
             
             builder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
-
-            builder.ConfigureContainer<ContainerBuilder>(builder =>
+            
+            builder.ConfigureContainer<ContainerBuilder>(registryBuilder =>
             {
-
-                // // Register the main configuration
-                // builder.Register(x => Application.Configuration)
-                //     .As<IConfiguration>()
-                //     .SingleInstance();
-
-                // Startup Application Plugins
-                builder.RegisterType<RegionModulesControllerPlugin>()
-                    .As<IApplicationPlugin>()
-                    .SingleInstance();
-
-                builder.RegisterType<LoadRegionsPlugin>().
-                    As<IApplicationPlugin>()
-                    .SingleInstance();
-
-                builder.RegisterType<RemoteAdminPlugin>()
-                    .As<IApplicationPlugin>()
-                    .SingleInstance();
-
-                // // Data Services
-                // builder.RegisterModule(new SimulationDataServiceModule());
-                // builder.RegisterModule(new EstateDataServiceModule());
-
-                // // Register Region Modules
-                // builder.RegisterModule(new CoreModulesModule());
-                // builder.RegisterModule(new OptionalModulesModule());
-                // builder.RegisterModule(new LindenUDPModule());
-                // builder.RegisterModule(new LindenCapsModule());
-                // builder.RegisterModule(new BasicPhysicsModule());
-                // builder.RegisterModule(new POSModule());
-                // builder.RegisterModule(new BulletSModule());
-                // builder.RegisterModule(new ubOdePhysicsModule());
-                // builder.RegisterModule(new MeshingModule());
-                // builder.RegisterModule(new ubOdePhysicsMeshingModule());
-                // builder.RegisterModule(new YEngineModule());
-                // builder.RegisterModule(new OpenSimSearchModule());
-                // builder.RegisterModule(new GroupsAddonModule());
-                // builder.RegisterModule(new GloebitModule());
+                // The registry we're building into
+                var registry = registryBuilder.ComponentRegistryBuilder;                
+                
+                // Search the Service Runtime directory First
+                var directoryPath = AppDomain.CurrentDomain.BaseDirectory;
+                RegisterServices.Register(registry, directoryPath, "OpenSim.*.dll");
+                    
+                // Register any plugins dropped into the addons directory also
+                directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "addon-modules");
+                RegisterServices.Register(registry, directoryPath);                
             })
-
-                .ConfigureLogging(loggingBuilder =>
-                {
-                    loggingBuilder.ClearProviders();
-                    loggingBuilder.AddLog4Net(log4NetConfigFile: logconfig);
-                    loggingBuilder.AddConsole();
-                })
-                .ConfigureServices(services =>
-                {
-                    services.AddHostedService<RegionService>();
-                    // services.AddHostedService<PidFileService>();
-                });
+            .ConfigureLogging(loggingBuilder =>
+            {
+                loggingBuilder.ClearProviders();
+                loggingBuilder.AddLog4Net(log4NetConfigFile: logconfig);
+                loggingBuilder.AddConsole();
+            })
+            .ConfigureServices(services =>
+            {
+                services.AddHostedService<RegionService>();
+                // services.AddHostedService<PidFileService>();
+            });
 
             RegionHost = builder.Build();
-
             RegionHost.Run();
         }
     }

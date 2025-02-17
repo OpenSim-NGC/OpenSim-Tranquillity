@@ -29,7 +29,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace OpenSim.Region.UserStatistics
+namespace OpenSim.Region.OptionalModules.UserStatistics
 {
     public static class HTMLUtil
     {

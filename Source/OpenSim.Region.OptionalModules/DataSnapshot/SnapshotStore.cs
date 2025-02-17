@@ -33,10 +33,10 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 using log4net;
-using OpenSim.Region.DataSnapshot.Interfaces;
+using OpenSim.Region.OptionalModules.DataSnapshot.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.DataSnapshot
+namespace OpenSim.Region.OptionalModules.DataSnapshot
 {
     public class SnapshotStore
     {

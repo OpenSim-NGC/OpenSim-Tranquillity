@@ -37,7 +37,7 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Monitoring;
 
-namespace OpenSim.Region.UserStatistics
+namespace OpenSim.Region.OptionalModules.UserStatistics
 {
     public class LogLinesAJAX : IStatsController
     {

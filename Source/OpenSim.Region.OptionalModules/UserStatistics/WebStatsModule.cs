@@ -50,7 +50,7 @@ using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSD = OpenMetaverse.StructuredData.OSD;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
-namespace OpenSim.Region.UserStatistics
+namespace OpenSim.Region.OptionalModules.UserStatistics
 {
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "WebStatsModule")]
     public class WebStatsModule : ISharedRegionModule

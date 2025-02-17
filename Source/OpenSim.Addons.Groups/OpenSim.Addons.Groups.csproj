@@ -4,7 +4,7 @@
     <Company>http://opensimulator.org</Company>
     <Product>OpenSim.Addons.Groups</Product>
     <Copyright>Copyright (c) OpenSimulator.org Developers</Copyright>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
@@ -14,7 +14,7 @@
     <PackageReference Include="log4net" Version="3.0.3" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.2" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Nini">

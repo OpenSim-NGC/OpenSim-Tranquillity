@@ -32,7 +32,7 @@ using System.Collections.Generic;
 using System.Text;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.UserStatistics
+namespace OpenSim.Region.OptionalModules.UserStatistics
 {
     public class Prototype_distributor : IStatsController
     {

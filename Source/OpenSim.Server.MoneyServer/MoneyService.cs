@@ -1,4 +1,13 @@
-﻿using log4net.Config;
+﻿/*
+ * Copyright (c) 2025, Tranquillity - OpenSimulator NGC
+ * Utopia Skye LLC
+ *
+ * This Source Code Form is subject to the terms of the
+ * Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+using log4net.Config;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -7,13 +16,9 @@ namespace OpenSim.Server.MoneyServer
 {
     public sealed class MoneyService : IHostedService
     {
-        private readonly Task _completedTask = Task.CompletedTask;
-
         private readonly IServiceProvider _serviceProvider;
         private readonly IConfiguration _configuration;
         private readonly ILogger<MoneyService> _logger;
-
-        private int m_res;
 
         public MoneyService(
             IServiceProvider serviceProvider,
@@ -35,7 +40,7 @@ namespace OpenSim.Server.MoneyServer
             app.Startup();
             app.Work();
 
-            return _completedTask;
+            return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken stoppingToken)
@@ -45,7 +50,7 @@ namespace OpenSim.Server.MoneyServer
             // Nothing to do here
             // OpenSimServer.Shutdown(m_res);
 
-            return _completedTask;
+            return Task.CompletedTask;
         }
     }
 }

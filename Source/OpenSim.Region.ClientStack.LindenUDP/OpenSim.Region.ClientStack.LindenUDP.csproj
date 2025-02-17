@@ -5,10 +5,13 @@
     <Product>OpenSim</Product>
     <Copyright>OpenSimulator developers</Copyright>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Autofac">
+      <HintPath>..\..\..\..\..\..\..\.nuget\packages\autofac\8.2.0\lib\net8.0\Autofac.dll</HintPath>
+    </Reference>
     <Reference Include="C5">
       <HintPath>..\..\Library\C5.dll</HintPath>
     </Reference>

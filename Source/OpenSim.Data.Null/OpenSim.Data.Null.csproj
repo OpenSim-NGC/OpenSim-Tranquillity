@@ -3,7 +3,9 @@
     <AssemblyTitle>OpenSim.Data.Null</AssemblyTitle>
     <Company>http://opensimulator.org</Company>
     <Product>OpenSim.Data.Null</Product>
-    <Copyright>Copyright (c) OpenSimulator.org Developers 2007-2009</Copyright>
+    <Copyright>Copyright (c) OpenSimulator.org Developers</Copyright>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="OpenMetaverseTypes">

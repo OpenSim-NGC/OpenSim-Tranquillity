@@ -6,13 +6,9 @@ namespace OpenSim.Server.RobustServer
 {
     public sealed class RobustService : IHostedService
     {
-        private readonly Task _completedTask = Task.CompletedTask;
-
         private readonly IServiceProvider _serviceProvider;
         private readonly IConfiguration _configuration;
         private readonly ILogger<RobustService> _logger;
-
-        private int m_res;
 
         public RobustService(
             IServiceProvider serviceProvider,
@@ -27,10 +23,8 @@ namespace OpenSim.Server.RobustServer
         public Task StartAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation("{Service} is running.", nameof(RobustServer));
-
             Application.Start(Environment.GetCommandLineArgs());
-
-            return _completedTask;
+            return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken stoppingToken)
@@ -40,7 +34,7 @@ namespace OpenSim.Server.RobustServer
             // Nothing to do here
             // OpenSimServer.Shutdown(m_res);
 
-            return _completedTask;
+            return Task.CompletedTask;
         }
     }
 }

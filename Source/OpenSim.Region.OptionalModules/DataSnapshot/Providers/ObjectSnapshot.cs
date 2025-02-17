@@ -25,18 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Xml;
+
 using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Region.DataSnapshot.Interfaces;
-using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Region.OptionalModules.DataSnapshot.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.DataSnapshot.Providers
+namespace OpenSim.Region.OptionalModules.DataSnapshot.Providers
 {
     public class ObjectSnapshot : IDataSnapshotProvider
     {

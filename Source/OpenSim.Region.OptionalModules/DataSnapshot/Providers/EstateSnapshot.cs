@@ -30,11 +30,11 @@ using System.Xml;
 using OpenMetaverse;
 using OpenSim.Framework;
 
-using OpenSim.Region.DataSnapshot.Interfaces;
+using OpenSim.Region.OptionalModules.DataSnapshot.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Region.DataSnapshot.Providers
+namespace OpenSim.Region.OptionalModules.DataSnapshot.Providers
 {
     public class EstateSnapshot : IDataSnapshotProvider
     {

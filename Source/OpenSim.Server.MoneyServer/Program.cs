@@ -1,3 +1,12 @@
+/*
+ * Copyright (c) 2025, Tranquillity - OpenSimulator NGC
+ * Utopia Skye LLC
+ *
+ * This Source Code Form is subject to the terms of the
+ * Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 using System.CommandLine;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +17,7 @@ using Autofac.Extensions.DependencyInjection;
 using Autofac;
 
 using ConfigurationSubstitution;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Server.MoneyServer
 {
@@ -96,60 +106,31 @@ namespace OpenSim.Server.MoneyServer
             });
             
             builder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
-
-            builder.ConfigureContainer<ContainerBuilder>(builder =>
+            
+            builder.ConfigureContainer<ContainerBuilder>(registryBuilder =>
             {
-
-                // // Register the main configuration
-                // builder.Register(x => Application.Configuration)
-                //     .As<IConfiguration>()
-                //     .SingleInstance();
-
-                // // Startup Application Plugins
-                // builder.RegisterType<RegionModulesControllerPlugin>()
-                //     .As<IApplicationPlugin>()
-                //     .SingleInstance();
-
-                // builder.RegisterType<LoadRegionsPlugin>().
-                //     As<IApplicationPlugin>()
-                //     .SingleInstance();
-
-                // builder.RegisterType<RemoteAdminPlugin>()
-                //     .As<IApplicationPlugin>()
-                //     .SingleInstance();
-
-                // // Data Services
-                // builder.RegisterModule(new SimulationDataServiceModule());
-                // builder.RegisterModule(new EstateDataServiceModule());
-
-                // // Register Region Modules
-                // builder.RegisterModule(new CoreModulesModule());
-                // builder.RegisterModule(new OptionalModulesModule());
-                // builder.RegisterModule(new LindenUDPModule());
-                // builder.RegisterModule(new LindenCapsModule());
-                // builder.RegisterModule(new BasicPhysicsModule());
-                // builder.RegisterModule(new POSModule());
-                // builder.RegisterModule(new BulletSModule());
-                // builder.RegisterModule(new ubOdePhysicsModule());
-                // builder.RegisterModule(new MeshingModule());
-                // builder.RegisterModule(new ubOdePhysicsMeshingModule());
-                // builder.RegisterModule(new YEngineModule());
-                // builder.RegisterModule(new OpenSimSearchModule());
-                // builder.RegisterModule(new GroupsAddonModule());
-                // builder.RegisterModule(new GloebitModule());
+                // The registry we're building into
+                var registry = registryBuilder.ComponentRegistryBuilder;                
+                
+                // Search the Service Runtime directory First
+                var directoryPath = AppDomain.CurrentDomain.BaseDirectory;
+                RegisterServices.Register(registry, directoryPath, "OpenSim.*.dll");
+                    
+                // Register any plugins dropped into the addons directory also
+                directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "addon-modules");
+                RegisterServices.Register(registry, directoryPath);                
             })
-
-                .ConfigureLogging(loggingBuilder =>
-                {
-                    loggingBuilder.ClearProviders();
-                    loggingBuilder.AddLog4Net(log4NetConfigFile: logconfig);
-                    loggingBuilder.AddConsole();
-                })
-                .ConfigureServices(services =>
-                {
-                    services.AddHostedService<MoneyService>();
-                    // services.AddHostedService<PidFileService>();
-                });
+            .ConfigureLogging(loggingBuilder =>
+            {
+                loggingBuilder.ClearProviders();
+                loggingBuilder.AddLog4Net(log4NetConfigFile: logconfig);
+                loggingBuilder.AddConsole();
+            })
+            .ConfigureServices(services =>
+            {
+                services.AddHostedService<MoneyService>();
+                // services.AddHostedService<PidFileService>();
+            });
 
             MoneyHost = builder.Build();
 

@@ -2,8 +2,10 @@
   <PropertyGroup>
     <AssemblyTitle>OpenSim.Services.Base</AssemblyTitle>
     <Company>http://opensimulator.org</Company>
-    <Product>OpenSim</Product>
+    <Product>OpenSim.Services.Base</Product>
     <Copyright>OpenSimulator developers</Copyright>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +28,6 @@
 
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.0.3" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.2" />
   </ItemGroup>
 </Project>

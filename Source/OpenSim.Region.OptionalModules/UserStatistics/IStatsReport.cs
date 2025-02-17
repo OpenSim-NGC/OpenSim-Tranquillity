@@ -27,7 +27,7 @@
 
 using System.Collections;
 
-namespace OpenSim.Region.UserStatistics
+namespace OpenSim.Region.OptionalModules.UserStatistics
 {
     public interface IStatsController
     {

@@ -27,7 +27,7 @@
 
 using System.Xml;
 
-namespace OpenSim.Region.DataSnapshot.Interfaces
+namespace OpenSim.Region.OptionalModules.DataSnapshot.Interfaces
 {
     public interface IDataSnapshot
     {

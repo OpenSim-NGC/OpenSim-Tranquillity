@@ -4,7 +4,7 @@
     <Company>http://opensimulator.org</Company>
     <Product>OpenSim</Product>
     <Copyright>Copyright (c) OpenSimulator.org Developers</Copyright>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>

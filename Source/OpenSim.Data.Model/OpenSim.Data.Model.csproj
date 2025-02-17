@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <PackageId>OpenSim.Data.Model</PackageId>
     <Version>0.9.3</Version>
@@ -17,22 +17,22 @@
   <ItemGroup>
 	<PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
 	<PackageReference Include="MediatR" Version="12.4.1" />
-	<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.13" />
-	<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.13" />
-	<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.13">
+	<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.2" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.2" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.2">
 	  <PrivateAssets>all</PrivateAssets>
 	  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 	</PackageReference>
-	<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.13" PrivateAssets="All" />
-  <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
-	<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.1" />
-  <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="8.0.1" />
-  <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.1" />
-	<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.2" PrivateAssets="All" />
+  <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.2" />
+	<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.2" />
+  <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="9.0.2" />
+  <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.2" />
+	<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.2" />
   <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
-	<PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.7" />
-	<PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.1" />
-	<PackageReference Include="System.Text.Json" Version="8.0.5" />
+	<PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="9.0.0" />
+	<PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.2" />
+	<PackageReference Include="System.Text.Json" Version="9.0.2" />
   </ItemGroup>
 
 </Project>

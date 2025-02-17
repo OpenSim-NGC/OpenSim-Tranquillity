@@ -27,7 +27,7 @@
 
 using OpenSim.Framework.Capabilities;
 
-namespace OpenSim.Region.DataSnapshot
+namespace OpenSim.Region.OptionalModules.DataSnapshot
 {
     [OSDMap]
     public class LLSDDiscoveryResponse
