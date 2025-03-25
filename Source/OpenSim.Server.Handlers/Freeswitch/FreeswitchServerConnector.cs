@@ -25,102 +25,101 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
 using System.Web;
-using System.Reflection;
-using Nini.Config;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
-using log4net;
 
-namespace OpenSim.Server.Handlers.Freeswitch
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+using Autofac;
+
+namespace OpenSim.Server.Handlers.Freeswitch;
+
+public class FreeswitchServerConnector(
+    IConfiguration config,
+    ILogger<FreeswitchServerConnector> logger,
+    IComponentContext componentContext)
+    : IServiceConnector
 {
-    public class FreeswitchServerConnector : ServiceConnector
+    protected string FreeSwitchApiPrefix = "/fsapi";
+    protected IFreeswitchService FreeswitchService;
+    
+    public string ConfigName { get; private set; }
+    public IHttpServer HttpServer { get; private set; }
+    
+    public void Initialize(IHttpServer httpServer, string configName = "FreeswitchService")
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        HttpServer = httpServer;
+        ConfigName = configName;
 
-        private IFreeswitchService m_FreeswitchService;
-        private string m_ConfigName = "FreeswitchService";
-        protected readonly string m_freeSwitchAPIPrefix = "/fsapi";
+        var serverConfig = config.GetSection(ConfigName);
+        if (serverConfig.Exists() is false)
+            throw new Exception($"No section {ConfigName} in config file");
 
-        public FreeswitchServerConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
-        {
-            if (configName != String.Empty)
-                m_ConfigName = configName;
+        string freeswitchServiceName = serverConfig.GetValue<string>("LocalServiceModule", String.Empty);
+        if (string.IsNullOrEmpty(freeswitchServiceName))
+            throw new Exception("No LocalServiceModule in config file");
 
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section '{0}' in config file", m_ConfigName));
+        FreeswitchService = componentContext.ResolveNamed<IFreeswitchService>(freeswitchServiceName);
 
-            string freeswitchService = serverConfig.GetString("LocalServiceModule",
-                    String.Empty);
-
-            if (freeswitchService.Length == 0)
-                throw new Exception("No LocalServiceModule in config file");
-
-            Object[] args = new Object[] { config };
-            m_FreeswitchService =
-                    ServerUtils.LoadPlugin<IFreeswitchService>(freeswitchService, args);
-
-            server.AddHTTPHandler(String.Format("{0}/freeswitch-config", m_freeSwitchAPIPrefix), FreeSwitchConfigHTTPHandler);
-            server.AddHTTPHandler(String.Format("{0}/region-config", m_freeSwitchAPIPrefix), RegionConfigHTTPHandler);
-        }
-
-        public Hashtable FreeSwitchConfigHTTPHandler(Hashtable request)
-        {
-            Hashtable response = new Hashtable();
-            response["str_response_string"] = string.Empty;
-            response["content_type"] = "text/plain";
-            response["keepalive"] = false;
-            response["int_response_code"] = 500;
-
-            Hashtable requestBody = ParseRequestBody((string) request["body"]);
-
-            string section = (string) requestBody["section"];
-
-            if (section == "directory")
-                response = m_FreeswitchService.HandleDirectoryRequest(requestBody);
-            else if (section == "dialplan")
-                response = m_FreeswitchService.HandleDialplanRequest(requestBody);
-            else
-                m_log.WarnFormat("[FreeSwitchVoice]: section was {0}", section);
-
-            return response;
-        }
-
-        private Hashtable ParseRequestBody(string body)
-        {
-            Hashtable bodyParams = new Hashtable();
-            // split string
-            string [] nvps = body.Split(new Char [] {'&'});
-
-            foreach (string s in nvps)
-            {
-                if (s.Trim() != "")
-                {
-                    string [] nvp = s.Split(new Char [] {'='});
-                    bodyParams.Add(HttpUtility.UrlDecode(nvp[0]), HttpUtility.UrlDecode(nvp[1]));
-                }
-            }
-
-            return bodyParams;
-        }
-
-        public Hashtable RegionConfigHTTPHandler(Hashtable request)
-        {
-            Hashtable response = new Hashtable();
-            response["content_type"] = "text/json";
-            response["keepalive"] = false;
-            response["int_response_code"] = 200;
-
-            response["str_response_string"] = m_FreeswitchService.GetJsonConfig();
-
-            return response;
-        }
-
+        HttpServer.AddHTTPHandler(String.Format("{0}/freeswitch-config", FreeSwitchApiPrefix), FreeSwitchConfigHttpHandler);
+        HttpServer.AddHTTPHandler(String.Format("{0}/region-config", FreeSwitchApiPrefix), RegionConfigHttpHandler);
     }
+
+    public Hashtable FreeSwitchConfigHttpHandler(Hashtable request)
+    {
+        Hashtable response = new Hashtable();
+        response["str_response_string"] = string.Empty;
+        response["content_type"] = "text/plain";
+        response["keepalive"] = false;
+        response["int_response_code"] = 500;
+
+        Hashtable requestBody = ParseRequestBody((string) request["body"]);
+
+        string section = (string) requestBody["section"];
+
+        if (section == "directory")
+            response = FreeswitchService.HandleDirectoryRequest(requestBody);
+        else if (section == "dialplan")
+            response = FreeswitchService.HandleDialplanRequest(requestBody);
+        else
+            logger.LogWarning($"section was {section}");
+
+        return response;
+    }
+
+    private Hashtable ParseRequestBody(string body)
+    {
+        Hashtable bodyParams = new Hashtable();
+        // split string
+        string [] nvps = body.Split(new Char [] {'&'});
+
+        foreach (string s in nvps)
+        {
+            if (s.Trim() != "")
+            {
+                string [] nvp = s.Split(new Char [] {'='});
+                bodyParams.Add(HttpUtility.UrlDecode(nvp[0]), HttpUtility.UrlDecode(nvp[1]));
+            }
+        }
+
+        return bodyParams;
+    }
+
+    public Hashtable RegionConfigHttpHandler(Hashtable request)
+    {
+        Hashtable response = new Hashtable();
+        response["content_type"] = "text/json";
+        response["keepalive"] = false;
+        response["int_response_code"] = 200;
+
+        response["str_response_string"] = FreeswitchService.GetJsonConfig();
+
+        return response;
+    }
+
 }
+

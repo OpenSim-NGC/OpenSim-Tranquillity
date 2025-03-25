@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) Contributors, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *
@@ -25,43 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Microsoft.Extensions.Configuration;
+using OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Framework.ServiceAuth
+namespace OpenSim.Server.Handlers.Base;
+
+public interface IServiceConnector
 {
-    public class ServiceAuth
-    {
-        public static IServiceAuth Create(IConfiguration config, string section)
-        {
-            CompoundAuthentication compoundAuth = new CompoundAuthentication();
-
-            var networkConfig = config.GetSection("Network");
-            if (networkConfig.Exists() is false)
-                throw new Exception($"No section {networkConfig} in config file");
-                
-            var sectionConfig = config.GetSection(section);
-            bool allowLlHttpRequestIn
-                = Util.GetConfigVarFromSections<bool>(config, "AllowllHTTPRequestIn", new string[] { "Network", section }, false);
-
-            if (!allowLlHttpRequestIn)
-                compoundAuth.AddAuthenticator(new DisallowLlHttpRequest());
-
-            string authType = Util.GetConfigVarFromSections<string>(config, "AuthType", new string[] { "Network", section }, "None");
-
-            switch (authType)
-            {
-                case "BasicHttpAuthentication":
-                    compoundAuth.AddAuthenticator(new BasicHttpAuthentication(config, section));
-                    break;
-            }
-
-//            foreach (IServiceAuth auth in compoundAuth.GetAuthentors())
-//                m_log.DebugFormat("[SERVICE AUTH]: Configured authenticator {0}", auth.Name);
-
-            if (compoundAuth.Count > 0)
-                return compoundAuth;
-            else
-                return null;
-        }
-    }
+    IHttpServer HttpServer { get; }
+    string ConfigName { get; }
+    void Initialize(IHttpServer httpServer, string configName);
 }

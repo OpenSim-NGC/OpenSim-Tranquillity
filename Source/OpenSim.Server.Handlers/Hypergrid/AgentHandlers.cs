@@ -29,19 +29,22 @@
 using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Framework;
-//using log4net;
-
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Hypergrid
 {
     public class GatekeeperAgentHandler : OpenSim.Server.Handlers.Simulation.AgentPostHandler
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        private readonly ILogger m_logger;
         private IGatekeeperService m_GatekeeperService;
 
-        public GatekeeperAgentHandler(IGatekeeperService gatekeeper, bool proxy) : base("/foreignagent")
+        public GatekeeperAgentHandler(
+            ILogger logger,
+            IGatekeeperService gatekeeper, 
+            bool proxy) : 
+            base(logger, "/foreignagent")
         {
+            m_logger = logger;
             m_GatekeeperService = gatekeeper;
             m_Proxy = proxy;
         }

@@ -25,40 +25,46 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using Nini.Config;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Handlers.Base;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Autofac;
+
 namespace OpenSim.Server.Handlers.Presence
 {
-    public class PresenceServiceConnector : ServiceConnector
+    public class PresenceServiceConnector(
+        IConfiguration config,
+        ILogger<PresenceServiceConnector> logger,
+        IComponentContext componentContext)
+        : IServiceConnector
     {
-        private IPresenceService m_PresenceService;
-        private string m_ConfigName = "PresenceService";
+        private const string _ConfigName = "PresenceService";
 
-        public PresenceServiceConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
+        public string ConfigName { get; private set; }
+        public IHttpServer HttpServer { get; private set; }
+        
+        public void Initialize(IHttpServer httpServer, string configName = _ConfigName)
         {
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
+            HttpServer = httpServer;
+            ConfigName = configName;
 
-            string gridService = serverConfig.GetString("LocalServiceModule",
-                    String.Empty);
+            var serverConfig = config.GetSection(ConfigName);
+            if (serverConfig.Exists() is false)
+                throw new Exception($"No section {ConfigName} in config file");
 
-            if (gridService.Length == 0)
+            var gridServiceName = serverConfig.GetValue("LocalServiceModule", string.Empty);
+            if (string.IsNullOrEmpty(gridServiceName))
                 throw new Exception("No LocalServiceModule in config file");
 
-            Object[] args = new Object[] { config };
-            m_PresenceService = ServerUtils.LoadPlugin<IPresenceService>(gridService, args);
+            var presenceService = componentContext.ResolveNamed<IPresenceService>(gridServiceName);
+            var auth = ServiceAuth.Create(config, ConfigName);
 
-            IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
-
-            server.AddStreamHandler(new PresenceServerPostHandler(m_PresenceService, auth));
+            HttpServer.AddStreamHandler(new PresenceServerPostHandler(logger, presenceService, auth));
         }
+
     }
 }

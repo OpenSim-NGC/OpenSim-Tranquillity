@@ -25,42 +25,36 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.IO;
-using System.Reflection;
 using System.Net;
-using System.Text;
-
-using OpenSim.Server.Base;
-using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
-using OpenSim.Framework.Servers.HttpServer;
 
 using OpenMetaverse;
-using OpenMetaverse.StructuredData;
 using Nwc.XmlRpc;
-using Nini.Config;
-using log4net;
+
+using Microsoft.Extensions.Logging;
 
 
 namespace OpenSim.Server.Handlers.Land
 {
     public class LandHandlers
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        private readonly ILogger m_logger;
         private ILandService m_LocalService;
 
-        public LandHandlers(ILandService service)
+        public LandHandlers(
+            ILogger logger, 
+            ILandService service)
         {
+            m_logger = logger;
             m_LocalService = service;
         }
 
         public XmlRpcResponse GetLandData(XmlRpcRequest request, IPEndPoint remoteClient)
         {
             Hashtable requestData = (Hashtable)request.Params[0];
+
             ulong regionHandle = Convert.ToUInt64(requestData["region_handle"]);
             uint x = Convert.ToUInt32(requestData["x"]);
             uint y = Convert.ToUInt32(requestData["y"]);
@@ -69,6 +63,7 @@ namespace OpenSim.Server.Handlers.Land
             byte regionAccess;
             LandData landData = m_LocalService.GetLandData(UUID.Zero, regionHandle, x, y, out regionAccess);
             Hashtable hash = new Hashtable();
+            
             if (landData != null)
             {
                 // for now, only push out the data we need for answering a ParcelInfoReqeust

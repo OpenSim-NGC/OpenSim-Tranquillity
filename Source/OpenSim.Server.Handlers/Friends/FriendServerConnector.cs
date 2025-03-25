@@ -25,39 +25,43 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using Nini.Config;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Server.Handlers.Friends
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+using Autofac;
+
+namespace OpenSim.Server.Handlers.Friends;
+
+public class FriendsServiceConnector(
+    IConfiguration config,
+    ILogger<FriendsServiceConnector> logger,
+    IComponentContext componentContext)
+    : IServiceConnector
 {
-    public class FriendsServiceConnector : ServiceConnector
+    public string ConfigName { get; private set; } 
+    public IHttpServer HttpServer { get; private set; }
+    
+    public void Initialize(IHttpServer httpServer, string configName = "FriendsService")
     {
-        private IFriendsService m_FriendsService;
-        private string m_ConfigName = "FriendsService";
+        HttpServer = httpServer;
+        ConfigName = configName;
 
-        public FriendsServiceConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
-        {
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
+        var serverConfig = config.GetSection(ConfigName);
+        if (serverConfig.Exists() is false)
+            throw new Exception($"No section {ConfigName} in config file");
 
-            string theService = serverConfig.GetString("LocalServiceModule",
-                    String.Empty);
+        string theServiceName = serverConfig.GetValue<string>("LocalServiceModule", String.Empty);
+        if (string.IsNullOrEmpty(theServiceName))
+            throw new Exception("No LocalServiceModule in config file");
 
-            if (theService.Length == 0)
-                throw new Exception("No LocalServiceModule in config file");
-
-            Object[] args = new Object[] { config };
-            m_FriendsService = ServerUtils.LoadPlugin<IFriendsService>(theService, args);
-
-            IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
-            server.AddStreamHandler(new FriendsServerPostHandler(m_FriendsService, auth));
-        }
+        var friendsService = componentContext.ResolveNamed<IFriendsService>(theServiceName);
+        var auth = ServiceAuth.Create(config, ConfigName);
+        HttpServer.AddStreamHandler(new FriendsServerPostHandler(logger, friendsService, auth));
     }
 }
+

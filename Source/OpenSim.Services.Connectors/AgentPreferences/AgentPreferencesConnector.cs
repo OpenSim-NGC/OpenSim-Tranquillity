@@ -25,62 +25,32 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using Nini.Config;
 using OpenSim.Framework;
-using OpenSim.Framework.ServiceAuth;
 using OpenSim.Services.Interfaces;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
-using IAvatarService = OpenSim.Services.Interfaces.IAvatarService;
 using OpenSim.Server.Base;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework.ServiceAuth;
 
 namespace OpenSim.Services.Connectors
 {
     public class AgentPreferencesServicesConnector : BaseServiceConnector, IAgentPreferencesService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private const string _section = "AgentPreferencesService";
+        private ILogger<AgentPreferencesServicesConnector> _logger;
+        private string _serverURI = String.Empty;
+        private IServiceAuth _auth = null;
 
-        private string m_ServerURI = String.Empty;
-
-        public AgentPreferencesServicesConnector()
+        public AgentPreferencesServicesConnector(
+            IConfiguration source, 
+            ILogger<AgentPreferencesServicesConnector> logger)
         {
-        }
-
-        public AgentPreferencesServicesConnector(string serverURI)
-        {
-            m_ServerURI = serverURI.TrimEnd('/');
-        }
-
-        public AgentPreferencesServicesConnector(IConfigSource source)
-            : base(source, "AgentPreferencesService")
-        {
-            Initialise(source);
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig gridConfig = source.Configs["AgentPreferencesService"];
-            if (gridConfig == null)
-            {
-                m_log.Error("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
-                throw new Exception("Agent Preferences connector init error");
-            }
-
-            string serviceURI = gridConfig.GetString("AgentPreferencesServerURI", string.Empty);
-
-            if (string.IsNullOrEmpty(serviceURI))
-            {
-                m_log.Error("[AGENT PREFERENCES CONNECTOR]: No Server URI named in section AgentPreferences");
-                throw new Exception("Agent Preferences connector init error");
-            }
-            m_ServerURI = serviceURI;
-
-            base.Initialise(source, "AgentPreferencesService");
+            _logger = logger;
+            
+            _auth = AuthType(source, _section);
+            _serverURI = ServiceURI(source, _section, "AgentPreferencesServerURI");
         }
 
         #region IAgentPreferencesService
@@ -90,25 +60,26 @@ namespace OpenSim.Services.Connectors
             Dictionary<string, object> sendData = new Dictionary<string, object>();
 
             string reply = string.Empty;
-            string uri = String.Concat(m_ServerURI, "/agentprefs");
+            string uri = String.Concat(_serverURI, "/agentprefs");
 
             sendData["METHOD"] = "getagentprefs";
             sendData["UserID"] = principalID;
             string reqString = ServerUtils.BuildQueryString(sendData);
-            // m_log.DebugFormat("[AGENT PREFS CONNECTOR]: queryString = {0}", reqString);
+
+            _logger.LogDebug($"[AGENT PREFS CONNECTOR]: queryString = {reqString}");
 
             try
             {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, m_Auth);
+                reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, _auth);
                 if (string.IsNullOrEmpty(reply))
                 {
-                    m_log.DebugFormat("[AGENT PREFERENCES CONNECTOR]: GetAgentPreferences received null or empty reply");
+                    _logger.LogDebug("[AGENT PREFERENCES CONNECTOR]: GetAgentPreferences received null or empty reply");
                     return null;
                 }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[AGENT PREFERENCES CONNECTOR]: Exception when contacting agent preferences server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug(e, $"[AGENT PREFERENCES CONNECTOR]: Exception when contacting agent preferences server at {uri}: {e.Message}");
             }
 
             Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -117,15 +88,16 @@ namespace OpenSim.Services.Connectors
                 if (replyData.ContainsKey("result") && 
                     (replyData["result"].ToString() == "null" || replyData["result"].ToString() == "Failure"))
                 {
-                    m_log.DebugFormat("[AGENT PREFERENCES CONNECTOR]: GetAgentPreferences received Failure response");
+                    _logger.LogDebug("[AGENT PREFERENCES CONNECTOR]: GetAgentPreferences received Failure response");
                     return null;
                 }
             }
             else
             {
-                m_log.DebugFormat("[AGENT PREFERENCES CONNECTOR]: GetAgentPreferences received null response");
+                _logger.LogDebug("[AGENT PREFERENCES CONNECTOR]: GetAgentPreferences received null response");
                 return null;
             }
+
             AgentPrefs prefs = new AgentPrefs(replyData);
             return prefs;
         }
@@ -145,26 +117,30 @@ namespace OpenSim.Services.Connectors
             sendData["PermGroup"] = data.PermGroup.ToString();
             sendData["PermNextOwner"] = data.PermNextOwner.ToString();
 
-            string uri = string.Concat(m_ServerURI, "/agentprefs");
+            string uri = string.Concat(_serverURI, "/agentprefs");
             string reqString = ServerUtils.BuildQueryString(sendData);
-            // m_log.DebugFormat("[AGENT PREFS CONNECTOR]: queryString = {0}", reqString);
+
+            _logger.LogDebug($"[AGENT PREFS CONNECTOR]: queryString = {reqString}");
 
             try
             {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, m_Auth);
+                string reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, _auth);
                 if (reply != string.Empty)
                 {
                     int indx = reply.IndexOf("success", StringComparison.InvariantCultureIgnoreCase);
                     if (indx > 0)
                         return true;
+
                     return false;
                 }
                 else
-                    m_log.DebugFormat("[AGENT PREFERENCES CONNECTOR]: StoreAgentPreferences received empty reply");
+                {
+                    _logger.LogDebug("[AGENT PREFERENCES CONNECTOR]: StoreAgentPreferences received empty reply");
+                }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[AGENT PREFERENCES CONNECTOR]: Exception when contacting agent preferences server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug($"[AGENT PREFERENCES CONNECTOR]: Exception when contacting agent preferences server at {uri}: {e.Message}");
             }
 
             return false;
@@ -178,21 +154,21 @@ namespace OpenSim.Services.Connectors
             sendData["METHOD"] = "getagentlang";
             sendData["UserID"] = principalID.ToString();
 
-            string uri = string.Concat(m_ServerURI, "/agentprefs");
+            string uri = string.Concat(_serverURI, "/agentprefs");
             string reqString = ServerUtils.BuildQueryString(sendData);
 
             try
             {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, m_Auth);
+                reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, _auth);
                 if (string.IsNullOrEmpty(reply))
                 {
-                    m_log.DebugFormat("[AGENT PREFERENCES CONNECTOR]: GetLang received null or empty reply");
+                    _logger.LogDebug("[AGENT PREFERENCES CONNECTOR]: GetLang received null or empty reply");
                     return "en-us"; // I guess? Gotta return somethin'!
                 }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[AGENT PREFERENCES CONNECTOR]: Exception when contacting agent preferences server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug(e, $"[AGENT PREFERENCES CONNECTOR]: Exception when contacting agent preferences server at {uri}: {e.Message}");
             }
 
             Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -201,15 +177,16 @@ namespace OpenSim.Services.Connectors
                 if (replyData.ContainsKey("result") &&
                     (replyData["result"].ToString() == "null" || replyData["result"].ToString() == "Failure"))
                 {
-                    m_log.DebugFormat("[AGENT PREFERENCES CONNECTOR]: GetLang received Failure response");
+                    _logger.LogDebug($"[AGENT PREFERENCES CONNECTOR]: GetLang received Failure response");
                     return "en-us";
                 }
+
                 if (replyData.ContainsKey("Language"))
                     return replyData["Language"].ToString();
             }
             else
             {
-                m_log.DebugFormat("[AGENT PREFERENCES CONNECTOR]: GetLang received null response");
+                _logger.LogDebug("[AGENT PREFERENCES CONNECTOR]: GetLang received null response");
 
             }
             return "en-us";

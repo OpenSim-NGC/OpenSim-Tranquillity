@@ -25,63 +25,32 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors
 {
     public class AuthenticationServicesConnector : BaseServiceConnector, IAuthenticationService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private string _serverURI = String.Empty;
+        private IServiceAuth _auth = null;
+        private IConfiguration _config;
+        private ILogger<AuthenticationServicesConnector> _logger;
+        private const string _section = "AuthenticationService";
 
-        private string m_ServerURI = String.Empty;
-
-        public AuthenticationServicesConnector()
+        public AuthenticationServicesConnector(
+            IConfiguration configuration, 
+            ILogger<AuthenticationServicesConnector> logger)
         {
-        }
-
-        public AuthenticationServicesConnector(string serverURI)
-        {
-            m_ServerURI = serverURI.TrimEnd('/');
-        }
-
-        public AuthenticationServicesConnector(IConfigSource source)
-            : base(source, "AuthenticationService")
-        {
-            Initialise(source);
-        }
-
-        public virtual void Initialise(IConfigSource source)
-        {
-            IConfig assetConfig = source.Configs["AuthenticationService"];
-            if (assetConfig == null)
-            {
-                m_log.Error("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
-                throw new Exception("Authentication connector init error");
-            }
-
-            string serviceURI = assetConfig.GetString("AuthenticationServerURI",
-                    String.Empty);
-
-            if (serviceURI.Length == 0)
-            {
-                m_log.Error("[AUTH CONNECTOR]: No Server URI named in section AuthenticationService");
-                throw new Exception("Authentication connector init error");
-            }
-            m_ServerURI = serviceURI;
-
-            base.Initialise(source, "AuthenticationService");
+            _logger = logger;
+            _auth = AuthType(configuration, _section);
+            _serverURI = ServiceURI(configuration, _section, "AuthenticationServerURI");
         }
 
         public string Authenticate(UUID principalID, string password, int lifetime, out UUID realID)
@@ -101,8 +70,8 @@ namespace OpenSim.Services.Connectors
             sendData["METHOD"] = "authenticate";
 
             string reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                    m_ServerURI + "/auth/plain",
-                    ServerUtils.BuildQueryString(sendData), m_Auth);
+                    _serverURI + "/auth/plain",
+                    ServerUtils.BuildQueryString(sendData), _auth);
 
             Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(
                     reply);
@@ -115,8 +84,8 @@ namespace OpenSim.Services.Connectors
 
         public bool Verify(UUID principalID, string token, int lifetime)
         {
-//            m_log.Error("[XXX]: Verify");
             Dictionary<string, object> sendData = new Dictionary<string, object>();
+
             sendData["LIFETIME"] = lifetime.ToString();
             sendData["PRINCIPAL"] = principalID.ToString();
             sendData["TOKEN"] = token;
@@ -124,11 +93,10 @@ namespace OpenSim.Services.Connectors
             sendData["METHOD"] = "verify";
 
             string reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                    m_ServerURI + "/auth/plain",
-                    ServerUtils.BuildQueryString(sendData), m_Auth);
+                    _serverURI + "/auth/plain",
+                    ServerUtils.BuildQueryString(sendData), _auth);
 
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(
-                    reply);
+            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
 
             if (replyData["Result"].ToString() != "Success")
                 return false;
@@ -145,8 +113,8 @@ namespace OpenSim.Services.Connectors
             sendData["METHOD"] = "release";
 
             string reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                    m_ServerURI + "/auth/plain",
-                    ServerUtils.BuildQueryString(sendData), m_Auth);
+                    _serverURI + "/auth/plain",
+                    ServerUtils.BuildQueryString(sendData), _auth);
 
             Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
 

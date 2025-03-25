@@ -25,40 +25,44 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using Nini.Config;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Server.Handlers.Grid
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+using Autofac;
+
+namespace OpenSim.Server.Handlers.Grid;
+
+public class GridServiceConnector(
+    IConfiguration config,
+    ILogger<GridServiceConnector> logger,
+    IComponentContext componentContext)
+    : IServiceConnector
 {
-    public class GridServiceConnector : ServiceConnector
+    public string ConfigName { get; private set; }
+    public IHttpServer HttpServer { get; private set; }
+
+    public void Initialize(IHttpServer httpServer, string configName = "GridService")
     {
-        private IGridService m_GridService;
-        private string m_ConfigName = "GridService";
+        HttpServer = httpServer;
+        ConfigName = configName;
 
-        public GridServiceConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
-        {
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
+        var serverConfig = config.GetSection(ConfigName);
+        if (serverConfig.Exists() is false)
+            throw new Exception($"No section {ConfigName} in config file");
 
-            string gridService = serverConfig.GetString("LocalServiceModule",
-                    String.Empty);
+        var gridServiceName = serverConfig.GetValue("LocalServiceModule", String.Empty);
+        if (string.IsNullOrEmpty(gridServiceName))
+            throw new Exception("No LocalServiceModule in config file");
 
-            if (gridService.Length == 0)
-                throw new Exception("No LocalServiceModule in config file");
+        var gridService = componentContext.ResolveNamed<IGridService>(gridServiceName);
+        var auth = ServiceAuth.Create(config, ConfigName);
 
-            Object[] args = new Object[] { config };
-            m_GridService = ServerUtils.LoadPlugin<IGridService>(gridService, args);
-
-            IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
-
-            server.AddStreamHandler(new GridServerPostHandler(m_GridService, auth));
-        }
+        HttpServer.AddStreamHandler(new GridServerPostHandler(logger, gridService, auth));
     }
 }
+

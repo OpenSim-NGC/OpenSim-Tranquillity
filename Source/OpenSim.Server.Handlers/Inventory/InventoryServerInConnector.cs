@@ -25,316 +25,309 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Net;
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using Nwc.XmlRpc;
-using OpenSim.Server.Base;
+
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
+
 using OpenMetaverse;
 
-namespace OpenSim.Server.Handlers.Inventory
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Autofac;
+
+namespace OpenSim.Server.Handlers.Inventory;
+
+public class InventoryServiceInConnector(
+    IConfiguration config,
+    ILogger<InventoryServiceInConnector> logger,
+    IComponentContext componentContext)
+    : IServiceConnector
 {
-    public class InventoryServiceInConnector : ServiceConnector
+    protected IInventoryService m_InventoryService;
+
+    private bool m_doLookup = false;
+
+    //private static readonly int INVENTORY_DEFAULT_SESSION_TIME = 30; // secs
+    //private AuthedSessionCache m_session_cache = new AuthedSessionCache(INVENTORY_DEFAULT_SESSION_TIME);
+
+    private string m_userserver_url;
+    public string ConfigName { get; private set; }
+    public IHttpServer HttpServer { get; private set; }
+
+    public void Initialize(IHttpServer httpServer, string configName = "InventoryService")
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        HttpServer = httpServer;
+        ConfigName = configName;
 
-        protected IInventoryService m_InventoryService;
+        var serverConfig = config.GetSection(ConfigName);
+        if (serverConfig.Exists() is false)
+            throw new Exception($"No section '{ConfigName}' in config file");
 
-        private bool m_doLookup = false;
+        string inventoryServiceName = serverConfig.GetValue("LocalServiceModule", String.Empty);
+        if (string.IsNullOrEmpty(inventoryServiceName))
+            throw new Exception("No LocalServiceModule in config file");
 
-        //private static readonly int INVENTORY_DEFAULT_SESSION_TIME = 30; // secs
-        //private AuthedSessionCache m_session_cache = new AuthedSessionCache(INVENTORY_DEFAULT_SESSION_TIME);
+        m_InventoryService = componentContext.ResolveNamed<IInventoryService>(inventoryServiceName);
 
-        private string m_userserver_url;
-        protected string m_ConfigName = "InventoryService";
+        m_userserver_url = serverConfig.GetValue("UserServerURI", String.Empty);
+        m_doLookup = serverConfig.GetValue<bool>("SessionAuthentication", false);
+        AddHttpHandlers();
+        logger.LogDebug("Handlers initialized");
+    }
 
-        public InventoryServiceInConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
+    protected virtual void AddHttpHandlers()
+    {
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<Guid, List<InventoryFolderBase>>(
+            "POST", "/SystemFolders/", GetSystemFolders, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<Guid, InventoryCollection>(
+            "POST", "/GetFolderContent/", GetFolderContent, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<InventoryFolderBase, bool>(
+                "POST", "/UpdateFolder/", m_InventoryService.UpdateFolder, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<InventoryFolderBase, bool>(
+                "POST", "/MoveFolder/", m_InventoryService.MoveFolder, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<InventoryFolderBase, bool>(
+                "POST", "/PurgeFolder/", m_InventoryService.PurgeFolder, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<List<Guid>, bool>(
+                "POST", "/DeleteFolders/", DeleteFolders, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<List<Guid>, bool>(
+                "POST", "/DeleteItem/", DeleteItems, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<Guid, InventoryItemBase>(
+                "POST", "/QueryItem/", GetItem, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<Guid, InventoryFolderBase>(
+                "POST", "/QueryFolder/", GetFolder, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseTrustedHandler<Guid, bool>(
+                "POST", "/CreateInventory/", CreateUsersInventory, CheckTrustSource));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<InventoryFolderBase, bool>(
+                "POST", "/NewFolder/", m_InventoryService.AddFolder, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<InventoryFolderBase, bool>(
+                "POST", "/CreateFolder/", m_InventoryService.AddFolder, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<InventoryItemBase, bool>(
+                "POST", "/NewItem/", m_InventoryService.AddItem, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+         new RestDeserialiseTrustedHandler<InventoryItemBase, bool>(
+             "POST", "/AddNewItem/", m_InventoryService.AddItem, CheckTrustSource));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<Guid, List<InventoryItemBase>>(
+                "POST", "/GetItems/", GetFolderItems, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseSecureHandler<List<InventoryItemBase>, bool>(
+                "POST", "/MoveItems/", MoveItems, CheckAuthSession));
+
+        HttpServer.AddStreamHandler(new InventoryServerMoveItemsHandler(logger, m_InventoryService));
+
+        // for persistent active gestures
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseTrustedHandler<Guid, List<InventoryItemBase>>
+                ("POST", "/ActiveGestures/", GetActiveGestures, CheckTrustSource));
+
+        // WARNING: Root folders no longer just delivers the root and immediate child folders (e.g
+        // system folders such as Objects, Textures), but it now returns the entire inventory skeleton.
+        // It would have been better to rename this request, but complexities in the BaseHttpServer
+        // (e.g. any http request not found is automatically treated as an xmlrpc request) make it easier
+        // to do this for now.
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseTrustedHandler<Guid, List<InventoryFolderBase>>
+                ("POST", "/RootFolders/", GetInventorySkeleton, CheckTrustSource));
+
+        HttpServer.AddStreamHandler(
+            new RestDeserialiseTrustedHandler<InventoryItemBase, int>
+            ("POST", "/AssetPermissions/", GetAssetPermissions, CheckTrustSource));
+
+    }
+
+    #region Wrappers for converting the Guid parameter
+
+    public List<InventoryFolderBase> GetSystemFolders(Guid guid)
+    {
+        UUID userID = new UUID(guid);
+        return new List<InventoryFolderBase>(GetSystemFolders(userID).Values);
+    }
+
+    // This shouldn't be here, it should be in the inventory service.
+    // But I don't want to deal with types and dependencies for now.
+    private Dictionary<AssetType, InventoryFolderBase> GetSystemFolders(UUID userID)
+    {
+        InventoryFolderBase root = m_InventoryService.GetRootFolder(userID);
+        if (root != null)
         {
-            if (configName != string.Empty)
-                m_ConfigName = configName;
-
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section '{0}' in config file", m_ConfigName));
-
-            string inventoryService = serverConfig.GetString("LocalServiceModule",
-                    String.Empty);
-
-            if (inventoryService.Length == 0)
-                throw new Exception("No LocalServiceModule in config file");
-
-            Object[] args = new Object[] { config };
-            m_InventoryService =
-                    ServerUtils.LoadPlugin<IInventoryService>(inventoryService, args);
-
-            m_userserver_url = serverConfig.GetString("UserServerURI", String.Empty);
-            m_doLookup = serverConfig.GetBoolean("SessionAuthentication", false);
-
-            AddHttpHandlers(server);
-            m_log.Debug("[INVENTORY HANDLER]: handlers initialized");
-        }
-
-        protected virtual void AddHttpHandlers(IHttpServer m_httpServer)
-        {
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<Guid, List<InventoryFolderBase>>(
-                "POST", "/SystemFolders/", GetSystemFolders, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<Guid, InventoryCollection>(
-                "POST", "/GetFolderContent/", GetFolderContent, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<InventoryFolderBase, bool>(
-                    "POST", "/UpdateFolder/", m_InventoryService.UpdateFolder, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<InventoryFolderBase, bool>(
-                    "POST", "/MoveFolder/", m_InventoryService.MoveFolder, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<InventoryFolderBase, bool>(
-                    "POST", "/PurgeFolder/", m_InventoryService.PurgeFolder, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<List<Guid>, bool>(
-                    "POST", "/DeleteFolders/", DeleteFolders, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<List<Guid>, bool>(
-                    "POST", "/DeleteItem/", DeleteItems, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<Guid, InventoryItemBase>(
-                    "POST", "/QueryItem/", GetItem, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<Guid, InventoryFolderBase>(
-                    "POST", "/QueryFolder/", GetFolder, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseTrustedHandler<Guid, bool>(
-                    "POST", "/CreateInventory/", CreateUsersInventory, CheckTrustSource));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<InventoryFolderBase, bool>(
-                    "POST", "/NewFolder/", m_InventoryService.AddFolder, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<InventoryFolderBase, bool>(
-                    "POST", "/CreateFolder/", m_InventoryService.AddFolder, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<InventoryItemBase, bool>(
-                    "POST", "/NewItem/", m_InventoryService.AddItem, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-             new RestDeserialiseTrustedHandler<InventoryItemBase, bool>(
-                 "POST", "/AddNewItem/", m_InventoryService.AddItem, CheckTrustSource));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<Guid, List<InventoryItemBase>>(
-                    "POST", "/GetItems/", GetFolderItems, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseSecureHandler<List<InventoryItemBase>, bool>(
-                    "POST", "/MoveItems/", MoveItems, CheckAuthSession));
-
-            m_httpServer.AddStreamHandler(new InventoryServerMoveItemsHandler(m_InventoryService));
-
-
-            // for persistent active gestures
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseTrustedHandler<Guid, List<InventoryItemBase>>
-                    ("POST", "/ActiveGestures/", GetActiveGestures, CheckTrustSource));
-
-            // WARNING: Root folders no longer just delivers the root and immediate child folders (e.g
-            // system folders such as Objects, Textures), but it now returns the entire inventory skeleton.
-            // It would have been better to rename this request, but complexities in the BaseHttpServer
-            // (e.g. any http request not found is automatically treated as an xmlrpc request) make it easier
-            // to do this for now.
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseTrustedHandler<Guid, List<InventoryFolderBase>>
-                    ("POST", "/RootFolders/", GetInventorySkeleton, CheckTrustSource));
-
-            m_httpServer.AddStreamHandler(
-                new RestDeserialiseTrustedHandler<InventoryItemBase, int>
-                ("POST", "/AssetPermissions/", GetAssetPermissions, CheckTrustSource));
-
-        }
-
-        #region Wrappers for converting the Guid parameter
-
-        public List<InventoryFolderBase> GetSystemFolders(Guid guid)
-        {
-            UUID userID = new UUID(guid);
-            return new List<InventoryFolderBase>(GetSystemFolders(userID).Values);
-        }
-
-        // This shouldn't be here, it should be in the inventory service.
-        // But I don't want to deal with types and dependencies for now.
-        private Dictionary<AssetType, InventoryFolderBase> GetSystemFolders(UUID userID)
-        {
-            InventoryFolderBase root = m_InventoryService.GetRootFolder(userID);
-            if (root != null)
+            InventoryCollection content = m_InventoryService.GetFolderContent(userID, root.ID);
+            if (content != null)
             {
-                InventoryCollection content = m_InventoryService.GetFolderContent(userID, root.ID);
-                if (content != null)
+                Dictionary<AssetType, InventoryFolderBase> folders = new Dictionary<AssetType, InventoryFolderBase>();
+                foreach (InventoryFolderBase folder in content.Folders)
                 {
-                    Dictionary<AssetType, InventoryFolderBase> folders = new Dictionary<AssetType, InventoryFolderBase>();
-                    foreach (InventoryFolderBase folder in content.Folders)
-                    {
-                        if ((folder.Type != (short)AssetType.Folder) && (folder.Type != (short)AssetType.Unknown))
-                            folders[(AssetType)folder.Type] = folder;
-                    }
-                    // Put the root folder there, as type Folder
-                    folders[AssetType.Folder] = root;
-                    return folders;
+                    if ((folder.Type != (short)AssetType.Folder) && (folder.Type != (short)AssetType.Unknown))
+                        folders[(AssetType)folder.Type] = folder;
+                }
+                // Put the root folder there, as type Folder
+                folders[AssetType.Folder] = root;
+                return folders;
+            }
+        }
+
+        logger.LogWarning($"System folders for {userID} not found");
+        return new Dictionary<AssetType, InventoryFolderBase>();
+    }
+
+    public InventoryItemBase GetItem(Guid guid)
+    {
+        return m_InventoryService.GetItem(UUID.Zero, new UUID(guid));
+    }
+
+    public InventoryFolderBase GetFolder(Guid guid)
+    {
+        return m_InventoryService.GetFolder(UUID.Zero, new UUID(guid));
+    }
+
+    public InventoryCollection GetFolderContent(Guid guid)
+    {
+        return m_InventoryService.GetFolderContent(UUID.Zero, new UUID(guid));
+    }
+
+    public List<InventoryItemBase> GetFolderItems(Guid folderID)
+    {
+        List<InventoryItemBase> allItems = new List<InventoryItemBase>();
+
+        // TODO: UUID.Zero is passed as the userID here, making the old assumption that the OpenSim
+        // inventory server only has a single inventory database and not per-user inventory databases.
+        // This could be changed but it requirs a bit of hackery to pass another parameter into this
+        // callback
+        List<InventoryItemBase> items = m_InventoryService.GetFolderItems(UUID.Zero, new UUID(folderID));
+
+        if (items != null)
+        {
+            allItems.InsertRange(0, items);
+        }
+        return allItems;
+    }
+
+    public bool CreateUsersInventory(Guid rawUserID)
+    {
+        UUID userID = new UUID(rawUserID);
+
+
+        return m_InventoryService.CreateUserInventory(userID);
+    }
+
+    public List<InventoryItemBase> GetActiveGestures(Guid rawUserID)
+    {
+        UUID userID = new UUID(rawUserID);
+
+        return m_InventoryService.GetActiveGestures(userID);
+    }
+
+    public List<InventoryFolderBase> GetInventorySkeleton(Guid rawUserID)
+    {
+        UUID userID = new UUID(rawUserID);
+        return m_InventoryService.GetInventorySkeleton(userID);
+    }
+
+    public int GetAssetPermissions(InventoryItemBase item)
+    {
+        return m_InventoryService.GetAssetPermissions(item.Owner, item.AssetID);
+    }
+
+    public bool DeleteFolders(List<Guid> items)
+    {
+        List<UUID> uuids = new List<UUID>();
+        foreach (Guid g in items)
+            uuids.Add(new UUID(g));
+        // oops we lost the user info here. Bad bad handlers
+        return m_InventoryService.DeleteFolders(UUID.Zero, uuids);
+    }
+
+    public bool DeleteItems(List<Guid> items)
+    {
+        List<UUID> uuids = new List<UUID>();
+        foreach (Guid g in items)
+            uuids.Add(new UUID(g));
+        // oops we lost the user info here. Bad bad handlers
+        return m_InventoryService.DeleteItems(UUID.Zero, uuids);
+    }
+
+    public bool MoveItems(List<InventoryItemBase> items)
+    {
+        // oops we lost the user info here. Bad bad handlers
+        // let's peek at one item
+        UUID ownerID = UUID.Zero;
+        if (items.Count > 0)
+            ownerID = items[0].Owner;
+        return m_InventoryService.MoveItems(ownerID, items);
+    }
+    #endregion
+
+    /// <summary>
+    /// Check that the source of an inventory request is one that we trust.
+    /// </summary>
+    /// <param name="peer"></param>
+    /// <returns></returns>
+    public bool CheckTrustSource(IPEndPoint peer)
+    {
+        if (m_doLookup)
+        {
+            logger.LogInformation($"Checking trusted source {peer}");
+
+            UriBuilder ub = new UriBuilder(m_userserver_url);
+            IPAddress[] uaddrs = Dns.GetHostAddresses(ub.Host);
+            foreach (IPAddress uaddr in uaddrs)
+            {
+                if (uaddr.Equals(peer.Address))
+                {
+                    return true;
                 }
             }
-            m_log.WarnFormat("[INVENTORY SERVICE]: System folders for {0} not found", userID);
-            return new Dictionary<AssetType, InventoryFolderBase>();
+
+            logger.LogWarning($"Rejecting request since source {peer} was not in the list of trusted sources");
+            
+            return false;
         }
-
-        public InventoryItemBase GetItem(Guid guid)
-        {
-            return m_InventoryService.GetItem(UUID.Zero, new UUID(guid));
-        }
-
-        public InventoryFolderBase GetFolder(Guid guid)
-        {
-            return m_InventoryService.GetFolder(UUID.Zero, new UUID(guid));
-        }
-
-        public InventoryCollection GetFolderContent(Guid guid)
-        {
-            return m_InventoryService.GetFolderContent(UUID.Zero, new UUID(guid));
-        }
-
-        public List<InventoryItemBase> GetFolderItems(Guid folderID)
-        {
-            List<InventoryItemBase> allItems = new List<InventoryItemBase>();
-
-            // TODO: UUID.Zero is passed as the userID here, making the old assumption that the OpenSim
-            // inventory server only has a single inventory database and not per-user inventory databases.
-            // This could be changed but it requirs a bit of hackery to pass another parameter into this
-            // callback
-            List<InventoryItemBase> items = m_InventoryService.GetFolderItems(UUID.Zero, new UUID(folderID));
-
-            if (items != null)
-            {
-                allItems.InsertRange(0, items);
-            }
-            return allItems;
-        }
-
-        public bool CreateUsersInventory(Guid rawUserID)
-        {
-            UUID userID = new UUID(rawUserID);
-
-
-            return m_InventoryService.CreateUserInventory(userID);
-        }
-
-        public List<InventoryItemBase> GetActiveGestures(Guid rawUserID)
-        {
-            UUID userID = new UUID(rawUserID);
-
-            return m_InventoryService.GetActiveGestures(userID);
-        }
-
-        public List<InventoryFolderBase> GetInventorySkeleton(Guid rawUserID)
-        {
-            UUID userID = new UUID(rawUserID);
-            return m_InventoryService.GetInventorySkeleton(userID);
-        }
-
-        public int GetAssetPermissions(InventoryItemBase item)
-        {
-            return m_InventoryService.GetAssetPermissions(item.Owner, item.AssetID);
-        }
-
-        public bool DeleteFolders(List<Guid> items)
-        {
-            List<UUID> uuids = new List<UUID>();
-            foreach (Guid g in items)
-                uuids.Add(new UUID(g));
-            // oops we lost the user info here. Bad bad handlers
-            return m_InventoryService.DeleteFolders(UUID.Zero, uuids);
-        }
-
-        public bool DeleteItems(List<Guid> items)
-        {
-            List<UUID> uuids = new List<UUID>();
-            foreach (Guid g in items)
-                uuids.Add(new UUID(g));
-            // oops we lost the user info here. Bad bad handlers
-            return m_InventoryService.DeleteItems(UUID.Zero, uuids);
-        }
-
-        public bool MoveItems(List<InventoryItemBase> items)
-        {
-            // oops we lost the user info here. Bad bad handlers
-            // let's peek at one item
-            UUID ownerID = UUID.Zero;
-            if (items.Count > 0)
-                ownerID = items[0].Owner;
-            return m_InventoryService.MoveItems(ownerID, items);
-        }
-        #endregion
-
-        /// <summary>
-        /// Check that the source of an inventory request is one that we trust.
-        /// </summary>
-        /// <param name="peer"></param>
-        /// <returns></returns>
-        public bool CheckTrustSource(IPEndPoint peer)
-        {
-            if (m_doLookup)
-            {
-                m_log.InfoFormat("[INVENTORY IN CONNECTOR]: Checking trusted source {0}", peer);
-                UriBuilder ub = new UriBuilder(m_userserver_url);
-                IPAddress[] uaddrs = Dns.GetHostAddresses(ub.Host);
-                foreach (IPAddress uaddr in uaddrs)
-                {
-                    if (uaddr.Equals(peer.Address))
-                    {
-                        return true;
-                    }
-                }
-
-                m_log.WarnFormat(
-                    "[INVENTORY IN CONNECTOR]: Rejecting request since source {0} was not in the list of trusted sources",
-                    peer);
-
-                return false;
-            }
-            else
-            {
-                return true;
-            }
-        }
-
-        /// <summary>
-        /// Check that the source of an inventory request for a particular agent is a current session belonging to
-        /// that agent.
-        /// </summary>
-        /// <param name="session_id"></param>
-        /// <param name="avatar_id"></param>
-        /// <returns></returns>
-        public virtual bool CheckAuthSession(string session_id, string avatar_id)
+        else
         {
             return true;
         }
+    }
 
+    /// <summary>
+    /// Check that the source of an inventory request for a particular agent is a current session belonging to
+    /// that agent.
+    /// </summary>
+    /// <param name="session_id"></param>
+    /// <param name="avatar_id"></param>
+    /// <returns></returns>
+    public virtual bool CheckAuthSession(string session_id, string avatar_id)
+    {
+        return true;
     }
 }
+

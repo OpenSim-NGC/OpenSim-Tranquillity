@@ -25,17 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
+
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
@@ -43,38 +34,52 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Authentication
 {
     public class AuthenticationServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger _logger;
+        private readonly IConfiguration _configuration;
 
-        private IAuthenticationService m_AuthenticationService;
+        private readonly IAuthenticationService m_AuthenticationService;
 
         private bool m_AllowGetAuthInfo = false;
         private bool m_AllowSetAuthInfo = false;
         private bool m_AllowSetPassword = false;
 
-        public AuthenticationServerPostHandler(IAuthenticationService service) :
-                this(service, null, null) {}
+        public AuthenticationServerPostHandler(
+            IConfiguration config,
+            ILogger logger,
+            IAuthenticationService service) :
+            this(config, logger, service, null) 
+        { }
 
-        public AuthenticationServerPostHandler(IAuthenticationService service, IConfig config, IServiceAuth auth) :
-                base("POST", "/auth", auth)
+        public AuthenticationServerPostHandler(
+            IConfiguration config, 
+            ILogger logger, 
+            IAuthenticationService service, 
+            IServiceAuth auth) :
+            base("POST", "/auth", auth)
         {
+            _configuration = config;
+            _logger = logger;
+
             m_AuthenticationService = service;
 
             if (config != null)
             {
-                m_AllowGetAuthInfo = config.GetBoolean("AllowGetAuthInfo", m_AllowGetAuthInfo);
-                m_AllowSetAuthInfo = config.GetBoolean("AllowSetAuthInfo", m_AllowSetAuthInfo);
-                m_AllowSetPassword = config.GetBoolean("AllowSetPassword", m_AllowSetPassword);
+                m_AllowGetAuthInfo = config.GetValue<bool>("AllowGetAuthInfo", m_AllowGetAuthInfo);
+                m_AllowSetAuthInfo = config.GetValue<bool>("AllowSetAuthInfo", m_AllowSetAuthInfo);
+                m_AllowSetPassword = config.GetValue<bool>("AllowSetPassword", m_AllowSetPassword);
             }
         }
 
         protected override byte[] ProcessRequest(string path, Stream request,
                 IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
-//            m_log.Error("[XXX]: Authenticating...");
             string[] p = SplitParams(path);
 
             if (p.Length > 0)
@@ -194,13 +199,11 @@ namespace OpenSim.Server.Handlers.Authentication
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
             doc.AppendChild(rootElement);
 
@@ -250,10 +253,6 @@ namespace OpenSim.Server.Handlers.Authentication
 
             if (!m_AuthenticationService.SetAuthInfo(existingInfo))
             {
-                m_log.ErrorFormat(
-                    "[AUTHENTICATION SERVER POST HANDLER]: Authentication info store failed for account {0} {1} {2}",
-                    existingInfo.PrincipalID);
-
                 return FailureResult();
             }
 
@@ -264,13 +263,11 @@ namespace OpenSim.Server.Handlers.Authentication
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
             doc.AppendChild(rootElement);
 
@@ -286,13 +283,11 @@ namespace OpenSim.Server.Handlers.Authentication
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse",  "");
 
             doc.AppendChild(rootElement);
 

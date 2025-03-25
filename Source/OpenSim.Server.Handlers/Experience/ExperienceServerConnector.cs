@@ -1,36 +1,39 @@
-using System;
-using Nini.Config;
-using OpenSim.Server.Base;
+using Autofac;
+
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
+using OpenSim.Server.Handlers.Estate;
 
-namespace OpenSim.Server.Handlers.Experience
+namespace OpenSim.Server.Handlers.Experience;
+
+public class ExperienceServiceConnector(
+    IConfiguration config,
+    ILogger<EstateDataRobustConnector> logger,
+    IComponentContext componentContext)
+    : IServiceConnector
 {
-    public class ExperienceServiceConnector : ServiceConnector
+    public IHttpServer HttpServer { get; private set; }
+    public string ConfigName { get; private set; }
+
+    public void Initialize(IHttpServer httpServer, string configName = "ExperienceService")
     {
-        private IExperienceService m_ExperienceService;
-        private string m_ConfigName = "ExperienceService";
+        HttpServer = httpServer;
+        ConfigName = configName;
 
-        public ExperienceServiceConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
-        {
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
+        var serverConfig = config.GetSection(ConfigName);
+        if (serverConfig.Exists() is false)
+            throw new Exception($"No section {ConfigName} in config file");
 
-            string service = serverConfig.GetString("LocalServiceModule", String.Empty);
-
-            if (service == String.Empty)
-                throw new Exception("LocalServiceModule not present in ExperienceService config file ExperienceService section");
-
-            Object[] args = new Object[] { config };
-            m_ExperienceService = ServerUtils.LoadPlugin<IExperienceService>(service, args);
-
-            IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
-
-            server.AddStreamHandler(new ExperienceServerPostHandler(m_ExperienceService, auth));
-        }
+        var serviceName = serverConfig.GetValue("LocalServiceModule", string.Empty);
+        if (string.IsNullOrWhiteSpace(serviceName))
+            throw new Exception("No LocalServiceModule in config file");
+        
+        var experienceService = componentContext.ResolveNamed<IExperienceService>(serviceName);
+        IServiceAuth auth = ServiceAuth.Create(config, ConfigName);
+        HttpServer.AddStreamHandler(new ExperienceServerPostHandler(experienceService, auth));
     }
 }

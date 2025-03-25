@@ -25,17 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
@@ -43,17 +33,22 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Presence
 {
     public class PresenceServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        private readonly ILogger m_logger;
         private IPresenceService m_PresenceService;
 
-        public PresenceServerPostHandler(IPresenceService service, IServiceAuth auth) :
-                base("POST", "/presence", auth)
+        public PresenceServerPostHandler(
+            ILogger logger, 
+            IPresenceService service, 
+            IServiceAuth auth) :
+            base("POST", "/presence", auth)
         {
+            m_logger = logger;
             m_PresenceService = service;
         }
 
@@ -67,26 +62,21 @@ namespace OpenSim.Server.Handlers.Presence
 
             //m_log.DebugFormat("[XXX]: query String: {0}", body);
             string method = string.Empty;
+
             try
             {
-                Dictionary<string, object> request = ServerUtils.ParseQueryString(body);
+                Dictionary<string, object> request =
+                        ServerUtils.ParseQueryString(body);
 
-                if (!request.TryGetValue("METHOD", out object tmpobj) || tmpobj is not string)
+                if (!request.ContainsKey("METHOD"))
                     return FailureResult();
 
-                method = (string)tmpobj;
+                method = request["METHOD"].ToString();
+
                 switch (method)
                 {
                     case "login":
-                        {
-                            //return LoginAgent(request); this is ilegal
-                            if (request.TryGetValue("UserID", out object uo) && uo is string user)
-                                m_log.Debug($"[PRESENCE HANDLER]: ilegal login try from {httpRequest.RemoteIPEndPoint} for userID {user}");
-                            else
-                                m_log.Debug($"[PRESENCE HANDLER]: ilegal login try from {httpRequest.RemoteIPEndPoint} for unkown user");
-
-                            return FailureResult();
-                        }
+                        return LoginAgent(request);
                     case "logout":
                         return LogoutAgent(request);
                     case "logoutregion":
@@ -98,11 +88,13 @@ namespace OpenSim.Server.Handlers.Presence
                     case "getagents":
                         return GetAgents(request);
                 }
-                m_log.Debug($"[PRESENCE HANDLER]: unknown method request: {method}");
+
+                m_logger.LogDebug($"[PRESENCE HANDLER]: unknown method request: {method}");
             }
+
             catch (Exception e)
             {
-                m_log.Debug($"[PRESENCE HANDLER]: Exception in method {method}: {e.Message}");
+                m_logger.LogDebug(e, $"[PRESENCE HANDLER]: Exception in method {method}");
             }
 
             return FailureResult();
@@ -218,13 +210,13 @@ namespace OpenSim.Server.Handlers.Presence
 
             if (!request.ContainsKey("uuids"))
             {
-                m_log.DebugFormat("[PRESENCE HANDLER]: GetAgents called without required uuids argument");
+                m_logger.LogDebug($"[PRESENCE HANDLER]: GetAgents called without required uuids argument");
                 return FailureResult();
             }
 
             if (!(request["uuids"] is List<string>))
             {
-                m_log.DebugFormat("[PRESENCE HANDLER]: GetAgents input argument was of unexpected type {0}", request["uuids"].GetType().ToString());
+                m_logger.LogDebug($"[PRESENCE HANDLER]: GetAgents input argument was of unexpected type {request["uuids"].GetType()}");
                 return FailureResult();
             }
 
@@ -256,13 +248,11 @@ namespace OpenSim.Server.Handlers.Presence
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
             doc.AppendChild(rootElement);
 
@@ -278,13 +268,11 @@ namespace OpenSim.Server.Handlers.Presence
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
             doc.AppendChild(rootElement);
 

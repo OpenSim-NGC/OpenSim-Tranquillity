@@ -24,318 +24,315 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
+
 using System.Net;
-
-using Nini.Config;
-using log4net;
+using Autofac;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
-
-using OpenSim.Server.Base;
-using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
-using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Framework.ServiceAuth;
+using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
+using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Server.Handlers
-{
-    public class EstateDataRobustConnector : ServiceConnector
+namespace OpenSim.Server.Handlers.Estate;
+
+public class EstateDataRobustConnector(
+    IConfiguration config,
+    ILogger<EstateDataRobustConnector> logger,
+    IComponentContext componentContext)
+    : IServiceConnector
+{  
+    public string ConfigName { get; private set; }
+    public IHttpServer HttpServer { get; private set; }
+    
+    public void Initialize(IHttpServer httpServer, string configName = "EstateService")
     {
-        private string m_ConfigName = "EstateService";
+        HttpServer = httpServer;
+        ConfigName = configName;
 
-        public EstateDataRobustConnector(IConfigSource config, IHttpServer server, string configName) :
-            base(config, server, configName)
-        {
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
+        var serverConfig = config.GetSection(ConfigName);
+        if (serverConfig.Exists() is false)
+            throw new Exception($"No section {ConfigName} in config file");
 
-            string service = serverConfig.GetString("LocalServiceModule",
-                    String.Empty);
+        var serviceName = serverConfig.GetValue("LocalServiceModule", string.Empty);
+        if (string.IsNullOrWhiteSpace(serviceName))
+            throw new Exception("No LocalServiceModule in config file");
 
-            if (service.Length == 0)
-                throw new Exception("No LocalServiceModule in config file");
+        var eService = componentContext.ResolveNamed<IEstateDataService>(serviceName);
 
-            Object[] args = new Object[] { config };
-            IEstateDataService e_service = ServerUtils.LoadPlugin<IEstateDataService>(service, args);
+        IServiceAuth auth = ServiceAuth.Create(config, ConfigName);
 
-            IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
+        HttpServer.AddStreamHandler(new EstateServerGetHandler(eService, auth));
+        HttpServer.AddStreamHandler(new EstateServerPostHandler(eService, auth));
+    }
+}
 
-            server.AddStreamHandler(new EstateServerGetHandler(e_service, auth));
-            server.AddStreamHandler(new EstateServerPostHandler(e_service, auth));
-        }
+public class EstateServerGetHandler : BaseStreamHandler
+{
+    IEstateDataService m_EstateService;
+
+    // Possibilities
+    // /estates/estate/?region=uuid&create=[t|f]
+    // /estates/estate/?eid=int
+    // /estates/?name=string
+    // /estates/?owner=uuid
+    // /estates/  (all)
+    // /estates/regions/?eid=int
+
+    public EstateServerGetHandler(IEstateDataService service, IServiceAuth auth) :
+        base("GET", "/estates", auth)
+    {
+        m_EstateService = service;
     }
 
-
-    public class EstateServerGetHandler : BaseStreamHandler
+    protected override byte[] ProcessRequest(string path, Stream request,
+            IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        Dictionary<string, object> data = null;
 
-        IEstateDataService m_EstateService;
+        string[] p = SplitParams(path);
 
-        // Possibilities
-        // /estates/estate/?region=uuid&create=[t|f]
-        // /estates/estate/?eid=int
+        // /estates/  (all)
         // /estates/?name=string
         // /estates/?owner=uuid
-        // /estates/  (all)
-        // /estates/regions/?eid=int
-
-        public EstateServerGetHandler(IEstateDataService service, IServiceAuth auth) :
-            base("GET", "/estates", auth)
+        if (p.Length == 0)
+            data = GetEstates(httpRequest, httpResponse);
+        else
         {
-            m_EstateService = service;
-        }
+            string resource = p[0];
 
-        protected override byte[] ProcessRequest(string path, Stream request,
-                IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            Dictionary<string, object> data = null;
-
-            string[] p = SplitParams(path);
-
-            // /estates/  (all)
-            // /estates/?name=string
-            // /estates/?owner=uuid
-            if (p.Length == 0)
-                data = GetEstates(httpRequest, httpResponse);
-            else
-            {
-                string resource = p[0];
-
-                // /estates/estate/?region=uuid&create=[t|f]
-                // /estates/estate/?eid=int
-                if ("estate".Equals(resource))
-                    data = GetEstate(httpRequest, httpResponse);
-                // /estates/regions/?eid=int
-                else if ("regions".Equals(resource))
-                    data = GetRegions(httpRequest, httpResponse);
-            }
-
-            if (data == null)
-                data = new Dictionary<string, object>();
-
-            string xmlString = ServerUtils.BuildXmlResponse(data);
-            return Util.UTF8NoBomEncoding.GetBytes(xmlString);
-
-        }
-
-        private Dictionary<string, object> GetEstates(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            // /estates/  (all)
-            // /estates/?name=string
-            // /estates/?owner=uuid
-
-            Dictionary<string, object> data = null;
-            string name = (string)httpRequest.Query["name"];
-            string owner = (string)httpRequest.Query["owner"];
-
-            if (!string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(owner))
-            {
-                List<int> estateIDs = null;
-                if (!string.IsNullOrEmpty(name))
-                {
-                    estateIDs = m_EstateService.GetEstates(name);
-                }
-                else if (!string.IsNullOrEmpty(owner))
-                {
-                    UUID ownerID = UUID.Zero;
-                    if (UUID.TryParse(owner, out ownerID))
-                        estateIDs = m_EstateService.GetEstatesByOwner(ownerID);
-                }
-
-                if (estateIDs == null || (estateIDs != null && estateIDs.Count == 0))
-                    httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-                else
-                {
-                    httpResponse.StatusCode = (int)HttpStatusCode.OK;
-                    httpResponse.ContentType = "text/xml";
-                    data = new Dictionary<string, object>();
-                    int i = 0;
-                    foreach (int id in estateIDs)
-                        data["estate" + i++] = id;
-                }
-            }
-            else
-            {
-                List<EstateSettings> estates = m_EstateService.LoadEstateSettingsAll();
-                if (estates == null || estates.Count == 0)
-                {
-                    httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-                }
-                else
-                {
-                    httpResponse.StatusCode = (int)HttpStatusCode.OK;
-                    httpResponse.ContentType = "text/xml";
-                    data = new Dictionary<string, object>();
-                    int i = 0;
-                    foreach (EstateSettings es in estates)
-                        data["estate" + i++] = es.ToMap();
-
-                }
-            }
-
-            return data;
-        }
-
-        private Dictionary<string, object> GetEstate(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
             // /estates/estate/?region=uuid&create=[t|f]
             // /estates/estate/?eid=int
-            Dictionary<string, object> data = null;
-            string region = (string)httpRequest.Query["region"];
-            string eid = (string)httpRequest.Query["eid"];
+            if ("estate".Equals(resource))
+                data = GetEstate(httpRequest, httpResponse);
+            // /estates/regions/?eid=int
+            else if ("regions".Equals(resource))
+                data = GetRegions(httpRequest, httpResponse);
+        }
 
-            EstateSettings estate = null;
+        if (data == null)
+            data = new Dictionary<string, object>();
 
-            if (!string.IsNullOrEmpty(region))
+        string xmlString = ServerUtils.BuildXmlResponse(data);
+        return Util.UTF8NoBomEncoding.GetBytes(xmlString);
+
+    }
+
+    private Dictionary<string, object> GetEstates(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        // /estates/  (all)
+        // /estates/?name=string
+        // /estates/?owner=uuid
+
+        Dictionary<string, object> data = null;
+        string name = (string)httpRequest.Query["name"];
+        string owner = (string)httpRequest.Query["owner"];
+
+        if (!string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(owner))
+        {
+            List<int> estateIDs = null;
+            if (!string.IsNullOrEmpty(name))
             {
-                if (UUID.TryParse(region, out UUID regionID))
-                {
-                    string create = (string)httpRequest.Query["create"];
-                    bool.TryParse(create, out bool createYN);
-                    estate = m_EstateService.LoadEstateSettings(regionID, createYN);
-                }
+                estateIDs = m_EstateService.GetEstates(name);
             }
-            else if (!string.IsNullOrEmpty(eid))
+            else if (!string.IsNullOrEmpty(owner))
             {
-                if (int.TryParse(eid, out  int id))
-                    estate = m_EstateService.LoadEstateSettings(id);
+                UUID ownerID = UUID.Zero;
+                if (UUID.TryParse(owner, out ownerID))
+                    estateIDs = m_EstateService.GetEstatesByOwner(ownerID);
             }
 
-            if (estate != null)
+            if (estateIDs == null || (estateIDs != null && estateIDs.Count == 0))
+                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+            else
             {
                 httpResponse.StatusCode = (int)HttpStatusCode.OK;
                 httpResponse.ContentType = "text/xml";
-                data = estate.ToMap();
+                data = new Dictionary<string, object>();
+                int i = 0;
+                foreach (int id in estateIDs)
+                    data["estate" + i++] = id;
+            }
+        }
+        else
+        {
+            List<EstateSettings> estates = m_EstateService.LoadEstateSettingsAll();
+            if (estates == null || estates.Count == 0)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
             }
             else
-                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-
-            return data;
-        }
-
-        private Dictionary<string, object> GetRegions(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            // /estates/regions/?eid=int
-            Dictionary<string, object> data = null;
-            string eid = (string)httpRequest.Query["eid"];
-
-            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-            if (!string.IsNullOrEmpty(eid))
             {
-                int id = 0;
-                if (Int32.TryParse(eid, out id))
-                {
-                    List<UUID> regions = m_EstateService.GetRegions(id);
-                    if (regions != null && regions.Count > 0)
-                    {
-                        data = new Dictionary<string, object>();
-                        int i = 0;
-                        foreach (UUID uuid in regions)
-                            data["region" + i++] = uuid.ToString();
-                        httpResponse.StatusCode = (int)HttpStatusCode.OK;
-                        httpResponse.ContentType = "text/xml";
-                    }
-                }
-            }
+                httpResponse.StatusCode = (int)HttpStatusCode.OK;
+                httpResponse.ContentType = "text/xml";
+                data = new Dictionary<string, object>();
+                int i = 0;
+                foreach (EstateSettings es in estates)
+                    data["estate" + i++] = es.ToMap();
 
-            return data;
+            }
         }
+
+        return data;
     }
 
-    public class EstateServerPostHandler : BaseStreamHandler
+    private Dictionary<string, object> GetEstate(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        // /estates/estate/?region=uuid&create=[t|f]
+        // /estates/estate/?eid=int
+        Dictionary<string, object> data = null;
+        string region = (string)httpRequest.Query["region"];
+        string eid = (string)httpRequest.Query["eid"];
 
-        IEstateDataService m_EstateService;
+        EstateSettings estate = null;
 
-        // Possibilities
-        // /estates/estate/ (post an estate)
-        // /estates/estate/?eid=int&region=uuid (link a region to an estate)
-
-        public EstateServerPostHandler(IEstateDataService service, IServiceAuth auth) :
-            base("POST", "/estates", auth)
+        if (!string.IsNullOrEmpty(region))
         {
-            m_EstateService = service;
-        }
-
-        protected override byte[] ProcessRequest(string path, Stream request,
-                                                 IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            Dictionary<string, object> data = null;
-
-            string[] p = SplitParams(path);
-
-            if (p.Length > 0)
+            UUID regionID = UUID.Zero;
+            if (UUID.TryParse(region, out regionID))
             {
-                string resource = p[0];
-
-                // /estates/estate/
-                // /estates/estate/?eid=int&region=uuid
-                if ("estate".Equals(resource))
-                {
-                    string body;
-                    using(StreamReader sr = new StreamReader(request))
-                        body = sr.ReadToEnd();
-
-                    body = body.Trim();
-
-                    Dictionary<string, object> requestData = ServerUtils.ParseQueryString(body);
-
-                    data = UpdateEstate(requestData, httpRequest, httpResponse);
-                }
+                string create = (string)httpRequest.Query["create"];
+                bool createYN = false;
+                Boolean.TryParse(create, out createYN);
+                estate = m_EstateService.LoadEstateSettings(regionID, createYN);
             }
-
-            if (data == null)
-                data = new Dictionary<string, object>();
-
-            string xmlString = ServerUtils.BuildXmlResponse(data);
-            return Util.UTF8NoBomEncoding.GetBytes(xmlString);
-
+        }
+        else if (!string.IsNullOrEmpty(eid))
+        {
+            int id = 0;
+            if (Int32.TryParse(eid, out id))
+                estate = m_EstateService.LoadEstateSettings(id);
         }
 
-        private Dictionary<string, object> UpdateEstate(Dictionary<string, object> requestData, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        if (estate != null)
         {
-            // /estates/estate/
-            // /estates/estate/?eid=int&region=uuid
-            Dictionary<string, object> result = new Dictionary<string, object>();
-            string eid = (string)httpRequest.Query["eid"];
-            string region = (string)httpRequest.Query["region"];
-
+            httpResponse.StatusCode = (int)HttpStatusCode.OK;
+            httpResponse.ContentType = "text/xml";
+            data = estate.ToMap();
+        }
+        else
             httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
 
-            if (string.IsNullOrEmpty(eid) && string.IsNullOrEmpty(region) &&
-                requestData.ContainsKey("OP") && requestData["OP"] != null && "STORE".Equals(requestData["OP"]))
+        return data;
+    }
+
+    private Dictionary<string, object> GetRegions(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        // /estates/regions/?eid=int
+        Dictionary<string, object> data = null;
+        string eid = (string)httpRequest.Query["eid"];
+
+        httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+        if (!string.IsNullOrEmpty(eid))
+        {
+            int id = 0;
+            if (Int32.TryParse(eid, out id))
             {
-                // /estates/estate/
-                EstateSettings es = new EstateSettings(requestData);
-                m_EstateService.StoreEstateSettings(es);
-                //m_log.DebugFormat("[EstateServerPostHandler]: Store estate {0}", es.ToString());
-                httpResponse.StatusCode = (int)HttpStatusCode.OK;
-                result["Result"] = true;
-            }
-            else if (!string.IsNullOrEmpty(region) && !string.IsNullOrEmpty(eid) &&
-                requestData.ContainsKey("OP") && requestData["OP"] != null && "LINK".Equals(requestData["OP"]))
-            {
-                int id = 0;
-                UUID regionID = UUID.Zero;
-                if (UUID.TryParse(region, out regionID) && Int32.TryParse(eid, out id))
+                List<UUID> regions = m_EstateService.GetRegions(id);
+                if (regions != null && regions.Count > 0)
                 {
-                    m_log.DebugFormat("[EstateServerPostHandler]: Link region {0} to estate {1}", regionID, id);
+                    data = new Dictionary<string, object>();
+                    int i = 0;
+                    foreach (UUID uuid in regions)
+                        data["region" + i++] = uuid.ToString();
                     httpResponse.StatusCode = (int)HttpStatusCode.OK;
-                    result["Result"] = m_EstateService.LinkRegion(regionID, id);
+                    httpResponse.ContentType = "text/xml";
                 }
             }
-            else
-                m_log.WarnFormat("[EstateServerPostHandler]: something wrong with POST request {0}", httpRequest.RawUrl);
-
-            return result;
         }
 
+        return data;
+    }
+}
+
+public class EstateServerPostHandler : BaseStreamHandler
+{
+     IEstateDataService m_EstateService;
+
+    // Possibilities
+    // /estates/estate/ (post an estate)
+    // /estates/estate/?eid=int&region=uuid (link a region to an estate)
+
+    public EstateServerPostHandler(IEstateDataService service, IServiceAuth auth) :
+        base("POST", "/estates", auth)
+    {
+        m_EstateService = service;
+    }
+
+    protected override byte[] ProcessRequest(string path, Stream request,
+                                             IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        Dictionary<string, object> data = null;
+
+        string[] p = SplitParams(path);
+
+        if (p.Length > 0)
+        {
+            string resource = p[0];
+
+            // /estates/estate/
+            // /estates/estate/?eid=int&region=uuid
+            if ("estate".Equals(resource))
+            {
+                string body;
+                using(StreamReader sr = new StreamReader(request))
+                    body = sr.ReadToEnd();
+
+                body = body.Trim();
+
+                Dictionary<string, object> requestData = ServerUtils.ParseQueryString(body);
+
+                data = UpdateEstate(requestData, httpRequest, httpResponse);
+            }
+        }
+
+        if (data == null)
+            data = new Dictionary<string, object>();
+
+        string xmlString = ServerUtils.BuildXmlResponse(data);
+        return Util.UTF8NoBomEncoding.GetBytes(xmlString);
+
+    }
+
+    private Dictionary<string, object> UpdateEstate(Dictionary<string, object> requestData, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        // /estates/estate/
+        // /estates/estate/?eid=int&region=uuid
+        Dictionary<string, object> result = new Dictionary<string, object>();
+        string eid = (string)httpRequest.Query["eid"];
+        string region = (string)httpRequest.Query["region"];
+
+        httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+
+        if (string.IsNullOrEmpty(eid) && string.IsNullOrEmpty(region) &&
+            requestData.ContainsKey("OP") && requestData["OP"] != null && "STORE".Equals(requestData["OP"]))
+        {
+            // /estates/estate/
+            EstateSettings es = new EstateSettings(requestData);
+            m_EstateService.StoreEstateSettings(es);
+            //m_log.DebugFormat("[EstateServerPostHandler]: Store estate {0}", es.ToString());
+            httpResponse.StatusCode = (int)HttpStatusCode.OK;
+            result["Result"] = true;
+        }
+        else if (!string.IsNullOrEmpty(region) && !string.IsNullOrEmpty(eid) &&
+            requestData.ContainsKey("OP") && requestData["OP"] != null && "LINK".Equals(requestData["OP"]))
+        {
+            int id = 0;
+            UUID regionID = UUID.Zero;
+            if (UUID.TryParse(region, out regionID) && Int32.TryParse(eid, out id))
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.OK;
+                result["Result"] = m_EstateService.LinkRegion(regionID, id);
+            }
+        }
+        else
+        {
+            //m_log.WarnFormat("[EstateServerPostHandler]: something wrong with POST request {0}", httpRequest.RawUrl);
+        }
+
+        return result;
     }
 }

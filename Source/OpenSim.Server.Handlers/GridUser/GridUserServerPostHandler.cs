@@ -25,35 +25,31 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
+
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.GridUser
 {
     public class GridUserServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        private readonly ILogger m_logger;
         private IGridUserService m_GridUserService;
 
-        public GridUserServerPostHandler(IGridUserService service, IServiceAuth auth) :
-                base("POST", "/griduser", auth)
+        public GridUserServerPostHandler(
+            ILogger logger, 
+            IGridUserService service, 
+            IServiceAuth auth) :
+            base("POST", "/griduser", auth)
         {
+            m_logger = logger;
             m_GridUserService = service;
         }
 
@@ -63,14 +59,15 @@ namespace OpenSim.Server.Handlers.GridUser
             string body;
             using(StreamReader sr = new StreamReader(requestData))
                 body = sr.ReadToEnd();
+
             body = body.Trim();
 
             //m_log.DebugFormat("[XXX]: query String: {0}", body);
             string method = string.Empty;
+
             try
             {
-                Dictionary<string, object> request =
-                        ServerUtils.ParseQueryString(body);
+                Dictionary<string, object> request = ServerUtils.ParseQueryString(body);
 
                 if (!request.ContainsKey("METHOD"))
                     return FailureResult();
@@ -92,11 +89,12 @@ namespace OpenSim.Server.Handlers.GridUser
                     case "getgriduserinfos":
                         return GetGridUserInfos(request);
                 }
-                m_log.DebugFormat("[GRID USER HANDLER]: unknown method request: {0}", method);
+
+                m_logger.LogDebug($"[GRID USER HANDLER]: unknown method request: {method}");
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[GRID USER HANDLER]: Exception in method {0}: {1}", method, e);
+                m_logger.LogDebug(e, $"[GRID USER HANDLER]: Exception in method {method}.");
             }
 
             return FailureResult();
@@ -206,13 +204,13 @@ namespace OpenSim.Server.Handlers.GridUser
 
             if (!request.ContainsKey("AgentIDs"))
             {
-                m_log.DebugFormat("[GRID USER HANDLER]: GetGridUserInfos called without required uuids argument");
+                m_logger.LogDebug("[GRID USER HANDLER]: GetGridUserInfos called without required uuids argument");
                 return FailureResult();
             }
 
             if (!(request["AgentIDs"] is List<string>))
             {
-                m_log.DebugFormat("[GRID USER HANDLER]: GetGridUserInfos input argument was of unexpected type {0}", request["uuids"].GetType().ToString());
+                m_logger.LogDebug($"[GRID USER HANDLER]: GetGridUserInfos input argument was of unexpected type {request["uuids"].GetType()}");
                 return FailureResult();
             }
 

@@ -25,26 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System;
-using System.Threading;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
-using System.IO;
-using System.Reflection;
-using System.Timers;
-using Nini.Config;
 using OpenSim.Framework;
-using OpenSim.Framework.Monitoring;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.Connectors
 {
     public class AssetServicesConnector : BaseServiceConnector, IAssetService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private const string _section = "AssetService";
+        private readonly ILogger<AssetServicesConnector> _logger;
+        private IServiceAuth _auth;
 
         public readonly object ConnectorLock = new object();
 
@@ -58,10 +52,7 @@ namespace OpenSim.Services.Connectors
         // Maps: Asset ID -> Handlers which will be called when the asset has been loaded
 
         private Dictionary<string, List<AssetRetrievedEx>> m_AssetHandlers = new Dictionary<string, List<AssetRetrievedEx>>();
-
-        public AssetServicesConnector()
-        {
-        }
+        protected IServiceAuth m_Auth;
 
         public AssetServicesConnector(string serverURI)
         {
@@ -69,43 +60,46 @@ namespace OpenSim.Services.Connectors
             m_ServerURI = tmp.IsResolvedHost ? tmp.URI : null;
         }
 
-        public AssetServicesConnector(IConfigSource source) 
+        public AssetServicesConnector(
+            IConfiguration source, 
+            ILogger<AssetServicesConnector> logger)
         {
-            Initialise(source);
-        }
+            _logger = logger;
+            _auth = AuthType(source, _section);
+            
+            var netconfig = source.GetSection("Network");
 
-        public virtual void Initialise(IConfigSource source)
-        {
-            IConfig netconfig = source.Configs["Network"];
-
-            IConfig assetConfig = source.Configs["AssetService"];
-            if (assetConfig == null)
+            var assetConfig = source.GetSection("AssetService");
+            if (assetConfig .Exists() is false)
             {
-                m_log.Error("[ASSET CONNECTOR]: AssetService missing from OpenSim.ini");
+                _logger.LogError("[ASSET CONNECTOR]: AssetService missing from OpenSim.ini");
                 throw new Exception("Asset connector init error");
             }
 
-            m_ServerURI = assetConfig.GetString("AssetServerURI", string.Empty);
+            m_ServerURI = assetConfig.GetValue("AssetServerURI", string.Empty);
             if (string.IsNullOrEmpty(m_ServerURI))
             {
-                if(netconfig != null)
-                    m_ServerURI = netconfig.GetString("asset_server_url", string.Empty);
+                if (netconfig.Exists())
+                {
+                    m_ServerURI = netconfig.GetValue("asset_server_url", string.Empty);
+                }
             }
+
             if (string.IsNullOrEmpty(m_ServerURI))
             {
-                m_log.Error("[ASSET CONNECTOR]: AssetServerURI not defined in section AssetService");
+                _logger.LogError("[ASSET CONNECTOR]: AssetServerURI not defined in section AssetService");
                 throw new Exception("Asset connector init error");
             }
 
             OSHHTPHost m_GridAssetsURL = new OSHHTPHost(m_ServerURI, true);
+
             if(!m_GridAssetsURL.IsResolvedHost)
             {
-                m_log.Error("[ASSET CONNECTOR]: Could not parse or resolve AssetServerURI");
+                _logger.LogError("[ASSET CONNECTOR]: Could not parse or resolve AssetServerURI");
                 throw new Exception("Asset connector init error");
             }
 
             m_ServerURI = m_GridAssetsURL.URI;
-            Initialise(source, "AssetService");
         }
 
         private int m_maxAssetRequestConcurrency = 8;
@@ -331,8 +325,9 @@ namespace OpenSim.Services.Connectors
                 if (asset.FullID.IsZero())
                 {
                     asset.FullID = UUID.Random();
-                    m_log.WarnFormat("[Assets] Zero ID: {0}", asset.Name);
+                    _logger.LogWarning($"[Assets] Zero ID: {asset.Name}");
                 }
+
                 asset.ID = asset.FullID.ToString();
             }
             else if (asset.FullID.IsZero())
@@ -341,7 +336,8 @@ namespace OpenSim.Services.Connectors
                     asset.FullID = uuid;
                 else
                 {
-                    m_log.WarnFormat("[Assets] Zero IDs: {0}",asset.Name);
+                    _logger.LogWarning($"[Assets] Zero IDs: {asset.Name}");
+
                     asset.FullID = UUID.Random();
                     asset.ID = asset.FullID.ToString();
                 }
@@ -357,8 +353,8 @@ namespace OpenSim.Services.Connectors
                 return null;
 
             string uri = m_ServerURI + "/assets/";
-
             string newID = null;
+            
             try
             {
                 newID = SynchronousRestObjectRequester.MakeRequest<AssetBase, string>("POST", uri, asset, 10000, m_Auth);

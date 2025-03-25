@@ -25,14 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers
 {
@@ -45,17 +43,14 @@ namespace OpenSim.Server.Handlers
 
     public class JsonRpcProfileHandlers
     {
-        static readonly ILog m_log =
-            LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger m_logger;
+        public IUserProfilesService Service { get; private set; }
 
-        public IUserProfilesService Service
+        public JsonRpcProfileHandlers(
+            ILogger logger,
+            IUserProfilesService service)
         {
-            get; private set;
-        }
-
-        public JsonRpcProfileHandlers(IUserProfilesService service)
-        {
+            m_logger = logger;
             Service = service;
         }
 
@@ -77,7 +72,7 @@ namespace OpenSim.Server.Handlers
             if(!json.ContainsKey("params"))
             {
                 response.Error.Code = ErrorCode.ParseError;
-                m_log.DebugFormat ("Classified Request");
+                m_logger.LogDebug("Classified Request");
                 return false;
             }
 
@@ -98,7 +93,8 @@ namespace OpenSim.Server.Handlers
             {
                 response.Error.Code = ErrorCode.ParseError;
                 response.Error.Message = "Error parsing classified update request";
-                m_log.DebugFormat ("Classified Update Request");
+         
+                m_logger.LogDebug("Classified Update Request");
                 return false;
             }
 
@@ -128,7 +124,7 @@ namespace OpenSim.Server.Handlers
             if(!json.ContainsKey("params"))
             {
                 response.Error.Code = ErrorCode.ParseError;
-                m_log.DebugFormat ("Classified Delete Request");
+                m_logger.LogDebug("Classified Delete Request");
                 return false;
             }
 
@@ -150,7 +146,8 @@ namespace OpenSim.Server.Handlers
             {
                 response.Error.Code = ErrorCode.ParseError;
                 response.Error.Message = "no parameters supplied";
-                m_log.DebugFormat ("Classified Info Request");
+
+                m_logger.LogDebug("Classified Info Request");
                 return false;
             }
 
@@ -158,6 +155,7 @@ namespace OpenSim.Server.Handlers
             UserClassifiedAdd ad = new UserClassifiedAdd();
             object Ad = (object)ad;
             OSD.DeserializeMembers(ref Ad, (OSDMap)tmpParams);
+
             if(Service.ClassifiedInfoRequest(ref ad, ref result))
             {
                 //If no maturity bits are set, set PG maturity bit. This works
@@ -165,12 +163,14 @@ namespace OpenSim.Server.Handlers
                 // based on maturity level. 0x4e is bits 1 (old viewers mature), 2 (pg), 3 (Mature) and 6 (Adult).
                 if ((ad.Flags & 0x4e) == 0)
                     ad.Flags |= 0x04;
+
                 response.Result = OSD.SerializeMembers(ad);
                 return true;
             }
 
             response.Error.Code = ErrorCode.InternalError;
             response.Error.Message = string.Format("{0}", result);
+
             return false;
         }
         #endregion Classifieds
@@ -182,7 +182,7 @@ namespace OpenSim.Server.Handlers
             if (!json.TryGetValue("params", out tmpParams) || !(tmpParams is OSDMap))
             {
                 response.Error.Code = ErrorCode.ParseError;
-                m_log.DebugFormat ("Avatar Picks Request");
+                m_logger.LogDebug("Avatar Picks Request");
                 return false;
             }
 
@@ -202,7 +202,8 @@ namespace OpenSim.Server.Handlers
             {
                 response.Error.Code = ErrorCode.ParseError;
                 response.Error.Message = "no parameters supplied";
-                m_log.DebugFormat ("Avatar Picks Info Request");
+
+                m_logger.LogDebug("Avatar Picks Info Request");
                 return false;
             }
 
@@ -210,6 +211,7 @@ namespace OpenSim.Server.Handlers
             UserProfilePick pick = new UserProfilePick();
             object Pick = (object)pick;
             OSD.DeserializeMembers(ref Pick, (OSDMap)tmpParams);
+
             if(Service.PickInfoRequest(ref pick, ref result))
             {
                 response.Result = OSD.SerializeMembers(pick);
@@ -228,7 +230,8 @@ namespace OpenSim.Server.Handlers
             {
                 response.Error.Code = ErrorCode.ParseError;
                 response.Error.Message = "no parameters supplied";
-                m_log.DebugFormat ("Avatar Picks Update Request");
+
+                m_logger.LogDebug("Avatar Picks Update Request");
                 return false;
             }
 
@@ -236,6 +239,7 @@ namespace OpenSim.Server.Handlers
             UserProfilePick pick = new UserProfilePick();
             object Pick = (object)pick;
             OSD.DeserializeMembers(ref Pick, (OSDMap)tmpParams);
+
             if(Service.PicksUpdate(ref pick, ref result))
             {
                 response.Result = OSD.SerializeMembers(pick);
@@ -254,17 +258,20 @@ namespace OpenSim.Server.Handlers
             if (!json.TryGetValue("params", out tmpParams) || !(tmpParams is OSDMap))
             {
                 response.Error.Code = ErrorCode.ParseError;
-                m_log.DebugFormat ("Avatar Picks Delete Request");
+                m_logger.LogDebug("Avatar Picks Delete Request");
+
                 return false;
             }
 
             OSDMap request = tmpParams as OSDMap;
             UUID pickId = new UUID(request["pickId"].AsString());
+
             if(Service.PicksDelete(pickId))
                 return true;
 
             response.Error.Code = ErrorCode.InternalError;
             response.Error.Message = "data error removing record";
+
             return false;
         }
         #endregion Picks
@@ -277,13 +284,15 @@ namespace OpenSim.Server.Handlers
             {
                 response.Error.Code = ErrorCode.ParseError;
                 response.Error.Message = "Params missing";
-                m_log.DebugFormat ("Avatar Notes Request");
+
+                m_logger.LogDebug("Avatar Notes Request");
                 return false;
             }
 
             UserProfileNotes note = new UserProfileNotes();
             object Note = (object)note;
             OSD.DeserializeMembers(ref Note, (OSDMap)tmpParams);
+
             if(Service.AvatarNotesRequest(ref note))
             {
                 response.Result = OSD.SerializeMembers(note);
@@ -292,6 +301,7 @@ namespace OpenSim.Server.Handlers
 
             response.Error.Code = ErrorCode.InternalError;
             response.Error.Message = "Error reading notes";
+
             return false;
         }
 
@@ -302,7 +312,8 @@ namespace OpenSim.Server.Handlers
             {
                 response.Error.Code = ErrorCode.ParseError;
                 response.Error.Message = "No parameters";
-                m_log.DebugFormat ("Avatar Notes Update Request");
+
+                m_logger.LogDebug("Avatar Notes Update Request");
                 return false;
             }
 
@@ -310,11 +321,13 @@ namespace OpenSim.Server.Handlers
             UserProfileNotes note = new UserProfileNotes();
             object Notes = (object) note;
             OSD.DeserializeMembers(ref Notes, (OSDMap)tmpParams);
-            if(Service.NotesUpdate(ref note, ref result))
+
+            if (Service.NotesUpdate(ref note, ref result))
             {
                 response.Result = OSD.SerializeMembers(note);
                 return true;
             }
+
             return true;
         }
         #endregion Notes
@@ -326,13 +339,15 @@ namespace OpenSim.Server.Handlers
             {
                 response.Error.Code = ErrorCode.ParseError;
                 response.Error.Message = "no parameters supplied";
-                m_log.DebugFormat ("Avatar Properties Request");
+
+                m_logger.LogDebug("Avatar Properties Request");
                 return false;
             }
 
             string result = string.Empty;
             UserProfileProperties props = new UserProfileProperties();
             object Props = (object)props;
+
             OSD.DeserializeMembers(ref Props, (OSDMap)json["params"]);
             if(Service.AvatarPropertiesRequest(ref props, ref result))
             {
@@ -351,7 +366,8 @@ namespace OpenSim.Server.Handlers
             {
                 response.Error.Code = ErrorCode.ParseError;
                 response.Error.Message = "no parameters supplied";
-                m_log.DebugFormat ("Avatar Properties Update Request");
+
+                m_logger.LogDebug("Avatar Properties Update Request");
                 return false;
             }
 
@@ -359,6 +375,7 @@ namespace OpenSim.Server.Handlers
             UserProfileProperties props = new UserProfileProperties();
             object Props = (object)props;
             OSD.DeserializeMembers(ref Props, (OSDMap)json["params"]);
+
             if(Service.AvatarPropertiesUpdate(ref props, ref result))
             {
                 response.Result = OSD.SerializeMembers(props);
@@ -378,13 +395,15 @@ namespace OpenSim.Server.Handlers
             {
                 response.Error.Code = ErrorCode.ParseError;
                 response.Error.Message = "no parameters supplied";
-                m_log.DebugFormat ("Avatar Interests Update Request");
+
+                m_logger.LogDebug("Avatar Interests Update Request");
                 return false;
             }
 
             string result = string.Empty;
             UserProfileProperties props = new UserProfileProperties();
             object Props = (object)props;
+
             OSD.DeserializeMembers(ref Props, (OSDMap)json["params"]);
             if(Service.AvatarInterestsUpdate(props, ref result))
             {
@@ -394,6 +413,7 @@ namespace OpenSim.Server.Handlers
 
             response.Error.Code = ErrorCode.InternalError;
             response.Error.Message = string.Format("{0}", result);
+            
             return false;
         }
         #endregion Interests
@@ -404,13 +424,15 @@ namespace OpenSim.Server.Handlers
             if(!json.ContainsKey("params"))
             {
                 response.Error.Code = ErrorCode.ParseError;
-                m_log.DebugFormat ("User Preferences Request");
+
+                m_logger.LogDebug("User Preferences Request");
                 return false;
             }
 
             string result = string.Empty;
             UserPreferences prefs = new UserPreferences();
             object Prefs = (object)prefs;
+
             OSD.DeserializeMembers(ref Prefs, (OSDMap)json["params"]);
             if(Service.UserPreferencesRequest(ref prefs, ref result))
             {
@@ -421,6 +443,7 @@ namespace OpenSim.Server.Handlers
             response.Error.Code = ErrorCode.InternalError;
             response.Error.Message = string.Format("{0}", result);
 //            m_log.InfoFormat("[PROFILES]: User preferences request error - {0}", response.Error.Message);
+            
             return false;
         }
 
@@ -430,13 +453,15 @@ namespace OpenSim.Server.Handlers
             {
                 response.Error.Code = ErrorCode.ParseError;
                 response.Error.Message = "no parameters supplied";
-                m_log.DebugFormat ("User Preferences Update Request");
+
+                m_logger.LogDebug("User Preferences Update Request");
                 return false;
             }
 
             string result = string.Empty;
             UserPreferences prefs = new UserPreferences();
             object Prefs = (object)prefs;
+
             OSD.DeserializeMembers(ref Prefs, (OSDMap)json["params"]);
             if(Service.UserPreferencesUpdate(ref prefs, ref result))
             {
@@ -446,7 +471,9 @@ namespace OpenSim.Server.Handlers
 
             response.Error.Code = ErrorCode.InternalError;
             response.Error.Message = string.Format("{0}", result);
-            m_log.InfoFormat("[PROFILES]: User preferences update error - {0}", response.Error.Message);
+
+            m_logger.LogInformation($"[PROFILES]: User preferences update error - {response.Error.Message}");
+
             return false;
         }
         #endregion User Preferences
@@ -458,7 +485,8 @@ namespace OpenSim.Server.Handlers
             if(!json.ContainsKey("params"))
             {
                 response.Error.Code = ErrorCode.ParseError;
-                m_log.DebugFormat ("Avatar Image Assets Request");
+                m_logger.LogDebug("Avatar Image Assets Request");
+
                 return false;
             }
 
@@ -479,7 +507,8 @@ namespace OpenSim.Server.Handlers
             {
                 response.Error.Code = ErrorCode.ParseError;
                 response.Error.Message = "no parameters supplied";
-                m_log.DebugFormat ("User Application Service URL Request: No Parameters!");
+
+                m_logger.LogDebug("User Application Service URL Request: No Parameters!");
                 return false;
             }
 
@@ -487,6 +516,7 @@ namespace OpenSim.Server.Handlers
             UserAppData props = new UserAppData();
             object Props = (object)props;
             OSD.DeserializeMembers(ref Props, (OSDMap)json["params"]);
+
             if(Service.RequestUserAppData(ref props, ref result))
             {
                 OSDMap res = new OSDMap();
@@ -508,7 +538,9 @@ namespace OpenSim.Server.Handlers
             {
                 response.Error.Code = ErrorCode.ParseError;
                 response.Error.Message = "no parameters supplied";
-                m_log.DebugFormat ("User App Data Update Request");
+
+                m_logger.LogDebug("User App Data Update Request");
+
                 return false;
             }
 
@@ -516,6 +548,7 @@ namespace OpenSim.Server.Handlers
             UserAppData props = new UserAppData();
             object Props = (object)props;
             OSD.DeserializeMembers(ref Props, (OSDMap)json["params"]);
+
             if(Service.SetUserAppData(props, ref result))
             {
                 response.Result = OSD.SerializeMembers(props);
@@ -524,9 +557,9 @@ namespace OpenSim.Server.Handlers
 
             response.Error.Code = ErrorCode.InternalError;
             response.Error.Message = string.Format("{0}", result);
+            
             return false;
         }
         #endregion UserData
     }
 }
-

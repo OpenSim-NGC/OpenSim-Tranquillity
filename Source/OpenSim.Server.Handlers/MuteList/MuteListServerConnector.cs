@@ -25,39 +25,45 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using Nini.Config;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Server.Handlers.GridUser
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Autofac;
+
+namespace OpenSim.Server.Handlers.GridUser;
+
+public class MuteListServiceConnector(
+    IConfiguration config,
+    ILogger<MuteListServiceConnector> logger,
+    IComponentContext componentContext)
+    : IServiceConnector
 {
-    public class MuteListServiceConnector : ServiceConnector
+    private const string _ConfigName = "MuteListService";
+
+    public string ConfigName { get; private set; }
+    public IHttpServer HttpServer { get; private set; }
+    
+    public void Initialize(IHttpServer httpServer, string configName = _ConfigName)
     {
-        private IMuteListService m_MuteListService;
-        private string m_ConfigName = "MuteListService";
+        HttpServer = httpServer;
+        ConfigName = configName;
 
-        public MuteListServiceConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
-        {
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
+        var serverConfig = config.GetSection(ConfigName);
+        if (serverConfig.Exists() is false)
+            throw new Exception($"No section {ConfigName} in config file");
 
-            string service = serverConfig.GetString("LocalServiceModule", String.Empty);
+        var serviceName = serverConfig.GetValue("LocalServiceModule", string.Empty);
+        if (string.IsNullOrEmpty(serviceName))
+            throw new Exception("LocalServiceModule not present in MuteListService config file MuteListService section");
 
-            if (service.Length == 0)
-                throw new Exception("LocalServiceModule not present in MuteListService config file MuteListService section");
-
-            Object[] args = new Object[] { config };
-            m_MuteListService = ServerUtils.LoadPlugin<IMuteListService>(service, args);
-
-            IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
-
-            server.AddStreamHandler(new MuteListServerPostHandler(m_MuteListService, auth));
-        }
+        var muteListService = componentContext.ResolveNamed<IMuteListService>(serviceName);
+        var auth = ServiceAuth.Create(config, ConfigName);
+        
+        HttpServer.AddStreamHandler(new MuteListServerPostHandler(logger, muteListService, auth));
     }
 }

@@ -25,36 +25,35 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
+
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
+
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.GridUser
 {
     public class MuteListServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly IMuteListService m_service;
+        private readonly IServiceAuth m_serviceAuth;
+        private readonly ILogger m_logger;
 
-        private IMuteListService m_service;
-
-        public MuteListServerPostHandler(IMuteListService service, IServiceAuth auth) :
-                base("POST", "/mutelist", auth)
+        public MuteListServerPostHandler(
+            ILogger logger, 
+            IMuteListService service, 
+            IServiceAuth auth) :
+            base("POST", "/mutelist", auth)
         {
+            m_logger = logger;
             m_service = service;
+            m_serviceAuth = auth;
         }
 
         protected override byte[] ProcessRequest(string path, Stream requestData,
@@ -63,6 +62,7 @@ namespace OpenSim.Server.Handlers.GridUser
             string body;
             using(StreamReader sr = new StreamReader(requestData))
                 body = sr.ReadToEnd();
+
             body = body.Trim();
 
             //m_log.DebugFormat("[XXX]: query String: {0}", body);
@@ -70,8 +70,7 @@ namespace OpenSim.Server.Handlers.GridUser
 
             try
             {
-                Dictionary<string, object> request =
-                        ServerUtils.ParseQueryString(body);
+                Dictionary<string, object> request =  ServerUtils.ParseQueryString(body);
 
                 if (!request.ContainsKey("METHOD"))
                     return FailureResult();
@@ -87,11 +86,12 @@ namespace OpenSim.Server.Handlers.GridUser
                     case "delete":
                         return deletemute(request);
                 }
-                m_log.DebugFormat("[MUTELIST HANDLER]: unknown method request: {0}", method);
+
+                m_logger.LogDebug($"[MUTELIST HANDLER]: unknown method request: {method}");
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[MUTELIST HANDLER]: Exception in method {0}: {1}", method, e);
+                m_logger.LogDebug(e, $"[MUTELIST HANDLER]: Exception in method {method}");
             }
 
             return FailureResult();
@@ -182,13 +182,14 @@ namespace OpenSim.Server.Handlers.GridUser
                 return FailureResult();
 
             string muteName;
-            if(request.ContainsKey("mutename"))
+            if (request.ContainsKey("mutename"))
             {
                 muteName = request["mutename"].ToString();
-
             }
             else
-               muteName = String.Empty;
+            {
+                muteName = String.Empty;
+            }
 
             return m_service.RemoveMute(agentID, muteID, muteName) ? SuccessResult() : FailureResult();
         }
@@ -197,13 +198,11 @@ namespace OpenSim.Server.Handlers.GridUser
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
             doc.AppendChild(rootElement);
 
@@ -219,13 +218,11 @@ namespace OpenSim.Server.Handlers.GridUser
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
             doc.AppendChild(rootElement);
 

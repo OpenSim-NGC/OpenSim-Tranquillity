@@ -25,16 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
 using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
 using System.Xml.Serialization;
+
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
@@ -45,8 +38,6 @@ namespace OpenSim.Server.Handlers.Asset
 {
     public class AssetServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private IAssetService m_AssetService;
 
         public AssetServerPostHandler(IAssetService service) :
@@ -76,10 +67,6 @@ namespace OpenSim.Server.Handlers.Asset
                 httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
                 return null;
             }
-
-            m_log.Info($"[AssetServerPost]: From {httpRequest.RemoteIPEndPoint} Asset {asset.ID}: " +
-                $"Name = {asset.Metadata.Name},Type = {(OpenMetaverse.AssetType)asset.Metadata.Type}, " +
-                $"CreatorID = {asset.Metadata.CreatorID}, Description = {asset.Metadata.Description}");
 
             string[] p = SplitParams(path);
             if (p.Length > 0)

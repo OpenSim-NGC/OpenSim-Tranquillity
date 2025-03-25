@@ -25,121 +25,106 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Net;
-using System.Reflection;
-using System.Threading;
-
-using Nini.Config;
-using log4net;
-
-using OpenSim.Server.Base;
-using OpenSim.Services.Interfaces;
+using Autofac;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using OpenMetaverse;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
-using OpenMetaverse;
+using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Server.Handlers.MapImage
+namespace OpenSim.Server.Handlers.Map;
+
+public class MapGetServiceConnector(
+    IConfiguration config,
+    ILogger<MapGetServiceConnector> logger,
+    IComponentContext componentContext)
+    : IServiceConnector
 {
-    public class MapGetServiceConnector : ServiceConnector
+    public string ConfigName { get; private set; }
+    public IHttpServer HttpServer { get; private set; }
+    
+    public void Initialize(IHttpServer httpServer, string configName = "MapImageService")
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private IMapImageService m_MapService;
+        HttpServer = httpServer;
+        ConfigName = configName;
 
-        private string m_ConfigName = "MapImageService";
+        var serverConfig = config.GetSection(ConfigName);
+        if (serverConfig.Exists() is false)
+            throw new Exception($"No section {ConfigName} in config file");
 
-        public MapGetServiceConnector(IConfigSource config, IHttpServer server, string configName) :
-            base(config, server, configName)
-        {
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
-
-            string gridService = serverConfig.GetString("LocalServiceModule", string.Empty);
-
-            if (string.IsNullOrWhiteSpace(gridService))
-                throw new Exception("No LocalServiceModule in config file");
-
-            object[] args = new object[] { config };
-            m_MapService = ServerUtils.LoadPlugin<IMapImageService>(gridService, args);
-
-            server.AddStreamHandler(new MapServerGetHandler(m_MapService));
-        }
-    }
-
-    class MapServerGetHandler : BaseStreamHandler
-    {
-        public static readonly object ev = new object();
-
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private IMapImageService m_MapService;
-
-        public MapServerGetHandler(IMapImageService service) :
-                base("GET", "/map")
-        {
-            m_MapService = service;
-        }
-
-        protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            if(!Monitor.TryEnter(ev, 5000))
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
-                httpResponse.AddHeader("Retry-After", "10");
-                return Array.Empty<byte>();
-            }
-
-            byte[] result = Array.Empty<byte>();
-            string format = string.Empty;
-
-            //UUID scopeID = new UUID("07f8d88e-cd5e-4239-a0ed-843f75d09992");
-            UUID scopeID = UUID.Zero;
-
-            // This will be map/tilefile.ext, but on multitenancy it will be
-            // map/scope/teilefile.ext
-            path = path.Trim('/');
-            string[] bits = path.Split(new char[] {'/'});
-            if (bits.Length > 2)
-            {
-                try
-                {
-                    scopeID = new UUID(bits[1]);
-                }
-                catch
-                {
-                    return new byte[9];
-                }
-                path = bits[2];
-                path = path.Trim('/');
-            }
-
-            if(path.Length == 0)
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-                httpResponse.ContentType = "text/plain";
-                return Array.Empty<byte>();
-            }
-
-            result = m_MapService.GetMapTile(path, scopeID, out format);
-            if (result.Length > 0)
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.OK;
-                if (format.Equals(".png"))
-                    httpResponse.ContentType = "image/png";
-                else if (format.Equals(".jpg") || format.Equals(".jpeg"))
-                    httpResponse.ContentType = "image/jpeg";
-            }
-            else
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-                httpResponse.ContentType = "text/plain";
-            }
-
-            Monitor.Exit(ev);
-
-            return result;
-        }
+        var gridServiceName = serverConfig.GetValue("LocalServiceModule", string.Empty);
+        if (string.IsNullOrWhiteSpace(gridServiceName))
+            throw new Exception("No LocalServiceModule in config file");
+        
+        var mapService = componentContext.ResolveNamed<IMapImageService>(gridServiceName);
+        HttpServer.AddStreamHandler(new MapServerGetHandler(logger, mapService));
     }
 }
+
+class MapServerGetHandler(ILogger logger, IMapImageService service) : BaseStreamHandler("GET", "/map")
+{
+    public static readonly object ev = new object();
+
+    protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        if(!Monitor.TryEnter(ev, 5000))
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+            httpResponse.AddHeader("Retry-After", "10");
+            return Array.Empty<byte>();
+        }
+
+        byte[] result = Array.Empty<byte>();
+        string format = string.Empty;
+
+        //UUID scopeID = new UUID("07f8d88e-cd5e-4239-a0ed-843f75d09992");
+        UUID scopeID = UUID.Zero;
+
+        // This will be map/tilefile.ext, but on multitenancy it will be
+        // map/scope/teilefile.ext
+        path = path.Trim('/');
+        string[] bits = path.Split(new char[] {'/'});
+        if (bits.Length > 2)
+        {
+            try
+            {
+                scopeID = new UUID(bits[1]);
+            }
+            catch
+            {
+                return new byte[9];
+            }
+            path = bits[2];
+            path = path.Trim('/');
+        }
+
+        if(path.Length == 0)
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+            httpResponse.ContentType = "text/plain";
+            return Array.Empty<byte>();
+        }
+
+        result = service.GetMapTile(path, scopeID, out format);
+        if (result.Length > 0)
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.OK;
+            if (format.Equals(".png"))
+                httpResponse.ContentType = "image/png";
+            else if (format.Equals(".jpg") || format.Equals(".jpeg"))
+                httpResponse.ContentType = "image/jpeg";
+        }
+        else
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+            httpResponse.ContentType = "text/plain";
+        }
+
+        Monitor.Exit(ev);
+
+        return result;
+    }
+}
+

@@ -25,58 +25,58 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Net;
-using System.Reflection;
 
-using Nini.Config;
 using OpenSim.Framework;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
-
-using log4net;
 using Nwc.XmlRpc;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Autofac;
+
 namespace OpenSim.Server.Handlers.Hypergrid
 {
-    public class InstantMessageServerConnector : ServiceConnector
+    public class InstantMessageServerConnector : IServiceConnector
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private IInstantMessage m_IMService;
 
-        public InstantMessageServerConnector(IConfigSource config, IHttpServer server) :
-            this(config, server, (IInstantMessageSimConnector)null)
-        {
-        }
+        protected IConfiguration m_configuration;
+        protected ILogger<InstantMessageServerConnector> m_logger;
+        protected IComponentContext m_context;
 
-        public InstantMessageServerConnector(IConfigSource config, IHttpServer server, string configName) :
-            this(config, server)
+        public InstantMessageServerConnector(
+            IConfiguration config, 
+            ILogger<InstantMessageServerConnector> logger,
+            IComponentContext componentContext)
         {
+            m_configuration = config;
+            m_logger = logger;
+            m_context = componentContext;
         }
+        
+        public string ConfigName { get; private set; } = "InstantMessageServerConnector";           // "HGInstantMessageService";
+        public IHttpServer HttpServer { get; private set; }
 
-        public InstantMessageServerConnector(IConfigSource config, IHttpServer server, IInstantMessageSimConnector simConnector) :
-                base(config, server, String.Empty)
+        public void Initialize(IHttpServer httpServer)
         {
-            IConfig gridConfig = config.Configs["HGInstantMessageService"];
-            if (gridConfig != null)
+            HttpServer = httpServer;
+
+            var gridConfig = m_configuration.GetSection(ConfigName);
+            if (gridConfig.Exists())
             {
-                string serviceDll = gridConfig.GetString("LocalServiceModule", string.Empty);
-
-                Object[] args = new Object[] { config, simConnector };
-                m_IMService = ServerUtils.LoadPlugin<IInstantMessage>(serviceDll, args);
+                string service = gridConfig.GetValue("LocalServiceModule", string.Empty);
+                m_IMService = m_context.ResolveNamed<IInstantMessage>(service);
             }
+
             if (m_IMService == null)
                 throw new Exception("InstantMessage server connector cannot proceed because of missing service");
 
-            server.AddXmlRPCHandler("grid_instant_message", ProcessInstantMessage, false);
-
+            HttpServer.AddXmlRPCHandler("grid_instant_message", ProcessInstantMessage, false);
         }
 
         public IInstantMessage GetService()
@@ -109,7 +109,6 @@ namespace OpenSim.Server.Handlers.Hypergrid
                 float pos_y = 0;
                 float pos_z = 0;
                 //m_log.Info("Processing IM");
-
 
                 Hashtable requestData = (Hashtable)request.Params[0];
                 // Check if it's got all the data
@@ -225,7 +224,7 @@ namespace OpenSim.Server.Handlers.Hypergrid
             }
             catch (Exception e)
             {
-                m_log.Error("[INSTANT MESSAGE]: Caught unexpected exception:", e);
+                m_logger.LogError(e, "Caught unexpected exception");
                 successful = false;
             }
 

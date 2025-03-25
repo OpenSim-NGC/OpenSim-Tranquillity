@@ -25,17 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.UserAccountService;
@@ -43,29 +32,38 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
 using OpenMetaverse;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.UserAccounts
 {
     public class UserAccountServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger m_logger;
+        private readonly IUserAccountService m_UserAccountService;
 
-        private IUserAccountService m_UserAccountService;
         private bool m_AllowCreateUser = false;
         private bool m_AllowSetAccount = false;
 
-        public UserAccountServerPostHandler(IUserAccountService service)
-            : this(service, null, null) {}
+        public UserAccountServerPostHandler(
+            ILogger logger, 
+            IUserAccountService service) :
+            this(logger, service, null, null) {}
 
-        public UserAccountServerPostHandler(IUserAccountService service, IConfig config, IServiceAuth auth) :
-                base("POST", "/accounts", auth)
+        public UserAccountServerPostHandler(
+            ILogger logger, 
+            IUserAccountService service, 
+            IConfigurationSection config, 
+            IServiceAuth auth) :
+            base("POST", "/accounts", auth)
         {
+            m_logger = logger;
             m_UserAccountService = service;
 
-            if (config != null)
+            if (config.Exists())
             {
-                m_AllowCreateUser = config.GetBoolean("AllowCreateUser", m_AllowCreateUser);
-                m_AllowSetAccount = config.GetBoolean("AllowSetAccount", m_AllowSetAccount);
+                m_AllowCreateUser = config.GetValue<bool>("AllowCreateUser", m_AllowCreateUser);
+                m_AllowSetAccount = config.GetValue<bool>("AllowSetAccount", m_AllowSetAccount);
             }
         }
 
@@ -75,6 +73,7 @@ namespace OpenSim.Server.Handlers.UserAccounts
             string body;
             using(StreamReader sr = new StreamReader(requestData))
                 body = sr.ReadToEnd();
+
             body = body.Trim();
 
             // We need to check the authorization header
@@ -104,8 +103,6 @@ namespace OpenSim.Server.Handlers.UserAccounts
                         return GetAccounts(request);
                     case "getmultiaccounts":
                         return GetMultiAccounts(request);
-                    case "setdisplayname":
-                        return SetDisplayName(request);
                     case "setaccount":
                         if (m_AllowSetAccount)
                             return StoreAccount(request);
@@ -113,11 +110,11 @@ namespace OpenSim.Server.Handlers.UserAccounts
                             return FailureResult();
                 }
 
-                m_log.DebugFormat("[USER SERVICE HANDLER]: unknown method request: {0}", method);
+                m_logger.LogDebug($"[USER SERVICE HANDLER]: unknown method request: {method}");
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[USER SERVICE HANDLER]: Exception in method {0}: {1}", method, e);
+                m_logger.LogDebug(e, $"[USER SERVICE HANDLER]: Exception in method {method}.");
             }
 
             return FailureResult();
@@ -212,14 +209,14 @@ namespace OpenSim.Server.Handlers.UserAccounts
 
             if (!request.TryGetValue("IDS", out object oids))
             {
-                m_log.DebugFormat("[USER SERVICE HANDLER]: GetMultiAccounts called without required uuids argument");
+                m_logger.LogDebug($"[USER SERVICE HANDLER]: GetMultiAccounts called without required uuids argument");
                 return FailureResult();
             }
 
             List<string> lids = oids as List<string>;
             if (lids == null)
             {
-                m_log.DebugFormat("[USER SERVICE HANDLER]: GetMultiAccounts input argument was of unexpected type {0} or null", oids.GetType().ToString());
+                m_logger.LogDebug($"[USER SERVICE HANDLER]: GetMultiAccounts input argument was of unexpected type {oids.GetType()} or null");
                 return FailureResult();
             }
 
@@ -256,28 +253,6 @@ namespace OpenSim.Server.Handlers.UserAccounts
 
             //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
-        }
-
-        byte[] SetDisplayName(Dictionary<string, object> request)
-        {
-            object otmp;
-            UUID principalID = UUID.Zero;
-            if (request.TryGetValue("PrincipalID", out otmp) && !UUID.TryParse(otmp.ToString(), out principalID))
-                return FailureResult();
-
-            UserAccount existingAccount = m_UserAccountService.GetUserAccount(UUID.Zero, principalID);
-            if (existingAccount == null)
-                return FailureResult();
-
-            if (!request.TryGetValue("DisplayName", out otmp))
-                return FailureResult();
-            
-            if (!m_UserAccountService.SetDisplayName(principalID, otmp.ToString()))
-                return FailureResult();
-
-            Dictionary<string, object> result = new Dictionary<string, object>();
-            result["result"] = "success";
-            return ResultToBytes(result);
         }
 
         byte[] StoreAccount(Dictionary<string, object> request)
@@ -324,9 +299,9 @@ namespace OpenSim.Server.Handlers.UserAccounts
 
             if (!m_UserAccountService.StoreUserAccount(existingAccount))
             {
-                m_log.ErrorFormat(
-                    "[USER ACCOUNT SERVER POST HANDLER]: Account store failed for account {0} {1} {2}",
-                    existingAccount.FirstName, existingAccount.LastName, existingAccount.PrincipalID);
+                m_logger.LogError(
+                    $"[USER ACCOUNT SERVER POST HANDLER]: Account store failed for account " +
+                    $"{existingAccount.FirstName} {existingAccount.LastName} {existingAccount.PrincipalID}");
 
                 return FailureResult();
             }

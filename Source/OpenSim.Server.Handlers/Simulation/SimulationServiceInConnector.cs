@@ -25,32 +25,41 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using Nini.Config;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
-namespace OpenSim.Server.Handlers.Simulation
+namespace OpenSim.Server.Handlers.Simulation;
+
+public class SimulationServiceInConnector(
+    IConfiguration config,
+    ILogger<SimulationServiceInConnector> logger,
+    IScene scene)
+    : IServiceConnector
 {
-    public class SimulationServiceInConnector : ServiceConnector
+    private const string _ConfigName = "SimulationService";
+
+    private ISimulationService localSimulationService;
+
+    public string ConfigName { get; private set; }
+    public IHttpServer HttpServer { get; private set; }
+    
+    public void Initialize(IHttpServer httpServer, string configName = _ConfigName)
     {
-        private ISimulationService m_LocalSimulationService;
-//        private IAuthenticationService m_AuthenticationService;
+        HttpServer = httpServer;
+        ConfigName = configName;
+        
+        localSimulationService = scene.RequestModuleInterface<ISimulationService>();
+        localSimulationService = localSimulationService.GetInnerService();
 
-        public SimulationServiceInConnector(IConfigSource config, IHttpServer server, IScene scene) :
-                base(config, server, String.Empty)
-        {
-            m_LocalSimulationService = scene.RequestModuleInterface<ISimulationService>();
-            m_LocalSimulationService = m_LocalSimulationService.GetInnerService();
+        // This one MUST be a stream handler because compressed fatpacks
+        // are pure binary and shoehorning that into a string with UTF-8
+        // encoding breaks it
 
-            // This one MUST be a stream handler because compressed fatpacks
-            // are pure binary and shoehorning that into a string with UTF-8
-            // encoding breaks it
-            server.AddSimpleStreamHandler(new AgentSimpleHandler(m_LocalSimulationService), true);
-            server.AddSimpleStreamHandler(new ObjectSimpleHandler(m_LocalSimulationService), true);
-        }
+        HttpServer.AddSimpleStreamHandler(new AgentSimpleHandler(logger, localSimulationService), true);
+        HttpServer.AddSimpleStreamHandler(new ObjectSimpleHandler(logger, localSimulationService), true);
     }
 }

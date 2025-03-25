@@ -16,6 +16,7 @@ using OpenSim.Server.Handlers.Authentication;
 using OpenSim.Server.Handlers.Authorization;
 using OpenSim.Server.Handlers.Avatar;
 using OpenSim.Server.Handlers.BakedTextures;
+using OpenSim.Server.Handlers.Estate;
 using OpenSim.Server.Handlers.Freeswitch;
 using OpenSim.Server.Handlers.Friends;
 using OpenSim.Server.Handlers.Grid;
@@ -23,11 +24,14 @@ using OpenSim.Server.Handlers.GridUser;
 using OpenSim.Server.Handlers.Hypergrid;
 using OpenSim.Server.Handlers.Inventory;
 using OpenSim.Server.Handlers.Login;
-using OpenSim.Server.Handlers.MapImage;
+using OpenSim.Server.Handlers.Map;
 using OpenSim.Server.Handlers.Presence;
 using OpenSim.Server.Handlers.Profiles;
 using OpenSim.Server.Handlers.UserAccounts;
 using OpenSim.Server.Handlers.UserAlias;
+using OpenSim.Server.Handlers.Land;
+using OpenSim.Server.Handlers.Neighbour;
+using OpenSim.Server.Handlers.Simulation;
 
 namespace OpenSim.Server.Handlers
 {
@@ -115,13 +119,13 @@ namespace OpenSim.Server.Handlers
                 .Named<IServiceConnector>("XInventoryInConnector")
                 .AsImplementedInterfaces();
 
-            // builder.RegisterType<LandServiceInConnector>()
-            //     .Named<IServiceConnector>("LandService")
-            //     .AsImplementedInterfaces();
+            builder.RegisterType<LandServiceInConnector>()
+                .Named<IServiceConnector>("LandService")
+                .AsImplementedInterfaces();
 
-            // builder.RegisterType<LLLoginServiceInConnector>()
-            //     .Named<IServiceConnector>("LoginService")
-            //     .AsImplementedInterfaces();
+            builder.RegisterType<LLLoginServiceInConnector>()
+                .Named<IServiceConnector>("LoginService")
+                .AsImplementedInterfaces();
 
             builder.RegisterType<MapAddServiceConnector>()
                 .Named<IServiceConnector>("MapImageService")
@@ -139,9 +143,9 @@ namespace OpenSim.Server.Handlers
                 .Named<IServiceConnector>("MuteListService")
                 .AsImplementedInterfaces();
 
-            // builder.RegisterType<NeighbourServiceInConnector>()
-            //     .Named<IServiceConnector>("NeighbourService")
-            //     .AsImplementedInterfaces();
+            builder.RegisterType<NeighbourServiceInConnector>()
+                .Named<IServiceConnector>("NeighbourService")
+                .AsImplementedInterfaces();
 
             builder.RegisterType<PresenceServiceConnector>()
                 .Named<IServiceConnector>("PresenceService")
@@ -151,9 +155,9 @@ namespace OpenSim.Server.Handlers
                 .Named<IServiceConnector>("UserProfilesService")
                 .AsImplementedInterfaces();
 
-            // builder.RegisterType<SimulationServiceInConnector>()
-            //     .Named<IServiceConnector>("SimulationService")
-            //     .AsImplementedInterfaces();
+            builder.RegisterType<SimulationServiceInConnector>()
+                .Named<IServiceConnector>("SimulationService")
+                .AsImplementedInterfaces();
 
             builder.RegisterType<UserAccountServiceConnector>()
                 .Named<IServiceConnector>("UserAccountService")

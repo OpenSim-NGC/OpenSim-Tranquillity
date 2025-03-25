@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
 using System.Net;
 using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
@@ -35,20 +33,23 @@ using OpenSim.Framework.Servers.HttpServer;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 
 namespace OpenSim.Server.Handlers.Simulation
 {
     public class ObjectSimpleHandler : SimpleStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private ISimulationService m_SimulationService;
+        private readonly ILogger m_logger;
+        private readonly ISimulationService m_SimulationService;
         protected bool m_Proxy = false;
 
-        public ObjectSimpleHandler(ISimulationService service) : base("/object")
+        public ObjectSimpleHandler(
+            ILogger logger,
+            ISimulationService service) : 
+            base("/object")
         {
+            m_logger = logger;
             m_SimulationService = service;
         }
 
@@ -136,7 +137,7 @@ namespace OpenSim.Server.Handlers.Simulation
             }
             catch (Exception ex)
             {
-                m_log.InfoFormat("[OBJECT HANDLER]: exception on deserializing scene object {0}", ex.Message);
+                m_logger.LogInformation(ex, $"[OBJECT HANDLER]: exception on deserializing scene object.");
                 httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
                 return;
             }
@@ -157,7 +158,7 @@ namespace OpenSim.Server.Handlers.Simulation
                     }
                     catch (Exception ex)
                     {
-                        m_log.InfoFormat("[OBJECT HANDLER]: exception on setting state for scene object {0}", ex.Message);
+                        m_logger.LogInformation(ex, $"[OBJECT HANDLER]: exception on setting state for scene object");
                         // ignore and continue
                     }
                 }
@@ -171,7 +172,7 @@ namespace OpenSim.Server.Handlers.Simulation
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[OBJECT HANDLER]: Exception in CreateObject: {0}", e.StackTrace);
+                m_logger.LogDebug(e, $"[OBJECT HANDLER]: Exception in CreateObject.");
                 result = false;
             }
 

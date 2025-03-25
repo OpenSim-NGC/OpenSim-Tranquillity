@@ -24,31 +24,31 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 
 using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
-
-using log4net;
 using Nwc.XmlRpc;
 using OpenMetaverse;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Hypergrid
 {
     public class HypergridHandlers
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger m_logger;
+        private readonly IGatekeeperService m_GatekeeperService;
 
-        private IGatekeeperService m_GatekeeperService;
-
-        public HypergridHandlers(IGatekeeperService gatekeeper)
+        public HypergridHandlers(
+            ILogger logger,
+            IGatekeeperService gatekeeper)
         {
+            m_logger = logger;
             m_GatekeeperService = gatekeeper;
-            m_log.DebugFormat("[HYPERGRID HANDLERS]: Active");
+
+            m_logger.LogDebug("[HYPERGRID HANDLERS]: Active");
         }
 
         /// <summary>
@@ -65,9 +65,19 @@ namespace OpenSim.Server.Handlers.Hypergrid
             if (name == null)
                 name = string.Empty;
 
-            m_log.DebugFormat("[HG Handler]: XMLRequest to link to {0} from {1}", (name.Length == 0) ? "default region" : name, remoteClient.Address.ToString());
-            bool success = m_GatekeeperService.LinkLocalRegion(name, out UUID regionID, out ulong regionHandle, out string externalName,
-                out string imageURL, out string reason, out int sizeX, out int sizeY);
+            UUID regionID = UUID.Zero;
+            string externalName = string.Empty;
+            string imageURL = string.Empty;
+            ulong regionHandle = 0;
+            string reason = string.Empty;
+            int sizeX = 256;
+            int sizeY = 256;
+
+            m_logger.LogDebug(
+                $"[HG Handler]: XMLRequest to link to {((name.Length == 0) ? "default region" : name)} " +
+                $"from {remoteClient.Address}");
+                
+            bool success = m_GatekeeperService.LinkRegion(name, out regionID, out regionHandle, out externalName, out imageURL, out reason, out sizeX, out sizeY);
 
             Hashtable hash = new Hashtable();
             hash["result"] = success.ToString();

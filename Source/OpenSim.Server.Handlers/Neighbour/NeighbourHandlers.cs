@@ -25,35 +25,35 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Reflection;
 using System.Net;
-using System.Text;
-
-using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
+
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 
 namespace OpenSim.Server.Handlers.Neighbour
 {
     public class NeighbourSimpleHandler : SimpleStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private INeighbourService m_NeighbourService;
-        private IAuthenticationService m_AuthenticationService;
+        private readonly ILogger m_logger;
+        private readonly INeighbourService m_NeighbourService;
+        private readonly IAuthenticationService m_AuthenticationService;
 
-        public NeighbourSimpleHandler(INeighbourService service, IAuthenticationService authentication) :
-                base("/region")
+        public NeighbourSimpleHandler(
+            ILogger logger,
+            INeighbourService service, 
+            IAuthenticationService authentication) :
+            base("/region")
         {
+            m_logger = logger;
             m_NeighbourService = service;
             m_AuthenticationService = authentication;
         }
@@ -83,18 +83,21 @@ namespace OpenSim.Server.Handlers.Neighbour
                     if (!RestHandlerUtils.GetParams(httpRequest.UriPath, out UUID regionID, out ulong regionHandle, out string action)
                         || regionID.IsZero())
                     {
-                        m_log.InfoFormat("[RegionPostHandler]: Invalid parameters for neighbour message {0}", httpRequest.UriPath);
+                        m_logger.LogInformation($"[RegionPostHandler]: Invalid parameters for neighbour message {httpRequest.UriPath}");
                         httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
                         return;
                     }
+
                     ProcessPostRequest(args, httpRequest, httpResponse, regionID);
                     break;
                 }
+
                 case "GET":
                 case "PUT":
                 case "DELETE":
                     httpResponse.StatusCode = (int)HttpStatusCode.NotImplemented;
                     return;
+
                 default:
                 {
                     httpResponse.StatusCode = (int)HttpStatusCode.MethodNotAllowed;
@@ -111,12 +114,14 @@ namespace OpenSim.Server.Handlers.Neighbour
                 // Authentication
                 string authority = string.Empty;
                 string authToken = string.Empty;
+                
                 if (!RestHandlerUtils.GetAuthentication(httpRequest, out authority, out authToken))
                 {
-                    m_log.InfoFormat("[RegionPostHandler]: Authentication failed for neighbour message");
+                    m_logger.LogInformation($"[RegionPostHandler]: Authentication failed for neighbour message");
                     httpResponse.StatusCode = (int)HttpStatusCode.Unauthorized;
                     return;
                 }
+
                 // TODO: Rethink this
                 //if (!m_AuthenticationService.VerifyKey(regionID, authToken))
                 //{
@@ -124,7 +129,7 @@ namespace OpenSim.Server.Handlers.Neighbour
                 //    httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
                 //    return result;
                 //}
-                m_log.DebugFormat("[RegionPostHandler]: Authentication succeeded for {0}", regionID);
+                m_logger.LogDebug($"[RegionPostHandler]: Authentication succeeded for {regionID}");
             }
 
             // retrieve the regionhandle
@@ -133,20 +138,20 @@ namespace OpenSim.Server.Handlers.Neighbour
                 UInt64.TryParse(args["destination_handle"].AsString(), out regionhandle);
 
             RegionInfo aRegion = new RegionInfo();
+
             try
             {
                 aRegion.UnpackRegionInfoData(args);
             }
             catch (Exception ex)
             {
-                m_log.InfoFormat("[RegionPostHandler]: exception on unpacking region info {0}", ex.Message);
+                m_logger.LogInformation(ex, $"[RegionPostHandler]: exception on unpacking region info");
                 httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
                 return;
             }
 
             // Finally!
             GridRegion thisRegion = m_NeighbourService.HelloNeighbour(regionhandle, aRegion);
-
             OSDMap resp = new OSDMap(1);
 
             if (thisRegion != null)
@@ -159,4 +164,3 @@ namespace OpenSim.Server.Handlers.Neighbour
         }
     }
 }
-

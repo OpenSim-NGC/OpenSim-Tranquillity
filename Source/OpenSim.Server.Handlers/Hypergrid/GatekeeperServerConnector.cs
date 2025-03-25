@@ -25,65 +25,53 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using Nini.Config;
-using OpenSim.Framework;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
-using log4net;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
-namespace OpenSim.Server.Handlers.Hypergrid
+using Autofac;
+
+namespace OpenSim.Server.Handlers.Hypergrid;
+
+public class GatekeeperServiceInConnector(
+    IConfiguration config,
+    ILogger<GatekeeperServiceInConnector> logger,
+    IComponentContext componentContext)
+    : IServiceConnector
 {
-    public class GatekeeperServiceInConnector : ServiceConnector
+    private IGatekeeperService m_GatekeeperService = null;
+    private bool m_Proxy = false;
+
+    public string ConfigName { get; private set; }
+    public IHttpServer HttpServer { get; private set; }
+    
+    public void Initialize(IHttpServer httpServer, string configName = "GatekeeperService")
     {
-//        private static readonly ILog m_log =
-//                LogManager.GetLogger(
-//                MethodBase.GetCurrentMethod().DeclaringType);
+        HttpServer = httpServer;
+        ConfigName = configName;
 
-        private IGatekeeperService m_GatekeeperService;
-        public IGatekeeperService GateKeeper
+        var gridConfig = config.GetSection(ConfigName);
+        if (gridConfig.Exists() is false)
         {
-            get { return m_GatekeeperService; }
+            var serviceName = gridConfig.GetValue("LocalServiceModule", string.Empty);
+            if (string.IsNullOrWhiteSpace(serviceName))
+                throw new Exception("No LocalServiceModule in config file");
+
+            m_GatekeeperService = componentContext.ResolveNamed<IGatekeeperService>(serviceName);
         }
 
-        bool m_Proxy = false;
+        if (m_GatekeeperService == null)
+            throw new Exception("Gatekeeper server connector cannot proceed because of missing service");
 
-        public GatekeeperServiceInConnector(IConfigSource config, IHttpServer server, ISimulationService simService) :
-                base(config, server, String.Empty)
-        {
-            IConfig gridConfig = config.Configs["GatekeeperService"];
-            if (gridConfig != null)
-            {
-                string serviceDll = gridConfig.GetString("LocalServiceModule", string.Empty);
-                Object[] args = new Object[] { config, simService };
-                m_GatekeeperService = ServerUtils.LoadPlugin<IGatekeeperService>(serviceDll, args);
+        m_Proxy = gridConfig.GetValue<bool>("HasProxy", false);
 
-            }
-            if (m_GatekeeperService == null)
-                throw new Exception("Gatekeeper server connector cannot proceed because of missing service");
+        var hghandlers = new HypergridHandlers(logger, m_GatekeeperService);
 
-            m_Proxy = gridConfig.GetBoolean("HasProxy", false);
-
-            HypergridHandlers hghandlers = new HypergridHandlers(m_GatekeeperService);
-            server.AddXmlRPCHandler("link_region", hghandlers.LinkRegionRequest, false);
-            server.AddXmlRPCHandler("get_region", hghandlers.GetRegion, false);
-
-            server.AddSimpleStreamHandler(new GatekeeperAgentHandler(m_GatekeeperService, m_Proxy),true);
-        }
-
-        public GatekeeperServiceInConnector(IConfigSource config, IHttpServer server, string configName)
-            : this(config, server, (ISimulationService)null)
-        {
-        }
-
-        public GatekeeperServiceInConnector(IConfigSource config, IHttpServer server)
-            : this(config, server, String.Empty)
-        {
-        }
+        HttpServer.AddXmlRPCHandler("link_region", hghandlers.LinkRegionRequest, false);
+        HttpServer.AddXmlRPCHandler("get_region", hghandlers.GetRegion, false);
+        HttpServer.AddSimpleStreamHandler(new GatekeeperAgentHandler(logger, m_GatekeeperService, m_Proxy),true);
     }
 }

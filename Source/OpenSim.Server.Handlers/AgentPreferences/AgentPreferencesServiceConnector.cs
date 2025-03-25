@@ -25,40 +25,48 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
-using System;
-using Nini.Config;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Server.Handlers.AgentPreferences
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+using Autofac;
+using OpenSim.Server.Base;
+
+namespace OpenSim.Server.Handlers.AgentPreferences;
+
+public class AgentPreferencesServiceConnector(
+    IComponentContext componentContext,
+    IConfiguration configuration,
+    ILogger<AgentPreferencesServiceConnector> logger)
+    : IServiceConnector
 {
-    public class AgentPreferencesServiceConnector : ServiceConnector
+    public string ConfigName { get; private set; } 
+    public IHttpServer HttpServer { get; private set; }
+
+    public void Initialize(IHttpServer server, string configName = "AgentPreferencesService")
     {
-        private IAgentPreferencesService m_AgentPreferencesService;
-        private string m_ConfigName = "AgentPreferencesService";
+        var serverConfig = configuration.GetSection(ConfigName);
+        if (serverConfig.Exists() is false)
+            throw new Exception($"No section {ConfigName} in config file");
 
-        public AgentPreferencesServiceConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
+        string service = serverConfig.GetValue<string>("LocalServiceModule", String.Empty);
+        if (String.IsNullOrWhiteSpace(service))
+            throw new Exception("No LocalServiceModule in config file");
+
+        var serviceName = ServerUtils.ParseServiceName(service);
+
+        var agentPreferencesService = componentContext.ResolveNamed<IAgentPreferencesService>(serviceName);
+        if (agentPreferencesService is null)
         {
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
-
-            string service = serverConfig.GetString("LocalServiceModule", String.Empty);
-
-            if (String.IsNullOrWhiteSpace(service))
-                throw new Exception("No LocalServiceModule in config file");
-
-            Object[] args = new Object[] { config };
-            m_AgentPreferencesService = ServerUtils.LoadPlugin<IAgentPreferencesService>(service, args);
-
-            IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
-
-            server.AddStreamHandler(new AgentPreferencesServerPostHandler(m_AgentPreferencesService, auth));
+            logger.LogError($"[SERVER]: Failed to load {serviceName}");
         }
+        
+        var auth = ServiceAuth.Create(configuration, ConfigName);
+        server.AddStreamHandler(new AgentPreferencesServerPostHandler(logger, agentPreferencesService, auth));
     }
 }
+

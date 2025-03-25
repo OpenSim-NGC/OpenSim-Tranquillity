@@ -25,50 +25,56 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
-using Nini.Config;
 using OpenMetaverse;
+
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Console;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Autofac;
+
 namespace OpenSim.Server.Handlers.Asset
 {
-    public class AssetServiceConnector : ServiceConnector
+    public class AssetServiceConnector(
+        IComponentContext componentContext,
+        IConfiguration configuration,
+        ILogger<AssetServiceConnector> logger)
+        : IServiceConnector
     {
-        private IAssetService m_AssetService;
-        private string m_ConfigName = "AssetService";
+        private IAssetService _assetService;
 
-        public AssetServiceConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
+        public string ConfigName { get; private set; }
+        public IHttpServer HttpServer { get; private set; }
+
+        public void Initialize(IHttpServer httpServer, string configName = "AssetService")
         {
-            if (string.IsNullOrEmpty(configName) is false)
-                m_ConfigName = configName;
+            HttpServer = httpServer;
+            ConfigName = configName;
 
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section '{0}' in config file", m_ConfigName));
+            var serverConfig = configuration.GetSection(ConfigName);
+            if (serverConfig.Exists() is false)
+                throw new Exception($"No section {ConfigName} in config file");
 
-            string assetService = serverConfig.GetString("LocalServiceModule", string.Empty);
-
+            string assetService = serverConfig.GetValue<string>("LocalServiceModule", String.Empty);
             if (string.IsNullOrEmpty(assetService))
                 throw new Exception("No LocalServiceModule in config file");
 
-            object[] args = new object[] { config, m_ConfigName };
-            m_AssetService = ServerUtils.LoadPlugin<IAssetService>(assetService, args);
+            var serviceName = assetService.Split(":")[1];
+            _assetService = componentContext.ResolveNamed<IAssetService>(serviceName);
 
-            if (m_AssetService == null)
-                throw new Exception(string.Format("Failed to load AssetService from {0}; config is {1}", assetService, m_ConfigName));
+            if (_assetService == null)
+            {
+                throw new Exception($"Failed to load AssetService from {assetService}; config is {ConfigName}");
+            }
 
-            bool allowDelete = serverConfig.GetBoolean("AllowRemoteDelete", false);
-            bool allowDeleteAllTypes = serverConfig.GetBoolean("AllowRemoteDeleteAllTypes", false);
-
-            string redirectURL = serverConfig.GetString("RedirectURL", string.Empty);
+            var allowDelete = serverConfig.GetValue<bool>("AllowRemoteDelete", false);
+            var allowDeleteAllTypes = serverConfig.GetValue<bool>("AllowRemoteDeleteAllTypes", false);
+            var redirectUrl = serverConfig.GetValue<string>("RedirectURL", string.Empty);
 
             AllowedRemoteDeleteTypes allowedRemoteDeleteTypes;
 
@@ -84,12 +90,12 @@ namespace OpenSim.Server.Handlers.Asset
                     allowedRemoteDeleteTypes = AllowedRemoteDeleteTypes.MapTile;
             }
 
-            IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
+            IServiceAuth auth = ServiceAuth.Create(configuration, ConfigName);
 
-            server.AddStreamHandler(new AssetServerGetHandler(m_AssetService, auth, redirectURL));
-            server.AddStreamHandler(new AssetServerPostHandler(m_AssetService, auth));
-            server.AddStreamHandler(new AssetServerDeleteHandler(m_AssetService, allowedRemoteDeleteTypes, auth));
-            server.AddStreamHandler(new AssetsExistHandler(m_AssetService));
+            HttpServer.AddStreamHandler(new AssetServerGetHandler(logger, _assetService, auth, redirectUrl));
+            HttpServer.AddStreamHandler(new AssetServerPostHandler(_assetService, auth));
+            HttpServer.AddStreamHandler(new AssetServerDeleteHandler(logger, _assetService, allowedRemoteDeleteTypes, auth));
+            HttpServer.AddStreamHandler(new AssetsExistHandler(_assetService));
 
             MainConsole.Instance.Commands.AddCommand("Assets", false,
                     "show asset",
@@ -119,7 +125,7 @@ namespace OpenSim.Server.Handlers.Asset
                 return;
             }
 
-            AssetBase asset = m_AssetService.Get(args[2]);
+            AssetBase asset = _assetService.Get(args[2]);
 
             if (asset == null || asset.Data.Length == 0)
             {
@@ -127,7 +133,7 @@ namespace OpenSim.Server.Handlers.Asset
                 return;
             }
 
-            if (!m_AssetService.Delete(asset.ID))
+            if (!_assetService.Delete(asset.ID))
                 MainConsole.Instance.Output("ERROR: Could not delete asset {0} {1}", asset.ID, asset.Name);
             else
                 MainConsole.Instance.Output("Deleted asset {0} {1}", asset.ID, asset.Name);
@@ -150,7 +156,7 @@ namespace OpenSim.Server.Handlers.Asset
                 return;
             }
 
-            AssetBase asset = m_AssetService.Get(assetId.ToString());
+            AssetBase asset = _assetService.Get(assetId.ToString());
             if (asset == null)
             {
                 MainConsole.Instance.Output("ERROR: No asset found with ID {0}", assetId);
@@ -181,7 +187,7 @@ namespace OpenSim.Server.Handlers.Asset
                 return;
             }
 
-            AssetBase asset = m_AssetService.Get(args[2]);
+            AssetBase asset = _assetService.Get(args[2]);
 
             if (asset == null || asset.Data.Length == 0)
             {

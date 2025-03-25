@@ -25,97 +25,100 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Net;
-using System.Reflection;
 
-using Nini.Config;
-using OpenSim.Framework;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
+
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
-using log4net;
 using Nwc.XmlRpc;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+using Autofac;
+
 namespace OpenSim.Server.Handlers.Hypergrid
 {
-    public class UserAgentServerConnector : ServiceConnector
+    public class UserAgentServerConnector : IServiceConnector
     {
-//        private static readonly ILog m_log =
-//                LogManager.GetLogger(
-//                MethodBase.GetCurrentMethod().DeclaringType);
+        private string[]? m_AuthorizedCallers;
+        private bool m_VerifyCallers = false;
 
-        private IUserAgentService m_HomeUsersService;
-        public IUserAgentService HomeUsersService
+        private readonly IConfiguration m_configuration;
+        private readonly ILogger<UserAgentServerConnector> m_logger;
+        private readonly IComponentContext m_context;
+        
+        public UserAgentServerConnector(
+            IComponentContext componentContext,
+            IConfiguration config, 
+            ILogger<UserAgentServerConnector> logger)
+        {
+            m_configuration = config;
+            m_logger = logger;
+            m_context = componentContext;
+        }
+
+        private IUserAgentService? m_HomeUsersService;
+        
+        public IUserAgentService? HomeUsersService
         {
             get { return m_HomeUsersService; }
         }
 
-        private string[] m_AuthorizedCallers;
+        public string ConfigName { get; private set; } = "UserAgentServerConnector";    // "UserAgentService";
 
-        private bool m_VerifyCallers = false;
+        public IHttpServer HttpServer { get; private set; }
 
-        public UserAgentServerConnector(IConfigSource config, IHttpServer server) :
-            this(config, server, (IFriendsSimConnector)null)
+        public void Initialize(IHttpServer httpServer)
         {
-        }
+            HttpServer = httpServer;
 
-        public UserAgentServerConnector(IConfigSource config, IHttpServer server, string configName) :
-            this(config, server)
-        {
-        }
-
-        public UserAgentServerConnector(IConfigSource config, IHttpServer server, IFriendsSimConnector friendsConnector) :
-                base(config, server, String.Empty)
-        {
-            IConfig gridConfig = config.Configs["UserAgentService"];
-            if (gridConfig != null)
+            var gridConfig = m_configuration.GetSection(ConfigName);
+            if (gridConfig.Exists())
             {
-                string serviceDll = gridConfig.GetString("LocalServiceModule", string.Empty);
-
-                Object[] args = new Object[] { config, friendsConnector };
-                m_HomeUsersService = ServerUtils.LoadPlugin<IUserAgentService>(serviceDll, args);
+                string? service = gridConfig.GetValue("LocalServiceModule", string.Empty);
+                if (string.IsNullOrEmpty(service) is false)
+                    m_HomeUsersService = m_context.ResolveNamed<IUserAgentService>(service);
             }
+
             if (m_HomeUsersService == null)
                 throw new Exception("UserAgent server connector cannot proceed because of missing service");
 
-            string loginServerIP = gridConfig.GetString("LoginServerIP", "127.0.0.1");
-            bool proxy = gridConfig.GetBoolean("HasProxy", false);
+            string? loginServerIP = gridConfig.GetValue("LoginServerIP", "127.0.0.1");
+            bool proxy = gridConfig.GetValue<bool>("HasProxy", false);
+            m_VerifyCallers = gridConfig.GetValue<bool>("VerifyCallers", false);
 
-            m_VerifyCallers = gridConfig.GetBoolean("VerifyCallers", false);
-            string csv = gridConfig.GetString("AuthorizedCallers", "127.0.0.1");
-            csv = csv.Replace(" ", "");
-            m_AuthorizedCallers = csv.Split(',');
+            string? csv = gridConfig.GetValue("AuthorizedCallers", "127.0.0.1");
+            csv = csv?.Replace(" ", "");
 
-            server.AddXmlRPCHandler("agent_is_coming_home", AgentIsComingHome, false);
-            server.AddXmlRPCHandler("get_home_region", GetHomeRegion, false);
-            server.AddXmlRPCHandler("verify_agent", VerifyAgent, false);
-            server.AddXmlRPCHandler("verify_client", VerifyClient, false);
-            server.AddXmlRPCHandler("logout_agent", LogoutAgent, false);
+            m_AuthorizedCallers = csv?.Split(',');
 
-#pragma warning disable 0612
-            server.AddXmlRPCHandler("status_notification", StatusNotification, false);
-            server.AddXmlRPCHandler("get_online_friends", GetOnlineFriends, false);
-#pragma warning restore 0612
-            server.AddXmlRPCHandler("get_user_info", GetUserInfo, false);
-            server.AddXmlRPCHandler("get_server_urls", GetServerURLs, false);
+            HttpServer.AddXmlRPCHandler("agent_is_coming_home", AgentIsComingHome, false);
+            HttpServer.AddXmlRPCHandler("get_home_region", GetHomeRegion, false);
+            HttpServer.AddXmlRPCHandler("verify_agent", VerifyAgent, false);
+            HttpServer.AddXmlRPCHandler("verify_client", VerifyClient, false);
+            HttpServer.AddXmlRPCHandler("logout_agent", LogoutAgent, false);
+            HttpServer.AddXmlRPCHandler("status_notification", StatusNotification, false);
+            HttpServer.AddXmlRPCHandler("get_online_friends", GetOnlineFriends, false);
+            HttpServer.AddXmlRPCHandler("get_user_info", GetUserInfo, false);
+            HttpServer.AddXmlRPCHandler("get_server_urls", GetServerURLs, false);
 
-            server.AddXmlRPCHandler("locate_user", LocateUser, false);
-            server.AddXmlRPCHandler("get_uui", GetUUI, false);
-            server.AddXmlRPCHandler("get_uuid", GetUUID, false);
+            HttpServer.AddXmlRPCHandler("locate_user", LocateUser, false);
+            HttpServer.AddXmlRPCHandler("get_uui", GetUUI, false);
+            HttpServer.AddXmlRPCHandler("get_uuid", GetUUID, false);
 
-            server.AddSimpleStreamHandler(new HomeAgentHandler(m_HomeUsersService, loginServerIP, proxy), true);
+            HttpServer.AddSimpleStreamHandler(new HomeAgentHandler(m_logger, m_HomeUsersService, loginServerIP, proxy), true);
         }
 
         public XmlRpcResponse GetHomeRegion(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            Hashtable requestData = (Hashtable)request.Params[0];
+            Hashtable? requestData = (Hashtable)request.Params[0];
             //string host = (string)requestData["host"];
             //string portstr = (string)requestData["port"];
             string userID_str = (string)requestData["userID"];

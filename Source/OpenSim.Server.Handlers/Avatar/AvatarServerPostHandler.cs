@@ -25,43 +25,39 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
+using OpenMetaverse;
+using OpenSim.Framework;
+using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-using OpenSim.Framework;
-using OpenSim.Framework.ServiceAuth;
-using OpenSim.Framework.Servers.HttpServer;
-using OpenMetaverse;
+using System.Xml;
 
 namespace OpenSim.Server.Handlers.Avatar
 {
     public class AvatarServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        private ILogger m_logger;
         private IAvatarService m_AvatarService;
 
-        public AvatarServerPostHandler(IAvatarService service, IServiceAuth auth) :
-                base("POST", "/avatar", auth)
+        public AvatarServerPostHandler(
+            ILogger logger,
+            IAvatarService service, IServiceAuth auth) :
+            base("POST", "/avatar", auth)
         {
+            m_logger = logger;
             m_AvatarService = service;
         }
 
-        protected override byte[] ProcessRequest(string path, Stream requestData,
-                IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        protected override byte[] ProcessRequest(
+            string path,
+            Stream requestData,
+            IOSHttpRequest httpRequest,
+            IOSHttpResponse httpResponse)
         {
             string body;
-            using(StreamReader sr = new StreamReader(requestData))
+            using (StreamReader sr = new StreamReader(requestData))
                 body = sr.ReadToEnd();
             body = body.Trim();
 
@@ -81,27 +77,31 @@ namespace OpenSim.Server.Handlers.Avatar
                 {
                     case "getavatar":
                         return GetAvatar(request);
+
                     case "setavatar":
                         return SetAvatar(request);
+
                     case "resetavatar":
                         return ResetAvatar(request);
+
                     case "setitems":
                         return SetItems(request);
+
                     case "removeitems":
                         return RemoveItems(request);
                 }
-                m_log.DebugFormat("[AVATAR HANDLER]: unknown method request: {0}", method);
+
+                m_logger.LogDebug($"[AVATAR HANDLER]: unknown method request: {method}");
             }
             catch (Exception e)
             {
-                m_log.Debug("[AVATAR HANDLER]: Exception {0}" + e);
+                m_logger.LogDebug(e, "[AVATAR HANDLER]: Exception.");
             }
 
             return FailureResult();
-
         }
 
-        byte[] GetAvatar(Dictionary<string, object> request)
+        private byte[] GetAvatar(Dictionary<string, object> request)
         {
             UUID user = UUID.Zero;
 
@@ -128,7 +128,7 @@ namespace OpenSim.Server.Handlers.Avatar
             return FailureResult();
         }
 
-        byte[] SetAvatar(Dictionary<string, object> request)
+        private byte[] SetAvatar(Dictionary<string, object> request)
         {
             UUID user = UUID.Zero;
 
@@ -147,7 +147,7 @@ namespace OpenSim.Server.Handlers.Avatar
             return FailureResult();
         }
 
-        byte[] ResetAvatar(Dictionary<string, object> request)
+        private byte[] ResetAvatar(Dictionary<string, object> request)
         {
             UUID user = UUID.Zero;
             if (!request.ContainsKey("UserID"))
@@ -176,7 +176,7 @@ namespace OpenSim.Server.Handlers.Avatar
             request.Remove("UserID");
         }
 
-        byte[] SetItems(Dictionary<string, object> request)
+        private byte[] SetItems(Dictionary<string, object> request)
         {
             UUID user = UUID.Zero;
             string[] names, values;
@@ -203,7 +203,7 @@ namespace OpenSim.Server.Handlers.Avatar
             return FailureResult();
         }
 
-        byte[] RemoveItems(Dictionary<string, object> request)
+        private byte[] RemoveItems(Dictionary<string, object> request)
         {
             UUID user = UUID.Zero;
             string[] names;
@@ -226,19 +226,15 @@ namespace OpenSim.Server.Handlers.Avatar
             return FailureResult();
         }
 
-
-
         private byte[] SuccessResult()
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
             doc.AppendChild(rootElement);
 
@@ -254,13 +250,11 @@ namespace OpenSim.Server.Handlers.Avatar
         {
             XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
             doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
             doc.AppendChild(rootElement);
 
@@ -271,6 +265,5 @@ namespace OpenSim.Server.Handlers.Avatar
 
             return Util.DocToBytes(doc);
         }
-
     }
 }

@@ -25,36 +25,42 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using Nini.Config;
-using System.Collections.Generic;
-using System.Reflection;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework.ServiceAuth;
+using Microsoft.Extensions.Configuration;
 
 namespace OpenSim.Services.Connectors
 {
-    public class HGAssetServiceConnector : IAssetService
+    public class HGAssetServiceConnector : BaseServiceConnector, IAssetService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<HGAssetServiceConnector> _logger;
+        private readonly IServiceAuth _auth;
+
         private ExpiringCacheOS<string, AssetServicesConnector> m_connectors = new ExpiringCacheOS<string, AssetServicesConnector>(60000);
 
-        public HGAssetServiceConnector(IConfigSource source)
+        public HGAssetServiceConnector(
+            IConfiguration configuration,
+            ILogger<HGAssetServiceConnector> logger)
         {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
-            {
-                // string name = moduleConfig.GetString("AssetServices", "");
+            _logger = logger;
+            _auth = AuthType(configuration, "AssetService");
 
-                IConfig assetConfig = source.Configs["AssetService"];
-                if (assetConfig == null)
+            var moduleConfig = configuration.GetSection("Modules");
+            if (moduleConfig.Exists())
+            {
+                var name = moduleConfig.GetValue("AssetServices", string.Empty);;
+
+                var assetConfig = configuration.GetSection("AssetService");
+                if (assetConfig.Exists() is false)
                 {
-                    m_log.Error("[HG ASSET SERVICE]: AssetService missing from OpenSim.ini");
+                    _logger.LogError("[HG ASSET SERVICE]: AssetService missing from OpenSim.ini");
                     return;
                 }
 
-                m_log.Info("[HG ASSET SERVICE]: HG asset service enabled");
+                _logger.LogInformation("[HG ASSET SERVICE]: HG asset service enabled");
             }
         }
 

@@ -25,42 +25,47 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using log4net;
-using Nini.Config;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Server.Handlers.Neighbour
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+namespace OpenSim.Server.Handlers.Neighbour;
+
+public class NeighbourServiceInConnector(
+    IConfiguration config,
+    ILogger<NeighbourServiceInConnector> logger,
+    INeighbourService nService,
+    IScene scene)
+    : IServiceConnector
 {
-    public class NeighbourServiceInConnector : ServiceConnector
+    private const string _ConfigName = "NeighbourService";
+
+    private IScene m_Scene = scene;
+    private IAuthenticationService m_AuthenticationService = null;
+    
+    public string ConfigName { get; private set; } = _ConfigName;
+    public IHttpServer HttpServer { get; private set; }
+    
+    public void Initialize(IHttpServer httpServer, string configName = _ConfigName)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private INeighbourService m_NeighbourService;
-        private IAuthenticationService m_AuthenticationService = null;
-
-        public NeighbourServiceInConnector(IConfigSource source, IHttpServer server, INeighbourService nService, IScene scene) :
-                base(source, server, String.Empty)
+        HttpServer = httpServer;
+        ConfigName = configName;
+        
+        if (nService == null)
         {
-
-            m_NeighbourService = nService;
-            if (m_NeighbourService == null)
-            {
-                m_log.Error("[NEIGHBOUR IN CONNECTOR]: neighbour service was not provided");
-                return;
-            }
-
-            //bool authentication = neighbourConfig.GetBoolean("RequireAuthentication", false);
-            //if (authentication)
-            //    m_AuthenticationService = scene.RequestModuleInterface<IAuthenticationService>();
-
-            server.AddSimpleStreamHandler(new NeighbourSimpleHandler(m_NeighbourService, m_AuthenticationService), true);
+            logger.LogError("Neighbour service was not provided");
+            return;
         }
+
+        //bool authentication = neighbourConfig.GetBoolean("RequireAuthentication", false);
+        //if (authentication)
+        //    m_AuthenticationService = scene.RequestModuleInterface<IAuthenticationService>();
+
+        HttpServer.AddSimpleStreamHandler(new NeighbourSimpleHandler(logger, nService, m_AuthenticationService), true);
     }
 }
+

@@ -1,45 +1,36 @@
-using log4net;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using Nini.Config;
 using OpenSim.Framework;
-
-using OpenSim.Framework.ServiceAuth;
 using OpenSim.Services.Interfaces;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Server.Base;
 using OpenMetaverse;
-using System.Security.AccessControl;
-using OpenSim.Data;
-using System.Linq;
 
-namespace OpenSim.Services.Connectors
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework.ServiceAuth;
+
+namespace OpenSim.Services.Connectors.Experience
 {
     public class ExperienceServicesConnector : BaseServiceConnector, IExperienceService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private const string SECTION_NAME = "Experience";
+        private const string SERVICE_URI = "experience";
+        private const string CONNECTION_URI = "experience";
+        
+        private readonly IConfiguration _configuration;
+        private readonly ILogger _logger;
+        private readonly IServiceAuth _auth;
+        private readonly string _serverURI;
 
-        private string m_ServerURI = String.Empty;
-
-        public ExperienceServicesConnector()
+        public ExperienceServicesConnector(
+            IConfiguration configuration,
+            ILogger<ExperienceServicesConnector> logger)
         {
-        }
-
-        public ExperienceServicesConnector(string serverURI)
-        {
-            m_ServerURI = serverURI.TrimEnd('/') + "/experience";
-        }
-
-        public ExperienceServicesConnector(IConfigSource source)
-        {
-            Initialise(source);
-        }
-
-        public virtual void Initialise(IConfigSource source)
-        {
-            IConfig gridConfig = source.Configs["ExperienceService"];
+            _configuration = configuration;
+            _logger = logger;
+            
+            _auth = new AuthType(configuration, SECTION_NAME);
+            _serverURI = this.ServiceURI(configuration, SECTION_NAME, SERVICE_URI);
+            
+            var gridConfig = source.Configs["ExperienceService"];
             if (gridConfig == null)
             {
                 m_log.Error("[EXPERIENCE CONNECTOR]: ExperienceService missing from configuration");

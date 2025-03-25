@@ -71,21 +71,7 @@ namespace OpenSim.Server.RobustServer
             }
         }
 
-        private IConfig LoadConfiguration(string[] args)
-        {
-            XmlConfigurator.Configure();
-
-            IConfig serverConfig = m_Server.Config.Configs["Startup"];
-            if (serverConfig == null)
-            {
-                System.Console.WriteLine("Startup config section missing in .ini file");
-                throw new Exception("Configuration error");
-            }
-
-            return serverConfig;
-        }
-
-        private void InitializeNetwork(IConfig serverConfig, string[] args)
+        private void InitializeNetwork(string[] args)
         {
             Culture.SetCurrentCulture();
             Culture.SetDefaultCurrentCulture();
@@ -98,6 +84,8 @@ namespace OpenSim.Server.RobustServer
             // ServicePointManager.ServerCertificateValidationCallback = ValidateServerCertificate;
 
             m_Server = new HttpServerBase("R.O.B.U.S.T.", args);
+            
+            IConfig serverConfig = m_Server.Config.Configs["Startup"];
 
             // int dnsTimeout = serverConfig.GetInt("DnsTimeout", 30000);
             // try { ServicePointManager.DnsRefreshTimeout = dnsTimeout; } catch { }
@@ -138,8 +126,10 @@ namespace OpenSim.Server.RobustServer
                 friendlyName = parts[1];
         }
 
-        private void InitalizeServiceConnectors(IConfig serverConfig)
+        private void InitalizeServiceConnectors()
         {
+            IConfig serverConfig = m_Server.Config.Configs["Startup"];
+
             string connList = serverConfig.GetString("ServiceConnectors", string.Empty);
             IConfig servicesConfig = m_Server.Config.Configs["ServiceList"];
 
@@ -193,32 +183,23 @@ namespace OpenSim.Server.RobustServer
 
                 try
                 {
-                    IServiceConnector connector = _componentContext.ResolveNamed<IServiceConnector>(friendlyName);
+                    var connector = _componentContext.ResolveNamed<IServiceConnector>(friendlyName);
+                    if (connector is not null)
+                    {
+                        connector.Initialize(server, configName);
+                        m_ServiceConnectors.Add(connector);
+                        _logger.LogInformation($"[SERVER]: {friendlyName} loaded successfully");
+                    }
+                    else
+                    {
+                        _logger.LogError($"[SERVER]: Failed to load {conn}");
+                    }
                 }
                 catch (Exception e)
                 {
                     _logger.LogError(e, $"[SERVER]: Failed to load {friendlyName}");
                     continue;
                 }
-
-                // object[] modargs = new object[] { m_Server.Config, server, configName };
-                // connector = ServerUtils.LoadPlugin<IServiceConnector>(conn, modargs);
-
-                // if (connector == null)
-                // {
-                //     modargs = new object[] { m_Server.Config, server };
-                //     connector = ServerUtils.LoadPlugin<IServiceConnector>(conn, modargs);
-                // }
-
-                // if (connector != null)
-                // {
-                //     m_ServiceConnectors.Add(connector);
-                //     _logger.LogInformation($"[SERVER]: {friendlyName} loaded successfully");
-                // }
-                // else
-                // {
-                //     _logger.LogError($"[SERVER]: Failed to load {conn}");
-                // }
             }
         }
 
@@ -227,11 +208,11 @@ namespace OpenSim.Server.RobustServer
             var args = Environment.GetCommandLineArgs();
 
             _logger.LogInformation($"{nameof(RobustServer)} is running.");
+            
+            XmlConfigurator.Configure();
 
-            IConfig serverConfig = LoadConfiguration(args);
-
-            InitializeNetwork(serverConfig, args);
-            InitalizeServiceConnectors(serverConfig);
+            InitializeNetwork(args);
+            InitalizeServiceConnectors();
 
             PrintFileToConsole("robuststartuplogo.txt");
 

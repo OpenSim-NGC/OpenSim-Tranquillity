@@ -25,21 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
 using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
 using System.Xml.Serialization;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Asset
 {
@@ -55,28 +48,37 @@ namespace OpenSim.Server.Handlers.Asset
 
     public class AssetServerDeleteHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private IAssetService m_AssetService;
+        private readonly ILogger m_logger;
+        private readonly IAssetService m_AssetService;
 
         /// <summary>
         /// Asset types that can be deleted remotely.
         /// </summary>
         private AllowedRemoteDeleteTypes m_allowedTypes;
 
-        public AssetServerDeleteHandler(IAssetService service, AllowedRemoteDeleteTypes allowedTypes) :
-                base("DELETE", "/assets")
+        public AssetServerDeleteHandler(
+            ILogger logger,
+            IAssetService service, 
+            AllowedRemoteDeleteTypes allowedTypes) :
+            base("DELETE", "/assets")
         {
+            m_logger = logger;
             m_AssetService = service;
             m_allowedTypes = allowedTypes;
         }
 
-        public AssetServerDeleteHandler(IAssetService service, AllowedRemoteDeleteTypes allowedTypes, IServiceAuth auth) :
+        public AssetServerDeleteHandler(
+            ILogger logger,            
+            IAssetService service, 
+            AllowedRemoteDeleteTypes allowedTypes, 
+            IServiceAuth auth) :
             base("DELETE", "/assets", auth)
         {
+            m_logger = logger;
             m_AssetService = service;
             m_allowedTypes = allowedTypes;
         }
+
         protected override byte[] ProcessRequest(string path, Stream request,
                 IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
@@ -100,9 +102,9 @@ namespace OpenSim.Server.Handlers.Asset
                         }
                         else
                         {
-                            m_log.DebugFormat(
-                                "[ASSET SERVER DELETE HANDLER]: Request to delete asset {0}, but type is {1} and allowed remote delete types are {2}",
-                                assetID, (AssetFlags)asset.Flags, m_allowedTypes);
+                            m_logger.LogDebug(
+                                $"[ASSET SERVER DELETE HANDLER]: Request to delete asset {assetID}, " +
+                                $"but type is {(AssetFlags)asset.Flags} and allowed remote delete types are {m_allowedTypes}");
                         }
                     }
                 }

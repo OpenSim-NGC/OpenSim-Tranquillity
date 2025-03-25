@@ -25,12 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
-using System.Reflection;
 using System.Net;
 
 using OpenSim.Services.Interfaces;
@@ -40,8 +34,7 @@ using OpenSim.Framework.Servers.HttpServer;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-
-using log4net;
+using Microsoft.Extensions.Logging;
 
 
 namespace OpenSim.Server.Handlers.Simulation
@@ -49,12 +42,15 @@ namespace OpenSim.Server.Handlers.Simulation
     //this is only for hg homeagent and gatekeeperagent
     public class AgentPostHandler : SimpleStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger m_logger;
 
         protected bool m_Proxy = false;
 
-        public AgentPostHandler(string path) : base(path)
+        public AgentPostHandler(
+            ILogger logger, 
+            string path) : base(path)
         {
+            m_logger = logger;
         }
 
         protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
@@ -82,7 +78,7 @@ namespace OpenSim.Server.Handlers.Simulation
 
             if (!Utils.GetParams(httpRequest.UriPath, out agentID, out regionID, out action))
             {
-                m_log.InfoFormat("[AGENT HANDLER]: Invalid parameters for agent message {0}", httpRequest.RawUrl);
+                m_logger.LogInformation($"[AGENT HANDLER]: Invalid parameters for agent message {httpRequest.RawUrl}");
 
                 httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
                 httpResponse.RawBuffer = Utils.falseStrBytes;
@@ -125,7 +121,7 @@ namespace OpenSim.Server.Handlers.Simulation
             }
             catch (Exception ex)
             {
-                m_log.InfoFormat("[AGENT HANDLER]: exception on unpacking ChildCreate message {0}", ex.Message);
+                m_logger.LogInformation(ex, $"[AGENT HANDLER]: exception on unpacking ChildCreate message,");
                 response.StatusCode = (int)HttpStatusCode.BadRequest;
                 return;
             }
@@ -170,12 +166,12 @@ namespace OpenSim.Server.Handlers.Simulation
             if (args.TryGetValue("destination_x", out tmpOSD) && tmpOSD != null)
                 Int32.TryParse(tmpOSD.AsString(), out data.x);
             else
-                m_log.WarnFormat("  -- request didn't have destination_x");
+                m_logger.LogWarning("  -- request didn't have destination_x");
 
             if (args.TryGetValue("destination_y", out tmpOSD) && tmpOSD != null)
                 Int32.TryParse(tmpOSD.AsString(), out data.y);
             else
-                m_log.WarnFormat("  -- request didn't have destination_y");
+                m_logger.LogWarning("  -- request didn't have destination_y");
 
             if (args.TryGetValue("destination_uuid", out tmpOSD) && tmpOSD != null)
                 UUID.TryParse(tmpOSD.AsString(), out data.uuid);
@@ -203,13 +199,15 @@ namespace OpenSim.Server.Handlers.Simulation
 
     public class AgentSimpleHandler : SimpleStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        private readonly ILogger m_logger;
         private ISimulationService m_SimulationService;
         protected bool m_Proxy = false;
 
-        public AgentSimpleHandler(ISimulationService service) : base("/agent")
+        public AgentSimpleHandler(
+            ILogger logger,
+            ISimulationService service) : base("/agent")
         {
+            m_logger = logger;
             m_SimulationService = service;
         }
 
@@ -219,7 +217,7 @@ namespace OpenSim.Server.Handlers.Simulation
             httpResponse.ContentType = "application/json";
             if (m_SimulationService == null)
             {
-                m_log.Debug("[AGENT HANDLER]: ProcessRequest called with null Simulation Service");
+                m_logger.LogDebug("[AGENT HANDLER]: ProcessRequest called with null Simulation Service");
                 httpResponse.StatusCode = (int)HttpStatusCode.InternalServerError;
                 httpResponse.RawBuffer = Utils.falseStrBytes;
                 return;
@@ -227,7 +225,7 @@ namespace OpenSim.Server.Handlers.Simulation
 
             if (!Utils.GetParams(httpRequest.UriPath, out UUID agentID, out UUID regionID, out string action))
             {
-                m_log.InfoFormat("[AGENT HANDLER]: Invalid parameters for agent message {0}", httpRequest.UriPath);
+                m_logger.LogInformation($"[AGENT HANDLER]: Invalid parameters for agent message {httpRequest.UriPath}");
 
                 httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
                 httpResponse.RawBuffer = Utils.falseStrBytes;
@@ -437,8 +435,9 @@ namespace OpenSim.Server.Handlers.Simulation
             }
 
             bool result = m_SimulationService.QueryAccess(destination, agentID, agentHomeURI, viaTeleport, position, features, ctx, out reason);
-            m_log.DebugFormat("[AGENT HANDLER]: QueryAccess returned {0} ({1}). Version={2}, {3}/{4}",
-                result, reason, version, inboundVersion, outboundVersion);
+            m_logger.LogDebug(
+                $"[AGENT HANDLER]: QueryAccess returned {result} ({reason}). Version={version}, " +
+                $"{inboundVersion}/{outboundVersion}");
 
             resp["success"] = OSD.FromBoolean(result);
             resp["reason"] = OSD.FromString(reason);
@@ -464,20 +463,25 @@ namespace OpenSim.Server.Handlers.Simulation
         protected void DoAgentDelete(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID agentID, string action, UUID regionID, string auth_token)
         {
             if (string.IsNullOrEmpty(action))
-                m_log.DebugFormat("[AGENT HANDLER]: >>> DELETE <<< RegionID: {0}; from: {1}; auth_code: {2}",
-                    regionID, httpRequest.RemoteIPEndPoint.Address.ToString(), auth_token);
+            {
+                m_logger.LogDebug(
+                    $"[AGENT HANDLER]: >>> DELETE <<< RegionID: {regionID}; " +
+                    $"from: {httpRequest.RemoteIPEndPoint.Address}; auth_code: {auth_token}");
+            }
             else
-                m_log.DebugFormat("[AGENT HANDLER]: Release {0} to RegionID: {1}", agentID, regionID);
-
+            {
+                m_logger.LogDebug($"[AGENT HANDLER]: Release {agentID} to RegionID: {regionID}");
+            }
 
             if (action.Equals("release"))
+            {
                 m_SimulationService.ReleaseAgent(regionID, agentID, "");
+            }
             else
             {
                 GridRegion destination = new GridRegion();
                 destination.RegionID = regionID;
-                Util.FireAndForget(
-                    o => m_SimulationService.CloseAgent(destination, agentID, auth_token), null, "AgentHandler.DoAgentDelete");
+                Util.FireAndForget(o => m_SimulationService.CloseAgent(destination, agentID, auth_token), null, "AgentHandler.DoAgentDelete");
             }
 
             httpResponse.StatusCode = (int)HttpStatusCode.OK;
@@ -511,7 +515,7 @@ namespace OpenSim.Server.Handlers.Simulation
             }
             catch (Exception ex)
             {
-                m_log.InfoFormat("[AGENT HANDLER]: exception on unpacking ChildCreate message {0}", ex.Message);
+                m_logger.LogInformation(ex, "[AGENT HANDLER]: exception on unpacking ChildCreate message.");
                 httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
                 httpResponse.RawBuffer = Util.UTF8.GetBytes("false");
                 return;
@@ -558,14 +562,22 @@ namespace OpenSim.Server.Handlers.Simulation
             OSD tmpOSD;
             // retrieve the input arguments
             if (args.TryGetValue("destination_x", out tmpOSD) && tmpOSD != null)
+            {
                 Int32.TryParse(tmpOSD.AsString(), out data.x);
+            }
             else
-                m_log.WarnFormat("  -- request didn't have destination_x");
+            {
+                m_logger.LogWarning("  -- request didn't have destination_x");
+            }
 
             if (args.TryGetValue("destination_y", out tmpOSD) && tmpOSD != null)
+            {
                 Int32.TryParse(tmpOSD.AsString(), out data.y);
+            }
             else
-                m_log.WarnFormat("  -- request didn't have destination_y");
+            {
+                m_logger.LogWarning("  -- request didn't have destination_y");
+            }
 
             if (args.TryGetValue("destination_uuid", out tmpOSD) && tmpOSD != null)
                 UUID.TryParse(tmpOSD.AsString(), out data.uuid);
@@ -588,7 +600,7 @@ namespace OpenSim.Server.Handlers.Simulation
         {
             reason = string.Empty;
             bool ret = m_SimulationService.CreateAgent(source, destination, aCircuit, teleportFlags, ctx, out reason);
-            //                m_log.DebugFormat("[AGENT HANDLER]: SYNC CreateAgent {0} {1}", ret.ToString(), reason);
+            // m_log.DebugFormat("[AGENT HANDLER]: SYNC CreateAgent {0} {1}", ret.ToString(), reason);
             return ret;
         }
 
@@ -619,10 +631,12 @@ namespace OpenSim.Server.Handlers.Simulation
 
             string messageType;
             if (args["message_type"] != null)
+            {
                 messageType = args["message_type"].AsString();
+            }
             else
             {
-                m_log.Warn("[AGENT HANDLER]: Agent Put Message Type not found. ");
+                m_logger.LogWarning($"[AGENT HANDLER]: Agent Put Message Type not found. ");
                 messageType = "AgentData";
             }
 
@@ -630,13 +644,14 @@ namespace OpenSim.Server.Handlers.Simulation
             if ("AgentData".Equals(messageType))
             {
                 AgentData agent = new AgentData();
+
                 try
                 {
                     agent.Unpack(args, m_SimulationService.GetScene(destination.RegionID), ctx);
                 }
                 catch (Exception ex)
                 {
-                    m_log.InfoFormat("[AGENT HANDLER]: exception on unpacking ChildAgentUpdate message {0}", ex.Message);
+                    m_logger.LogInformation(ex, $"[AGENT HANDLER]: exception on unpacking ChildAgentUpdate message");
                     httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
                     httpResponse.RawBuffer = Util.UTF8.GetBytes("false");
                     return;
@@ -649,17 +664,19 @@ namespace OpenSim.Server.Handlers.Simulation
             else if ("AgentPosition".Equals(messageType))
             {
                 AgentPosition agent = new AgentPosition();
+                
                 try
                 {
                     agent.Unpack(args, m_SimulationService.GetScene(destination.RegionID), ctx);
                 }
                 catch (Exception ex)
                 {
-                    m_log.InfoFormat("[AGENT HANDLER]: exception on unpacking ChildAgentUpdate message {0}", ex.Message);
+                    m_logger.LogInformation(ex, $"[AGENT HANDLER]: exception on unpacking ChildAgentUpdate message");
                     httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
                     httpResponse.RawBuffer = Util.UTF8.GetBytes("false");
                     return;
                 }
+
                 //agent.Dump();
                 // This is one of the meanings of PUT agent
                 result = m_SimulationService.UpdateAgent(destination, agent);

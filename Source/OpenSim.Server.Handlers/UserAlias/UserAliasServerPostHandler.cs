@@ -25,38 +25,34 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
 using OpenMetaverse;
+using Microsoft.Extensions.Logging;
+using System.Reflection.Metadata;
 
 namespace OpenSim.Server.Handlers.UserAlias
 {
     public class UserAliasServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        private readonly ILogger m_logger;
         private IUserAliasService m_UserAliasService;
 
-        public UserAliasServerPostHandler(IUserAliasService service)
-            : this(service, null, null) {}
+        public UserAliasServerPostHandler(
+            ILogger logger, 
+            IUserAliasService service)
+            : this(logger, service, null) {}
 
-        public UserAliasServerPostHandler(IUserAliasService service, IConfig config, IServiceAuth auth) :
-                base("POST", "/useralias", auth)
+        public UserAliasServerPostHandler(
+            ILogger logger,
+            IUserAliasService service, 
+            IServiceAuth auth) :
+            base("POST", "/useralias", auth)
         {
+            m_logger = logger;
             m_UserAliasService = service;
         }
 
@@ -89,11 +85,11 @@ namespace OpenSim.Server.Handlers.UserAlias
                         return GetUserAliases(request);
                 }
 
-                m_log.DebugFormat("[USER SERVICE HANDLER]: unknown method request: {0}", method);
+                m_logger.LogDebug($"[USER SERVICE HANDLER]: unknown method request: {method}");
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[USER SERVICE HANDLER]: Exception in method {0}: {1}", method, e);
+                m_logger.LogDebug(e, $"[USER SERVICE HANDLER]: Exception in method {method}.");
             }
 
             return FailureResult();

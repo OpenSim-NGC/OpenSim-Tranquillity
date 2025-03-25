@@ -34,6 +34,7 @@ using System.Reflection;
 using Nini.Config;
 using log4net;
 using System.Net.Http.Headers;
+using Microsoft.Extensions.Configuration;
 
 namespace OpenSim.Framework.ServiceAuth
 {
@@ -53,10 +54,11 @@ namespace OpenSim.Framework.ServiceAuth
             get { return m_CredentialsB64; }
         }
 
-        public BasicHttpAuthentication(IConfigSource config, string section)
+        public BasicHttpAuthentication(IConfiguration config, string section)
         {
             m_Username = Util.GetConfigVarFromSections<string>(config, "HttpAuthUsername", new string[] { "Network", section }, string.Empty);
             m_Password = Util.GetConfigVarFromSections<string>(config, "HttpAuthPassword", new string[] { "Network", section }, string.Empty);
+            
             string str = m_Username + ":" + m_Password;
             byte[] encData_byte = Util.UTF8.GetBytes(str);
 

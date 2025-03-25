@@ -25,36 +25,33 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Server.Base;
+
 namespace OpenSim.Server.Handlers.AgentPreferences
 {
     public class AgentPreferencesServerPostHandler : BaseStreamHandler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger m_logger;
+        private readonly IAgentPreferencesService m_AgentPreferencesService;
+        private readonly IServiceAuth m_auth;
 
-        private IAgentPreferencesService m_AgentPreferencesService;
-
-        public AgentPreferencesServerPostHandler(IAgentPreferencesService service, IServiceAuth auth) :
+        public AgentPreferencesServerPostHandler(
+            ILogger logger, 
+            IAgentPreferencesService service, 
+            IServiceAuth auth) :
         base("POST", "/agentprefs", auth)
         {
+            m_logger = logger;
             m_AgentPreferencesService = service;
+            m_auth = auth;
         }
 
         protected override byte[] ProcessRequest(string path, Stream requestData,
@@ -65,12 +62,11 @@ namespace OpenSim.Server.Handlers.AgentPreferences
             sr.Close();
             body = body.Trim();
 
-            //m_log.DebugFormat("[XXX]: query String: {0}", body);
+            //m_logger.LogDebug($"Query String: {body}");
 
             try
             {
-                Dictionary<string, object> request =
-                    ServerUtils.ParseQueryString(body);
+                Dictionary<string, object> request = ServerUtils.ParseQueryString(body);
 
                 if (!request.ContainsKey("METHOD"))
                     return FailureResult();
@@ -86,11 +82,12 @@ namespace OpenSim.Server.Handlers.AgentPreferences
                     case "getagentlang":
                         return GetAgentLang(request);
                 }
-                m_log.DebugFormat("[AGENT PREFERENCES HANDLER]: unknown method request: {0}", method);
+
+                m_logger.LogDebug($"[AGENT PREFERENCES HANDLER]: unknown method request: {method}");
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[AGENT PREFERENCES HANDLER]: Exception {0}", e);
+                m_logger.LogDebug(e, $"[AGENT PREFERENCES HANDLER]: Exception");
             }
 
             return FailureResult();
@@ -104,6 +101,7 @@ namespace OpenSim.Server.Handlers.AgentPreferences
             UUID userID;
             if (!UUID.TryParse(request["UserID"].ToString(), out userID))
                 return FailureResult();
+                
             AgentPrefs prefs = m_AgentPreferencesService.GetAgentPreferences(userID);
             Dictionary<string, object> result = new Dictionary<string, object>();
             if (prefs != null)
