@@ -25,29 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
-using System.Reflection;
-using OpenSim.Services.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Data;
 using OpenSim.Framework;
 
 namespace OpenSim.Services.EstateService
 {
-    public class EstateDataService : ServiceBase, IEstateDataService
+    public class EstateDataService : IEstateDataService
     {
-//        private static readonly ILog m_log =
-//                LogManager.GetLogger(
-//                MethodBase.GetCurrentMethod().DeclaringType);
-
         protected IEstateDataStore m_database;
 
         public EstateDataService(IConfigSource config)
-            : base(config)
         {
             string dllName = String.Empty;
             string connString = String.Empty;

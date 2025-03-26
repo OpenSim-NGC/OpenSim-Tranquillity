@@ -25,28 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Text;
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
-using OpenSim.Services.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Data;
 using OpenSim.Framework;
 
 namespace OpenSim.Services.EstateService
 {
-    public class MuteListService : ServiceBase, IMuteListService
+    public class MuteListService : IMuteListService
     {
-//        private static readonly ILog m_log =
-//                LogManager.GetLogger(
-//                MethodBase.GetCurrentMethod().DeclaringType);
-
         protected IMuteListData m_database;
 
         public MuteListService(IConfigSource config)
-            : base(config)
         {
             string dllName = String.Empty;
             string connString = String.Empty;

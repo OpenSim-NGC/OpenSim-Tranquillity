@@ -25,22 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
-using log4net;
 using Nini.Config;
-using OpenSim.Framework;
 using OpenSim.Data;
-using OpenSim.Services.Interfaces;
-using OpenSim.Services.Base;
 
 namespace OpenSim.Services.Friends
 {
-    public class FriendsServiceBase : ServiceBase
+    public class FriendsServiceBase
     {
         protected IFriendsData m_Database = null;
 
-        public FriendsServiceBase(IConfigSource config) : base(config)
+        public FriendsServiceBase(IConfigSource config)
         {
             string dllName = String.Empty;
             string connString = String.Empty;

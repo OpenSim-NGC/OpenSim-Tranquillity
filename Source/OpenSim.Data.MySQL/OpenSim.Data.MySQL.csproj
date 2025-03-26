@@ -52,7 +52,8 @@
     <EmbeddedResource Include="Resources\XAssetStore.migrations" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.0.3" />
+    <PackageReference Include="Autofac" Version="8.2.0" />
+    <PackageReference Include="log4net" Version="3.0.4" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
     <PackageReference Include="MySqlConnector" Version="2.4.0" />
