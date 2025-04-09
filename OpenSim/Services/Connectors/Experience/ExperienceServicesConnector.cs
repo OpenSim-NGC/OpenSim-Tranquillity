@@ -215,7 +215,7 @@ namespace OpenSim.Services.Connectors
             return new UUID[0];
         }
 
-        public ExperienceInfo UpdateExpereienceInfo(ExperienceInfo info)
+        public ExperienceInfo UpdateExperienceInfo(ExperienceInfo info)
         {
             // let's just pray they never add a parameter named "method"
             Dictionary<string, object> sendData = info.ToDictionary();
