@@ -34,7 +34,7 @@ using OpenSim.Framework.ServiceAuth;
 
 namespace OpenSim.Services.Connectors
 {
-    public class AuthorizationServicesConnector : BaseServiceConnector
+    public class AuthorizationServicesConnector : IAuthorizationService
     {
         private const string _section = "AuthorizationService";
         private IServiceAuth _auth = null;
@@ -52,8 +52,8 @@ namespace OpenSim.Services.Connectors
             _config = configuration;
             _logger = logger;
 
-            _auth = AuthType(configuration, _section);           
-            _serverURI = ServiceURI(configuration, _section, "AuthorizationServerURI");
+            _auth = ServiceAuth.Create(configuration, _section);           
+            _serverURI = ServiceURI.LookupServiceURI(configuration, _section, "AuthorizationServerURI");
 
             var authorizationConfig = _config.GetSection("AuthorizationService");
             if (authorizationConfig.Exists() is false)
@@ -70,14 +70,14 @@ namespace OpenSim.Services.Connectors
             _logger.LogInformation("[AUTHORIZATION CONNECTOR]: AuthorizationService initialized");
         }
 
-        public bool IsAuthorizedForRegion(string userID, string firstname, string surname, string email, string regionName, string regionID, out string message)
+        public bool IsAuthorizedForRegion(string userID, string firstname, string lastname, string email, string regionName, string regionID, out string message)
         {
             // do a remote call to the authorization server specified in the AuthorizationServerURI
             _logger.LogInformation($"[AUTHORIZATION CONNECTOR]: IsAuthorizedForRegion checking {userID} at remote server {_serverURI}");
 
             string uri = _serverURI;
 
-            AuthorizationRequest req = new AuthorizationRequest(userID, firstname, surname, email, regionName, regionID);
+            AuthorizationRequest req = new AuthorizationRequest(userID, firstname, lastname, email, regionName, regionID);
             AuthorizationResponse response;
 
             try

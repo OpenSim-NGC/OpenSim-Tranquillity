@@ -145,6 +145,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.UserAccoun
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.UserProfilesService", "Source\OpenSim.Services.UserProfilesService\OpenSim.Services.UserProfilesService.csproj", "{B4C57E7D-0000-0000-0000-000000000000}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Tests.Services.Connectors", "Tests\OpenSim.Tests.Services.Connectors\OpenSim.Tests.Services.Connectors.csproj", "{34A834DE-7B57-4603-8E49-E5991498356B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -427,6 +429,10 @@ Global
 		{B4C57E7D-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B4C57E7D-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B4C57E7D-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{34A834DE-7B57-4603-8E49-E5991498356B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{34A834DE-7B57-4603-8E49-E5991498356B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{34A834DE-7B57-4603-8E49-E5991498356B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{34A834DE-7B57-4603-8E49-E5991498356B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -501,6 +507,7 @@ Global
 		{CB1C903F-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{C87C3128-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{B4C57E7D-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{34A834DE-7B57-4603-8E49-E5991498356B} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A40AD54B-8BC7-41E4-B241-19B59EA65D2A}

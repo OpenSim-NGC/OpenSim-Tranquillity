@@ -25,64 +25,39 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using Nini.Config;
 using OpenSim.Framework;
-
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Services.Interfaces;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors
 {
-    public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
+    public class PresenceServicesConnector : IPresenceService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private const string _section = "PresenceService";
+        private const string _uriName = "PresenceServerURI";
 
-        private string m_ServerURI = String.Empty;
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<PresenceServicesConnector> _logger;
+        private IServiceAuth _auth = null;
 
-        public PresenceServicesConnector()
+        private readonly string _serverURI = String.Empty;
+
+        public PresenceServicesConnector(
+            IConfiguration configuration,
+            ILogger<PresenceServicesConnector> logger
+            )
         {
+            _configuration = configuration;
+            _logger = logger;
+
+            _auth = ServiceAuth.Create(_configuration, _section);
+            _serverURI = ServiceURI.LookupServiceURI(_configuration, _section, _uriName);
         }
-
-        public PresenceServicesConnector(string serverURI)
-        {
-            m_ServerURI = serverURI.TrimEnd('/');
-        }
-
-        public PresenceServicesConnector(IConfigSource source)
-        {
-            Initialise(source);
-        }
-
-        public virtual void Initialise(IConfigSource source)
-        {
-            IConfig gridConfig = source.Configs["PresenceService"];
-            if (gridConfig == null)
-            {
-                m_log.Error("[PRESENCE CONNECTOR]: PresenceService missing from OpenSim.ini");
-                throw new Exception("Presence connector init error");
-            }
-
-            string serviceURI = gridConfig.GetString("PresenceServerURI",
-                    String.Empty);
-
-            if (serviceURI.Length == 0)
-            {
-                m_log.Error("[PRESENCE CONNECTOR]: No Server URI named in section PresenceService");
-                throw new Exception("Presence connector init error");
-            }
-            m_ServerURI = serviceURI;
-
-            base.Initialise(source, "PresenceService");
-        }
-
 
         #region IPresenceService
 
@@ -99,27 +74,27 @@ namespace OpenSim.Services.Connectors
             sendData["SecureSessionID"] = secureSessionID.ToString();
 
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/presence";
-            // m_log.DebugFormat("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+            string uri = _serverURI + "/presence";
+
             try
             {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
+                string reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, _auth);
                 if (reply != string.Empty)
                 {
                     int indx = reply.IndexOf("success", StringComparison.InvariantCultureIgnoreCase);
                     if (indx > 0)
                         return true;
+
                     return false;
                 }
                 else
-                    m_log.DebugFormat("[PRESENCE CONNECTOR]: LoginAgent received empty reply");
+                {
+                    _logger.LogDebug("[PRESENCE CONNECTOR]: LoginAgent received empty reply");
+                }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug(e, $"[PRESENCE CONNECTOR]: Exception when contacting presence server at {uri}: {e.Message}");
             }
 
             return false;
@@ -137,28 +112,29 @@ namespace OpenSim.Services.Connectors
             sendData["SessionID"] = sessionID.ToString();
 
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/presence";
-            // m_log.DebugFormat("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+            string uri = _serverURI + "/presence";
+
+            // _logger.LogDebug("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+            
             try
             {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
-
+                string reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, _auth);
                 if (reply != string.Empty)
                 {
                     int indx = reply.IndexOf("success", StringComparison.InvariantCultureIgnoreCase);
                     if (indx > 0)
                         return true;
+
                     return false;
                 }
                 else
-                    m_log.DebugFormat("[PRESENCE CONNECTOR]: LogoutAgent received empty reply");
+                {
+                    _logger.LogDebug("[PRESENCE CONNECTOR]: LogoutAgent received empty reply");
+                }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug(e, $"[PRESENCE CONNECTOR]: Exception when contacting presence server at {uri}: {e.Message}");
             }
 
             return false;
@@ -175,27 +151,27 @@ namespace OpenSim.Services.Connectors
             sendData["RegionID"] = regionID.ToString();
 
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/presence";
-            // m_log.DebugFormat("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+            string uri = _serverURI + "/presence";
+            // _logger.LogDebug("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
             try
             {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
+                string reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, _auth);
                 if (reply != string.Empty)
                 {
                     int indx = reply.IndexOf("success", StringComparison.InvariantCultureIgnoreCase);
                     if (indx > 0)
                         return true;
+
                     return false;
                 }
                 else
-                    m_log.DebugFormat("[PRESENCE CONNECTOR]: LogoutRegionAgents received empty reply");
+                {
+                    _logger.LogDebug("[PRESENCE CONNECTOR]: LogoutRegionAgents received empty reply");
+                }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug(e, $"[PRESENCE CONNECTOR]: Exception when contacting presence server at {uri}: {e.Message}");
             }
 
             return false;
@@ -213,14 +189,13 @@ namespace OpenSim.Services.Connectors
             sendData["RegionID"] = regionID.ToString();
 
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/presence";
-            // m_log.DebugFormat("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+            string uri = _serverURI + "/presence";
+
+            // _logger.LogDebug("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+            
             try
             {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
+                string reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, _auth);
                 if (reply != string.Empty)
                 {
                     Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -229,19 +204,23 @@ namespace OpenSim.Services.Connectors
                     {
                         if (replyData["result"].ToString().ToLower() == "success")
                             return true;
-                        else
-                            return false;
+
+                        return false;
                     }
                     else
-                        m_log.DebugFormat("[PRESENCE CONNECTOR]: ReportAgent reply data does not contain result field");
+                    {
+                        _logger.LogDebug("[PRESENCE CONNECTOR]: ReportAgent reply data does not contain result field");
+                    }
 
                 }
                 else
-                    m_log.DebugFormat("[PRESENCE CONNECTOR]: ReportAgent received empty reply");
+                {
+                    _logger.LogDebug("[PRESENCE CONNECTOR]: ReportAgent received empty reply");
+                }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug(e, $"[PRESENCE CONNECTOR]: Exception when contacting presence server at {uri}: {e.Message}");
             }
 
             return false;
@@ -259,23 +238,21 @@ namespace OpenSim.Services.Connectors
 
             string reply = string.Empty;
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/presence";
-            // m_log.DebugFormat("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+            string uri = _serverURI + "/presence";
+            // _logger.LogDebug("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+
             try
             {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
+                reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, _auth);
                 if (string.IsNullOrEmpty(reply))
                 {
-                    m_log.DebugFormat("[PRESENCE CONNECTOR]: GetAgent received null or empty reply");
+                    _logger.LogDebug("[PRESENCE CONNECTOR]: GetAgent received null or empty reply");
                     return null;
                 }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug(e, $"[PRESENCE CONNECTOR]: Exception when contacting presence server at {uri}: {e.Message}");
                 return null;
             }
 
@@ -293,12 +270,12 @@ namespace OpenSim.Services.Connectors
                     if (replyData["result"].ToString() == "null")
                         return null;
 
-                    m_log.DebugFormat("[PRESENCE CONNECTOR]: Invalid reply (result not dictionary) received from presence server when querying for sessionID {0}", sessionID.ToString());
+                    _logger.LogDebug($"[PRESENCE CONNECTOR]: Invalid reply (result not dictionary) received from presence server when querying for sessionID {sessionID.ToString()}");
                 }
             }
             else
             {
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: Invalid reply received from presence server when querying for sessionID {0}", sessionID.ToString());
+                _logger.LogDebug($"[PRESENCE CONNECTOR]: Invalid reply received from presence server when querying for sessionID {sessionID.ToString()}");
             }
 
             return pinfo;
@@ -316,23 +293,21 @@ namespace OpenSim.Services.Connectors
 
             string reply = string.Empty;
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/presence";
-            //m_log.DebugFormat("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+            string uri = _serverURI + "/presence";
+            //_logger.LogDebug("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+
             try
             {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
+                reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, _auth);
                 if (string.IsNullOrEmpty(reply))
                 {
-                    m_log.DebugFormat("[PRESENCE CONNECTOR]: GetAgents received null or empty reply");
+                    _logger.LogDebug("[PRESENCE CONNECTOR]: GetAgents received null or empty reply");
                     return null;
                 }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug(e, $"[PRESENCE CONNECTOR]: Exception when contacting presence server at {uri}: {e.Message}");
             }
 
             List<PresenceInfo> rinfos = new List<PresenceInfo>();
@@ -348,7 +323,7 @@ namespace OpenSim.Services.Connectors
                 }
 
                 Dictionary<string, object>.ValueCollection pinfosList = replyData.Values;
-                //m_log.DebugFormat("[PRESENCE CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
+                //_logger.LogDebug("[PRESENCE CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
                 foreach (object presence in pinfosList)
                 {
                     if (presence is Dictionary<string, object>)
@@ -357,16 +332,18 @@ namespace OpenSim.Services.Connectors
                         rinfos.Add(pinfo);
                     }
                     else
-                        m_log.DebugFormat("[PRESENCE CONNECTOR]: GetAgents received invalid response type {0}",
-                            presence.GetType());
+                    {
+                        _logger.LogDebug($"[PRESENCE CONNECTOR]: GetAgents received invalid response type {presence.GetType()}");
+                    }
                 }
             }
             else
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: GetAgents received null response");
+            {
+                _logger.LogDebug("[PRESENCE CONNECTOR]: GetAgents received null response");
+            }
 
             return rinfos.ToArray();
         }
-
 
         #endregion
 

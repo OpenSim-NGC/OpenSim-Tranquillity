@@ -34,9 +34,10 @@ using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.Connectors
 {
-    public class AssetServicesConnector : BaseServiceConnector, IAssetService
+    public class AssetServicesConnector : IAssetService
     {
         private const string _section = "AssetService";
+
         private readonly ILogger<AssetServicesConnector> _logger;
         private IServiceAuth _auth;
 
@@ -54,35 +55,19 @@ namespace OpenSim.Services.Connectors
         private Dictionary<string, List<AssetRetrievedEx>> m_AssetHandlers = new Dictionary<string, List<AssetRetrievedEx>>();
         protected IServiceAuth m_Auth;
 
-        public AssetServicesConnector(string serverURI)
-        {
-            OSHHTPHost tmp = new OSHHTPHost(serverURI, true);
-            m_ServerURI = tmp.IsResolvedHost ? tmp.URI : null;
-        }
-
         public AssetServicesConnector(
             IConfiguration source, 
-            ILogger<AssetServicesConnector> logger)
+            ILogger<AssetServicesConnector> logger
+            )
         {
             _logger = logger;
-            _auth = AuthType(source, _section);
-            
-            var netconfig = source.GetSection("Network");
 
-            var assetConfig = source.GetSection("AssetService");
-            if (assetConfig .Exists() is false)
-            {
-                _logger.LogError("[ASSET CONNECTOR]: AssetService missing from OpenSim.ini");
-                throw new Exception("Asset connector init error");
-            }
+            _auth = ServiceAuth.Create(source, _section);
+            m_ServerURI = ServiceURI.LookupServiceURI(source, _section, "AssetServerURIAssetServerURI");
 
-            m_ServerURI = assetConfig.GetValue("AssetServerURI", string.Empty);
             if (string.IsNullOrEmpty(m_ServerURI))
             {
-                if (netconfig.Exists())
-                {
-                    m_ServerURI = netconfig.GetValue("asset_server_url", string.Empty);
-                }
+                m_ServerURI = ServiceURI.LookupServiceURI(source, "Network", "asset_server_url");
             }
 
             if (string.IsNullOrEmpty(m_ServerURI))

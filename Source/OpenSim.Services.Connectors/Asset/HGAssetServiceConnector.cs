@@ -34,19 +34,32 @@ using Microsoft.Extensions.Configuration;
 
 namespace OpenSim.Services.Connectors
 {
-    public class HGAssetServiceConnector : BaseServiceConnector, IAssetService
+    public class HGAssetServiceConnector : IAssetService
     {
-        private readonly ILogger<HGAssetServiceConnector> _logger;
+        protected const string _serviceName = "AssetService";
+        protected const string _uriName = "AssetServicesURI";
+
+        private readonly IConfiguration _configuration;     
+        private readonly ILogger _logger;
+        private readonly IAssetService _assetService;
+
         private readonly IServiceAuth _auth;
+        private readonly string _serverURI = string.Empty;
 
         private ExpiringCacheOS<string, AssetServicesConnector> m_connectors = new ExpiringCacheOS<string, AssetServicesConnector>(60000);
 
         public HGAssetServiceConnector(
             IConfiguration configuration,
-            ILogger<HGAssetServiceConnector> logger)
+            ILogger<HGAssetServiceConnector> logger,
+            IAssetService assetService
+            )
         {
+            _configuration = configuration;
             _logger = logger;
-            _auth = AuthType(configuration, "AssetService");
+            _assetService = assetService;
+
+            _auth = ServiceAuth.Create(configuration, "AssetService");
+            var setviceURI = ServiceURI.LookupServiceURI(configuration, _serviceName, _uriName);
 
             var moduleConfig = configuration.GetSection("Modules");
             if (moduleConfig.Exists())
@@ -67,14 +80,14 @@ namespace OpenSim.Services.Connectors
         private AssetServicesConnector GetConnector(string url)
         {
             AssetServicesConnector connector = null;
-            lock (m_connectors)
-            {
-                if (!m_connectors.TryGetValue(url, 60000, out connector))
-                {
-                    connector = new AssetServicesConnector(url);
-                    m_connectors.Add(url, connector);
-                }
-            }
+            //lock (m_connectors)
+            //{
+            //    if (!m_connectors.TryGetValue(url, 60000, out connector))
+            //    {
+            //        connector = new AssetServicesConnector(_configuration, _logger);
+            //        m_connectors.Add(url, connector);
+            //    }
+            //}
             return connector;
         }
 

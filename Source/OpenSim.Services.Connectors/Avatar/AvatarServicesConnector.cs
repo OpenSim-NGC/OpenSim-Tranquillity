@@ -36,12 +36,14 @@ using Microsoft.Extensions.Configuration;
 
 namespace OpenSim.Services.Connectors;
 
-public class AvatarServicesConnector : BaseServiceConnector, IAvatarService
+public class AvatarServicesConnector : IAvatarService
 {
     private const string _serviceName = "AvatarService";
-    private ILogger<AvatarServicesConnector> _logger;
-    private string _serverURI = String.Empty;
-    private IServiceAuth _auth = null;
+    private const string _uriName = "AvatarServerURI";
+
+    private readonly ILogger<AvatarServicesConnector> _logger;
+    private readonly string _serverURI = String.Empty;
+    private readonly IServiceAuth _auth = null;
 
     public AvatarServicesConnector(
         IConfiguration configuration,
@@ -49,8 +51,8 @@ public class AvatarServicesConnector : BaseServiceConnector, IAvatarService
     {
         _logger = logger;
 
-        _auth = AuthType(configuration, _serviceName);
-        _serverURI = ServiceURI(configuration, _serviceName, "AvatarServerURI");
+        _auth = ServiceAuth.Create(configuration, _serviceName);
+        _serverURI = ServiceURI.LookupServiceURI(configuration, _serviceName, _uriName);
     }
 
     #region IAvatarService

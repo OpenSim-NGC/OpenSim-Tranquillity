@@ -36,7 +36,7 @@ using OpenSim.Framework.ServiceAuth;
 
 namespace OpenSim.Services.Connectors
 {
-    public class AgentPreferencesServicesConnector : BaseServiceConnector, IAgentPreferencesService
+    public class AgentPreferencesServicesConnector : IAgentPreferencesService
     {
         private const string _section = "AgentPreferencesService";
         private ILogger<AgentPreferencesServicesConnector> _logger;
@@ -49,8 +49,8 @@ namespace OpenSim.Services.Connectors
         {
             _logger = logger;
             
-            _auth = AuthType(source, _section);
-            _serverURI = ServiceURI(source, _section, "AgentPreferencesServerURI");
+            _auth = ServiceAuth.Create(source, _section);
+            _serverURI = ServiceURI.LookupServiceURI(source, _section, "AgentPreferencesServerURI");
         }
 
         #region IAgentPreferencesService

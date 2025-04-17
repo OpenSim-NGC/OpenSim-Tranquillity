@@ -48,7 +48,13 @@ namespace OpenSim.Services.Interfaces
         /// <param name="message"></param>
         /// <returns></returns>
         bool IsAuthorizedForRegion(
-            string userID, string firstName, string lastName, string regionID, out string message);
+            string userID, 
+            string firstname, 
+            string lastName, 
+            string email, 
+            string regionName, 
+            string regionID, 
+            out string message);
     }
 
     public class AuthorizationRequest

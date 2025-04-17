@@ -4422,7 +4422,13 @@ namespace OpenSim.Region.Framework.Scenes
             if (AuthorizationService is not null)
             {
                 if (!AuthorizationService.IsAuthorizedForRegion(
-                    agent.AgentID.ToString(), agent.firstname, agent.lastname, RegionInfo.RegionID.ToString(), out reason))
+                    userID: agent.AgentID.ToString(),
+                    firstname: agent.firstname,
+                    lastName: agent.lastname,
+                    email: string.Empty,            // We dont have this information here
+                    regionName: RegionInfo.RegionName,
+                    regionID: RegionInfo.RegionID.ToString(),
+                    out reason))
                 {
                     m_log.WarnFormat("[CONNECTION BEGIN]: Denied access to: {0} ({1} {2}) at {3} because: {4}",
                                      agent.AgentID, agent.firstname, agent.lastname, RegionInfo.RegionName, reason);

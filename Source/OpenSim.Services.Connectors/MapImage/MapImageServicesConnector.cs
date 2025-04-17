@@ -25,67 +25,36 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Net;
-using System.Reflection;
-
-using Nini.Config;
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
 
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
-using OpenMetaverse.StructuredData;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.Connectors
 {
-    public class MapImageServicesConnector : BaseServiceConnector, IMapImageService
+    public class MapImageServicesConnector : IMapImageService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<MapImageServicesConnector> _logger;
+        private readonly IServiceAuth _auth;
 
-        private string m_ServerURI = String.Empty;
+        private readonly string _serverURI = string.Empty;
 
-        public MapImageServicesConnector()
+        public MapImageServicesConnector(
+            IConfiguration configuration,
+            ILogger<MapImageServicesConnector> logger
+            )
         {
-        }
+            _configuration = configuration;
+            _logger = logger;
+            _auth = ServiceAuth.Create(configuration, "MapImageService");
+            var serviceURI = ServiceURI.LookupServiceURI(configuration, "MapImageService", "MapImageServerURI");
 
-        public MapImageServicesConnector(string serverURI)
-        {
-            m_ServerURI = serverURI.TrimEnd('/');
-        }
-
-        public MapImageServicesConnector(IConfigSource source)
-        {
-            Initialise(source);
-        }
-
-        public virtual void Initialise(IConfigSource source)
-        {
-            IConfig config = source.Configs["MapImageService"];
-            if (config == null)
-            {
-                m_log.Error("[MAP IMAGE CONNECTOR]: MapImageService missing");
-                throw new Exception("MapImage connector init error");
-            }
-
-            string serviceURI = config.GetString("MapImageServerURI",
-                    String.Empty);
-
-            if (serviceURI.Length == 0)
-            {
-                m_log.Error("[MAP IMAGE CONNECTOR]: No Server URI named in section MapImageService");
-                throw new Exception("MapImage connector init error");
-            }
-            m_ServerURI = serviceURI;
-            m_ServerURI = serviceURI.TrimEnd('/');
-            base.Initialise(source, "MapImageService");
+            _serverURI = serviceURI.TrimEnd('/');
         }
 
         public bool RemoveMapTile(int x, int y, UUID scopeID, out string reason)
@@ -117,39 +86,43 @@ namespace OpenSim.Services.Connectors
 
             try
             {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI + "/map", reqString, 10, null, false);
+                string reply = SynchronousRestFormsRequester.MakeRequest("POST", _serverURI + "/map", reqString, 10, null, false);
                 if (reply.Length > 0)
                 {
                     Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
                     if(replyData.TryGetValue("Result", out object resultobj))
                     {
                         string res = resultobj as string;
-                        if(string.IsNullOrEmpty(res))
+                        if (string.IsNullOrEmpty(res))
                         {
-                            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: unknown result field");
+                            _logger.LogDebug("[MAP IMAGE CONNECTOR]: unknown result field");
                             return false;
                         }
                         else if (res.Equals("success", StringComparison.InvariantCultureIgnoreCase))
+                        {
                             return true;
+                        }
                         else if (res.Equals("failure", StringComparison.InvariantCultureIgnoreCase))
                         {
                             reason = replyData["Message"].ToString();
-                            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile failed: {0}", reason);
+                            _logger.LogDebug($"[MAP IMAGE CONNECTOR]: RemoveMapTile failed: {reason}");
                             return false;
                         }
-                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile unknown result field contents");
+
+                        _logger.LogDebug("[MAP IMAGE CONNECTOR]: RemoveMapTile unknown result field contents");
                         return false;
                     }
                 }
                 else
                 {
-                    m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile reply data does not contain result field");
+                    _logger.LogDebug("[MAP IMAGE CONNECTOR]: RemoveMapTile reply data does not contain result field");
                 }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile Exception at {0}/map: {1}", m_ServerURI, e.Message);
+                _logger.LogDebug(e, $"[MAP IMAGE CONNECTOR]: RemoveMapTile Exception at {_serverURI}/map: {e.Message}");
             }
+
             return false;
         }
 
@@ -187,45 +160,50 @@ namespace OpenSim.Services.Connectors
 
             try
             {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI + "/map", reqString, 10, m_Auth, false);
+                string reply = SynchronousRestFormsRequester.MakeRequest("POST", _serverURI + "/map", reqString, 10, _auth, false);
                 if (reply.Length > 0)
                 {
                     Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
                     if (replyData.TryGetValue("Result", out object resultobj))
                     {
                         string res = resultobj as string;
+
                         if (string.IsNullOrEmpty(res))
                         {
-                            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile unknown result field");
+                            _logger.LogDebug("[MAP IMAGE CONNECTOR]: AddMapTile unknown result field");
                             return false;
                         }
                         else if (res.Equals("success", StringComparison.InvariantCultureIgnoreCase))
+                        {
                             return true;
+                        }
                         else if (res.Equals("failure", StringComparison.InvariantCultureIgnoreCase))
                         {
                             reason = replyData["Message"].ToString();
-                            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile failed: {0}", reason);
+                            _logger.LogDebug($"[MAP IMAGE CONNECTOR]: AddMapTile failed: {reason}");
                             return false;
                         }
-                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile unknown result field contents");
+
+                        _logger.LogDebug("[MAP IMAGE CONNECTOR]: AddMapTile unknown result field contents");
                         return false;
                     }
                 }
                 else
                 {
-                    m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile reply data does not contain result field");
+                    _logger.LogDebug("[MAP IMAGE CONNECTOR]: AddMapTile reply data does not contain result field");
                 }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile Exception at {0}/map: {1}", m_ServerURI, e.Message);
+                _logger.LogDebug(e, $"[MAP IMAGE CONNECTOR]: AddMapTile Exception at {_serverURI}/map: {e.Message}");
             }
             finally
             {
                 // This just dumps a warning for any operation that takes more than 100 ms
                 int tickdiff = Util.EnvironmentTickCountSubtract(tickstart);
-                m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile {1} Bytes in {0}ms", tickdiff, jpgData.Length);
+                _logger.LogDebug($"[MAP IMAGE CONNECTOR]: AddMapTile {jpgData.Length} Bytes in {tickdiff}ms");
             }
+
             return false;
         }
 

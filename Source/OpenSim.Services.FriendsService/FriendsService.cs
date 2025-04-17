@@ -27,20 +27,20 @@
 
 using OpenMetaverse;
 using OpenSim.Framework;
-using System;
-using System.Collections.Generic;
 using OpenSim.Services.Interfaces;
 using OpenSim.Data;
-using Nini.Config;
-using log4net;
+
 using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 
 namespace OpenSim.Services.Friends
 {
-    public class FriendsService : FriendsServiceBase, IFriendsService
+    public class FriendsService : IFriendsService
     {
-        public FriendsService(IConfigSource config) : base(config)
+        protected IFriendsData m_Database = null;
+
+        public FriendsService(IFriendsData friendsData)
         {
+            m_Database = friendsData;
         }
 
         public virtual FriendInfo[] GetFriends(UUID PrincipalID)

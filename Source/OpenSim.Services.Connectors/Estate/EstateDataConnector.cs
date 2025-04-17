@@ -24,84 +24,86 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 
-using log4net;
-
 using OpenMetaverse;
-using Nini.Config;
 
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
-using System.Net.Http;
+
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework.ServiceAuth;
 
 namespace OpenSim.Services.Connectors
 {
-    public class EstateDataRemoteConnector : BaseServiceConnector, IEstateDataService
+    public class EstateDataRemoteConnector : IEstateDataService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private const string _sectionName = "EstateService";
+        private const string _uriName = "EstateServerURI";
 
-        private string m_ServerURI = String.Empty;
+        private readonly IConfiguration _config;
+        private readonly ILogger<EstateDataRemoteConnector> _logger;
+
+        private readonly IServiceAuth _auth;
+        private readonly string _serverURI;
+
         private ExpiringCache<string, List<EstateSettings>> m_EstateCache = new ExpiringCache<string, List<EstateSettings>>();
         private const int EXPIRATION = 5 * 60; // 5 minutes in secs
 
-        public EstateDataRemoteConnector(IConfigSource source)
+        public EstateDataRemoteConnector(
+            IConfiguration configuration,
+            ILogger<EstateDataRemoteConnector> logger)
         {
-            Initialise(source);
-        }
+            _config = configuration;
+            _logger = logger;
 
-        public virtual void Initialise(IConfigSource source)
-        {
-            IConfig gridConfig = source.Configs["EstateService"];
-            if (gridConfig is null)
+            _auth = ServiceAuth.Create(_config, _sectionName);
+            _serverURI = ServiceURI.LookupServiceURI(configuration, _sectionName, _uriName);
+            
+            if (string.IsNullOrEmpty(_serverURI))
             {
-                m_log.Error("[ESTATE CONNECTOR]: EstateService missing from OpenSim.ini");
+                _logger.LogError($"[ESTATE CONNECTOR]: No Server URI named in section {_sectionName}");
                 throw new Exception("Estate connector init error");
             }
-
-            string serviceURI = gridConfig.GetString("EstateServerURI", string.Empty);
-            if (serviceURI.Length == 0)
-            {
-                m_log.Error("[ESTATE CONNECTOR]: No Server URI named in section EstateService");
-                throw new Exception("Estate connector init error");
-            }
-            m_ServerURI = serviceURI;
-
-            base.Initialise(source, "EstateService");
         }
 
         #region IEstateDataService
 
         public List<EstateSettings> LoadEstateSettingsAll()
         {
-            string uri = m_ServerURI + "/estates";
+            string uri = _serverURI + "/estates";
             string reply = MakeRequest("GET", uri, string.Empty);
+
             if (String.IsNullOrEmpty(reply))
                 return [];
 
             Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+
             if (replyData != null && replyData.Count > 0)
             {
-                m_log.Debug($"[ESTATE CONNECTOR]: LoadEstateSettingsAll returned {replyData.Count} elements");
+                _logger.LogDebug($"[ESTATE CONNECTOR]: LoadEstateSettingsAll returned {replyData.Count} elements");
                 Dictionary<string, object>.ValueCollection estateData = replyData.Values;
                 List<EstateSettings> estates = [];
+
                 foreach (object r in estateData)
                 {
-                    if (r is Dictionary<string, object> dr )
+                    if (r is Dictionary<string, object> dr)
                     {
                         EstateSettings es = new EstateSettings(dr);
                         estates.Add(es);
                     }
                 }
+
                 m_EstateCache.AddOrUpdate("estates", estates, EXPIRATION);
                 return estates;
             }
             else
-                m_log.Debug($"[ESTATE CONNECTOR]: LoadEstateSettingsAll from {uri} received empty response");
+            {
+                _logger.LogDebug($"[ESTATE CONNECTOR]: LoadEstateSettingsAll from {uri} received empty response");
+            }
 
             return [];
         }
@@ -150,7 +152,7 @@ namespace OpenSim.Services.Connectors
         public List<UUID> GetRegions(int estateID)
         {
             // /estates/regions/?eid=int
-            string uri = m_ServerURI + "/estates/regions/?eid=" + estateID.ToString();
+            string uri = _serverURI + "/estates/regions/?eid=" + estateID.ToString();
 
             string reply = MakeRequest("GET", uri, string.Empty);
             if (String.IsNullOrEmpty(reply))
@@ -159,7 +161,8 @@ namespace OpenSim.Services.Connectors
             Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
             if (replyData != null && replyData.Count > 0)
             {
-                m_log.Debug($"[ESTATE CONNECTOR]: GetRegions for estate {estateID} returned {replyData.Count} elements");
+                _logger.LogDebug($"[ESTATE CONNECTOR]: GetRegions for estate {estateID} returned {replyData.Count} elements");
+
                 List<UUID> regions = [];
                 Dictionary<string, object>.ValueCollection data = replyData.Values;
                 foreach (object r in data)
@@ -170,14 +173,16 @@ namespace OpenSim.Services.Connectors
                 return regions;
             }
             else
-                m_log.Debug($"[ESTATE CONNECTOR]: GetRegions from {uri} received null or zero response");
+            {
+                _logger.LogDebug($"[ESTATE CONNECTOR]: GetRegions from {uri} received null or zero response");
+            }
             return [];
         }
 
         public EstateSettings LoadEstateSettings(UUID regionID, bool create)
         {
             // /estates/estate/?region=uuid&create=[t|f]
-            string uri = m_ServerURI + string.Format("/estates/estate/?region={0}&create={1}", regionID, create);
+            string uri = _serverURI + string.Format("/estates/estate/?region={0}&create={1}", regionID, create);
 
             //MakeRequest is bugged as its using the older deprecated WebRequest.  A call to the estate
             // service here will return a 404 if the estate doesnt exist which is correct but the code
@@ -193,13 +198,13 @@ namespace OpenSim.Services.Connectors
 
             if (replyData != null && replyData.Count > 0)
             {
-                m_log.DebugFormat("[ESTATE CONNECTOR]: LoadEstateSettings({0}) returned {1} elements", regionID, replyData.Count);
+                _logger.LogDebug($"[ESTATE CONNECTOR]: LoadEstateSettings({regionID}) returned {replyData.Count} elements");
                 EstateSettings es = new EstateSettings(replyData);
                 return es;
             }
             else
             {
-                m_log.DebugFormat("[ESTATE CONNECTOR]: LoadEstateSettings(regionID) from {0} received null or zero response", uri);
+                _logger.LogDebug($"[ESTATE CONNECTOR]: LoadEstateSettings(regionID) from {uri} received null or zero response");
             }
 
             return null;
@@ -208,7 +213,7 @@ namespace OpenSim.Services.Connectors
         public EstateSettings LoadEstateSettings(int estateID)
         {
             // /estates/estate/?eid=int
-            string uri = m_ServerURI + $"/estates/estate/?eid={estateID}";
+            string uri = _serverURI + $"/estates/estate/?eid={estateID}";
 
             string reply = MakeRequest("GET", uri, string.Empty);
             if (String.IsNullOrEmpty(reply))
@@ -218,12 +223,15 @@ namespace OpenSim.Services.Connectors
 
             if (replyData != null && replyData.Count > 0)
             {
-                m_log.Debug($"[ESTATE CONNECTOR]: LoadEstateSettings({estateID}) returned {replyData.Count} elements");
+                _logger.LogDebug($"[ESTATE CONNECTOR]: LoadEstateSettings({estateID}) returned {replyData.Count} elements");
+
                 EstateSettings es = new EstateSettings(replyData);
                 return es;
             }
             else
-                m_log.DebugFormat("[ESTATE CONNECTOR]: LoadEstateSettings(estateID) from {0} received null or zero response", uri);
+            {
+                _logger.LogDebug($"[ESTATE CONNECTOR]: LoadEstateSettings(estateID) from {uri} received null or zero response");
+            }
 
             return null;
         }
@@ -241,7 +249,7 @@ namespace OpenSim.Services.Connectors
         public void StoreEstateSettings(EstateSettings es)
         {
             // /estates/estate/
-            string uri = m_ServerURI + "/estates/estate";
+            string uri = _serverURI + "/estates/estate";
 
             Dictionary<string, object> formdata = es.ToMap();
             formdata["OP"] = "STORE";
@@ -252,12 +260,13 @@ namespace OpenSim.Services.Connectors
         public bool LinkRegion(UUID regionID, int estateID)
         {
             // /estates/estate/?eid=int&region=uuid
-            string uri = m_ServerURI + $"/estates/estate/?eid={estateID}&region={regionID}";
+            string uri = _serverURI + $"/estates/estate/?eid={estateID}&region={regionID}";
 
             Dictionary<string, object> formdata = new()
             {
                 ["OP"] = "LINK"
             };
+
             return PostRequest(uri, formdata);
         }
 
@@ -274,15 +283,17 @@ namespace OpenSim.Services.Connectors
             {
                 if (replyData.TryGetValue("Result", out object ortmp) && ortmp is string srtmp)
                 {
-                    if (bool.TryParse(srtmp, out  bool result))
+                    if (bool.TryParse(srtmp, out bool result))
                     {
-                        m_log.Debug($"[ESTATE CONNECTOR]: PostRequest {uri} returned {result}");
+                        _logger.LogDebug($"[ESTATE CONNECTOR]: PostRequest {uri} returned {result}");
                         return result;
                     }
                 }
             }
             else
-                m_log.Debug($"[ESTATE CONNECTOR]: PostRequest {uri} received empty response");
+            {
+                _logger.LogDebug($"[ESTATE CONNECTOR]: PostRequest {uri} received empty response");
+            }
 
             return false;
         }
@@ -303,7 +314,7 @@ namespace OpenSim.Services.Connectors
             string reply = string.Empty;
             try
             {
-                reply = SynchronousRestFormsRequester.MakeRequest(verb, uri, formdata, 30, m_Auth);
+                reply = SynchronousRestFormsRequester.MakeRequest(verb, uri, formdata, 30, _auth);
                 return reply;
             }
             catch (HttpRequestException e)
@@ -312,20 +323,22 @@ namespace OpenSim.Services.Connectors
                 {
                     if (status == HttpStatusCode.Unauthorized)
                     {
-                        m_log.Error($"[ESTATE CONNECTOR]: Web request {uri} requires authentication ");
+                        _logger.LogError($"[ESTATE CONNECTOR]: Web request {uri} requires authentication ");
                     }
                     else if (status != HttpStatusCode.NotFound)
                     {
-                        m_log.Error($"[ESTATE CONNECTOR]: Resource {uri} not found ");
+                        _logger.LogError($"[ESTATE CONNECTOR]: Resource {uri} not found ");
                         return reply;
                     }
                 }
                 else
-                    m_log.Error($"[ESTATE CONNECTOR]: WebException for {verb} {uri} {formdata} {e.Message}");
+                {
+                    _logger.LogError($"[ESTATE CONNECTOR]: WebException for {verb} {uri} {formdata} {e.Message}");
+                }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat($"[ESTATE CONNECTOR]: Exception when contacting estate server at {uri}: {e.Message}");
+                _logger.LogDebug(e, $"[ESTATE CONNECTOR]: Exception when contacting estate server at {uri}: {e.Message}");
             }
 
             return null;

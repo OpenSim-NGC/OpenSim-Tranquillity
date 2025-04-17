@@ -63,5 +63,10 @@ namespace OpenSim.Framework.ServiceAuth
             else
                 return null;
         }
+
+        public static IServiceAuth Create(IConfiguration configuration)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

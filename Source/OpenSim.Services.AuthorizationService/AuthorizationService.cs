@@ -54,5 +54,11 @@ namespace OpenSim.Services.AuthorizationService
             message = "Authorized";
             return true;
         }
+
+        public bool IsAuthorizedForRegion(string userID, string firstname, string lastName, string email, string regionName, string regionID, out string message)
+        {
+            message = "Authorized";
+            return true;
+        }
     }
 }

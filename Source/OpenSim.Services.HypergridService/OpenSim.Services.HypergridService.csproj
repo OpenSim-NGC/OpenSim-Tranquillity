@@ -28,7 +28,6 @@
     <ProjectReference Include="..\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
     <ProjectReference Include="..\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
     <ProjectReference Include="..\OpenSim.Services.AssetService\OpenSim.Services.AssetService.csproj" />
-    <ProjectReference Include="..\OpenSim.Services.Base\OpenSim.Services.Base.csproj" />
     <ProjectReference Include="..\OpenSim.Services.Connectors\OpenSim.Services.Connectors.csproj" />
     <ProjectReference Include="..\OpenSim.Services.FriendsService\OpenSim.Services.FriendsService.csproj" />
     <ProjectReference Include="..\OpenSim.Services.FSAssetService\OpenSim.Services.FSAssetService.csproj" />

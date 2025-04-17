@@ -36,21 +36,25 @@ using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.Connectors
 {
-    public class AuthenticationServicesConnector : BaseServiceConnector, IAuthenticationService
+    public class AuthenticationServicesConnector : IAuthenticationService
     {
-        private string _serverURI = String.Empty;
-        private IServiceAuth _auth = null;
-        private IConfiguration _config;
-        private ILogger<AuthenticationServicesConnector> _logger;
+        private readonly IConfiguration _config;
+        private readonly ILogger<AuthenticationServicesConnector> _logger;
+
+        private readonly string _serverURI;
+        private readonly IServiceAuth _auth;
+
         private const string _section = "AuthenticationService";
+        private const string _uri = "AuthenticationServerURI";
 
         public AuthenticationServicesConnector(
             IConfiguration configuration, 
             ILogger<AuthenticationServicesConnector> logger)
         {
             _logger = logger;
-            _auth = AuthType(configuration, _section);
-            _serverURI = ServiceURI(configuration, _section, "AuthenticationServerURI");
+
+            _auth = ServiceAuth.Create(configuration, _section);
+            _serverURI = ServiceURI.LookupServiceURI(configuration, _section, _uri);
         }
 
         public string Authenticate(UUID principalID, string password, int lifetime, out UUID realID)

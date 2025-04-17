@@ -25,61 +25,37 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using Nini.Config;
 using OpenSim.Framework;
-
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Services.Interfaces;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+
 namespace OpenSim.Services.Connectors
 {
-    public class MuteListServicesConnector : BaseServiceConnector, IMuteListService
+    public class MuteListServicesConnector : IMuteListService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private const string _section = "MuteListService";
+        private const string _uriName = "MuteListServerURI";
 
-        private string m_ServerURI = String.Empty;
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<MuteListServicesConnector> _logger;
+        private IServiceAuth _auth = null;
+        private readonly string _serverURI = String.Empty;
 
-        public MuteListServicesConnector()
+        public MuteListServicesConnector(IConfiguration configuration, ILogger<MuteListServicesConnector> logger)
         {
-        }
+            _configuration = configuration;
+            _logger = logger;
 
-        public MuteListServicesConnector(string serverURI)
-        {
-            m_ServerURI = serverURI.TrimEnd('/') + "/mutelist";
-        }
-
-        public MuteListServicesConnector(IConfigSource source)
-        {
-            Initialise(source);
-        }
-
-        public virtual void Initialise(IConfigSource source)
-        {
-            IConfig gridConfig = source.Configs["MuteListService"];
-            if (gridConfig == null)
-            {
-                m_log.Error("[MUTELIST CONNECTOR]: MuteListService missing from configuration");
-                throw new Exception("MuteList connector init error");
-            }
-
-            string serviceURI = gridConfig.GetString("MuteListServerURI",
-                    String.Empty);
-
-            if (serviceURI.Length == 0)
-            {
-                m_log.Error("[MUTELIST CONNECTOR]: No Server URI named in section GridUserService");
-                throw new Exception("MuteList connector init error");
-            }
-            m_ServerURI = serviceURI + "/mutelist";
-            base.Initialise(source, "MuteListService");
+            _auth = ServiceAuth.Create(_configuration, _section);
+            var serviceURI = ServiceURI.LookupServiceURI(_configuration, _section, _uriName);
+            
+            _serverURI = serviceURI + "/mutelist";
         }
 
         #region IMuteListService
@@ -92,8 +68,8 @@ namespace OpenSim.Services.Connectors
 
             try
             {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI,
-                                    ServerUtils.BuildQueryString(sendData), m_Auth);
+                string reply = SynchronousRestFormsRequester.MakeRequest("POST", _serverURI,
+                                    ServerUtils.BuildQueryString(sendData), _auth);
                 if (reply != string.Empty)
                 {
                     Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -101,19 +77,24 @@ namespace OpenSim.Services.Connectors
                     if (replyData.ContainsKey("result"))
                     {
                         string datastr = replyData["result"].ToString();
-                        if(String.IsNullOrWhiteSpace(datastr))
+                        if (String.IsNullOrWhiteSpace(datastr))
                             return null;
+
                         return Convert.FromBase64String(datastr);
                     }
                     else
-                        m_log.DebugFormat("[MUTELIST CONNECTOR]: get reply data does not contain result field");
+                    {
+                        _logger.LogDebug("[MUTELIST CONNECTOR]: get reply data does not contain result field");
+                    }
                 }
                 else
-                    m_log.DebugFormat("[MUTELIST CONNECTOR]: get received empty reply");
+                {
+                    _logger.LogDebug("[MUTELIST CONNECTOR]: get received empty reply");
+                }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[MUTELIST CONNECTOR]: Exception when contacting server at {0}: {1}", m_ServerURI, e.Message);
+                _logger.LogDebug(e, $"[MUTELIST CONNECTOR]: Exception when contacting server at {_serverURI}: {e.Message}");
             }
 
             return null;
@@ -154,7 +135,7 @@ namespace OpenSim.Services.Connectors
         {
             try
             {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI, reqString, m_Auth);
+                string reply = SynchronousRestFormsRequester.MakeRequest("POST", _serverURI, reqString, _auth);
                 if (reply != string.Empty)
                 {
                     int indx = reply.IndexOf("success", StringComparison.InvariantCultureIgnoreCase);
@@ -163,11 +144,13 @@ namespace OpenSim.Services.Connectors
                     return false;
                 }
                 else
-                    m_log.DebugFormat("[MUTELIST CONNECTOR]: {0} received empty reply", meth);
+                {
+                    _logger.LogDebug($"[MUTELIST CONNECTOR]: {meth} received empty reply");
+                }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[MUTELIST CONNECTOR]: Exception when contacting server at {0}: {1}", m_ServerURI, e.Message);
+                _logger.LogDebug(e, $"[MUTELIST CONNECTOR]: Exception when contacting server at {_serverURI}: {e.Message}");
             }
 
             return false;

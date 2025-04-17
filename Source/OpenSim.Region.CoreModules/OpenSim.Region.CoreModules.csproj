@@ -49,7 +49,6 @@
     <ProjectReference Include="..\OpenSim.Region.PhysicsModules.SharedBase\OpenSim.Region.PhysicsModules.SharedBase.csproj" />
     <ProjectReference Include="..\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
     <ProjectReference Include="..\OpenSim.Server.Handlers\OpenSim.Server.Handlers.csproj" />
-    <ProjectReference Include="..\OpenSim.Services.Base\OpenSim.Services.Base.csproj" />
     <ProjectReference Include="..\OpenSim.Services.Connectors\OpenSim.Services.Connectors.csproj" />
     <ProjectReference Include="..\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
   </ItemGroup>

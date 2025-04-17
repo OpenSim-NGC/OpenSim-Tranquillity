@@ -27,7 +27,6 @@
 
 using System.Text;
 using OpenMetaverse;
-using Nini.Config;
 using OpenSim.Services.Interfaces;
 using OpenSim.Data;
 using OpenSim.Framework;
@@ -38,35 +37,9 @@ namespace OpenSim.Services.EstateService
     {
         protected IMuteListData m_database;
 
-        public MuteListService(IConfigSource config)
+        public MuteListService(IMuteListData muteListData)
         {
-            string dllName = String.Empty;
-            string connString = String.Empty;
-
-            // Try reading the [DatabaseService] section, if it exists
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig != null)
-            {
-                dllName = dbConfig.GetString("StorageProvider", String.Empty);
-                connString = dbConfig.GetString("ConnectionString", String.Empty);
-                connString = dbConfig.GetString("MuteConnectionString", connString);
-            }
-
-            // Try reading the [MuteListStore] section, if it exists
-            IConfig muteConfig = config.Configs["MuteListStore"];
-            if (muteConfig != null)
-            {
-                dllName = muteConfig.GetString("StorageProvider", dllName);
-                connString = muteConfig.GetString("ConnectionString", connString);
-            }
-
-            // We tried, but this doesn't exist. We can't proceed
-            if (dllName.Length == 0)
-                throw new Exception("No StorageProvider configured");
-
-            m_database = LoadPlugin<IMuteListData>(dllName, new Object[] { connString });
-            if (m_database == null)
-                throw new Exception("Could not find a storage interface in the given module");
+            m_database = muteListData;
         }
 
         public Byte[] MuteListRequest(UUID agentID, uint crc)

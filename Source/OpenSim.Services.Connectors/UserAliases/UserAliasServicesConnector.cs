@@ -25,70 +25,49 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using Nini.Config;
 using OpenSim.Framework;
-
-using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
+using OpenSim.Framework.ServiceAuth;
 
 namespace OpenSim.Services.Connectors
 {
-    public class UserAliasServicesConnector : BaseServiceConnector, IUserAliasService
+    public class UserAliasServicesConnector : IUserAliasService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<UserAliasServicesConnector> _logger;
+        private readonly IConfiguration _configuration;
 
+        private readonly IServiceAuth m_Auth;
         private string m_ServerURI = String.Empty;
 
-        public UserAliasServicesConnector()
+        public UserAliasServicesConnector(
+            IConfiguration configuration,
+            ILogger<UserAliasServicesConnector> logger)
         {
-        }
+            _configuration = configuration;
+            _logger = logger;
+            
+            m_Auth = ServiceAuth.Create(configuration, "UserAliasService");
+            m_ServerURI = ServiceURI.LookupServiceURI(configuration, "UserAliasService", "UserAliasServerURI");
 
-        public UserAliasServicesConnector(string serverURI)
-        {
-            m_ServerURI = serverURI.TrimEnd('/');
-        }
-
-        public UserAliasServicesConnector(IConfigSource source)
-        {
-            Initialise(source);
-        }
-
-        public virtual void Initialise(IConfigSource source)
-        {
-            IConfig aliasConfig = source.Configs["UserAliasService"];
-            if (aliasConfig == null)
+            if (string.IsNullOrWhiteSpace(m_ServerURI))
             {
-                m_log.Error("[ALIAS CONNECTOR]: UserAliasService missing from OpenSim.ini");
+                _logger.LogError("[ACCOUNT CONNECTOR]: UserAliasServerURI not found in section UserAliasService");
                 throw new Exception("User Alias connector init error");
             }
 
-            string serviceURI = aliasConfig.GetString("UserAliasServerURI", string.Empty);
-
-            if (string.IsNullOrWhiteSpace(serviceURI))
-            {
-                m_log.Error("[ACCOUNT CONNECTOR]: UserAliasServerURI not found in section UserAliasService");
-                throw new Exception("User Alias connector init error");
-            }
-
-            OSHHTPHost tmp = new OSHHTPHost(serviceURI, true);
+            OSHHTPHost tmp = new OSHHTPHost(m_ServerURI, true);
             if (!tmp.IsResolvedHost)
             {
-                m_log.ErrorFormat("[ALIAS CONNECTOR]: {0}", tmp.IsValidHost ? "Could not resolve UserAliasServerURI" : "UserAliasServerURI is a invalid host");
+                var reason = tmp.IsValidHost ? "Could not resolve UserAliasServerURI" : "UserAliasServerURI is a invalid host";
+                _logger.LogError($"[ALIAS CONNECTOR]: {reason}");
                 throw new Exception("User Alias connector init error");
             }
 
             m_ServerURI = tmp.URI;
-
-            base.Initialise(source, "UserAliasService");
         }
 
         public UserAlias GetUserForAlias(UUID aliasID)
@@ -110,13 +89,13 @@ namespace OpenSim.Services.Connectors
 
                 if (string.IsNullOrEmpty(reply))
                 {
-                    m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: GetUserForAlias received null or empty reply");
+                    _logger.LogDebug($"[ACCOUNT ALIAS CONNECTOR]: GetUserForAlias received null or empty reply");
                     return null;
                 }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug(e, $"[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {uri}: {e.Message}");
             }
 
             Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -152,13 +131,13 @@ namespace OpenSim.Services.Connectors
 
                 if (string.IsNullOrEmpty(reply))
                 {
-                    m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: GetUserLiases received null or empty reply");
+                    _logger.LogDebug($"[ACCOUNT ALIAS CONNECTOR]: GetUserLiases received null or empty reply");
                     return null;
                 }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug(e, $"[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {uri}: {e.Message}");
             }
 
             Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -181,9 +160,7 @@ namespace OpenSim.Services.Connectors
                 }
                 else
                 {
-                    m_log.DebugFormat(
-                        "[USER ALIAS CONNECTOR]: GetUserAliases received invalid response type {0}",
-                        elements.GetType());
+                    _logger.LogDebug($"[USER ALIAS CONNECTOR]: GetUserAliases received invalid response type {elements.GetType()}");
                 }
             }
 
@@ -211,13 +188,13 @@ namespace OpenSim.Services.Connectors
 
                 if (string.IsNullOrEmpty(reply))
                 {
-                    m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: CreateAlias received null or empty reply");
+                    _logger.LogDebug($"[ACCOUNT ALIAS CONNECTOR]: CreateAlias received null or empty reply");
                     return null;
                 }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug(e, $"[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {uri}: {e.Message}");
                 return null;
             }
 
@@ -254,13 +231,13 @@ namespace OpenSim.Services.Connectors
 
                 if (string.IsNullOrEmpty(reply))
                 {
-                    m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: DeleteAlias received null or empty reply");
+                    _logger.LogDebug($"[ACCOUNT ALIAS CONNECTOR]: DeleteAlias received null or empty reply");
                     return false;
                 }
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
+                _logger.LogDebug(e, $"[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {uri}: {e.Message}");
                 return false;
             }
 
