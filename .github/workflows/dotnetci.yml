@@ -2,9 +2,9 @@ name: dotnet package
 
 on:
   push:
-    branches: [ develop ]
+    branches: [ develop,hotfix/0.9.3.9208 ]
   pull_request:
-    branches: [ develop ]
+    branches: [ develop,hotfix/0.9.3.9208 ]
 
 jobs:
   build:
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dotnet-version: [ '9.0.x' ]
+        dotnet-version: [ '8.0.x' ]
 
     steps:
     - uses: actions/checkout@v4
