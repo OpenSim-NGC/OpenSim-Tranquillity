@@ -2,7 +2,7 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ develop, master ]
+    branches: [ develop ]
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ develop ]
@@ -11,7 +11,7 @@ on:
 
 jobs:
   analyze:
-    name: Analyze
+
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -21,21 +21,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'csharp' ]
+        dotnet-version: [ '9.0.x' ]
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    # Initializes the CodeQL tools for scanning.
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+    - uses: actions/checkout@v4
       with:
-        languages: ${{ matrix.language }}
-        config-file: ./.github/codeql/codeql-config.yml
+        fetch-depth: 0
 
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
+    - name: Setup .NET ${{matrix.dotnet-version }}
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: ${{ matrix.dotnet-version }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --configuration Release
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: csharp
+        config-file: ./.github/codeql/codeql-config.yml
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
