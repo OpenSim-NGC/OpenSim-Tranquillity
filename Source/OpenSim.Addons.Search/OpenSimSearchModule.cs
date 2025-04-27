@@ -1,16 +1,15 @@
 ﻿using Autofac;
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Addons.Search
+namespace OpenSim.Addons.Search;
+
+public class OpenSimSearchModule : Module
 {
-    public class OpenSimSearchModule : Module
+    protected override void Load(ContainerBuilder builder)
     {
-        protected override void Load(ContainerBuilder builder)
-        {
-            builder.RegisterType<OpenSearchModule>()
-                .Named<ISharedRegionModule>("OpenSimSearch")
-                .AsImplementedInterfaces()
-                .SingleInstance();
-        }
+        builder.RegisterType<OpenSearchModule>()
+            .Named<ISharedRegionModule>("OpenSimSearch")
+            .AsImplementedInterfaces()
+            .SingleInstance();
     }
 }
