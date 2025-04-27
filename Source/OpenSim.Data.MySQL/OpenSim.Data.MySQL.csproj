@@ -8,9 +8,6 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Autofac">
-      <HintPath>..\..\..\..\..\..\..\.nuget\packages\autofac\8.2.0\lib\net8.0\Autofac.dll</HintPath>
-    </Reference>
     <Reference Include="OpenMetaverse">
       <HintPath>..\..\Library\OpenMetaverse.dll</HintPath>
     </Reference>
@@ -52,6 +49,7 @@
     <EmbeddedResource Include="Resources\XAssetStore.migrations" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Autofac" Version="8.2.0" />
     <PackageReference Include="log4net" Version="3.0.3" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
