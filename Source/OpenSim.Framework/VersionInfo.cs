@@ -25,38 +25,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- // THIS CS FILE IS AUTO GENERATED FROM A T4 TEMPLATE. MODIFY THE TEMPLATE, NOT THE CS FILE!
 
 namespace OpenSim
 {
     public class VersionInfo
     {
-        public const string VersionNumber = "0.9.3";
-        public const string AssemblyVersionNumber = "0.9.3";
-        public const string Release = "9054";
-
-        public const Flavour VERSION_FLAVOUR = Flavour.Dev;
-
-        public enum Flavour
-        {
-            Unknown,
-            Dev,
-            RC1,
-            RC2,
-            RC3,
-            Release,
-            Post_Fixes,
-            Extended
-        }
+        public const string VersionNumber = ThisAssembly.AssemblyFileVersion;
+        public const string AssemblyVersionNumber = ThisAssembly.AssemblyVersion;
+        public const string Configuration = ThisAssembly.AssemblyConfiguration;
 
         public static string Version
         {
-            get { return GetVersionString(VersionNumber, Release); }
+            get { return GetVersionString(); }
         }
 
-        public static string GetVersionString(string versionNumber, string release)
+        public static string GetVersionString()
         {
-            string versionString = $"OpenSim-NGC Tranquillity {versionNumber}.{release}";
+            
+            string versionString = $"OpenSim-NGC Tranquillity {ThisAssembly.AssemblyVersion}";
             return versionString.PadRight(VERSIONINFO_VERSION_LENGTH);
         }
 
