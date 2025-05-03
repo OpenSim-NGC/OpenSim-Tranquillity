@@ -1308,15 +1308,30 @@ namespace OpenSim.Framework
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string SHA1Hash(byte[] data)
         {
             byte[] hash = ComputeSHA1Hash(data);
             return bytesToHexString(hash, false);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static byte[] ComputeSHA1Hash(byte[] src)
         {
             return SHA1.HashData(src);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static string SHA256Hash(byte[] data)
+        {
+            return SHA256Hash(data.AsSpan());
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static string SHA256Hash(ReadOnlySpan<byte> data)
+        {
+            byte[] hash = SHA256.HashData(data);
+            return bytesToHexString(hash, false);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1487,7 +1502,7 @@ namespace OpenSim.Framework
 
                 // (Optional)...
                 request.CertificateExtensions.Add(
-                new X509KeyUsageExtension(X509KeyUsageFlags.DataEncipherment | X509KeyUsageFlags.KeyEncipherment | X509KeyUsageFlags.DigitalSignature , false));
+                    new X509KeyUsageExtension(X509KeyUsageFlags.DataEncipherment | X509KeyUsageFlags.KeyEncipherment | X509KeyUsageFlags.DigitalSignature , false));
 
                 // (Optional) SSL Server Authentication...
                 request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid("1.3.6.1.5.5.7.3.1")], false));
@@ -3421,7 +3436,7 @@ namespace OpenSim.Framework
                     finally
                     {
                         Interlocked.Decrement(ref numRunningThreadFuncs);
-                        activeThreads.TryRemove(threadFuncNum, out ThreadInfo dummy);
+                        activeThreads.TryRemove(threadFuncNum, out _);
                         if (loggingEnabled && threadInfo.LogThread)
                             m_log.Debug($"Exit threadfunc {threadFuncNum} ({FormatDuration(threadInfo.Elapsed())}");
                         callback = null;
@@ -3456,7 +3471,7 @@ namespace OpenSim.Framework
             catch (Exception)
             {
                 Interlocked.Decrement(ref numQueuedThreadFuncs);
-                activeThreads.TryRemove(threadFuncNum, out ThreadInfo dummy);
+                activeThreads.TryRemove(threadFuncNum, out _);
                 throw;
             }
         }

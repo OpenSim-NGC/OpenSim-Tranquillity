@@ -3,6 +3,16 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.11.35303.130
 MinimumVisualStudioVersion = 10.0.40219.1
+
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcJanusService", "addon-modules/os-webrtc-janus/Janus/WebRtcJanusService.csproj", "{AA629949-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoice", "addon-modules/os-webrtc-janus/WebRtcVoice/WebRtcVoice.csproj", "{C76F3732-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceServiceModule", "addon-modules/os-webrtc-janus/WebRtcVoiceServiceModule/WebRtcVoiceServiceModule.csproj", "{5B354044-0000-0000-0000-000000000000}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceRegionModule", "addon-modules/os-webrtc-janus/WebRtcVoiceRegionModule/WebRtcVoiceRegionModule.csproj", "{00122A60-0000-0000-0000-000000000000}"
+EndProject
+
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Tests.Common", "Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj", "{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}"
@@ -157,6 +167,24 @@ Global
 		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5}.Release|Any CPU.Build.0 = Release|Any CPU
+
+        {AA629949-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {AA629949-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {AA629949-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {AA629949-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+        {C76F3732-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {C76F3732-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {C76F3732-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {C76F3732-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+        {5B354044-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {5B354044-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {5B354044-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {5B354044-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+        {00122A60-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {00122A60-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {00122A60-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {00122A60-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+
 		{4C8A6BF4-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4C8A6BF4-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C8A6BF4-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU

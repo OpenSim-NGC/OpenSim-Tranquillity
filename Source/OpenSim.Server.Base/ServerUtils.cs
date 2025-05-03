@@ -569,7 +569,7 @@ namespace OpenSim.Server.Base
                 catch (Exception e)
                 {
                     m_log.Debug($"[serverUtils.ParseXmlResponse]: failed error: {e.Message}\n --string:\n{data}\n");
-                }
+            }
             }
             return [];
         }
