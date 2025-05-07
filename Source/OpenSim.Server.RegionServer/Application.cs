@@ -71,7 +71,7 @@ namespace OpenSim
         public static void Start(string[] args)
         {
             // First line, hook the appdomain to the crash reporter
-            AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
+            //AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
 
             Culture.SetCurrentCulture();
             Culture.SetDefaultCurrentCulture();
@@ -278,6 +278,7 @@ namespace OpenSim
                 MainConsole.Instance = null;
             }
             */
+            /*
             configSource.Alias.AddAlias("On", true);
             configSource.Alias.AddAlias("Off", false);
             configSource.Alias.AddAlias("True", true);
@@ -331,6 +332,7 @@ namespace OpenSim
                     }
                 }
             }
+            */
         }
 
         private static bool _IsHandlingException = false; // Make sure we don't go recursive on ourself
