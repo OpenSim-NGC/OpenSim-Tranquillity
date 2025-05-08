@@ -9,9 +9,6 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Autofac">
-      <HintPath>..\..\..\..\..\..\..\.nuget\packages\autofac\8.2.0\lib\net8.0\Autofac.dll</HintPath>
-    </Reference>
     <Reference Include="C5">
       <HintPath>..\..\Library\C5.dll</HintPath>
     </Reference>

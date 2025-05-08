@@ -33,75 +33,105 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
+using OpenSim.Data;
+using OpenSim.Services.Base;
 
-namespace OpenSim.Server.Handlers.Grid;
-
-public class GridInfoHandlers
+namespace OpenSim.Server.Handlers.Grid
 {
-    private IConfiguration m_Config;
-    private ILogger m_logger;
-
-    private Dictionary<string, string> _info = new Dictionary<string, string>();
-    
-    private byte[] cachedJsonAnswer = null;
-    private byte[] cachedRestAnswer = null;
-    
-    /// <summary>
-    /// Instantiate a GridInfoService object.
-    /// </summary>
-    /// <param name="configPath">path to config path containing
-    /// grid information</param>
-    /// <remarks>
-    /// GridInfoService uses the [GridInfo] section of the
-    /// standard OpenSim.ini file --- which is not optimal, but
-    /// anything else requires a general redesign of the config
-    /// system.
-    /// </remarks>
-    public GridInfoHandlers(IConfiguration config, ILogger logger)
+    public class GridInfoHandlers
     {
-        m_Config = config;
-        m_logger = logger;
-        
-        _info["platform"] = "OpenSim";
+        private static readonly ILog _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private IConfigSource m_Config;
+        private Dictionary<string, string> _info = [];
+        private Dictionary<string, string> _stats = [];
+        private byte[] cachedJsonAnswer = null;
+        private byte[] cachedRestAnswer = null;
+        private byte[] cachedStatAnswer = null;
+        private bool stats_available = false;
+        private int _lastrun;
+        protected IRegionData m_Database_regions = null;
+        protected IGridUserData m_Database_griduser = null;
 
-        try
+        /// <summary>
+        /// Instantiate a GridInfoService object.
+        /// </summary>
+        /// <param name="configPath">path to config path containing
+        /// grid information</param>
+        /// <remarks>
+        /// GridInfoService uses the [GridInfo] section of the
+        /// standard OpenSim.ini file --- which is not optimal, but
+        /// anything else requires a general redesign of the config
+        /// system.
+        /// </remarks>
+        public GridInfoHandlers(IConfigSource configSource)
         {
-            var gridCfg = config.GetSection("GridInfoService");
-            if (gridCfg.Exists())
-            {
-                foreach (var k in gridCfg.AsEnumerable())
-                {
-                    var keyparts = k.Key.Split(":");
-                    if ((keyparts.Length <= 1) || (keyparts[0] != "GridInfoService")) 
-                        continue;
-                    
-                    var v = gridCfg.GetValue<string>(keyparts[1]);
-                    if (!string.IsNullOrEmpty(v))
-                        _info[keyparts[1]] = v;
-                }
-            }
-            else 
-            {
-                var netCfg = config.GetSection("Network");
-                if (netCfg.Exists())
-                {
-                    var listenerPort = netCfg.GetValue("http_listener_port", ConfigSettings.DefaultRegionHttpPort.ToString());
-                    _info["login"] = $"http://127.0.0.1:{listenerPort}/";
-                }
-                else
-                {
-                    _info["login"] = "http://127.0.0.1:9000/";
-                }
+            m_Config = configSource;
+            loadGridInfo(configSource);
+        }
 
-                IssueWarning();
+        private void loadGridInfo(IConfigSource configSource)
+        {
+            IConfig gridCfg = configSource.Configs["GridInfoService"];
+
+            stats_available = !gridCfg.GetBoolean("DisableStatsEndpoint", false);
+            _lastrun = 0;
+
+            if (stats_available)
+            {
+                stats_available = false;
+                IConfig dbConfig = configSource.Configs["DatabaseService"];
+                if (dbConfig is not null)
+                {
+                    ServiceBase serviceBase = new(configSource);
+                    string dllName = dbConfig.GetString("StorageProvider", String.Empty);
+                    string connString = dbConfig.GetString("ConnectionString", String.Empty);
+
+                    if (dllName.Length != 0 && connString.Length != 0)
+                    {
+                        m_Database_regions = serviceBase.LoadPlugin<IRegionData>(dllName, [connString, "regions"]);
+                        if(m_Database_regions != null)
+                        {
+                            m_Database_griduser = serviceBase.LoadPlugin<IGridUserData>(dllName, [connString, "GridUser"]);
+                            if (m_Database_griduser != null)
+                            {
+                                stats_available = true;
+                                _log.Debug("[GRID INFO SERVICE]: Grid Stats enabled");
+                            }
+                        }
+                    }
+                }
+                if (!stats_available)
+                {
+                    _log.Warn("[GRID INFO SERVICE]: Could not find or initialize Database Service config, grid stats will be unavailable!");
+                }
             }
+
+            _info["platform"] = "OpenSim";
+            try
+            {
+                if (gridCfg != null)
+                {
+                    foreach (string k in gridCfg.GetKeys())
+                        _info[k] = gridCfg.GetString(k);
+                }
+                else 
+                {
+                    IConfig netCfg = configSource.Configs["Network"];
+                    if (netCfg != null)
+                    {
+                        _info["login"] = string.Format("http://127.0.0.1:{0}/",
+                            netCfg.GetString("http_listener_port", ConfigSettings.DefaultRegionHttpPort.ToString()));
+                    }
+                    else
+                    {
+                        _info["login"] = "http://127.0.0.1:9000/";
+                    }
+                    IssueWarning();
+                }
 
             _info.TryGetValue("home", out string tmp);
 
-            tmp = Util.GetConfigVarFromSections<string>(config, "HomeURI",
-                new string[] { "Startup", "Hypergrid" }, tmp);
+                tmp = Util.GetConfigVarFromSections<string>(m_Config, "HomeURI", ["Startup", "Hypergrid"], tmp);
 
             if (string.IsNullOrEmpty(tmp))
             {
@@ -113,24 +143,18 @@ public class GridInfoHandlers
             if (!string.IsNullOrEmpty(tmp))
                 _info["home"] = OSD.FromString(tmp);
 
-            tmp = Util.GetConfigVarFromSections<string>(m_Config, "HomeURIAlias",
-                new string[] { "Startup", "Hypergrid" }, string.Empty);
-            
-            if (!string.IsNullOrEmpty(tmp))
-                _info["homealias"] = OSD.FromString(tmp);
+                tmp = Util.GetConfigVarFromSections<string>(m_Config, "HomeURIAlias", ["Startup", "Hypergrid"], string.Empty);
+                if (!string.IsNullOrEmpty(tmp))
+                    _info["homealias"] = OSD.FromString(tmp);
 
-            _info.TryGetValue("gatekeeper", out tmp);
-            tmp = Util.GetConfigVarFromSections<string>(m_Config, "GatekeeperURI",
-                new string[] { "Startup", "Hypergrid" }, tmp);
-            
-            if (!string.IsNullOrEmpty(tmp))
-                _info["gatekeeper"] = OSD.FromString(tmp);
+                _info.TryGetValue("gatekeeper", out tmp);
+                tmp = Util.GetConfigVarFromSections<string>(m_Config, "GatekeeperURI", ["Startup", "Hypergrid"], tmp);
+                if (!string.IsNullOrEmpty(tmp))
+                    _info["gatekeeper"] = OSD.FromString(tmp);
 
-            tmp = Util.GetConfigVarFromSections<string>(m_Config, "GatekeeperURIAlias",
-                new string[] { "Startup", "Hypergrid" }, string.Empty);
-            
-            if (!string.IsNullOrEmpty(tmp))
-                _info["gatekeeperalias"] = OSD.FromString(tmp);
+                tmp = Util.GetConfigVarFromSections<string>(m_Config, "GatekeeperURIAlias", ["Startup", "Hypergrid"], string.Empty);
+                if (!string.IsNullOrEmpty(tmp))
+                    _info["gatekeeperalias"] = OSD.FromString(tmp);
 
         }
         catch (Exception)
@@ -146,16 +170,16 @@ public class GridInfoHandlers
         m_logger.LogWarning("[GRID INFO SERVICE]: found no [GridInfoService] section in your configuration files");
         m_logger.LogWarning("[GRID INFO SERVICE]: trying to guess sensible defaults, you might want to provide better ones:");
 
-        foreach (string k in _info.Keys)
-        {
-            m_logger.LogWarning($"[GRID INFO SERVICE]: {k}: {_info[k]}");
+            foreach (KeyValuePair<string, string> k in _info)
+            {
+                _log.Warn($"[GRID INFO SERVICE]: {k.Key}: {k.Value}");
+            }
         }
-    }
 
-    public XmlRpcResponse XmlRpcGridInfoMethod(XmlRpcRequest request, IPEndPoint remoteClient)
-    {
-        XmlRpcResponse response = new XmlRpcResponse();
-        Hashtable responseData = new Hashtable();
+        public XmlRpcResponse XmlRpcGridInfoMethod(XmlRpcRequest request, IPEndPoint remoteClient)
+        {
+            XmlRpcResponse response = new XmlRpcResponse();
+            Hashtable responseData = [];
 
         m_logger.LogDebug("[GRID INFO SERVICE]: Request for grid info");
 
@@ -233,8 +257,93 @@ public class GridInfoHandlers
             cachedJsonAnswer = OSDParser.SerializeJsonToBytes(map);
         }
 
-        httpResponse.ContentType = "application/json";
-        httpResponse.RawBuffer = cachedJsonAnswer;
+            httpResponse.ContentType = "application/json";
+            httpResponse.RawBuffer = cachedJsonAnswer;
+        }
+
+        public void GetGridStats(int now)
+        {
+            int region_count = 0;
+            int active_users = 0;
+            int residents = 0;
+
+            try
+            {
+                // Fetch region data
+                List<RegionData> regions = m_Database_regions.GetOnlineRegions(UUID.Zero);
+                foreach (RegionData region in regions)
+                {
+                    // Count individual region equivalent
+                    region_count += (region.sizeX * region.sizeY) >> 16;
+                }
+                regions = null;
+
+                // Fetch all grid users, can't do a simple query unfortunately
+                GridUserData[] gridusers = m_Database_griduser.GetAll(string.Empty);
+
+                // Go through grid user data
+                foreach (GridUserData griduser in gridusers)
+                {
+                    // Don't count if uui
+                    if (!griduser.UserID.Contains(';'))
+                        residents++;
+
+                    if(griduser.Data.TryGetValue("Login", out string login) &&
+                            int.TryParse(login, out int last_login))
+                    {
+                        if (last_login == 0)
+                            continue;
+
+                        // Count if last login was within the last 30 days
+                        if (last_login > (now - 2592000))
+                            active_users++;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Error($"[GRID INFO SERVICE]: Could not fetch grid stats: {ex.Message}");
+            }
+
+            _stats["residents"] = residents.ToString();
+            _stats["active_users"] = active_users.ToString();
+            _stats["region_count"] = region_count.ToString();
+
+            _lastrun = now;
+        }
+
+        public void RestGridStatsHandler(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        {
+            httpResponse.KeepAlive = false;
+            if (httpRequest.HttpMethod != "GET" || !stats_available)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.MethodNotAllowed;
+                return;
+            }
+
+            // Only fetch new stats if the last run is 15 minutes old since this is heavy db stuff
+            int now = Util.UnixTimeSinceEpoch();
+
+            if (cachedStatAnswer == null || (now - 900) > _lastrun)
+            {
+                GetGridStats(now);
+                osUTF8 osb = OSUTF8Cached.Acquire();
+                osb.AppendASCII("<gridstats>");
+                foreach (KeyValuePair<string, string> k in _stats)
+                {
+                    osb.AppendASCII('<');
+                    osb.AppendASCII(k.Key);
+                    osb.AppendASCII('>');
+                    osb.AppendASCII(SecurityElement.Escape(k.Value.ToString()));
+                    osb.AppendASCII("</");
+                    osb.AppendASCII(k.Key);
+                    osb.AppendASCII('>');
+                }
+                osb.AppendASCII("</gridstats>");
+                cachedStatAnswer = OSUTF8Cached.GetArrayAndRelease(osb);
+            }
+            httpResponse.ContentType = "application/xml";
+            httpResponse.RawBuffer = cachedStatAnswer;
+        }
     }
 }
-

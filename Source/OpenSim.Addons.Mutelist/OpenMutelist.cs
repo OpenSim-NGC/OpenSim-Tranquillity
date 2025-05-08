@@ -32,17 +32,14 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Services.Interfaces;
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Xml;
 
-[assembly: Addin("OpenSimMutelist", OpenSim.VersionInfo.AssemblyVersionNumber + "0.1")]
+[assembly: Addin("OpenSimMutelist", OpenSim.VersionInfo.AssemblyVersionNumber)]
 [assembly: AddinDependency("OpenSim.Region.Framework", OpenSim.VersionInfo.AssemblyVersionNumber)]
 [assembly: AddinDescription("OpenSimMutelist module.")]
 [assembly: AddinAuthor("Kevin Cozens")]

@@ -309,7 +309,6 @@
     ;; default is false
     ; TelehubAllowLandmark = false
 
-
     ;; Let's Encrypt and others ".pem" certificates converter settings.
     ;; Enabling this feature will automatically convert the CA .pem certificates to
     ;; OpenSim compatible PKCS12 .p12 and .pfx certificates on every server startup.
@@ -333,7 +332,6 @@
     ;; Set the .p12 and .pfx password.
     ;# {outputCertPassword} {} {Set the .p12 and .pfx password} {} ""
     outputCertPassword = ""
-
 
     ;; SSL selfsigned certificate settings.
     ;; Enable selfsigned certificate creation for local and external use. When set to true, will create a folder SSL\ and 2 sub folders SSL\ssl\ and SSL\src\.

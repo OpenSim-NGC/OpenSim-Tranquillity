@@ -2,9 +2,9 @@ name: dotnet package
 
 on:
   push:
-    branches: [ develop ]
+    branches: [ master, develop ]
   pull_request:
-    branches: [ develop ]
+    branches: [ master, develop ]
 
 jobs:
   build:
@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Setup .NET ${{matrix.dotnet-version }}
       uses: actions/setup-dotnet@v3

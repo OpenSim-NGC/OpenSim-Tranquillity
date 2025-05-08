@@ -8,9 +8,6 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Autofac">
-      <HintPath>..\..\..\..\..\..\..\.nuget\packages\autofac\8.2.0\lib\net8.0\Autofac.dll</HintPath>
-    </Reference>
     <Reference Include="OpenMetaverse">
       <HintPath>..\..\Library\OpenMetaverse.dll</HintPath>
     </Reference>

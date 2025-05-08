@@ -228,11 +228,11 @@ namespace OpenSim
                     throw new Exception("CombineContiguousRegions not suported");
                 }
 
-                string pidFile = startupConfig.GetString("PIDFile", String.Empty);
-                if (pidFile != String.Empty)
+                string pidFile = startupConfig.GetString("PIDFile", string.Empty);
+                if (pidFile.Length > 0)
                     CreatePIDFile(pidFile);
 
-                userStatsURI = startupConfig.GetString("Stats_URI", String.Empty);
+                userStatsURI = startupConfig.GetString("Stats_URI", string.Empty);
 
                 m_securePermissionsLoading = startupConfig.GetBoolean("SecurePermissionsLoading", true);
 
@@ -357,18 +357,18 @@ namespace OpenSim
             
             // Sure is not the right place for this but do the job...
             // Must always be called before (all) / the HTTP servers starting for the Certs creation or renewals.
-            if (startupConfig.GetBoolean("EnableSelfsignedCertSupport", false))
-            {
-                if (!File.Exists("SSL\\ssl\\"+ startupConfig.GetString("CertFileName") +".p12") || startupConfig.GetBoolean("CertRenewOnStartup"))
-                {               
-                    Util.CreateOrUpdateSelfsignedCert(
-                        string.IsNullOrEmpty(startupConfig.GetString("CertFileName")) ? "OpenSim" : startupConfig.GetString("CertFileName"),
-                        string.IsNullOrEmpty(startupConfig.GetString("CertHostName")) ? "localhost" : startupConfig.GetString("CertHostName"),
-                        string.IsNullOrEmpty(startupConfig.GetString("CertHostIp")) ? "127.0.0.1" : startupConfig.GetString("CertHostIp"),
-                        string.IsNullOrEmpty(startupConfig.GetString("CertPassword")) ? string.Empty : startupConfig.GetString("CertPassword")
-                    );
+                if (startupConfig.GetBoolean("EnableSelfsignedCertSupport", false))
+                {
+                    if(!File.Exists("SSL\\ssl\\"+ startupConfig.GetString("CertFileName") +".p12") || startupConfig.GetBoolean("CertRenewOnStartup"))
+                    {               
+                        Util.CreateOrUpdateSelfsignedCert(
+                            string.IsNullOrEmpty(startupConfig.GetString("CertFileName")) ? "OpenSim" : startupConfig.GetString("CertFileName"),
+                            string.IsNullOrEmpty(startupConfig.GetString("CertHostName")) ? "localhost" : startupConfig.GetString("CertHostName"),
+                            string.IsNullOrEmpty(startupConfig.GetString("CertHostIp")) ? "127.0.0.1" : startupConfig.GetString("CertHostIp"),
+                            string.IsNullOrEmpty(startupConfig.GetString("CertPassword")) ? string.Empty : startupConfig.GetString("CertPassword")
+                        );
+                    }
                 }
-            }
 
             if (startupConfig.GetBoolean("EnableCertConverter", false))
             {

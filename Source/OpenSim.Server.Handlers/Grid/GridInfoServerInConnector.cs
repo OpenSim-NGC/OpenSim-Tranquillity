@@ -55,6 +55,20 @@ public class GridInfoServerInConnector(
             new SimpleStreamHandler("/json_grid_info", handlers.JsonGetGridInfoMethod));
 
         HttpServer.AddXmlRPCHandler("get_grid_info", handlers.XmlRpcGridInfoMethod, false);
+            IConfig gridCfg = config.Configs["GridInfoService"];
+
+            bool stats_disabled = gridCfg.GetBoolean("DisableStatsEndpoint", false);
+
+            server.AddSimpleStreamHandler(new SimpleStreamHandler("/get_grid_info",
+                                                               handlers.RestGetGridInfoMethod));
+            server.AddSimpleStreamHandler(new SimpleStreamHandler("/json_grid_info",
+                                                          handlers.JsonGetGridInfoMethod));
+            server.AddXmlRPCHandler("get_grid_info", handlers.XmlRpcGridInfoMethod, false);
+
+            if (!stats_disabled)
+            {
+                server.AddSimpleStreamHandler(new SimpleStreamHandler("/get_grid_stats", handlers.RestGridStatsHandler));
+            }
+        }
     }
 }
-
