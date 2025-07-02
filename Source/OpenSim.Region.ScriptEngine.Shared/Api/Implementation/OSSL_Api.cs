@@ -5124,6 +5124,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             ScriptSleep(1000);
         }
 
+        public void osTriggerSoundAtPos(LSL_String sound, LSL_Vector position, LSL_Float gain)
+        {
+            if (m_SoundModule == null)
+                return;
+
+            UUID soundID = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, sound, AssetType.Sound);
+            if (soundID == UUID.Zero)
+                return;
+
+            m_SoundModule.TriggerSound(soundID, m_host.OwnerID, m_host.UUID, UUID.Zero, gain, position, m_host.RegionHandle);
+        }
+
         // get only one part
         private SceneObjectPart GetSingleLinkPart(int linkType)
         {
