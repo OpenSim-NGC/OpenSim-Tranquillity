@@ -6263,6 +6263,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return 1;
         }
 
+        public LSL_Float osPerlinNoise2D(LSL_Float x, LSL_Float y, LSL_Integer octaves, LSL_Float persistence)
+        {
+            return new LSL_Float(TerrainUtil.PerlinNoise2D(x, y, octaves, persistence));
+        }
+
         public void osParticleSystem(LSL_List rules)
         {
             InitLSL();

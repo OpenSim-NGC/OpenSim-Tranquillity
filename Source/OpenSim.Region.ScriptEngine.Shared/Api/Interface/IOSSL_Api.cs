@@ -922,5 +922,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
              /// <returns>a integer with index of match point or -1</returns>
         //ApiDesc Returns the nth index of the sublist constrained with start and end count.
        LSL_Integer osListFindListNext(LSL_List src, LSL_List test, LSL_Integer start, LSL_Integer end, LSL_Integer instance);
+       LSL_Float osPerlinNoise2D(LSL_Float x, LSL_Float y, LSL_Integer octaves, LSL_Float persistence);
     }
 }
