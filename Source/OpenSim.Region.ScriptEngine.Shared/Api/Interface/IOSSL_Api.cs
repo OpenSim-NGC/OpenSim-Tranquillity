@@ -739,7 +739,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
               void osTriggerSound(LSL_Integer linknum, LSL_String sound, LSL_Float volume);
         //ApiDesc Trigger a given preloaded sound with volume and axis-aligned bounding box for a given link.
               void osTriggerSoundLimited(LSL_Integer linknum, LSL_String sound, LSL_Float volume, vector top_north_east, vector bottom_south_west);
-
+        //ApiDesc Trigger a given preloaded sound at a position
+              void osTriggerSoundAtPos(LSL_String sound, vector position, LSL_Float gain);
         //ApiDesc Detected params return of triggered user event of their set country.
         LSL_String osDetectedCountry(LSL_Integer number);
         //ApiDesc Returns the country of a user.
@@ -922,5 +923,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
              /// <returns>a integer with index of match point or -1</returns>
         //ApiDesc Returns the nth index of the sublist constrained with start and end count.
        LSL_Integer osListFindListNext(LSL_List src, LSL_List test, LSL_Integer start, LSL_Integer end, LSL_Integer instance);
+       LSL_Float osPerlinNoise2D(LSL_Float x, LSL_Float y, LSL_Integer octaves, LSL_Float persistence);
     }
 }
