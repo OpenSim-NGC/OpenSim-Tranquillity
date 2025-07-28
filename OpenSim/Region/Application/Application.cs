@@ -77,23 +77,8 @@ namespace OpenSim
             Culture.SetDefaultCurrentCulture();
 
             AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
-
-            /*
-            // pre load System.Drawing.Common.dll for the platform
-            // this will fail if a newer version is present on GAC, bin folder, etc, since LoadFrom only accepts the path, if it cannot find it elsewhere
-            string targetdll = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),"lib",
-                        (Util.IsWindows() ? "win" : "linux"), "System.Drawing.Common.dll");
-            try
-            {
-                Assembly asmb =  Assembly.LoadFrom(targetdll);
-            }
-            catch (Exception e)
-            {
-                m_log.Error("Failed to load System.Drawing.Common.dll for current platform" + e.Message);
-                throw;
-            }
-            */
-            string targetdll = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
+            
+            var targetdll = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
                         "System.Drawing.Common.dll");
             string src = targetdll + (Util.IsWindows() ? ".win" : ".linux");
             try
@@ -114,6 +99,18 @@ namespace OpenSim
                 throw;
             }
 
+            // pre load System.Drawing.Common.dll for the platform
+            // this will fail if a newer version is present on GAC, bin folder, etc, since LoadFrom only accepts the path, if it cannot find it elsewhere
+            try
+            {
+                Assembly asmb = Assembly.LoadFrom(targetdll);
+            }
+            catch (Exception e)
+            {
+                m_log.Error("Failed to load System.Drawing.Common.dll for current platform" + e.Message);
+                throw;
+            }
+
             ServicePointManager.DefaultConnectionLimit = 32;
             ServicePointManager.MaxServicePointIdleTime = 30000;
 
@@ -126,7 +123,7 @@ namespace OpenSim
 
             // Configure Log4Net
             configSource.AddSwitch("Startup", "logconfig");
-            string logConfigFile = configSource.Configs["Startup"].GetString("logconfig", String.Empty);
+            string logConfigFile = configSource.Configs["Startup"].GetString("logconfig", string.Empty);
             if (!string.IsNullOrEmpty(logConfigFile))
             {
                 XmlConfigurator.Configure(new System.IO.FileInfo(logConfigFile));
@@ -385,7 +382,7 @@ namespace OpenSim
 
             string msg = $"\r\nAPPLICATION EXCEPTION DETECTED: {e}\r\n\r\n";
 
-            Exception ex = (Exception) e.ExceptionObject;
+            Exception ex = (Exception)e.ExceptionObject;
 
             msg += $"Exception: {ex}\r\n";
             if (ex.InnerException != null)
