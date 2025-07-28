@@ -26,6 +26,7 @@
  */
 
 using System;
+using System.Buffers;
 using System.Collections;
 using System.Collections.Specialized;
 using System.Globalization;
@@ -123,8 +124,9 @@ namespace OpenSim.Framework
                 PooledConnectionIdleTimeout = TimeSpan.FromSeconds(31),
                 PooledConnectionLifetime = TimeSpan.FromMinutes(3)
             };
+            
             //shh.SslOptions.ClientCertificates = null,
-            shh.SslOptions.EnabledSslProtocols = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12 | SslProtocols.Tls13;
+            shh.SslOptions.EnabledSslProtocols = SslProtocols.None;     // Use system default
             if (NoVerifyCertChain)
             {
                 shh.SslOptions.CertificateRevocationCheckMode = X509RevocationMode.NoCheck;
@@ -189,8 +191,9 @@ namespace OpenSim.Framework
                 PooledConnectionIdleTimeout = TimeSpan.FromSeconds(31),
                 PooledConnectionLifetime = TimeSpan.FromMinutes(3)
             };
+            
             //shh.SslOptions.ClientCertificates = null,
-            shh.SslOptions.EnabledSslProtocols = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12 | SslProtocols.Tls13;
+            shh.SslOptions.EnabledSslProtocols = SslProtocols.None;     // Use system default
             if (NoVerifyCertChain)
             {
                 shh.SslOptions.CertificateRevocationCheckMode = X509RevocationMode.NoCheck;
@@ -531,7 +534,6 @@ namespace OpenSim.Framework
         {
             int reqnum = RequestNumber++;
             string method = (data is not null && data["RequestMethod"] is not null) ? data["RequestMethod"] : "unknown";
-
             if (DebugLevel >= 3)
                 m_log.Debug($"[LOGHTTP]: HTTP OUT {reqnum} ServiceForm '{method}' to {url}");
 
@@ -803,18 +805,18 @@ namespace OpenSim.Framework
         /// </remarks>
         public static int CopyStream(this Stream copyFrom, Stream copyTo, int maximumBytesToCopy)
         {
-            byte[] buffer = new byte[4096];
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(8196);
             int readBytes;
             int totalCopiedBytes = 0;
 
-            while ((readBytes = copyFrom.Read(buffer, 0, Math.Min(4096, maximumBytesToCopy))) > 0)
+            while ((readBytes = copyFrom.Read(buffer, 0, Math.Min(8196, maximumBytesToCopy))) > 0)
             {
                 int writeBytes = Math.Min(maximumBytesToCopy, readBytes);
                 copyTo.Write(buffer, 0, writeBytes);
                 totalCopiedBytes += writeBytes;
                 maximumBytesToCopy -= writeBytes;
             }
-
+            ArrayPool<byte>.Shared.Return(buffer);
             return totalCopiedBytes;
         }
 
@@ -1148,7 +1150,7 @@ namespace OpenSim.Framework
             HttpResponseMessage responseMessage = null;
             HttpRequestMessage request = null;
             HttpClient client = null;
-            string respstring = String.Empty;
+            string respstring = string.Empty;
             int sendlen = 0;
             int rcvlen = 0;
             try
