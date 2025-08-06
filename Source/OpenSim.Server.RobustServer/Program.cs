@@ -36,11 +36,11 @@ namespace OpenSim.Server.RobustServer
             var inimasterOption = new Option<string>
                 (name: "--inimaster", description: "The path to the master ini file.",
                 getDefaultValue: () => "OpenSimDefaults.ini");
-            var inidirectoryOption = new Option<string>(
-                    name: "--inidirectory", 
-                    description:    "The path to folder for config ini files.OpenSimulator will read all of *.ini files " +
-                                    "in this directory and override OpenSim.ini settings",
-                    getDefaultValue: () => "config");
+            var inidirectoryOption = new Option<string>
+                (name: "--inidirectory", 
+                description:    "The path to folder for config ini files. OpenSimulator will read all of *.ini files " +
+                                "in this directory and override OpenSim.ini settings",
+                getDefaultValue: () => "config");
             var consoleOption = new Option<string>
                 (name: "--console", description: "console type, one of basic, local or rest.", 
                 getDefaultValue: () => "local")
