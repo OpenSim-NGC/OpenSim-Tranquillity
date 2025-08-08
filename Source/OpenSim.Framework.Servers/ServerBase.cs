@@ -61,6 +61,9 @@ namespace OpenSim.Framework.Servers
         
         protected string m_startupDirectory = Environment.CurrentDirectory;
 
+        protected string m_pidFile = string.Empty;
+
+        protected ServerStatsCollector m_serverStatsCollector;
 
         /// <summary>
         /// Server version information.  Usually VersionInfo + information about git commit, operating system, etc.
@@ -263,6 +266,20 @@ namespace OpenSim.Framework.Servers
             Culture.SetDefaultCurrentCulture();
 
             // m_Server = new HttpServerBase("R.O.B.U.S.T.", args);
+        protected void RemovePIDFile()
+        {
+            if (!string.IsNullOrEmpty(m_pidFile))
+            {
+                try
+                {
+                    File.Delete(m_pidFile);
+                }
+                catch (Exception e)
+                {
+                    m_log.Error($"[SERVER BASE]: Error whilst removing {m_pidFile}", e);
+                }
+                m_pidFile = string.Empty;
+            }
         }
         
         /// <summary>

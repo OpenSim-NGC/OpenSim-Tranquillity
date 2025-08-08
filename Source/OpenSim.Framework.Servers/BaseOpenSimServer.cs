@@ -178,9 +178,10 @@ namespace OpenSim.Framework.Servers
             // _logger.LogInformation($"[STARTUP]: version: {m_version}");
             
             _logger.LogInformation(
-                $"[STARTUP]: Operating system version: {Environment.OSVersion}, " +
-                $".NET platform {Util.RuntimePlatformStr}, " +
-                $"Runtime {Environment.Version}");
+                $"[STARTUP]: Version: {m_version}\n" +
+                $"[STARTUP]: Operating system version: {Environment.OSVersion},\n" +
+                $"[STARTUP]: .NET platform {Util.RuntimePlatformStr},\n" +
+                $"[STARTUP]: Runtime {Environment.Version}");
             _logger.LogInformation(
                 $"[STARTUP]: Processor Architecture: {RuntimeInformation.ProcessArchitecture}"+
                 $"({(BitConverter.IsLittleEndian ? "le" : "be")} {(Environment.Is64BitProcess ? "64" : "32")}bit)");
@@ -189,7 +190,7 @@ namespace OpenSim.Framework.Servers
             {
                 StartupSpecific();
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 _logger.LogCritical(e, "Fatal error");
                 Environment.Exit(1);

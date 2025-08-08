@@ -155,7 +155,7 @@ namespace OpenSim.Services.Connectors
             string uri = _serverURI + "/estates/regions/?eid=" + estateID.ToString();
 
             string reply = MakeRequest("GET", uri, string.Empty);
-            if (String.IsNullOrEmpty(reply))
+            if (string.IsNullOrEmpty(reply))
                 return [];
 
             Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -188,9 +188,10 @@ namespace OpenSim.Services.Connectors
             // service here will return a 404 if the estate doesnt exist which is correct but the code
             // assumes thats a fatal error.  BTW We should never ever call Enviroinment.Exit from a supporting
             // module or a library like this.  So its gonna go.
-            var reply = MakeRequest("GET", uri, string.Empty);
-            if (String.IsNullOrEmpty(reply))
+            string reply = MakeRequest("GET", uri, string.Empty);
+            if (string.IsNullOrEmpty(reply))
             {
+                m_log.DebugFormat("[ESTATE CONNECTOR] connection to remote estates service failed");
                 return null;
             }
 
@@ -216,7 +217,7 @@ namespace OpenSim.Services.Connectors
             string uri = _serverURI + $"/estates/estate/?eid={estateID}";
 
             string reply = MakeRequest("GET", uri, string.Empty);
-            if (String.IsNullOrEmpty(reply))
+            if (string.IsNullOrEmpty(reply))
                 return null;
 
             Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -275,7 +276,7 @@ namespace OpenSim.Services.Connectors
             string reqString = ServerUtils.BuildQueryString(sendData);
 
             string reply = MakeRequest("POST", uri, reqString);
-            if (String.IsNullOrEmpty(reply))
+            if (string.IsNullOrEmpty(reply))
                 return false;
 
             Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);

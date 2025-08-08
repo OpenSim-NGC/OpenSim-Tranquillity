@@ -297,15 +297,13 @@ namespace OpenSim.Services.Connectors
             return exist;
         }
 
-        string stringUUIDZero = UUID.Zero.ToString();
-
         public virtual string Store(AssetBase asset)
         {
             // Have to assign the asset ID here. This isn't likely to
             // trigger since current callers don't pass emtpy IDs
             // We need the asset ID to route the request to the proper
             // cluster member, so we can't have the server assign one.
-            if (asset.ID.Length == 0 || asset.ID == stringUUIDZero)
+            if (asset.ID.Length == 0 || asset.ID == UUID.ZeroString)
             {
                 if (asset.FullID.IsZero())
                 {
@@ -349,7 +347,7 @@ namespace OpenSim.Services.Connectors
                 newID = null;
             }
 
-            if (string.IsNullOrEmpty(newID) || newID == stringUUIDZero)
+            if (string.IsNullOrEmpty(newID) || newID.Equals(UUID.ZeroString))
             {
                 return string.Empty;
             }

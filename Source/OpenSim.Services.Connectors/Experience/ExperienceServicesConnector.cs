@@ -197,7 +197,7 @@ namespace OpenSim.Services.Connectors.Experience
             return new UUID[0];
         }
 
-        public ExperienceInfo UpdateExpereienceInfo(ExperienceInfo info)
+        public ExperienceInfo UpdateExperienceInfo(ExperienceInfo info)
         {
             // let's just pray they never add a parameter named "method"
             Dictionary<string, object> sendData = info.ToDictionary();
@@ -207,7 +207,7 @@ namespace OpenSim.Services.Connectors.Experience
 
             string reply = SynchronousRestFormsRequester.MakeRequest("POST", _serverURI, request_str, _auth);
 
-            //m_log.InfoFormat("[EXPERIENCE SERVICE CONNECTOR]: UpdateExpereienceInfo Reply: {0}", reply);
+            //m_log.InfoFormat("[EXPERIENCE SERVICE CONNECTOR]: UpdateExperienceInfo Reply: {0}", reply);
 
             if (reply != string.Empty)
             {

@@ -300,7 +300,7 @@ namespace OpenSim.Services.UserAccountService
 
             List<UserAccount> lret = new(ret.Length);
             for(int i = 0; i < ret.Length; i++)
-                lret[i] = MakeUserAccount(ret[i]);
+                lret.Add(MakeUserAccount(ret[i]));
             return lret;
         }
 
@@ -660,19 +660,30 @@ namespace OpenSim.Services.UserAccountService
             firstName = firstName.Trim();
             lastName = lastName.Trim();
             UserAccount account = GetUserAccount(UUID.Zero, firstName, lastName);
-            if (account == null)
+
+            if (account is not null)
             {
+                m_log.Error($"[USER ACCOUNT SERVICE]: A user with the name {firstName} {lastName} already exists!");
+                return null;
+            }
+
                 account = new UserAccount(UUID.Zero, principalID, firstName, lastName, email);
                 if (account.ServiceURLs == null || account.ServiceURLs.Count == 0)
                 {
-                    account.ServiceURLs = new Dictionary<string, object>();
-                    account.ServiceURLs["HomeURI"] = string.Empty;
-                    account.ServiceURLs["InventoryServerURI"] = string.Empty;
-                    account.ServiceURLs["AssetServerURI"] = string.Empty;
+                account.ServiceURLs = new Dictionary<string, object>
+                {
+                    ["HomeURI"] = string.Empty,
+                    ["InventoryServerURI"] = string.Empty,
+                    ["AssetServerURI"] = string.Empty
+                };
                 }
 
-                if (StoreUserAccount(account))
+            if (!StoreUserAccount(account))
                 {
+                m_log.Error($"[USER ACCOUNT SERVICE]: Account creation failed for account {firstName} {lastName}");
+                return null;
+            }
+
                     bool success;
                     if (_authenticationService != null)
                     {
@@ -724,7 +735,7 @@ namespace OpenSim.Services.UserAccountService
 
                         if (CreateDefaultAvatarEntries)
                         {
-                            if (String.IsNullOrEmpty(model))
+                    if (string.IsNullOrEmpty(model))
                                 CreateDefaultAppearanceEntries(account.PrincipalID);
                             else
                                 EstablishAppearance(account.PrincipalID, model);

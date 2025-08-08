@@ -214,7 +214,6 @@ namespace OpenSim.Framework
                     }
                 }
             }
-
         }
 
         /// <summary>
@@ -309,7 +308,6 @@ namespace OpenSim.Framework
 
             return controldata;
         }
-
 
         public void UnpackUpdateMessage(OSDMap args)
         {
