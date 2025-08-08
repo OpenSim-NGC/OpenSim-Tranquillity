@@ -1,7 +1,5 @@
 ﻿using Autofac;
 
-using OpenSim.Region.Framework.Interfaces;
-
 namespace OpenSim.Data.MySQL;
 
 public class MySQLDataModule : Module
@@ -68,9 +66,9 @@ public class MySQLDataModule : Module
             .Named<IRegionData>("MySqlRegionData")
             .AsImplementedInterfaces().SingleInstance();                                                        
 
-        builder.RegisterType<MySQLSimulationData>()
-            .Named<ISimulationDataStore>("MySQLSimulationData")
-            .AsImplementedInterfaces().SingleInstance();                                                        
+        // builder.RegisterType<MySQLSimulationData>()
+        //     .Named<ISimulationDataStore>("MySQLSimulationData")
+        //     .AsImplementedInterfaces().SingleInstance();                                                        
 
         builder.RegisterType<MySqlUserAccountData>()
             .Named<IUserAccountData>("MySqlUserAccountData")

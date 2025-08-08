@@ -25,18 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
 using System.Xml;
 
 using OpenSim.Framework;
-using OpenSim.Services.Base;
 using OpenSim.Services.Interfaces;
-
-using log4net;
-using Nini.Config;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
@@ -46,9 +40,10 @@ namespace OpenSim.Services.InventoryService
     /// Basically a hack to give us a Inventory library while we don't have a inventory server
     /// once the server is fully implemented then should read the data from that
     /// </summary>
-    public class LibraryService : ServiceBase, ILibraryService
+    public class LibraryService : ILibraryService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<LibraryService> _logger;
 
         private static readonly UUID libOwner = Constants.m_MrOpenSimID;
         private const string m_LibraryRootFolderIDstr = "00000112-000f-0000-0000-000100bba000";
@@ -78,8 +73,14 @@ namespace OpenSim.Services.InventoryService
         static readonly uint m_NextPermissions = (uint)PermissionMask.AllAndExport;
         static readonly uint m_GroupPermissions = 0;
 
-        public LibraryService(IConfigSource config):base(config)
+        public LibraryService(
+            IConfiguration config,
+            ILogger<LibraryService> logger
+            )
         {
+            _configuration = config;
+            _logger = logger;
+            
             lock(m_rootLock)
             {
                 if(m_root != null)
@@ -90,14 +91,14 @@ namespace OpenSim.Services.InventoryService
             string pLibrariesLocation = Path.Combine("inventory", "Libraries.xml");
             string pLibName = "OpenSim Library";
 
-            IConfig libConfig = config.Configs["LibraryService"];
-            if (libConfig != null)
+            var libConfig = config.GetSection("LibraryService");
+            if (libConfig.Exists())
             {
-                pLibrariesLocation = libConfig.GetString("DefaultLibrary", pLibrariesLocation);
-                pLibName = libConfig.GetString("LibraryName", pLibName);
+                pLibrariesLocation = libConfig.GetValue("DefaultLibrary", pLibrariesLocation);
+                pLibName = libConfig.GetValue("LibraryName", pLibName);
             }
 
-            m_log.Debug("[LIBRARY]: Starting library service...");
+            _logger.LogDebug("[LIBRARY]: Starting library service...");
 
             m_LibraryRootFolder = new InventoryFolderImpl();
             m_LibraryRootFolder.Owner = libOwner;
@@ -139,7 +140,7 @@ namespace OpenSim.Services.InventoryService
         /// <param name="assets"></param>
         protected void LoadLibraries(string librariesControlPath)
         {
-            m_log.InfoFormat("[LIBRARY INVENTORY]: Loading library control file {0}", librariesControlPath);
+            _logger.LogInformation("[LIBRARY INVENTORY]: Loading library control file {0}", librariesControlPath);
             LoadFromFile(librariesControlPath, "Libraries control", ReadLibraryFromConfig);
         }
 
@@ -147,7 +148,7 @@ namespace OpenSim.Services.InventoryService
         /// Read a library set from config
         /// </summary>
         /// <param name="config"></param>
-        protected void ReadLibraryFromConfig(IConfig config, string path)
+        protected void ReadLibraryFromConfig(IConfigurationSection config, string path)
         {
             string basePath = Path.GetDirectoryName(path);
             if (config.Contains("RootVersion"))

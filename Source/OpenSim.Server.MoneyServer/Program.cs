@@ -18,6 +18,7 @@ using Autofac;
 
 using ConfigurationSubstitution;
 using OpenSim.Server.Base;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.MoneyServer
 {
@@ -133,7 +134,7 @@ namespace OpenSim.Server.MoneyServer
             });
 
             MoneyHost = builder.Build();
-
+            LogManager.LoggerFactory = MoneyHost.Services.GetService<ILoggerFactory>();
             //XmlConfigurator.Configure();
             //Application.Configure(args);
 

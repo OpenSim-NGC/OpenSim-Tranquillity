@@ -29,25 +29,22 @@
  * https://github.com/openmetaversefoundation/simiangrid/
  */
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
-using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.IO;
 using System.Reflection;
-using System.Threading;
-
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.MapImageService
 {
     public class MapImageService : IMapImageService
     {
-        private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
+        
 #pragma warning disable 414
         private string LogHeader = "[MAP IMAGE SERVICE]";
 #pragma warning restore 414
@@ -72,7 +69,7 @@ namespace OpenSim.Services.MapImageService
                 if (!m_Initialized)
                 {
                     m_Initialized = true;
-                    m_log.Debug("[MAP IMAGE SERVICE]: Starting MapImage service");
+                    _logger.LogDebug("[MAP IMAGE SERVICE]: Starting MapImage service");
 
                     IConfig serviceConfig = config.Configs["MapImageService"];
                     if (serviceConfig is not null)
@@ -107,7 +104,7 @@ namespace OpenSim.Services.MapImageService
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("[MAP IMAGE SERVICE]: Unable to save image file {0}: {1}", fileName, e);
+                    _logger.LogWarning(e, $"[MAP IMAGE SERVICE]: Unable to save image file {fileName}");
                     reason = e.Message;
                     return false;
                 }
@@ -129,7 +126,7 @@ namespace OpenSim.Services.MapImageService
                 }
                 catch (Exception e)
                 {
-                    m_log.Warn($"[MAP IMAGE SERVICE]: Unable to save delete file {fileName}: {e.Message}");
+                    _logger.LogWarning(e, $"[MAP IMAGE SERVICE]: Unable to save delete file {fileName}");
                     reason = e.Message;
                     return false;
                 }
@@ -190,7 +187,9 @@ namespace OpenSim.Services.MapImageService
                 {
                     if (!CreateTile(zoomLevel, toMultiRez.x, toMultiRez.y, path))
                     {
-                        m_log.WarnFormat("[MAP IMAGE SERVICE]: Unable to create tile for {0},{1} at zoom level {1}", toMultiRez.x, toMultiRez.y, zoomLevel);
+                        _logger.LogWarning(
+                            $"[MAP IMAGE SERVICE]: Unable to create tile for {toMultiRez.x},{toMultiRez.y} " +
+                            $"at zoom level {zoomLevel}");
                         return;
                     }
                 }
@@ -249,7 +248,9 @@ namespace OpenSim.Services.MapImageService
                         Bitmap bm = new Bitmap(fileName);
                         if (bm.Width != IMAGE_WIDTH || bm.Height != IMAGE_WIDTH || bm.PixelFormat != PixelFormat.Format24bppRgb)
                         {
-                            m_log.Error($"[MAP IMAGE SERVICE]: invalid map tile {fileName}: {bm.Width} , {bm.Height}, {bm.PixelFormat}");
+                            _logger.LogError(
+                                $"[MAP IMAGE SERVICE]: invalid map tile {fileName}: {bm.Width} , " +
+                                $"{bm.Height}, {bm.PixelFormat}");
                             bm.Dispose();
                             return null;
                         }
@@ -259,7 +260,7 @@ namespace OpenSim.Services.MapImageService
             }
             catch (Exception e)
             {
-                m_log.Warn($"[MAP IMAGE SERVICE]: Unable to read image data from {fileName}: {e.Message}");
+                _logger.LogWarning(e, $"[MAP IMAGE SERVICE]: Unable to read image data from {fileName}");
             }
 
             return null;
@@ -271,12 +272,14 @@ namespace OpenSim.Services.MapImageService
             {
                 lock(m_Sync)
                 {
-                    return File.Exists(fileName) ? new Bitmap(fileName) : new Bitmap(IMAGE_WIDTH, IMAGE_WIDTH, PixelFormat.Format24bppRgb);
+                    return File.Exists(fileName) ? 
+                        new Bitmap(fileName) : 
+                        new Bitmap(IMAGE_WIDTH, IMAGE_WIDTH, PixelFormat.Format24bppRgb);
                 }
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[MAP IMAGE SERVICE]: Unable to read image data from {0}: {1}", fileName, e);
+                _logger.LogWarning(e, "[MAP IMAGE SERVICE]: Unable to read image data from {0}", fileName);
             }
 
             return null;
@@ -337,7 +340,7 @@ namespace OpenSim.Services.MapImageService
             }
             catch (Exception e)
             {
-                m_log.Warn($"[MAP IMAGE SERVICE]: Oops on saving {outputFile} {e.Message}");
+                _logger.LogWarning(e, $"[MAP IMAGE SERVICE]: Oops on saving {outputFile}");
             }
 
             output.Dispose();

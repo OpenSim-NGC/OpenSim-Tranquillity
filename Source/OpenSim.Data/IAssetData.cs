@@ -25,14 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Framework.PluginLoader;
 
 namespace OpenSim.Data
 {
-    public interface IAssetDataPlugin : IPlugin
+    public interface IAssetDataPlugin
     {
         AssetBase GetAsset(UUID uuid);
         bool StoreAsset(AssetBase asset);

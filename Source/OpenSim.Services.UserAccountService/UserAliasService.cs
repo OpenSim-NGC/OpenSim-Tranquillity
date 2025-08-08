@@ -29,56 +29,27 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using log4net;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Data;
 using OpenSim.Framework;
-using OpenSim.Services.Base;
 using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Services.UserAccountService
 {
-    public class UserAliasService : ServiceBase, IUserAliasService
+    public class UserAliasService : IUserAliasService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<UserAliasService> _logger;
+        private readonly IUserAliasData _database;
 
-        protected IUserAliasData m_Database = null;
-
-        public UserAliasService(IConfigSource config) 
-            : base(config)
+        public UserAliasService(
+            ILogger<UserAliasService> logger,
+            IUserAliasData database)
         {
-            string dllName = String.Empty;
-            string connString = String.Empty;
-            string realm = "UserAlias";
-
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig != null)
-            {
-                dllName = dbConfig.GetString("StorageProvider", String.Empty);
-                connString = dbConfig.GetString("ConnectionString", String.Empty);
-            }
-
-            IConfig userConfig = config.Configs["UserAliasService"];
-            if (userConfig == null)
-            {
-                throw new Exception("No UserAliasService configuration");
-            }
-
-            dllName = userConfig.GetString("StorageProvider", dllName);
-            if (dllName.Length == 0)
-            {
-                throw new Exception("No StorageProvider configured");
-            }
-
-            connString = userConfig.GetString("ConnectionString", connString);
-            realm = userConfig.GetString("Realm", realm);
-
-            m_Database = LoadPlugin<IUserAliasData>(dllName, new Object[] { connString, realm });
-
-            if (m_Database == null)
-            {
-                throw new Exception("Could not find a storage interface in the given module");
-            }
+            _logger = logger;
+            _database = database;
 
             // Console commands
 
@@ -102,8 +73,7 @@ namespace OpenSim.Services.UserAccountService
                         "delete an existing user alias by aliasId", HandleDeleteAlias);
             }
         }
-
-
+        
         #region Console commands
 
         /// <summary>
@@ -180,9 +150,7 @@ namespace OpenSim.Services.UserAccountService
         /// <returns>List<UserAlias>() - A list of aliases or null if none are defined</UUID></returns>
         public List<UserAlias> GetUserAliases(UUID userID)
         {
- //           m_log.DebugFormat("[USER ALIAS SERVICE] Retrieving aliases for user by userid {0}", userID);
-
-            var aliases = m_Database.GetUserAliases(userID);
+            var aliases = _database.GetUserAliases(userID);
 
             if ((aliases == null) || (aliases.Count == 0))
                 return null;
@@ -207,7 +175,7 @@ namespace OpenSim.Services.UserAccountService
         {
 //            m_log.DebugFormat("[USER ALIAS SERVICE]: Retrieving userID for alias by aliasId ", aliasID);
 
-            var alias = m_Database.GetUserForAlias(aliasID);
+            var alias = _database.GetUserForAlias(aliasID);
 
             if (alias == null)
             {
@@ -235,7 +203,7 @@ namespace OpenSim.Services.UserAccountService
                 Description = Description
             };
 
-            if (m_Database.Store(aliasData) == true)
+            if (_database.Store(aliasData) == true)
             {
                 return new UserAlias(AliasID, UserID, Description); 
             }
@@ -245,8 +213,7 @@ namespace OpenSim.Services.UserAccountService
 
         public bool DeleteAlias(UUID aliasID)
         {
-            return m_Database.Delete("AliasID", aliasID.ToString());
-            throw new NotImplementedException();
+            return _database.Delete("AliasID", aliasID.ToString());
         }
     }
 }

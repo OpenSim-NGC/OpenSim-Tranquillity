@@ -29,14 +29,58 @@ using System.Reflection;
 using System.Xml;
 using System.Xml.Serialization;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using OpenSim.Framework;
 using OpenMetaverse;
 
-namespace OpenSim.Server.Base
+namespace OpenSim.Server.Base;
+
+public static class ServerUtils
 {
-    public static class ServerUtils
+    private static readonly ILogger _logger = 
+        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    
+    public static void ParseService(string serviceName, out string dllName, out string className)
     {
-        public static  byte[] SerializeResult(XmlSerializer xs, object data)
+        className = String.Empty;
+
+        // The path for a dynamic plugin will contain ":" on Windows
+        string[] parts = serviceName.Split(new char[] { ':' });
+
+        if (parts.Length < 3)
+        {
+            // Linux. There will be ':' but the one we're looking for
+            dllName = parts[0];
+            if (parts.Length > 1)
+                className = parts[1];
+        }
+        else
+        {
+            // This is Windows. Deal with the : in the Drive letter since
+            // the : is also our seperator in the serviceName
+            dllName = String.Format("{0}:{1}", parts[0], parts[1]);
+            if (parts.Length > 2)
+                className = parts[2];
+        }
+    }
+
+    public static string ParseServiceName(string service)
+    {
+        string dllName = string.Empty;
+        string serviceName = string.Empty;
+        ParseService(service, out dllName, out serviceName);
+        return (serviceName);
+    }
+
+    public static string ParseDllName(string service)
+    {
+        string dllName = string.Empty;
+        string serviceName = string.Empty;
+        ParseService(service, out dllName, out serviceName);
+        return (dllName);
+    }
+
+    public static  byte[] SerializeResult(XmlSerializer xs, object data)
         {
             using (MemoryStream ms = new MemoryStream())
             using (XmlTextWriter xw = new XmlTextWriter(ms, Util.UTF8))
@@ -52,298 +96,258 @@ namespace OpenSim.Server.Base
             }
         }
 
-        public static void ParseService(string serviceName, out string dllName, out string className)
+
+    public static Dictionary<string, object> ParseQueryString(string query)
+    {
+        string[] terms = query.Split(new char[] { '&' });
+
+        int nterms = terms.Length;
+        if (nterms == 0)
+            return new Dictionary<string, object>();
+
+        Dictionary<string, object> result = new Dictionary<string, object>(nterms);
+        string name;
+
+        for (int i = 0; i < nterms; ++i)
         {
-            className = String.Empty;
+            string[] elems = terms[i].Split(new char[] { '=' });
 
-            // The path for a dynamic plugin will contain ":" on Windows
-            string[] parts = serviceName.Split(new char[] { ':' });
+            if (elems.Length == 0)
+                continue;
 
-            if (parts.Length < 3)
+            if (String.IsNullOrWhiteSpace(elems[0]))
+                continue;
+
+            name = System.Web.HttpUtility.UrlDecode(elems[0]);
+
+            if (name.EndsWith("[]"))
             {
-                // Linux. There will be ':' but the one we're looking for
-                dllName = parts[0];
-                if (parts.Length > 1)
-                    className = parts[1];
+                name = name.Substring(0, name.Length - 2);
+                if (String.IsNullOrWhiteSpace(name))
+                    continue;
+                if (result.ContainsKey(name))
+                {
+                    if (result[name] is not List<string> l)
+                        continue;
+
+                    if (elems.Length > 1 && !string.IsNullOrWhiteSpace(elems[1]))
+                        l.Add(System.Web.HttpUtility.UrlDecode(elems[1]));
+                    else
+                        l.Add(string.Empty);
+                }
+                else
+                {
+                    List<string> newList = new List<string>();
+                    if (elems.Length > 1 && !String.IsNullOrWhiteSpace(elems[1]))
+                        newList.Add(System.Web.HttpUtility.UrlDecode(elems[1]));
+                    else
+                        newList.Add(String.Empty);
+                    result[name] = newList;
+                }
             }
             else
             {
-                // This is Windows. Deal with the : in the Drive letter since
-                // the : is also our seperator in the serviceName
-                dllName = String.Format("{0}:{1}", parts[0], parts[1]);
-                if (parts.Length > 2)
-                    className = parts[2];
-            }
-        }
-
-        public static string ParseServiceName(string service)
-        {
-            string dllName = string.Empty;
-            string serviceName = string.Empty;
-            ParseService(service, out dllName, out serviceName);
-            return (serviceName);
-        }
-
-        public static string ParseDllName(string service)
-        {
-            string dllName = string.Empty;
-            string serviceName = string.Empty;
-            ParseService(service, out dllName, out serviceName);
-            return (dllName);
-        }
-        
-        public static Dictionary<string, object> ParseQueryString(string query)
-        {
-            string[] terms = query.Split(new char[] { '&' });
-
-            int nterms = terms.Length;
-            if (nterms == 0)
-                return new Dictionary<string, object>();
-
-            Dictionary<string, object> result = new Dictionary<string, object>(nterms);
-            string name;
-
-            for (int i = 0; i < nterms; ++i)
-            {
-                string[] elems = terms[i].Split(new char[] { '=' });
-
-                if (elems.Length == 0)
-                    continue;
-
-                if (String.IsNullOrWhiteSpace(elems[0]))
-                    continue;
-
-                name = System.Web.HttpUtility.UrlDecode(elems[0]);
-
-                if (name.EndsWith("[]"))
+                if (!result.ContainsKey(name))
                 {
-                    name = name.Substring(0, name.Length - 2);
-                    if (String.IsNullOrWhiteSpace(name))
-                        continue;
-                    if (result.ContainsKey(name))
-                    {
-                        if (result[name] is not List<string> l)
-                            continue;
-
-                        if (elems.Length > 1 && !string.IsNullOrWhiteSpace(elems[1]))
-                            l.Add(System.Web.HttpUtility.UrlDecode(elems[1]));
-                        else
-                            l.Add(string.Empty);
-                    }
+                    if (elems.Length > 1 && !String.IsNullOrWhiteSpace(elems[1]))
+                        result[name] = System.Web.HttpUtility.UrlDecode(elems[1]);
                     else
-                    {
-                        List<string> newList = new List<string>();
-                        if (elems.Length > 1 && !String.IsNullOrWhiteSpace(elems[1]))
-                            newList.Add(System.Web.HttpUtility.UrlDecode(elems[1]));
-                        else
-                            newList.Add(String.Empty);
-                        result[name] = newList;
-                    }
-                }
-                else
-                {
-                    if (!result.ContainsKey(name))
-                    {
-                        if (elems.Length > 1 && !String.IsNullOrWhiteSpace(elems[1]))
-                            result[name] = System.Web.HttpUtility.UrlDecode(elems[1]);
-                        else
-                            result[name] = String.Empty;
-                    }
+                        result[name] = String.Empty;
                 }
             }
-
-            return result;
         }
 
-        public static string BuildQueryString(Dictionary<string, object> data)
+        return result;
+    }
+
+    public static string BuildQueryString(Dictionary<string, object> data)
+    {
+        // this is not conform to html url encoding
+        // can only be used on Body of POST or PUT
+        StringBuilder sb = new StringBuilder(4096);
+
+        string pvalue;
+
+        foreach (KeyValuePair<string, object> kvp in data)
         {
-            // this is not conform to html url encoding
-            // can only be used on Body of POST or PUT
-            StringBuilder sb = new StringBuilder(4096);
-
-            string pvalue;
-
-            foreach (KeyValuePair<string, object> kvp in data)
+            if (kvp.Value is List<string> l)
             {
-                if (kvp.Value is List<string> l)
-                {
-                    string nkey = System.Web.HttpUtility.UrlEncode(kvp.Key);
-                    for (int i = 0; i < l.Count; ++i)
-                    {
-                        if (sb.Length != 0)
-                            sb.Append('&');
-                        sb.Append(nkey);
-                        sb.Append("[]=");
-                        sb.Append(System.Web.HttpUtility.UrlEncode(l[i]));
-                    }
-                }
-                else if (kvp.Value is Dictionary<string, object>)
-                {
-                    // encode complex structures as JSON
-                    string js;
-                    try
-                    {
-                        LitJson.JsonMapper.RegisterExporter<UUID>((uuid, writer) => writer.Write(uuid.ToString()));
-                        js = LitJson.JsonMapper.ToJson(kvp.Value);
-                    }
-                    //catch(Exception e)
-                    catch
-                    {
-                        continue;
-                    }
-                    if (sb.Length != 0)
-                        sb.Append('&');
-                    sb.Append(System.Web.HttpUtility.UrlEncode(kvp.Key));
-                    sb.Append('=');
-                    sb.Append(System.Web.HttpUtility.UrlEncode(js));
-                }
-                else
+                string nkey = System.Web.HttpUtility.UrlEncode(kvp.Key);
+                for (int i = 0; i < l.Count; ++i)
                 {
                     if (sb.Length != 0)
                         sb.Append('&');
-                    sb.Append(System.Web.HttpUtility.UrlEncode(kvp.Key));
- 
-                    pvalue = kvp.Value.ToString();
-                    if (!string.IsNullOrEmpty(pvalue))
-                    {
-                        sb.Append('=');
-                        sb.Append(System.Web.HttpUtility.UrlEncode(pvalue));
-                    }
+                    sb.Append(nkey);
+                    sb.Append("[]=");
+                    sb.Append(System.Web.HttpUtility.UrlEncode(l[i]));
                 }
             }
-
-            return sb.ToString();
-        }
-
-
-        public static string BuildXmlResponse(Dictionary<string, object> data)
-        {
-            XmlDocument doc = new XmlDocument();
-
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
-
-            doc.AppendChild(xmlnode);
-
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
-
-            doc.AppendChild(rootElement);
-
-            BuildXmlData(rootElement, data);
-
-            return doc.InnerXml;
-        }
-
-        private static void BuildXmlData(XmlElement parent, Dictionary<string, object> data)
-        {
-            foreach (KeyValuePair<string, object> kvp in data)
+            else if (kvp.Value is Dictionary<string, object>)
             {
-                if (kvp.Value is null)
-                    continue;
-
-                XmlElement elem = parent.OwnerDocument.CreateElement("", XmlConvert.EncodeLocalName(kvp.Key), "");
-
-                if (kvp.Value is Dictionary<string, object> dic)
-                {
-                    XmlAttribute type = parent.OwnerDocument.CreateAttribute("", "type", "");
-                    type.Value = "List";
-                    elem.Attributes.Append(type);
-
-                    BuildXmlData(elem, dic);
-                }
-                else
-                {
-                    elem.AppendChild(parent.OwnerDocument.CreateTextNode(kvp.Value.ToString()));
-                }
-
-                parent.AppendChild(elem);
-            }
-        }
-
-        private static Dictionary<string, object> ScanXmlResponse(XmlReader xr)
-        {
-            Dictionary<string, object> ret = new Dictionary<string, object>();
-            xr.Read();
-            while (!xr.EOF && xr.NodeType != XmlNodeType.EndElement)
-            {
-                if (xr.IsStartElement())
-                {
-                    string type = xr.GetAttribute("type");
-                    if (type != "List")
-                    {
-                        if (xr.IsEmptyElement)
-                        {
-                            ret[XmlConvert.DecodeName(xr.Name)] = "";
-                            xr.Read();
-                        }
-                        else
-                            ret[XmlConvert.DecodeName(xr.Name)] = xr.ReadElementContentAsString();
-                    }
-                    else
-                    {
-                        string name = XmlConvert.DecodeName(xr.Name);
-                        if (xr.IsEmptyElement)
-                            ret[name] = new Dictionary<string, object>();
-                        else
-                            ret[name] = ScanXmlResponse(xr);
-                        xr.Read();
-                    }
-                }
-                else
-                    xr.Read();
-            }
-            return ret;
-        }
-
-        private static readonly XmlReaderSettings ParseXmlStringResponseXmlReaderSettings = new()
-        {
-            IgnoreWhitespace = true,
-            IgnoreComments = true,
-            ConformanceLevel = ConformanceLevel.Fragment,
-            CloseInput = true,
-            MaxCharactersInDocument = 50_000_000
-        };
-
-        private static readonly XmlParserContext ParseXmlResponseXmlParserContext = new(null, null, null, XmlSpace.None)
-        {
-            Encoding = Util.UTF8NoBomEncoding
-        };
-
-        public static Dictionary<string, object> ParseXmlResponse(string data)
-        {
-            if(!string.IsNullOrEmpty(data))
-            {
+                // encode complex structures as JSON
+                string js;
                 try
                 {
-                    using XmlReader xr = XmlReader.Create(new StringReader(data), ParseXmlStringResponseXmlReaderSettings, ParseXmlResponseXmlParserContext);
-                    {
-                        if (xr.ReadToFollowing("ServerResponse"))
-                            return ScanXmlResponse(xr);
-                    }
+                    LitJson.JsonMapper.RegisterExporter<UUID>((uuid, writer) => writer.Write(uuid.ToString()));
+                    js = LitJson.JsonMapper.ToJson(kvp.Value);
                 }
-                catch (Exception e)
+                //catch(Exception e)
+                catch
                 {
-                    m_log.Debug($"[serverUtils.ParseXmlResponse]: failed error: {e.Message}\n --string:\n{data}\n");
+                    continue;
+                }
+                if (sb.Length != 0)
+                    sb.Append('&');
+                sb.Append(System.Web.HttpUtility.UrlEncode(kvp.Key));
+                sb.Append('=');
+                sb.Append(System.Web.HttpUtility.UrlEncode(js));
             }
+            else
+            {
+                if (sb.Length != 0)
+                    sb.Append('&');
+                sb.Append(System.Web.HttpUtility.UrlEncode(kvp.Key));
+
+                pvalue = kvp.Value.ToString();
+                if (!string.IsNullOrEmpty(pvalue))
+                {
+                    sb.Append('=');
+                    sb.Append(System.Web.HttpUtility.UrlEncode(pvalue));
+                }
             }
-            return new Dictionary<string, object>();
         }
 
-        private static readonly XmlReaderSettings ParseXmlStreamResponseXmlReaderSettings = new()
-        {
-            IgnoreWhitespace = true,
-            IgnoreComments = true,
-            ConformanceLevel = ConformanceLevel.Fragment,
-            CloseInput = true,
-            MaxCharactersInDocument = 50_000_000
-        };
+        return sb.ToString();
+    }
 
-        public static Dictionary<string, object> ParseXmlResponse(Stream src)
+
+    public static string BuildXmlResponse(Dictionary<string, object> data)
+    {
+        XmlDocument doc = new XmlDocument();
+
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
+
+        doc.AppendChild(xmlnode);
+
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
+
+        doc.AppendChild(rootElement);
+
+        BuildXmlData(rootElement, data);
+
+        return doc.InnerXml;
+    }
+
+    private static void BuildXmlData(XmlElement parent, Dictionary<string, object> data)
+    {
+        foreach (KeyValuePair<string, object> kvp in data)
         {
-            using XmlReader xr = XmlReader.Create(src, 
-                ParseXmlStreamResponseXmlReaderSettings, ParseXmlResponseXmlParserContext);
-            if (xr.ReadToFollowing("ServerResponse"))
-                    return ScanXmlResponse(xr);
-            return new Dictionary<string, object>();
+            if (kvp.Value is null)
+                continue;
+
+            XmlElement elem = parent.OwnerDocument.CreateElement("", XmlConvert.EncodeLocalName(kvp.Key), "");
+
+            if (kvp.Value is Dictionary<string, object> dic)
+            {
+                XmlAttribute type = parent.OwnerDocument.CreateAttribute("", "type", "");
+                type.Value = "List";
+                elem.Attributes.Append(type);
+
+                BuildXmlData(elem, dic);
+            }
+            else
+            {
+                elem.AppendChild(parent.OwnerDocument.CreateTextNode(kvp.Value.ToString()));
+            }
+
+            parent.AppendChild(elem);
         }
+    }
+
+    private static Dictionary<string, object> ScanXmlResponse(XmlReader xr)
+    {
+        Dictionary<string, object> ret = new Dictionary<string, object>();
+        xr.Read();
+        while (!xr.EOF && xr.NodeType != XmlNodeType.EndElement)
+        {
+            if (xr.IsStartElement())
+            {
+                string type = xr.GetAttribute("type");
+                if (type != "List")
+                {
+                    if (xr.IsEmptyElement)
+                    {
+                        ret[XmlConvert.DecodeName(xr.Name)] = "";
+                        xr.Read();
+                    }
+                    else
+                        ret[XmlConvert.DecodeName(xr.Name)] = xr.ReadElementContentAsString();
+                }
+                else
+                {
+                    string name = XmlConvert.DecodeName(xr.Name);
+                    if (xr.IsEmptyElement)
+                        ret[name] = new Dictionary<string, object>();
+                    else
+                        ret[name] = ScanXmlResponse(xr);
+                    xr.Read();
+                }
+            }
+            else
+                xr.Read();
+        }
+        return ret;
+    }
+
+    private static readonly XmlReaderSettings ParseXmlStringResponseXmlReaderSettings = new()
+    {
+        IgnoreWhitespace = true,
+        IgnoreComments = true,
+        ConformanceLevel = ConformanceLevel.Fragment,
+        CloseInput = true,
+        MaxCharactersInDocument = 50_000_000
+    };
+
+    private static readonly XmlParserContext ParseXmlResponseXmlParserContext = new(null, null, null, XmlSpace.None)
+    {
+        Encoding = Util.UTF8NoBomEncoding
+    };
+
+    public static Dictionary<string, object> ParseXmlResponse(string data)
+    {
+        if (!string.IsNullOrEmpty(data))
+        {
+            try
+            {
+                using XmlReader xr = XmlReader.Create(new StringReader(data), ParseXmlStringResponseXmlReaderSettings, ParseXmlResponseXmlParserContext);
+                {
+                    if (xr.ReadToFollowing("ServerResponse"))
+                        return ScanXmlResponse(xr);
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.LogDebug($"[serverUtils.ParseXmlResponse]: failed error: {e.Message}\n --string:\n{data}\n");
+        }
+        }
+        return new Dictionary<string, object>();
+    }
+
+    private static readonly XmlReaderSettings ParseXmlStreamResponseXmlReaderSettings = new()
+    {
+        IgnoreWhitespace = true,
+        IgnoreComments = true,
+        ConformanceLevel = ConformanceLevel.Fragment,
+        CloseInput = true,
+        MaxCharactersInDocument = 50_000_000
+    };
+
+    public static Dictionary<string, object> ParseXmlResponse(Stream src)
+    {
+        using XmlReader xr = XmlReader.Create(src, 
+            ParseXmlStreamResponseXmlReaderSettings, ParseXmlResponseXmlParserContext);
+        if (xr.ReadToFollowing("ServerResponse"))
+                return ScanXmlResponse(xr);
+        return new Dictionary<string, object>();
     }
 }

@@ -25,14 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Net;
-using System.Reflection;
-
-using Nini.Config;
-using log4net;
 using System.Net.Http.Headers;
 using Microsoft.Extensions.Configuration;
 

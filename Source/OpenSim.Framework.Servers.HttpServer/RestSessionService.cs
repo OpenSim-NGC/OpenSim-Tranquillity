@@ -25,14 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework.Servers.HttpServer
 {
@@ -185,7 +183,7 @@ namespace OpenSim.Framework.Servers.HttpServer
     public class RestDeserialiseSecureHandler<TRequest, TResponse> : BaseOutputStreamHandler, IStreamHandler
         where TRequest : new()
     {
-        private static readonly ILog m_log
+        private static readonly ILogger _logger
             = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private RestDeserialiseMethod<TRequest, TResponse> m_method;
@@ -216,7 +214,7 @@ namespace OpenSim.Framework.Servers.HttpServer
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[REST]: Deserialization problem. Ignoring request. " + e);
+                    _logger.LogError(e, "[REST]: Deserialization problem. Ignoring request.");
                     fail = true;
                 }
             }
@@ -240,8 +238,8 @@ namespace OpenSim.Framework.Servers.HttpServer
     public class RestDeserialiseTrustedHandler<TRequest, TResponse> : BaseOutputStreamHandler, IStreamHandler
         where TRequest : new()
     {
-        private static readonly ILog m_log
-            = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger =
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         /// <summary>
         /// The operation to perform once trust has been established.
@@ -276,7 +274,7 @@ namespace OpenSim.Framework.Servers.HttpServer
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[REST]: Deserialization problem. Ignoring request. " + e);
+                    _logger.LogError(e, "[REST]: Deserialization problem. Ignoring request.");
                     fail = true;
                 }
             }

@@ -25,23 +25,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-
-using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Server.Base;
 using OpenSim.Framework;
-
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.Connectors.Friends
 {
     public class FriendsSimConnector
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<FriendsSimConnector> _logger;
+
+        public FriendsSimConnector(ILogger<FriendsSimConnector> logger)
+        {
+            _logger = logger;
+        }
 
         protected virtual string ServicePath()
         {
@@ -171,15 +170,16 @@ namespace OpenSim.Services.Connectors.Friends
                             return;
                         }
                         else
-                            m_log.DebugFormat("[FRIENDS SIM CONNECTOR]: reply data does not contain result field");
+                            _logger.LogDebug($"[FRIENDS SIM CONNECTOR]: reply data does not contain result field");
 
                     }
                     else
-                        m_log.DebugFormat("[FRIENDS SIM CONNECTOR]: received empty reply");
+                        _logger.LogDebug($"[FRIENDS SIM CONNECTOR]: received empty reply");
                 }
                 catch (Exception e)
                 {
-                    m_log.DebugFormat("[FRIENDS SIM CONNECTOR]: Exception when contacting remote sim at {0}: {1}", uri, e.Message);
+                    _logger.LogDebug(e, 
+                        $"[FRIENDS SIM CONNECTOR]: Exception when contacting remote sim at {uri}");
                 }
 
                 return;

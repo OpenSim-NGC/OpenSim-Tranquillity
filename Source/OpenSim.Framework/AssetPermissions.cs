@@ -1,19 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
+﻿using System.Reflection;
 
 using Nini.Config;
-using log4net;
-
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 
 namespace OpenSim.Framework
 {
     public class AssetPermissions
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(
-            MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger =
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private bool[] m_DisallowExport, m_DisallowImport;
         private string[] m_AssetTypeNames;
@@ -46,7 +42,7 @@ namespace OpenSim.Framework
                 if (index >= 0)
                     bitArray[index] = true;
                 else
-                    m_log.Warn($"[Asset Permissions]: Invalid AssetType {s}");
+                    _logger.LogWarning($"[Asset Permissions]: Invalid AssetType {s}");
             }
 
         }
@@ -58,7 +54,7 @@ namespace OpenSim.Framework
             int index = Array.IndexOf(m_AssetTypeNames, assetTypeName.ToLower());
             if (index >= 0 && m_DisallowExport[index])
             {
-                m_log.Debug($"[Asset Permissions]: Export denied: configuration does not allow export of AssetType {assetTypeName}");
+                _logger.LogDebug($"[Asset Permissions]: Export denied: configuration does not allow export of AssetType {assetTypeName}");
                 return false;
             }
 
@@ -72,13 +68,11 @@ namespace OpenSim.Framework
             int index = Array.IndexOf(m_AssetTypeNames, assetTypeName.ToLower());
             if (index >= 0 && m_DisallowImport[index])
             {
-                m_log.Debug($"[Asset Permissions]: Import denied: configuration does not allow import of AssetType {assetTypeName}");
+                _logger.LogDebug($"[Asset Permissions]: Import denied: configuration does not allow import of AssetType {assetTypeName}");
                 return false;
             }
 
             return true;
         }
-
-
     }
 }

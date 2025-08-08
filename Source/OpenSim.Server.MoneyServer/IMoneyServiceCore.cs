@@ -38,14 +38,27 @@ namespace OpenSim.Server.MoneyServer
 {
     public interface IMoneyServiceCore
     {
+        /// <summary>Gets the HTTP server.</summary>
         BaseHttpServer GetHttpServer();
+
+        /// <summary>Gets the session dic.</summary>
         Dictionary<string, string> GetSessionDic();
+
+        /// <summary>Gets the secure session dic.</summary>
         Dictionary<string, string> GetSecureSessionDic();
+
+        /// <summary>Gets the web session dic.</summary>
         Dictionary<string, string> GetWebSessionDic();
 
-        //
+        /// <summary>Gets the server configuration.</summary>
         IConfig GetServerConfig();
+
+        /// <summary>Gets the cert configuration.</summary>
         IConfig GetCertConfig();
+
+        /// <summary>Determines whether [is check client cert].</summary>
+        /// <returns>
+        ///   <c>true</c> if [is check client cert]; otherwise, <c>false</c>.</returns>
         bool IsCheckClientCert();
     }
 }

@@ -23,6 +23,7 @@ using OpenSim.ApplicationPlugins.RemoteController;
 using ConfigurationSubstitution;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Base;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.RegionServer
 {
@@ -138,6 +139,7 @@ namespace OpenSim.Server.RegionServer
             });
 
             RegionHost = builder.Build();
+            LogManager.LoggerFactory = RegionHost.Services.GetService<ILoggerFactory>();
             RegionHost.Run();
         }
     }

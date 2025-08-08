@@ -25,14 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using log4net;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Framework.PluginLoader;
-using OpenSim.Data;
 using MySqlConnector;
 
 namespace OpenSim.Data.MySQL
@@ -42,19 +39,20 @@ namespace OpenSim.Data.MySQL
     /// </summary>
     public class MySQLInventoryData : IInventoryDataPlugin
     {
-        private static readonly ILog m_log
-            = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        public static MySQLInventoryData Instance { get; } = new();
+        
+        private readonly ILogger _logger;
         private string m_connectionString;
         private object m_dbLock = new object();
 
-        public string Version { get { return "1.0.0.0"; } }
-
-        public void Initialise()
+        public MySQLInventoryData(ILogger<MySQLInventoryData> logger)
         {
-            m_log.Info("[MySQLInventoryData]: " + Name + " cannot be default-initialized!");
-            throw new PluginNotInitialisedException (Name);
+            _logger = logger;
+            Instance = this;
         }
+        
+
+        public string Version { get { return "1.0.0.0"; } }
 
         /// <summary>
         /// <para>Initialises Inventory interface</para>

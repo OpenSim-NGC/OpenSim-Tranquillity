@@ -29,17 +29,16 @@
 // can have up to m_concurrency number of execution threads
 // it will hold each thread up to m_threadsHoldtime ms waiting for more work, before releasing it back to the pool.
 
-using System;
 using System.Collections.Concurrent;
 using System.Reflection;
-using System.Threading;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework
 {
     public class ObjectJobEngine : IDisposable
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private readonly object m_mainLock = new object();
         private readonly string m_name;
@@ -185,7 +184,7 @@ namespace OpenSim.Framework
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[ObjectJob {0}]: Job failed, continuing.  Exception {1}", m_name, e);
+                    _logger.LogError(e, $"[ObjectJob {m_name}]: Job failed, continuing.");
                 }
             }
             lock (m_mainLock)

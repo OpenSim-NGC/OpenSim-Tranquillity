@@ -25,22 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Xml;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework
 {
     public class RegionInfo
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private static readonly string LogHeader = "[REGION INFO]";
 
         public bool commFailTF = false;
@@ -438,7 +436,7 @@ namespace OpenSim.Framework
             string keylower = key.ToLower();
             if (m_extraSettings.TryGetValue(keylower, out val))
                 return val;
-            m_log.DebugFormat("[RegionInfo] Could not locate value for parameter {0}", key);
+            _logger.LogDebug($"[RegionInfo] Could not locate value for parameter {key}");
             return null;
         }
 
@@ -609,9 +607,8 @@ namespace OpenSim.Framework
             if (externalName == "SYSTEMIP")
             {
                 m_externalHostName = Util.GetLocalHost().ToString();
-                m_log.InfoFormat(
-                    "[REGIONINFO]: Resolving SYSTEMIP to {0} for external hostname of region {1}",
-                    m_externalHostName, name);
+                _logger.LogInformation(
+                    $"[REGIONINFO]: Resolving SYSTEMIP to {m_externalHostName} for external hostname of region {name}");
             }
             else if (!m_resolveAddress)
             {
@@ -635,9 +632,15 @@ namespace OpenSim.Framework
             Vector3 temp_vector;
 
             if (Vector3.TryParse(temp_location, out temp_vector))
+            {
                 DefaultLandingPoint = temp_vector;
+            }
             else
-                m_log.ErrorFormat("[RegionInfo]: Unable to parse DefaultLanding for '{0}'. The value given was '{1}'", RegionName, temp_location);
+            {
+                _logger.LogError(
+                    $"[RegionInfo]: Unable to parse DefaultLanding for '{RegionName}'. " +
+                    $"The value given was '{temp_location}'");
+            }
 
             allKeys.Remove("DefaultLanding");
 
@@ -750,7 +753,10 @@ namespace OpenSim.Framework
             }
 
             if (ValuesCapped)
-                m_log.WarnFormat("[RegionInfo]: The default landing location for {0} has been capped to {1}", RegionName, DefaultLandingPoint);
+            {
+                _logger.LogWarning(
+                    $"[RegionInfo]: The default landing location for {RegionName} has been capped to {DefaultLandingPoint}");
+            }
         }
 
         // Make sure user specified region sizes are sane.
@@ -767,8 +773,11 @@ namespace OpenSim.Framework
                     RegionSizeX -= partial;
                     if (RegionSizeX == 0)
                         RegionSizeX = Constants.RegionSize;
-                    m_log.ErrorFormat("{0} Region size must be multiple of {1}. Enforcing {2}.RegionSizeX={3} instead of specified {4}",
-                        LogHeader, Constants.RegionSize, m_regionName, RegionSizeX, RegionSizeX + partial);
+
+                    _logger.LogError(
+                        $"{LogHeader} Region size must be multiple of {Constants.RegionSize}. " +
+                        $"Enforcing {m_regionName}.RegionSizeX={RegionSizeX} " +
+                        $"instead of specified {RegionSizeX + partial}");
                 }
                 partial = RegionSizeY % Constants.RegionSize;
                 if (partial != 0)
@@ -776,8 +785,11 @@ namespace OpenSim.Framework
                     RegionSizeY -= partial;
                     if (RegionSizeY == 0)
                         RegionSizeY = Constants.RegionSize;
-                    m_log.ErrorFormat("{0} Region size must be multiple of {1}. Enforcing {2}.RegionSizeY={3} instead of specified {4}",
-                        LogHeader, Constants.RegionSize, m_regionName, RegionSizeY, RegionSizeY + partial);
+
+                    _logger.LogError(
+                        $"{LogHeader} Region size must be multiple of {Constants.RegionSize}. " +
+                        $"Enforcing {m_regionName}.RegionSizeY={RegionSizeY} instead of specified " +
+                        $"{RegionSizeY + partial}");
                 }
 
                 // Because of things in the viewer, regions MUST be square.
@@ -787,8 +799,9 @@ namespace OpenSim.Framework
                     uint minSize = Math.Min(RegionSizeX, RegionSizeY);
                     RegionSizeX = minSize;
                     RegionSizeY = minSize;
-                    m_log.ErrorFormat("{0} Regions must be square until viewers are updated. Forcing region {1} size to <{2},{3}>",
-                                        LogHeader, m_regionName, RegionSizeX, RegionSizeY);
+                    _logger.LogError(
+                        $"{LogHeader} Regions must be square until viewers are updated. " +
+                        $"Forcing region {m_regionName} size to <{RegionSizeX},{RegionSizeY}>");
                 }
 
                 // There is a practical limit to region size.
@@ -796,11 +809,12 @@ namespace OpenSim.Framework
                 {
                     RegionSizeX = Math.Clamp(RegionSizeX, Constants.RegionSize, Constants.MaximumRegionSize);
                     RegionSizeY = Math.Clamp(RegionSizeY, Constants.RegionSize, Constants.MaximumRegionSize);
-                    m_log.ErrorFormat("{0} Region dimensions must be less than {1}. Clamping {2}'s size to <{3},{4}>",
-                                        LogHeader, Constants.MaximumRegionSize, m_regionName, RegionSizeX, RegionSizeY);
+                    _logger.LogError(
+                        $"{LogHeader} Region dimensions must be less than {Constants.MaximumRegionSize}. " +
+                        $"Clamping {m_regionName}'s size to <{RegionSizeX},{RegionSizeY}>");
                 }
 
-                m_log.InfoFormat("{0} Region {1} size set to <{2},{3}>", LogHeader, m_regionName, RegionSizeX, RegionSizeY);
+                _logger.LogInformation($"{LogHeader} Region {m_regionName} size set to <{RegionSizeX},{RegionSizeY}>");
             }
         }
 

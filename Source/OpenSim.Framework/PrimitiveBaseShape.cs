@@ -25,16 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-
-using System.IO;
 using System.Reflection;
 using System.Xml;
 using System.Xml.Schema;
 using System.Xml.Serialization;
 using System.Runtime.CompilerServices;
-using log4net;
+
+using Microsoft.Extensions.Logging;
+
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
@@ -79,7 +77,8 @@ namespace OpenSim.Framework
     [Serializable]
     public class PrimitiveBaseShape
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private static readonly byte[] DEFAULT_TEXTURE = new Primitive.TextureEntry(new UUID("89556747-24cb-43ed-920b-47caed15465f")).GetBytes();
 
@@ -197,9 +196,9 @@ namespace OpenSim.Framework
 
                 if (!Enum.IsDefined(typeof(HollowShape), hollowShapeByte))
                 {
-                    m_log.WarnFormat(
-                        "[SHAPE]: Attempt to set a ProfileCurve with a hollow shape value of {0}, which isn't a valid enum.  Replacing with default shape.",
-                        hollowShapeByte);
+                    _logger.LogWarning(
+                        $"[SHAPE]: Attempt to set a ProfileCurve with a hollow shape value of {hollowShapeByte}, " +
+                        $"which isn't a valid enum.  Replacing with default shape.");
 
                     _hollowShape = HollowShape.Same;
                 }
@@ -213,9 +212,9 @@ namespace OpenSim.Framework
 
                 if (!Enum.IsDefined(typeof(ProfileShape), profileShapeByte))
                 {
-                    m_log.WarnFormat(
-                        "[SHAPE]: Attempt to set a ProfileCurve with a profile shape value of {0}, which isn't a valid enum.  Replacing with square.",
-                        profileShapeByte);
+                    _logger.LogWarning(
+                        $"[SHAPE]: Attempt to set a ProfileCurve with a profile shape value of {profileShapeByte}, " +
+                        $"which isn't a valid enum.  Replacing with square.");
 
                     _profileShape = ProfileShape.Square;
                 }
@@ -295,7 +294,7 @@ namespace OpenSim.Framework
                 try { return new Primitive.TextureEntry(m_textureEntry, 0, m_textureEntry.Length); }
                 catch { }
 
-                m_log.Warn("[SHAPE]: Failed to decode texture, length=" + ((m_textureEntry != null) ? m_textureEntry.Length : 0));
+                _logger.LogWarning($"[SHAPE]: Failed to decode texture, length={(m_textureEntry != null ? m_textureEntry.Length : 0)}");
                 return new Primitive.TextureEntry(UUID.Zero);
             }
 
@@ -1675,7 +1674,7 @@ namespace OpenSim.Framework
                 }
                 catch
                 {
-                    m_log.Debug("PrimitiveBaseShape] error decoding MOAP xml" );
+                    _logger.LogDebug("PrimitiveBaseShape] error decoding MOAP xml" );
                 }
             }
 

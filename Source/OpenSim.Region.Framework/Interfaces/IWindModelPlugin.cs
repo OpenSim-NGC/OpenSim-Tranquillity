@@ -25,12 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-
 using Nini.Config;
-using OpenSim.Framework;
-using OpenSim.Framework.PluginLoader;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
 
@@ -39,7 +34,7 @@ using Mono.Addins;
 namespace OpenSim.Region.Framework.Interfaces
 {
     [TypeExtensionPoint(Path = "/OpenSim/WindModule", NodeName = "WindModel")]
-    public interface IWindModelPlugin : IPlugin
+    public interface IWindModelPlugin //: IPlugin
     {
         /// <summary>
         /// Brief description of this plugin's wind model

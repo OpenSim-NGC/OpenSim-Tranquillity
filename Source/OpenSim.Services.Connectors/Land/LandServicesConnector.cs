@@ -25,41 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using Nini.Config;
 using OpenSim.Framework;
 
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 using Nwc.XmlRpc;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
-using System.Net.Http;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.Connectors
 {
     public class LandServicesConnector : ILandService
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        protected readonly ILogger<LandServicesConnector> _logger;
+        protected IGridService m_GridService;
 
-        protected IGridService m_GridService = null;
-
-        public LandServicesConnector()
-        {
-        }
-
-        public LandServicesConnector(IGridService gridServices)
-        {
-            Initialise(gridServices);
-        }
-
-        public virtual void Initialise(IGridService gridServices)
+        public LandServicesConnector(
+            ILogger<LandServicesConnector> logger, 
+            IGridService gridServices)
         {
             m_GridService = gridServices;
         }
@@ -97,7 +81,7 @@ namespace OpenSim.Services.Connectors
                     XmlRpcResponse response = request.Send(info.ServerURI, hclient);
                     if (response.IsFault)
                     {
-                        m_log.ErrorFormat("[LAND CONNECTOR]: remote call returned an error: {0}", response.FaultString);
+                        _logger.LogError("[LAND CONNECTOR]: remote call returned an error: {0}", response.FaultString);
                     }
                     else
                     {
@@ -125,18 +109,19 @@ namespace OpenSim.Services.Connectors
                         }
                         catch (Exception e)
                         {
-                            m_log.ErrorFormat(
-                                "[LAND CONNECTOR]: Got exception while parsing land-data: {0} {1}",
-                                e.Message, e.StackTrace);
+                            _logger.LogError(
+                                e, "[LAND CONNECTOR]: Got exception while parsing land-data");
                         }
                     }
                 }
                 else
-                    m_log.WarnFormat("[LAND CONNECTOR]: Couldn't find region with handle {0}", regionHandle);
+                {
+                    _logger.LogWarning("[LAND CONNECTOR]: Couldn't find region with handle {0}", regionHandle);
+                }
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[LAND CONNECTOR]: Couldn't contact region {0}: {1}", regionHandle, e.Message);
+                _logger.LogError(e, "[LAND CONNECTOR]: Couldn't contact region {0}", regionHandle);
             }
 
             return landData;

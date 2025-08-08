@@ -10,28 +10,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System;
-using System.Reflection;
-
+using Microsoft.Extensions.Logging;
 using OpenSim.Framework;
-using OpenSim.Services.Interfaces;
-using OpenSim.Services.Base;
-
-using OpenMetaverse.StructuredData;
-using OpenMetaverse;
-
-using Nini.Config;
-using log4net;
-using System.Threading.Tasks;
-using System.Text.RegularExpressions;
-using System.Collections.Generic;
 
 namespace WebRtcVoice
 {
     // Encapsulization of a Session to the Janus server
     public class JanusRoom : IDisposable
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = LogManager.CreateLogger<JanusRoom>();
         private static readonly string LogHeader = "[JANUS ROOM]";
 
         public int RoomId { get; private set; }

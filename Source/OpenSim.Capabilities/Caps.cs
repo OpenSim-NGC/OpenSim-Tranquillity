@@ -25,13 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
-using System.Reflection;
-using System.Threading;
-using log4net;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework.Servers;
@@ -50,8 +46,7 @@ namespace OpenSim.Framework.Capabilities
 
     public class Caps : IDisposable
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        private readonly ILogger _logger;
         private readonly string m_httpListenerHostName;
         private readonly uint m_httpListenPort;
 
@@ -59,6 +54,13 @@ namespace OpenSim.Framework.Capabilities
         /// This is the uuid portion of every CAPS path.  It is used to make capability urls private to the requester.
         /// </summary>
         private readonly string m_capsObjectPath;
+
+        public Caps(ILogger logger, IHttpServer mHttpListener)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            m_httpListener = mHttpListener ?? throw new ArgumentNullException(nameof(mHttpListener));
+        }
+
         public string CapsObjectPath { get { return m_capsObjectPath; } }
 
         private readonly CapsHandlers m_capsHandlers;
@@ -211,7 +213,7 @@ namespace OpenSim.Framework.Capabilities
 
             if(!m_pollServiceHandlers.TryAdd(capName, pollServiceHandler))
             {
-                m_log.ErrorFormat(
+                _logger.LogError(
                     "[CAPS]: Handler with name {0} already registered (ulr {1}, agent {2}, region {3}",
                     capName, pollServiceHandler.Url, m_agentID, m_regionName);
                 return;

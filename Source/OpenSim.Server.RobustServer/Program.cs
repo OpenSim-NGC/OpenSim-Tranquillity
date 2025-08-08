@@ -8,131 +8,164 @@
  */
 
 using System.CommandLine;
-
+using System.Reflection;
 using Autofac.Extensions.DependencyInjection;
 using Autofac;
-
+using Autofac.Core;
+using Autofac.Core.Registration;
 using ConfigurationSubstitution;
+using Microsoft.AspNetCore.Builder;
 using OpenSim.Server.Base;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.RobustServer
 {
     class Program
     {
-        public static IHost RegionHost { get; private set; }
-
         public static async Task<int> Main(string[] args)
         {
             var rootCommand = new RootCommand();
 
             var logconfigOption = new Option<string>
-                (name: "--logconfig", description: "Instruct log4net to use this file as configuration file.",
+                ( name: "--logconfig", description: "Instruct log4net to use this file as configuration file.",
                 getDefaultValue: () => "OpenSim.Server.RobustServer.dll.config");
             var backgroundOption = new Option<bool>
-                (name: "--background", description: "If true, OpenSimulator will run in the background",
+                ( name: "--background", description: "If true, OpenSimulator will run in the background",
                 getDefaultValue: () => false);
             var inifileOption = new Option<List<string>>
-                (name: "--inifile", description: "Specify the location of zero or more .ini file(s) to read.");
+                ( name: "--inifile", description: "Specify the location of zero or more .ini file(s) to read.");
             var inimasterOption = new Option<string>
-                (name: "--inimaster", description: "The path to the master ini file.",
+                ( name: "--inimaster", description: "The path to the master ini file.",
                 getDefaultValue: () => "OpenSimDefaults.ini");
-            var inidirectoryOption = new Option<string>(
-                    name: "--inidirectory", 
-                    description:    "The path to folder for config ini files.OpenSimulator will read all of *.ini files " +
-                                    "in this directory and override OpenSim.ini settings",
-                    getDefaultValue: () => "config");
-            var consoleOption = new Option<string>
-                (name: "--console", description: "console type, one of basic, local or rest.", 
-                getDefaultValue: () => "local")
-                .FromAmong("basic", "local", "rest");
+            var inidirectoryOption = new Option<string>
+                ( name: "--inidirectory", 
+                description:    "The path to folder for config ini files.OpenSimulator will read all of *.ini files " +
+                                "in this directory and override OpenSim.ini settings",
+                getDefaultValue: () => "config");
 
             rootCommand.AddGlobalOption(logconfigOption);
             rootCommand.AddGlobalOption(backgroundOption);
             rootCommand.AddGlobalOption(inifileOption);
             rootCommand.AddGlobalOption(inimasterOption);
             rootCommand.AddGlobalOption(inidirectoryOption);
-            rootCommand.AddGlobalOption(consoleOption);
 
-            rootCommand.SetHandler((logconfig, background, inifile, inimaster, inidirectory, console) =>
-            {
-                StartRobust(args, logconfig, background, inifile, inimaster, inidirectory, console);
-            },
-            logconfigOption,
-            backgroundOption, 
-            inifileOption, 
-            inimasterOption, 
-            inidirectoryOption, 
-            consoleOption);
+            rootCommand.SetHandler((logconfig, background, inifile, inimaster, inidirectory) =>
+                {
+                    StartRobust(args, logconfig, background, inifile, inimaster, inidirectory);
+                },
+                logconfigOption,
+                backgroundOption,
+                inifileOption,
+                inimasterOption,
+                inidirectoryOption);
 
             return await rootCommand.InvokeAsync(args);
         }
+        
+        private static void Register(
+            IComponentRegistryBuilder builder, 
+            string directoryPath, 
+            string searchPattern = "*.dll"
+        )
+        {
+            if (Directory.Exists(directoryPath) is false)
+                return;
+        
+            // Load assemblies from the directory
+            var assemblies = Directory.GetFiles(directoryPath, searchPattern)
+                .Select(Assembly.LoadFrom)
+                .ToArray();
+        
+            // Register services from the modules in the assemblies
+            foreach (var assembly in assemblies)
+            {
+                var moduleTypes = assembly.GetTypes()
+                    .Where(t => typeof(IModule).IsAssignableFrom(t) && t.IsClass && !t.IsAbstract)
+                    .ToList();
 
+                foreach (var moduleType in moduleTypes)
+                {
+                    var moduleInstance = (IModule)Activator.CreateInstance(moduleType);
+                    moduleInstance?.Configure(builder);
+                }
+            }
+        }
+        
         private static void StartRobust(
             string[] args, 
             string logconfig, 
             bool background, 
             List<string> inifile, 
             string inimaster,
-            string inidirectory,
-            string console
+            string inidirectory
             )
         {
-            IHostBuilder builder = Host.CreateDefaultBuilder(args);
-
-            builder.ConfigureAppConfiguration(configuration =>
+            var builder = WebApplication.CreateBuilder(args);
+            
+            builder.Configuration.AddIniFile(inimaster, optional: true, reloadOnChange: true);
+            
+            foreach (var item in inifile)
             {
-                configuration.AddIniFile(inimaster, optional: true, reloadOnChange: true);
-                foreach (var item in inifile)
-                {
-                    configuration.AddIniFile(item, optional: true, reloadOnChange: true);
-                }
+                builder.Configuration.AddIniFile(item, optional: true, reloadOnChange: true);
+            }
 
-                if (string.IsNullOrEmpty(inidirectory) is false)
+            if (string.IsNullOrEmpty(inidirectory) is false)
+            {
+                if (Directory.Exists(inidirectory))
                 {
-                    if (Directory.Exists(inidirectory))
+                    foreach (var item in Directory.GetFiles(inidirectory, "*.ini"))
                     {
-                        foreach (var item in Directory.GetFiles(inidirectory, "*.ini"))
-                        {
-                            configuration.AddIniFile(item, optional: true, reloadOnChange: true);
-                        }
+                        builder.Configuration.AddIniFile(item, optional: true, reloadOnChange: true);
                     }
                 }
+            }
                 
-                configuration.EnableSubstitutions("$(", ")");
-            });
+            builder.Configuration.EnableSubstitutions("$(", ")");
             
-            builder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
-
-            builder.ConfigureContainer<ContainerBuilder>(registryBuilder =>
-            {
-                // The registry we're building into
-                var registry = registryBuilder.ComponentRegistryBuilder;                
-                
-                // Search the Service Runtime directory First
-                var directoryPath = AppDomain.CurrentDomain.BaseDirectory;
-                RegisterServices.Register(registry, directoryPath, "OpenSim.*.dll");
+            builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory())
+                .ConfigureContainer<ContainerBuilder>(registryBuilder =>
+                {
+                    // The registry we're building into
+                    var registry = registryBuilder.ComponentRegistryBuilder;
                     
-                // Register any plugins dropped into the addons directory also
-                directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "addon-modules");
-                RegisterServices.Register(registry, directoryPath);                
-            })
-            .ConfigureLogging(loggingBuilder =>
+                    // Search the Service Runtime directory First
+                    var directoryPath = AppDomain.CurrentDomain.BaseDirectory;
+                    Register(registry, directoryPath, "OpenSim.*.dll");
+                        
+                    // Register any plugins dropped into the addons directory also
+                    directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "addon-modules");
+                    Register(registry, directoryPath);    
+                }); 
+            
+            builder.Logging.ClearProviders();
+            builder.Logging.AddConsole();
+            builder.Logging.AddDebug();
+            
+            builder.Services.AddHostedService<RobustService>();
+            builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
+            builder.Services.BuildServiceProvider();
+         
+            builder.Services.AddControllers();
+            builder.Services.AddOpenApi();
+            builder.Services.AddEndpointsApiExplorer();
+            
+            builder.Services.AddHostedService<PIDFileService>();
+            builder.Services.AddHostedService<TimerService>();
+            builder.Services.AddHostedService<RobustService>();
+            
+            var app = builder.Build();
+            if (app.Environment.IsDevelopment())
             {
-                loggingBuilder.ClearProviders();
-                loggingBuilder.AddLog4Net(log4NetConfigFile: logconfig);
-                loggingBuilder.AddConsole();
-            })
-            .ConfigureServices(services =>
-            {
-                services.AddHostedService<RobustService>();
-                // services.AddHostedService<PidFileService>();
-                
-                // Initialize the service provider
-                var serviceProvider = services.BuildServiceProvider();
-            });
+                app.MapOpenApi();
+            }
 
-            RegionHost = builder.Build();
-            RegionHost.Run();
+            app.UseHttpsRedirection();
+            app.UseAuthorization();
+            app.MapControllers();
+            
+            LogManager.LoggerFactory = app.Services.GetService<ILoggerFactory>();
+            
+            app.Run();
         }
     }
 }

@@ -25,17 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Framework.PluginLoader;
 
 namespace OpenSim.Data
 {
     /// <summary>
     /// An interface for accessing inventory data from a storage server
     /// </summary>
-    public interface IInventoryDataPlugin : IPlugin
+    public interface IInventoryDataPlugin
     {
         /// <summary>
         /// Initialises the interface

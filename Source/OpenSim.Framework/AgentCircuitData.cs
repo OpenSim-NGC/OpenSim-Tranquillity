@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
-using System.Collections.Generic;
-using log4net;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
@@ -40,7 +38,8 @@ namespace OpenSim.Framework
     /// </summary>
     public class AgentCircuitData
     {
-        private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         /// <summary>
         /// Avatar Unique Agent Identifier
@@ -338,7 +337,7 @@ namespace OpenSim.Framework
             if(args.TryGetValue("far", out tmpOSD))
                 startfar = (float)tmpOSD.AsReal();
 
-            //m_log.InfoFormat("[AGENTCIRCUITDATA]: agentid={0}, child={1}, startpos={2}", AgentID, child, startpos);
+            //_logger.LogInformation($"[AGENTCIRCUITDATA]: agentid={AgentID}, child={child}, startpos={startpos}", AgentID, child, startpos);
 
             try
             {
@@ -353,16 +352,16 @@ namespace OpenSim.Framework
                 if (args.TryGetValue("packed_appearance", out tmpOSD) && (tmpOSD is OSDMap))
                 {
                     Appearance.Unpack((OSDMap)tmpOSD);
-//                    m_log.InfoFormat("[AGENTCIRCUITDATA] unpacked appearance");
+//                    _logger.InfoFormat("[AGENTCIRCUITDATA] unpacked appearance");
                 }
                 else
                 {
-                    m_log.Warn("[AGENTCIRCUITDATA]: failed to find a valid packed_appearance");
+                    _logger.LogWarning("[AGENTCIRCUITDATA]: failed to find a valid packed_appearance");
                 }
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[AGENTCIRCUITDATA] failed to unpack appearance; {0}",e.Message);
+                _logger.LogError(e, $"[AGENTCIRCUITDATA] failed to unpack appearance; {e.Message}");
             }
 
             ServiceURLs = new Dictionary<string, object>();
@@ -387,7 +386,6 @@ namespace OpenSim.Framework
                     tmpOSD = urls[i];
                     tmpOSDb = urls[i + 1];
                     ServiceURLs[tmpOSD.AsString()] = tmpOSDb.AsString();
-                    //System.Console.WriteLine("XXX " + urls[i * 2].AsString() + "=" + urls[(i * 2) + 1].AsString());
                 }
             }
         }

@@ -25,31 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
 using System.Net;
-using System.Reflection;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenMetaverse;
 using OpenMetaverse.Imaging;
-using OpenMetaverse.StructuredData;
 using Nwc.XmlRpc;
-using log4net;
-
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using OpenSim.Services.Connectors.Simulation;
-using System.Net.Http;
 
 namespace OpenSim.Services.Connectors.Hypergrid
 {
-    public class GatekeeperServiceConnector : SimulationServiceConnector
+    public class GatekeeperServiceConnector : ISimulationService
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
+        private readonly SimulationServiceConnector _simulationService;
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<GatekeeperServiceConnector> _logger;
+        
         private static UUID m_HGMapImage = new UUID("00000000-0000-1111-9999-000000000013");
 
         private IAssetService m_AssetService;
@@ -64,12 +60,12 @@ namespace OpenSim.Services.Connectors.Hypergrid
             m_AssetService = assService;
         }
 
-        protected override string AgentPath()
+        protected string AgentPath()
         {
             return "foreignagent/";
         }
 
-        protected override string ObjectPath()
+        protected string ObjectPath()
         {
             return "foreignobject/";
         }
@@ -339,6 +335,53 @@ namespace OpenSim.Services.Connectors.Hypergrid
             }
 
             return null;
+        }
+
+        public IScene GetScene(UUID regionId)
+        {
+            return _simulationService.GetScene(regionId);
+        }
+
+        public ISimulationService GetInnerService()
+        {
+            return _simulationService.GetInnerService();
+        }
+
+        public bool CreateAgent(GridRegion source, GridRegion destination, AgentCircuitData aCircuit, uint flags,
+            EntityTransferContext ctx, out string reason)
+        {
+            return _simulationService.CreateAgent(source, destination, aCircuit, flags, ctx, out reason);
+        }
+
+        public bool UpdateAgent(GridRegion destination, AgentData data, EntityTransferContext ctx)
+        {
+            return _simulationService.UpdateAgent(destination, data, ctx);
+        }
+
+        public bool UpdateAgent(GridRegion destination, AgentPosition data)
+        {
+            return _simulationService.UpdateAgent(destination, data);
+        }
+
+        public bool QueryAccess(GridRegion destination, UUID agentID, string agentHomeURI, bool viaTeleport, Vector3 position,
+            List<UUID> features, EntityTransferContext ctx, out string reason)
+        {
+            return _simulationService.QueryAccess(destination, agentID, agentHomeURI, viaTeleport, position, features, ctx, out reason);
+        }
+
+        public bool ReleaseAgent(UUID originRegion, UUID id, string uri)
+        {
+            return _simulationService.ReleaseAgent(originRegion, id, uri);
+        }
+
+        public bool CloseAgent(GridRegion destination, UUID id, string auth_token)
+        {
+            return _simulationService.CloseAgent(destination, id, auth_token);
+        }
+
+        public bool CreateObject(GridRegion destination, Vector3 newPosition, ISceneObject sog, bool isLocalCall)
+        {
+            return _simulationService.CreateObject(destination, newPosition, sog, isLocalCall);
         }
     }
 }

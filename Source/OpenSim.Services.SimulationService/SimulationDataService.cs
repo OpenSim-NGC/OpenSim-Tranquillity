@@ -35,11 +35,11 @@ namespace OpenSim.Services.SimulationService
 {
     public class SimulationDataService : ISimulationDataService
     {
-        protected ISimulationDataStore m_database;
+        protected readonly ISimulationDataStore _simulationDataStore;
 
         public SimulationDataService(ISimulationDataStore simulationDataStore)
         {
-            m_database = simulationDataStore;
+            _simulationDataStore = simulationDataStore;
         }
 
         public void StoreObject(SceneObjectGroup obj, UUID regionUUID)
@@ -48,112 +48,112 @@ namespace OpenSim.Services.SimulationService
             if ((flags & (uint)(PrimFlags.Temporary | PrimFlags.TemporaryOnRez)) != 0)
                 return;
 
-            m_database.StoreObject(obj, regionUUID);
+            _simulationDataStore.StoreObject(obj, regionUUID);
         }
 
         public void RemoveObject(UUID uuid, UUID regionUUID)
         {
-            m_database.RemoveObject(uuid, regionUUID);
+            _simulationDataStore.RemoveObject(uuid, regionUUID);
         }
 
         public void StorePrimInventory(UUID primID, ICollection<TaskInventoryItem> items)
         {
-            m_database.StorePrimInventory(primID, items);
+            _simulationDataStore.StorePrimInventory(primID, items);
         }
 
         public List<SceneObjectGroup> LoadObjects(UUID regionUUID)
         {
-            return m_database.LoadObjects(regionUUID);
+            return _simulationDataStore.LoadObjects(regionUUID);
         }
 
         public void StoreTerrain(TerrainData terrain, UUID regionID)
         {
-            m_database.StoreTerrain(terrain, regionID);
+            _simulationDataStore.StoreTerrain(terrain, regionID);
         }
 
         public void StoreBakedTerrain(TerrainData terrain, UUID regionID)
         {
-            m_database.StoreBakedTerrain(terrain, regionID);
+            _simulationDataStore.StoreBakedTerrain(terrain, regionID);
         }
 
         public void StoreTerrain(double[,] terrain, UUID regionID)
         {
-            m_database.StoreTerrain(terrain, regionID);
+            _simulationDataStore.StoreTerrain(terrain, regionID);
         }
 
         public double[,] LoadTerrain(UUID regionID)
         {
-            return m_database.LoadTerrain(regionID);
+            return _simulationDataStore.LoadTerrain(regionID);
         }
 
         public TerrainData LoadTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ)
         {
-            return m_database.LoadTerrain(regionID, pSizeX, pSizeY, pSizeZ);
+            return _simulationDataStore.LoadTerrain(regionID, pSizeX, pSizeY, pSizeZ);
         }
 
         public TerrainData LoadBakedTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ)
         {
-            return m_database.LoadBakedTerrain(regionID, pSizeX, pSizeY, pSizeZ);
+            return _simulationDataStore.LoadBakedTerrain(regionID, pSizeX, pSizeY, pSizeZ);
         }
 
         public void StoreLandObject(ILandObject Parcel)
         {
-            m_database.StoreLandObject(Parcel);
+            _simulationDataStore.StoreLandObject(Parcel);
         }
 
         public void RemoveLandObject(UUID globalID)
         {
-            m_database.RemoveLandObject(globalID);
+            _simulationDataStore.RemoveLandObject(globalID);
         }
 
         public List<LandData> LoadLandObjects(UUID regionUUID)
         {
-            return m_database.LoadLandObjects(regionUUID);
+            return _simulationDataStore.LoadLandObjects(regionUUID);
         }
 
         public void StoreRegionSettings(RegionSettings rs)
         {
-            m_database.StoreRegionSettings(rs);
+            _simulationDataStore.StoreRegionSettings(rs);
         }
 
         public RegionSettings LoadRegionSettings(UUID regionUUID)
         {
-            return m_database.LoadRegionSettings(regionUUID);
+            return _simulationDataStore.LoadRegionSettings(regionUUID);
         }
 
         public string LoadRegionEnvironmentSettings(UUID regionUUID)
         {
-            return m_database.LoadRegionEnvironmentSettings(regionUUID);
+            return _simulationDataStore.LoadRegionEnvironmentSettings(regionUUID);
         }
 
         public void StoreRegionEnvironmentSettings(UUID regionUUID, string settings)
         {
-            m_database.StoreRegionEnvironmentSettings(regionUUID, settings);
+            _simulationDataStore.StoreRegionEnvironmentSettings(regionUUID, settings);
         }
 
         public void RemoveRegionEnvironmentSettings(UUID regionUUID)
         {
-            m_database.RemoveRegionEnvironmentSettings(regionUUID);
+            _simulationDataStore.RemoveRegionEnvironmentSettings(regionUUID);
         }
 
         public UUID[] GetObjectIDs(UUID regionID)
         {
-            return m_database.GetObjectIDs(regionID);
+            return _simulationDataStore.GetObjectIDs(regionID);
         }
 
         public void SaveExtra(UUID regionID, string name, string val)
         {
-            m_database.SaveExtra(regionID, name, val);
+            _simulationDataStore.SaveExtra(regionID, name, val);
         }
 
         public void RemoveExtra(UUID regionID, string name)
         {
-            m_database.RemoveExtra(regionID, name);
+            _simulationDataStore.RemoveExtra(regionID, name);
         }
 
         public Dictionary<string, string> GetExtra(UUID regionID)
         {
-            return m_database.GetExtra(regionID);
+            return _simulationDataStore.GetExtra(regionID);
         }
     }
 }

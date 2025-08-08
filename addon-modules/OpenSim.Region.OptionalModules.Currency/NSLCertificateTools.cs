@@ -8,7 +8,9 @@ using System.Net;
 using System.Net.Security;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
+
 using log4net;
+
 
 namespace NSL.Certificate.Tools
 {
@@ -21,18 +23,19 @@ namespace NSL.Certificate.Tools
 
         private X509Chain m_chain = null;
         private X509Certificate2 m_cacert = null;
+        private X509Certificate2 m_mycert = null;
 
         private Mono.Security.X509.X509Crl m_clientcrl = null;
 
 
-        /// <summary>
-        /// NSL Certificate Verify
-        /// </summary>
+        /// <summary>NSL Certificate Verify</summary>
         public NSLCertificateVerify()
         {
             m_chain = null;
             m_cacert = null;
             m_clientcrl = null;
+
+            //  m_log.InfoFormat("[NSL CERT VERIFY]: NSLCertificateVerify()");
         }
 
 
@@ -43,6 +46,8 @@ namespace NSL.Certificate.Tools
         public NSLCertificateVerify(string certfile)
         {
             SetPrivateCA(certfile);
+
+            // m_log.InfoFormat("[NSL CERT VERIFY]: NSLCertificateVerify()");
         }
 
 
@@ -55,7 +60,38 @@ namespace NSL.Certificate.Tools
         {
             SetPrivateCA(certfile);
             SetPrivateCRL(crlfile);
+
+            // m_log.InfoFormat("[NSL CERT VERIFY]: NSLCertificateVerify()");
         }
+
+
+        /// <summary>
+        /// Set Private Certificate
+        /// </summary>
+        /// <param name="certfile"></param>
+        /// <param name="passwd"></param>
+        public void SetPrivateCert(string certfile, string passwd)
+        {
+            try
+            {
+                m_mycert = new X509Certificate2(certfile, passwd);
+            }
+            catch (Exception ex)
+            {
+                m_mycert = null;
+                m_log.ErrorFormat("[SET PRIVATE CERT]: Cert File setting error [{0}]. {1}", certfile, ex);
+            }
+        }
+
+
+        /// <summary>
+        /// Get Private Certificate
+        /// </summary>
+        public X509Certificate2 GetPrivateCert()
+        {
+            return m_mycert;
+        }
+
 
 
         /// <summary>
@@ -83,8 +119,8 @@ namespace NSL.Certificate.Tools
             }
         }
 
-
-        //
+        /// <summary>Sets the private CRL.</summary>
+        /// <param name="crlfile">The crlfile.</param>
         public void SetPrivateCRL(string crlfile)
         {
             try
@@ -121,21 +157,13 @@ namespace NSL.Certificate.Tools
             {
                 if (m_chain.ChainStatus[i].Status == X509ChainStatusFlags.UntrustedRoot) return true;
             }
-            //
+            
             return false;
         }
 
 
-        /*
-        SslPolicyErrors:
-            RemoteCertificateNotAvailable = 1, // 証明書が利用できません．
-            RemoteCertificateNameMismatch = 2, // 証明書名が不一致です．
-            RemoteCertificateChainErrors  = 4, // ChainStatus が空でない配列を返しました．
-        */
-
-
         /// <summary>
-        /// Validate Server Certificate
+        /// Validate Server Certificate Callback Function
         /// </summary>
         /// <param name="obj"></param>
         /// <param name="certificate"></param>
@@ -144,44 +172,45 @@ namespace NSL.Certificate.Tools
         /// <returns></returns>
         public bool ValidateServerCertificate(object obj, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
-            m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Start.");
+            m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Policy is ({0})", sslPolicyErrors);
 
             if (obj is HttpWebRequest)
             {
                 HttpWebRequest Request = (HttpWebRequest)obj;
                 string noVerify = Request.Headers.Get("NoVerifyCert");
-                if (noVerify != null && noVerify.ToLower() == "true")
+                if ((noVerify != null) && (noVerify.ToLower() == "true"))
                 {
-                    m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: No Verify Certificate.");
+                    m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: No Verify Server Certificate.");
                     return true;
                 }
             }
 
             X509Certificate2 certificate2 = new X509Certificate2(certificate);
-            string simplename = certificate2.GetNameInfo(X509NameType.SimpleName, false);
+            string commonname = certificate2.GetNameInfo(X509NameType.SimpleName, false);
+            m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Common Name is \"{0}\"", commonname);
 
             // None, ChainErrors Error except for．
-            if (sslPolicyErrors != SslPolicyErrors.None && sslPolicyErrors != SslPolicyErrors.RemoteCertificateChainErrors)
+            if ((sslPolicyErrors != SslPolicyErrors.None) && (sslPolicyErrors != SslPolicyErrors.RemoteCertificateChainErrors))
             {
-                m_log.ErrorFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Policy Error! {0}", sslPolicyErrors);
+                m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Policy Error! {0}", sslPolicyErrors);
                 return false;
             }
 
             bool valid = CheckPrivateChain(certificate2);
             if (valid)
             {
-                m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Valid Server Certification for \"{0}\"", simplename);
+                m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Valid Server Certification for \"{0}\"", commonname);
             }
             else
             {
-                m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Failed to Verify Server Certification for \"{0}\"", simplename);
+                m_log.InfoFormat("[NSL SERVER CERT VERIFY]: ValidateServerCertificate: Failed to Verify Server Certification for \"{0}\"", commonname);
             }
             return valid;
         }
 
 
         /// <summary>
-        /// Validate Client Certificate
+        /// Validate Client Certificate Callback Function
         /// </summary>
         /// <param name="obj"></param>
         /// <param name="certificate"></param>
@@ -190,13 +219,19 @@ namespace NSL.Certificate.Tools
         /// <returns></returns>
         public bool ValidateClientCertificate(object obj, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
-            m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: ValidateClientCertificate: Start");
+            m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: ValidateClientCertificate: Start.");
+
+            if (certificate == null)
+            {
+                m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: ValidateClientCertificate: Client does not have a Certificate!");
+                return false;
+            }
 
             X509Certificate2 certificate2 = new X509Certificate2(certificate);
-            string simplename = certificate2.GetNameInfo(X509NameType.SimpleName, false);
-            m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: ValidateClientCertificate: Simple Name is \"{0}\"", simplename);
+            string commonname = certificate2.GetNameInfo(X509NameType.SimpleName, false);
+            m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: ValidateClientCertificate: Common Name is \"{0}\"", commonname);
 
-            // None, ChainErrors 以外は全てエラーとする．
+            // None, ChainErrors Anything other than that is an error.
             if (sslPolicyErrors != SslPolicyErrors.None && sslPolicyErrors != SslPolicyErrors.RemoteCertificateChainErrors)
             {
                 m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: ValidateClientCertificate: Policy Error! {0}", sslPolicyErrors);
@@ -210,7 +245,7 @@ namespace NSL.Certificate.Tools
                 Mono.Security.X509.X509Crl.X509CrlEntry entry = m_clientcrl.GetCrlEntry(monocert);
                 if (entry != null)
                 {
-                    m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: Common Name \"{0}\" was revoked at {1}", simplename, entry.RevocationDate.ToString());
+                    m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: Common Name \"{0}\" was revoked at {1}", commonname, entry.RevocationDate.ToString());
                     return false;
                 }
             }
@@ -218,44 +253,14 @@ namespace NSL.Certificate.Tools
             bool valid = CheckPrivateChain(certificate2);
             if (valid)
             {
-                m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: Valid Client Certification for \"{0}\"", simplename);
+                m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: Valid Client Certification for \"{0}\"", commonname);
             }
             else
             {
-                m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: Failed to Verify Client Certification for \"{0}\"", simplename);
+                m_log.InfoFormat("[NSL CLIENT CERT VERIFY]: Failed to Verify Client Certification for \"{0}\"", commonname);
             }
             return valid;
         }
     }
-
-
-    // /// <summary>
-    // /// class NSL Certificate Policy
-    // /// </summary>
-    // public class NSLCertificatePolicy : ICertificatePolicy
-    // {
-    //     /// <summary>
-    //     /// Check Validation Result
-    //     /// </summary>
-    //     /// <param name="srvPoint"></param>
-    //     /// <param name="certificate"></param>
-    //     /// <param name="request"></param>
-    //     /// <param name="certificateProblem"></param>
-    //     /// <returns></returns>
-    //     public bool CheckValidationResult(ServicePoint srvPoint, X509Certificate certificate, WebRequest request, int certificateProblem)
-    //     {
-    //         if (certificateProblem == 0 ||              //normal
-    //             certificateProblem == -2146762487 ||    //Not trusted?
-    //             certificateProblem == -2146762495 ||    //Expired
-    //             certificateProblem == -2146762481)
-    //         {   //Incorrect name?
-    //             return true;
-    //         }
-    //         else
-    //         {
-    //             return false;
-    //         }
-    //     }
-    // }
 
 }

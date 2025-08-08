@@ -25,38 +25,34 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Reflection;
-using Nini.Config;
-using log4net;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
 using OpenSim.Data;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
-namespace OpenSim.Services.PresenceService
-{
-    public class PresenceService : PresenceServiceBase, IPresenceService
-    {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+namespace OpenSim.Services.PresenceService;
 
+    public class PresenceService : IPresenceService
+    {
         protected bool m_allowDuplicatePresences = false;
         const int EXPIREMS = 300000;
         static ExpiringCacheOS<UUID, PresenceData> BySessionCache = new ExpiringCacheOS<UUID, PresenceData>(60000);
         static ExpiringCacheOS<string, PresenceData> ByUserCache = new ExpiringCacheOS<string, PresenceData>(60000);
 
-        public PresenceService(IConfigSource config)
-            : base(config)
+        public PresenceService(
+            IConfiguration config,
+            ILogger<PresenceService> logger,
+            IPresenceData presenceData)
         {
             m_log.Debug("[PRESENCE SERVICE]: Starting presence service");
 
-            IConfig presenceConfig = config.Configs["PresenceService"];
-            if (presenceConfig != null)
+            var presenceConfig = config.GetSection("PresenceService");
+            if (presenceConfig.Exists() is true)
             {
-                m_allowDuplicatePresences = presenceConfig.GetBoolean("AllowDuplicatePresences", m_allowDuplicatePresences);
+                m_allowDuplicatePresences = presenceConfig.GetValue<bool>("AllowDuplicatePresences", false);
             }
         }
 
@@ -249,4 +245,3 @@ namespace OpenSim.Services.PresenceService
         }
 
     }
-}

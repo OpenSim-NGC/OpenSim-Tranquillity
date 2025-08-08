@@ -25,17 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
-using System.Net.Http;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Web;
-using log4net;
-
+using Microsoft.Extensions.Logging;
 using OpenSim.Framework.ServiceAuth;
 
 namespace OpenSim.Framework
@@ -48,7 +43,8 @@ namespace OpenSim.Framework
     /// </remarks>
     public class RestClient : IDisposable
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         // private string realuri;
 
@@ -163,11 +159,11 @@ namespace OpenSim.Framework
             }
             catch (ArgumentException)
             {
-                m_log.Error("[REST]: Query parameter " + name + " is already added.");
+                _logger.LogError($"[REST]: Query parameter {name} is already added.");
             }
             catch (Exception e)
             {
-                m_log.Error("[REST]: An exception was raised adding query parameter to dictionary. Exception: {0}",e);
+                _logger.LogError(e, $"[REST]: An exception was raised adding query parameter to dictionary.");
             }
         }
 
@@ -183,11 +179,11 @@ namespace OpenSim.Framework
             }
             catch (ArgumentException)
             {
-                m_log.Error("[REST]: Query parameter " + name + " is already added.");
+                _logger.LogError("[REST]: Query parameter " + name + " is already added.");
             }
             catch (Exception e)
             {
-                m_log.Error("[REST]: An exception was raised adding query parameter to dictionary. Exception: {0}",e);
+                _logger.LogError("[REST]: An exception was raised adding query parameter to dictionary. Exception: {0}",e);
             }
         }
 
@@ -279,7 +275,9 @@ namespace OpenSim.Framework
 
 
                     if (WebUtil.DebugLevel >= 3)
-                        m_log.DebugFormat("[REST CLIENT] {0} to {1}", RequestMethod, uri);
+                    {
+                        _logger.LogDebug($"[REST CLIENT] {RequestMethod} to {uri}");
+                    }
 
                     //_request.ContentType = "application/xml";
                     responseMessage = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
@@ -302,21 +300,21 @@ namespace OpenSim.Framework
                             if (status == HttpStatusCode.NotFound)
                             {
                                 // This is often benign. E.g., requesting a missing asset will return 404.
-                                m_log.DebugFormat("[REST CLIENT] Resource not found (404): {0}", uri.ToString());
+                                _logger.LogDebug($"[REST CLIENT] Resource not found (404): {uri}");
                             }
                             else
                             {
-                                m_log.Error($"[REST CLIENT] Error fetching resource from server: {uri} status: {status} {e.Message}");
+                                _logger.LogError($"[REST CLIENT] Error fetching resource from server: {uri} status: {status} {e.Message}");
                             }
                         }
                         else
                         {
-                            m_log.Error($"[REST CLIENT] Error fetching resource from server: {uri} {e.Message}");
+                            _logger.LogError($"[REST CLIENT] Error fetching resource from server: {uri} {e.Message}");
                         }
                     }
                     else
                     {
-                        m_log.Error($"[REST CLIENT] Error fetching null resource from server: {e.Message}");
+                        _logger.LogError($"[REST CLIENT] Error fetching null resource from server: {e.Message}");
                     }
                     return null;
                 }
@@ -376,22 +374,34 @@ namespace OpenSim.Framework
             catch (HttpRequestException e)
             {
                 if(uri is not null)
-                { 
+                {
                     if (e.StatusCode is HttpStatusCode status)
-                        m_log.Warn($"[REST]: POST {uri} failed with status {status} and message {e.Message}");
+                    {
+                        _logger.LogWarning($"[REST]: POST {uri} failed with status {status} and message {e.Message}");
+                    }
                     else
-                        m_log.Warn($"[REST]: POST {uri} failed with message {e.Message}");
+                    {
+                        _logger.LogWarning($"[REST]: POST {uri} failed with message {e.Message}");
+                    }
                 }
                 else
-                    m_log.Warn($"[REST]: POST failed {e.Message}");
+                {
+                    _logger.LogWarning($"[REST]: POST failed {e.Message}");
+                }
+
                 return;
             }
             catch (Exception e)
             {
                 if (uri is not null)
-                    m_log.Warn($"[REST]: POST {uri} failed with message {e.Message}");
+                {
+                    _logger.LogWarning($"[REST]: POST {uri} failed with message {e.Message}");
+                }
                 else
-                    m_log.Warn($"[REST]: POST failed {e.Message}");
+                {
+                    _logger.LogWarning($"[REST]: POST failed {e.Message}");
+                }
+
                 return;
             }
             finally

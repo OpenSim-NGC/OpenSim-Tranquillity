@@ -26,7 +26,6 @@
  */
 
 using System;
-using OpenSim.Framework;
 using System.Collections;
 
 namespace OpenSim.Services.Interfaces

@@ -10,17 +10,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System;
 using System.Reflection;
-using System.Threading.Tasks;
-
-using OpenSim.Framework;
-using OpenSim.Services.Interfaces;
-using OpenSim.Services.Base;
-
 using OpenMetaverse.StructuredData;
-using OpenMetaverse;
-
 using Nini.Config;
 using log4net;
 

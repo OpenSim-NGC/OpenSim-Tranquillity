@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Contributors, http://opensimulator.org/
+ * Copyright (c) Contributors, http://whitecore-sim.org/, http://aurora-sim.org, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -9,7 +9,7 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the OpenSimulator Project nor the
+ *     * Neither the name of the WhiteCore-Sim Project nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
  *
@@ -25,41 +25,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenSim.Framework.PluginLoader;
+namespace OpenSim.Framework.Console;
 
-namespace OpenSim.Region.Framework.Interfaces
+public class MainConsole
 {
-    /// <summary>
-    /// OpenSimulator Application Plugin framework interface
-    /// </summary>
-    public interface IApplicationPlugin : IPlugin
+    #region Delegates
+
+    public delegate void IncomingLogWrite(string level, string text);
+
+    #endregion
+
+    public static ICommandConsole Instance { get; set; }
+    public static event IncomingLogWrite OnIncomingLogWrite;
+
+    public static void TriggerLog(string level, string text)
     {
-        /// <summary>
-        /// Initialize the Plugin
-        /// </summary>
-        /// <param name="openSim">The Application instance</param>
-        void Initialise(IOpenSimBase openSim);
-
-        /// <summary>
-        /// Called when the application loading is completed
-        /// </summary>
-        void PostInitialise();
-    }
-
-
-    public class ApplicationPluginInitialiser : PluginInitialiserBase
-    {
-        private IOpenSimBase server;
-
-        public ApplicationPluginInitialiser(IOpenSimBase s)
-        {
-            server = s;
-        }
-
-        public override void Initialise(IPlugin plugin)
-        {
-            IApplicationPlugin p = plugin as IApplicationPlugin;
-            p.Initialise(server);
-        }
+        if (OnIncomingLogWrite != null)
+            OnIncomingLogWrite(level, text);
     }
 }

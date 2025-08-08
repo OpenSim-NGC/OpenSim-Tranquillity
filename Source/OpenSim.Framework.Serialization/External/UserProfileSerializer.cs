@@ -28,7 +28,6 @@
 using System.IO;
 using System.Xml;
 using OpenMetaverse;
-using OpenSim.Framework;
 
 namespace OpenSim.Framework.Serialization.External
 {

@@ -26,7 +26,7 @@
  */
 
 using MySqlConnector;
-using System;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.MySQL
 {
@@ -35,14 +35,17 @@ namespace OpenSim.Data.MySQL
     /// </summary>
     public class MySqlFramework
     {
-        private static readonly log4net.ILog m_log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<MySqlFramework> _logger;
 
         protected string m_connectionString = String.Empty;
         protected MySqlTransaction m_trans = null;
 
-        // Constructor using a connection string. Instances constructed
-        // this way will open a new connection for each call.
-        protected MySqlFramework(string connectionString)
+        protected MySqlFramework(ILogger<MySqlFramework> logger)
+        {
+            _logger = logger;
+        }
+            
+        protected void Initialize(string connectionString)
         {
             m_connectionString = connectionString;
         }

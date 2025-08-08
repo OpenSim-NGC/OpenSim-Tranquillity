@@ -25,11 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
@@ -402,7 +400,8 @@ namespace OpenSim.Framework
 
         public List<UUID> CachedFriendsOnline;
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         public void SetLookAt(Vector3 value)
         {
@@ -561,7 +560,7 @@ namespace OpenSim.Framework
                     }
                     catch (IndexOutOfRangeException)
                     {
-                        m_log.WarnFormat("[CHILD AGENT DATA]: scripts list is shorter than object list.");
+                        _logger.LogWarning("[CHILD AGENT DATA]: scripts list is shorter than object list.");
                     }
 
                     attObjs.Add(info);
@@ -779,7 +778,7 @@ namespace OpenSim.Framework
             else
             {
                 // if missing try the old pack method
-                m_log.WarnFormat("[CHILDAGENTDATAUPDATE] No packed appearance, checking old method");
+                _logger.LogWarning("[CHILDAGENTDATAUPDATE] No packed appearance, checking old method");
 
                 Appearance = new AvatarAppearance();
 

@@ -25,14 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
 using System.Text;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework
 {
@@ -48,7 +46,8 @@ namespace OpenSim.Framework
         const float AVBOXMINY = 0.3f;
         const float AVBOXMINZ = 1.2f;
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         // this is viewer capabilities and weared things dependent
         // should be only used as initial default value ( V1 viewers )
@@ -615,7 +614,7 @@ namespace OpenSim.Framework
 
                     if (!existingAttachment.AssetID.IsZero() && existingAttachment.AttachPoint == (attachpoint & 0x7F))
                     {
-                        m_log.Debug($"[AVATAR APPEARANCE]: Ignoring attach of an already attached item {item} at point {attachpoint}");
+                        _logger.LogDebug($"[AVATAR APPEARANCE]: Ignoring attach of an already attached item {item} at point {attachpoint}");
                         return false;
                     }
                     else
@@ -898,9 +897,9 @@ namespace OpenSim.Framework
             SetDefaultParams();
             m_attachments = new Dictionary<int, List<AvatarAttachment>>();
 
-            if(data == null)
+            if (data == null)
             {
-                m_log.Warn("[AVATAR APPEARANCE]: data to unpack is null");
+                _logger.LogWarning("[AVATAR APPEARANCE]: data to unpack is null");
                 return;
             }
 
@@ -998,7 +997,7 @@ namespace OpenSim.Framework
                 }
                 else
                 {
-                    m_log.Warn("[AVATAR APPEARANCE]: failed to unpack visual parameters");
+                    _logger.LogWarning("[AVATAR APPEARANCE]: failed to unpack visual parameters");
                 }
 
                 // Attachments
@@ -1018,7 +1017,7 @@ namespace OpenSim.Framework
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[AVATAR APPEARANCE]: unpack failed badly: {0}{1}", e.Message, e.StackTrace);
+                _logger.LogError(e, $"[AVATAR APPEARANCE]: unpack failed badly: {e.Message}{e.StackTrace}");
             }
         }
 

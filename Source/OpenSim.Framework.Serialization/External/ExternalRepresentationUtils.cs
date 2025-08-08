@@ -25,15 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Frozen;
 using System.Diagnostics;
-using System.IO;
 using System.Reflection;
-using System.Text;
 using System.Xml;
-using log4net;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenSim.Services.Interfaces;
 
@@ -44,7 +40,8 @@ namespace OpenSim.Framework.Serialization.External
     /// </summary>
     public class ExternalRepresentationUtils
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         /// <summary>
         /// Populate a node with data read from xml using a dictinoary of processors
@@ -60,9 +57,9 @@ namespace OpenSim.Framework.Serialization.External
                 nodeToFill,
                 processors,
                 xtr,
-                (o, nodeName, e) => {
-                    m_log.Debug(string.Format("[ExternalRepresentationUtils]: Error while parsing element {0} ",
-                        nodeName), e);
+                (o, nodeName, e) =>
+                {
+                    _logger.LogDebug(e, $"[ExternalRepresentationUtils]: Error while parsing element {nodeName}");
                 });
         }
 
@@ -111,13 +108,13 @@ namespace OpenSim.Framework.Serialization.External
 
                         if (xtr.EOF)
                         {
-                            m_log.Debug("[ExternalRepresentationUtils]: Aborting ExecuteReadProcessors due to unexpected end of XML");
+                            _logger.LogDebug("[ExternalRepresentationUtils]: Aborting ExecuteReadProcessors due to unexpected end of XML");
                             break;
                         }
 
                         if (++numErrors == 10)
                         {
-                            m_log.Debug("[ExternalRepresentationUtils]: Aborting ExecuteReadProcessors due to too many parsing errors");
+                            _logger.LogDebug("[ExternalRepresentationUtils]: Aborting ExecuteReadProcessors due to too many parsing errors");
                             break;
                         }
 
@@ -133,7 +130,7 @@ namespace OpenSim.Framework.Serialization.External
 
                 if (timer.Elapsed.TotalSeconds >= 60)
                 {
-                    m_log.Debug("[ExternalRepresentationUtils]: Aborting ExecuteReadProcessors due to timeout");
+                    _logger.LogDebug("[ExternalRepresentationUtils]: Aborting ExecuteReadProcessors due to timeout");
                     errors = true;
                     break;
                 }
@@ -377,9 +374,8 @@ namespace OpenSim.Framework.Serialization.External
                         break;
 
                     default:
-                        m_log.WarnFormat(
-                            "[HG ASSET MAPPER]: Unrecognized node {0} in asset XML transform in {1}",
-                            reader.NodeType, sceneName);
+                        _logger.LogWarning(
+                            $"[HG ASSET MAPPER]: Unrecognized node {reader.NodeType} in asset XML transform in {sceneName}");
                         break;
                 }
             }

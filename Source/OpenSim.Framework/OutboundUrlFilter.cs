@@ -25,13 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Reflection;
-using log4net;
-using LukeSkywalker.IPNetwork;
+using Microsoft.Extensions.Logging;
 using Nini.Config;
 using IPNetwork = LukeSkywalker.IPNetwork.IPNetwork;
 
@@ -40,7 +36,8 @@ namespace OpenSim.Framework
 {
     public class OutboundUrlFilter
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         public string Name { get; private set; }
 
@@ -85,10 +82,10 @@ namespace OpenSim.Framework
                     = networkConfig.GetString("OutboundDisallowForUserScriptsExcept", configBlacklistExceptions);
             }
 
-            m_log.DebugFormat(
-                "[OUTBOUND URL FILTER]: OutboundDisallowForUserScripts for {0} is [{1}]", Name, configBlacklist);
-            m_log.DebugFormat(
-                "[OUTBOUND URL FILTER]: OutboundDisallowForUserScriptsExcept for {0} is [{1}]", Name, configBlacklistExceptions);
+            _logger.LogDebug(
+                $"[OUTBOUND URL FILTER]: OutboundDisallowForUserScripts for {Name} is [{configBlacklist}]");
+            _logger.LogDebug(
+                $"[OUTBOUND URL FILTER]: OutboundDisallowForUserScriptsExcept for {Name} is [{configBlacklistExceptions}]");
 
             OutboundUrlFilter.ParseConfigList(
                 configBlacklist, Name, out m_blacklistNetworks, out m_blacklistEndPoints);
@@ -116,9 +113,8 @@ namespace OpenSim.Framework
 
                     if (!IPNetwork.TryParse(configEntry, out network))
                     {
-                        m_log.ErrorFormat(
-                            "[OUTBOUND URL FILTER]: Entry [{0}] is invalid network for {1}", configEntry, filterName);
-
+                        _logger.LogError(
+                            $"[OUTBOUND URL FILTER]: Entry [{configEntry}] is invalid network for {filterName}");
                         continue;
                     }
 
@@ -130,10 +126,8 @@ namespace OpenSim.Framework
 
                     if (!Uri.TryCreate("http://" + configEntry, UriKind.Absolute, out configEntryUri))
                     {
-                        m_log.ErrorFormat(
-                            "[OUTBOUND URL FILTER]: EndPoint entry [{0}] is invalid endpoint for {1}",
-                            configEntry, filterName);
-
+                        _logger.LogError(
+                            $"[OUTBOUND URL FILTER]: EndPoint entry [{configEntry}] is invalid endpoint for {filterName}");
                         continue;
                     }
 

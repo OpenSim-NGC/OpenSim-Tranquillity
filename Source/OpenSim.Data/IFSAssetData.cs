@@ -25,16 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Framework.PluginLoader;
 
 namespace OpenSim.Data
 {
     public delegate string FSStoreDelegate(AssetBase asset, bool force);
 
-    public interface IFSAssetDataPlugin : IPlugin
+    public interface IFSAssetDataPlugin
     {
         bool[]          AssetsExist(UUID[] uuids);
         void            Initialise(string connect, string realm, int SkipAccessTimeDays);

@@ -25,21 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Reflection;
 using System.Runtime;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
-using log4net;
-using log4net.Appender;
-using log4net.Core;
-using log4net.Repository;
-using Nini.Config;
+using Autofac;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using OpenSim.Framework.Console;
 using OpenSim.Framework.Monitoring;
 
@@ -47,159 +39,243 @@ namespace OpenSim.Framework.Servers
 {
     public class ServerBase
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        public IConfigSource Config { get; protected set; }
+        private readonly ILogger _logger;
+        protected readonly IConfiguration _config;
+        private readonly IComponentContext _componentContext;
+        protected readonly ServerStatsCollector _serverStatsCollector;
+        
+        protected readonly string _consoleType;
+        protected readonly string _prompt;
+        protected readonly uint _remoteConsolePort;
+        
+        public bool Running
+        {
+            get { return m_Running; }
+        }
 
         /// <summary>
         /// Console to be used for any command line output.  Can be null, in which case there should be no output.
         /// </summary>
         protected ICommandConsole m_console;
-
-        protected OpenSimAppender m_consoleAppender;
-        protected FileAppender m_logFileAppender;
-        protected FileAppender m_statsLogFileAppender;
-
         protected DateTime m_startuptime;
+        
         protected string m_startupDirectory = Environment.CurrentDirectory;
 
-        protected string m_pidFile = String.Empty;
-
-        protected ServerStatsCollector m_serverStatsCollector;
 
         /// <summary>
         /// Server version information.  Usually VersionInfo + information about git commit, operating system, etc.
         /// </summary>
         protected string m_version;
 
-        public ServerBase()
+        protected string[] m_Arguments;
+        protected string m_configDirectory = ".";
+        private bool m_Running = true;
+        private bool DoneShutdown = false;
+
+        public ServerBase(
+            IConfiguration config,
+            ILogger logger,
+            IComponentContext componentContext)
         {
+            _logger = logger;
+            _config = config;
+            _componentContext = componentContext;
+            _serverStatsCollector = null; // Should new one here.  serverStatsCollector;
+
             m_startuptime = DateTime.Now;
             m_version = VersionInfo.Version;
+
             EnhanceVersionInformation();
-        }
 
-        protected void CreatePIDFile(string path)
+            InitializeConsole(consoleType: "local", prompt: "$ ");
+
+            InitializeNetwork();
+        }
+        
+        protected void Initialise()
         {
-            if (File.Exists(path))
-                m_log.Error($"[SERVER BASE]: Previous pid file {path} still exists on startup.  Possibly previously unclean shutdown.");
+            foreach (var s in MainServer.Servers.Values)
+                s.Start();
 
-            try
-            {
-                string pidstring = Environment.ProcessId.ToString();
-
-                using (FileStream fs = File.Create(path))
-                {
-                    Byte[] buf = Encoding.ASCII.GetBytes(pidstring);
-                    fs.Write(buf, 0, buf.Length);
-                }
-
-                m_pidFile = path;
-
-                m_log.InfoFormat("[SERVER BASE]: Created pid file {0}", m_pidFile);
-            }
-            catch (Exception e)
-            {
-                m_log.Warn(string.Format("[SERVER BASE]: Could not create PID file at {0} ", path), e);
-            }
+            MainServer.RegisterHttpConsoleCommands(MainConsole.Instance);
+            //
+            // MethodInfo mi = m_console.GetType().GetMethod("SetServer", BindingFlags.Public | BindingFlags.Instance, null, new Type[] { typeof(BaseHttpServer) }, null);
+            //
+            // if (mi != null)
+            // {
+            //     if (m_consolePort == 0)
+            //         mi.Invoke(MainConsole.Instance, new object[] { MainServer.Instance });
+            //     else
+            //         mi.Invoke(MainConsole.Instance, new object[] { MainServer.GetHttpServer(m_consolePort) });
+            // }
         }
-
-        protected void RemovePIDFile()
+        
+        public void InitializeConsole(string consoleType = "", string prompt = "")
         {
-            if (!string.IsNullOrEmpty(m_pidFile))
+            var startupConfig = _config.GetSection("Startup");
+            if (startupConfig.Exists())
             {
-                try
-                {
-                    File.Delete(m_pidFile);
-                }
-                catch (Exception e)
-                {
-                    m_log.Error($"[SERVER BASE]: Error whilst removing {m_pidFile}", e);
-                }
-
-                m_pidFile = String.Empty;
+                consoleType = startupConfig.GetValue("console", consoleType);
+                prompt = startupConfig.GetValue("Prompt", prompt);
             }
-        }
 
+            if (string.IsNullOrEmpty(consoleType) is false)
+            {
+                if (consoleType == "basic")
+                    MainConsole.Instance = _componentContext.ResolveNamed<ICommandConsole>("CommandConsole");
+                else if (consoleType == "rest")
+                    MainConsole.Instance = _componentContext.ResolveNamed<ICommandConsole>("RemoteConsole");
+                else if (consoleType == "mock")
+                    MainConsole.Instance = _componentContext.ResolveNamed<ICommandConsole>("MockConsole");
+                else if (consoleType == "local")
+                    MainConsole.Instance = _componentContext.ResolveNamed<ICommandConsole>("Console");
+            }
+            else
+            {
+                MainConsole.Instance = null;
+            }
+
+            //  FIXME MainConsole.Instance?.DefaultPrompt(prompt);
+        }
+        
+        private void InitializeNetwork( )
+        {
+            var startupConfig = _config.GetSection("Startup");
+            if (startupConfig.Exists())
+            {
+                if (startupConfig.GetValue<bool>("EnableRobustSelfsignedCertSupport", false))
+                {
+                    if (!File.Exists("SSL\\ssl\\"+ startupConfig.GetValue<string>("RobustCertFileName") +".p12") || 
+                        startupConfig.GetValue<bool>("RobustCertRenewOnStartup"))
+                    {
+                        var certFileName = startupConfig.GetValue("RobustCertFileName", "Robust");
+                        var certHostName = startupConfig.GetValue("RobustCertHostName", "localhost");
+                        var certHostIp = startupConfig.GetValue("RobustCertHostIp", "127.0.0.1");
+                        var certPassword = startupConfig.GetValue("RobustCertPassword", string.Empty);
+                        
+                        Util.CreateOrUpdateSelfsignedCert(certFileName, certHostName, certHostIp, certPassword);
+                    }
+                }
+            }
+            
+            // var networkConfig = _config.GetSection("Network");
+            // if (networkConfig.Exists())
+            // {
+            //
+            //     LogEnvironmentInformation();
+            //
+            //     RegisterCommonCommands();
+            //     RegisterCommonComponents(Config);
+            //
+            //     // Allow derived classes to perform initialization that
+            //     // needs to be done after the console has opened
+            //     Initialise();
+            //     
+            //
+            //     uint port = (uint)networkConfig.GetInt("port", 0);
+            //
+            //     if (port == 0)
+            //     {
+            //         System.Console.WriteLine("ERROR: No 'port' entry found in [Network].  Server can't start");
+            //         Environment.Exit(1);
+            //     }
+            //
+            //     bool ssl_main = networkConfig.GetBoolean("https_main", false);
+            //     bool ssl_listener = networkConfig.GetBoolean("https_listener", false);
+            //     bool ssl_external = networkConfig.GetBoolean("https_external", false);
+            //
+            //     _consolePort = networkConfig.GetValue<uint>("ConsolePort", 0);
+            //
+            //     BaseHttpServer httpServer = null;
+            //
+            //     //
+            //     // This is where to make the servers:
+            //     //
+            //     //
+            //     // Make the base server according to the port, etc.
+            //     // ADD: Possibility to make main server ssl
+            //     // Then, check for https settings and ADD a server to
+            //     // m_Servers
+            //     //
+            //     if (!ssl_main)
+            //     {
+            //         httpServer = new BaseHttpServer(port);
+            //     }
+            //     else
+            //     {
+            //         string cert_path = networkConfig.GetString("cert_path", string.Empty);
+            //         if (cert_path.Length == 0)
+            //         {
+            //             System.Console.WriteLine("ERROR: Path to X509 certificate is missing, server can't start.");
+            //             Environment.Exit(1);
+            //         }
+            //
+            //         string cert_pass = networkConfig.GetString("cert_pass", string.Empty);
+            //         if (cert_pass.Length == 0)
+            //         {
+            //             System.Console.WriteLine(
+            //                 "ERROR: Password for X509 certificate is missing, server can't start.");
+            //             Environment.Exit(1);
+            //         }
+            //
+            //         httpServer = new BaseHttpServer(port, ssl_main, cert_path, cert_pass);
+            //     }
+            //
+            //     MainServer.AddHttpServer(httpServer);
+            //     MainServer.Instance = httpServer;
+            //
+            //     // If https_listener = true, then add an ssl listener on the https_port...
+            //     if (ssl_listener == true)
+            //     {
+            //         uint https_port = (uint)networkConfig.GetInt("https_port", 0);
+            //
+            //         _logger.LogWarning($"[SSL]: External flag is {ssl_external}");
+            //
+            //         if (!ssl_external)
+            //         {
+            //             string cert_path = networkConfig.GetString("cert_path", string.Empty);
+            //             if (cert_path.Length == 0)
+            //             {
+            //                 System.Console.WriteLine("Path to X509 certificate is missing, server can't start.");
+            //                 //Thread.CurrentThread.Abort();
+            //             }
+            //
+            //             string cert_pass = networkConfig.GetString("cert_pass", string.Empty);
+            //             if (cert_pass.Length == 0)
+            //             {
+            //                 System.Console.WriteLine("Password for X509 certificate is missing, server can't start.");
+            //                 //Thread.CurrentThread.Abort();
+            //             }
+            //
+            //             MainServer.AddHttpServer(new BaseHttpServer(https_port, ssl_listener, cert_path, cert_pass));
+            //         }
+            //         else
+            //         {
+            //             _logger.LogWarning(
+            //                 $"[SSL]: SSL port is active but no SSL is used because external SSL was requested.");
+            //             MainServer.AddHttpServer(new BaseHttpServer(https_port));
+            //         }
+            //     }
+            // }
+            
+
+            Culture.SetCurrentCulture();
+            Culture.SetDefaultCurrentCulture();
+
+            // m_Server = new HttpServerBase("R.O.B.U.S.T.", args);
+        }
+        
         /// <summary>
         /// Log information about the circumstances in which we're running (OpenSimulator version number, CLR details,
         /// etc.).
         /// </summary>
         public void LogEnvironmentInformation()
         {
-            // FIXME: This should be done down in ServerBase but we need to sort out and refactor the log4net
-            // XmlConfigurator calls first accross servers.
-            m_log.Info($"[SERVER BASE]: Starting in {m_startupDirectory}");
-
-            m_log.Info($"[SERVER BASE]: OpenSimulator version: {m_version}");
-
-            // clr version potentially is more confusing than helpful, since it doesn't tell us if we're running under Mono/MS .NET and
-            // the clr version number doesn't match the project version number under Mono.
-            //m_log.Info("[STARTUP]: Virtual machine runtime version: " + Environment.Version + Environment.NewLine);
-            m_log.Info(
-                $"[SERVER BASE]: Operating system version: {Environment.OSVersion}, .NET platform {Util.RuntimePlatformStr}, {(Environment.Is64BitProcess ? "64" : "32")}-bit");
-        }
-
-        public void RegisterCommonAppenders(IConfig startupConfig)
-        {
-            ILoggerRepository repository = LogManager.GetRepository();
-            IAppender[] appenders = repository.GetAppenders();
-
-            foreach (IAppender appender in appenders)
-            {
-                if (appender.Name == "Console")
-                {
-                    m_consoleAppender = (OpenSimAppender)appender;
-                }
-                else if (appender.Name == "LogFileAppender")
-                {
-                    m_logFileAppender = (FileAppender)appender;
-                }
-                else if (appender.Name == "StatsLogFileAppender")
-                {
-                    m_statsLogFileAppender = (FileAppender)appender;
-                }
-            }
-
-            if (null == m_consoleAppender)
-            {
-                Notice("No appender named Console found (see the log4net config file for this executable)!");
-            }
-            else
-            {
-                // FIXME: This should be done through an interface rather than casting.
-                m_consoleAppender.Console = (ConsoleBase)m_console;
-
-                // If there is no threshold set then the threshold is effectively everything.
-                if (m_consoleAppender.Threshold is null)
-                    m_consoleAppender.Threshold = Level.All;
-
-                //Notice($"Console log level is {m_consoleAppender.Threshold}");
-            }
-
-            if (m_logFileAppender != null && startupConfig != null)
-            {
-                string cfgFileName = startupConfig.GetString("logfile", null);
-                if (cfgFileName != null)
-                {
-                    m_logFileAppender.File = cfgFileName;
-                    m_logFileAppender.ActivateOptions();
-                }
-
-                m_log.InfoFormat("[SERVER BASE]: Logging started to file {0}", m_logFileAppender.File);
-            }
-
-            if (m_statsLogFileAppender != null && startupConfig != null)
-            {
-                string cfgStatsFileName = startupConfig.GetString("StatsLogFile", null);
-                if (cfgStatsFileName != null)
-                {
-                    m_statsLogFileAppender.File = cfgStatsFileName;
-                    m_statsLogFileAppender.ActivateOptions();
-                }
-
-                m_log.InfoFormat("[SERVER BASE]: Stats Logging started to file {0}", m_statsLogFileAppender.File);
-            }
+            _logger.LogInformation($"[SERVER BASE]: Starting in {m_startupDirectory}");
+            _logger.LogInformation($"[SERVER BASE]: Tranquillity version: {m_version}");
+            _logger.LogInformation(
+                $"[SERVER BASE]: Operating system version: {Environment.OSVersion}, " +
+                $".NET platform {Util.RuntimePlatformStr}, {(Environment.Is64BitProcess ? "64" : "32")}-bit");
         }
 
         /// <summary>
@@ -218,38 +294,6 @@ namespace OpenSim.Framework.Servers
 
             m_console.Commands.AddCommand(
                 "General", false, "show uptime", "show uptime", "Show server uptime", HandleShow);
-
-            m_console.Commands.AddCommand(
-                "General", false, "get log level", "get log level", "Get the current console logging level",
-                (mod, cmd) => ShowLogLevel());
-
-            m_console.Commands.AddCommand(
-                "General", false, "set log level", "set log level <level>",
-                "Set the console logging level for this session.", HandleSetLogLevel);
-
-            m_console.Commands.AddCommand(
-                "General", false, "config set",
-                "config set <section> <key> <value>",
-                "Set a config option.  In most cases this is not useful since changed parameters are not dynamically reloaded.  Neither do changed parameters persist - you will have to change a config file manually and restart.", HandleConfig);
-
-            m_console.Commands.AddCommand(
-                "General", false, "config get",
-                "config get [<section>] [<key>]",
-                "Synonym for config show",
-                HandleConfig);
-
-            m_console.Commands.AddCommand(
-                "General", false, "config show",
-                "config show [<section>] [<key>]",
-                "Show config information",
-                "If neither section nor field are specified, then the whole current configuration is printed." + Environment.NewLine
-                + "If a section is given but not a field, then all fields in that section are printed.",
-                HandleConfig);
-
-            m_console.Commands.AddCommand(
-                "General", false, "config save",
-                "config save <path>",
-                "Save current configuration to a file at the given path", HandleConfig);
 
             m_console.Commands.AddCommand(
                 "General", false, "command-script",
@@ -329,13 +373,12 @@ namespace OpenSim.Framework.Servers
             StatsManager.RegisterConsoleCommands(m_console);
         }
 
-        public void RegisterCommonComponents(IConfigSource configSource)
+        public void RegisterCommonComponents()
         {
-            //IConfig networkConfig = configSource.Configs["Network"];
-
-            m_serverStatsCollector = new ServerStatsCollector();
-            m_serverStatsCollector.Initialise(configSource);
-            m_serverStatsCollector.Start();
+            if (_serverStatsCollector.Enabled is true)
+            {
+                _serverStatsCollector.Start();
+            }
         }
 
         private void HandleShowThreadpoolCallsActive(string module, string[] args)
@@ -535,151 +578,7 @@ namespace OpenSim.Framework.Servers
                     break;
             }
         }
-
-        /// <summary>
-        /// Change and load configuration file data.
-        /// </summary>
-        /// <param name="module"></param>
-        /// <param name="cmd"></param>
-        private void HandleConfig(string module, string[] cmd)
-        {
-            if (cmd.Length > 1)
-            {
-                string firstParam = cmd[1].ToLower();
-
-                switch (firstParam)
-                {
-                    case "set":
-                        if (cmd.Length < 5)
-                        {
-                            Notice("Syntax: config set <section> <key> <value>");
-                            Notice("Example: config set ScriptEngine.DotNetEngine NumberOfScriptThreads 5");
-                        }
-                        else
-                        {
-                            IConfig c;
-                            IConfigSource source = new IniConfigSource();
-                            c = source.AddConfig(cmd[2]);
-                            if (c != null)
-                            {
-                                string _value = String.Join(" ", cmd, 4, cmd.Length - 4);
-                                c.Set(cmd[3], _value);
-                                Config.Merge(source);
-
-                                Notice("In section [{0}], set {1} = {2}", c.Name, cmd[3], _value);
-                            }
-                        }
-                        break;
-
-                    case "get":
-                    case "show":
-                        if (cmd.Length == 2)
-                        {
-                            foreach (IConfig config in Config.Configs)
-                            {
-                                Notice("[{0}]", config.Name);
-                                string[] keys = config.GetKeys();
-                                foreach (string key in keys)
-                                    Notice("  {0} = {1}", key, config.GetString(key));
-                            }
-                        }
-                        else if (cmd.Length == 3 || cmd.Length == 4)
-                        {
-                            IConfig config = Config.Configs[cmd[2]];
-                            if (config == null)
-                            {
-                                Notice("Section \"{0}\" does not exist.",cmd[2]);
-                                break;
-                            }
-                            else
-                            {
-                                if (cmd.Length == 3)
-                                {
-                                    Notice("[{0}]", config.Name);
-                                    foreach (string key in config.GetKeys())
-                                        Notice("  {0} = {1}", key, config.GetString(key));
-                                }
-                                else
-                                {
-                                    Notice(
-                                        "config get {0} {1} : {2}",
-                                        cmd[2], cmd[3], config.GetString(cmd[3]));
-                                }
-                            }
-                        }
-                        else
-                        {
-                            Notice("Syntax: config {0} [<section>] [<key>]", firstParam);
-                            Notice("Example: config {0} ScriptEngine.DotNetEngine NumberOfScriptThreads", firstParam);
-                        }
-
-                        break;
-
-                    case "save":
-                        if (cmd.Length < 3)
-                        {
-                            Notice("Syntax: config save <path>");
-                            return;
-                        }
-
-                        string path = cmd[2];
-                        Notice("Saving configuration file: {0}", path);
-
-                        if (Config is IniConfigSource)
-                        {
-                            IniConfigSource iniCon = (IniConfigSource)Config;
-                            iniCon.Save(path);
-                        }
-                        else if (Config is XmlConfigSource)
-                        {
-                            XmlConfigSource xmlCon = (XmlConfigSource)Config;
-                            xmlCon.Save(path);
-                        }
-
-                        break;
-                }
-            }
-        }
-
-        private void HandleSetLogLevel(string module, string[] cmd)
-        {
-            if (cmd.Length != 4)
-            {
-                Notice("Usage: set log level <level>");
-                return;
-            }
-
-            if (null == m_consoleAppender)
-            {
-                Notice("No appender named Console found (see the log4net config file for this executable)!");
-                return;
-            }
-
-            string rawLevel = cmd[3];
-
-            ILoggerRepository repository = LogManager.GetRepository();
-            Level consoleLevel = repository.LevelMap[rawLevel];
-
-            if (consoleLevel != null)
-                m_consoleAppender.Threshold = consoleLevel;
-            else
-                Notice(
-                    "{0} is not a valid logging level.  Valid logging levels are ALL, DEBUG, INFO, WARN, ERROR, FATAL, OFF",
-                    rawLevel);
-
-            ShowLogLevel();
-        }
-
-        private void ShowLogLevel()
-        {
-            if (null == m_consoleAppender)
-            {
-                Notice("No appender named Console found (see the log4net config file for this executable)!");
-                return;
-            }
-            Notice("Console log level is {0}", m_consoleAppender.Threshold);
-        }
-
+        
         protected virtual void HandleScript(string module, string[] parms)
         {
             if (parms.Length != 2)
@@ -702,7 +601,7 @@ namespace OpenSim.Framework.Servers
 
             if (File.Exists(fileName))
             {
-                m_log.Info("[SERVER BASE]: Running " + fileName);
+                _logger.LogInformation("[SERVER BASE]: Running " + fileName);
 
                 using (StreamReader readFile = File.OpenText(fileName))
                 {
@@ -715,7 +614,7 @@ namespace OpenSim.Framework.Servers
                             || currentCommand.StartsWith("//")
                             || currentCommand.StartsWith("#")))
                         {
-                            m_log.Info("[SERVER BASE]: Running '" + currentCommand + "'");
+                            _logger.LogInformation("[SERVER BASE]: Running '" + currentCommand + "'");
                             m_console.RunCommand(currentCommand);
                         }
                     }
@@ -740,8 +639,6 @@ namespace OpenSim.Framework.Servers
         {
             Notice(GetVersionText());
             Notice("Startup directory: " + m_startupDirectory);
-            if (null != m_consoleAppender)
-                Notice(String.Format("Console log level: {0}", m_consoleAppender.Threshold));
         }
 
         /// <summary>
@@ -768,26 +665,26 @@ namespace OpenSim.Framework.Servers
             string gitRefPointerPath = Path.Combine(gitDir, "HEAD");
             if (File.Exists(gitRefPointerPath))
             {
-                //m_log.DebugFormat("[SERVER BASE]: Found {0}", gitRefPointerPath);
+                //_logger.DebugFormat("[SERVER BASE]: Found {0}", gitRefPointerPath);
 
                 string rawPointer = "";
 
                 using (StreamReader pointerFile = File.OpenText(gitRefPointerPath))
                     rawPointer = pointerFile.ReadLine();
 
-                //m_log.DebugFormat("[SERVER BASE]: rawPointer [{0}]", rawPointer);
+                //_logger.DebugFormat("[SERVER BASE]: rawPointer [{0}]", rawPointer);
 
                 Match m = Regex.Match(rawPointer, "^ref: (.+)$");
 
                 if (m.Success)
                 {
-                    //m_log.DebugFormat("[SERVER BASE]: Matched [{0}]", m.Groups[1].Value);
+                    //_logger.DebugFormat("[SERVER BASE]: Matched [{0}]", m.Groups[1].Value);
 
                     string gitRef = m.Groups[1].Value;
                     string gitRefPath = Path.Combine(gitDir, gitRef);
                     if (File.Exists(gitRefPath))
                     {
-                        //m_log.DebugFormat("[SERVER BASE]: Found gitRefPath [{0}]", gitRefPath);
+                        //_logger.DebugFormat("[SERVER BASE]: Found gitRefPath [{0}]", gitRefPath);
                         using (StreamReader refFile = File.OpenText(gitRefPath))
                             buildVersion = refFile.ReadLine();
 
@@ -959,13 +856,68 @@ namespace OpenSim.Framework.Servers
 
         public virtual void Shutdown()
         {
-            m_serverStatsCollector.Close();
+            if (_serverStatsCollector != null)
+            {
+                _serverStatsCollector.Close();
+            }
+
             ShutdownSpecific();
         }
 
+        public virtual int Run()
+        {
+            Watchdog.Enabled = true;
+            MemoryWatchdog.Enabled = true;
+
+            while (m_Running)
+            {
+                try
+                {
+                    MainConsole.Instance.Prompt();
+                }
+                catch (Exception e)
+                {
+                    LoggerExtensions.LogError(_logger, e, $"Command error");
+                }
+            }
+
+            if (!DoneShutdown)
+            {
+                DoneShutdown = true;
+                MainServer.Stop();
+
+                MemoryWatchdog.Enabled = false;
+                Watchdog.Enabled = false;
+                WorkManager.Stop();
+            }
+            return 0;
+        }
+
+        protected void ShutdownSpecific()
+        {
+            if(!m_Running)
+                return;
+            
+            m_Running = false;
+            
+            LoggerExtensions.LogInformation(_logger, "[CONSOLE] Quitting");
+            
+            MainServer.Stop();
+            MemoryWatchdog.Enabled = false;
+        }
+
         /// <summary>
-        /// Should be overriden and referenced by descendents if they need to perform extra shutdown processing
+        /// Check if we can convert the string to a URI
         /// </summary>
-        protected virtual void ShutdownSpecific() {}
+        /// <param name="file">String uri to the remote resource</param>
+        /// <returns>true if we can convert the string to a Uri object</returns>
+        private bool IsUri(string file)
+        {
+            Uri configUri;
+
+            return Uri.TryCreate(file, UriKind.Absolute,
+                out configUri) && (configUri.Scheme == Uri.UriSchemeHttp || configUri.Scheme == Uri.UriSchemeHttps);
+        }
+
     }
 }

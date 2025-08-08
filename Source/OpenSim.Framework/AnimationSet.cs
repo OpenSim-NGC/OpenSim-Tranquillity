@@ -25,9 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
 using OpenMetaverse;
 
 namespace OpenSim.Framework
@@ -88,7 +85,8 @@ namespace OpenSim.Framework
         }
 
         public int AnimationCount { get; private set; }
-        private Dictionary<string, KeyValuePair<string, UUID>> m_animations = new Dictionary<string, KeyValuePair<string, UUID>>();
+        private Dictionary<string, KeyValuePair<string, UUID>> m_animations = 
+            new Dictionary<string, KeyValuePair<string, UUID>>();
 
         public UUID GetAnimation(string index)
         {
@@ -122,10 +120,6 @@ namespace OpenSim.Framework
         public AnimationSet(Byte[] data)
         {
             string assetData = System.Text.Encoding.ASCII.GetString(data);
-            Console.WriteLine("--------------------");
-            Console.WriteLine("AnimationSet length {0} bytes", assetData.Length);
-            Console.WriteLine(assetData);
-            Console.WriteLine("--------------------");
         }
 
         public static readonly byte[] ZeroCountBytesReply = osUTF8.GetASCIIBytes("version 1\ncount 0\n");

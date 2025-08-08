@@ -29,8 +29,6 @@ using System;
 using System.Collections.Generic;
 using OpenMetaverse;
 
-using OpenSim.Framework;
-
 namespace OpenSim.Services.Interfaces
 {
     public class UserAlias

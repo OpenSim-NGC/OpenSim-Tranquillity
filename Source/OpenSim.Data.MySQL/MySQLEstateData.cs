@@ -25,11 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using MySqlConnector;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -38,21 +37,20 @@ namespace OpenSim.Data.MySQL
 {
     public class MySQLEstateStore : IEstateDataStore
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger<MySQLEstateStore> _logger;
+        private readonly Migration _migration;
 
         private string m_connectionString;
 
         private FieldInfo[] m_Fields;
         private Dictionary<string, FieldInfo> m_FieldMap = new();
-
-        protected virtual Assembly Assembly
+        
+        public MySQLEstateStore(
+            ILogger<MySQLEstateStore> logger,
+            Migration migration)
         {
-            get { return GetType().Assembly; }
-        }
-
-        public MySQLEstateStore()
-        {
+            _logger = logger;
+            _migration = migration;
         }
 
         public MySQLEstateStore(string connectionString)
@@ -66,19 +64,20 @@ namespace OpenSim.Data.MySQL
 
             try
             {
-                m_log.Info("[REGION DB]: MySql - connecting: " + Util.GetDisplayConnectionString(m_connectionString));
+                _logger.LogInformation(
+                    "[REGION DB]: MySql - connecting: {}",
+                    Util.GetDisplayConnectionString(m_connectionString));
             }
             catch (Exception e)
             {
-                m_log.Debug("Exception: password not found in connection string\n" + e.ToString());
+                _logger.LogDebug(e, "Exception: password not found in connection string\n");
             }
 
             using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
             {
                 dbcon.Open();
-
-                Migration m = new Migration(dbcon, Assembly, "EstateStore");
-                m.Update();
+                _migration.Initialize(dbcon, GetType().Assembly, "EstateStore");
+                _migration.Update();
                 dbcon.Close();
 
                 Type t = typeof(EstateSettings);
@@ -559,7 +558,7 @@ namespace OpenSim.Data.MySQL
                 }
                 catch (MySqlException ex)
                 {
-                    m_log.Error("[REGION DB]: LinkRegion failed: " + ex.Message);
+                    _logger.LogError(ex, "[REGION DB]: LinkRegion failed");
                     transaction.Rollback();
                 }
 
@@ -594,7 +593,7 @@ namespace OpenSim.Data.MySQL
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[REGION DB]: Error reading estate map. " + e.ToString());
+                    _logger.LogError(e, "[REGION DB]: Error reading estate map.");
                     return result;
                 }
                 dbcon.Close();

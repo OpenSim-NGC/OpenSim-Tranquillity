@@ -25,38 +25,31 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
-using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
-using System.Threading;
-using log4net;
-using log4net.Appender;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using System.Collections.Concurrent;
-using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework
 {
@@ -121,7 +114,8 @@ namespace OpenSim.Framework
     /// </summary>
     public static class Util
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         /// <summary>
         /// Log-level for the thread pool:
@@ -144,7 +138,9 @@ namespace OpenSim.Framework
             LogOverloads = true;
             TimeStampClockPeriod = 1.0D / (double)Stopwatch.Frequency;
             TimeStampClockPeriodMS = 1e3 * TimeStampClockPeriod;
-            m_log.Info($"[UTIL] TimeStamp clock with period of {Math.Round(TimeStampClockPeriodMS, 6, MidpointRounding.AwayFromZero)}ms");
+
+            _logger.LogInformation(
+                $"[UTIL] TimeStamp clock with period of {Math.Round(TimeStampClockPeriodMS, 6, MidpointRounding.AwayFromZero)}ms");
         }
 
         private static uint nextXferID = 5000;
@@ -1105,11 +1101,11 @@ namespace OpenSim.Framework
             else
                 nativeLibraryPath = Path.Combine(Path.Combine(path, "lib32"), libraryName);
 
-            m_log.Debug($"[UTIL]: Loading native Windows library at {nativeLibraryPath}");
+            _logger.LogDebug($"[UTIL]: Loading native Windows library at {nativeLibraryPath}");
 
             if (!NativeLibrary.TryLoad(nativeLibraryPath, out _))
             {
-                m_log.Error($"[UTIL]: Couldn't find native Windows library at {nativeLibraryPath}");
+                _logger.LogError($"[UTIL]: Couldn't find native Windows library at {nativeLibraryPath}");
                 return false;
             }
             return true;
@@ -1560,8 +1556,9 @@ namespace OpenSim.Framework
         /// <param name="outputPassword">The output certificates password.</param>
         private static void ConvertPemToPKCS12Certificate(string certFileName, string certPath, string keyPath, string outputPassword)
         {
-            if(string.IsNullOrEmpty(certPath) || string.IsNullOrEmpty(keyPath)){
-                m_log.Error($"[UTIL PemToPKCS12]: Missing fullchain.pem or privkey.pem path!.");
+            if(string.IsNullOrEmpty(certPath) || string.IsNullOrEmpty(keyPath))
+            {
+                _logger.LogError($"[UTIL PemToPKCS12]: Missing fullchain.pem or privkey.pem path!.");
                 return;
             }
 
@@ -1573,15 +1570,18 @@ namespace OpenSim.Framework
             }
             catch(CryptographicException e)
             {
-                m_log.Error($"[UTIL PemToPKCS12]: {e.Message}" );
+                _logger.LogError($"[UTIL PemToPKCS12]: {e.Message}" );
                 return;
             }
 
             // Create the SSL folder and ssl sub folder if not exists.
-            if (!Directory.Exists(pathSSLcerts))
+            if (Directory.Exists(pathSSLcerts) is false)
+            {
                 Directory.CreateDirectory(pathSSLcerts);
+            }
 
             string sslFileNames = System.IO.Path.Combine(pathSSLcerts, certFileName);
+            
             // Export and store the .pfx and .p12 certificates in SSL\ssl\.
             byte[] pfxCertBytes = string.IsNullOrEmpty(outputPassword)
                                 ? certificate.Export(X509ContentType.Pfx)
@@ -1592,7 +1592,6 @@ namespace OpenSim.Framework
                                 ? certificate.Export(X509ContentType.Pkcs12) 
                                 : certificate.Export(X509ContentType.Pkcs12, outputPassword);
             File.WriteAllBytes(sslFileNames + ".p12", p12CertBytes);
-            
         }
 
         public static int fast_distance2d(int x, int y)
@@ -2028,38 +2027,6 @@ namespace OpenSim.Framework
             return ".";
         }
 
-        public static string logFile()
-        {
-            foreach (IAppender appender in LogManager.GetRepository().GetAppenders())
-            {
-                if (appender is FileAppender appender1 && appender1.Name == "LogFileAppender")
-                {
-                    return appender1.File;
-                }
-            }
-
-            return "./OpenSim.log";
-        }
-
-        public static string StatsLogFile()
-        {
-            foreach (IAppender appender in LogManager.GetRepository().GetAppenders())
-            {
-                if (appender is FileAppender appender1 && appender1.Name == "StatsLogFileAppender")
-                {
-                    return appender1.File;
-                }
-            }
-
-            return "./OpenSimStats.log";
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static string logDir()
-        {
-            return Path.GetDirectoryName(logFile());
-        }
-
         // From: http://coercedcode.blogspot.com/2008/03/c-generate-unique-filenames-within.html
         public static string GetUniqueFilename(string FileName)
         {
@@ -2178,7 +2145,9 @@ namespace OpenSim.Framework
                 else if (typeof(T) == typeof(float))
                     val = cnf.GetValue<float>(varname, (float)val);
                 else
-                    m_log.ErrorFormat("[UTIL]: Unhandled type {0}", typeof(T));
+                {
+                    _logger.LogError($"[UTIL]: Unhandled type {typeof(T)}");
+                }
             }
 
             return (T)val;
@@ -2249,7 +2218,9 @@ namespace OpenSim.Framework
                 else if (typeof(T) == typeof(float))
                     val = cnf.GetFloat(varname, (float)val);
                 else
-                    m_log.ErrorFormat("[UTIL]: Unhandled type {0}", typeof(T));
+                {
+                    _logger.LogError($"[UTIL]: Unhandled type {typeof(T)}");
+                }
             }
             return (T)val;
         }
@@ -2358,7 +2329,7 @@ namespace OpenSim.Framework
             IConfig cnf = config.Configs["Startup"];
             if (cnf == null)
             {
-                m_log.Warn("[UTILS]: Startup section doesn't exist");
+                _logger.LogWarning("[UTILS]: Startup section doesn't exist");
                 return false;
             }
 
@@ -2379,7 +2350,8 @@ namespace OpenSim.Framework
                 }
                 catch (Exception e)
                 {
-                    m_log.Warn($"[UTILS]: Exception copying configuration file {configFile} to {exampleConfigFile}: {e.Message}");
+                    _logger.LogWarning(
+                        $"[UTILS]: Exception copying configuration file {configFile} to {exampleConfigFile}: {e.Message}");
                     return false;
                 }
             }
@@ -2447,7 +2419,7 @@ namespace OpenSim.Framework
             }
             catch (Exception e)
             {
-                m_log.Error(e.ToString());
+                _logger.LogError(e,e.ToString());
             }
         }
 
@@ -2461,7 +2433,7 @@ namespace OpenSim.Framework
             }
             catch (Exception e)
             {
-                m_log.Error(e.ToString());
+                _logger.LogError(e,e.ToString());
             }
             return null;
         }
@@ -2828,13 +2800,13 @@ namespace OpenSim.Framework
                 else
                 {
                     // uh?
-                    m_log.Debug($"[UTILS]: Got OSD of unexpected type {buffer.Type}");
+                    _logger.LogDebug($"[UTILS]: Got OSD of unexpected type {buffer.Type}");
                     return null;
                 }
             }
             catch (Exception ex)
             {
-                m_log.Debug($"[UTILS]: exception on GetOSDMap {ex.Message}");
+                _logger.LogDebug(ex,$"[UTILS]: exception on GetOSDMap {ex.Message}");
                 return null;
             }
         }
@@ -3420,7 +3392,7 @@ namespace OpenSim.Framework
                 ThreadInfo t = entry.Value;
                 if (t.DoTimeout && t.Running && !t.Aborted && (t.Elapsed() >= THREAD_TIMEOUT))
                 {
-                    m_log.Warn($"Timeout in threadfunc {t.ThreadFuncNum} ({t.Thread.Name}) {t.GetStackTrace()}");
+                    _logger.LogWarning($"Timeout in threadfunc {t.ThreadFuncNum} ({t.Thread.Name}) {t.GetStackTrace()}");
                     t.Abort();
                     activeThreads.TryRemove(entry.Key, out _);
 
@@ -3494,7 +3466,10 @@ namespace OpenSim.Framework
                     try
                     {
                         if (loggingEnabled && threadInfo.LogThread)
-                            m_log.DebugFormat("Run threadfunc {0} (Queued {1}, Running {2})", threadFuncNum, numQueued1, numRunning1);
+                        {
+                            _logger.LogDebug(
+                                $"Run threadfunc {threadFuncNum} (Queued {numQueued1}, Running {numRunning1})");
+                        }
 
                         Culture.SetCurrentCulture();
                         callback(o);
@@ -3504,14 +3479,17 @@ namespace OpenSim.Framework
                     }
                     catch (Exception e)
                     {
-                        m_log.Error($"[UTIL]: Util STP threadfunc {threadFuncNum} terminated with error {e.Message}");
+                        _logger.LogError($"[UTIL]: Util STP threadfunc {threadFuncNum} terminated with error {e.Message}");
                     }
                     finally
                     {
                         Interlocked.Decrement(ref numRunningThreadFuncs);
                         activeThreads.TryRemove(threadFuncNum, out _);
                         if (loggingEnabled && threadInfo.LogThread)
-                            m_log.Debug($"Exit threadfunc {threadFuncNum} ({FormatDuration(threadInfo.Elapsed())}");
+                        {
+                            _logger.LogDebug($"Exit threadfunc {threadFuncNum} ({FormatDuration(threadInfo.Elapsed())}");
+                        }
+
                         callback = null;
                         o = null;
                         threadInfo = null;
@@ -3854,7 +3832,7 @@ namespace OpenSim.Framework
         /// </summary>
         public static void PrintCallStack()
         {
-            PrintCallStack(m_log.DebugFormat);
+            PrintCallStack(_logger.LogDebug);
         }
 
         public delegate void DebugPrinter(string msg, params Object[] parm);
@@ -3890,7 +3868,7 @@ namespace OpenSim.Framework
                 }
                 catch (Exception e)
                 {
-                    m_log.Warn($"[UTIL]: Exception parsing XFF header {xff}: {e.Message}");
+                    _logger.LogWarning($"[UTIL]: Exception parsing XFF header {xff}: {e.Message}");
                 }
             }
 
@@ -3909,7 +3887,7 @@ namespace OpenSim.Framework
                 }
                 catch (Exception e)
                 {
-                    m_log.Warn($"[UTIL]: exception in GetCallerIP: {e.Message}");
+                    _logger.LogWarning(e, $"[UTIL]: exception in GetCallerIP: {e.Message}");
                 }
             }
             return string.Empty;
@@ -4666,7 +4644,7 @@ namespace OpenSim.Framework
                 }
             }
 
-            m_log.Error($"{message} Failed XML ({length} bytes) = {xml}");
+            _logger.LogError($"{message} Failed XML ({length} bytes) = {xml}");
         }
 
         // public static SKBitmap ResizeImageSolid(SKBitmap image, int width, int height)

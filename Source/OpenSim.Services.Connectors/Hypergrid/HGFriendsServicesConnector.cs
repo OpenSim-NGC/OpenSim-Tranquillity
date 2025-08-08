@@ -25,16 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using Nini.Config;
+using Microsoft.Extensions.Logging;
 using OpenSim.Framework;
-using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Friends;
-using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
+using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 
@@ -42,9 +36,7 @@ namespace OpenSim.Services.Connectors.Hypergrid
 {
     public class HGFriendsServicesConnector : FriendsSimConnector
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger _logger;
 
         private string m_ServerURI = String.Empty;
         private string m_ServiceKey = String.Empty;

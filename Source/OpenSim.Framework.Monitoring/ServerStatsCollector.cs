@@ -25,14 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Net.NetworkInformation;
 using System.Text;
-using System.Threading;
-using log4net;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Nini.Config;
 using OpenMetaverse.StructuredData;
 
@@ -40,7 +37,9 @@ namespace OpenSim.Framework.Monitoring
 {
     public class ServerStatsCollector
     {
-        private readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger _logger;
+        private readonly IConfiguration _config;
+        
         private readonly string LogHeader = "[SERVER STATS]";
 
         public bool Enabled = false;
@@ -79,20 +78,21 @@ namespace OpenSim.Framework.Monitoring
         PerfCounterControl processorPercentPerfCounter = null;
         */
 
-        // IRegionModuleBase.Initialize
-        public void Initialise(IConfigSource source)
+        public ServerStatsCollector(
+            ILogger<ServerStatsCollector> logger,
+            IConfiguration config)
         {
-            if (source == null)
-                return;
+            _logger = logger;
+            _config = config;
 
-            IConfig cfg = source.Configs["Monitoring"];
-
-            if (cfg != null)
-                Enabled = cfg.GetBoolean("ServerStatsEnabled", false);
-
-            if (Enabled)
+            var cfg = _config.GetSection("Monitoring");
+            if (cfg.Exists())
             {
-                NetworkInterfaceTypes = cfg.GetString("NetworkInterfaceTypes", "Ethernet");
+                Enabled = cfg.GetValue<bool>("ServerStatsEnabled", false);
+                if (Enabled)
+                {
+                    NetworkInterfaceTypes = cfg.GetValue("NetworkInterfaceTypes", "Ethernet");
+                }
             }
         }
 
@@ -169,7 +169,7 @@ namespace OpenSim.Framework.Monitoring
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("{0} Exception creating 'Process': {1}", LogHeader, e);
+                _logger.LogError(e, $"{LogHeader} Exception creating 'Process'");
             }
 
             MakeStat("BuiltinThreadpoolWorkerThreadsAvailable", null, "threads", ContainerThreadpool,
@@ -209,10 +209,12 @@ namespace OpenSim.Framework.Monitoring
                     string nicInterfaceType = nic.NetworkInterfaceType.ToString();
                     if (!okInterfaceTypes.Contains(nicInterfaceType))
                     {
-                        m_log.DebugFormat("{0} Not including stats for network interface '{1}' of type '{2}'.",
-                                                LogHeader, nic.Name, nicInterfaceType);
-                        m_log.DebugFormat("{0}     To include, add to comma separated list in [Monitoring]NetworkInterfaceTypes={1}",
-                                                LogHeader, NetworkInterfaceTypes);
+                        _logger.LogDebug(
+                            $"{LogHeader} Not including stats for network interface " +
+                            $"'{nic.Name}' of type '{nicInterfaceType}'.");
+                        _logger.LogDebug(
+                            $"{LogHeader}     To include, add to comma separated list in " +
+                            $"[Monitoring]NetworkInterfaceTypes={NetworkInterfaceTypes}");
                         continue;
                     }
 
@@ -234,7 +236,7 @@ namespace OpenSim.Framework.Monitoring
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("{0} Exception creating 'Network Interface': {1}", LogHeader, e);
+                _logger.LogError(e, $"{LogHeader} Exception creating 'Network Interface'");
             }
 
             MakeStat("ProcessMemory", null, "MB", ContainerMemory,
@@ -342,7 +344,7 @@ namespace OpenSim.Framework.Monitoring
             catch
             {
                 // There are times interfaces go away so we just won't update the stat for this
-                m_log.ErrorFormat("{0} Exception fetching stat on interface '{1}'", LogHeader, stat.Description);
+                _logger.LogError($"{LogHeader} Exception fetching stat on interface '{stat.Description}'");
             }
         }
     }

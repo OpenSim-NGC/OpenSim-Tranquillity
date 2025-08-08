@@ -25,12 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 using System.Xml;
-using log4net;
+using Microsoft.Extensions.Logging;
 using Nini.Config;
 using OpenMetaverse;
 
@@ -44,7 +41,8 @@ namespace OpenSim.Framework.AssetLoader.Filesystem
         private static readonly UUID LIBRARY_OWNER_ID = new UUID("11111111-1111-0000-0000-000100bba000");
         private static readonly string LIBRARY_OWNER_IDstr = "11111111-1111-0000-0000-000100bba000";
 
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         protected static AssetBase CreateAsset(string assetIdStr, string name, string path, sbyte type)
         {
@@ -59,7 +57,7 @@ namespace OpenSim.Framework.AssetLoader.Filesystem
             else
             {
                 asset.Data = Array.Empty<byte>();
-                m_log.InfoFormat("[ASSETS]: Instantiated: [{0}]", name);
+                _logger.LogInformation($"[ASSETS]: Instantiated: [{name}]");
             }
 
             return asset;
@@ -88,7 +86,7 @@ namespace OpenSim.Framework.AssetLoader.Filesystem
             }
             else
             {
-                m_log.ErrorFormat("[ASSETS]: file: [{0}] not found !", path);
+                _logger.LogError($"[ASSETS]: file: [{path}] not found !");
             }
         }
 
@@ -114,12 +112,12 @@ namespace OpenSim.Framework.AssetLoader.Filesystem
                 }
                 catch (XmlException e)
                 {
-                    m_log.ErrorFormat("[ASSETS]: Error loading {0} : {1}", assetSetPath, e.Message);
+                    _logger.LogError(e, $"[ASSETS]: Error loading {assetSetPath}");
                 }
             }
             else
             {
-                m_log.ErrorFormat("[ASSETS]: Asset set control file {0} does not exist! No assets loaded.", assetSetFilename);
+                _logger.LogError($"[ASSETS]: Asset set control file {assetSetFilename} does not exist! No assets loaded.");
             }
 
             assets.ForEach(action);
@@ -160,12 +158,12 @@ namespace OpenSim.Framework.AssetLoader.Filesystem
                 }
                 catch (XmlException e)
                 {
-                    m_log.ErrorFormat("[ASSETS]: Error loading {0} : {1}", assetSetPath, e.Message);
+                    _logger.LogError(e, $"[ASSETS]: Error loading {assetSetPath}");
                 }
             }
             else
             {
-                m_log.ErrorFormat("[ASSETS]: Asset set file {0} does not exist!", assetSetPath);
+                _logger.LogError($"[ASSETS]: Asset set file {assetSetPath} does not exist!");
             }
         }
     }

@@ -25,32 +25,29 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
-using System.Threading;
 using System.Timers;
 using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
-using log4net;
 using OpenMetaverse;
-using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Framework.Servers.HttpServer;
 using Timer=System.Timers.Timer;
 using Nini.Config;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework.Servers
 {
     /// <summary>
     /// Common base for the main OpenSimServers (user, grid, inventory, region, etc)
     /// </summary>
-    public abstract class BaseOpenSimServer : ServerBase
+    public abstract class BaseOpenSimServer
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         /// <summary>
         /// Used by tests to suppress Environment.Exit(0) so that post-run operations are possible.
@@ -76,7 +73,7 @@ namespace OpenSim.Framework.Servers
             get { return m_httpServer; }
         }
 
-        public BaseOpenSimServer() : base()
+        public BaseOpenSimServer()
         {
             // Random uuid for private data
             m_osSecret = UUID.Random().ToString();
@@ -107,41 +104,41 @@ namespace OpenSim.Framework.Servers
         /// </summary>
         protected virtual void StartupSpecific()
         {
-            StatsManager.SimExtraStats = new SimExtraStatsCollector();
-            RegisterCommonCommands();
-            RegisterCommonComponents(Config);
-
-            IConfig startupConfig = Config.Configs["Startup"];
-
-            m_NoVerifyCertChain = startupConfig.GetBoolean("NoVerifyCertChain", m_NoVerifyCertChain);
-            m_NoVerifyCertHostname = startupConfig.GetBoolean("NoVerifyCertHostname", m_NoVerifyCertHostname);
-            ServicePointManager.ServerCertificateValidationCallback = ValidateServerCertificate;
-
-            WebUtil.SetupHTTPClients(m_NoVerifyCertChain, m_NoVerifyCertHostname, null, 32 );
-
-            int logShowStatsSeconds = startupConfig.GetInt("LogShowStatsSeconds", m_periodDiagnosticTimerMS / 1000);
-            m_periodDiagnosticTimerMS = logShowStatsSeconds * 1000;
-            m_periodicDiagnosticsTimer.Elapsed += new ElapsedEventHandler(LogDiagnostics);
-            if (m_periodDiagnosticTimerMS != 0)
-            {
-                m_periodicDiagnosticsTimer.Interval = m_periodDiagnosticTimerMS;
-                m_periodicDiagnosticsTimer.Enabled = true;
-            }
+            // StatsManager.SimExtraStats = new SimExtraStatsCollector();
+            // //RegisterCommonCommands();
+            // //RegisterCommonComponents(Config);
+            //
+            // IConfig startupConfig = Config.Configs["Startup"];
+            //
+            // m_NoVerifyCertChain = startupConfig.GetBoolean("NoVerifyCertChain", m_NoVerifyCertChain);
+            // m_NoVerifyCertHostname = startupConfig.GetBoolean("NoVerifyCertHostname", m_NoVerifyCertHostname);
+            // ServicePointManager.ServerCertificateValidationCallback = ValidateServerCertificate;
+            //
+            // WebUtil.SetupHTTPClients(m_NoVerifyCertChain, m_NoVerifyCertHostname, null, 32 );
+            //
+            // int logShowStatsSeconds = startupConfig.GetInt("LogShowStatsSeconds", m_periodDiagnosticTimerMS / 1000);
+            // m_periodDiagnosticTimerMS = logShowStatsSeconds * 1000;
+            // m_periodicDiagnosticsTimer.Elapsed += new ElapsedEventHandler(LogDiagnostics);
+            // if (m_periodDiagnosticTimerMS != 0)
+            // {
+            //     m_periodicDiagnosticsTimer.Interval = m_periodDiagnosticTimerMS;
+            //     m_periodicDiagnosticsTimer.Enabled = true;
+            // }
         }
 
-        protected override void ShutdownSpecific()
+        protected void ShutdownSpecific()
         {
             Watchdog.Enabled = false;
-            base.ShutdownSpecific();
+            //base.ShutdownSpecific();
             
             MainServer.Stop();
 
             Thread.Sleep(500);
             WorkManager.Stop();
 
-            RemovePIDFile();
+            //RemovePIDFile();
 
-            m_log.Info("[SHUTDOWN]: Shutdown processing on main thread complete.  Exiting...");
+            _logger.LogInformation("[SHUTDOWN]: Shutdown processing on main thread complete.  Exiting...");
 
            if (!SuppressExit)
                 Environment.Exit(0);
@@ -162,32 +159,39 @@ namespace OpenSim.Framework.Servers
         /// </summary>
         protected void LogDiagnostics(object source, ElapsedEventArgs e)
         {
-            StringBuilder sb = new StringBuilder("DIAGNOSTICS\n\n");
-            sb.Append(GetUptimeReport());
-            sb.Append(StatsManager.SimExtraStats.Report());
-            sb.Append(Environment.NewLine);
-            sb.Append(GetThreadsReport());
-
-            m_log.Debug(sb);
+            // StringBuilder sb = new StringBuilder("DIAGNOSTICS\n\n");
+            // sb.Append(GetUptimeReport());
+            // sb.Append(StatsManager.SimExtraStats.Report());
+            // sb.Append(Environment.NewLine);
+            // sb.Append(GetThreadsReport());
+            //
+            // _logger.LogDebug(sb.ToString());
         }
 
         /// <summary>
-        /// Performs initialisation of the scene, such as loading configuration from disk.
+        /// Performs initialization of the scene, such as loading configuration from disk.
         /// </summary>
         public virtual void Startup()
         {
-            m_log.Info("[STARTUP]: Beginning startup processing");
+            _logger.LogInformation("[STARTUP]: Beginning startup processing");
 
-            m_log.Info("[STARTUP]: version: " + m_version);
-            m_log.Info($"[STARTUP]: Operating system version: {Environment.OSVersion}, .NET platform {Util.RuntimePlatformStr}, Runtime {Environment.Version}");
-            m_log.Info($"[STARTUP]: Processor Architecture: {RuntimeInformation.ProcessArchitecture}({(BitConverter.IsLittleEndian ? "le" : "be")} {(Environment.Is64BitProcess ? "64" : "32")}bit)");
+            // _logger.LogInformation($"[STARTUP]: version: {m_version}");
+            
+            _logger.LogInformation(
+                $"[STARTUP]: Operating system version: {Environment.OSVersion}, " +
+                $".NET platform {Util.RuntimePlatformStr}, " +
+                $"Runtime {Environment.Version}");
+            _logger.LogInformation(
+                $"[STARTUP]: Processor Architecture: {RuntimeInformation.ProcessArchitecture}"+
+                $"({(BitConverter.IsLittleEndian ? "le" : "be")} {(Environment.Is64BitProcess ? "64" : "32")}bit)");
+
             try
             {
                 StartupSpecific();
             }
             catch(Exception e)
             {
-                m_log.Fatal("Fatal error: " + e.ToString());
+                _logger.LogCritical(e, "Fatal error");
                 Environment.Exit(1);
             }
         }
@@ -200,17 +204,18 @@ namespace OpenSim.Framework.Servers
 
         public string StatReport(IOSHttpRequest httpRequest)
         {
-            httpRequest.QueryAsDictionary.TryGetValue("region", out string id);
-
-            // If we catch a request for "callback", wrap the response in the value for jsonp
-            if (httpRequest.QueryAsDictionary.TryGetValue("callback", out string cb) && ! string.IsNullOrEmpty(cb))
-            {
-                return cb + "(" + StatsManager.SimExtraStats.XReport((DateTime.Now - m_startuptime).ToString() , m_version, id) + ");";
-            }
-            else
-            {
-                return StatsManager.SimExtraStats.XReport((DateTime.Now - m_startuptime).ToString() , m_version, id);
-            }
+            // httpRequest.QueryAsDictionary.TryGetValue("region", out string id);
+            //
+            // // If we catch a request for "callback", wrap the response in the value for jsonp
+            // if (httpRequest.QueryAsDictionary.TryGetValue("callback", out string cb) && ! string.IsNullOrEmpty(cb))
+            // {
+            //     return cb + "(" + StatsManager.SimExtraStats.XReport((DateTime.Now - m_startuptime).ToString() , m_version, id) + ");";
+            // }
+            // else
+            // {
+            //     return StatsManager.SimExtraStats.XReport((DateTime.Now - m_startuptime).ToString() , m_version, id);
+            // }
+            return string.Empty;
         }
     }
 }

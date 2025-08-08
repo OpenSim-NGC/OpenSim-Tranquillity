@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Framework.PluginLoader;
 
 namespace OpenSim.Data
 {
@@ -36,7 +34,7 @@ namespace OpenSim.Data
     /// This interface exists to distinguish between the normal IAssetDataPlugin and the one used by XAssetService
     /// for now.
     /// </summary>
-    public interface IXAssetDataPlugin : IPlugin
+    public interface IXAssetDataPlugin
     {
         AssetBase GetAsset(UUID uuid);
         void StoreAsset(AssetBase asset);

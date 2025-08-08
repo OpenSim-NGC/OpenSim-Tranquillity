@@ -27,15 +27,16 @@
 
 using System.Collections;
 using System.Reflection;
-using log4net;
 using OpenSim.Framework.Monitoring;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework.Servers.HttpServer
 {
     public class PollServiceRequestManager
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private readonly ConcurrentQueue<PollServiceHttpRequest> m_retryRequests = new();
         private readonly int m_WorkerThreadCount = 0;
@@ -169,7 +170,7 @@ namespace OpenSim.Framework.Servers.HttpServer
             }
             catch (Exception e)
             {
-                m_log.Error($"Exception in poll service thread: {e}");
+                _logger.LogError(e, $"Exception in poll service thread");
             }
         }
     }

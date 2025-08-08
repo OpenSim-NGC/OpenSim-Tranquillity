@@ -25,13 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Data;
 using OpenMetaverse;
-using OpenSim.Framework;
 using MySqlConnector;
 
 namespace OpenSim.Data.MySQL

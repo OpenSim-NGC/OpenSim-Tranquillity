@@ -24,22 +24,20 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
+
 using System.Collections;
 using System.Reflection;
-
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using Nwc.XmlRpc;
-using log4net;
-
 using OpenSim.Framework;
-using System.Net.Http;
 
 namespace OpenSim.Services.Connectors.InstantMessage
 {
     public class InstantMessageServiceConnector
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         /// <summary>
         /// This actually does the XMLRPC Request
@@ -66,13 +64,13 @@ namespace OpenSim.Services.Connectors.InstantMessage
                 }
                 else
                 {
-                    m_log.DebugFormat("[GRID INSTANT MESSAGE]: No response from {0}", url);
+                    _logger.LogDebug("[GRID INSTANT MESSAGE]: No response from {0}", url);
                     return false;
                 }
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[GRID INSTANT MESSAGE]: Error sending message to {0} : {1}", url, e.Message);
+                _logger.LogError(e,"[GRID INSTANT MESSAGE]: Error sending message to {0}", url);
             }
 
             return false;

@@ -25,13 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.IO;
 using System.IO.Compression;
 using System.Reflection;
-
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework
 {
@@ -66,7 +62,9 @@ namespace OpenSim.Framework
 
     public class TerrainData
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        
         private static string LogHeader = "[TERRAIN DATA]";
 
         private float[,] m_heightmap;
@@ -472,7 +470,7 @@ namespace OpenSim.Framework
 
                 }
             }
-            // m_log.DebugFormat("{0} new by doubles. sizeX={1}, sizeY={2}, sizeZ={3}", LogHeader, SizeX, SizeY, SizeZ);
+            // _logger.LogDebug(string.Format("{0} new by doubles. sizeX={1}, sizeY={2}, sizeZ={3}", LogHeader, SizeX, SizeY, SizeZ));
 
             m_taints = new TerrainTaintsArray(m_taintSizeX * m_taintSizeY);
         }
@@ -491,7 +489,7 @@ namespace OpenSim.Framework
             m_heightmap = new float[SizeX, SizeY];
             m_taints = new TerrainTaintsArray(m_taintSizeX * m_taintSizeY);
 
-            // m_log.DebugFormat("{0} new by dimensions. sizeX={1}, sizeY={2}, sizeZ={3}", LogHeader, SizeX, SizeY, SizeZ);
+            // _logger.LogDebug(string.Format("{0} new by dimensions. sizeX={1}, sizeY={2}, sizeZ={3}", LogHeader, SizeX, SizeY, SizeZ));
             ClearLand(0f);
         }
 
@@ -503,7 +501,7 @@ namespace OpenSim.Framework
             for (int xx = 0; xx < SizeX; xx++)
                 for (int yy = 0; yy < SizeY; yy++)
                     m_heightmap[xx, yy] = cmap[ind++];
-            // m_log.DebugFormat("{0} new by compressed map. sizeX={1}, sizeY={2}, sizeZ={3}", LogHeader, SizeX, SizeY, SizeZ);
+            // _logger.LogDebug(string.Format("{0} new by compressed map. sizeX={1}, sizeY={2}, sizeZ={3}", LogHeader, SizeX, SizeY, SizeZ));
         }
 
         // Create a heighmap from a database blob
@@ -514,20 +512,21 @@ namespace OpenSim.Framework
             {
                 case DBTerrainRevision.Variable2DGzip:
                     FromCompressedTerrainSerializationV2DGZip(pBlob);
-                    m_log.DebugFormat("{0} HeightmapTerrainData create from Variable2DGzip serialization. Size=<{1},{2}>", LogHeader, SizeX, SizeY);
+                    _logger.LogDebug($"{LogHeader} HeightmapTerrainData create from Variable2DGzip serialization. Size=<{SizeX},{SizeY}>");
                     break;
 
                 case DBTerrainRevision.Variable2D:
                     FromCompressedTerrainSerializationV2D(pBlob);
-                    m_log.DebugFormat("{0} HeightmapTerrainData create from Variable2D serialization. Size=<{1},{2}>", LogHeader, SizeX, SizeY);
+                    _logger.LogDebug($"{LogHeader} HeightmapTerrainData create from Variable2D serialization. Size=<{SizeX},{SizeY}>");
                     break;
                 case DBTerrainRevision.Compressed2D:
                     FromCompressedTerrainSerialization2D(pBlob);
-                    m_log.DebugFormat("{0} HeightmapTerrainData create from Compressed2D serialization. Size=<{1},{2}>", LogHeader, SizeX, SizeY);
+                    _logger.LogDebug($"{LogHeader} HeightmapTerrainData create from Compressed2D serialization. Size=<{SizeX},{SizeY}>");
                     break;
                 default:
                     FromLegacyTerrainSerialization(pBlob);
-                    m_log.DebugFormat("{0} HeightmapTerrainData create from legacy serialization. Size=<{1},{2}>", LogHeader, SizeX, SizeY);
+                    _logger.LogDebug(
+                        $"{LogHeader} HeightmapTerrainData create from legacy serialization. Size=<{SizeX},{SizeY}>");
                     break;
             }
         }
@@ -619,7 +618,7 @@ namespace OpenSim.Framework
             }
             catch {}
 
-            m_log.DebugFormat("{0} V2D {1} bytes", LogHeader, ret.Length);
+            _logger.LogDebug($"{LogHeader} V2D {ret.Length} bytes");
 
             return ret;
         }
@@ -660,7 +659,7 @@ namespace OpenSim.Framework
             }
             catch {}
 
-            m_log.DebugFormat("{0} V2DGzip {1} bytes", LogHeader, ret.Length);
+            _logger.LogDebug($"{{LogHeader}} V2DGzip {ret.Length} bytes");
             return ret;
         }
 
@@ -711,8 +710,9 @@ namespace OpenSim.Framework
                 }
                 ClearTaint();
 
-                m_log.DebugFormat("{0} Read (compressed2D) heightmap. Heightmap size=<{1},{2}>. Region size=<{3},{4}>. CompFact={5}",
-                                LogHeader, hmSizeX, hmSizeY, SizeX, SizeY, hmCompressionFactor);
+                _logger.LogDebug(
+                    $"{LogHeader} Read (compressed2D) heightmap. Heightmap size=<{hmSizeX},{hmSizeY}>. " +
+                    $"Region size=<{SizeX},{SizeY}>. CompFact={hmCompressionFactor}");
             }
         }
 
@@ -761,22 +761,19 @@ namespace OpenSim.Framework
             catch (Exception e)
             {
                 ClearTaint();
-                m_log.ErrorFormat("{0} 2D error: {1} - terrain may be damaged",
-                                LogHeader, e.Message);
+                _logger.LogError(e, $"{LogHeader} 2D error - {e.Message} : terrain may be damaged");
                 return;
             }
             ClearTaint();
 
-            m_log.DebugFormat("{0} V2D Heightmap size=<{1},{2}>. Region size=<{3},{4}>",
-                            LogHeader, hmSizeX, hmSizeY, SizeX, SizeY);
-
+            _logger.LogDebug($"{LogHeader} V2D Heightmap size=<{hmSizeX},{hmSizeY}>. Region size=<{SizeX},{SizeY}>");
         }
 
         // as above but Gzip compressed
         public void FromCompressedTerrainSerializationV2DGZip(byte[] pBlob)
         {
-            m_log.InfoFormat("{0} VD2Gzip {1} bytes input",
-                            LogHeader, pBlob.Length);
+            _logger.LogInformation($"{LogHeader} VD2Gzip {pBlob.Length} bytes input");
+
             int hmSizeX, hmSizeY;
 
             try
@@ -827,15 +824,13 @@ namespace OpenSim.Framework
             catch( Exception e)
             {
                 ClearTaint();
-                m_log.ErrorFormat("{0} V2DGzip error: {1} - terrain may be damaged",
-                                LogHeader, e.Message);
+                _logger.LogError(e, $"{LogHeader} V2DGzip error: {e.Message} - terrain may be damaged");
                 return;
             }
 
             ClearTaint();
-            m_log.DebugFormat("{0} V2DGzip. Heightmap size=<{1},{2}>. Region size=<{3},{4}>",
-                            LogHeader, hmSizeX, hmSizeY, SizeX, SizeY);
-
+            _logger.LogDebug(
+                $"{LogHeader} V2DGzip. Heightmap size=<{hmSizeX},{hmSizeY}>. Region size=<{SizeX},{SizeY}>");
         }
     }
 }

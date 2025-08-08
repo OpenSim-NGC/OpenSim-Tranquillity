@@ -26,84 +26,82 @@
  */
 
 using System;
-using OpenSim.Framework;
 using System.Collections.Generic;
 using OpenMetaverse;
 
-namespace OpenSim.Services.Interfaces
+namespace OpenSim.Services.Interfaces;
+
+public class PresenceInfo
 {
-    public class PresenceInfo
+    public string UserID;
+    public UUID RegionID;
+
+    public PresenceInfo()
     {
-        public string UserID;
-        public UUID RegionID;
-
-        public PresenceInfo()
-        {
-        }
-
-        public PresenceInfo(Dictionary<string, object> kvp)
-        {
-            if (kvp.TryGetValue("UserID", out object ouid))
-                UserID = ouid.ToString();
-            if (kvp.TryGetValue("RegionID", out object orid))
-                _ = UUID.TryParse(orid.ToString(), out RegionID);
-        }
-
-        public Dictionary<string, object> ToKeyValuePairs()
-        {
-            return new Dictionary<string, object>
-            {
-                ["UserID"] = UserID,
-                ["RegionID"] = RegionID.ToString()
-            };
-        }
     }
 
-    public interface IPresenceService
+    public PresenceInfo(Dictionary<string, object> kvp)
     {
-        /// <summary>
-        /// Store session information.
-        /// </summary>
-        /// <returns>/returns>
-        /// <param name='userID'></param>
-        /// <param name='sessionID'></param>
-        /// <param name='secureSessionID'></param>
-        bool LoginAgent(string userID, UUID sessionID, UUID secureSessionID);
-
-        /// <summary>
-        /// Remove session information.
-        /// </summary>
-        /// <returns></returns>
-        /// <param name='sessionID'></param>
-        bool LogoutAgent(UUID sessionID);
-
-        /// <summary>
-        /// Remove session information for all agents in the given region.
-        /// </summary>
-        /// <returns></returns>
-        /// <param name='regionID'></param>
-        bool LogoutRegionAgents(UUID regionID);
-
-        /// <summary>
-        /// Update data for an existing session.
-        /// </summary>
-        /// <returns></returns>
-        /// <param name='sessionID'></param>
-        /// <param name='regionID'></param>
-        bool ReportAgent(UUID sessionID, UUID regionID);
-
-        /// <summary>
-        /// Get session information for a given session ID.
-        /// </summary>
-        /// <returns></returns>
-        /// <param name='sessionID'></param>
-        PresenceInfo GetAgent(UUID sessionID);
-
-        /// <summary>
-        /// Get session information for a collection of users.
-        /// </summary>
-        /// <returns>Session information for the users.</returns>
-        /// <param name='userIDs'></param>
-        PresenceInfo[] GetAgents(string[] userIDs);
+        if (kvp.TryGetValue("UserID", out object ouid))
+            UserID = ouid.ToString();
+        if (kvp.TryGetValue("RegionID", out object orid))
+            _ = UUID.TryParse(orid.ToString(), out RegionID);
     }
+
+    public Dictionary<string, object> ToKeyValuePairs()
+    {
+        return new Dictionary<string, object>
+        {
+            ["UserID"] = UserID,
+            ["RegionID"] = RegionID.ToString()
+        };
+    }
+}
+
+public interface IPresenceService
+{
+    /// <summary>
+    /// Store session information.
+    /// </summary>
+    /// <returns>/returns>
+    /// <param name='userID'></param>
+    /// <param name='sessionID'></param>
+    /// <param name='secureSessionID'></param>
+    bool LoginAgent(string userID, UUID sessionID, UUID secureSessionID);
+
+    /// <summary>
+    /// Remove session information.
+    /// </summary>
+    /// <returns></returns>
+    /// <param name='sessionID'></param>
+    bool LogoutAgent(UUID sessionID);
+
+    /// <summary>
+    /// Remove session information for all agents in the given region.
+    /// </summary>
+    /// <returns></returns>
+    /// <param name='regionID'></param>
+    bool LogoutRegionAgents(UUID regionID);
+
+    /// <summary>
+    /// Update data for an existing session.
+    /// </summary>
+    /// <returns></returns>
+    /// <param name='sessionID'></param>
+    /// <param name='regionID'></param>
+    bool ReportAgent(UUID sessionID, UUID regionID);
+
+    /// <summary>
+    /// Get session information for a given session ID.
+    /// </summary>
+    /// <returns></returns>
+    /// <param name='sessionID'></param>
+    PresenceInfo GetAgent(UUID sessionID);
+
+    /// <summary>
+    /// Get session information for a collection of users.
+    /// </summary>
+    /// <returns>Session information for the users.</returns>
+    /// <param name='userIDs'></param>
+    PresenceInfo[] GetAgents(string[] userIDs);
 }

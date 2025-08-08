@@ -182,7 +182,7 @@ namespace OpenSim.Services.Connectors
         public EstateSettings LoadEstateSettings(UUID regionID, bool create)
         {
             // /estates/estate/?region=uuid&create=[t|f]
-            string uri = m_ServerURI + $"/estates/estate/?region={regionID}&create={create}";
+            string uri = _serverURI + $"/estates/estate/?region={regionID}&create={create}";
 
             //MakeRequest is bugged as its using the older deprecated WebRequest.  A call to the estate
             // service here will return a 404 if the estate doesnt exist which is correct but the code

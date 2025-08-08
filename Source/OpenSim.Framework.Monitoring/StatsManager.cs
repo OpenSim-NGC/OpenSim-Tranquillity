@@ -167,11 +167,7 @@ namespace OpenSim.Framework.Monitoring
             }
             else
             {
-                // Legacy
-                if (SimExtraStats != null)
-                    con.Output(SimExtraStats.Report(con.ConsoleScene));
-                else
-                    OutputAllStatsToConsole(con);
+                OutputAllStatsToConsole(con);
             }
         }
 

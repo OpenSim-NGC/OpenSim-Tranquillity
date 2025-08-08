@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework.Monitoring
 {
@@ -49,7 +47,8 @@ namespace OpenSim.Framework.Monitoring
     /// </remarks>
     public static class WorkManager
     {
-        private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         public static JobEngine JobEngine { get; private set; }
 
@@ -223,7 +222,7 @@ namespace OpenSim.Framework.Monitoring
                 }
                 catch (Exception e)
                 {
-                    m_log.Error(string.Format("[WATCHDOG]: Exception in thread {0}.", name), e);
+                    _logger.LogError(e, $"[WATCHDOG]: Exception in thread {name}.");
                 }
                 finally
                 {

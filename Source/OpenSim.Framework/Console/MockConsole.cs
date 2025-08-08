@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Contributors, http://opensimulator.org/
+ * Copyright (c) Contributors, http://whitecore-sim.org/, http://aurora-sim.org, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -9,7 +9,7 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the OpenSimulator Project nor the
+ *     * Neither the name of the WhiteCore-Sim Project nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
  *
@@ -25,24 +25,39 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
-namespace OpenSim.Framework.Console
+namespace OpenSim.Framework.Console;
+
+/// <summary>
+///     This is a Fake console that's used when setting up the Scene in Unit Tests
+///     Don't use this except for Unit Testing or you're in for a world of hurt when the
+///     sim gets to ReadLine
+/// </summary>
+public class MockConsole(IConfiguration config, ILogger<MockConsole> logger) :
+    CommandConsole(config, logger)
 {
-    /// <summary>
-    /// This will be a set of typical column sizes to allow greater consistency between console commands.
-    /// </summary>
-    public static class ConsoleDisplayUtil
+    protected readonly IConfiguration _config = config;
+    protected readonly ILogger<MockConsole> _logger = logger;
+
+    public override string Name => "MockConsole";
+
+    public override void Output(string text, Level level)
     {
-        public const int CoordTupleSize = 11;
-        public const int PortSize = 5;
+    }
 
-        public const int EstateNameSize = 20;
-        public const int ParcelNameSize = 40;
-        public const int RegionNameSize = 20;
-        public const int UserNameSize = 35;
+    public override string ReadLine(string p, bool isCommand, bool e)
+    {
+        //Thread.CurrentThread.Join(1000);
+        return string.Empty;
+    }
 
-        public const int UuidSize = 36;
-        public const int VectorSize = 15;
+    public override void UnlockOutput()
+    {
+    }
+
+    public override void LockOutput()
+    {
     }
 }

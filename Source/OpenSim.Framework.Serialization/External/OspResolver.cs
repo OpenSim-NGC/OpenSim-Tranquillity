@@ -27,9 +27,8 @@
 
 using System.Reflection;
 using System.Text;
-using log4net;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
-using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Framework.Serialization
@@ -40,7 +39,8 @@ namespace OpenSim.Framework.Serialization
     /// </summary>
     public class OspResolver
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger _logger = 
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         public const string OSPA_PREFIX = "ospa:";
         public const string OSPA_NAME_KEY = "n";
@@ -59,7 +59,7 @@ namespace OpenSim.Framework.Serialization
         {
             if (userService == null)
             {
-                m_log.Warn("[OSP RESOLVER]: UserService is null");
+                _logger.LogWarning("[OSP RESOLVER]: UserService is null");
                 return userId.ToString();
             }
 
@@ -125,7 +125,7 @@ namespace OpenSim.Framework.Serialization
 
                 if (tupleSeparatorIndex < 0)
                 {
-                    m_log.WarnFormat("[OSP RESOLVER]: Ignoring non-tuple component {0} in OSPA {1}", tuple, ospa);
+                    _logger.LogWarning($"[OSP RESOLVER]: Ignoring non-tuple component {tuple} in OSPA {ospa}");
                     continue;
                 }
 
@@ -167,7 +167,7 @@ namespace OpenSim.Framework.Serialization
 
             if (nameSeparatorIndex < 0)
             {
-                m_log.WarnFormat("[OSP RESOLVER]: Ignoring unseparated name {0}", name);
+                _logger.LogWarning($"[OSP RESOLVER]: Ignoring unseparated name {name}");
                 return UUID.Zero;
             }
 

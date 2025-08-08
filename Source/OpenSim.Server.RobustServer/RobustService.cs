@@ -1,55 +1,36 @@
-﻿using Nini.Config;
-using System.Net.Security;
+﻿using System.Net.Security;
+using System.Runtime.InteropServices.Swift;
 using System.Security.Cryptography.X509Certificates;
-using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
-using OpenSim.Server.Base;
-using OpenSim.Server.Handlers.Base;
-using log4net.Config;
 using Autofac;
 
 namespace OpenSim.Server.RobustServer
 {
-    public class RobustService : IHostedService
+    public class RobustService : ServerBase, IHostedService
     {
         private readonly IComponentContext _componentContext;
         private readonly IConfiguration _configuration;
         private readonly ILogger<RobustService> _logger;
-
-        // Legacy Stuff
-        protected HttpServerBase m_Server = null;
-        protected List<IServiceConnector> m_ServiceConnectors = new();
-        private bool m_NoVerifyCertChain = false;
-        private bool m_NoVerifyCertHostname = false;
+        private readonly ICommandConsole _console;
         
+        // Legacy Stuff
+        protected ServerBase m_Server = null;
+
+        private readonly object _consoleType;
+
+        private readonly string _prompt;
+        //protected List<IServiceConnector> m_ServiceConnectors = new();
 
         public RobustService(
-            IComponentContext componentContext,
             IConfiguration configuration,
-            ILogger<RobustService> logger)
+            ILogger<RobustService> logger,
+            IComponentContext componentContext) : 
+            base(configuration, logger, componentContext) 
         {
-            _componentContext = componentContext;
             _configuration = configuration;
             _logger = logger;
-        }
-
-        public bool ValidateServerCertificate(
-            object sender,
-            X509Certificate certificate,
-            X509Chain chain,
-            SslPolicyErrors sslPolicyErrors)
-        {
-            if (m_NoVerifyCertChain)
-                sslPolicyErrors &= ~SslPolicyErrors.RemoteCertificateChainErrors;
- 
-            if (m_NoVerifyCertHostname)
-                sslPolicyErrors &= ~SslPolicyErrors.RemoteCertificateNameMismatch;
-
-            if (sslPolicyErrors == SslPolicyErrors.None)
-                return true;
-
-            return false;
+            _componentContext = componentContext;
         }
 
         /// <summary>
@@ -69,31 +50,6 @@ namespace OpenSim.Server.RobustServer
                     }
                 }
             }
-        }
-
-        private void InitializeNetwork(string[] args)
-        {
-            Culture.SetCurrentCulture();
-            Culture.SetDefaultCurrentCulture();
-
-            // ServicePointManager.DefaultConnectionLimit = 64;
-            // ServicePointManager.MaxServicePointIdleTime = 30000;
-
-            // ServicePointManager.Expect100Continue = false;
-            // ServicePointManager.UseNagleAlgorithm = false;
-            // ServicePointManager.ServerCertificateValidationCallback = ValidateServerCertificate;
-
-            m_Server = new HttpServerBase("R.O.B.U.S.T.", args);
-            
-            IConfig serverConfig = m_Server.Config.Configs["Startup"];
-
-            // int dnsTimeout = serverConfig.GetInt("DnsTimeout", 30000);
-            // try { ServicePointManager.DnsRefreshTimeout = dnsTimeout; } catch { }
-
-            m_NoVerifyCertChain = serverConfig.GetBoolean("NoVerifyCertChain", m_NoVerifyCertChain);
-            m_NoVerifyCertHostname = serverConfig.GetBoolean("NoVerifyCertHostname", m_NoVerifyCertHostname);
-
-            WebUtil.SetupHTTPClients(m_NoVerifyCertChain, m_NoVerifyCertHostname, null, 32);
         }
 
         private static void ParseServiceEntry(string c, out string configName, out string conn, out uint port, out string friendlyName)
@@ -128,24 +84,23 @@ namespace OpenSim.Server.RobustServer
 
         private void InitalizeServiceConnectors()
         {
-            IConfig serverConfig = m_Server.Config.Configs["Startup"];
-
-            string connList = serverConfig.GetString("ServiceConnectors", string.Empty);
-            IConfig servicesConfig = m_Server.Config.Configs["ServiceList"];
-
-            if (servicesConfig == null)
+            var serverConfig = _configuration.GetSection("Startup");
+            if (serverConfig.Exists() is false)
             {
                 _logger.LogError("ServiceList config section missing in .ini file");
                 throw new Exception("Configuration error");
             }
+            
+            string connList = serverConfig.GetValue("ServiceConnectors", string.Empty);
+            var servicesConfig = _configuration.GetSection("ServiceList");
 
             List<string> servicesList = new();
             if (!string.IsNullOrEmpty(connList))
                 servicesList.Add(connList);
 
-            foreach (string k in servicesConfig.GetKeys())
+            foreach (var kvp in servicesConfig.AsEnumerable())
             {
-                string v = servicesConfig.GetString(k);
+                var v = kvp.Value;
                 if (!string.IsNullOrEmpty(v))
                     servicesList.Add(v);
             }
@@ -181,25 +136,25 @@ namespace OpenSim.Server.RobustServer
 
                 _logger.LogInformation("[SERVER]: Loading {0} on port {1}", friendlyName, server.Port);
 
-                try
-                {
-                    var connector = _componentContext.ResolveNamed<IServiceConnector>(friendlyName);
-                    if (connector is not null)
-                    {
-                        connector.Initialize(server, configName);
-                        m_ServiceConnectors.Add(connector);
-                        _logger.LogInformation($"[SERVER]: {friendlyName} loaded successfully");
-                    }
-                    else
-                    {
-                        _logger.LogError($"[SERVER]: Failed to load {conn}");
-                    }
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, $"[SERVER]: Failed to load {friendlyName}");
-                    continue;
-                }
+                // try
+                // {
+                //     var connector = _componentContext.ResolveNamed<IServiceConnector>(friendlyName);
+                //     if (connector is not null)
+                //     {
+                //         connector.Initialize(server, configName);
+                //         m_ServiceConnectors.Add(connector);
+                //         _logger.LogInformation($"[SERVER]: {friendlyName} loaded successfully");
+                //     }
+                //     else
+                //     {
+                //         _logger.LogError($"[SERVER]: Failed to load {conn}");
+                //     }
+                // }
+                // catch (Exception e)
+                // {
+                //     _logger.LogError(e, $"[SERVER]: Failed to load {friendlyName}");
+                //     continue;
+                // }
             }
         }
 
@@ -208,11 +163,10 @@ namespace OpenSim.Server.RobustServer
             var args = Environment.GetCommandLineArgs();
 
             _logger.LogInformation($"{nameof(RobustServer)} is running.");
-            
-            XmlConfigurator.Configure();
-
-            InitializeNetwork(args);
-            InitalizeServiceConnectors();
+            //
+            // InitializeConsole(args);
+            // InitializeNetwork(args);
+            // InitalizeServiceConnectors();
 
             PrintFileToConsole("robuststartuplogo.txt");
 

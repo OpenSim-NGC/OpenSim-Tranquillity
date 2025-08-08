@@ -65,7 +65,7 @@ namespace OpenSim.Server.MoneyServer
     /// </summary>
     internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private string connectionString = string.Empty;
         private uint m_moneyServerPort = 8008;         // 8008 is default server port

@@ -25,14 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Data;
 using System.Data.Common;
-using System.IO;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Data
 {
@@ -69,7 +66,7 @@ namespace OpenSim.Data
     /// </summary>
     public class Migration
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly ILogger _logger;
 
         protected string _type;
         protected DbConnection _conn;
@@ -77,23 +74,10 @@ namespace OpenSim.Data
 
         private Regex _match_old;
         private Regex _match_new;
-
-        /// <summary>Have the parameterless constructor just so we can specify it as a generic parameter with the new() constraint.
-        /// Currently this is only used in the tests. A Migration instance created this way must be then
-        /// initialized with Initialize(). Regular creation should be through the parameterized constructors.
-        /// </summary>
-        public Migration()
+        
+        public Migration(ILogger<Migration> logger)
         {
-        }
-
-        public Migration(DbConnection conn, Assembly assem, string subtype, string type)
-        {
-            Initialize(conn, assem, type, subtype);
-        }
-
-        public Migration(DbConnection conn, Assembly assem, string type)
-        {
-            Initialize(conn, assem, type, "");
+            _logger = logger;
         }
 
         /// <summary>Must be called after creating with the parameterless constructor.
@@ -105,7 +89,7 @@ namespace OpenSim.Data
         /// <param name="assem"></param>
         /// <param name="subtype"></param>
         /// <param name="type"></param>
-        public void Initialize (DbConnection conn, Assembly assem, string type, string subtype)
+        public void Initialize (DbConnection conn, Assembly assem, string type, string subtype = "")
         {
             _type = type;
             _conn = conn;
@@ -123,7 +107,10 @@ namespace OpenSim.Data
             if (ver <= 0)   // -1 = no table, 0 = no version record
             {
                 if (ver < 0)
+                {
                     ExecuteScript("create table migrations(name varchar(100), version int)");
+                }
+
                 InsertVersion("migrations", 1);
             }
         }
@@ -183,8 +170,9 @@ namespace OpenSim.Data
                 return;
 
             // to prevent people from killing long migrations.
-            m_log.InfoFormat("[MIGRATIONS]: Upgrading {0} to latest revision {1}.", _type, migrations.Keys[migrations.Count - 1]);
-            m_log.Info("[MIGRATIONS]: NOTE - this may take a while, don't interrupt this process!");
+            _logger.LogInformation(
+                $"[MIGRATIONS]: Upgrading {_type} to latest revision {migrations.Keys[migrations.Count - 1]}");
+            _logger.LogInformation("[MIGRATIONS]: NOTE - this may take a while, don't interrupt this process!");
 
             foreach (KeyValuePair<int, string[]> kvp in migrations)
             {
@@ -203,8 +191,15 @@ namespace OpenSim.Data
                 }
                 catch (Exception e)
                 {
-                    m_log.DebugFormat("[MIGRATIONS]: Cmd was {0}", e.Message.Replace("\n", " "));
-                    m_log.Debug("[MIGRATIONS]: An error has occurred in the migration.  If you're running OpenSim for the first time then you can probably safely ignore this, since certain migration commands attempt to fetch data out of old tables.  However, if you're using an existing database and you see database related errors while running OpenSim then you will need to fix these problems manually. Continuing.");
+                    _logger.LogDebug($"[MIGRATIONS]: Cmd was {e.Message.Replace("\n", " ")}");
+                    _logger.LogDebug(
+                        $"[MIGRATIONS]: An error has occurred in the migration.  " +
+                        $"If you're running OpenSim for the first time then you can probably safely ignore this, " +
+                        $"since certain migration commands attempt to fetch data out of old tables.  However, if " +
+                        $" you're using an existing database and you see database related errors while running " +
+                        $"OpenSim then you will need to fix these problems manually. Continuing.");
+                    
+                    _logger.LogDebug("[MIGRATIONS]: Rolling back migration.");
                     ExecuteScript("ROLLBACK;");
                 }
 
@@ -263,13 +258,13 @@ namespace OpenSim.Data
 
         private void InsertVersion(string type, int version)
         {
-            m_log.InfoFormat("[MIGRATIONS]: Creating {0} at version {1}", type, version);
+            _logger.LogInformation($"[MIGRATIONS]: Creating {type} at version {version}");
             ExecuteScript("insert into migrations(name, version) values('" + type + "', " + version + ")");
         }
 
         private void UpdateVersion(string type, int version)
         {
-            m_log.InfoFormat("[MIGRATIONS]: Updating {0} to version {1}", type, version);
+            _logger.LogInformation($"[MIGRATIONS]: Updating {type} to version {version}");
             ExecuteScript("update migrations set version=" + version + " where name='" + type + "'");
         }
 
@@ -367,7 +362,9 @@ namespace OpenSim.Data
 
                             if (!int.TryParse(sLine.Substring(9).Trim(), out nVersion))
                             {
-                                m_log.ErrorFormat("[MIGRATIONS]: invalid version marker at {0}: line {1}. Migration failed!", sFile, nLineNo);
+                                _logger.LogError(
+                                    $"[MIGRATIONS]: invalid version marker at {sFile}: line {nLineNo}. " +
+                                    $"Migration failed!");
                                 break;
                             }
                         }
@@ -407,7 +404,10 @@ scan_old_style:
             }
 
             if (migrations.Count < 1)
-                m_log.DebugFormat("[MIGRATIONS]: {0} data tables already up to date at revision {1}", _type, after);
+            {
+                _logger.LogDebug(
+                    $"[MIGRATIONS]: {_type} data tables already up to date at revision {after}");
+            }
 
             return migrations;
         }

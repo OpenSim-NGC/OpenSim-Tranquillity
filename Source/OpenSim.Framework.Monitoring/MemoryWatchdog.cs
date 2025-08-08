@@ -25,13 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Threading;
-using log4net;
-
 namespace OpenSim.Framework.Monitoring
 {
     /// <summary>
@@ -39,8 +32,6 @@ namespace OpenSim.Framework.Monitoring
     /// </summary>
     public static class MemoryWatchdog
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         /// <summary>
         /// Is this watchdog active?
         /// </summary>
@@ -49,14 +40,12 @@ namespace OpenSim.Framework.Monitoring
             get { return m_enabled; }
             set
             {
-//                m_log.DebugFormat("[MEMORY WATCHDOG]: Setting MemoryWatchdog.Enabled to {0}", value);
-
                 if (value && !m_enabled)
                     UpdateLastRecord(GC.GetTotalMemory(false), Util.EnvironmentTickCount());
-
                 m_enabled = value;
             }
         }
+
         private static bool m_enabled;
 
         /// <summary>
@@ -64,7 +53,11 @@ namespace OpenSim.Framework.Monitoring
         /// </summary>
         public static double AverageHeapAllocationRate
         {
-            get { if (m_samples.Count > 0) return m_samples.Average(); else return 0; }
+            get
+            {
+                if (m_samples.Count > 0) return m_samples.Average();
+                else return 0;
+            }
         }
 
         /// <summary>
@@ -72,7 +65,11 @@ namespace OpenSim.Framework.Monitoring
         /// </summary>
         public static double LastHeapAllocationRate
         {
-            get { if (m_samples.Count > 0) return m_samples.Last(); else return 0; }
+            get
+            {
+                if (m_samples.Count > 0) return m_samples.Last();
+                else return 0;
+            }
         }
 
         /// <summary>
@@ -111,7 +108,7 @@ namespace OpenSim.Framework.Monitoring
             long memoryDiff = memoryNow - m_lastUpdateMemory;
 
             if (m_samples.Count >= m_maxSamples)
-                    m_samples.Dequeue();
+                m_samples.Dequeue();
 
             double elapsed = Util.EnvironmentTickCountSubtract(now, m_lastUpdateTick);
 
