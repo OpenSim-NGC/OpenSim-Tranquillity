@@ -646,15 +646,16 @@ namespace OpenSim.Framework
                         using GZipStream compressionStream = new(outputStream, CompressionMode.Compress);
                         inp.CopyTo(compressionStream);
                         compressionStream.Flush();
-                                ret = outputStream.ToArray();
-                            }
-                        }
-                m_log.Debug($"{LogHeader} V2DGzip {ret.Length} bytes");
+                        ret = outputStream.ToArray();
                     }
+                }
+                _logger.LogDebug($"{LogHeader} V2DGzip {ret.Length} bytes");
+            }
             catch (Exception ex)
             {
-                m_log.Error($"{LogHeader} V2DGzip error: {ex.Message}");
-                }
+                _logger.LogError(ex, $"{LogHeader} V2DGzip error: {ex.Message}");
+            }
+            
             return ret;
         }
 

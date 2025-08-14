@@ -33,7 +33,6 @@ using Autofac;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenSim.Framework.Console;
-using OpenSim.Framework.Monitoring;
 
 namespace OpenSim.Framework.Servers
 {
@@ -140,27 +139,27 @@ namespace OpenSim.Framework.Servers
 
             //  FIXME MainConsole.Instance?.DefaultPrompt(prompt);
         }
-        
-        private void InitializeNetwork( )
+
+        private void InitializeNetwork()
         {
             var startupConfig = _config.GetSection("Startup");
             if (startupConfig.Exists())
             {
                 if (startupConfig.GetValue<bool>("EnableRobustSelfsignedCertSupport", false))
                 {
-                    if (!File.Exists("SSL\\ssl\\"+ startupConfig.GetValue<string>("RobustCertFileName") +".p12") || 
+                    if (!File.Exists("SSL\\ssl\\" + startupConfig.GetValue<string>("RobustCertFileName") + ".p12") ||
                         startupConfig.GetValue<bool>("RobustCertRenewOnStartup"))
                     {
                         var certFileName = startupConfig.GetValue("RobustCertFileName", "Robust");
                         var certHostName = startupConfig.GetValue("RobustCertHostName", "localhost");
                         var certHostIp = startupConfig.GetValue("RobustCertHostIp", "127.0.0.1");
                         var certPassword = startupConfig.GetValue("RobustCertPassword", string.Empty);
-                        
+
                         Util.CreateOrUpdateSelfsignedCert(certFileName, certHostName, certHostIp, certPassword);
                     }
                 }
             }
-            
+
             // var networkConfig = _config.GetSection("Network");
             // if (networkConfig.Exists())
             // {
@@ -260,12 +259,14 @@ namespace OpenSim.Framework.Servers
             //         }
             //     }
             // }
-            
+
 
             Culture.SetCurrentCulture();
             Culture.SetDefaultCurrentCulture();
 
             // m_Server = new HttpServerBase("R.O.B.U.S.T.", args);
+        }
+
         protected void RemovePIDFile()
         {
             if (!string.IsNullOrEmpty(m_pidFile))
@@ -276,7 +277,7 @@ namespace OpenSim.Framework.Servers
                 }
                 catch (Exception e)
                 {
-                    m_log.Error($"[SERVER BASE]: Error whilst removing {m_pidFile}", e);
+                    _logger.LogError($"[SERVER BASE]: Error whilst removing {m_pidFile}", e);
                 }
                 m_pidFile = string.Empty;
             }

@@ -26,7 +26,6 @@
  */
 
 using System;
-using OpenSim.Framework.Monitoring;
 
 namespace OpenSim.Framework.Servers.HttpServer
 {

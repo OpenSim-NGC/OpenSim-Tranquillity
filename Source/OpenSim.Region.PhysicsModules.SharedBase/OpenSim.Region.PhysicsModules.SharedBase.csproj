@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.1.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.7" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.8" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,7 +21,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
-    <ProjectReference Include="..\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
   </ItemGroup>
 
 </Project>

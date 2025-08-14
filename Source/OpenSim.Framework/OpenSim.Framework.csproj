@@ -9,6 +9,9 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup> 
   <ItemGroup>
+    <Reference Include="Autofac">
+      <HintPath>..\..\..\..\..\..\..\.nuget\packages\autofac\8.4.0\lib\net8.0\Autofac.dll</HintPath>
+    </Reference>
     <Reference Include="LukeSkywalker.IPNetwork">
       <HintPath>..\..\Library\LukeSkywalker.IPNetwork.dll</HintPath>
     </Reference>
@@ -30,15 +33,11 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.1.0" />
-    <PackageReference Include="Mono.Addins" Version="1.4.1" />
-    <PackageReference Include="Mono.Addins.Setup" Version="1.4.1" />
-    <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.7" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.8" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.8" />
     <PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
-    <PackageReference Include="System.Drawing.Common" Version="9.0.3" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.3" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.3" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.3" />
+    <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.8" />
   </ItemGroup>
 </Project>

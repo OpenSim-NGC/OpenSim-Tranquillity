@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Contributors, http://whitecore-sim.org/, http://aurora-sim.org, http://opensimulator.org/
+ * Copyright (c) Contributors, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -9,7 +9,7 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the WhiteCore-Sim Project nor the
+ *     * Neither the name of the OpenSimulator Project nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
  *
@@ -25,22 +25,58 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using log4net.Appender;
+using log4net.Core;
+
 namespace OpenSim.Framework.Console;
 
-public class MainConsole
+/// <summary>
+///     Writes log information out onto the console
+/// </summary>
+public class OpenSimAppender : AnsiColorTerminalAppender
 {
-    #region Delegates
+    public ConsoleBase Console { get; set; }
 
-    public delegate void IncomingLogWrite(string level, string text);
-
-    #endregion
-
-    public static ICommandConsole Instance { get; set; }
-    public static event IncomingLogWrite OnIncomingLogWrite;
-
-    public static void TriggerLog(string level, string text)
+    protected override void Append(LoggingEvent le)
     {
-        if (OnIncomingLogWrite != null)
-            OnIncomingLogWrite(level, text);
+        //if (_console != null)
+        //    _console.LockOutput();
+
+        var loggingMessage = RenderLoggingEvent(le);
+
+        try
+        {
+            if (Console != null)
+            {
+                ConsoleLevel level;
+
+                if (le.Level == Level.Error)
+                    level = "error";
+                else if (le.Level == Level.Warn)
+                    level = "warn";
+                else
+                    level = "normal";
+
+                Console.Output(loggingMessage, level);
+            }
+            else
+            {
+                if (!loggingMessage.EndsWith("\n"))
+                    System.Console.WriteLine(loggingMessage);
+                else
+                    System.Console.Write(loggingMessage);
+            }
+        }
+        catch (Exception e)
+        {
+            System.Console.WriteLine($"Couldn't write out log message: {e}");
+        }
+        /*
+        finally
+        {
+            if (_console != null)
+                _console.UnlockOutput();
+        }
+        */
     }
 }

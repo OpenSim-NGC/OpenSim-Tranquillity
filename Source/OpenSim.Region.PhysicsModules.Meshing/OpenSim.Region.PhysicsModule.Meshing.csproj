@@ -10,8 +10,6 @@
   
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.1.0" />
-    <PackageReference Include="Mono.Addins" Version="1.4.1" />
-    <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.3" />
   </ItemGroup>
 
@@ -35,7 +33,6 @@
   
   <ItemGroup>
     <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
-    <ProjectReference Include="..\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
     <ProjectReference Include="..\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
     <ProjectReference Include="..\OpenSim.Region.PhysicsModules.SharedBase\OpenSim.Region.PhysicsModules.SharedBase.csproj" />
   </ItemGroup>

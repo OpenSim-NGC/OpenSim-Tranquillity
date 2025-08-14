@@ -10,7 +10,6 @@
 
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.1.0" />
-    <PackageReference Include="Mono.Addins" Version="1.4.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,7 +29,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
-    <ProjectReference Include="..\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
     <ProjectReference Include="..\OpenSim.Framework.Monitoring\OpenSim.Framework.Monitoring.csproj" />
     <ProjectReference Include="..\OpenSim.Region.ClientStack.LindenCaps\OpenSim.Region.ClientStack.LindenCaps.csproj" />
     <ProjectReference Include="..\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj" />

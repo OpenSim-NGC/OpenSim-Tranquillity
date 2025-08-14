@@ -41,7 +41,6 @@ using Microsoft.Extensions.Logging;
 using OSHttpServer;
 using tinyHTTPListener = OSHttpServer.OSHttpListener;
 using Nwc.XmlRpc;
-using OpenSim.Framework.Monitoring;
 using OpenMetaverse.StructuredData;
 
 namespace OpenSim.Framework.Servers.HttpServer
@@ -82,11 +81,6 @@ namespace OpenSim.Framework.Servers.HttpServer
         /// opensim-request-id header but we are not currently logging this.
         /// </remarks>
         public int RequestNumber { get; private set; }
-
-        /// <summary>
-        /// Statistic for holding number of requests processed.
-        /// </summary>
-        private Stat m_requestsProcessedStat;
 
         public volatile bool HTTPDRunning = false;
 

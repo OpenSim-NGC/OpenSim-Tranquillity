@@ -39,11 +39,8 @@
     <ProjectReference Include="..\OpenSim.Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\OpenSim.Data.MySQL\OpenSim.Data.MySQL.csproj" />
     <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
-    <ProjectReference Include="..\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
     <ProjectReference Include="..\OpenSim.Framework.Monitoring\OpenSim.Framework.Monitoring.csproj" />
     <ProjectReference Include="..\OpenSim.Framework.Serialization\OpenSim.Framework.Serialization.csproj" />
-    <ProjectReference Include="..\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj" />
-    <ProjectReference Include="..\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
     <ProjectReference Include="..\OpenSim.Region.ClientStack.LindenUDP\OpenSim.Region.ClientStack.LindenUDP.csproj" />
     <ProjectReference Include="..\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
     <ProjectReference Include="..\OpenSim.Region.PhysicsModules.SharedBase\OpenSim.Region.PhysicsModules.SharedBase.csproj" />
@@ -58,9 +55,6 @@
     <PackageReference Include="log4net" Version="3.1.0" />
     <PackageReference Include="MailKit" Version="4.13.0" />
     <PackageReference Include="MimeKit" Version="4.13.0" />
-    <PackageReference Include="Mono.Addins" Version="1.4.1" />
-    <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
-    <PackageReference Include="MySqlConnector" Version="2.4.0" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.3" />
   </ItemGroup>
 

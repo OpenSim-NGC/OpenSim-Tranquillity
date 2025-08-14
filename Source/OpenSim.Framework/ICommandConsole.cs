@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Contributors, http://whitecore-sim.org/, http://aurora-sim.org, http://opensimulator.org/
+ * Copyright (c) Contributors, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -9,7 +9,7 @@
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the WhiteCore-Sim Project nor the
+ *     * Neither the name of the OpenSimulator Project nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
  *
@@ -25,164 +25,34 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Microsoft.Extensions.Configuration;
+using Nini.Config;
 
-namespace OpenSim.Framework;
-
-/// <summary>
-///     The console interface
-///     This deals with all things that happen on the console or GUI
-/// </summary>
-public interface ICommandConsole
+namespace OpenSim.Framework
 {
-    /// <summary>
-    ///     Initialize the Console Framework
-    /// </summary>
-    /// <returns>bool - true if initialization was successful</returns>
-    bool Initialize();
-    
-    /// <summary>
-    ///     Returns the plugin name
-    /// </summary>
-    /// <returns></returns>
-    string Name { get; }
+    public delegate void OnOutputDelegate(string message);
+    public delegate void OnCntrCCelegate();
 
-    /// <summary>
-    ///     All commands that are enabled on this console
-    /// </summary>
-    ICommands Commands { get; set; }
+    public interface ICommandConsole : IConsole
+    {
+        event OnOutputDelegate OnOutput;
 
-    /// <summary>
-    ///     The log level required to write onto the console
-    /// </summary>
-    Level Threshold { get; set; }
+        ICommands Commands { get; }
 
-    /// <summary>
-    ///     The text behind the blinking cursor on the console
-    /// </summary>
-    string DefaultPrompt { get; set; }
+        /// <summary>
+        /// The default prompt text.
+        /// </summary>
+        string DefaultPrompt { get; set; }
 
-    /// <summary>
-    ///     The current scene the console is set to use (can be null)
-    /// </summary>
-    IScene ConsoleScene { get; set; }
+        /// <summary>
+        /// Display a command prompt on the console and wait for user input
+        /// </summary>
+        void Prompt();
 
-    /// <summary>
-    ///     All scenes that the console has
-    /// </summary>
-    List<IScene> ConsoleScenes { get; set; }
+        void RunCommand(string cmd);
 
-    bool HasProcessedCurrentCommand { get; set; }
+        string ReadLine(string p, bool isCommand, bool e);
 
-    /// <summary>
-    ///     Locks other threads from inserting text onto the console until the other threads are done
-    /// </summary>
-    void LockOutput();
-
-    /// <summary>
-    ///     All finished with inserting text onto the console, let other threads go through
-    /// </summary>
-    void UnlockOutput();
-
-    void Output(string format);
-    void Output(string text, Level level);
-    
-    /// <summary>
-    ///     Read a line of text from the console, can return ""
-    /// </summary>
-    /// <param name="prompt">The message that will be displayed to the console before a prompt is started</param>
-    /// <returns></returns>
-    string Prompt(string prompt);
-
-    /// <summary>
-    ///     Reads a line of text from the console, and if the user presses enter with no text, defaultReturn is returned for this method
-    /// </summary>
-    /// <param name="prompt">The message that will be displayed to the console before a prompt is started</param>
-    /// <param name="defaultReturn">The default response to return if "" is given</param>
-    /// <returns></returns>
-    string Prompt(string prompt, string defaultReturn);
-
-    /// <summary>
-    ///     Reads a line of text from the console, excluding the given characters and will return defaultResponse if enter is pressed with ""
-    /// </summary>
-    /// <param name="prompt">The message that will be displayed to the console before a prompt is started</param>
-    /// <param name="defaultResponse">The default response to return if "" is given</param>
-    /// <param name="excludedCharacters">The characters that cannot be in the response</param>
-    /// <returns></returns>
-    string Prompt(string prompt, string defaultResponse, List<char> excludedCharacters);
-
-    /// <summary>
-    ///     Reads a line of text from the console, returning defaultResponse if no response is given, only the given options are valid entries for the user to use
-    /// </summary>
-    /// <param name="prompt">The message that will be displayed to the console before a prompt is started</param>
-    /// <param name="defaultresponse">The default response to return if "" is given</param>
-    /// <param name="options">The options that the user has to select from</param>
-    /// <returns></returns>
-    string Prompt(string prompt, string defaultresponse, List<string> options);
-
-    /// <summary>
-    ///     Sets up a prompt for secure information (hides the user text and disallows viewing of the text typed later)
-    /// </summary>
-    /// <param name="prompt">The message that will be displayed to the console before a prompt is started</param>
-    /// <returns></returns>
-    string PasswordPrompt(string prompt);
-
-    /// <summary>
-    ///     Run the given command (acts like it was typed from the console)
-    /// </summary>
-    /// <param name="cmd"></param>
-    void RunCommand(string cmd);
-
-    /// <summary>
-    ///     Starts the prompt for the console. This will never stop until the region is closed.
-    /// </summary>
-    void ReadConsole();
-
-    /// <summary>
-    ///     Check to see whether level A is lower or equal to levelB
-    /// </summary>
-    /// <param name="levelA"></param>
-    /// <param name="levelB"></param>
-    /// <returns></returns>
-    bool CompareLogLevels(string levelA, string levelB);
-
-
-    bool IsDebugEnabled { get; }
-    bool IsErrorEnabled { get; }
-    bool IsTraceEnabled { get; }
-    bool IsFatalEnabled { get; }
-    bool IsInfoEnabled { get; }
-    bool IsWarnEnabled { get; }
-
-    void Debug(object message);
-    void DebugFormat(string format, params object[] args);
-    void Error(object message);
-    void ErrorFormat(string format, params object[] args);
-    void Fatal(object message);
-    void FatalFormat(string format, params object[] args);
-    void Format(Level level, string format, params object[] args);
-    void FormatNoTime(Level level, string format, params object[] args);
-    void Info(object message);
-    void CleanInfo(object message);
-    void CleanInfoFormat(string format, params object[] args);
-    void Ticker();
-    void Ticker (string message, bool newline);
-    void InfoFormat(string format, params object[] args);
-    void Log(Level level, object message);
-    void Trace(object message);
-    void TraceFormat(string format, params object[] args);
-    void Warn(object message);
-    void WarnFormat(string format, params object[] args);
-}
-
-public enum Level
-{
-    All = 0,
-    Trace = 1,
-    Debug = 2,
-    Info = 3,
-    Warn = 4,
-    Error = 5,
-    Fatal = 6,
-    Off = 7
+        void ReadConfig(IConfigSource configSource);
+        void SetCntrCHandler(OnCntrCCelegate handler);
+    }
 }

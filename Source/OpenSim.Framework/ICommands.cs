@@ -1,28 +1,53 @@
+using System.Xml;
+
 namespace OpenSim.Framework;
 
-public delegate void CommandDelegate (IScene scene, string [] cmd);
+public delegate void CommandDelegate(string module, string[] cmd);
 
 public interface ICommands
 {
+    void FromXml(XmlElement root, CommandDelegate fn);
+
+    XmlElement GetXml(XmlDocument doc);
+    
     /// <summary>
-    ///     Get help for the given help string
+    /// Get help for the given help string
     /// </summary>
     /// <param name="cmd">Parsed parts of the help string.  If empty then general help is returned.</param>
     /// <returns></returns>
-    List<string> GetHelp (string [] cmd);
+    List<string> GetHelp(string[] cmd);
 
     /// <summary>
-    ///     Add a command to those which can be invoked from the console.
+    /// Add a command to those which can be invoked from the console.
     /// </summary>
-    /// <param name="command">The string that will make the command execute</param>
-    /// <param name="commandHelp">The message that will show the user how to use the command</param>
-    /// <param name="infomessage">Any information about how the command works or what it does</param>
+    /// <param name="module"></param>
+    /// <param name="command"></param>
+    /// <param name="help"></param>
+    /// <param name="longhelp"></param>
     /// <param name="fn"></param>
-    /// <param name="requiresAScene">Whether this command requires a scene to be fired</param>
-    /// <param name="fireOnceForAllScenes">Whether this command will only be executed once if there is no current scene</param>
-    void AddCommand (string command, string commandHelp, string infomessage, CommandDelegate fn, bool requiresAScene, bool fireOnceForAllScenes);
+    void AddCommand(string module, bool shared, string command, string help, string longhelp, CommandDelegate fn);
 
-    bool ContainsCommand (string command);
-    string [] FindNextOption (string [] cmd);
-    string [] Resolve (string [] cmd);
+    /// <summary>
+    /// Add a command to those which can be invoked from the console.
+    /// </summary>
+    /// <param name="module"></param>
+    /// <param name="command"></param>
+    /// <param name="help"></param>
+    /// <param name="longhelp"></param>
+    /// <param name="descriptivehelp"></param>
+    /// <param name="fn"></param>
+    void AddCommand(string module, bool shared, string command,
+        string help, string longhelp, string descriptivehelp,
+        CommandDelegate fn);
+
+    /// <summary>
+    /// Has the given command already been registered?
+    /// </summary>
+    /// <returns></returns>
+    /// <param name="command">Command.</param>
+    bool HasCommand(string command);
+
+    string[] FindNextOption(string[] command, bool term);
+
+    string[] Resolve(string[] command);
 }

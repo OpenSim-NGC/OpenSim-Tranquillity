@@ -26,16 +26,12 @@
  */
 
 using System.Reflection;
-using System.Text;
 using System.Timers;
-using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using OpenMetaverse;
-using OpenSim.Framework.Monitoring;
 using OpenSim.Framework.Servers.HttpServer;
 using Timer=System.Timers.Timer;
-using Nini.Config;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 
@@ -176,12 +172,10 @@ namespace OpenSim.Framework.Servers
             _logger.LogInformation("[STARTUP]: Beginning startup processing");
 
             // _logger.LogInformation($"[STARTUP]: version: {m_version}");
-            
-            _logger.LogInformation(
-                $"[STARTUP]: Version: {m_version}\n" +
-                $"[STARTUP]: Operating system version: {Environment.OSVersion},\n" +
-                $"[STARTUP]: .NET platform {Util.RuntimePlatformStr},\n" +
-                $"[STARTUP]: Runtime {Environment.Version}");
+
+            _logger.LogInformation($"[STARTUP]: Operating system version: {Environment.OSVersion}");
+            _logger.LogInformation($"[STARTUP]: .NET platform {Util.RuntimePlatformStr}");
+            _logger.LogInformation($"[STARTUP]: Runtime {Environment.Version}");
             _logger.LogInformation(
                 $"[STARTUP]: Processor Architecture: {RuntimeInformation.ProcessArchitecture}"+
                 $"({(BitConverter.IsLittleEndian ? "le" : "be")} {(Environment.Is64BitProcess ? "64" : "32")}bit)");

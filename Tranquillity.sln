@@ -3,17 +3,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.11.35303.130
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Addons", "addon-modules", "{80E10B10-2E0D-11F0-B111-B1AE63E25457}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Addons", "Addons", "{80E10B10-2E0D-11F0-B111-B1AE63E25457}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.OptionalModules.Currency", "addon-modules\OpenSim.Region.OptionalModules.Currency\OpenSim.Region.OptionalModules.Currency.csproj", "{2B6DD15C-0B5D-41CA-B713-71B60147114D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.OptionalModules.Currency", "Addons\OpenSim.Region.OptionalModules.Currency\OpenSim.Region.OptionalModules.Currency.csproj", "{2B6DD15C-0B5D-41CA-B713-71B60147114D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcJanusService", "addon-modules\os-webrtc-janus\Janus\WebRtcJanusService.csproj", "{AA629949-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcJanusService", "Addons\os-webrtc-janus\Janus\WebRtcJanusService.csproj", "{AA629949-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoice", "addon-modules\os-webrtc-janus\WebRtcVoice\WebRtcVoice.csproj", "{C76F3732-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoice", "Addons\os-webrtc-janus\WebRtcVoice\WebRtcVoice.csproj", "{C76F3732-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceServiceModule", "addon-modules\os-webrtc-janus\WebRtcVoiceServiceModule\WebRtcVoiceServiceModule.csproj", "{5B354044-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceServiceModule", "Addons\os-webrtc-janus\WebRtcVoiceServiceModule\WebRtcVoiceServiceModule.csproj", "{5B354044-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceRegionModule", "addon-modules\os-webrtc-janus\WebRtcVoiceRegionModule\WebRtcVoiceRegionModule.csproj", "{00122A60-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceRegionModule", "Addons\os-webrtc-janus\WebRtcVoiceRegionModule\WebRtcVoiceRegionModule.csproj", "{00122A60-0000-0000-0000-000000000000}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}"
 EndProject
@@ -59,15 +59,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.SQLite", "Sour
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework", "Source\OpenSim.Framework\OpenSim.Framework.csproj", "{BCCDBB55-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.AssetLoader.Filesystem", "Source\OpenSim.Framework.AssetLoader.Filesystem\OpenSim.Framework.AssetLoader.Filesystem.csproj", "{384A4FAB-0000-0000-0000-000000000000}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.Serialization", "Source\OpenSim.Framework.Serialization\OpenSim.Framework.Serialization.csproj", "{B0A05773-E72F-44FD-B1DA-84AC15B6F425}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Monitoring", "Source\OpenSim.Framework.Monitoring\OpenSim.Framework.Monitoring.csproj", "{69AB1BC7-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Serialization", "Source\OpenSim.Framework.Serialization\OpenSim.Framework.Serialization.csproj", "{BD63E665-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Servers", "Source\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj", "{726D540D-0000-0000-0000-000000000000}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Framework.Servers.HttpServer", "Source\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj", "{159EC5C2-0000-0000-0000-000000000000}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.Monitoring", "Source\OpenSim.Framework.Monitoring\OpenSim.Framework.Monitoring.csproj", "{F0CD630E-D19E-4B05-BB84-5B0A27DA278B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ClientStack.LindenCaps", "Source\OpenSim.Region.ClientStack.LindenCaps\OpenSim.Region.ClientStack.LindenCaps.csproj", "{574BCA63-0000-0000-0000-000000000000}"
 EndProject
@@ -154,6 +148,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.UserProfilesService", "Source\OpenSim.Services.UserProfilesService\OpenSim.Services.UserProfilesService.csproj", "{B4C57E7D-0000-0000-0000-000000000000}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Tests.Services.Connectors", "Tests\OpenSim.Tests.Services.Connectors\OpenSim.Tests.Services.Connectors.csproj", "{34A834DE-7B57-4603-8E49-E5991498356B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.Console", "Source\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj", "{0BF45E88-405A-468A-9796-D14C226D8AF2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.Servers", "Source\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj", "{7B31934E-4353-4353-B2BA-8B9085E47F74}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -257,26 +255,6 @@ Global
 		{BCCDBB55-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BCCDBB55-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BCCDBB55-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{384A4FAB-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{384A4FAB-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{384A4FAB-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{384A4FAB-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{69AB1BC7-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{69AB1BC7-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{69AB1BC7-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{69AB1BC7-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BD63E665-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BD63E665-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BD63E665-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BD63E665-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{726D540D-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{726D540D-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{726D540D-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{726D540D-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{159EC5C2-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{159EC5C2-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{159EC5C2-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{159EC5C2-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
 		{574BCA63-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{574BCA63-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{574BCA63-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -453,6 +431,22 @@ Global
 		{34A834DE-7B57-4603-8E49-E5991498356B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{34A834DE-7B57-4603-8E49-E5991498356B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{34A834DE-7B57-4603-8E49-E5991498356B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0A05773-E72F-44FD-B1DA-84AC15B6F425}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0A05773-E72F-44FD-B1DA-84AC15B6F425}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0A05773-E72F-44FD-B1DA-84AC15B6F425}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0A05773-E72F-44FD-B1DA-84AC15B6F425}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F0CD630E-D19E-4B05-BB84-5B0A27DA278B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F0CD630E-D19E-4B05-BB84-5B0A27DA278B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F0CD630E-D19E-4B05-BB84-5B0A27DA278B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F0CD630E-D19E-4B05-BB84-5B0A27DA278B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0BF45E88-405A-468A-9796-D14C226D8AF2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0BF45E88-405A-468A-9796-D14C226D8AF2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0BF45E88-405A-468A-9796-D14C226D8AF2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0BF45E88-405A-468A-9796-D14C226D8AF2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7B31934E-4353-4353-B2BA-8B9085E47F74}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B31934E-4353-4353-B2BA-8B9085E47F74}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B31934E-4353-4353-B2BA-8B9085E47F74}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B31934E-4353-4353-B2BA-8B9085E47F74}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -478,11 +472,6 @@ Global
 		{10024C78-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{675096A5-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{BCCDBB55-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
-		{384A4FAB-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
-		{69AB1BC7-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
-		{BD63E665-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
-		{726D540D-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
-		{159EC5C2-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{574BCA63-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{E7F1E4AB-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{B60B8DCD-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
@@ -531,6 +520,10 @@ Global
 		{00122A60-0000-0000-0000-000000000000} = {80E10B10-2E0D-11F0-B111-B1AE63E25457}
 		{5B354044-0000-0000-0000-000000000000} = {80E10B10-2E0D-11F0-B111-B1AE63E25457}
 		{2B6DD15C-0B5D-41CA-B713-71B60147114D} = {80E10B10-2E0D-11F0-B111-B1AE63E25457}
+		{B0A05773-E72F-44FD-B1DA-84AC15B6F425} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{F0CD630E-D19E-4B05-BB84-5B0A27DA278B} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{0BF45E88-405A-468A-9796-D14C226D8AF2} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{7B31934E-4353-4353-B2BA-8B9085E47F74} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A40AD54B-8BC7-41E4-B241-19B59EA65D2A}
