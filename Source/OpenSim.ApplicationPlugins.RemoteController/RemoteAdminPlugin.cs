@@ -301,8 +301,8 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 responseData["accepted"] = true;
                 responseData["rebooting"] = true;
 
-                string message;
-                List<int> times = new List<int>();
+                int timeout = 30;
+                bool cancel = false;
 
                 if (requestData.ContainsKey("alerts"))
                 {
@@ -310,55 +310,45 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     if (alertTimes.Length == 1 && Convert.ToInt32(alertTimes[0]) == -1)
                     {
                         m_log.Info("[RADMIN]: Request to cancel restart.");
-
-                        if (restartModule != null)
+                        cancel = true;
+                    }
+                    else
+                    {
+                        timeout = 0;
+                        foreach (string a in alertTimes)
                         {
-                            message = "Restart has been cancelled";
-
-                            if (requestData.ContainsKey("message"))
-                                message = requestData["message"].ToString();
-
-                            restartModule.AbortRestart(message);
-
-                            responseData["success"] = true;
-                            responseData["rebooting"] = false;
-
-                            return;
+                            timeout += Convert.ToInt32(a);
                         }
                     }
-                    foreach (string a in alertTimes)
-                        times.Add(Convert.ToInt32(a));
                 }
                 else
                 {
-                    int timeout = 30;
-                    if (requestData.ContainsKey("milliseconds"))
-                        timeout = Int32.Parse(requestData["milliseconds"].ToString()) / 1000;
-                    while (timeout > 0)
-                    {
-                        times.Add(timeout);
-                        if (timeout > 300)
-                            timeout -= 120;
-                        else if (timeout > 30)
-                            timeout -= 30;
-                        else
-                            timeout -= 15;
-                    }
+					if (requestData.ContainsKey("milliseconds"))
+					{
+						int milliseconds = Int32.Parse(requestData["milliseconds"].ToString());
+						if (milliseconds == -1)
+						{
+							m_log.Info("[RADMIN]: Request to cancel restart.");
+							cancel = true;
+						}
+						else
+						{
+							timeout = milliseconds / 1000;
+						}
+					}
                 }
+
+				if (restartModule != null && cancel)
+				{
+					restartModule.AbortRestart("Region restart has been aborted\n");
+
+					responseData["success"] = true;
+					responseData["rebooting"] = false;
+
+					return;
+				}
 
                 m_log.Info("[RADMIN]: Request to restart Region.");
-
-                message = "Region is restarting in {0}. Please save what you are doing and log out.";
-
-                if (requestData.ContainsKey("message"))
-                    message = requestData["message"].ToString();
-
-                bool notice = true;
-                if (requestData.ContainsKey("noticetype")
-                    && ((string)requestData["noticetype"] == "dialog"))
-                {
-                    notice = false;
-                }
 
                 if (startupConfig.GetBoolean("SkipDelayOnEmptyRegion", false))
                 {
@@ -390,9 +380,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     if (agents == 0)
                     {
                         m_log.Info("[RADMIN]: No avatars detected, shutting down without delay");
-
-                        times.Clear();
-                        times.Add(0);
+                        timeout = 0;
                     }
                 }
 
@@ -407,7 +395,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 {
                     restartModule = s.RequestModuleInterface<IRestartModule>();
                     if (restartModule != null)
-                        restartModule.ScheduleRestart(UUID.Zero, message, times.ToArray(), notice);
+                        restartModule.ScheduleRestart(UUID.Zero, timeout);
                 }
                 responseData["success"] = true;
             }

@@ -3141,6 +3141,21 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             OutPacket(alertPack, ThrottleOutPacketType.Task);
         }
 
+        public void SendAlertMessage(string message, string info, byte[] extra)
+        {
+            AlertMessagePacket alertPack = (AlertMessagePacket)PacketPool.Instance.GetPacket(PacketType.AlertMessage);
+            //alertPack.AgentInfo = new AlertMessagePacket.AgentInfoBlock[1];
+            //alertPack.AgentInfo[0] = new AlertMessagePacket.AgentInfoBlock();
+            //alertPack.AgentInfo[0].AgentID = AgentId;
+            alertPack.AlertData = new AlertMessagePacket.AlertDataBlock();
+            alertPack.AlertData.Message = Util.StringToBytes256(message);
+            alertPack.AlertInfo = new AlertMessagePacket.AlertInfoBlock[1];
+            alertPack.AlertInfo[0] = new AlertMessagePacket.AlertInfoBlock();
+            alertPack.AlertInfo[0].Message = Util.StringToBytes256(info);
+            alertPack.AlertInfo[0].ExtraParams = extra;
+            OutPacket(alertPack, ThrottleOutPacketType.Task);
+        }
+
         /// <summary>
         /// Send an agent alert message to the client.
         /// </summary>

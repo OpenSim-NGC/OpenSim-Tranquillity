@@ -872,6 +872,10 @@ namespace OpenSim.Tests.Common
         {
         }
 
+        public void SendAlertMessage(string message, string info, byte[] extra)
+        {
+        }
+
         public void SendSystemAlertMessage(string message)
         {
         }
