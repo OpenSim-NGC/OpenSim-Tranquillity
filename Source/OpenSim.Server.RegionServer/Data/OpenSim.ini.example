@@ -458,6 +458,10 @@
     ;# {MapColor4} {} {Terrain color 4 for textured maps} {"#C8C8C8"}
     ; MapColor4 = "#C8C8C8"
 
+    ;# {OnlyGenerateIfMissing} {} { true false } false
+    ;; Set this to true if you would only like the region to generate a map tile if it doesn't already have one
+    ;; Leave this false if you would like to generate a new tile every time the region starts
+    ; OnlyGenerateIfMissing = false
 
 [Permissions]
     ;# {permissionmodules} {} {Permission modules to use (may specify multiple modules, separated by comma} {} DefaultPermissionsModule
