@@ -55,4 +55,7 @@
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
     <PackageReference Include="MySqlConnector" Version="2.4.0" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
 </Project>

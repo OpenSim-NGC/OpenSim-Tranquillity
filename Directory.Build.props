@@ -12,6 +12,13 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
   </PropertyGroup>
+    <PropertyGroup>
+    <!-- Define a common output directory for all projects -->
+    <OutputPath>$(SolutionDir)build\$(Configuration)\</OutputPath>
+    <BaseOutputPath>$(SolutionDir)build\</BaseOutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Nerdbank.GitVersioning" Version="3.7.115">
       <PrivateAssets>all</PrivateAssets>

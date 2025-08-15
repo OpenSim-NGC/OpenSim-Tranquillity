@@ -78,24 +78,53 @@ namespace OpenSim
 
             AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
 
-            /*
-            // pre load System.Drawing.Common.dll for the platform
-            // this will fail if a newer version is present on GAC, bin folder, etc, since LoadFrom only accepts the path, if it cannot find it elsewhere
-            string targetdll = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),"lib",
-                        (Util.IsWindows() ? "win" : "linux"), "System.Drawing.Common.dll");
+            var targetdll = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
+                        "System.Drawing.Common.dll");
+            string src = targetdll + (Util.IsWindows() ? ".win" : ".linux");
             try
             {
-                Assembly asmb =  Assembly.LoadFrom(targetdll);
+                if (!File.Exists(targetdll))
+                    File.Copy(src, targetdll);
+                else
+                {
+                    FileInfo targetInfo = new(targetdll);
+                    FileInfo srcInfo = new(src);
+                    if(targetInfo.Length != srcInfo.Length)
+                        File.Copy(src, targetdll, true);
+                }
             }
             catch (Exception e)
             {
-                XmlConfigurator.Configure(new System.IO.FileInfo("OpenSim.Server.RegionServer.dll.config"));
-                m_log.Info("[OPENSIM MAIN]: configured log4net using default OpenSim.Server.RegionServer.dll.config");
+                m_log.Error("Failed to copy System.Drawing.Common.dll for current platform" + e.Message);
+                throw;
             }
 
-            m_log.InfoFormat("[OPENSIM MAIN]: System Locale is {0}", System.Threading.Thread.CurrentThread.CurrentCulture);
+            // pre load System.Drawing.Common.dll for the platform
+            // this will fail if a newer version is present on GAC, bin folder, etc, since LoadFrom only accepts the path, if it cannot find it elsewhere
+            try
+            {
+                Assembly asmb = Assembly.LoadFrom(targetdll);
+            }
+            catch (Exception e)
+            {
+                m_log.Error("Failed to load System.Drawing.Common.dll for current platform" + e.Message);
+                throw;
+            }
 
-            if(!Util.IsWindows())
+            ServicePointManager.DefaultConnectionLimit = 32;
+            ServicePointManager.MaxServicePointIdleTime = 30000;
+
+            try { ServicePointManager.DnsRefreshTimeout = 5000; } catch { }
+            ServicePointManager.Expect100Continue = false;
+            ServicePointManager.UseNagleAlgorithm = false;
+
+            // Add the arguments supplied when running the application to the configuration
+            ArgvConfigSource configSource = new ArgvConfigSource(args);
+
+            // Configure Log4Net
+            configSource.AddSwitch("Startup", "logconfig");
+            string logConfigFile = configSource.Configs["Startup"].GetString("logconfig", string.Empty);
+            if (!string.IsNullOrEmpty(logConfigFile))
             {
                 XmlConfigurator.Configure(new System.IO.FileInfo(logConfigFile));
                 m_log.Info($"[OPENSIM MAIN]: configured log4net using \"{logConfigFile}\" as configuration file");
