@@ -27,16 +27,17 @@
 
 using System.Text;
 using System.Text.RegularExpressions;
-using Nini.Config;
+
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework.Console;
 
 /// <summary>
 ///     A console that uses cursor control and color
 /// </summary>
-public class LocalConsole : CommandConsole
+public class LocalConsole : ICommandConsole
 {
-    // private readonly object m_syncRoot = new object();
     private const string LOGLEVEL_NONE = "(none)";
 
     private static readonly ConsoleColor[] Colors =
@@ -61,31 +62,56 @@ public class LocalConsole : CommandConsole
         @"^(?<Front>.*?)\[(?<Category>[^\]]+)\]:?(?<End>.*)", RegexOptions.Singleline | RegexOptions.Compiled);
 
     private readonly StringBuilder m_commandLine = new();
-    private int m_cursorXPosition;
-
-    private int m_cursorYPosition = -1;
-    private bool m_echo = true;
     private readonly List<string> m_history = new();
     private readonly bool m_historyEnable;
     private readonly string m_historyPath;
     private readonly bool m_historytimestamps;
+    private int m_cursorXPosition;
 
-    public LocalConsole(string defaultPrompt, IConfig startupConfig = null) : base(defaultPrompt)
+    private int m_cursorYPosition = -1;
+    private bool m_echo = true;
+    private string prompt = "> ";
+
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<LocalConsole> _logger;
+    private readonly ICommandConsole _commandConsole;
+
+    public ICommands Commands => _commandConsole.Commands;
+
+    public string DefaultPrompt { get => _commandConsole.DefaultPrompt; set => _commandConsole.DefaultPrompt = value; }
+    public IScene ConsoleScene { get => _commandConsole.ConsoleScene; set => _commandConsole.ConsoleScene = value; }
+
+    public LocalConsole(IConfiguration configuration, ILogger<LocalConsole> logger, ICommandConsole commandConsole)
     {
-        if (startupConfig == null) return;
+        _configuration = configuration;
+        _logger = logger;
+        _commandConsole = commandConsole;
 
-        m_historyEnable = startupConfig.GetBoolean("ConsoleHistoryFileEnabled", false);
-        if (!m_historyEnable)
+        var startupConfig = _configuration.GetSection("Startup");  
+        if (startupConfig.Exists() == false)
+            return;
+
+        m_historyEnable = startupConfig.GetValue<bool>("ConsoleHistoryFileEnabled", false);
+        if (m_historyEnable is false)
         {
-            _logger.Info("[LOCAL CONSOLE]: Persistent command line history from file is Disabled");
+            _logger.LogInformation("[LOCAL CONSOLE]: Persistent command line history from file is Disabled");
             return;
         }
 
-        var m_historyFile = startupConfig.GetString("ConsoleHistoryFile", "OpenSimConsoleHistory.txt");
-        var m_historySize = startupConfig.GetInt("ConsoleHistoryFileLines", 100);
+        var m_historySize = startupConfig.GetValue<int>("ConsoleHistoryFileLines", 100);
+        if (m_historySize <= 0)
+        {
+            _logger.LogInformation("[LOCAL CONSOLE]: Persistent command line history from file is Disabled, size is {0}",
+                m_historySize);
+            m_historyEnable = false;
+            return;
+        }
+
+        var m_historyFile = startupConfig.GetValue("ConsoleHistoryFile", "OpenSimConsoleHistory.txt");
         m_historyPath = Path.GetFullPath(Path.Combine(Util.configDir(), m_historyFile));
-        m_historytimestamps = startupConfig.GetBoolean("ConsoleHistoryTimeStamp", false);
-        m_log.InfoFormat(
+        m_historytimestamps = startupConfig.GetValue<bool>("ConsoleHistoryTimeStamp", false);
+
+        _logger.LogInformation(
             "[LOCAL CONSOLE]: Persistent command line history is Enabled, up to {0} lines from file {1} {2} timestamps",
             m_historySize, m_historyPath, m_historytimestamps ? "with" : "without");
 
@@ -128,16 +154,28 @@ public class LocalConsole : CommandConsole
                 }
             }
 
-            m_log.InfoFormat("[LOCAL CONSOLE]: Read {0} lines of command line history from file {1}", m_history.Count,
-                m_historyPath);
+            _logger.LogInformation("[LOCAL CONSOLE]: Read {0} lines of command line history from file {1}", m_history.Count, m_historyPath);
         }
         else
         {
-            m_log.InfoFormat("[LOCAL CONSOLE]: Creating new empty command line history file {0}", m_historyPath);
+            _logger.LogInformation("[LOCAL CONSOLE]: Creating new empty command line history file {0}", m_historyPath);
             File.Create(m_historyPath).Dispose();
         }
 
         System.Console.TreatControlCAsInput = true;
+    }
+
+    public event OnOutputDelegate OnOutput
+    {
+        add
+        {
+            _commandConsole.OnOutput += value;
+        }
+
+        remove
+        {
+            _commandConsole.OnOutput -= value;
+        }
     }
 
     private static ConsoleColor DeriveColor(string input)
@@ -317,7 +355,7 @@ public class LocalConsole : CommandConsole
         }
     }
 
-    public override void LockOutput()
+    public void LockOutput()
     {
         Monitor.Enter(m_commandLine);
         try
@@ -338,7 +376,7 @@ public class LocalConsole : CommandConsole
         }
     }
 
-    public override void UnlockOutput()
+    public void UnlockOutput()
     {
         if (m_cursorYPosition != -1)
         {
@@ -405,12 +443,12 @@ public class LocalConsole : CommandConsole
             System.Console.Write(outText);
     }
 
-    public override void Output(string format)
+    public void Output(string format)
     {
         Output(format, null);
     }
 
-    public override void Output(string format, params object[] components)
+    public void Output(string format, params object[] components)
     {
         string level = null;
         if (components != null && components.Length > 0)
@@ -480,7 +518,7 @@ public class LocalConsole : CommandConsole
         return true;
     }
 
-    public override string ReadLine(string p, bool isCommand, bool e)
+    public string ReadLine(string p, bool isCommand, bool e)
     {
         m_cursorXPosition = 0;
         prompt = p;
@@ -501,7 +539,7 @@ public class LocalConsole : CommandConsole
         {
             Show();
             //Reduce collisions with internal read terminal information like cursor position on linux
-            while (System.Console.KeyAvailable == false)
+            while (!System.Console.KeyAvailable)
                 Thread.Sleep(100);
 
             var key = System.Console.ReadKey(true);
@@ -632,5 +670,50 @@ public class LocalConsole : CommandConsole
                 }
             }
         }
+    }
+
+    public void Prompt()
+    {
+        _commandConsole.Prompt();
+    }
+
+    public void RunCommand(string cmd)
+    {
+        _commandConsole.RunCommand(cmd);
+    }
+
+    public void ReadConfig(IConfiguration configSource)
+    {
+        _commandConsole.ReadConfig(configSource);
+    }
+
+    public void SetCntrCHandler(OnCntrCCelegate handler)
+    {
+        _commandConsole.SetCntrCHandler(handler);
+    }
+
+    public string Prompt(string p)
+    {
+        return _commandConsole.Prompt(p);
+    }
+
+    public string Prompt(string p, string def)
+    {
+        return _commandConsole.Prompt(p, def);
+    }
+
+    public string Prompt(string p, List<char> excludedCharacters)
+    {
+        return _commandConsole.Prompt(p, excludedCharacters);
+    }
+
+    public string Prompt(string p, string def, List<char> excludedCharacters, bool echo = true)
+    {
+        return _commandConsole.Prompt(p, def, excludedCharacters, echo);
+    }
+
+    public string Prompt(string prompt, string defaultresponse, List<string> options)
+    {
+        return _commandConsole.Prompt(prompt, defaultresponse, options);
     }
 }

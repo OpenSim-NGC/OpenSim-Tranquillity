@@ -1,15 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyTitle>OpenSim.Addons.OfflineIM</AssemblyTitle>
-    <Company>http://opensimulator.org</Company>
-    <Product>OpenSim.Addons.OfflineIM</Product>
-    <Copyright>Copyright (c) OpenSimulator.org Developers</Copyright>
+    <AssemblyTitle>OpenSim.Data.MySQL.MoneyData</AssemblyTitle>
+    <Company>OpenSim</Company>
+    <Product>OpenSim.Data.MySQL.MoneyData</Product>
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.1.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.8" />
+    <PackageReference Include="System.Text.Json" Version="9.0.7" />
+    <PackageReference Include="MySqlConnector" Version="2.4.0" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Nini">
@@ -21,13 +21,15 @@
     <Reference Include="OpenMetaverseTypes">
       <HintPath>..\..\Library\OpenMetaverseTypes.dll</HintPath>
     </Reference>
+    <Reference Include="XMLRPC">
+      <HintPath>..\..\Library\XMLRPC.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OpenSim.Data\OpenSim.Data.csproj" />
-    <ProjectReference Include="..\OpenSim.Data.MySQL\OpenSim.Data.MySQL.csproj" />
+    <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
-    <ProjectReference Include="..\OpenSim.Server.Handlers\OpenSim.Server.Handlers.csproj" />
-    <ProjectReference Include="..\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
     <ProjectReference Include="..\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="..\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
   </ItemGroup>
 </Project>

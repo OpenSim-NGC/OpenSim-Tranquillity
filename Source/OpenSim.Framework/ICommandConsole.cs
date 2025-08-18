@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
+using Microsoft.Extensions.Configuration;
 
 namespace OpenSim.Framework
 {
@@ -39,20 +39,11 @@ namespace OpenSim.Framework
         ICommands Commands { get; }
 
         /// <summary>
-        /// The default prompt text.
-        /// </summary>
-        string DefaultPrompt { get; set; }
-
-        /// <summary>
         /// Display a command prompt on the console and wait for user input
         /// </summary>
         void Prompt();
-
         void RunCommand(string cmd);
-
-        string ReadLine(string p, bool isCommand, bool e);
-
-        void ReadConfig(IConfigSource configSource);
+        void ReadConfig(IConfiguration configSource);
         void SetCntrCHandler(OnCntrCCelegate handler);
     }
 }

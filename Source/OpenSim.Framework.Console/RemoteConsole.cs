@@ -29,19 +29,19 @@ using System.Collections;
 using System.Timers;
 using System.Web;
 using System.Xml;
-using Nini.Config;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
-using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Framework.Monitoring;
 using Timer = System.Timers.Timer;
 
 namespace OpenSim.Framework.Console;
 
 // A console that uses REST interfaces
 //
-public class RemoteConsole : CommandConsole
+public class RemoteConsole : ICommandConsole
 {
     protected string m_AllowedOrigin = string.Empty;
-    protected IConfigSource m_Config;
 
     // The list of sessions we maintain. Unlike other console types,
     // multiple users on the same console are explicitly allowed.
@@ -89,40 +89,63 @@ public class RemoteConsole : CommandConsole
 
     protected string m_UserName = string.Empty;
 
+    protected readonly IConfiguration _configuration;
+    protected readonly ILogger<RemoteConsole> _logger;
+    protected readonly ICommandConsole _commandConsole;
 
-    public RemoteConsole(string defaultPrompt) : base(defaultPrompt)
+    public ICommands Commands => _commandConsole.Commands;
+
+    public IScene ConsoleScene { get => _commandConsole.ConsoleScene; set => _commandConsole.ConsoleScene = value; }
+    public string DefaultPrompt { get => _commandConsole.DefaultPrompt; set => _commandConsole.DefaultPrompt = value; }
+
+    public RemoteConsole(
+        IConfiguration configuration,
+        ILogger<RemoteConsole> logger,
+        ICommandConsole commandConsole
+        )
     {
+        _configuration = configuration;
+        _logger = logger;
+        _commandConsole = commandConsole;
+
         // There is something wrong with this architecture.
         // A prompt is sent on every single input, so why have this?
         // TODO: Investigate and fix.
-        m_lastPromptUsed = defaultPrompt;
+        m_lastPromptUsed = DefaultPrompt;
 
         // Start expiration of sesssions.
         m_expireTimer.Elapsed += DoExpire;
         m_expireTimer.Start();
-    }
-
-    public override void ReadConfig(IConfigSource config)
-    {
-        m_Config = config;
 
         // We're pulling this from the 'Network' section for legacy
         // compatibility. However, this is so essentially insecure
         // that TLS and client certs should be used instead of
         // a username / password.
-        var netConfig = m_Config.Configs["Network"];
-
-        if (netConfig == null)
+        var netConfig = _configuration.GetSection("Network");
+        if (netConfig.Exists() == false)
             return;
 
         // Get the username and password.
-        m_UserName = netConfig.GetString("ConsoleUser", string.Empty);
-        m_Password = netConfig.GetString("ConsolePass", string.Empty);
+        m_UserName = netConfig.GetValue("ConsoleUser", string.Empty);
+        m_Password = netConfig.GetValue("ConsolePass", string.Empty);
 
         // Woefully underdocumented, this is what makes javascript
         // console clients work. Set to "*" for anywhere or (better)
         // to specific addresses.
-        m_AllowedOrigin = netConfig.GetString("ConsoleAllowedOrigin", string.Empty);
+        m_AllowedOrigin = netConfig.GetValue("ConsoleAllowedOrigin", string.Empty);
+    }
+
+    public event OnOutputDelegate OnOutput
+    {
+        add
+        {
+            _commandConsole.OnOutput += value;
+        }
+
+        remove
+        {
+            _commandConsole.OnOutput -= value;
+        }
     }
 
     public void SetServer(IHttpServer server)
@@ -137,12 +160,12 @@ public class RemoteConsole : CommandConsole
         m_Server.AddHTTPHandler("/SessionCommand", HandleHttpSessionCommand);
     }
 
-    public override void Output(string format)
+    public void Output(string format)
     {
         Output(format, null);
     }
 
-    public override void Output(string format, params object[] components)
+    public void Output(string format, params object[] components)
     {
         string level = null;
         if (components != null && components.Length > 0)
@@ -207,7 +230,7 @@ public class RemoteConsole : CommandConsole
         System.Console.WriteLine(text.Trim());
     }
 
-    public override string ReadLine(string p, bool isCommand, bool e)
+    public string ReadLine(string p, bool isCommand, bool e)
     {
         // Output the prompt an prepare to wait. This
         // is called on a dedicated console thread and
@@ -374,12 +397,10 @@ public class RemoteConsole : CommandConsole
         // Our reply is an XML document.
         // TODO: Change this to Linq.Xml
         var xmldoc = new XmlDocument();
-        var xmlnode = xmldoc.CreateNode(XmlNodeType.XmlDeclaration,
-            "", "");
+        var xmlnode = xmldoc.CreateNode(XmlNodeType.XmlDeclaration,"", "");
 
         xmldoc.AppendChild(xmlnode);
-        var rootElement = xmldoc.CreateElement("", "ConsoleSession",
-            "");
+        var rootElement = xmldoc.CreateElement("", "ConsoleSession","");
 
         xmldoc.AppendChild(rootElement);
 
@@ -680,6 +701,51 @@ public class RemoteConsole : CommandConsole
         result = CheckOrigin(result);
 
         return result;
+    }
+
+    public void Prompt()
+    {
+        _commandConsole.Prompt();
+    }
+
+    public void RunCommand(string cmd)
+    {
+        _commandConsole.RunCommand(cmd);
+    }
+
+    public void ReadConfig(IConfiguration configSource)
+    {
+        _commandConsole.ReadConfig(configSource);
+    }
+
+    public void SetCntrCHandler(OnCntrCCelegate handler)
+    {
+        _commandConsole.SetCntrCHandler(handler);
+    }
+
+    public string Prompt(string p)
+    {
+        return _commandConsole.Prompt(p);
+    }
+
+    public string Prompt(string p, string def)
+    {
+        return _commandConsole.Prompt(p, def);
+    }
+
+    public string Prompt(string p, List<char> excludedCharacters)
+    {
+        return _commandConsole.Prompt(p, excludedCharacters);
+    }
+
+    public string Prompt(string p, string def, List<char> excludedCharacters, bool echo = true)
+    {
+        return _commandConsole.Prompt(p, def, excludedCharacters, echo);
+    }
+
+    public string Prompt(string prompt, string defaultresponse, List<string> options)
+    {
+        return _commandConsole.Prompt(prompt, defaultresponse, options);
     }
 
     // Connection specific data, indexed by a session ID

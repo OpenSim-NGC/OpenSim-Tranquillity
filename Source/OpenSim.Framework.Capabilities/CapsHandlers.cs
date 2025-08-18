@@ -26,12 +26,12 @@
  */
 
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
-using OpenSim.Framework.Servers;
-using OpenSim.Framework.Servers.HttpServer;
+using System.Collections.Generic;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+using OpenSim.Framework.Servers;
+using OpenSim.Framework.Servers.HttpServer;
 
 namespace OpenSim.Framework.Capabilities
 {

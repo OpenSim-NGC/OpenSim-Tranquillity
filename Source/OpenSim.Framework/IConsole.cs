@@ -30,6 +30,7 @@ namespace OpenSim.Framework
     public interface IConsole
     {
         IScene ConsoleScene { get; set; }
+        string DefaultPrompt { get; set; }
 
         void Output(string format);
         void Output(string format, params object[] components);
@@ -41,5 +42,7 @@ namespace OpenSim.Framework
 
         // Displays a prompt and returns a default value, user may only enter 1 of 2 options
         string Prompt(string prompt, string defaultresponse, List<string> options);
+
+        string ReadLine(string prompt, bool isCommand, bool echo);
     }
 }

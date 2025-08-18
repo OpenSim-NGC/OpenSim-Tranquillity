@@ -25,9 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenMetaverse;
 using System;
 using System.Collections;
+using OpenMetaverse;
 
 namespace OpenSim.Framework.Capabilities
 {

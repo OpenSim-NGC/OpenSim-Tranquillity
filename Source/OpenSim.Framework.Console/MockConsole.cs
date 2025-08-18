@@ -26,7 +26,7 @@
  */
 
 using System.Xml;
-using Nini.Config;
+using Microsoft.Extensions.Configuration;
 
 namespace OpenSim.Framework.Console;
 
@@ -98,11 +98,11 @@ public class MockConsole : ICommandConsole
         return "";
     }
 
-    public void ReadConfig(IConfigSource configSource)
+    public void SetCntrCHandler(OnCntrCCelegate handler)
     {
     }
 
-    public void SetCntrCHandler(OnCntrCCelegate handler)
+    public void ReadConfig(IConfiguration configSource)
     {
     }
 

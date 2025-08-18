@@ -26,7 +26,7 @@
  */
 
 using System.Net;
-using Nwc.XmlRpc;
+using XmlRpcCore;
 
 namespace OpenSim.Framework.Servers.HttpServer
 {

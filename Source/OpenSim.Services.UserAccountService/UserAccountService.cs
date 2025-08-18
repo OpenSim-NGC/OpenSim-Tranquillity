@@ -670,19 +670,19 @@ namespace OpenSim.Services.UserAccountService
                 account = new UserAccount(UUID.Zero, principalID, firstName, lastName, email);
                 if (account.ServiceURLs == null || account.ServiceURLs.Count == 0)
                 {
-                account.ServiceURLs = new Dictionary<string, object>
-                {
-                    ["HomeURI"] = string.Empty,
-                    ["InventoryServerURI"] = string.Empty,
-                    ["AssetServerURI"] = string.Empty
-                };
+                    account.ServiceURLs = new Dictionary<string, object>
+                    {
+                        ["HomeURI"] = string.Empty,
+                        ["InventoryServerURI"] = string.Empty,
+                        ["AssetServerURI"] = string.Empty
+                    };
                 }
 
-            if (!StoreUserAccount(account))
+                if (!StoreUserAccount(account))
                 {
-                m_log.Error($"[USER ACCOUNT SERVICE]: Account creation failed for account {firstName} {lastName}");
+                _logger.LogError($"[USER ACCOUNT SERVICE]: Account creation failed for account {firstName} {lastName}");
                 return null;
-            }
+                }
 
                     bool success;
                     if (_authenticationService != null)
@@ -735,7 +735,7 @@ namespace OpenSim.Services.UserAccountService
 
                         if (CreateDefaultAvatarEntries)
                         {
-                    if (string.IsNullOrEmpty(model))
+                            if (string.IsNullOrEmpty(model))
                                 CreateDefaultAppearanceEntries(account.PrincipalID);
                             else
                                 EstablishAppearance(account.PrincipalID, model);

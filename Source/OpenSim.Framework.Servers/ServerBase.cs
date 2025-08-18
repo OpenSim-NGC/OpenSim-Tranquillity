@@ -29,10 +29,13 @@ using System.Diagnostics;
 using System.Runtime;
 using System.Text;
 using System.Text.RegularExpressions;
+
 using Autofac;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using OpenSim.Framework.Console;
+
+using OpenSim.Framework.Monitoring;
 
 namespace OpenSim.Framework.Servers
 {

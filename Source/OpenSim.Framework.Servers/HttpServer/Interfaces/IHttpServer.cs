@@ -25,81 +25,79 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nwc.XmlRpc;
+namespace OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Framework.Servers.HttpServer
+/// <summary>
+/// Interface to OpenSimulator's built in HTTP server.  Use this to register handlers (http, llsd, xmlrpc, etc.)
+/// for given URLs.
+/// </summary>
+public interface IHttpServer
 {
-    /// <summary>
-    /// Interface to OpenSimulator's built in HTTP server.  Use this to register handlers (http, llsd, xmlrpc, etc.)
-    /// for given URLs.
-    /// </summary>
-    public interface IHttpServer
-    {
-        uint SSLPort { get; }
-        string SSLCommonName { get; }
+    uint SSLPort { get; }
+    string SSLCommonName { get; }
 
-        uint Port { get; }
-        bool UseSSL { get; }
+    uint Port { get; }
+    bool UseSSL { get; }
 
 //        // Note that the agent string is provided simply to differentiate
 //        // the handlers - it is NOT required to be an actual agent header
 //        // value.
 //        bool AddAgentHandler(string agent, IHttpAgentHandler handler);
 
-        /// <summary>
-        /// </remarks>
-        /// <param name="methodName"></param>
-        /// <param name="handler"></param>
-        /// <returns>
-        /// true if the handler was successfully registered, false if a handler with the same name already existed.
-        /// </returns>
-        bool AddHTTPHandler(string methodName, GenericHTTPMethod handler);
+    /// <summary>
+    /// </remarks>
+    /// <param name="methodName"></param>
+    /// <param name="handler"></param>
+    /// <returns>
+    /// true if the handler was successfully registered, false if a handler with the same name already existed.
+    /// </returns>
+    bool AddHTTPHandler(string methodName, GenericHTTPMethod handler);
 
-        bool AddPollServiceHTTPHandler(string uripath, PollServiceEventArgs args);
-        bool AddPollServiceHTTPHandler(PollServiceEventArgs args);
-        bool AddPollServiceHTTPHandlerVarPath(PollServiceEventArgs args);
+    bool AddPollServiceHTTPHandler(string uripath, PollServiceEventArgs args);
+    bool AddPollServiceHTTPHandler(PollServiceEventArgs args);
+    bool AddPollServiceHTTPHandlerVarPath(PollServiceEventArgs args);
 
-        void RemovePollServiceHTTPHandler(string url, string path);
-        void RemovePollServiceHTTPHandler(string path);
+    void RemovePollServiceHTTPHandler(string url, string path);
+    void RemovePollServiceHTTPHandler(string path);
 
-        /// <summary>
-        /// Adds a LLSD handler, yay.
-        /// </summary>
-        /// <param name="path">/resource/ path</param>
-        /// <param name="handler">handle the LLSD response</param>
-        /// <returns></returns>
-        bool AddLLSDHandler(string path, LLSDMethod handler);
+    /// <summary>
+    /// Adds a LLSD handler, yay.
+    /// </summary>
+    /// <param name="path">/resource/ path</param>
+    /// <param name="handler">handle the LLSD response</param>
+    /// <returns></returns>
+    bool AddLLSDHandler(string path, LLSDMethod handler);
 
-        /// <summary>
-        /// Add a stream handler to the http server.  If the handler already exists, then nothing happens.
-        /// </summary>
-        /// <param name="handler"></param>
-        void AddStreamHandler(IRequestHandler handler);
-        void AddSimpleStreamHandler(ISimpleStreamHandler handler, bool varPath = false);
+    /// <summary>
+    /// Add a stream handler to the http server.  If the handler already exists, then nothing happens.
+    /// </summary>
+    /// <param name="handler"></param>
+    void AddStreamHandler(IRequestHandler handler);
+    void AddSimpleStreamHandler(ISimpleStreamHandler handler, bool varPath = false);
 
-        bool AddXmlRPCHandler(string method, XmlRpcMethod handler);
-        bool AddXmlRPCHandler(string method, XmlRpcMethod handler, bool keepAlive);
+    bool AddXmlRPCHandler(string method, XmlRpcMethod handler);
+    bool AddXmlRPCHandler(string method, XmlRpcMethod handler, bool keepAlive);
 
-        bool AddJsonRPCHandler(string method, JsonRPCMethod handler);
+    bool AddJsonRPCHandler(string method, JsonRPCMethod handler);
 
-        /// <summary>
-        /// Websocket HTTP server handlers.
-        /// </summary>
-        /// <param name="servicepath"></param>
-        /// <param name="handler"></param>
-        void AddWebSocketHandler(string servicepath, BaseHttpServer.WebSocketRequestDelegate handler);
+    /// <summary>
+    /// Websocket HTTP server handlers.
+    /// </summary>
+    /// <param name="servicepath"></param>
+    /// <param name="handler"></param>
+    void AddWebSocketHandler(string servicepath, BaseHttpServer.WebSocketRequestDelegate handler);
 
 
-        void RemoveWebSocketHandler(string servicepath);
+    void RemoveWebSocketHandler(string servicepath);
 
-        /// <summary>
-        /// Gets the XML RPC handler for given method name
-        /// </summary>
-        /// <param name="method">Name of the method</param>
-        /// <returns>Returns null if not found</returns>
-        XmlRpcMethod GetXmlRPCHandler(string method);
+    /// <summary>
+    /// Gets the XML RPC handler for given method name
+    /// </summary>
+    /// <param name="method">Name of the method</param>
+    /// <returns>Returns null if not found</returns>
+    XmlRpcMethod GetXmlRPCHandler(string method);
 
-        bool SetDefaultLLSDHandler(DefaultLLSDMethod handler);
+    bool SetDefaultLLSDHandler(DefaultLLSDMethod handler);
 
 //        /// <summary>
 //        /// Remove the agent if it is registered.
@@ -109,26 +107,25 @@ namespace OpenSim.Framework.Servers.HttpServer
 //        /// <returns></returns>
 //        bool RemoveAgentHandler(string agent, IHttpAgentHandler handler);
 
-        /// <summary>
-        /// Remove an HTTP handler
-        /// </summary>
-        /// <param name="httpMethod"></param>
-        /// <param name="path"></param>
-        void RemoveHTTPHandler(string httpMethod, string path);
+    /// <summary>
+    /// Remove an HTTP handler
+    /// </summary>
+    /// <param name="httpMethod"></param>
+    /// <param name="path"></param>
+    void RemoveHTTPHandler(string httpMethod, string path);
 
 
-        bool RemoveLLSDHandler(string path, LLSDMethod handler);
+    bool RemoveLLSDHandler(string path, LLSDMethod handler);
 
-        void RemoveStreamHandler(string httpMethod, string path);
-        void RemoveSimpleStreamHandler(string path);
+    void RemoveStreamHandler(string httpMethod, string path);
+    void RemoveSimpleStreamHandler(string path);
 
-        void RemoveXmlRPCHandler(string method);
+    void RemoveXmlRPCHandler(string method);
 
-        void RemoveJsonRPCHandler(string method);
+    void RemoveJsonRPCHandler(string method);
 
-        string GetHTTP404();
-        void AddIndexPHPMethodHandler(string key, SimpleStreamMethod sh);
-        void RemoveIndexPHPMethodHandler(string key);
-        SimpleStreamMethod TryGetIndexPHPMethodHandler(string key);
-    }
+    string GetHTTP404();
+    void AddIndexPHPMethodHandler(string key, SimpleStreamMethod sh);
+    void RemoveIndexPHPMethodHandler(string key);
+    SimpleStreamMethod TryGetIndexPHPMethodHandler(string key);
 }

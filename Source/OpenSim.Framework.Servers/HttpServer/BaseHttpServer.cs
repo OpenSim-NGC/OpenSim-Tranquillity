@@ -37,11 +37,15 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Xml;
+
 using Microsoft.Extensions.Logging;
+
 using OSHttpServer;
 using tinyHTTPListener = OSHttpServer.OSHttpListener;
-using Nwc.XmlRpc;
 using OpenMetaverse.StructuredData;
+
+using OpenSim.Framework.Monitoring;
+using XmlRpcCore;
 
 namespace OpenSim.Framework.Servers.HttpServer
 {
@@ -1140,6 +1144,7 @@ namespace OpenSim.Framework.Servers.HttpServer
             }
 
             XmlRpcRequest xmlRprcRequest = null;
+
             try
             {
                 using (StreamReader reader = new StreamReader(requestStream, Encoding.UTF8))
@@ -1194,13 +1199,15 @@ namespace OpenSim.Framework.Servers.HttpServer
                         break;
                     }
                 }
+                
                 xmlRprcRequest.Params.Add(request.Headers.Get(xff)); // Param[3]
 
                 // reserve this for
                 // ... by Fumi.Iseki for DTLNSLMoneyServer
                 // BUT make its presence possible to detect/parse
                 string rcn = request.IHttpClientContext.SSLCommonName;
-                if(!string.IsNullOrWhiteSpace(rcn))
+                
+                if (!string.IsNullOrWhiteSpace(rcn))
                 {
                     rcn = "SSLCN:" + rcn;
                     xmlRprcRequest.Params.Add(rcn); // Param[4] or Param[5]

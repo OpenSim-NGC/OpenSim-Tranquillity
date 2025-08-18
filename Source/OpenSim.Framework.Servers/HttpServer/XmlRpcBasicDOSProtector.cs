@@ -26,8 +26,7 @@
  */
 
 using System.Net;
-using Nwc.XmlRpc;
-using OpenSim.Framework;
+using XmlRpcCore;
 
 
 namespace OpenSim.Framework.Servers.HttpServer
@@ -51,7 +50,6 @@ namespace OpenSim.Framework.Servers.HttpServer
         }
         public XmlRpcResponse Process(XmlRpcRequest request, IPEndPoint client)
         {
-
             XmlRpcResponse resp = null;
             string clientstring = GetClientString(request, client);
             string endpoint = GetEndPoint(request, client);

@@ -53,17 +53,12 @@ public class ConsoleLevel
 }
 
 public class ConsoleBase : IConsole
-{
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-    protected string prompt = "# ";
-
-    public ConsoleBase(string defaultPrompt)
+{ 
+    public ConsoleBase()
     {
-        DefaultPrompt = defaultPrompt;
     }
 
-    public string DefaultPrompt { get; set; }
+    public string DefaultPrompt { get; set; } = string.Empty;
 
     public IScene ConsoleScene { get; set; }
 
@@ -101,12 +96,12 @@ public class ConsoleBase : IConsole
 
     public string Prompt(string p)
     {
-        return ReadLine(string.Format("{0}: ", p), false, true);
+        return ReadLine($"{p}: ", false, true);
     }
 
     public string Prompt(string p, string def)
     {
-        var ret = ReadLine(string.Format("{0} [{1}]: ", p, def), false, true);
+        var ret = ReadLine($"{p} [{def}]: ", false, true);
         if (ret.Length == 0)
             ret = def;
 
@@ -133,7 +128,7 @@ public class ConsoleBase : IConsole
         return ret;
     }
 
-    public virtual string Prompt(string p, string def, List<char> excludedCharacters, bool echo = true)
+    public string Prompt(string p, string def, List<char> excludedCharacters, bool echo = true)
     {
         var itisdone = false;
         var ret = string.Empty;
@@ -166,7 +161,7 @@ public class ConsoleBase : IConsole
     }
 
     // Displays a command prompt and returns a default value, user may only enter 1 of 2 options
-    public virtual string Prompt(string prompt, string defaultresponse, List<string> options)
+    public string Prompt(string prompt, string defaultresponse, List<string> options)
     {
         var itisdone = false;
         var optstr = string.Empty;
@@ -174,7 +169,7 @@ public class ConsoleBase : IConsole
             optstr += " " + s;
 
         var temp = Prompt(prompt, defaultresponse);
-        while (itisdone == false)
+        while (!itisdone)
             if (options.Contains(temp))
             {
                 itisdone = true;
@@ -188,19 +183,17 @@ public class ConsoleBase : IConsole
         return temp;
     }
 
-    public virtual void LockOutput()
+    public void LockOutput()
     {
     }
 
-    public virtual void UnlockOutput()
+    public void UnlockOutput()
     {
     }
 
-    public virtual string ReadLine(string p, bool isCommand, bool e)
+    public string ReadLine(string prompt, bool isCommand, bool echo)
     {
-        System.Console.Write("{0}", p);
-        var cmdinput = System.Console.ReadLine();
-
-        return cmdinput;
+        System.Console.Write("{0}", prompt);
+        return System.Console.ReadLine();
     }
 }

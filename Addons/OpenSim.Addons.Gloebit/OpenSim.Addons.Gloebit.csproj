@@ -28,17 +28,19 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\OpenSim.Data\OpenSim.Data.csproj" />
-    <ProjectReference Include="..\OpenSim.Data.MySQL\OpenSim.Data.MySQL.csproj" />
-    <ProjectReference Include="..\OpenSim.Data.PGSQL\OpenSim.Data.PGSQL.csproj" />
-    <ProjectReference Include="..\OpenSim.Data.SQLite\OpenSim.Data.SQLite.csproj" />
-    <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
-    <ProjectReference Include="..\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj" />
-    <ProjectReference Include="..\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
-    <ProjectReference Include="..\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj" />
-    <ProjectReference Include="..\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
-    <ProjectReference Include="..\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
-    <ProjectReference Include="..\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />    
+    <ProjectReference Include="..\..\Source\OpenSim.Data.MySQL\OpenSim.Data.MySQL.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Data.Null\OpenSim.Data.Null.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Data.PGSQL\OpenSim.Data.PGSQL.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Data.SQLite\OpenSim.Data.SQLite.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Data\OpenSim.Data.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Framework.Capabilities\OpenSim.Framework.Capabilities.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\GloebitSubscriptionsMySQL.migrations" />
