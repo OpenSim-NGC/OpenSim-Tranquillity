@@ -25,23 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Timers;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Diagnostics;
-using System.Reflection;
-using System.Threading;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.PhysicsModules.SharedBase;
-using OpenSim.Region.Framework.Scenes.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
-using System.Runtime.Serialization;
+using System.Timers;
 using Timer = System.Timers.Timer;
-using log4net;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -134,7 +122,7 @@ namespace OpenSim.Region.Framework.Scenes
                         // when using megaregions, because the megaregion is correctly configured
                         // only after all the regions have been loaded. (If we don't do this then
                         // when the prim moves it might think that it crossed into a region.)
-                        SceneManager.Instance.OnRegionsReadyStatusChange += delegate(SceneManager sm)
+                        SceneManager.Instance.OnRegionsReadyStatusChange += delegate (SceneManager sm)
                         {
                             if (sm.AllRegionsReady)
                                 timer.Start();
@@ -327,8 +315,8 @@ namespace OpenSim.Region.Framework.Scenes
                         newMotion.m_selected = true;
                 }
 
-//                newMotion.m_timerStopped = false;
-//                newMotion.m_running = true;
+                //                newMotion.m_timerStopped = false;
+                //                newMotion.m_running = true;
                 newMotion.m_isCrossing = false;
                 newMotion.m_waitingCrossing = false;
             }
@@ -485,10 +473,10 @@ namespace OpenSim.Region.Framework.Scenes
 
             m_group.RootPart.Velocity = Vector3.Zero;
             m_group.RootPart.AngularVelocity = Vector3.Zero;
-//            m_group.SendGroupRootTerseUpdate();
+            //            m_group.SendGroupRootTerseUpdate();
             m_group.RootPart.ScheduleTerseUpdate();
             m_frames.Clear();
-            if(running)
+            if (running)
                 m_group.Scene.EventManager.TriggerMovingEndEvent(m_group.RootPart.LocalId);
         }
 
@@ -500,10 +488,10 @@ namespace OpenSim.Region.Framework.Scenes
 
             m_group.RootPart.Velocity = Vector3.Zero;
             m_group.RootPart.AngularVelocity = Vector3.Zero;
-//            m_skippedUpdates = 1000;
-//            m_group.SendGroupRootTerseUpdate();
+            //            m_skippedUpdates = 1000;
+            //            m_group.SendGroupRootTerseUpdate();
             m_group.RootPart.ScheduleTerseUpdate();
-            if(running)
+            if (running)
                 m_group.Scene.EventManager.TriggerMovingEndEvent(m_group.RootPart.LocalId);
         }
 
@@ -525,7 +513,7 @@ namespace OpenSim.Region.Framework.Scenes
                     return;
                 if (m_running && !m_waitingCrossing)
                     StartTimer();
-//                m_skippedUpdates = 1000;
+                //                m_skippedUpdates = 1000;
             }
         }
 
@@ -550,7 +538,7 @@ namespace OpenSim.Region.Framework.Scenes
                     end = -1;
                 }
 
-                for (int i = start; i != end ; i += direction)
+                for (int i = start; i != end; i += direction)
                 {
                     Keyframe k = m_keyframes[i];
 
@@ -558,13 +546,13 @@ namespace OpenSim.Region.Framework.Scenes
                     if (k.Position.HasValue)
                     {
                         k.Position = (k.Position * direction);
-//                        k.Velocity = (Vector3)k.Position / (k.TimeMS / 1000.0f);
+                        //                        k.Velocity = (Vector3)k.Position / (k.TimeMS / 1000.0f);
                         k.Position += pos;
                     }
                     else
                     {
                         k.Position = pos;
-//                        k.Velocity = Vector3.Zero;
+                        //                        k.Velocity = Vector3.Zero;
                     }
 
                     k.StartRotation = rot;
@@ -579,38 +567,38 @@ namespace OpenSim.Region.Framework.Scenes
                         k.Rotation = rot;
                     }
 
-/* ang vel not in use for now
+                    /* ang vel not in use for now
 
-                    float angle = 0;
+                                        float angle = 0;
 
-                    float aa = k.StartRotation.X * k.StartRotation.X + k.StartRotation.Y * k.StartRotation.Y + k.StartRotation.Z * k.StartRotation.Z + k.StartRotation.W * k.StartRotation.W;
-                    float bb = ((Quaternion)k.Rotation).X * ((Quaternion)k.Rotation).X + ((Quaternion)k.Rotation).Y * ((Quaternion)k.Rotation).Y + ((Quaternion)k.Rotation).Z * ((Quaternion)k.Rotation).Z + ((Quaternion)k.Rotation).W * ((Quaternion)k.Rotation).W;
-                    float aa_bb = aa * bb;
+                                        float aa = k.StartRotation.X * k.StartRotation.X + k.StartRotation.Y * k.StartRotation.Y + k.StartRotation.Z * k.StartRotation.Z + k.StartRotation.W * k.StartRotation.W;
+                                        float bb = ((Quaternion)k.Rotation).X * ((Quaternion)k.Rotation).X + ((Quaternion)k.Rotation).Y * ((Quaternion)k.Rotation).Y + ((Quaternion)k.Rotation).Z * ((Quaternion)k.Rotation).Z + ((Quaternion)k.Rotation).W * ((Quaternion)k.Rotation).W;
+                                        float aa_bb = aa * bb;
 
-                    if (aa_bb == 0)
-                    {
-                        angle = 0;
-                    }
-                    else
-                    {
-                        float ab = k.StartRotation.X * ((Quaternion)k.Rotation).X +
-                                   k.StartRotation.Y * ((Quaternion)k.Rotation).Y +
-                                   k.StartRotation.Z * ((Quaternion)k.Rotation).Z +
-                                   k.StartRotation.W * ((Quaternion)k.Rotation).W;
-                        float q = (ab * ab) / aa_bb;
+                                        if (aa_bb == 0)
+                                        {
+                                            angle = 0;
+                                        }
+                                        else
+                                        {
+                                            float ab = k.StartRotation.X * ((Quaternion)k.Rotation).X +
+                                                       k.StartRotation.Y * ((Quaternion)k.Rotation).Y +
+                                                       k.StartRotation.Z * ((Quaternion)k.Rotation).Z +
+                                                       k.StartRotation.W * ((Quaternion)k.Rotation).W;
+                                            float q = (ab * ab) / aa_bb;
 
-                        if (q > 1.0f)
-                        {
-                            angle = 0;
-                        }
-                        else
-                        {
-                            angle = (float)Math.Acos(2 * q - 1);
-                        }
-                    }
+                                            if (q > 1.0f)
+                                            {
+                                                angle = 0;
+                                            }
+                                            else
+                                            {
+                                                angle = (float)Math.Acos(2 * q - 1);
+                                            }
+                                        }
 
-                    k.AngularVelocity = (new Vector3(0, 0, 1) * (Quaternion)k.Rotation) * (angle / (k.TimeMS / 1000));
- */
+                                        k.AngularVelocity = (new Vector3(0, 0, 1) * (Quaternion)k.Rotation) * (angle / (k.TimeMS / 1000));
+                     */
                     k.TimeTotal = k.TimeMS;
 
                     m_frames.Add(k);
@@ -651,15 +639,15 @@ namespace OpenSim.Region.Framework.Scenes
 
             m_group.RootPart.Velocity = Vector3.Zero;
             m_group.RootPart.AngularVelocity = Vector3.Zero;
-//            m_group.SendGroupRootTerseUpdate();
+            //            m_group.SendGroupRootTerseUpdate();
             m_group.RootPart.ScheduleTerseUpdate();
             m_frames.Clear();
         }
 
-//        [NonSerialized()] Vector3 m_lastPosUpdate;
-//        [NonSerialized()] Quaternion m_lastRotationUpdate;
+        //        [NonSerialized()] Vector3 m_lastPosUpdate;
+        //        [NonSerialized()] Quaternion m_lastRotationUpdate;
         [NonSerialized()] Vector3 m_currentVel;
-//        [NonSerialized()] int m_skippedUpdates;
+        //        [NonSerialized()] int m_skippedUpdates;
         [NonSerialized()] double m_lasttickMS;
 
         private void DoOnTimer(double tickDuration)
@@ -673,15 +661,15 @@ namespace OpenSim.Region.Framework.Scenes
             if (m_group == null)
                 return;
 
-//            bool update = false;
+            //            bool update = false;
 
             if (m_selected)
             {
                 if (m_group.RootPart.Velocity != Vector3.Zero)
                 {
                     m_group.RootPart.Velocity = Vector3.Zero;
-//                    m_skippedUpdates = 1000;
-//                    m_group.SendGroupRootTerseUpdate();
+                    //                    m_skippedUpdates = 1000;
+                    //                    m_group.SendGroupRootTerseUpdate();
                     m_group.RootPart.ScheduleTerseUpdate();
                 }
                 return;
@@ -694,7 +682,7 @@ namespace OpenSim.Region.Framework.Scenes
                 // retry to set the position that evtually caused the outbound
                 // if still outside region this will call startCrossing below
                 m_isCrossing = false;
-//                m_skippedUpdates = 1000;
+                //                m_skippedUpdates = 1000;
                 m_group.AbsolutePosition = m_nextPosition;
 
                 if (!m_isCrossing)
@@ -728,11 +716,11 @@ namespace OpenSim.Region.Framework.Scenes
 
                 m_currentFrame.TimeMS += (int)tickDuration;
                 m_lasttickMS = nowMS - 50f;
-//                update = true;
+                //                update = true;
             }
 
             int elapsed = (int)(nowMS - m_lasttickMS);
-            if( elapsed > 3 * tickDuration)
+            if (elapsed > 3 * tickDuration)
                 elapsed = (int)tickDuration;
 
             m_currentFrame.TimeMS -= elapsed;
@@ -765,16 +753,16 @@ namespace OpenSim.Region.Framework.Scenes
                     else
                         m_group.RootPart.Velocity = Vector3.Zero;
                 }
-//                update = true;
+                //                update = true;
             }
             else
             {
-//                bool lastSteps = remainingSteps < 4;
-        
+                //                bool lastSteps = remainingSteps < 4;
+
                 Vector3 currentPosition = m_group.AbsolutePosition;
                 Vector3 motionThisFrame = (Vector3)m_currentFrame.Position - currentPosition;
                 motionThisFrame /= (float)remainingSteps;
- 
+
                 m_nextPosition = currentPosition + motionThisFrame;
 
                 Quaternion currentRotation = m_group.GroupRotation;
@@ -784,42 +772,42 @@ namespace OpenSim.Region.Framework.Scenes
                     Quaternion step = Quaternion.Slerp(m_currentFrame.StartRotation, (Quaternion)m_currentFrame.Rotation, completed);
                     step.Normalize();
                     m_group.RootPart.RotationOffset = step;
-/*
-                    if (Math.Abs(step.X - m_lastRotationUpdate.X) > 0.001f
-                        || Math.Abs(step.Y - m_lastRotationUpdate.Y) > 0.001f
-                        || Math.Abs(step.Z - m_lastRotationUpdate.Z) > 0.001f)
-                        update = true;
-*/
+                    /*
+                                        if (Math.Abs(step.X - m_lastRotationUpdate.X) > 0.001f
+                                            || Math.Abs(step.Y - m_lastRotationUpdate.Y) > 0.001f
+                                            || Math.Abs(step.Z - m_lastRotationUpdate.Z) > 0.001f)
+                                            update = true;
+                    */
                 }
 
                 m_group.AbsolutePosition = m_nextPosition;
-//                if(lastSteps)
-//                    m_group.RootPart.Velocity = Vector3.Zero;
-//                else
-                    m_group.RootPart.Velocity = m_currentVel;
-/*
-                if(!update && (
-//                    lastSteps ||
-                    m_skippedUpdates * tickDuration > 0.5 ||
-                    Math.Abs(m_nextPosition.X - currentPosition.X) > 5f ||
-                    Math.Abs(m_nextPosition.Y - currentPosition.Y) > 5f ||
-                    Math.Abs(m_nextPosition.Z - currentPosition.Z) > 5f
-                    ))
-                {
-                    update = true;
-                }
-                else
-                    m_skippedUpdates++;
-*/
+                //                if(lastSteps)
+                //                    m_group.RootPart.Velocity = Vector3.Zero;
+                //                else
+                m_group.RootPart.Velocity = m_currentVel;
+                /*
+                                if(!update && (
+                //                    lastSteps ||
+                                    m_skippedUpdates * tickDuration > 0.5 ||
+                                    Math.Abs(m_nextPosition.X - currentPosition.X) > 5f ||
+                                    Math.Abs(m_nextPosition.Y - currentPosition.Y) > 5f ||
+                                    Math.Abs(m_nextPosition.Z - currentPosition.Z) > 5f
+                                    ))
+                                {
+                                    update = true;
+                                }
+                                else
+                                    m_skippedUpdates++;
+                */
             }
-//            if(update)
-//            {
-//                m_lastPosUpdate = m_nextPosition;
-//                m_lastRotationUpdate = m_group.GroupRotation; 
-//                m_skippedUpdates = 0;
-//                m_group.SendGroupRootTerseUpdate();
-                m_group.RootPart.ScheduleTerseUpdate();
-//            }
+            //            if(update)
+            //            {
+            //                m_lastPosUpdate = m_nextPosition;
+            //                m_lastRotationUpdate = m_group.GroupRotation; 
+            //                m_skippedUpdates = 0;
+            //                m_group.SendGroupRootTerseUpdate();
+            m_group.RootPart.ScheduleTerseUpdate();
+            //            }
         }
 
         public Byte[] Serialize()
@@ -862,8 +850,8 @@ namespace OpenSim.Region.Framework.Scenes
             if (m_group.RootPart.Velocity != Vector3.Zero)
             {
                 m_group.RootPart.Velocity = Vector3.Zero;
-//                m_skippedUpdates = 1000;
-//                m_group.SendGroupRootTerseUpdate();
+                //                m_skippedUpdates = 1000;
+                //                m_group.SendGroupRootTerseUpdate();
                 m_group.RootPart.ScheduleTerseUpdate();
             }
         }
@@ -875,8 +863,8 @@ namespace OpenSim.Region.Framework.Scenes
             if (m_group != null)
             {
                 m_group.RootPart.Velocity = Vector3.Zero;
-//                m_skippedUpdates = 1000;
-//                m_group.SendGroupRootTerseUpdate();
+                //                m_skippedUpdates = 1000;
+                //                m_group.SendGroupRootTerseUpdate();
                 m_group.RootPart.ScheduleTerseUpdate();
 
                 if (m_running)

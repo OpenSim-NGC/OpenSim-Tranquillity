@@ -35,10 +35,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\OpenSim.Capabilities\OpenSim.Capabilities.csproj" />
     <ProjectReference Include="..\OpenSim.Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\OpenSim.Data.MySQL\OpenSim.Data.MySQL.csproj" />
     <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
+	<ProjectReference Include="..\OpenSim.Framework.Capabilities\OpenSim.Framework.Capabilities.csproj" />
     <ProjectReference Include="..\OpenSim.Framework.Monitoring\OpenSim.Framework.Monitoring.csproj" />
     <ProjectReference Include="..\OpenSim.Framework.Serialization\OpenSim.Framework.Serialization.csproj" />
     <ProjectReference Include="..\OpenSim.Region.ClientStack.LindenUDP\OpenSim.Region.ClientStack.LindenUDP.csproj" />
@@ -52,7 +52,6 @@
 
   <ItemGroup>
     <PackageReference Include="Ionic.Zlib.Core" Version="1.0.0" />
-    <PackageReference Include="log4net" Version="3.1.0" />
     <PackageReference Include="MailKit" Version="4.13.0" />
     <PackageReference Include="MimeKit" Version="4.13.0" />
     <PackageReference Include="System.Drawing.Common" Version="6.0.0" />

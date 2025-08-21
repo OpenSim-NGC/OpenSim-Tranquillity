@@ -25,27 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.IO;
-using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Text;
-using System.Xml;
-using System.Xml.Serialization;
+using log4net;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
 using OpenSim.Framework;
-
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Region.PhysicsModules.SharedBase;
+using System.Drawing;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Xml;
+using System.Xml.Serialization;
 using PermissionMask = OpenSim.Framework.PermissionMask;
-using System.Text.Json;
-
-using log4net;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -929,7 +922,7 @@ namespace OpenSim.Region.Framework.Scenes
                 // If not a root prim, the offset rotation is computed by SOG and is relative to the root.
                 PhysicsActor actor = PhysActor;
                 if (actor != null && _parentID == 0 && (Shape.PCode != 9 || Shape.State == 0))
-                { 
+                {
                     m_rotationOffset = actor.Orientation;
                 }
                 return m_rotationOffset;
@@ -1378,8 +1371,8 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
-        public float SitActiveRange { get; set;}
-        public Vector3 StandOffset { get; set;}
+        public float SitActiveRange { get; set; }
+        public Vector3 StandOffset { get; set; }
 
         public bool Stopped
         {
@@ -2314,7 +2307,7 @@ namespace OpenSim.Region.Framework.Scenes
             byte[] extraP = new byte[oldextrap.Length];
             Array.Copy(oldextrap, extraP, extraP.Length);
             dupe.Shape.ExtraParams = extraP;
-            
+
             if (Shape.RenderMaterials is not null && Shape.RenderMaterials.overrides is not null &&
                 Shape.RenderMaterials.overrides.Length > 0)
             {
@@ -2342,7 +2335,7 @@ namespace OpenSim.Region.Framework.Scenes
 
             dupe.PseudoCRC = (int)(DateTime.UtcNow.Ticks);
 
-            dupe.LinksetData = null;  
+            dupe.LinksetData = null;
             if (LinksetData is not null)
             {
                 dupe.LinksetData = (LinksetData)LinksetData.Clone();

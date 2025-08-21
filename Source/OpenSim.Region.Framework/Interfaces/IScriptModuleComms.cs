@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
-using System.Collections.Generic;
 using OpenMetaverse;
+using System.Reflection;
 
 namespace OpenSim.Region.Framework.Interfaces
 {
@@ -81,7 +79,7 @@ namespace OpenSim.Region.Framework.Interfaces
         /// public methods.
         /// </summary>
         /// <param name="target"></param>
-        void RegisterScriptInvocations(IRegionModuleBase target);
+        void RegisterScriptInvocations(IRegionModule target);
 
         /// <summary>
         /// Returns an array of all registered script calls
@@ -124,7 +122,7 @@ namespace OpenSim.Region.Framework.Interfaces
         /// checking for fields with <see cref="ScriptConstantAttribute"/>.
         /// </summary>
         /// <param name="target"></param>
-        void RegisterConstants(IRegionModuleBase target);
+        void RegisterConstants(IRegionModule target);
 
         /// <summary>
         /// Operation to check for a registered constant

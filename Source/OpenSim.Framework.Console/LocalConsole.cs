@@ -547,7 +547,7 @@ public class LocalConsole : ICommandConsole
             if ((key.Modifiers & ConsoleModifiers.Control) != 0 && key.Key == ConsoleKey.C)
             {
                 System.Console.Write(Environment.NewLine);
-                LocalCancelKeyPressed();
+                // XXX Fixme LocalCancelKeyPressed();
                 return string.Empty;
             }
 
@@ -715,5 +715,15 @@ public class LocalConsole : ICommandConsole
     public string Prompt(string prompt, string defaultresponse, List<string> options)
     {
         return _commandConsole.Prompt(prompt, defaultresponse, options);
+    }
+
+    public void FireOnOutput(string text)
+    {
+        _commandConsole.FireOnOutput(text);
+    }
+
+    public void CancelKeyPressed(object sender, ConsoleCancelEventArgs args)
+    {
+        _commandConsole.CancelKeyPressed(sender, args);
     }
 }

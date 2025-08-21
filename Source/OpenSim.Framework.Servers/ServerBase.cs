@@ -34,7 +34,7 @@ using Autofac;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-
+using OpenSim.Framework.Console;
 using OpenSim.Framework.Monitoring;
 
 namespace OpenSim.Framework.Servers

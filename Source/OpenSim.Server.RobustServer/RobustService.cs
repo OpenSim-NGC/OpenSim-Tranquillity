@@ -4,10 +4,11 @@ using System.Security.Cryptography.X509Certificates;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using Autofac;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.RobustServer
 {
-    public class RobustService : ServerBase, IHostedService
+    public class RobustService : IHostedService     // ServerBase
     {
         private readonly IComponentContext _componentContext;
         private readonly IConfiguration _configuration;
@@ -15,7 +16,7 @@ namespace OpenSim.Server.RobustServer
         private readonly ICommandConsole _console;
         
         // Legacy Stuff
-        protected ServerBase m_Server = null;
+        // protected ServerBase m_Server = null;
 
         private readonly object _consoleType;
 
@@ -25,8 +26,7 @@ namespace OpenSim.Server.RobustServer
         public RobustService(
             IConfiguration configuration,
             ILogger<RobustService> logger,
-            IComponentContext componentContext) : 
-            base(configuration, logger, componentContext) 
+            IComponentContext componentContext)
         {
             _configuration = configuration;
             _logger = logger;
@@ -124,17 +124,17 @@ namespace OpenSim.Server.RobustServer
 
                 ParseServiceEntry(c, out configName, out conn, out port, out friendlyName);
 
-                BaseHttpServer server;
+                //BaseHttpServer server;
 
-                if (port != 0)
-                    server = (BaseHttpServer)MainServer.GetHttpServer(port);
-                else
-                    server = MainServer.Instance;
+                //if (port != 0)
+                //    server = (BaseHttpServer)MainServer.GetHttpServer(port);
+                //else
+                //    server = MainServer.Instance;
 
-                if (friendlyName == "LLLoginServiceInConnector")
-                    server.AddSimpleStreamHandler(new IndexPHPHandler(server));
+                //if (friendlyName == "LLLoginServiceInConnector")
+                //    server.AddSimpleStreamHandler(new IndexPHPHandler(server));
 
-                _logger.LogInformation("[SERVER]: Loading {0} on port {1}", friendlyName, server.Port);
+                // _logger.LogInformation("[SERVER]: Loading {0} on port {1}", friendlyName, server.Port);
 
                 // try
                 // {
@@ -170,10 +170,10 @@ namespace OpenSim.Server.RobustServer
 
             PrintFileToConsole("robuststartuplogo.txt");
 
-            int res = m_Server.Run();
-            m_Server?.Shutdown();
+            // int res = m_Server.Run();
+            // m_Server?.Shutdown();
 
-            Environment.Exit(res);
+            Environment.Exit(0);
 
             return Task.CompletedTask;
         }

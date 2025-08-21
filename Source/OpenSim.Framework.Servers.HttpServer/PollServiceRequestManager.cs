@@ -29,6 +29,7 @@ using System.Collections;
 using System.Reflection;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using OpenSim.Framework.Monitoring;
 
 namespace OpenSim.Framework.Servers.HttpServer
 {

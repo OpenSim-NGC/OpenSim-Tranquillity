@@ -118,6 +118,7 @@ namespace OpenSim.Framework.Servers.HttpServer
         protected RemoteCertificateValidationCallback m_certificateValidationCallback = null;
 
         protected IPAddress m_listenIPAddress = IPAddress.Any;
+        private Stat m_requestsProcessedStat;
 
         public string Protocol
         {

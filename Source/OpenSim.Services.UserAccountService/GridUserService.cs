@@ -28,11 +28,12 @@
 using OpenSim.Data;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
+
 using OpenMetaverse;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using OpenSim.Framework.Console;
 
 namespace OpenSim.Services.UserAccountService;
 

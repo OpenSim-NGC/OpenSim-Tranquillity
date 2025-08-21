@@ -186,12 +186,12 @@ public class CommandConsole : ICommandConsole
             Output(s);
     }
 
-    protected void FireOnOutput(string text)
+    public void FireOnOutput(string text)
     {
         OnOutput?.Invoke(text);
     }
 
-    protected void CancelKeyPressed(object sender, ConsoleCancelEventArgs args)
+    public void CancelKeyPressed(object sender, ConsoleCancelEventArgs args)
     {
         if (OnCntrC != null && args.SpecialKey == ConsoleSpecialKey.ControlC)
         {

@@ -25,13 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
-using System.Runtime.Serialization;
-using System.Security.Permissions;
-using log4net;
-using OpenSim.Framework;
 using OpenMetaverse;
+using OpenSim.Framework;
 using System.Runtime.CompilerServices;
 
 namespace OpenSim.Region.Framework.Scenes
@@ -66,7 +61,7 @@ namespace OpenSim.Region.Framework.Scenes
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return osUTF8Name == null ? string.Empty : osUTF8Name.ToString(); }
-            set { osUTF8Name = value == null? null : new osUTF8(value); }
+            set { osUTF8Name = value == null ? null : new osUTF8(value); }
         }
 
         /// <summary>
@@ -141,7 +136,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <returns></returns>
         public virtual EntityBase Copy()
         {
-            return (EntityBase) MemberwiseClone();
+            return (EntityBase)MemberwiseClone();
         }
     }
 

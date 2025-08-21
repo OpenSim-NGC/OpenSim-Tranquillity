@@ -25,20 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
-using System.Text;
+using log4net;
+using OpenMetaverse;
+using OpenSim.Framework;
+using OpenSim.Region.Framework.Interfaces;
 using System.Reflection;
 using System.Xml;
 using System.Xml.Serialization;
-
-using OpenSim.Data;
-using OpenSim.Framework;
-using OpenSim.Region.Framework.Interfaces;
-
-using OpenMetaverse;
-
-using log4net;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -146,7 +139,8 @@ namespace OpenSim.Region.Framework.Scenes
         // ITerrainChannel.this[x,y]
         public float this[int x, int y]
         {
-            get {
+            get
+            {
                 if (x < 0 || x >= Width || y < 0 || y >= Height)
                     return 0;
                 return m_terrainData[x, y];
@@ -194,9 +188,9 @@ namespace OpenSim.Region.Framework.Scenes
         // ITerrainChannel.LoadFromXmlString()
         public void LoadFromXmlString(string data)
         {
-            using(StringReader sr = new StringReader(data))
+            using (StringReader sr = new StringReader(data))
             {
-                using(XmlTextReader reader = new XmlTextReader(sr))
+                using (XmlTextReader reader = new XmlTextReader(sr))
                 {
                     reader.DtdProcessing = DtdProcessing.Ignore;
                     ReadXml(reader);
@@ -235,11 +229,11 @@ namespace OpenSim.Region.Framework.Scenes
                         // First compute the rotation location for the new height.
                         dispX += (int)(rotationDisplacement.X
                             + ((float)xx - rotationDisplacement.X) * Math.Cos(radianRotation)
-                            - ((float)yy - rotationDisplacement.Y) * Math.Sin(radianRotation) );
+                            - ((float)yy - rotationDisplacement.Y) * Math.Sin(radianRotation));
 
                         dispY += (int)(rotationDisplacement.Y
                             + ((float)xx - rotationDisplacement.X) * Math.Sin(radianRotation)
-                            + ((float)yy - rotationDisplacement.Y) * Math.Cos(radianRotation) );
+                            + ((float)yy - rotationDisplacement.Y) * Math.Cos(radianRotation));
 
                         if (dispX >= 0 && dispX < m_terrainData.SizeX && dispY >= 0 && dispY < m_terrainData.SizeY)
                         {

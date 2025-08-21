@@ -42,14 +42,14 @@
     <EmbeddedResource Include="Resources\os_groups_Store.migrations" />
     <EmbeddedResource Include="Resources\Presence.migrations" />
     <EmbeddedResource Include="Resources\RegionStore.migrations" />
-	  <EmbeddedResource Include="Resources\UserAlias.migrations" />
+	<EmbeddedResource Include="Resources\UserAlias.migrations" />
     <EmbeddedResource Include="Resources\UserAccount.migrations" />
     <EmbeddedResource Include="Resources\UserProfiles.migrations" />
     <EmbeddedResource Include="Resources\XAssetStore.migrations" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="8.4.0" />
-    <PackageReference Include="log4net" Version="3.1.0" />
+    <PackageReference Include="MySqlConnector" Version="2.4.0" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />

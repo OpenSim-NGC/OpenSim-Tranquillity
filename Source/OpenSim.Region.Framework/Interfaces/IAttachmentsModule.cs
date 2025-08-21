@@ -25,12 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Xml;
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
+using System.Xml;
 
 namespace OpenSim.Region.Framework.Interfaces
 {
@@ -111,7 +109,7 @@ namespace OpenSim.Region.Framework.Interfaces
         /// </summary>
         /// <param name="sp"></param>
         /// <param name="rezlist"></param>
-        void RezMultipleAttachmentsFromInventory(IScenePresence sp,List<KeyValuePair<UUID, uint>> rezlist);
+        void RezMultipleAttachmentsFromInventory(IScenePresence sp, List<KeyValuePair<UUID, uint>> rezlist);
 
         /// <summary>
         /// Detach the given item to the ground.

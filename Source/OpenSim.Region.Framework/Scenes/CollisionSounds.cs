@@ -26,12 +26,7 @@
  */
 // Ubit 2012
 
-using System;
-using System.Reflection;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
-using log4net;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -44,8 +39,6 @@ namespace OpenSim.Region.Framework.Scenes
 
     public static class CollisionSounds
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private const int MaxMaterials = 7;
         // part part
 
@@ -59,7 +52,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         private static UUID snd_MetalMetal = new UUID("be7295c0-a158-11e1-b3dd-0801201c9a66");
         private static UUID snd_MetalGlass = new UUID("be7295c0-a158-11e1-b3dd-0801202c9a66");
-        private static UUID snd_MetalWood  = new UUID("be7295c0-a158-11e1-b3dd-0801203c9a66");
+        private static UUID snd_MetalWood = new UUID("be7295c0-a158-11e1-b3dd-0801203c9a66");
         private static UUID snd_MetalFlesh = new UUID("be7295c0-a158-11e1-b3dd-0801204c9a66");
         private static UUID snd_MetalPlastic = new UUID("be7295c0-a158-11e1-b3dd-0801205c9a66");
         private static UUID snd_MetalRubber = new UUID("be7295c0-a158-11e1-b3dd-0801206c9a66");
@@ -129,7 +122,7 @@ namespace OpenSim.Region.Framework.Scenes
             if (sog == null || sog.IsDeleted || sog.inTransit)
                 return;
 
-            if(sog.CollisionSoundThrottled(part.CollisionSoundType))
+            if (sog.CollisionSoundThrottled(part.CollisionSoundType))
                 return;
 
             float volume = part.CollisionSoundVolume;
@@ -143,7 +136,7 @@ namespace OpenSim.Region.Framework.Scenes
                     volume = 1.0f;
                     break;
                 case 1: // selected sound
-                    if(soundID == part.invalidCollisionSoundUUID)
+                    if (soundID == part.invalidCollisionSoundUUID)
                         return;
                     HaveSound = true;
                     break;
@@ -165,39 +158,39 @@ namespace OpenSim.Region.Framework.Scenes
             CollisionForSoundInfo colInfo;
             uint id;
 
-            for(int i = 0; i < collidersinfolist.Count; i++)
+            for (int i = 0; i < collidersinfolist.Count; i++)
             {
                 colInfo = collidersinfolist[i];
 
                 id = colInfo.colliderID;
                 if (id == 0) // terrain collision
+                {
+                    if (!doneownsound)
                     {
-                        if (!doneownsound)
+                        if (!HaveSound)
                         {
-                            if (!HaveSound)
-                            {
-                                float vol = Math.Abs(colInfo.relativeVel);
-                                if (vol < 0.2f)
-                                    continue;
+                            float vol = Math.Abs(colInfo.relativeVel);
+                            if (vol < 0.2f)
+                                continue;
 
-                                vol *= vol * .0625f; // 4m/s == full volume
-                                if (vol > 1.0f)
-                                    vol = 1.0f;
+                            vol *= vol * .0625f; // 4m/s == full volume
+                            if (vol > 1.0f)
+                                vol = 1.0f;
 
-                                soundID = m_TerrainPart[thisMaterial];
-                                volume *= vol;
-                            }
-                            part.SendCollisionSound(soundID, volume, colInfo.position);
-                            doneownsound = true;
+                            soundID = m_TerrainPart[thisMaterial];
+                            volume *= vol;
                         }
-                        continue;
+                        part.SendCollisionSound(soundID, volume, colInfo.position);
+                        doneownsound = true;
                     }
+                    continue;
+                }
 
                 SceneObjectPart otherPart = sog.Scene.GetSceneObjectPart(id);
                 if (otherPart != null)
                 {
                     SceneObjectGroup othersog = otherPart.ParentGroup;
-                    if(othersog == null || othersog.IsDeleted || othersog.inTransit)
+                    if (othersog == null || othersog.IsDeleted || othersog.inTransit)
                         continue;
 
                     int otherType = otherPart.CollisionSoundType;
@@ -206,7 +199,7 @@ namespace OpenSim.Region.Framework.Scenes
 
                     if (!HaveSound)
                     {
-                        if(othersog.CollisionSoundThrottled(otherType))
+                        if (othersog.CollisionSoundThrottled(otherType))
                             continue;
 
                         if (otherType == 1)
@@ -254,7 +247,7 @@ namespace OpenSim.Region.Framework.Scenes
         }
 
         public static void AvatarCollisionSound(ScenePresence av, List<CollisionForSoundInfo> collidersinfolist)
-         {
+        {
             if (collidersinfolist.Count == 0 || av == null)
                 return;
 
@@ -271,7 +264,7 @@ namespace OpenSim.Region.Framework.Scenes
             uint id;
             float volume;
 
-            for(int i = 0; i< collidersinfolist.Count; i++)
+            for (int i = 0; i < collidersinfolist.Count; i++)
             {
                 colInfo = collidersinfolist[i];
 
@@ -280,9 +273,9 @@ namespace OpenSim.Region.Framework.Scenes
                 if (id == 0) // no terrain collision sounds for now
                 {
                     continue;
-//                    volume = Math.Abs(colInfo.relativeVel);
-//                    if (volume < 0.2f)
-//                        continue;
+                    //                    volume = Math.Abs(colInfo.relativeVel);
+                    //                    if (volume < 0.2f)
+                    //                        continue;
 
                 }
 
@@ -299,7 +292,7 @@ namespace OpenSim.Region.Framework.Scenes
                         if (otherPart.CollisionSoundType == 2)
                         {
                             volmod = otherPart.CollisionSoundVolume;
-                            if(volmod == 0.0)
+                            if (volmod == 0.0)
                                 continue;
                         }
                         volume = Math.Abs(colInfo.relativeVel);
@@ -307,7 +300,7 @@ namespace OpenSim.Region.Framework.Scenes
                         // should never be heard.
                         if (volume < 3.2f)
                             continue;
-//                        m_log.DebugFormat("Collision speed was {0}", volume);
+                        //                        m_log.DebugFormat("Collision speed was {0}", volume);
 
                         // Cap to 0.2 times volume because climbing stairs should not be noisy
                         // Also changed scaling
@@ -324,18 +317,18 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     continue;
                 }
-/*
-                else if (!doneownsound)
-                {
-                    ScenePresence otherav = av.Scene.GetScenePresence(Id);
-                    if (otherav != null && (!otherav.IsChildAgent))
-                    {
-                        soundID = snd_FleshFlesh;
-                        av.SendCollisionSound(soundID, 1.0);
-                        doneownsound = true;
-                    }
-                }
- */
+                /*
+                                else if (!doneownsound)
+                                {
+                                    ScenePresence otherav = av.Scene.GetScenePresence(Id);
+                                    if (otherav != null && (!otherav.IsChildAgent))
+                                    {
+                                        soundID = snd_FleshFlesh;
+                                        av.SendCollisionSound(soundID, 1.0);
+                                        doneownsound = true;
+                                    }
+                                }
+                 */
             }
         }
     }

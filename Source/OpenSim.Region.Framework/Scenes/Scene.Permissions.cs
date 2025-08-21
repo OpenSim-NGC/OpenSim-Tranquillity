@@ -25,14 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Text;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Region.Framework.Interfaces;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -43,7 +37,7 @@ namespace OpenSim.Region.Framework.Scenes
     public delegate bool PropagatePermissionsHandler();
     public delegate bool RezObjectHandler(int objectCount, UUID owner, Vector3 objectPosition);
     public delegate bool DeleteObjectHandlerByIDs(UUID objectID, UUID deleter);
-    public delegate bool DeleteObjectHandler(SceneObjectGroup sog, ScenePresence sp);  
+    public delegate bool DeleteObjectHandler(SceneObjectGroup sog, ScenePresence sp);
     public delegate bool TransferObjectHandler(UUID objectID, UUID recipient);
     public delegate bool TakeObjectHandler(SceneObjectGroup sog, ScenePresence sp);
     public delegate bool SellGroupObjectHandler(UUID userID, UUID groupID);
@@ -185,7 +179,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         #region Object Permission Checks
 
-        public uint GenerateClientFlags( SceneObjectPart part, ScenePresence sp)
+        public uint GenerateClientFlags(SceneObjectPart part, ScenePresence sp)
         {
             const PrimFlags DEFAULT_FLAGS =
                 PrimFlags.ObjectModify |
@@ -253,7 +247,7 @@ namespace OpenSim.Region.Framework.Scenes
             {
                 foreach (RezObjectHandler h in handler.GetInvocationList().AsSpan())
                 {
-                    if (h(objectCount, owner,objectPosition) == false)
+                    if (h(objectCount, owner, objectPosition) == false)
                         return false;
                 }
             }
@@ -287,7 +281,7 @@ namespace OpenSim.Region.Framework.Scenes
             DeleteObjectHandler handler = OnDeleteObject;
             if (handler is not null)
             {
-               if(sog is null || client is null || client.SceneAgent is null)
+                if (sog is null || client is null || client.SceneAgent is null)
                     return false;
 
                 ScenePresence sp = client.SceneAgent as ScenePresence;
@@ -323,7 +317,7 @@ namespace OpenSim.Region.Framework.Scenes
             TakeObjectHandler handler = OnTakeObject;
             if (handler is not null)
             {
-                if(sog is null || sp is null)
+                if (sog is null || sp is null)
                     return false;
                 foreach (TakeObjectHandler h in handler.GetInvocationList().AsSpan())
                 {
@@ -365,7 +359,7 @@ namespace OpenSim.Region.Framework.Scenes
             SellObjectHandler handler = OnSellObject;
             if (handler is not null)
             {
-                if(sog is null || client is null || client.SceneAgent is null)
+                if (sog is null || client is null || client.SceneAgent is null)
                     return false;
 
                 ScenePresence sp = client.SceneAgent as ScenePresence;
@@ -383,7 +377,7 @@ namespace OpenSim.Region.Framework.Scenes
             SellObjectHandlerByUserID handler = OnSellObjectByUserID;
             if (handler is not null)
             {
-                if(sog is null)
+                if (sog is null)
                     return false;
                 foreach (SellObjectHandlerByUserID h in handler.GetInvocationList().AsSpan())
                 {
@@ -403,7 +397,7 @@ namespace OpenSim.Region.Framework.Scenes
             TakeCopyObjectHandler handler = OnTakeCopyObject;
             if (handler is not null)
             {
-                if(sog is null || sp is null)
+                if (sog is null || sp is null)
                     return false;
 
                 foreach (TakeCopyObjectHandler h in handler.GetInvocationList().AsSpan())
@@ -426,10 +420,10 @@ namespace OpenSim.Region.Framework.Scenes
             DuplicateObjectHandler handler = OnDuplicateObject;
             if (handler is not null)
             {
-                if(sog is null || sog.IsDeleted)
+                if (sog is null || sog.IsDeleted)
                     return false;
                 ScenePresence sp = m_scene.GetScenePresence(agentID);
-                if(sp is null || sp.IsDeleted)
+                if (sp is null || sp.IsDeleted)
                     return false;
                 foreach (DuplicateObjectHandler h in handler.GetInvocationList().AsSpan())
                 {
@@ -443,7 +437,7 @@ namespace OpenSim.Region.Framework.Scenes
         #endregion
 
         #region persence EDIT or MOVE OBJECT
-        private  const uint CANSELECTMASK = (uint)(
+        private const uint CANSELECTMASK = (uint)(
             PrimFlags.ObjectMove |
             PrimFlags.ObjectModify |
             PrimFlags.ObjectOwnerModify
@@ -476,7 +470,7 @@ namespace OpenSim.Region.Framework.Scenes
             EditObjectHandler handler = OnEditObject;
             if (handler is not null)
             {
-                if(sog is null || client is null || client.SceneAgent is null)
+                if (sog is null || client is null || client.SceneAgent is null)
                     return false;
 
                 ScenePresence sp = client.SceneAgent as ScenePresence;
@@ -495,7 +489,7 @@ namespace OpenSim.Region.Framework.Scenes
             EditObjectPermsHandler handler = OnEditObjectPerms;
             if (handler is not null)
             {
-                if(sog is null)
+                if (sog is null)
                     return false;
                 foreach (EditObjectPermsHandler h in handler.GetInvocationList().AsSpan())
                 {
@@ -529,7 +523,7 @@ namespace OpenSim.Region.Framework.Scenes
             MoveObjectHandler handler = OnMoveObject;
             if (handler is not null)
             {
-                if(sog is null || client is null || client.SceneAgent is null)
+                if (sog is null || client is null || client.SceneAgent is null)
                     return false;
 
                 ScenePresence sp = client.SceneAgent as ScenePresence;
@@ -562,7 +556,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         public bool CanObjectEnterWithScripts(SceneObjectGroup sog, ILandObject land)
         {
-            ObjectEnterWithScriptsHandler handler =  OnObjectEnterWithScripts;
+            ObjectEnterWithScriptsHandler handler = OnObjectEnterWithScripts;
             if (handler is not null)
             {
                 foreach (ObjectEnterWithScriptsHandler h in handler.GetInvocationList().AsSpan())
@@ -582,11 +576,11 @@ namespace OpenSim.Region.Framework.Scenes
             ReturnObjectsHandler handler = OnReturnObjects;
             if (handler is not null)
             {
-                if(objects is null)
+                if (objects is null)
                     return false;
 
                 ScenePresence sp = null;
-                if(client is not null && client.SceneAgent is not null)
+                if (client is not null && client.SceneAgent is not null)
                     sp = client.SceneAgent as ScenePresence;
 
                 foreach (ReturnObjectsHandler h in handler.GetInvocationList().AsSpan())
@@ -720,7 +714,7 @@ namespace OpenSim.Region.Framework.Scenes
             RunScriptHandler handler = OnRunScript;
             if (handler is not null)
             {
-                if(item is null || part is null)
+                if (item is null || part is null)
                     return false;
                 foreach (RunScriptHandler h in handler.GetInvocationList().AsSpan())
                 {
@@ -994,7 +988,7 @@ namespace OpenSim.Region.Framework.Scenes
             DeedObjectHandler handler = OnDeedObject;
             if (handler is not null)
             {
-               if(sog is null || client is null || client.SceneAgent is null || targetGroupID.IsZero())
+                if (sog is null || client is null || client.SceneAgent is null || targetGroupID.IsZero())
                     return false;
 
                 ScenePresence sp = client.SceneAgent as ScenePresence;
@@ -1110,7 +1104,7 @@ namespace OpenSim.Region.Framework.Scenes
                 if (client is null || destPart is null || item is null)
                     return false;
 
-                if(client.SceneAgent is not ScenePresence sp || sp.IsDeleted)
+                if (client.SceneAgent is not ScenePresence sp || sp.IsDeleted)
                     return false;
 
                 Delegate[] list = handler.GetInvocationList();

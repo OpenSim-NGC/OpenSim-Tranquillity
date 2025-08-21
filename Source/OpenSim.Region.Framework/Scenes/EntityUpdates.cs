@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenSim.Framework;
 
 namespace OpenSim.Region.Framework.Scenes
@@ -168,7 +166,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         static EntityUpdatesPool()
         {
-            for(int i = 0; i < PREALLOC; ++i)
+            for (int i = 0; i < PREALLOC; ++i)
                 m_pool[i] = new EntityUpdate(null, 0);
             m_poolPtr = PREALLOC - 1;
         }

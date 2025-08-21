@@ -34,12 +34,12 @@ namespace OpenSim.Region.Framework.Interfaces
     // option flags for NPCs
     public enum NPCOptionsFlags : int
     {
-        None                    = 0x00, // no flags (max restriction)
-        AllowNotOwned           = 0x01, // allow NPCs to be created not Owned
-        AllowSenseAsAvatar      = 0x02, // allow NPCs to set to be sensed as Avatars
-        AllowCloneOtherAvatars  = 0x04, // allow NPCs to created cloning a avatar in region
-        NoNPCGroup              = 0x08, // NPCs will have no group title, otherwise will have "- NPC -"
-        objectGroup               = 0x10  // NPC will have host sog groupID
+        None = 0x00, // no flags (max restriction)
+        AllowNotOwned = 0x01, // allow NPCs to be created not Owned
+        AllowSenseAsAvatar = 0x02, // allow NPCs to set to be sensed as Avatars
+        AllowCloneOtherAvatars = 0x04, // allow NPCs to created cloning a avatar in region
+        NoNPCGroup = 0x08, // NPCs will have no group title, otherwise will have "- NPC -"
+        objectGroup = 0x10  // NPC will have host sog groupID
     }
 
     /// <summary>
@@ -302,6 +302,6 @@ namespace OpenSim.Region.Framework.Interfaces
         /// </returns>
         UUID GetOwner(UUID agentID);
 
-        NPCOptionsFlags NPCOptionFlags {get;}
+        NPCOptionsFlags NPCOptionFlags { get; }
     }
 }

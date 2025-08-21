@@ -32,15 +32,9 @@
 
 // terrain patchs must be 16mx16m
 
-using System;
-using System.Collections.Generic;
-
-using log4net;
-
-using OpenSim.Framework;
-
 using OpenMetaverse;
 using OpenMetaverse.Packets;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.ClientStack.LindenUDP
 {
@@ -60,7 +54,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
         static OpenSimTerrainCompressor()
         {
-            if(Constants.TerrainPatchSize != 16)
+            if (Constants.TerrainPatchSize != 16)
                 throw new Exception("Terrain patch size must be 16m x 16m");
 
             // Initialize the compression tables
@@ -140,9 +134,9 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             header.QuantWBits = wordsize | (wordsize << 4);
 
             int k = 0;
-            for (int j = 0; j < 256 ; j += 16)
+            for (int j = 0; j < 256; j += 16)
             {
-                int nj =  j + 16;
+                int nj = j + 16;
                 for (int i = j; i < nj; ++i)
                     block[k++] = (patchData[i] - sub) * premult;
             }
@@ -169,7 +163,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 if (largeRegion)
                     output.PackBits((patchX << 16) | (patchY & 0xFFFF), 32);
                 else
-                    output.PackBits((patchX << 5) | (patchY & 0x1F) , 10);
+                    output.PackBits((patchX << 5) | (patchY & 0x1F), 10);
 
                 // and thats all
                 output.PackBits(ZERO_EOB, 2);
@@ -232,14 +226,14 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 patch[lastZeroindx] = 0;
 
             int i = 0;
-            while(i < 256)
+            while (i < 256)
             {
                 int temp = patch[i];
 
                 if (temp == 0)
                 {
                     int j = i + 1;
-                    while(j < lastZeroindx)
+                    while (j < lastZeroindx)
                     {
                         if (patch[j] != 0)
                             break;
@@ -253,12 +247,12 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                     }
 
                     i = j - i;
-                    while(i > 8)
+                    while (i > 8)
                     {
                         output.PackBitsFromByte(ZERO_CODE);
                         i -= 8;
                     }
-                    if( i > 0)
+                    if (i > 0)
                         output.PackBitsFromByte(ZERO_CODE, i);
                     i = j;
                     continue;
@@ -296,11 +290,11 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
         #region Initialization
 
-         private unsafe static void BuildQuantizeTables16()
+        private unsafe static void BuildQuantizeTables16()
         {
             const float oosob = 2.0f / 16;
             float tmp;
-            fixed(float* fQuantizeTable16 = QuantizeTable16, fDeQuantizeTable16 = DequantizeTable16)
+            fixed (float* fQuantizeTable16 = QuantizeTable16, fDeQuantizeTable16 = DequantizeTable16)
             {
                 float* dqptr = fDeQuantizeTable16;
                 float* qptr = fQuantizeTable16;
@@ -343,7 +337,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                         }
                         else
                         {
-                            if (j < 15 ) j++;
+                            if (j < 15) j++;
                             else i++;
 
                             right = true;
@@ -436,7 +430,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             int wbitsMaxValue = 1 << wbits;
             bool dowbits = wbits < 17;
 
-            fixed (float*  fQuantizeTable16 = QuantizeTable16)
+            fixed (float* fQuantizeTable16 = QuantizeTable16)
             fixed (int* fCopyMatrix16 = CopyMatrix16)
             {
                 for (j = 0, k = 0; j < 256; j += 16, k++)

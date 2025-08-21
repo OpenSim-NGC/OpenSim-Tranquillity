@@ -7,9 +7,9 @@
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
-  <Target Name="CopyFiles">
+  <!--<Target Name="CopyFiles">
     <Copy SourceFiles="@(FilesToCopy_0000)" DestinationFolder="../../../bin/" />
-  </Target>
+  </Target>-->
   <ItemGroup>
     <Reference Include="Nini">
       <HintPath>..\..\Library\Nini.dll</HintPath>
@@ -33,8 +33,8 @@
     <ProjectReference Include="..\..\Source\OpenSim.Data.PGSQL\OpenSim.Data.PGSQL.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Data.SQLite\OpenSim.Data.SQLite.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Data\OpenSim.Data.csproj" />
+	<ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Framework.Capabilities\OpenSim.Framework.Capabilities.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj" />

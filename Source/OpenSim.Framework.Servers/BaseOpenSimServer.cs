@@ -30,8 +30,11 @@ using System.Timers;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using OpenMetaverse;
+
 using OpenSim.Framework.Servers.HttpServer;
-using Timer=System.Timers.Timer;
+using OpenSim.Framework.Monitoring;
+
+using Timer = System.Timers.Timer;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 

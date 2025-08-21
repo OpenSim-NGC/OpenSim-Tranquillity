@@ -25,18 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.IO;
-using System.Reflection;
-using System.Text;
-using System.Xml;
 using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.Framework.Scenes;
+using System.Reflection;
+using System.Text;
+using System.Xml;
 
 namespace OpenSim.Region.Framework.Scenes.Serialization
 {
@@ -78,9 +72,9 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
 
                     List<SceneObjectGroup> coaObjects = coa.Objects;
 
-//                    m_log.DebugFormat(
-//                        "[COALESCED SCENE OBJECTS SERIALIZER]: Writing {0} objects for coalesced object",
-//                        coaObjects.Count);
+                    //                    m_log.DebugFormat(
+                    //                        "[COALESCED SCENE OBJECTS SERIALIZER]: Writing {0} objects for coalesced object",
+                    //                        coaObjects.Count);
 
                     // This is weak - we're relying on the set of coalesced objects still being identical
                     Vector3[] offsets = coa.GetSizeAndOffsets(out size);
@@ -96,9 +90,9 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
                     {
                         SceneObjectGroup obj = coaObjects[i];
 
-//                        m_log.DebugFormat(
-//                            "[COALESCED SCENE OBJECTS SERIALIZER]: Writing offset for object {0}, {1}",
-//                            i, obj.Name);
+                        //                        m_log.DebugFormat(
+                        //                            "[COALESCED SCENE OBJECTS SERIALIZER]: Writing offset for object {0}, {1}",
+                        //                            i, obj.Name);
 
                         writer.WriteStartElement("SceneObjectGroup");
                         writer.WriteAttributeString("offsetx", offsets[i].X.ToString(Culture.FormatProvider));
@@ -115,7 +109,7 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
 
                 string output = sw.ToString();
 
-//                Console.WriteLine(output);
+                //                Console.WriteLine(output);
 
                 return output;
             }
@@ -203,7 +197,7 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
                 // Quickly check if this is a coalesced object, without fully parsing the XML
                 using (ms = new MemoryStream(data, 0, len, false))
                 {
-                    using(StreamReader sr = new StreamReader(ms, Encoding.UTF8))
+                    using (StreamReader sr = new StreamReader(ms, Encoding.UTF8))
                     {
                         using (XmlTextReader reader = new XmlTextReader(sr))
                         {

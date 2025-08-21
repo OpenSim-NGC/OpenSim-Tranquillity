@@ -110,10 +110,10 @@ namespace OpenSim.Region.PhysicsModules.SharedBase
         // Anything else could cause problems.
         public event physicsCrash OnPhysicsCrash;
 
-        public static PhysicsScene Null
-        {
-            get { return new NullPhysicsScene(); }
-        }
+        //public static PhysicsScene Null
+        //{
+        //    get { return new NullPhysicsScene(); }
+        //}
 
         public RequestAssetDelegate RequestAssetMethod { get; set; }
 

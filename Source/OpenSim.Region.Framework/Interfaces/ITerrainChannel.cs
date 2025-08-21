@@ -25,16 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenSim.Framework;
 using OpenMetaverse;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.Framework.Interfaces
 {
     public interface ITerrainChannel
     {
-        int Width { get;}       // X dimension
-        int Height { get;}      // Y dimension
-        int Altitude { get;}    // Z dimension
+        int Width { get; }       // X dimension
+        int Height { get; }      // Y dimension
+        int Altitude { get; }    // Z dimension
 
         float this[int x, int y] { get; set; }
 

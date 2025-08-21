@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using OpenMetaverse;
+using System.Collections;
 
 namespace OpenSim.Region.Framework.Interfaces
 {
@@ -42,7 +40,7 @@ namespace OpenSim.Region.Framework.Interfaces
         public int memory;
     };
 
-    public interface IScriptModule: INonSharedRegionModule
+    public interface IScriptModule : INonSharedRegionModule
     {
         /// <summary>
         /// Triggered when a script is removed from the script module.

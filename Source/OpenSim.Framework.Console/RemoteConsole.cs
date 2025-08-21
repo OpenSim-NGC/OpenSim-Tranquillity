@@ -33,6 +33,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenSim.Framework.Monitoring;
+using OpenSim.Framework.Servers.HttpServer;
 using Timer = System.Timers.Timer;
 
 namespace OpenSim.Framework.Console;
@@ -721,6 +722,16 @@ public class RemoteConsole : ICommandConsole
     public void SetCntrCHandler(OnCntrCCelegate handler)
     {
         _commandConsole.SetCntrCHandler(handler);
+    }
+
+    public void FireOnOutput(string text)
+    {
+        _commandConsole.FireOnOutput(text);
+    }
+
+    public void CancelKeyPressed(object sender, ConsoleCancelEventArgs args)
+    {
+        _commandConsole.CancelKeyPressed(sender, args);
     }
 
     public string Prompt(string p)

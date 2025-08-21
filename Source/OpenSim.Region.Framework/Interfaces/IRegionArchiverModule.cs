@@ -25,12 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-
-using OpenMetaverse;
-
 namespace OpenSim.Region.Framework.Interfaces
 {
     /// <summary>
@@ -106,7 +100,7 @@ namespace OpenSim.Region.Framework.Interfaces
         /// <param name="options">
         /// Dictionary of options.
         /// </param>
-        void DearchiveRegion(string loadPath, Guid requestId, Dictionary<string,object> options);
+        void DearchiveRegion(string loadPath, Guid requestId, Dictionary<string, object> options);
 
         /// <summary>
         /// Dearchive a region from a stream.  This replaces the existing scene.
@@ -128,6 +122,6 @@ namespace OpenSim.Region.Framework.Interfaces
         /// <param name="options">
         /// Dictionary of options.
         /// </param>
-        void DearchiveRegion(Stream loadStream, Guid requestId, Dictionary<string,object> options);
+        void DearchiveRegion(Stream loadStream, Guid requestId, Dictionary<string, object> options);
     }
 }

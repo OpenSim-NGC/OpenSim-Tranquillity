@@ -102,6 +102,16 @@ public class MockConsole : ICommandConsole
     {
     }
 
+    public void FireOnOutput(string text)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void CancelKeyPressed(object sender, ConsoleCancelEventArgs args)
+    {
+        throw new NotImplementedException();
+    }
+
     public void ReadConfig(IConfiguration configSource)
     {
     }

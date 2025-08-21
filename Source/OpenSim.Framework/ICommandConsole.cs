@@ -45,5 +45,7 @@ namespace OpenSim.Framework
         void RunCommand(string cmd);
         void ReadConfig(IConfiguration configSource);
         void SetCntrCHandler(OnCntrCCelegate handler);
+        void FireOnOutput(string text);
+        void CancelKeyPressed(object sender, ConsoleCancelEventArgs args);
     }
 }

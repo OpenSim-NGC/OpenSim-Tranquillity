@@ -659,101 +659,101 @@ namespace OpenSim.Services.UserAccountService
         {
             firstName = firstName.Trim();
             lastName = lastName.Trim();
+
             UserAccount account = GetUserAccount(UUID.Zero, firstName, lastName);
 
             if (account is not null)
             {
-                m_log.Error($"[USER ACCOUNT SERVICE]: A user with the name {firstName} {lastName} already exists!");
+                _logger.LogError($"[USER ACCOUNT SERVICE]: A user with the name {firstName} {lastName} already exists!");
                 return null;
             }
 
-                account = new UserAccount(UUID.Zero, principalID, firstName, lastName, email);
-                if (account.ServiceURLs == null || account.ServiceURLs.Count == 0)
-                {
-                    account.ServiceURLs = new Dictionary<string, object>
-                    {
-                        ["HomeURI"] = string.Empty,
-                        ["InventoryServerURI"] = string.Empty,
-                        ["AssetServerURI"] = string.Empty
-                    };
-                }
+            account = new UserAccount(UUID.Zero, principalID, firstName, lastName, email);
 
-                if (!StoreUserAccount(account))
+            if (account.ServiceURLs == null || account.ServiceURLs.Count == 0)
+            {
+                account.ServiceURLs = new Dictionary<string, object>
                 {
+                    ["HomeURI"] = string.Empty,
+                    ["InventoryServerURI"] = string.Empty,
+                    ["AssetServerURI"] = string.Empty
+                };
+            }
+
+            if (StoreUserAccount(account) is false)
+            {
                 _logger.LogError($"[USER ACCOUNT SERVICE]: Account creation failed for account {firstName} {lastName}");
                 return null;
+            }
+
+            bool success;
+            if (_authenticationService != null)
+            {
+                success = _authenticationService.SetPassword(account.PrincipalID, password);
+                if (!success)
+                {
+                    _logger.LogWarning("[USER ACCOUNT SERVICE]: Unable to set password for account {0} {1}.",
+                        firstName, lastName);
                 }
+            }
 
-                    bool success;
-                    if (_authenticationService != null)
-                    {
-                        success = _authenticationService.SetPassword(account.PrincipalID, password);
-                        if (!success)
-                        {
-                            _logger.LogWarning("[USER ACCOUNT SERVICE]: Unable to set password for account {0} {1}.",
-                                firstName, lastName);
-                        }
-                    }
+            GridRegion home = null;
 
-                    GridRegion home = null;
-                    if (_gridService != null)
-                    {
-                        List<GridRegion> defaultRegions = _gridService.GetDefaultRegions(UUID.Zero);
-                        if (defaultRegions != null && defaultRegions.Count >= 1)
-                            home = defaultRegions[0];
+            if (_gridService != null)
+            {
+                List<GridRegion> defaultRegions = _gridService.GetDefaultRegions(UUID.Zero);
+                if (defaultRegions != null && defaultRegions.Count >= 1)
+                    home = defaultRegions[0];
 
-                        if (_gridUserService != null && home != null)
-                        {
-                            _gridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID,
-                                new Vector3(128, 128, 0), new Vector3(0, 1, 0));
-                        }
-                        else
-                        {
-                            _logger.LogWarning("[USER ACCOUNT SERVICE]: Unable to set home for account {0} {1}.",
-                                firstName, lastName);
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogWarning("[USER ACCOUNT SERVICE]: Unable to retrieve home region for account {0} {1}.",
-                           firstName, lastName);
-                    }
-
-                    if (_inventoryService != null)
-                    {
-                        success = _inventoryService.CreateUserInventory(account.PrincipalID);
-                        if (!success)
-                        {
-                            _logger.LogWarning("[USER ACCOUNT SERVICE]: Unable to create inventory for account {0} {1}.",
-                                firstName, lastName);
-                        }
-                        else
-                        {
-                            _logger.LogDebug(
-                                "[USER ACCOUNT SERVICE]: Created user inventory for {0} {1}", firstName, lastName);
-                        }
-
-                        if (CreateDefaultAvatarEntries)
-                        {
-                            if (string.IsNullOrEmpty(model))
-                                CreateDefaultAppearanceEntries(account.PrincipalID);
-                            else
-                                EstablishAppearance(account.PrincipalID, model);
-                        }
-                    }
-
-                    _logger.LogInformation(
-                        "[USER ACCOUNT SERVICE]: Account {0} {1} {2} created successfully",
-                        firstName, lastName, account.PrincipalID);
+                if (_gridUserService != null && home != null)
+                {
+                    _gridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID,
+                        new Vector3(128, 128, 0), new Vector3(0, 1, 0));
                 }
                 else
                 {
-                    _logger.LogError("[USER ACCOUNT SERVICE]: Account creation failed for account {0} {1}", firstName, lastName);
+                    _logger.LogWarning("[USER ACCOUNT SERVICE]: Unable to set home for account {0} {1}.",
+                        firstName, lastName);
                 }
             }
             else
             {
-                _logger.LogError("[USER ACCOUNT SERVICE]: A user with the name {0} {1} already exists!", firstName, lastName);
+                _logger.LogWarning("[USER ACCOUNT SERVICE]: Unable to retrieve home region for account {0} {1}.",
+                    firstName, lastName);
+            }
+
+            if (_inventoryService != null)
+            {
+                success = _inventoryService.CreateUserInventory(account.PrincipalID);
+                if (!success)
+                {
+                    _logger.LogWarning("[USER ACCOUNT SERVICE]: Unable to create inventory for account {0} {1}.",
+                        firstName, lastName);
+                }
+                else
+                {
+                    _logger.LogDebug(
+                        "[USER ACCOUNT SERVICE]: Created user inventory for {0} {1}", firstName, lastName);
+                }
+
+                if (CreateDefaultAvatarEntries)
+                {
+                    if (string.IsNullOrEmpty(model))
+                        CreateDefaultAppearanceEntries(account.PrincipalID);
+                    else
+                        EstablishAppearance(account.PrincipalID, model);
+                }
+            }
+
+            if (account is not null)
+            { 
+                _logger.LogInformation(
+                    "[USER ACCOUNT SERVICE]: Account {0} {1} {2} created successfully",
+                    firstName, lastName, account.PrincipalID);
+            }
+            else
+            {
+                _logger.LogError("[USER ACCOUNT SERVICE]: Account creation failed for account {0} {1}", firstName, lastName);
             }
 
             return account;

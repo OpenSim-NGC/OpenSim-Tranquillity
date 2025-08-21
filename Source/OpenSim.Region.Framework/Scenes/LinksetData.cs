@@ -1,20 +1,13 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using ICSharpCode.SharpZipLib.Zip;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes
 {
     public class LinksetData : ICloneable
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        
         public const int LINKSETDATA_MAX = 131072;
 
         private static readonly object linksetDataLock = new object();
@@ -30,11 +23,15 @@ namespace OpenSim.Region.Framework.Scenes
         [JsonRequired]
         public int BytesUsed { get; set; }
 
-        public LinksetData()
+        private readonly ILogger<LinksetData> _logger;
+
+        public LinksetData(ILogger<LinksetData> logger)
         {
             Data = new();
             BytesFree = LINKSETDATA_MAX;
             BytesUsed = 0;
+
+            _logger = logger;
         }
 
         public object Clone()
@@ -44,7 +41,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void Clear()
         {
-            lock(linksetDataLock)
+            lock (linksetDataLock)
             {
                 Data.Clear();
                 BytesFree = LINKSETDATA_MAX;
@@ -64,20 +61,20 @@ namespace OpenSim.Region.Framework.Scenes
         {
             lock (linksetDataLock)
             {
-                return ((Data is null) || (Data.Count <= 0)) ? 
+                return ((Data is null) || (Data.Count <= 0)) ?
                     null : JsonSerializer.Serialize<LinksetData>(this);
             }
         }
-   
+
         public static LinksetData DeserializeLinksetData(string data)
         {
             LinksetData lsd = null;
-            
+
             if (string.IsNullOrWhiteSpace(data) is false)
-            {           
+            {
                 try
                 {
-                    lsd = JsonSerializer.Deserialize<LinksetData>(data);                  
+                    lsd = JsonSerializer.Deserialize<LinksetData>(data);
                 }
                 catch (JsonException jse)
                 {
@@ -85,7 +82,7 @@ namespace OpenSim.Region.Framework.Scenes
                     {
                         m_log.Debug($"Exception deserializing LinkSetData, trying original format: {jse.Message}");
                         var listData = JsonSerializer.Deserialize<SortedList<string, LinksetDataEntry>>(data);
-                        lsd = new LinksetData { Data = listData }; 
+                        lsd = new LinksetData { Data = listData };
                     }
                     catch (Exception e)
                     {
@@ -413,7 +410,7 @@ namespace OpenSim.Region.Framework.Scenes
                 JsonSerializer.Serialize<LinksetDataEntry>(this));
         }
 
-        public string Password { get; set; } 
+        public string Password { get; set; }
 
         public string Value { get; set; }
 

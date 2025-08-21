@@ -25,15 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
 //using System.Reflection;
-using System.Threading;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Region.Framework.Interfaces;
+using System.Collections.Concurrent;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -73,7 +68,7 @@ namespace OpenSim.Region.Framework.Scenes
     /// </remarks>
     public class AsyncInventorySender
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         protected Scene m_scene;
 
@@ -100,8 +95,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="ownerID"></param>
         public void HandleFetchInventory(IClientAPI remoteClient, UUID[] items, UUID[] owners)
         {
-               //m_log.DebugFormat(
-               //     "[ASYNC INVENTORY SENDER]: Putting request from {0} for {1} on queue", remoteClient.Name, itemID);
+            //m_log.DebugFormat(
+            //     "[ASYNC INVENTORY SENDER]: Putting request from {0} for {1} on queue", remoteClient.Name, itemID);
 
             m_fetchHolder.Enqueue(new FetchHolder(remoteClient, items, owners));
             if (Monitor.TryEnter(m_threadLock))
@@ -120,7 +115,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         protected void ProcessQueue()
         {
-            lock(m_threadLock)
+            lock (m_threadLock)
             {
                 try
                 {
@@ -132,7 +127,7 @@ namespace OpenSim.Region.Framework.Scenes
                         //     "[ASYNC INVENTORY SENDER]: Handling request from {0} for {1} on queue", fh.Client.Name, fh.ItemID);
 
                         var items = new List<InventoryItemBase>();
-                        for(int i = 0; i < fh.Items.Length; ++i )
+                        for (int i = 0; i < fh.Items.Length; ++i)
                         {
                             InventoryItemBase item = m_scene.InventoryService.GetItem(fh.Owners[i], fh.Items[i]);
                             if (item == null)
@@ -151,10 +146,10 @@ namespace OpenSim.Region.Framework.Scenes
                         }
 
                         fh.Client.SendInventoryItemDetails(items.ToArray());
-                         // TODO: Possibly log any failure
+                        // TODO: Possibly log any failure
                     }
                 }
-                catch  { }
+                catch { }
                 m_running = false;
             }
         }

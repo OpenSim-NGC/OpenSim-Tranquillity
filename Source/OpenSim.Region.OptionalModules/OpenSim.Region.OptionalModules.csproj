@@ -33,9 +33,9 @@
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\OpenSim.Capabilities\OpenSim.Capabilities.csproj" />
     <ProjectReference Include="..\OpenSim.Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
+	<ProjectReference Include="..\OpenSim.Framework.Capabilities\OpenSim.Framework.Capabilities.csproj" />
     <ProjectReference Include="..\OpenSim.Framework.Monitoring\OpenSim.Framework.Monitoring.csproj" />
     <ProjectReference Include="..\OpenSim.Region.ClientStack.LindenUDP\OpenSim.Region.ClientStack.LindenUDP.csproj" />
     <ProjectReference Include="..\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj" />
@@ -49,8 +49,7 @@
 
   <ItemGroup>
     <PackageReference Include="Ionic.Zlib.Core" Version="1.0.0" />
-    <PackageReference Include="log4net" Version="3.1.0" />
-    <PackageReference Include="System.Data.SQLite" Version="1.0.119" />
+    <PackageReference Include="System.Data.SQLite" Version="2.0.1" />
     <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
   </ItemGroup>
   

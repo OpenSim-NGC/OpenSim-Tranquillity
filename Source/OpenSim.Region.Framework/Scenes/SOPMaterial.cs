@@ -25,13 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Text;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography; // for computing md5 hash
-using OpenSim.Framework;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography; // for computing md5 hash
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -212,7 +209,7 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                     inthash ^= NormalMapID.GetHashCode();
                     inthash ^= SpecularMapID.GetHashCode();
-                 }
+                }
                 validinthash = true;
             }
             return inthash;

@@ -25,11 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-
 namespace OpenSim.Region.Framework.Interfaces
 {
-    public interface INonSharedRegionModule : IRegionModuleBase
+    public interface INonSharedRegionModule : IRegionModule
     {
     }
 }

@@ -25,17 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using System.Text;
-using System.IO;
 using System.Xml;
-using OpenSim.Framework.Serialization;
-using OpenSim.Framework.Serialization.External;
-using OpenSim.Region.Framework.Scenes.Serialization;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -410,7 +404,7 @@ namespace OpenSim.Region.Framework.Scenes
         {
             get
             {
-                if((vd.m_flags & VehicleFlag.CAMERA_DECOUPLED) != 0)
+                if ((vd.m_flags & VehicleFlag.CAMERA_DECOUPLED) != 0)
                     return true;
                 return false;
             }

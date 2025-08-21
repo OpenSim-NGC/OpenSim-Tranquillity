@@ -25,15 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
 //using System.Reflection;
-using System.Threading;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+using System.Collections.Concurrent;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -90,11 +86,11 @@ namespace OpenSim.Region.Framework.Scenes
                     g.DeleteGroupFromScene(false);
             }
 
-            if(Monitor.TryEnter(m_threadLock))
+            if (Monitor.TryEnter(m_threadLock))
             {
-                if(!m_running)
+                if (!m_running)
                 {
-                    if(Enabled)
+                    if (Enabled)
                     {
                         m_running = true;
                         Util.FireAndForget(x => InventoryDeQueueAndDelete());
@@ -137,7 +133,7 @@ namespace OpenSim.Region.Framework.Scenes
                         }
 
                         count += x.objectGroups.Count;
-                        if(count > 256)
+                        if (count > 256)
                         {
                             Thread.Sleep(50); // throttle
                             count = 0;

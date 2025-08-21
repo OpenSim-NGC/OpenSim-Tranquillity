@@ -33,15 +33,15 @@ public interface ISnmpModule
     void Critical(string Message, Scene scene);
     void Warning(string Message, Scene scene);
     void Major(string Message, Scene scene);
-    void ColdStart(int step , Scene scene);
-    void Shutdown(int step , Scene scene);
+    void ColdStart(int step, Scene scene);
+    void Shutdown(int step, Scene scene);
     //
     // Node Start/stop events
     //
     void LinkUp(Scene scene);
     void LinkDown(Scene scene);
     void BootInfo(string data, Scene scene);
-    void trapDebug(string Module,string data, Scene scene);
+    void trapDebug(string Module, string data, Scene scene);
     void trapXMRE(int data, string Message, Scene scene);
 
 }

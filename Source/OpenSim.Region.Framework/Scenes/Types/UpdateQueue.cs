@@ -25,12 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Runtime.Serialization;
-using System.Security.Permissions;
 using OpenMetaverse;
-using OpenSim.Region.Framework.Scenes;
 
 namespace OpenSim.Region.Framework.Scenes.Types
 {
@@ -66,7 +61,8 @@ namespace OpenSim.Region.Framework.Scenes.Types
         {
             lock (m_syncObject)
             {
-                if (!m_ids.ContainsKey(part.UUID)) {
+                if (!m_ids.ContainsKey(part.UUID))
+                {
                     m_ids.Add(part.UUID, true);
                     m_queue.Enqueue(part);
                 }

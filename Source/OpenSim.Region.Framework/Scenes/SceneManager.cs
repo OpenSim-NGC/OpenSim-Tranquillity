@@ -25,14 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Reflection;
-using OpenMetaverse;
 using log4net;
+using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+using System.Net;
+using System.Reflection;
 
 namespace OpenSim.Region.Framework.Scenes
 {
@@ -92,7 +90,8 @@ namespace OpenSim.Region.Framework.Scenes
         private static SceneManager m_instance = null;
         public static SceneManager Instance
         {
-            get {
+            get
+            {
                 if (m_instance == null)
                     m_instance = new SceneManager();
                 return m_instance;
@@ -103,7 +102,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         public List<Scene> Scenes
         {
-            get { return new List<Scene>(m_localScenes.FindAll(delegate(Scene s) { return true; })); }
+            get { return new List<Scene>(m_localScenes.FindAll(delegate (Scene s) { return true; })); }
         }
 
         /// <summary>
@@ -196,7 +195,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void SendSimOnlineNotification(ulong regionHandle)
         {
-            Scene s = m_localScenes.FindValue(delegate(Scene x)
+            Scene s = m_localScenes.FindValue(delegate (Scene x)
                     {
                         if (x.RegionInfo.RegionHandle == regionHandle)
                             return true;
@@ -209,7 +208,7 @@ namespace OpenSim.Region.Framework.Scenes
 
                 for (int i = 0; i < sceneList.Count; i++)
                 {
-                    if (sceneList[i]!= s)
+                    if (sceneList[i] != s)
                     {
                         // Inform other regions to tell their avatar about me
                         //sceneList[i].OtherRegionUp(Result);
@@ -310,12 +309,12 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void SendCommandToPluginModules(string[] cmdparams)
         {
-            ForEachSelectedScene(delegate(Scene scene) { scene.SendCommandToPlugins(cmdparams); });
+            ForEachSelectedScene(delegate (Scene scene) { scene.SendCommandToPlugins(cmdparams); });
         }
 
         public void SetBypassPermissionsOnCurrentScene(bool bypassPermissions)
         {
-            ForEachSelectedScene(delegate(Scene scene) { scene.Permissions.SetBypassPermissions(bypassPermissions); });
+            ForEachSelectedScene(delegate (Scene scene) { scene.Permissions.SetBypassPermissions(bypassPermissions); });
         }
 
         public void ForEachSelectedScene(Action<Scene> func)
@@ -328,12 +327,12 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void RestartCurrentScene()
         {
-            ForEachSelectedScene(delegate(Scene scene) { scene.RestartNow(); });
+            ForEachSelectedScene(delegate (Scene scene) { scene.RestartNow(); });
         }
 
         public void BackupCurrentScene()
         {
-            ForEachSelectedScene(delegate(Scene scene) { scene.Backup(true); });
+            ForEachSelectedScene(delegate (Scene scene) { scene.Backup(true); });
         }
 
         public bool TrySetCurrentScene(string regionName)
@@ -361,7 +360,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         public bool TrySetCurrentScene(UUID regionID)
         {
-//            m_log.Debug("Searching for Region: '" + regionID + "'");
+            //            m_log.Debug("Searching for Region: '" + regionID + "'");
 
             Scene s;
 
@@ -423,9 +422,9 @@ namespace OpenSim.Region.Framework.Scenes
             List<ScenePresence> avatars = new List<ScenePresence>();
 
             ForEachSelectedScene(
-                delegate(Scene scene)
+                delegate (Scene scene)
                 {
-                    scene.ForEachRootScenePresence(delegate(ScenePresence scenePresence)
+                    scene.ForEachRootScenePresence(delegate (ScenePresence scenePresence)
                     {
                         avatars.Add(scenePresence);
                     });
@@ -439,9 +438,9 @@ namespace OpenSim.Region.Framework.Scenes
         {
             List<ScenePresence> presences = new List<ScenePresence>();
 
-            ForEachSelectedScene(delegate(Scene scene)
+            ForEachSelectedScene(delegate (Scene scene)
             {
-                scene.ForEachScenePresence(delegate(ScenePresence sp)
+                scene.ForEachScenePresence(delegate (ScenePresence sp)
                 {
                     presences.Add(sp);
                 });
@@ -463,12 +462,12 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void ForceCurrentSceneClientUpdate()
         {
-            ForEachSelectedScene(delegate(Scene scene) { scene.ForceClientUpdate(); });
+            ForEachSelectedScene(delegate (Scene scene) { scene.ForceClientUpdate(); });
         }
 
         public void HandleEditCommandOnCurrentScene(string[] cmdparams)
         {
-            ForEachSelectedScene(delegate(Scene scene) { scene.HandleEditCommand(cmdparams); });
+            ForEachSelectedScene(delegate (Scene scene) { scene.HandleEditCommand(cmdparams); });
         }
 
         public bool TryGetScenePresence(UUID avatarId, out ScenePresence avatar)

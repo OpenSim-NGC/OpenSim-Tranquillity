@@ -25,17 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Threading;
-using OpenMetaverse;
 using log4net;
 using Nini.Config;
+using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
-
 using OpenSim.Region.Framework.Interfaces;
+using System.Reflection;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.Framework.Scenes
@@ -71,11 +66,11 @@ namespace OpenSim.Region.Framework.Scenes
         /// <value>
         /// All the region modules attached to this scene.
         /// </value>
-        public Dictionary<string, IRegionModuleBase> RegionModules
+        public Dictionary<string, IRegionModule> RegionModules
         {
             get { return m_regionModules; }
         }
-        private Dictionary<string, IRegionModuleBase> m_regionModules = new Dictionary<string, IRegionModuleBase>();
+        private Dictionary<string, IRegionModule> m_regionModules = new Dictionary<string, IRegionModule>();
 
         /// <value>
         /// The module interfaces available from this scene.
@@ -175,7 +170,7 @@ namespace OpenSim.Region.Framework.Scenes
             get { return m_permissions; }
         }
 
-         /* Used by the loadbalancer plugin on GForge */
+        /* Used by the loadbalancer plugin on GForge */
         protected RegionStatus m_regStatus;
         public RegionStatus RegionStatus
         {
@@ -310,7 +305,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         /// <param name="name"></param>
         /// <param name="module"></param>
-        public void AddRegionModule(string name, IRegionModuleBase module)
+        public void AddRegionModule(string name, IRegionModule module)
         {
             if (!RegionModules.ContainsKey(name))
             {
@@ -410,7 +405,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="mod"></param>
         public void RegisterModuleInterface<M>(M mod)
         {
-//            m_log.DebugFormat("[SCENE BASE]: Registering interface {0}", typeof(M));
+            //            m_log.DebugFormat("[SCENE BASE]: Registering interface {0}", typeof(M));
 
             List<Object> l = null;
             if (!ModuleInterfaces.TryGetValue(typeof(M), out l))
@@ -496,7 +491,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <returns>null if there is no registered module implementing that interface</returns>
         public T RequestModuleInterface<T>()
         {
-            if (ModuleInterfaces.TryGetValue(typeof(T), out List<object> mio ) && mio.Count > 0)
+            if (ModuleInterfaces.TryGetValue(typeof(T), out List<object> mio) && mio.Count > 0)
                 return (T)mio[0];
 
             return default;
@@ -518,7 +513,7 @@ namespace OpenSim.Region.Framework.Scenes
             }
             else
             {
-                return new T[] {};
+                return new T[] { };
             }
         }
 
@@ -532,7 +527,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="shorthelp"></param>
         /// <param name="longhelp"></param>
         /// <param name="callback"></param>
-        public void AddCommand(IRegionModuleBase module, string command, string shorthelp, string longhelp, CommandDelegate callback)
+        public void AddCommand(IRegionModule module, string command, string shorthelp, string longhelp, CommandDelegate callback)
         {
             AddCommand(module, command, shorthelp, longhelp, string.Empty, callback);
         }
@@ -541,8 +536,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// Call this from a region module to add a command to the OpenSim console.
         /// </summary>
         /// <param name="mod">
-        /// The use of IRegionModuleBase is a cheap trick to get a different method signature,
-        /// though all new modules should be using interfaces descended from IRegionModuleBase anyway.
+        /// The use of IRegionModule is a cheap trick to get a different method signature,
+        /// though all new modules should be using interfaces descended from IRegionModule anyway.
         /// </param>
         /// <param name="category">
         /// Category of the command.  This is the section under which it will appear when the user asks for help
@@ -552,7 +547,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="longhelp"></param>
         /// <param name="callback"></param>
         public void AddCommand(
-            string category, IRegionModuleBase module, string command, string shorthelp, string longhelp, CommandDelegate callback)
+            string category, IRegionModule module, string command, string shorthelp, string longhelp, CommandDelegate callback)
         {
             AddCommand(category, module, command, shorthelp, longhelp, string.Empty, callback);
         }
@@ -566,7 +561,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="longhelp"></param>
         /// <param name="descriptivehelp"></param>
         /// <param name="callback"></param>
-        public void AddCommand(IRegionModuleBase module, string command, string shorthelp, string longhelp, string descriptivehelp, CommandDelegate callback)
+        public void AddCommand(IRegionModule module, string command, string shorthelp, string longhelp, string descriptivehelp, CommandDelegate callback)
         {
             string moduleName = (module is null) ? module.Name : string.Empty;
             AddCommand(moduleName, module, command, shorthelp, longhelp, descriptivehelp, callback);
@@ -585,7 +580,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="descriptivehelp"></param>
         /// <param name="callback"></param>
         public void AddCommand(
-            string category, IRegionModuleBase module, string command,
+            string category, IRegionModule module, string command,
             string shorthelp, string longhelp, string descriptivehelp, CommandDelegate callback)
         {
             if (MainConsole.Instance is null)

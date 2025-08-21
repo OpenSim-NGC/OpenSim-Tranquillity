@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using OpenMetaverse;
 
 namespace OpenSim.Region.Framework.Scenes.Animation
@@ -189,7 +187,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
             int i = 0;
             if (!BitConverter.IsLittleEndian)
             {
-                unknown0 = Utils.BytesToUInt16(BinBVHUtil.EndianSwap(animationdata,i,2)); i += 2; // Always 1
+                unknown0 = Utils.BytesToUInt16(BinBVHUtil.EndianSwap(animationdata, i, 2)); i += 2; // Always 1
                 unknown1 = Utils.BytesToUInt16(BinBVHUtil.EndianSwap(animationdata, i, 2)); i += 2; // Always 0
                 Priority = Utils.BytesToInt(BinBVHUtil.EndianSwap(animationdata, i, 4)); i += 4;
                 Length = Utils.BytesToFloat(BinBVHUtil.EndianSwap(animationdata, i, 4), 0); i += 4;
@@ -273,10 +271,10 @@ namespace OpenSim.Region.Framework.Scenes.Animation
                 // We found the end of the string
                 // append the bytes from the beginning of the string to the end of the string
                 // advance i
-                byte[] interm = new byte[endpos-i];
-                for (; i<endpos; i++)
+                byte[] interm = new byte[endpos - i];
+                for (; i < endpos; i++)
                 {
-                    interm[i-startpos] = data[i];
+                    interm[i - startpos] = data[i];
                 }
                 i++;  // advance past the null character
 
@@ -456,9 +454,9 @@ namespace OpenSim.Region.Framework.Scenes.Animation
             iostream.Write(BinBVHUtil.WriteNullTerminatedString(Name));
             iostream.Write(BinBVHUtil.ES(Utils.IntToBytes(Priority)));
             iostream.Write(BinBVHUtil.ES(Utils.IntToBytes(rotationkeys.Length)));
-            for (int i=0;i<rotationkeys.Length;i++)
+            for (int i = 0; i < rotationkeys.Length; i++)
             {
-                rotationkeys[i].WriteBytesToStream(iostream, InPoint, OutPoint,  -1f, 1f);
+                rotationkeys[i].WriteBytesToStream(iostream, InPoint, OutPoint, -1f, 1f);
             }
             iostream.Write(BinBVHUtil.ES(Utils.IntToBytes((positionkeys.Length))));
             for (int i = 0; i < positionkeys.Length; i++)
@@ -521,7 +519,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
             //m_parentGroup.GetTimeDilation() * (float)ushort.MaxValue
             //0-1
 
-//            float difference = upper - lower;
+            //            float difference = upper - lower;
             // we're trying to get a zero lower and modify all values equally so we get a percentage position
             if (lower > 0)
             {

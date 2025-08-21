@@ -25,17 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
-
 using OpenSim.Framework;
+using System.Collections.Concurrent;
 
 namespace OpenSim.Region.Framework.Scenes
 {
     public class PriorityQueue
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         public delegate bool UpdatePriorityHandler(ref int priority, ISceneEntity entity);
 
@@ -50,7 +47,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary.
         public const int NumberOfImmediateQueues = 2;
         // first queues are immediate, so no counts
-        private static readonly int[] m_queueCounts = {0, 0, 8, 8, 5, 4, 3, 2, 1, 1, 1, 1, 1 };
+        private static readonly int[] m_queueCounts = { 0, 0, 8, 8, 5, 4, 3, 2, 1, 1, 1, 1, 1 };
         // this is                     ava, ava, attach, <10m, 20,40,80,160m,320,640,1280, +
 
         private PriorityMinHeap[] m_heaps = new PriorityMinHeap[NumberOfQueues];
@@ -76,7 +73,7 @@ namespace OpenSim.Region.Framework.Scenes
             get { return m_mainLock; }
         }
 
-#region constructor
+        #region constructor
         public PriorityQueue(int capacity)
         {
             capacity /= 4;
@@ -87,9 +84,9 @@ namespace OpenSim.Region.Framework.Scenes
             m_nextQueue = NumberOfImmediateQueues;
             m_countFromQueue = m_queueCounts[m_nextQueue];
         }
-#endregion Constructor
+        #endregion Constructor
 
-#region PublicMethods
+        #region PublicMethods
         public void Close()
         {
             PriorityMinHeap[] tmpheaps;
@@ -190,7 +187,7 @@ namespace OpenSim.Region.Framework.Scenes
             // matter what else. Breaks fairness. But very useful.
             try
             {
-                lock(m_mainLock)
+                lock (m_mainLock)
                 {
                     for (int iq = 0; iq < NumberOfImmediateQueues; iq++)
                     {
@@ -221,9 +218,9 @@ namespace OpenSim.Region.Framework.Scenes
                     for (int i = NumberOfImmediateQueues; i < NumberOfQueues; ++i)
                     {
                         m_nextQueue++;
-                        if(m_nextQueue >= NumberOfQueues)
+                        if (m_nextQueue >= NumberOfQueues)
                             m_nextQueue = NumberOfImmediateQueues;
- 
+
                         curheap = m_heaps[m_nextQueue];
                         if (curheap.Count == 0)
                             continue;
@@ -247,7 +244,7 @@ namespace OpenSim.Region.Framework.Scenes
         {
             try
             {
-                lock(m_mainLock)
+                lock (m_mainLock)
                 {
                     for (int iq = 0; iq < NumberOfQueues; ++iq)
                     {
@@ -313,7 +310,7 @@ namespace OpenSim.Region.Framework.Scenes
             return s;
         }
 
-#endregion PublicMethods
+        #endregion PublicMethods
     }
 
     public class PriorityMinHeap
@@ -360,7 +357,7 @@ namespace OpenSim.Region.Framework.Scenes
 
         private void BubbleDown(int index)
         {
-            if(m_size < 2)
+            if (m_size < 2)
                 return;
 
             EntityUpdate childItem;
@@ -381,7 +378,7 @@ namespace OpenSim.Region.Framework.Scenes
                 {
                     childItemR = m_items[child + 1];
 
-                    if(childItem.EntryOrder > childItemR.EntryOrder)
+                    if (childItem.EntryOrder > childItemR.EntryOrder)
                     {
                         childItem = childItemR;
                         ++child;
