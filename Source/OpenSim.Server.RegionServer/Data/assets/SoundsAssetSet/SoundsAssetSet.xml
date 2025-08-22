@@ -161,4 +161,11 @@
     <Key Name="assetType" Value="1" />
     <Key Name="fileName" Value="OSSndWindowOpen.ogg" />
   </Section>
+  
+  <Section Name="UISndRestart">
+	<Key Name="assetID" Value="b92a0f64-7709-8811-40c5-16afd624a45f" />
+	<Key Name="name" Value="UISndRestart" />
+	<Key Name="assetType" Value="1" />
+	<Key Name="fileName" Value="OSSndRestart.ogg" />
+  </Section>
 </Nini>
