@@ -17547,8 +17547,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public void llGodLikeRezObject(string inventory, LSL_Vector pos)
         {
-            if (!World.Permissions.IsGod(m_host.OwnerID))
-                NotImplemented("llGodLikeRezObject");
+            ScenePresence scenePresence;
+            if (!World.TryGetScenePresence(m_host.OwnerID, out scenePresence))
+            {
+                Error("llGodLikeRezObject", "Owner is not in the region");
+                return;
+            }
+
+            if (scenePresence.GodController.GodLevel < 100)
+            {
+                Error("llGodLikeRezObject", "Owner is not in GodMode");
+                return;
+            }
 
             AssetBase rezAsset = World.AssetService.Get(inventory);
             if (rezAsset == null)

@@ -661,26 +661,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         private void RegionRestart(double seconds, string msg)
         {
             IRestartModule restartModule = World.RequestModuleInterface<IRestartModule>();
-
-            List<int> times = new();
-            while (seconds > 0)
-            {
-                times.Add((int)seconds);
-                if (seconds > 300)
-                    seconds -= 120;
-                else if (seconds > 120)
-                    seconds -= 60;
-                else if (seconds > 60)
-                    seconds -= 30;
-                else
-                    seconds -= 15;
-            }
-
-            if (msg.Length == 0)
-                restartModule.ScheduleRestart(UUID.Zero, "Region: " + World.RegionInfo.RegionName + " is about to restart.\n\nIf you stay here you will be logged out.\n\n\nTime remaining: {0}.\n", times.ToArray(), true);
-
-            else
-                restartModule.ScheduleRestart(UUID.Zero, msg + "\n\nTime remaining: {0}.\n", times.ToArray(), true);
+            
+            restartModule.ScheduleRestart(UUID.Zero, (int)seconds);
         }
 
         public void osRegionNotice(string msg)
