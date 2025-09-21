@@ -612,7 +612,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     m_internalObjectHost = smtpConfig.GetString("internal_object_host", m_internalObjectHost);
                 }
 
-                IConfig chatConfig = seConfigSource.Configs["SMTP"];
+                IConfig chatConfig = seConfigSource.Configs["Chat"];
                 if(chatConfig != null)
                 {
                     m_whisperdistance = chatConfig.GetInt("whisper_distance", m_whisperdistance);
