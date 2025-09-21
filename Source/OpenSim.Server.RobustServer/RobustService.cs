@@ -1,4 +1,5 @@
-﻿using Nini.Config;
+﻿using System.Net;
+using Nini.Config;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using OpenSim.Framework;
@@ -83,29 +84,6 @@ namespace OpenSim.Server.RobustServer
             }
 
             return serverConfig;
-        }
-
-        private void InitializeNetwork(IConfig serverConfig, string[] args)
-        {
-            Culture.SetCurrentCulture();
-            Culture.SetDefaultCurrentCulture();
-
-            // ServicePointManager.DefaultConnectionLimit = 64;
-            // ServicePointManager.MaxServicePointIdleTime = 30000;
-
-            // ServicePointManager.Expect100Continue = false;
-            // ServicePointManager.UseNagleAlgorithm = false;
-            // ServicePointManager.ServerCertificateValidationCallback = ValidateServerCertificate;
-
-            m_Server = new HttpServerBase("R.O.B.U.S.T.", args);
-
-            // int dnsTimeout = serverConfig.GetInt("DnsTimeout", 30000);
-            // try { ServicePointManager.DnsRefreshTimeout = dnsTimeout; } catch { }
-
-            m_NoVerifyCertChain = serverConfig.GetBoolean("NoVerifyCertChain", m_NoVerifyCertChain);
-            m_NoVerifyCertHostname = serverConfig.GetBoolean("NoVerifyCertHostname", m_NoVerifyCertHostname);
-
-            WebUtil.SetupHTTPClients(m_NoVerifyCertChain, m_NoVerifyCertHostname, null, 32);
         }
 
         private static void ParseServiceEntry(string c, out string configName, out string conn, out uint port, out string friendlyName)
@@ -226,11 +204,19 @@ namespace OpenSim.Server.RobustServer
         {
             var args = Environment.GetCommandLineArgs();
 
-            _logger.LogInformation($"{nameof(RobustServer)} is running.");
+            _logger.LogInformation($"{nameof(RobustServer)} - {VersionInfo.GetVersionString()} is running.");
 
+            Culture.SetCurrentCulture();
+            Culture.SetDefaultCurrentCulture();
+
+            m_Server = new HttpServerBase("R.O.B.U.S.T.", args);
+            
             IConfig serverConfig = LoadConfiguration(args);
+            m_NoVerifyCertChain = serverConfig.GetBoolean("NoVerifyCertChain", m_NoVerifyCertChain);
+            m_NoVerifyCertHostname = serverConfig.GetBoolean("NoVerifyCertHostname", m_NoVerifyCertHostname);
 
-            InitializeNetwork(serverConfig, args);
+            WebUtil.SetupHTTPClients(m_NoVerifyCertChain, m_NoVerifyCertHostname, null, 32);
+
             InitalizeServiceConnectors(serverConfig);
 
             PrintFileToConsole("robuststartuplogo.txt");
@@ -245,7 +231,7 @@ namespace OpenSim.Server.RobustServer
 
         public Task StopAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("{Service} is stopping.", nameof(RobustServer));
+            _logger.LogInformation($"{{Service}} - {VersionInfo.GetVersionString()} is stopping.", nameof(RobustServer));
 
             // Nothing to do here
             // OpenSimServer.Shutdown(m_res);

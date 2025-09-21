@@ -39,7 +39,7 @@ namespace OpenSim.Server.Handlers
                 .Named<IServiceConnector>("AgentPreferencesService")
                 .AsImplementedInterfaces();
 
-            builder.RegisterType<AssetServiceConnector>()
+            builder.RegisterType<AssetServiceHandler>()
                 .Named<IServiceConnector>("AssetServiceConnector")
                 .AsImplementedInterfaces();
 

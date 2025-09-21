@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -39,12 +37,12 @@ using OpenSim.Server.Handlers.Base;
 
 namespace OpenSim.Server.Handlers.Asset
 {
-    public class AssetServiceConnector : ServiceConnector
+    public class AssetServiceHandler : ServiceConnector
     {
         private IAssetService m_AssetService;
         private string m_ConfigName = "AssetService";
 
-        public AssetServiceConnector(IConfigSource config, IHttpServer server, string configName) :
+        public AssetServiceHandler(IConfigSource config, IHttpServer server, string configName) :
                 base(config, server, configName)
         {
             if (string.IsNullOrEmpty(configName) is false)

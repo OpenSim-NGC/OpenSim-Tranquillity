@@ -19,6 +19,6 @@
     <ProjectReference Include="..\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.1.0" />
+    <PackageReference Include="log4net" Version="3.2.0" />
   </ItemGroup>
 </Project>

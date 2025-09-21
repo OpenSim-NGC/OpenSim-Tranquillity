@@ -19,7 +19,7 @@ namespace OpenSim.Server.RobustServer
 {
     class Program
     {
-        public static IHost RegionHost { get; private set; }
+        public static IHost ApplicationHost { get; private set; }
 
         public static async Task<int> Main(string[] args)
         {
@@ -77,6 +77,18 @@ namespace OpenSim.Server.RobustServer
             string console
             )
         {
+            // HostApplicationBuilderSettings settings = new()
+            // {
+            //     Args = args,
+            //     Configuration = new ConfigurationManager(),
+            //     ContentRootPath = Directory.GetCurrentDirectory(),
+            // };
+            // settings.Configuration.AddJsonFile("hostsettings.json", optional: true);
+            // settings.Configuration.AddEnvironmentVariables(prefix: "PREFIX_");
+            // settings.Configuration.AddCommandLine(args);
+            //
+            // HostApplicationBuilder builder = Host.CreateApplicationBuilder(settings);
+            
             IHostBuilder builder = Host.CreateDefaultBuilder(args);
 
             builder.ConfigureAppConfiguration(configuration =>
@@ -131,8 +143,8 @@ namespace OpenSim.Server.RobustServer
                 var serviceProvider = services.BuildServiceProvider();
             });
 
-            RegionHost = builder.Build();
-            RegionHost.Run();
+            ApplicationHost = builder.Build();
+            ApplicationHost.Run();
         }
     }
 }
