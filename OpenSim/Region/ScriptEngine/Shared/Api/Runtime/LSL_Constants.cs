@@ -35,7 +35,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
     public partial class ScriptBaseClass
     {
         // SCRIPTS CONSTANTS
-        public static readonly LSLInteger OS_APIVERSION = 23;
+        public static readonly LSLInteger OS_APIVERSION = 24;
 
         public static readonly LSLInteger TRUE = 1;
         public static readonly LSLInteger FALSE = 0;
@@ -1183,5 +1183,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int SIM_STAT_SCRIPT_RUN_PCT       = 25;
         public const int SIM_STAT_AI_MS                = 26;
 
+        public const int BEACON_MAP  = 0x1;
+        public const int BEACON_SHOW_MAP  = 0x1;
+        public const int BEACON_FOCUS_MAP = 0x2;
     }
 }
