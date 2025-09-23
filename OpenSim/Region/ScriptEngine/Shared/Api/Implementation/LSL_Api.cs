@@ -31,6 +31,7 @@ using OpenMetaverse;
 using OpenMetaverse.Assets;
 using OpenMetaverse.Packets;
 using OpenMetaverse.Rendering;
+using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.Land;
 using OpenSim.Region.Framework.Interfaces;
@@ -42,8 +43,8 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.ScriptBase;
-using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Hypergrid;
+using OpenSim.Services.Interfaces;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -53,13 +54,13 @@ using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using AssetLandmark = OpenSim.Framework.AssetLandmark;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
-using MappingType = OpenMetaverse.MappingType;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
 using LSL_Key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
@@ -67,13 +68,12 @@ using LSL_List = OpenSim.Region.ScriptEngine.Shared.LSL_Types.list;
 using LSL_Rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
 using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
+using MappingType = OpenMetaverse.MappingType;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
 using PrimType = OpenSim.Region.Framework.Scenes.PrimType;
 using RegionFlags = OpenSim.Framework.RegionFlags;
 using RegionInfo = OpenSim.Framework.RegionInfo;
-using System.Runtime.CompilerServices;
-using OpenMetaverse.StructuredData;
 
 #pragma warning disable IDE1006
 
@@ -2437,7 +2437,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         {
             if (face == ScriptBaseClass.ALL_SIDES)
                 face = 0;
-            if (face < 0)
+            else if (face < 0)
                 return ScriptBaseClass.NULL_KEY;
 
             Primitive.TextureEntry tex = part.Shape.Textures;
@@ -4410,10 +4410,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public void llSetBuoyancy(double buoyancy)
         {
-
             if (!m_host.ParentGroup.IsDeleted)
             {
-                m_host.ParentGroup.RootPart.SetBuoyancy((float)buoyancy);
+                m_host.ParentGroup.SetBuoyancy((float)buoyancy);
             }
         }
 
@@ -14072,7 +14071,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             if ((m_item.PermsMask & ScriptBaseClass.PERMISSION_TRACK_CAMERA) == 0)
             {
-                Error("llGetCameraAspect", "No permissions to track the camera");
+                Error("llGetCameraFOV", "No permissions to track the camera");
                 return LSL_Float.Zero;
             }
 
@@ -14143,24 +14142,84 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         public void llMapDestination(string simname, LSL_Vector pos, LSL_Vector lookAt)
         {
             DetectParams detectedParams = m_ScriptEngine.GetDetectParams(m_item.ItemID, 0);
-            if (detectedParams == null)
+            if (detectedParams is null)
             {
-                if (m_host.ParentGroup.IsAttachment == true)
+                if (m_host.ParentGroup.IsAttachment)
                 {
-                    detectedParams = new DetectParams
-                    {
-                        Key = m_host.OwnerID
-                    };
+                    detectedParams = new DetectParams { Key = m_host.OwnerID };
                 }
                 else
-                {
                     return;
+            }
+
+            ScenePresence avatar = World.GetScenePresence(detectedParams.Key);
+            //lookat does nothing
+            avatar?.ControllingClient.SendScriptTeleportRequest(m_host.Name,
+                    simname, pos, ScriptBaseClass.BEACON_FOCUS_MAP | ScriptBaseClass.BEACON_SHOW_MAP);
+            ScriptSleep(m_sleepMsOnMapDestination);
+        }
+
+        public void llMapBeacon(string simname, LSL_Vector pos, LSL_List loptions)
+        {
+            DetectParams detectedParams = m_ScriptEngine.GetDetectParams(m_item.ItemID, 0);
+            if (detectedParams is null)
+            {
+                if (m_host.ParentGroup.IsAttachment)
+                {
+                    detectedParams = new DetectParams { Key = m_host.OwnerID };
+                }
+                else
+                    return;
+            }
+
+            int options = 0;
+            if(loptions is not null && loptions.Length > 0)
+            {
+                if(loptions.Length != 3)
+                    throw new InvalidCastException("Unknown llMapBeacon rules");
+                try
+                {
+                    int cmd = loptions.GetLSLIntegerItem(0);
+                    if( cmd == ScriptBaseClass.BEACON_MAP)
+                    {
+                        int open_map;
+                        int focus_map;
+                        try
+                        {
+                            open_map = loptions.GetLSLIntegerItem(1);
+                        }
+                        catch (InvalidCastException)
+                        {
+                            throw new InvalidCastException("llMapBeacon open_map must be a 0 or 1");
+                        }
+                        try
+                        {
+                            focus_map = loptions.GetLSLIntegerItem(2);
+                        }
+                        catch (InvalidCastException)
+                        {
+                            throw new InvalidCastException("llMapBeacon focus_map must be a 0 or 1 ");
+                        }
+
+                        if (open_map != 0)
+                        {
+                            options = ScriptBaseClass.BEACON_SHOW_MAP;
+                            if (focus_map != 0)
+                                options |= ScriptBaseClass.BEACON_FOCUS_MAP;
+                        }
+                    }
+                    else
+                        throw new InvalidCastException($"Unknown llMapBeacon rule {cmd}");
+                }
+                catch (InvalidCastException)
+                {
+                    throw new InvalidCastException($"Invalid llMapBeacon rule");
                 }
             }
 
             ScenePresence avatar = World.GetScenePresence(detectedParams.Key);
             avatar?.ControllingClient.SendScriptTeleportRequest(m_host.Name,
-                    simname, pos, lookAt);
+                    simname, pos, options);
             ScriptSleep(m_sleepMsOnMapDestination);
         }
 
@@ -21171,6 +21230,173 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     break;
             }
             return new LSL_String();
+        }
+
+        public LSL_String llGetRenderMaterial(LSL_Integer lface )
+        {
+            return GetMaterial(m_host, lface.value);
+        }
+
+        protected static LSL_String GetMaterial(SceneObjectPart part, int face)
+        {
+            if (part.Shape.RenderMaterials is null ||
+                    part.Shape.RenderMaterials.entries is null ||
+                    part.Shape.RenderMaterials.entries.Length == 0)
+                return ScriptBaseClass.NULL_KEY;
+
+            if (face == ScriptBaseClass.ALL_SIDES)
+                face = 0;
+            else if (face < 0)
+                return ScriptBaseClass.NULL_KEY;
+            else if (face >= GetNumberOfSides(part))
+                return ScriptBaseClass.NULL_KEY;
+
+            UUID asset = UUID.Zero;
+            bool found = false;
+            foreach(Primitive.RenderMaterials.RenderMaterialEntry re in part.Shape.RenderMaterials.entries)
+            {
+                if(re.te_index == face)
+                {
+                    asset = re.id;
+                    found = true;
+                    break;
+                }
+            }
+
+            if(!found)
+                 return ScriptBaseClass.NULL_KEY;
+
+            lock (part.TaskInventory)
+            {
+                part.TaskInventory.LockItemsForRead(true);
+                try
+                { 
+                    foreach (KeyValuePair<UUID, TaskInventoryItem> inv in part.TaskInventory)
+                    {
+                        if (inv.Value.Type == (int)AssetType.Material && inv.Value.AssetID.Equals(asset))
+                            return inv.Value.Name.ToString();
+                    }
+                }
+                finally { part.TaskInventory.LockItemsForRead(false); }
+            }
+
+            if((part.ParentGroup.EffectiveOwnerPerms & (uint)PermissionMask.All) != (uint)PermissionMask.All)
+                return ScriptBaseClass.NULL_KEY;
+
+            return asset.ToString();
+        }
+
+        public LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer lface)
+        {
+            SceneObjectPart part;
+            if (linknum == ScriptBaseClass.LINK_ROOT)
+                part = m_host.ParentGroup.RootPart;
+            else if (linknum == ScriptBaseClass.LINK_THIS)
+                part = m_host;
+            else
+                part = m_host.ParentGroup.GetLinkNumPart(linknum);
+            if(part is null)
+                return 0;
+
+            if (part.Shape.RenderMaterials is null ||
+                    part.Shape.RenderMaterials.entries is null ||
+                    part.Shape.RenderMaterials.entries.Length == 0)
+                return 0;
+
+            int face = lface.value;
+            if (face == ScriptBaseClass.ALL_SIDES)
+            {
+                int nsides = GetNumberOfSides(part);
+                bool[] pbr = new bool[nsides];
+                foreach(Primitive.RenderMaterials.RenderMaterialEntry re in part.Shape.RenderMaterials.entries)
+                {
+                    if(re.te_index > 0 && re.te_index < pbr.Length && re.id.IsNotZero())
+                        pbr[re.te_index] = true;
+                }
+                foreach(bool b in pbr)
+                {
+                    if (!b)
+                        return 0;
+                }
+                return 1;
+            }
+
+            if (face < 0)
+                return 0;
+            else if (face >= GetNumberOfSides(part))
+                return 0;
+            foreach(Primitive.RenderMaterials.RenderMaterialEntry re in part.Shape.RenderMaterials.entries)
+            {
+                if(re.te_index == face)
+                    return re.id.IsZero() ? 0 : 1;
+            }
+            return 0;
+        }
+
+        public LSL_Vector llWorldPosToHUD(LSL_Vector wp)
+        {
+            if(!m_host.ParentGroup.IsAttachment)
+                return LSL_Vector.Zero;
+
+            uint atp = m_host.ParentGroup.AttachmentPoint;
+            if(atp < (uint)AttachmentPoint.HUDCenter2 || atp > (uint)AttachmentPoint.HUDBottomRight)
+                return LSL_Vector.Zero;
+
+            if (m_item.PermsGranter.NotEqual(m_host.OwnerID) ||
+                (m_item.PermsMask & ScriptBaseClass.PERMISSION_TRACK_CAMERA) == 0)
+            {
+                Error("llGetCameraPos", "No permissions to track the camera");
+                return LSL_Vector.Zero;
+            }
+
+            ScenePresence sp = World.GetScenePresence(m_host.OwnerID);
+            if(sp is null)
+                return LSL_Vector.Zero;
+
+            int h = sp.ControllingClient.viewHeight;
+            float aspect = h > 0 ?(float)sp.ControllingClient.viewWidth / h : 1f;
+
+            Vector3 totarget = (Vector3)wp - sp.CameraPosition;
+            float at = totarget.Dot(sp.CameraAtAxis);
+            float left = totarget.Dot(sp.CameraLeftAxis);
+            float up = totarget.Dot(sp.CameraUpAxis);
+
+            float fov = at * MathF.Tan((float)sp.ControllingClient.FOV * 0.5f);
+            if(fov > 0)
+            {
+                fov = 0.45f / fov;
+                left *= fov;
+                up *= fov;
+            }
+
+            switch(atp)
+            {
+                case (uint)AttachmentPoint.HUDTop:
+                    up -= 0.5f;
+                    break;
+                case (uint)AttachmentPoint.HUDTopLeft:
+                    up -= 0.5f;
+                    left -= 0.5f * aspect;
+                    break;
+                case (uint)AttachmentPoint.HUDTopRight:
+                    up -= 0.5f;
+                    left += 0.5f * aspect;
+                    break;
+                case (uint)AttachmentPoint.HUDBottom:
+                    up += 0.5f;
+                    break;
+                case (uint)AttachmentPoint.HUDBottomLeft:
+                    up += 0.5f;
+                    left -= 0.5f * aspect;
+                    break;
+                case (uint)AttachmentPoint.HUDBottomRight:
+                    up += 0.5f;
+                    left += 0.5f * aspect;
+                    break;
+                default:
+                    break;
+            }
+            return new(at > 0 ? 1 : -1, left, up);
         }
 
         static string HMAC_SHA224(string key, string message)
