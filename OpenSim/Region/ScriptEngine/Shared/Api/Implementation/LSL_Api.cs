@@ -21361,8 +21361,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             float left = totarget.Dot(sp.CameraLeftAxis);
             float up = totarget.Dot(sp.CameraUpAxis);
 
-            float fov = at * MathF.Tan((float)sp.ControllingClient.FOV * 0.5f);
-            if(fov > 0)
+            float fov = at * MathF.Tan(sp.ControllingClient.FOV * 0.5f);
+            
+            if (fov > 0)
             {
                 fov = 0.45f / fov;
                 left *= fov;
