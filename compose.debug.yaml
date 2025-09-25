@@ -1,0 +1,11 @@
+
+services:
+  robust:
+    image: robust
+    build:
+      context: .
+      dockerfile: OpenSim/Server/Dockerfile
+      args:
+        - configuration=Debug
+    volumes:
+      - ~/.vsdbg:/remote_debugger:rw
