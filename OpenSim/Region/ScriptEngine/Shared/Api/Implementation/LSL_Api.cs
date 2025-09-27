@@ -21251,20 +21251,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             else if (face >= GetNumberOfSides(part))
                 return ScriptBaseClass.NULL_KEY;
 
-            UUID asset = UUID.Zero;
-            bool found = false;
-            foreach(Primitive.RenderMaterials.RenderMaterialEntry re in part.Shape.RenderMaterials.entries)
-            {
-                if(re.te_index == face)
-                {
-                    asset = re.id;
-                    found = true;
-                    break;
-                }
-            }
-
-            if(!found)
-                 return ScriptBaseClass.NULL_KEY;
+            var re = part.Shape.RenderMaterials.entries
+                .FirstOrDefault(entry => entry.te_index == face);
+            if (re == null)
+                return ScriptBaseClass.NULL_KEY;
+            UUID asset = re.id;
 
             lock (part.TaskInventory)
             {
