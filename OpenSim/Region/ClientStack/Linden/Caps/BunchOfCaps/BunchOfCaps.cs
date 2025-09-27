@@ -890,6 +890,7 @@ namespace OpenSim.Region.ClientStack.Linden
 
                         Primitive.TextureEntry textureEntry = new(Primitive.TextureEntry.WHITE_TEXTURE);
 
+                        const float EPSILON = 1e-6f;
                         for (uint face = 0; face < face_list.Count; face++)
                         {
                             OSDMap faceMap = (OSDMap)face_list[(int)face];
@@ -905,19 +906,19 @@ namespace OpenSim.Region.ClientStack.Linden
                             if(faceMap.TryGetInt("image", out int textureNum) && textureNum >= 0 && textureNum < textures.Count)
                                 f.TextureID = textures[textureNum];
 
-                            if(faceMap.TryGetFloat("imagerot", out float imagerot) && imagerot != 0)
+                            if(faceMap.TryGetFloat("imagerot", out float imagerot) && Math.Abs(imagerot) > EPSILON)
                                 f.Rotation = imagerot;
 
-                            if(faceMap.TryGetFloat("offsets", out float offsets) && offsets != 0)
+                            if(faceMap.TryGetFloat("offsets", out float offsets) && Math.Abs(offsets) > EPSILON)
                                 f.OffsetU = offsets;
 
-                            if(faceMap.TryGetFloat("offsett", out float offsett) && offsett != 0)
+                            if(faceMap.TryGetFloat("offsett", out float offsett) && Math.Abs(offsett) > EPSILON)
                                 f.OffsetV = offsett;
 
-                            if(faceMap.TryGetFloat("scales", out float scales) && scales != 0)
+                            if(faceMap.TryGetFloat("scales", out float scales) && Math.Abs(scales) > EPSILON)
                                 f.RepeatU = scales;
 
-                            if(faceMap.TryGetFloat("scalet", out float scalet) && scalet != 0)
+                            if(faceMap.TryGetFloat("scalet", out float scalet) && Math.Abs(scalet) > EPSILON)
                                 f.RepeatV = scalet;
 
                             textureEntry.FaceTextures[face] = f;
