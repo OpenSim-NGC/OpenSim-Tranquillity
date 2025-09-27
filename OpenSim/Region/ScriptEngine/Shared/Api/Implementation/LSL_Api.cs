@@ -21271,10 +21271,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 part.TaskInventory.LockItemsForRead(true);
                 try
                 { 
-                    foreach (KeyValuePair<UUID, TaskInventoryItem> inv in part.TaskInventory)
+                    foreach (KeyValuePair<UUID, TaskInventoryItem> inv in part.TaskInventory.Where(inv => inv.Value.Type == (int)AssetType.Material && inv.Value.AssetID.Equals(asset)))
                     {
-                        if (inv.Value.Type == (int)AssetType.Material && inv.Value.AssetID.Equals(asset))
-                            return inv.Value.Name.ToString();
+                        return inv.Value.Name.ToString();
                     }
                 }
                 finally { part.TaskInventory.LockItemsForRead(false); }
