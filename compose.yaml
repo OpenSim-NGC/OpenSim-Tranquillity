@@ -1,0 +1,7 @@
+
+services:
+  robust:
+    image: robust
+    build:
+      context: .
+      dockerfile: OpenSim/Server/Dockerfile

@@ -1426,5 +1426,10 @@ namespace OpenSim.Tests.Common
         {
             throw new NotImplementedException();
         }
+
+        public void SendScriptTeleportRequest(string objName, string simName, Vector3 pos, int options)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

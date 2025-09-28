@@ -284,6 +284,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
               void llMakeFire(int particles, double scale, double vel, double lifetime, double arc, string texture, LSL_Vector offset);
               void llMakeFountain(int particles, double scale, double vel, double lifetime, double arc, int bounce, string texture, LSL_Vector offset, double bounce_offset);
               void llMakeSmoke(int particles, double scale, double vel, double lifetime, double arc, string texture, LSL_Vector offset);
+              void llMapBeacon(string simname, LSL_Vector pos, LSL_List loptions);
               void llMapDestination(string simname, LSL_Vector pos, LSL_Vector look_at);
         LSL_String llMD5String(string src, int nonce);
         LSL_String llSHA1String(string src);
@@ -543,11 +544,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
       LSL_Integer llReplaceAgentEnvironment(LSL_Key agent_id, LSL_Float transition, LSL_String environment);
 
       LSL_Integer llDerezObject(LSL_Key objectUUID, LSL_Integer flag);
-      LSL_Key llRezObjectWithParams(string inventory, LSL_List lparam);
-      LSL_String llGetStartString();
+          LSL_Key llRezObjectWithParams(string inventory, LSL_List lparam);
+       LSL_String llGetStartString();
       LSL_Integer llGetLinkSitFlags(LSL_Integer linknum);
-      void llSetLinkSitFlags(LSL_Integer linknum, LSL_Integer flags);
-      LSL_String llHMAC(LSL_String private_key, LSL_String message, LSL_String algo);
-      LSL_String llComputeHash(LSL_String message, LSL_String algo);
+             void llSetLinkSitFlags(LSL_Integer linknum, LSL_Integer flags);
+       LSL_String llHMAC(LSL_String private_key, LSL_String message, LSL_String algo);
+       LSL_String llComputeHash(LSL_String message, LSL_String algo);
+       LSL_String llGetRenderMaterial(LSL_Integer face);
+      LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer face);
+       LSL_Vector llWorldPosToHUD(LSL_Vector WorldPosition);
     }
 }
