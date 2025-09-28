@@ -189,6 +189,22 @@ namespace OpenSim.Region.ScriptEngine.Yengine
                 scriptStateN.AppendChild(experienceN);
                 //m_RunOnePhase = "GetExecutionState I";
                 //CheckRunLockInvariants(true);
+                
+                if (m_localsHeapUsed > 0)
+                {
+                    XmlElement lheap = doc.CreateElement("", "LHeapUse", "");
+                    lheap.AppendChild(doc.CreateTextNode(m_localsHeapUsed.ToString()));
+                    scriptStateN.AppendChild(lheap);
+                }
+
+                /*
+                if(m_StackLeft < m_StackSize)
+                {
+                    XmlElement stk = doc.CreateElement("", "stkLft", "");
+                    stk.AppendChild(doc.CreateTextNode(m_StackLeft.ToString()));
+                    scriptStateN.AppendChild(stk);
+                }
+                */
 
                 // Let script run again.
                 suspendOnCheckRunHold = false;
