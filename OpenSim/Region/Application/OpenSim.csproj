@@ -10,27 +10,27 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="NDesk.Options">
-      <HintPath>..\..\..\bin\NDesk.Options.dll</HintPath>
+      <HintPath>..\..\..\Library\NDesk.Options.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Nini">
-      <HintPath>..\..\..\bin\Nini.dll</HintPath>
+      <HintPath>..\..\..\Library\Nini.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverse">
-      <HintPath>..\..\..\bin\OpenMetaverse.dll</HintPath>
+      <HintPath>..\..\..\Library\OpenMetaverse.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverse.StructuredData">
-      <HintPath>..\..\..\bin\OpenMetaverse.StructuredData.dll</HintPath>
+      <HintPath>..\..\..\Library\OpenMetaverse.StructuredData.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\..\bin\OpenMetaverseTypes.dll</HintPath>
+      <HintPath>..\..\..\Library\OpenMetaverseTypes.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="XMLRPC">
-      <HintPath>..\..\..\bin\XMLRPC.dll</HintPath>
+      <HintPath>..\..\..\Library\XMLRPC.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
@@ -50,14 +50,8 @@
     <ProjectReference Include="..\..\Services\UserAccountService\OpenSim.Services.UserAccountService.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="$(SolutionDir)\bin\**">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
-	<Content Include="Resources/OpenSim.addin.xml">
-	  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	</Content>
+    <Content Include="$(SolutionDir)\bin\**" CopyToPublishDirectory="Always" />
+    <Content Include="Resources/OpenSim.addin.xml" CopyToOutputDirectory="Always" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.2.0" />
