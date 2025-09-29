@@ -8,22 +8,22 @@
   <ItemGroup>
     <Reference Include="Nini" >
       <Name>Nini</Name>
-      <HintPath>../../../bin/Nini.dll</HintPath>
+      <HintPath>../../../Library/Nini.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverse" >
       <Name>OpenMetaverse</Name>
-      <HintPath>../../../bin/OpenMetaverse.dll</HintPath>
+      <HintPath>../../../Library/OpenMetaverse.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverse.StructuredData" >
       <Name>OpenMetaverse.StructuredData</Name>
-      <HintPath>../../../bin/OpenMetaverse.StructuredData.dll</HintPath>
+      <HintPath>../../../Library/OpenMetaverse.StructuredData.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverseTypes" >
       <Name>OpenMetaverseTypes</Name>
-      <HintPath>../../../bin/OpenMetaverseTypes.dll</HintPath>
+      <HintPath>../../../Library/OpenMetaverseTypes.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>

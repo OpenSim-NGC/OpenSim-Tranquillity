@@ -14,15 +14,15 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Nini">
-      <HintPath>..\..\..\bin\Nini.dll</HintPath>
+      <HintPath>..\..\..\Library\Nini.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverse">
-      <HintPath>..\..\..\bin\OpenMetaverse.dll</HintPath>
+      <HintPath>..\..\..\Library\OpenMetaverse.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\..\bin\OpenMetaverseTypes.dll</HintPath>
+      <HintPath>..\..\..\Library\OpenMetaverseTypes.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
