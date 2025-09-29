@@ -7,7 +7,8 @@
     <Copyright>Copyright © Intel Corporation 2010</Copyright>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.1.0" />
+    <PackageReference Include="log4net" Version="3.2.0" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.9" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\Framework\OpenSim.Framework.csproj" />
