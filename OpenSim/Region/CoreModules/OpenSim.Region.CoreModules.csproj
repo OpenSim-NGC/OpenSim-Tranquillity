@@ -12,9 +12,6 @@
       <HintPath>..\..\..\Library\CSJ2K.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Microsoft.CSharp">
-      <Private>False</Private>
-    </Reference>
     <Reference Include="NDesk.Options">
       <HintPath>..\..\..\Library\NDesk.Options.dll</HintPath>
       <Private>False</Private>
