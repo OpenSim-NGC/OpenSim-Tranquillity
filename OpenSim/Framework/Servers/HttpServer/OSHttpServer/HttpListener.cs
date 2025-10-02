@@ -1,23 +1,20 @@
-﻿using System;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Net.Security;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 
 namespace OSHttpServer
 {
-    public class OSHttpListener: IDisposable
+    public class OSHttpListener : IDisposable
     {
         private readonly IPAddress m_address;
         private readonly X509Certificate m_certificate;
         private readonly IHttpContextFactory m_contextFactory;
         private readonly int m_port;
         private readonly ManualResetEvent m_shutdownEvent = new(false);
-        private readonly SslProtocols m_sslProtocols = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12 | SslProtocols.Tls13;
+        private SslProtocols m_sslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13;
 
         private TcpListener m_listener;
         private ILogWriter m_logWriter = NullLogWriter.Instance;
@@ -37,11 +34,11 @@ namespace OSHttpServer
         /// <param name="factory">Factory used to create <see cref="IHttpClientContext"/>es.</param>
         /// <exception cref="ArgumentNullException"><c>address</c> is null.</exception>
         /// <exception cref="ArgumentException">Port must be a positive number.</exception>
-        protected OSHttpListener(IPAddress address, int port)
+        protected OSHttpListener(IPAddress address, int port, IHttpContextFactory factory = null)
         {
             m_address = address;
             m_port = port;
-            m_contextFactory = new HttpContextFactory(m_logWriter);
+            m_contextFactory = factory ?? new HttpContextFactory(m_logWriter);
             m_contextFactory.RequestReceived += OnRequestReceived;
         }
 
@@ -123,7 +120,7 @@ namespace OSHttpServer
         /// </summary>
         public bool UseTraceLogs { get; set; }
 
-        private async void AcceptLoop()
+        private async Task AcceptLoop()
         {
             while (true)
             {
@@ -171,7 +168,7 @@ namespace OSHttpServer
                     continue;
 
                 socket.NoDelay = true;
-                
+
                 try
                 {
                     if (!OnAcceptingSocket(socket))
@@ -218,7 +215,7 @@ namespace OSHttpServer
         /// <returns>true if connection can be accepted; otherwise false.</returns>
         protected bool OnAcceptingSocket(Socket socket)
         {
-            if(Accepted!=null)
+            if (Accepted != null)
             {
                 ClientAcceptedEventArgs args = new(socket);
                 Accepted?.Invoke(this, args);
@@ -232,6 +229,8 @@ namespace OSHttpServer
         /// </summary>
         /// <param name="backlog">Number of connections that can stand in a queue to be accepted.</param>
         /// <exception cref="InvalidOperationException">Listener have already been started.</exception>
+        private Task m_acceptLoopTask;
+
         public void Start(int backlog)
         {
             if (m_listener != null)
@@ -239,7 +238,18 @@ namespace OSHttpServer
 
             m_listener = new TcpListener(m_address, m_port);
             m_listener.Start(backlog);
-            Task.Run(AcceptLoop).ConfigureAwait(false);
+            m_acceptLoopTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await AcceptLoop();
+                }
+                catch (Exception ex)
+                {
+                    m_logWriter.Write(this, LogPrio.Error, $"AcceptLoop exception: {ex}");
+                    ExceptionThrown?.Invoke(this, ex);
+                }
+            });
         }
 
         /// <summary>
@@ -255,7 +265,7 @@ namespace OSHttpServer
                 m_logWriter.Write(this, LogPrio.Error, "Failed to shutdown listener properly.");
             m_listener.Stop();
             m_listener = null;
-            Dispose();
+            // Do not call Dispose() here to avoid double disposal; let Dispose() be called explicitly.
         }
 
         public void Dispose()
@@ -270,6 +280,11 @@ namespace OSHttpServer
             {
                 m_shutdownEvent.Dispose();
                 m_CancellationSource.Dispose();
+            }
+            if (m_listener != null)
+            {
+                m_listener.Stop();
+                m_listener = null;
             }
         }
     }

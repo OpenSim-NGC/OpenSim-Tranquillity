@@ -7,14 +7,8 @@
     <Copyright>OpenSimulator developers</Copyright>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Nini">
-      <HintPath>..\..\..\..\..\bin\Nini.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\..\..\..\bin\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <Reference Include="Nini" HintPath="..\..\..\..\..\Library\Nini.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\..\..\Library\OpenMetaverseTypes.dll" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\Application\OpenSim.csproj" />

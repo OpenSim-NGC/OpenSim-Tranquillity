@@ -7,26 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="Nini" >
-      <Name>Nini</Name>
-      <HintPath>../../../bin/Nini.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverse" >
-      <Name>OpenMetaverse</Name>
-      <HintPath>../../../bin/OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverse.StructuredData" >
-      <Name>OpenMetaverse.StructuredData</Name>
-      <HintPath>../../../bin/OpenMetaverse.StructuredData.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverseTypes" >
-      <Name>OpenMetaverseTypes</Name>
-      <HintPath>../../../bin/OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <Reference Include="Nini" HintPath="..\..\..\Library\Nini.dll" />
+    <Reference Include="OpenMetaverse" HintPath="..\..\..\Library\OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\..\Library\OpenMetaverse.StructuredData.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\Library\OpenMetaverseTypes.dll" />
   </ItemGroup>
 
   <ItemGroup>

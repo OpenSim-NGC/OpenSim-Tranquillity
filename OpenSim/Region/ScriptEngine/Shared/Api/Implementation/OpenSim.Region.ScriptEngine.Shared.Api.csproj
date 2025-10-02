@@ -12,22 +12,10 @@
     <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Nini">
-      <HintPath>..\..\..\..\..\..\bin\Nini.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverse">
-      <HintPath>..\..\..\..\..\..\bin\OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverse.StructuredData">
-      <HintPath>..\..\..\..\..\..\bin\OpenMetaverse.StructuredData.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\..\..\..\..\bin\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <Reference Include="Nini" HintPath="..\..\..\..\..\..\Library\Nini.dll" />
+    <Reference Include="OpenMetaverse" HintPath="..\..\..\..\..\..\Library\OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\..\..\..\Library\OpenMetaverseTypes.dll" />
+    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\..\..\..\..\Library\OpenMetaverse.StructuredData.dll" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Application\OpenSim.csproj" />

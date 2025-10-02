@@ -20,6 +20,7 @@ OpenSimConsoleHistory.txt
 launchSettings.json
 
 build/
+publish/
 
 */bin/Debug/*
 */bin/Release/*
