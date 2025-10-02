@@ -7,22 +7,10 @@
     <Copyright>OpenSimulator developers</Copyright>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="BulletXNA.dll">
-      <HintPath>..\..\..\..\bin\BulletXNA.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Nini.dll">
-      <HintPath>..\..\..\..\bin\Nini.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverse">
-      <HintPath>..\..\..\..\bin\OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\..\..\bin\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <Reference Include="BulletXNA.dll" HintPath="..\..\..\..\Library\BulletXNA.dll" />
+    <Reference Include="Nini.dll" HintPath="..\..\..\..\Library\Nini.dll" />
+    <Reference Include="OpenMetaverse.dll" HintPath="..\..\..\..\Library\OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\..\Library\OpenMetaverseTypes.dll" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\Framework\OpenSim.Framework.csproj" />

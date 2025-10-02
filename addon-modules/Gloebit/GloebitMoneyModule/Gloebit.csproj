@@ -2,30 +2,16 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
-  <Target Name="CopyFiles">
+  <!-- <Target Name="CopyFiles">
     <Copy SourceFiles="@(FilesToCopy_0000)" DestinationFolder="../../../bin/" />
-  </Target>
+  </Target> -->
   <ItemGroup>
-    <Reference Include="Nini">
-      <HintPath>..\..\..\bin\Nini.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverse">
-      <HintPath>..\..\..\bin\OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverse.StructuredData">
-      <HintPath>..\..\..\bin\OpenMetaverse.StructuredData.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\..\bin\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="XMLRPC">
-      <HintPath>..\..\..\bin\XMLRPC.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <Reference Include="Nini" HintPath="..\..\..\Library\Nini.dll" />
+    <Reference Include="log4net" HintPath="..\..\..\Library\log4net.dll" />
+    <Reference Include="OpenMetaverse" HintPath="..\..\..\Library\OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\..\Library\OpenMetaverse.StructuredData.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\Library\OpenMetaverseTypes.dll" />
+    <Reference Include="XMLRPC" HintPath="..\..\..\Library\XMLRPC.dll" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\OpenSim\Data\OpenSim.Data.csproj" />

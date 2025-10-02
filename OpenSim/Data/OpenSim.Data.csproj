@@ -7,22 +7,10 @@
     <Copyright>Copyright (c) OpenSimulator.org Developers 2007-2009</Copyright>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="OpenMetaverse">
-      <HintPath>..\..\bin\OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverse.StructuredData">
-      <HintPath>..\..\bin\OpenMetaverse.StructuredData.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="XMLRPC">
-      <HintPath>..\..\bin\XMLRPC.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <Reference Include="OpenMetaverse" HintPath="..\..\Library\OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\Library\OpenMetaverse.StructuredData.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\Library\OpenMetaverseTypes.dll" />
+    <Reference Include="XMLRPC" HintPath="..\..\Library\XMLRPC.dll" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Framework\OpenSim.Framework.csproj" />
