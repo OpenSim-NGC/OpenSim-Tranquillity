@@ -7,34 +7,13 @@
     <Copyright>Copyright ©  2012</Copyright>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="NDesk.Options">
-      <HintPath>..\..\..\Library\NDesk.Options.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="netcd">
-      <HintPath>..\..\..\Library\netcd.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Nini">
-      <HintPath>..\..\..\Library\Nini.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverse">
-      <HintPath>..\..\..\Library\OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverse.StructuredData">
-      <HintPath>..\..\..\Library\OpenMetaverse.StructuredData.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\..\Library\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="XMLRPC">
-      <HintPath>..\..\..\Library\XMLRPC.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <Reference Include="NDesk.Options" HintPath="..\..\..\Library\NDesk.Options.dll" />
+    <Reference Include="netcd" HintPath="..\..\..\Library\netcd.dll" />
+    <Reference Include="Nini" HintPath="..\..\..\Library\Nini.dll" />
+    <Reference Include="OpenMetaverse" HintPath="..\..\..\Library\OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\..\Library\OpenMetaverse.StructuredData.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\Library\OpenMetaverseTypes.dll" />
+    <Reference Include="XMLRPC" HintPath="..\..\..\Library\XMLRPC.dll" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Capabilities\OpenSim.Capabilities.csproj" />
