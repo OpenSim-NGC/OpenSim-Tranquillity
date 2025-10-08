@@ -8,7 +8,6 @@
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="CSJ2K" HintPath="..\..\..\Library\CSJ2K.dll" />
     <Reference Include="NDesk.Options" HintPath="..\..\..\Library\NDesk.Options.dll" />
     <Reference Include="Nini" HintPath="..\..\..\Library\Nini.dll" />
     <Reference Include="OpenMetaverse" HintPath="..\..\..\Library\OpenMetaverse.dll" />
@@ -74,6 +73,7 @@
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
     <PackageReference Include="MySqlConnector" Version="2.4.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.9" />
-    <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
+    <PackageReference Include="CoreJ2K.Skia" Version="1.1.2.50" />
+    <PackageReference Include="SkiaSharp" Version="3.119.1" />
   </ItemGroup>
 </Project>

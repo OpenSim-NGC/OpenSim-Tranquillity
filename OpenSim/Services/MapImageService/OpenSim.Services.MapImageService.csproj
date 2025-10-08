@@ -11,6 +11,9 @@
     <Reference Include="Nini" HintPath="..\..\..\Library\Nini.dll" />
     <Reference Include="OpenMetaverse" HintPath="..\..\..\Library\OpenMetaverse.dll" />
     <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\Library\OpenMetaverseTypes.dll" />
+    <Reference Include="SkiaSharp">
+      <HintPath>..\..\..\..\..\..\..\..\.nuget\packages\skiasharp\3.119.1\ref\net8.0\SkiaSharp.dll</HintPath>
+    </Reference>
   </ItemGroup>
     <ItemGroup>
     <PackageReference Include="log4net" Version="3.2.0" />

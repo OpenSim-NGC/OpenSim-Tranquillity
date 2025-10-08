@@ -25,10 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
 using System.Reflection;
 using System.Text;
 
@@ -37,7 +34,8 @@ using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.Imaging;
-using CSJ2K;
+using CoreJ2K;
+using SkiaSharp;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -182,12 +180,13 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
             return DoJ2KDecode(assetID, j2kData, out layers, out components);
         }
 
-        public Image DecodeToImage(byte[] j2kData)
+        public SKImage DecodeToImage(byte[] j2kData)
         {
-            if (m_useCSJ2K)
-            { 
-                return J2kImage.FromBytes(j2kData);
-            }
+//            if (m_useCSJ2K)
+//            { 
+                return J2kImage.FromBytes(j2kData).As<SKImage>();
+//            }
+/*
             else
             {
                 ManagedImage mimage;
@@ -200,6 +199,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
                 else
                     return null;
             }
+*/
         }
 
 
@@ -235,7 +235,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
                         List<int> layerStarts;
                         using (MemoryStream ms = new MemoryStream(j2kData))
                         {
-                            layerStarts = CSJ2K.J2kImage.GetLayerBoundaries(ms);
+                            layerStarts = CoreJ2K.J2kImage.GetLayerBoundaries(ms);
                         }
 
                         if (layerStarts != null && layerStarts.Count > 0)

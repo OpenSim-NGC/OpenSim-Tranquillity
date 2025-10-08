@@ -25,15 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.IO;
 using System.Reflection;
 using System.Runtime;
 
-using CSJ2K;
+using CoreJ2K;
 using Nini.Config;
 using log4net;
 using Warp3D;
@@ -44,7 +41,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
 using OpenMetaverse;
-using OpenMetaverse.Assets;
 using OpenMetaverse.Imaging;
 using OpenMetaverse.Rendering;
 using OpenMetaverse.StructuredData;

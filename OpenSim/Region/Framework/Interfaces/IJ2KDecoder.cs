@@ -28,6 +28,7 @@
 using System.Drawing;
 using OpenMetaverse;
 using OpenMetaverse.Imaging;
+using SkiaSharp;
 
 namespace OpenSim.Region.Framework.Interfaces
 {
@@ -60,6 +61,6 @@ namespace OpenSim.Region.Framework.Interfaces
         /// </summary>
         /// <param name="j2kData"></param>
         /// <returns>decoded image or 'null' of unsuccessful</returns>
-        Image DecodeToImage(byte[] j2kData);
+        SKImage DecodeToImage(byte[] j2kData);
     }
 }

@@ -28,7 +28,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Net;
 using System.Reflection;
@@ -40,6 +39,7 @@ using OpenMetaverse.Imaging;
 using OpenMetaverse.StructuredData;
 using Nwc.XmlRpc;
 using log4net;
+using SkiaSharp;
 
 using OpenSim.Services.Connectors.Simulation;
 using System.Net.Http;
@@ -188,7 +188,7 @@ namespace OpenSim.Services.Connectors.Hypergrid
 
                 byte[] imageData = null;
 
-                using (Bitmap bitmap = new Bitmap(filename))
+                using (SKBitmap bitmap = SKBitmap.Decode(filename))
                 {
                     //m_log.Debug("Size: " + m.PhysicalDimension.Height + "-" + m.PhysicalDimension.Width);
                     imageData = OpenJPEG.EncodeFromImage(bitmap, false);

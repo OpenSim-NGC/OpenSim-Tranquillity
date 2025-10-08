@@ -27,8 +27,28 @@
 
 using System;
 using System.Collections.Specialized;
-using System.Drawing;
-using System.Drawing.Imaging;
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+using OpenSim.Services.Interfaces;
+
+namespace OpenSim.Capabilities.Handlers
+{
+    public class GetTextureRobustHandler : BaseStreamHandler
+    {
+        private static readonly ILog m_log =
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private IAssetService m_assetService;
+=======
+using OpenSim.Services.Interfaces;
+using SkiaSharp;
+
+namespace OpenSim.Capabilities.Handlers
+{
+    public class GetTextureRobustHandler : BaseStreamHandler
+    {
+        private static readonly ILog m_log =
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private IAssetService m_assetService;
 using System.Reflection;
 using System.IO;
 using System.Net;
