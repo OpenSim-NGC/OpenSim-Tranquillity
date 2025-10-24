@@ -26,12 +26,12 @@
  */
 
 using SkiaSharp;
+using CoreJ2K;
 using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Services.Interfaces;
-using CoreJ2K;
 
 namespace OpenSim.Region.CoreModules.World.Warp3DMap
 {
