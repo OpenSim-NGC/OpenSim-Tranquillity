@@ -78,7 +78,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         /// Note we create a 256x256 dimension texture even if the actual terrain is larger.
         /// </remarks>
 
-        public static Bitmap Splat(ITerrainChannel terrain, UUID[] textureIDs,
+    public static SKBitmap Splat(ITerrainChannel terrain, UUID[] textureIDs,
                 float[] startHeights, float[] heightRanges,
                 uint regionPositionX, uint regionPositionY,
                 IAssetService assetService, IJ2KDecoder decoder,
@@ -113,15 +113,15 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
 
                         // Try to fetch a cached copy of the decoded/resized version of this texture
                         AssetBase asset = assetService.GetCached(cacheName);
+
                         if(asset != null)
                         {
                             try
                             {
                                 using(MemoryStream stream = new MemoryStream(asset.Data))
-                                    detailTexture[i] = (Bitmap)Image.FromStream(stream);
+                                    detailTexture[i] = SKBitmap.Decode(stream);
 
-                                if(detailTexture[i].PixelFormat != PixelFormat.Format24bppRgb ||
-                                    detailTexture[i] == null || 
+                                if(detailTexture[i] == null ||
                                    detailTexture[i].ColorType != SKColorType.Rgb888x ||
                                    detailTexture[i].Width != 16 || detailTexture[i].Height != 16)
                                 {
@@ -131,7 +131,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                             }
                             catch(Exception ex)
                             {
-                                m_log.Warn("Failed to decode cached terrain patch texture" + textureIDs[i] + "): " + ex.Message);
+                                m_log.Warn("Failed to decode cached terrain patch texture " + textureIDs[i] + "): " + ex.Message);
                             }
                         }
 
@@ -143,7 +143,19 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                             {
                                 try
                                 {
-                                    detailTexture[i] = (SKBitmap)J2kImage.FromBytes(asset.Data, null, false, 8);
+                                    var j2k = J2kImage.FromBytes(asset.Data);
+                                    if (j2k != null)
+                                    {
+                                        SKImage skImg = j2k.As<SKImage>();
+                                        if (skImg != null)
+                                        {
+                                            using (SKData png = skImg.Encode(SKEncodedImageFormat.Png, 100))
+                                            using (var ms = new MemoryStream(png.ToArray()))
+                                            {
+                                                detailTexture[i] = SKBitmap.Decode(ms);
+                                            }
+                                        }
+                                    }
                                 }
                                 catch(Exception ex)
                                 {
@@ -180,22 +192,6 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                                     newAsset.Metadata.ContentType = "image/png";
                                     assetService.Store(newAsset);
                                 }
-                                }
-                                // Cache a PNG copy of this terrain texture
-                                AssetBase newAsset = new AssetBase
-                                {
-                                    Data = data,
-                                    Description = "PNG",
-                                    Flags = AssetFlags.Collectable,
-                                    FullID = UUID.Zero,
-                                    ID = cacheName,
-                                    Local = true,
-                                    Name = String.Empty,
-                                    Temporary = true,
-                                    Type = (sbyte)AssetType.Unknown
-                                };
-                                newAsset.Metadata.ContentType = "image/png";
-                                assetService.Store(newAsset);
                             }
                         }
                     }
