@@ -25,19 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
 using System.Reflection;
 using System.Text;
-
+using CSJ2K;
 using log4net;
 using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.Imaging;
-using CSJ2K;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -235,7 +231,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
                         List<int> layerStarts;
                         using (MemoryStream ms = new MemoryStream(j2kData))
                         {
-                            layerStarts = CSJ2K.J2kImage.GetLayerBoundaries(ms);
+                            layerStarts = J2kImage.GetLayerBoundaries(ms);
                         }
 
                         if (layerStarts != null && layerStarts.Count > 0)
