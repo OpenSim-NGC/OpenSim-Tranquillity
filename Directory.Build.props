@@ -21,4 +21,12 @@
   </PackageReference>
 </ItemGroup> -->
 
+  <ItemGroup>
+    <!-- Add System.Drawing.Common for projects still referencing System.Drawing types while
+         the SkiaSharp migration is in progress. This helps compilation across the solution.
+         Note: System.Drawing.Common may have platform-specific runtime requirements (libgdiplus on Linux).
+    -->
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+  </ItemGroup>
+
 </Project>

@@ -32,7 +32,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Framework.Serialization.Tests
 {
-    [TestFixture]
     public class LandDataSerializerTest : OpenSimTestCase
     {
         private LandData land;
@@ -42,7 +41,6 @@ namespace OpenSim.Framework.Serialization.Tests
         private static string preSerializedWithParcelAccessList
             = "<?xml version=\"1.0\" encoding=\"utf-16\"?>\n<LandData>\n  <Area>128</Area>\n  <AuctionID>0</AuctionID>\n  <AuthBuyerID>00000000-0000-0000-0000-000000000000</AuthBuyerID>\n  <Category>10</Category>\n  <ClaimDate>0</ClaimDate>\n  <ClaimPrice>0</ClaimPrice>\n  <GlobalID>54ff9641-dd40-4a2c-b1f1-47dd3af24e50</GlobalID>\n  <GroupID>d740204e-bbbf-44aa-949d-02c7d739f6a5</GroupID>\n  <IsGroupOwned>False</IsGroupOwned>\n  <Bitmap>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</Bitmap>\n  <Description>land data to test LandDataSerializer</Description>\n  <Flags>536870944</Flags>\n  <LandingType>2</LandingType>\n  <Name>LandDataSerializerTest Land</Name>\n  <Status>0</Status>\n  <LocalID>0</LocalID>\n  <MediaAutoScale>1</MediaAutoScale>\n  <MediaID>d4452578-2f25-4b97-a81b-819af559cfd7</MediaID>\n  <MediaURL>http://videos.opensimulator.org/bumblebee.mp4</MediaURL>\n  <MusicURL />\n  <OwnerID>1b8eedf9-6d15-448b-8015-24286f1756bf</OwnerID>\n  <ParcelAccessList>\n    <ParcelAccessEntry>\n      <AgentID>62d65d45-c91a-4f77-862c-46557d978b6c</AgentID>\n      <Time>0</Time>\n      <AccessList>2</AccessList>\n    </ParcelAccessEntry>\n    <ParcelAccessEntry>\n      <AgentID>ec2a8d18-2378-4fe0-8b68-2a31b57c481e</AgentID>\n      <Time>0</Time>\n      <AccessList>1</AccessList>\n    </ParcelAccessEntry>\n  </ParcelAccessList>\n  <PassHours>0</PassHours>\n  <PassPrice>0</PassPrice>\n  <SalePrice>0</SalePrice>\n  <SnapshotID>00000000-0000-0000-0000-000000000000</SnapshotID>\n  <UserLocation>&lt;0, 0, 0&gt;</UserLocation>\n  <UserLookAt>&lt;0, 0, 0&gt;</UserLookAt>\n  <Dwell>0</Dwell>\n  <OtherCleanTime>0</OtherCleanTime>\n</LandData>";
 
-        [SetUp]
         public void setup()
         {
             // setup LandData object
@@ -87,7 +85,7 @@ namespace OpenSim.Framework.Serialization.Tests
         /// <summary>
         /// Test the LandDataSerializer.Serialize() method
         /// </summary>
-//        [Test]
+//        [Fact]
 //        public void LandDataSerializerSerializeTest()
 //        {
 //            TestHelpers.InMethod();
@@ -111,7 +109,7 @@ namespace OpenSim.Framework.Serialization.Tests
         /// <summary>
         /// Test the LandDataSerializer.Deserialize() method
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLandDataDeserializeNoAccessLists()
         {
             TestHelpers.InMethod();
@@ -120,29 +118,29 @@ namespace OpenSim.Framework.Serialization.Tests
             Dictionary<string, object> options = new Dictionary<string, object>();
             LandData ld = LandDataSerializer.Deserialize(LandDataSerializer.Serialize(this.land, options));
             Assert.That(ld, Is.Not.Null, "Deserialize(string) returned null");
-//            Assert.That(ld.AABBMax, Is.EqualTo(land.AABBMax));
-//            Assert.That(ld.AABBMin, Is.EqualTo(land.AABBMin));
-            Assert.That(ld.Area, Is.EqualTo(land.Area));
-            Assert.That(ld.AuctionID, Is.EqualTo(land.AuctionID));
-            Assert.That(ld.AuthBuyerID, Is.EqualTo(land.AuthBuyerID));
-            Assert.That(ld.Category, Is.EqualTo(land.Category));
-            Assert.That(ld.ClaimDate, Is.EqualTo(land.ClaimDate));
-            Assert.That(ld.ClaimPrice, Is.EqualTo(land.ClaimPrice));
+//            Assert.Equal(,);
+//            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
             Assert.That(ld.GlobalID, Is.EqualTo(land.GlobalID), "Reified LandData.GlobalID != original LandData.GlobalID");
-            Assert.That(ld.GroupID, Is.EqualTo(land.GroupID));
-            Assert.That(ld.Description, Is.EqualTo(land.Description));
-            Assert.That(ld.Flags, Is.EqualTo(land.Flags));
-            Assert.That(ld.LandingType, Is.EqualTo(land.LandingType));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
             Assert.That(ld.Name, Is.EqualTo(land.Name), "Reified LandData.Name != original LandData.Name");
-            Assert.That(ld.Status, Is.EqualTo(land.Status));
-            Assert.That(ld.LocalID, Is.EqualTo(land.LocalID));
-            Assert.That(ld.MediaAutoScale, Is.EqualTo(land.MediaAutoScale));
-            Assert.That(ld.MediaID, Is.EqualTo(land.MediaID));
-            Assert.That(ld.MediaURL, Is.EqualTo(land.MediaURL));
-            Assert.That(ld.OwnerID, Is.EqualTo(land.OwnerID));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestLandDataDeserializeWithAccessLists()
         {
             TestHelpers.InMethod();
@@ -155,8 +153,8 @@ namespace OpenSim.Framework.Serialization.Tests
                         "Reified LandData.GlobalID != original LandData.GlobalID (pre-serialized with parcel access list)");
             Assert.That(ld.Name == this.landWithParcelAccessList.Name,
                         "Reified LandData.Name != original LandData.Name (pre-serialized with parcel access list)");
-            Assert.That(ld.ParcelAccessList.Count, Is.EqualTo(2));
-            Assert.That(ld.ParcelAccessList[0].AgentID, Is.EqualTo(UUID.Parse("62d65d45-c91a-4f77-862c-46557d978b6c")));
+            Assert.Equal(,);
+            Assert.Equal(,));
         }
     }
 }

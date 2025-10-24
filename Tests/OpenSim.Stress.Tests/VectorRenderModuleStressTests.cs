@@ -35,7 +35,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Tests.Stress
 {
-    [TestFixture]
     public class VectorRenderModuleStressTests : OpenSimTestCase
     {
         public Scene Scene { get; private set; }
@@ -54,7 +53,7 @@ namespace OpenSim.Tests.Stress
             SceneHelpers.SetupSceneModules(Scene, Dtm, Vrm);
         }
 
-        [Test]
+        [Fact]
         public void TestConcurrentRepeatedDraw()
         {
             int threads = 4;

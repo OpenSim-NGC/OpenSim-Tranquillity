@@ -35,10 +35,9 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.Framework.Tests
 {
-    [TestFixture]
     public class UserInventoryTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestCreateInventoryFolders()
         {
             TestHelpers.InMethod();
@@ -55,22 +54,22 @@ namespace OpenSim.Region.Framework.Tests
             List<InventoryFolderBase> oneFolder
                 = UserInventoryHelpers.GetInventoryFolders(scene.InventoryService, user1.PrincipalID, foldersName);
 
-            Assert.That(oneFolder.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             InventoryFolderBase firstRetrievedFolder = oneFolder[0];
-            Assert.That(firstRetrievedFolder.Name, Is.EqualTo(foldersName));
+            Assert.Equal(,);
 
             UserInventoryHelpers.CreateInventoryFolder(scene.InventoryService, user1.PrincipalID, foldersName, false);
 
             List<InventoryFolderBase> twoFolders
                 = UserInventoryHelpers.GetInventoryFolders(scene.InventoryService, user1.PrincipalID, foldersName);
 
-            Assert.That(twoFolders.Count, Is.EqualTo(2));
-            Assert.That(twoFolders[0].Name, Is.EqualTo(foldersName));
-            Assert.That(twoFolders[1].Name, Is.EqualTo(foldersName));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
             Assert.That(twoFolders[0].ID, Is.Not.EqualTo(twoFolders[1].ID));
         }
 
-        [Test]
+        [Fact]
         public void TestGiveInventoryItem()
         {
             TestHelpers.InMethod();
@@ -88,7 +87,7 @@ namespace OpenSim.Region.Framework.Tests
             InventoryItemBase retrievedItem1
                 = UserInventoryHelpers.GetInventoryItem(scene.InventoryService, user2.PrincipalID, "Notecards/item1");
 
-            Assert.That(retrievedItem1, Is.Not.Null);
+            Assert.NotNull();
 
             // Try giving back the freshly received item
             scene.GiveInventoryItem(user1.PrincipalID, user2.PrincipalID, retrievedItem1.ID, out message);
@@ -96,10 +95,10 @@ namespace OpenSim.Region.Framework.Tests
             List<InventoryItemBase> reretrievedItems
                 = UserInventoryHelpers.GetInventoryItems(scene.InventoryService, user1.PrincipalID, "Notecards/item1");
 
-            Assert.That(reretrievedItems.Count, Is.EqualTo(2));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestGiveInventoryFolder()
         {
             TestHelpers.InMethod();
@@ -116,7 +115,7 @@ namespace OpenSim.Region.Framework.Tests
             InventoryFolderBase retrievedFolder1
                 = UserInventoryHelpers.GetInventoryFolder(scene.InventoryService, user2.PrincipalID, "folder1");
 
-            Assert.That(retrievedFolder1, Is.Not.Null);
+            Assert.NotNull();
 
             // Try giving back the freshly received folder
             scene.GiveInventoryFolder(null, user1.PrincipalID, user2.PrincipalID, retrievedFolder1.ID, UUID.Zero);
@@ -124,11 +123,11 @@ namespace OpenSim.Region.Framework.Tests
             List<InventoryFolderBase> reretrievedFolders
                 = UserInventoryHelpers.GetInventoryFolders(scene.InventoryService, user1.PrincipalID, "folder1");
 
-            Assert.That(reretrievedFolders.Count, Is.EqualTo(2));
+            Assert.Equal(,);
         }
 
         // Work in Progress test. All Assertions pertaining permissions are commented for now.
-        [Test]
+        [Fact]
         public void TestGiveInventoryItemFullPerms()
         {
             TestHelpers.InMethod();
@@ -152,19 +151,19 @@ namespace OpenSim.Region.Framework.Tests
             string message;
 
             InventoryItemBase retrievedItem1 = scene.GiveInventoryItem(user2.PrincipalID, user1.PrincipalID, item1.ID, out message);
-            Assert.That(retrievedItem1, Is.Not.Null);
+            Assert.NotNull();
             //Assert.That((retrievedItem1.CurrentPermissions & (uint)OpenMetaverse.PermissionMask.All) == (uint)OpenMetaverse.PermissionMask.All);
 
             retrievedItem1
                 = UserInventoryHelpers.GetInventoryItem(scene.InventoryService, user2.PrincipalID, "Objects/SomeObject");
-            Assert.That(retrievedItem1, Is.Not.Null);
+            Assert.NotNull();
             //Assert.That((retrievedItem1.BasePermissions & (uint)OpenMetaverse.PermissionMask.All) == (uint)OpenMetaverse.PermissionMask.All);
             //Assert.That((retrievedItem1.CurrentPermissions & (uint)OpenMetaverse.PermissionMask.All) == (uint)OpenMetaverse.PermissionMask.All);
 
             // Rez the object
             scene.RezObject(sp2.ControllingClient, retrievedItem1.ID, UUID.Zero, Vector3.Zero, Vector3.Zero, UUID.Zero, 0, false, false, false, UUID.Zero);
             SceneObjectGroup sog = scene.GetSceneObjectGroup("SomeObject");
-            Assert.That(sog, Is.Not.Null);
+            Assert.NotNull();
 
             // This is failing for all sorts of reasons. We'll fix it after perms are fixed.
             //Console.WriteLine("Item Perms " + retrievedItem1.CurrentPermissions + " Obj Owner Perms " + sog.RootPart.OwnerMask + " Base Perms " + sog.RootPart.BaseMask + "\n");

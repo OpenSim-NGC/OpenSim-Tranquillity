@@ -3,16 +3,14 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31229.75
 MinimumVisualStudioVersion = 10.0.40219.1
-
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcJanusService", "addon-modules/os-webrtc-janus/Janus/WebRtcJanusService.csproj", "{AA629949-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcJanusService", "addon-modules\os-webrtc-janus\Janus\WebRtcJanusService.csproj", "{AA629949-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoice", "addon-modules/os-webrtc-janus/WebRtcVoice/WebRtcVoice.csproj", "{C76F3732-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoice", "addon-modules\os-webrtc-janus\WebRtcVoice\WebRtcVoice.csproj", "{C76F3732-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceServiceModule", "addon-modules/os-webrtc-janus/WebRtcVoiceServiceModule/WebRtcVoiceServiceModule.csproj", "{5B354044-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceServiceModule", "addon-modules\os-webrtc-janus\WebRtcVoiceServiceModule\WebRtcVoiceServiceModule.csproj", "{5B354044-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceRegionModule", "addon-modules/os-webrtc-janus/WebRtcVoiceRegionModule/WebRtcVoiceRegionModule.csproj", "{00122A60-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceRegionModule", "addon-modules\os-webrtc-janus\WebRtcVoiceRegionModule\WebRtcVoiceRegionModule.csproj", "{00122A60-0000-0000-0000-000000000000}"
 EndProject
-
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gloebit", "addon-modules\Gloebit\GloebitMoneyModule\Gloebit.csproj", "{4C8A6BF4-0000-0000-0000-000000000000}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim", "OpenSim\Region\Application\OpenSim.csproj", "{AC9EB8AB-0000-0000-0000-000000000000}"
@@ -167,30 +165,30 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Source", "Source", "{E886CE
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Data.Model", "Source\OpenSim.Data.Model\OpenSim.Data.Model.csproj", "{B120B128-D6C6-40B6-9D83-4F1F7D921109}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.CoreModules.Tests", "Tests\OpenSim.Region.CoreModules.Tests\OpenSim.Region.CoreModules.Tests.csproj", "{D8704FD0-9010-4560-A64A-E12E982B25B7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-
-        {AA629949-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-        {AA629949-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-        {AA629949-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-        {AA629949-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-        {C76F3732-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-        {C76F3732-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-        {C76F3732-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-        {C76F3732-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-        {5B354044-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-        {5B354044-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-        {5B354044-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-        {5B354044-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-        {00122A60-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-        {00122A60-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-        {00122A60-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-        {00122A60-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
-
+		{AA629949-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA629949-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA629949-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA629949-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C76F3732-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C76F3732-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C76F3732-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C76F3732-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5B354044-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5B354044-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5B354044-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5B354044-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{00122A60-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{00122A60-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{00122A60-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{00122A60-0000-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4C8A6BF4-0000-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4C8A6BF4-0000-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C8A6BF4-0000-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -491,6 +489,10 @@ Global
 		{186509B6-EF90-431A-9034-75A1221E4120}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{186509B6-EF90-431A-9034-75A1221E4120}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{186509B6-EF90-431A-9034-75A1221E4120}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D8704FD0-9010-4560-A64A-E12E982B25B7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D8704FD0-9010-4560-A64A-E12E982B25B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D8704FD0-9010-4560-A64A-E12E982B25B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D8704FD0-9010-4560-A64A-E12E982B25B7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -498,6 +500,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 		{B120B128-D6C6-40B6-9D83-4F1F7D921109} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{D8704FD0-9010-4560-A64A-E12E982B25B7} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A40AD54B-8BC7-41E4-B241-19B59EA65D2A}

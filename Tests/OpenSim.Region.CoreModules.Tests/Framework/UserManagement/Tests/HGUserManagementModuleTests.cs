@@ -26,7 +26,7 @@
  */
 
 using System;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.Framework.UserManagement;
@@ -34,13 +34,12 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Framework.UserManagement.Tests
 {
-    [TestFixture]
     public class HGUserManagementModuleTests : OpenSimTestCase
     {
         /// <summary>
         /// Test that a new HG agent (i.e. one without a user account) has their name cached in the UMM upon creation.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestCachedUserNameForNewAgent()
         {
             TestHelpers.InMethod();
@@ -68,7 +67,7 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement.Tests
             SceneHelpers.AddScenePresence(scene, acd);
 
             string name = hgumm.GetUserName(userId);
-            Assert.That(name, Is.EqualTo(string.Format("{0}.{1} @{2}", firstName, lastName, homeUri)));
+            Assert.Equal(,));
         }
     }
 }

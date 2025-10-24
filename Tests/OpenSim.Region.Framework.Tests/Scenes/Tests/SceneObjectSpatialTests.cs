@@ -28,7 +28,7 @@
 using System;
 using System.Reflection;
 using System.Threading;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -39,13 +39,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// <summary>
     /// Spatial scene object tests (will eventually cover root and child part position, rotation properties, etc.)
     /// </summary>
-    [TestFixture]
     public class SceneObjectSpatialTests : OpenSimTestCase
     {
         TestScene m_scene;
         UUID m_ownerId = TestHelpers.ParseTail(0x1);
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -53,7 +51,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_scene = new SceneHelpers().SetupScene();
         }
 
-        [Test]
+        [Fact]
         public void TestGetSceneObjectGroupPosition()
         {
             TestHelpers.InMethod();
@@ -65,10 +63,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             so.AbsolutePosition = position;
             m_scene.AddNewSceneObject(so, false);
 
-            Assert.That(so.AbsolutePosition, Is.EqualTo(position));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestGetRootPartPosition()
         {
             TestHelpers.InMethod();
@@ -80,14 +78,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             so.AbsolutePosition = partPosition;
             m_scene.AddNewSceneObject(so, false);
 
-            Assert.That(so.RootPart.AbsolutePosition, Is.EqualTo(partPosition));
-            Assert.That(so.RootPart.GroupPosition, Is.EqualTo(partPosition));
+            Assert.Equal(,);
+            Assert.Equal(,);
             Assert.That(so.RootPart.GetWorldPosition(), Is.EqualTo(partPosition));
-            Assert.That(so.RootPart.RelativePosition, Is.EqualTo(partPosition));
-            Assert.That(so.RootPart.OffsetPosition, Is.EqualTo(Vector3.Zero));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestGetChildPartPosition()
         {
             TestHelpers.InMethod();
@@ -106,14 +104,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Vector3 childPosition = new Vector3(rootPartPosition + childOffsetPosition);
 
             SceneObjectPart childPart = so.Parts[1];
-            Assert.That(childPart.AbsolutePosition, Is.EqualTo(childPosition));
-            Assert.That(childPart.GroupPosition, Is.EqualTo(rootPartPosition));
+            Assert.Equal(,);
+            Assert.Equal(,);
             Assert.That(childPart.GetWorldPosition(), Is.EqualTo(childPosition));
-            Assert.That(childPart.RelativePosition, Is.EqualTo(childOffsetPosition));
-            Assert.That(childPart.OffsetPosition, Is.EqualTo(childOffsetPosition));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestGetChildPartPositionAfterObjectRotation()
         {
             TestHelpers.InMethod();
@@ -138,16 +136,16 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             SceneObjectPart childPart = so.Parts[1];
 
-            Assert.That(childPart.AbsolutePosition, Is.EqualTo(childPosition));
+            Assert.Equal(,);
 
-            Assert.That(childPart.GroupPosition, Is.EqualTo(rootPartPosition));
+            Assert.Equal(,);
             Assert.That(childPart.GetWorldPosition(), Is.EqualTo(childPosition));
 
             // Relative to root part as (0, 0, 0)
-            Assert.That(childPart.RelativePosition, Is.EqualTo(childOffsetPosition));
+            Assert.Equal(,);
 
             // Relative to root part as (0, 0, 0)
-            Assert.That(childPart.OffsetPosition, Is.EqualTo(childOffsetPosition));
+            Assert.Equal(,);
         }
     }
 }

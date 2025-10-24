@@ -42,14 +42,12 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.ClientStack.Linden.Tests
 {
-    [TestFixture]
     public class EventQueueTests : OpenSimTestCase
     {
         private TestScene m_scene;
         private EventQueueGetModule m_eqgMod;
         private NPCModule m_npcMod;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -79,7 +77,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
             SceneHelpers.SetupSceneModules(m_scene, config, capsModule, m_eqgMod, m_npcMod);
         }
 
-        [Test]
+        [Fact]
         public void TestAddForClient()
         {
             TestHelpers.InMethod();
@@ -91,7 +89,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
             Assert.That(MainServer.Instance.GetPollServiceHandlerKeys().Count, Is.EqualTo(1));
         }
 
-        [Test]
+        [Fact]
         public void TestRemoveForClient()
         {
             TestHelpers.InMethod();
@@ -106,7 +104,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
             Assert.That(MainServer.Instance.GetPollServiceHandlerKeys().Count, Is.EqualTo(0));
         }
 
-        [Test]
+        [Fact]
         public void TestEnqueueMessage()
         {
             TestHelpers.InMethod();
@@ -154,7 +152,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
         /// <summary>
         /// Test an attempt to put a message on the queue of a user that is not in the region.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestEnqueueMessageNoUser()
         {
             TestHelpers.InMethod();
@@ -172,7 +170,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
         /// <summary>
         /// NPCs do not currently have an event queue but a caller may try to send a message anyway, so check behaviour.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestEnqueueMessageToNpc()
         {
             TestHelpers.InMethod();

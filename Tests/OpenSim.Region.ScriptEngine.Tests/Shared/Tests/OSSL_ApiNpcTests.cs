@@ -40,13 +40,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// <summary>
     /// Tests for OSSL NPC API
     /// </summary>
-    [TestFixture]
     public class OSSL_NpcApiAppearanceTest : OpenSimTestCase
     {
         protected Scene m_scene;
         protected XEngine.XEngine m_engine;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -75,7 +73,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Test creation of an NPC where the appearance data comes from a notecard
         /// </summary>
-        [Test]
+        [Fact]
         public void TestOsNpcCreateUsingAppearanceFromNotecard()
         {
             TestHelpers.InMethod();
@@ -98,15 +96,15 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Try creating a bot using the appearance in the notecard.
             string npcRaw = osslApi.osNpcCreate("Jane", "Doe", new LSL_Types.Vector3(128, 128, 128), notecardName);
-            Assert.That(npcRaw, Is.Not.Null);
+            Assert.NotNull();
 
             UUID npcId = new UUID(npcRaw);
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            Assert.That(npc, Is.Not.Null);
-            Assert.That(npc.Appearance.AvatarHeight, Is.EqualTo(newHeight));
+            Assert.NotNull();
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestOsNpcCreateNotExistingNotecard()
         {
             TestHelpers.InMethod();
@@ -135,7 +133,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Test creation of an NPC where the appearance data comes from an avatar already in the region.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestOsNpcCreateUsingAppearanceFromAvatar()
         {
             TestHelpers.InMethod();
@@ -159,15 +157,15 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Try creating a bot using the existing avatar's appearance
             string npcRaw = osslApi.osNpcCreate("Jane", "Doe", new LSL_Types.Vector3(128, 128, 128), sp.UUID.ToString());
-            Assert.That(npcRaw, Is.Not.Null);
+            Assert.NotNull();
 
             UUID npcId = new UUID(npcRaw);
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            Assert.That(npc, Is.Not.Null);
-            Assert.That(npc.Appearance.AvatarHeight, Is.EqualTo(newHeight));
+            Assert.NotNull();
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestOsNpcLoadAppearance()
         {
             TestHelpers.InMethod();
@@ -202,11 +200,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             UUID npcId = new UUID(npcRaw);
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            Assert.That(npc, Is.Not.Null);
-            Assert.That(npc.Appearance.AvatarHeight, Is.EqualTo(secondHeight));
+            Assert.NotNull();
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestOsNpcLoadAppearanceNotExistingNotecard()
         {
             TestHelpers.InMethod();
@@ -246,14 +244,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             UUID npcId = new UUID(npcRaw);
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            Assert.That(npc, Is.Not.Null);
-            Assert.That(npc.Appearance.AvatarHeight, Is.EqualTo(firstHeight));
+            Assert.NotNull();
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test removal of an owned NPC.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestOsNpcRemoveOwned()
         {
             TestHelpers.InMethod();
@@ -294,20 +292,20 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             // Should still be around
             UUID npcId = new UUID(npcRaw);
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            Assert.That(npc, Is.Not.Null);
+            Assert.NotNull();
 
             osslApi.osNpcRemove(npcRaw);
 
             npc = m_scene.GetScenePresence(npcId);
 
             // Now the owner deleted it and it's gone
-            Assert.That(npc, Is.Null);
+            Assert.Null();
         }
 
         /// <summary>
         /// Test removal of an unowned NPC.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestOsNpcRemoveUnowned()
         {
             TestHelpers.InMethod();
@@ -337,7 +335,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             UUID npcId = new UUID(npcRaw);
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            Assert.That(npc, Is.Null);
+            Assert.Null();
         }
     }
 }

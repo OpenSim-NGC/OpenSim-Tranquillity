@@ -132,13 +132,12 @@ namespace OpenSim.Region.CoreModules.Scripting.HttpRequest.Tests
     /// alternative code can be written to make this work for Windows).  However, the value of being able to
     /// regression test this kind of code is very high.
     /// </remarks>
-    [TestFixture]
     public class ScriptsHttpRequestsTests : OpenSimTestCase
     {
         /// <summary>
         /// Test what happens when we get a 404 response from a call.
         /// </summary>
-//        [Test]
+//        [Fact]
         public void Test404Response()
         {
             TestHelpers.InMethod();
@@ -183,7 +182,7 @@ namespace OpenSim.Region.CoreModules.Scripting.HttpRequest.Tests
             hr.SendRequest();
 
             Assert.That(hr.Status, Is.EqualTo((int)HttpStatusCode.NotFound));
-            Assert.That(hr.ResponseBody, Is.EqualTo(rawResponse));
+            Assert.Equal(,);
         }
     }
 }

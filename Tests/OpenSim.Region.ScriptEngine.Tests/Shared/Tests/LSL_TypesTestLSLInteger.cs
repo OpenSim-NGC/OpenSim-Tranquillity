@@ -26,13 +26,12 @@
  */
 
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenSim.Tests.Common;
 using OpenSim.Region.ScriptEngine.Shared;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Tests
 {
-    [TestFixture]
     public class LSL_TypesTestLSLInteger : OpenSimTestCase
     {
         private Dictionary<double, int> m_doubleIntSet;
@@ -76,7 +75,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests LSLFloat is correctly cast explicitly to LSLInteger.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestExplicitCastLSLFloatToLSLInteger()
         {
             TestHelpers.InMethod();
@@ -86,14 +85,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             foreach (KeyValuePair<double, int> number in m_doubleIntSet)
             {
                 testInteger = (LSL_Types.LSLInteger) new LSL_Types.LSLFloat(number.Key);
-                Assert.AreEqual(testInteger.value, number.Value);
+                Assert.Equal(testInteger.value, number.Value);
             }
         }
 
         /// <summary>
         /// Tests string is correctly cast explicitly to LSLInteger.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestExplicitCastStringToLSLInteger()
         {
             TestHelpers.InMethod();
@@ -103,14 +102,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             foreach (KeyValuePair<string, int> number in m_stringIntSet)
             {
                 testInteger = (LSL_Types.LSLInteger) number.Key;
-                Assert.AreEqual(testInteger.value, number.Value);
+                Assert.Equal(testInteger.value, number.Value);
             }
         }
 
         /// <summary>
         /// Tests LSLString is correctly cast explicitly to LSLInteger.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestExplicitCastLSLStringToLSLInteger()
         {
             TestHelpers.InMethod();
@@ -120,14 +119,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             foreach (KeyValuePair<string, int> number in m_stringIntSet)
             {
                 testInteger = (LSL_Types.LSLInteger) new LSL_Types.LSLString(number.Key);
-                Assert.AreEqual(testInteger.value, number.Value);
+                Assert.Equal(testInteger.value, number.Value);
             }
         }
 
         /// <summary>
         /// Tests boolean correctly cast implicitly to LSLInteger.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestImplicitCastBooleanToLSLInteger()
         {
             TestHelpers.InMethod();
@@ -135,16 +134,16 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             LSL_Types.LSLInteger testInteger;
 
             testInteger = (1 == 0);
-            Assert.AreEqual(0, testInteger.value);
+            Assert.Equal(0, testInteger.value);
 
             testInteger = (1 == 1);
-            Assert.AreEqual(1, testInteger.value);
+            Assert.Equal(1, testInteger.value);
 
             testInteger = false;
-            Assert.AreEqual(0, testInteger.value);
+            Assert.Equal(0, testInteger.value);
 
             testInteger = true;
-            Assert.AreEqual(1, testInteger.value);
+            Assert.Equal(1, testInteger.value);
         }
     }
 }

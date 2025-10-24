@@ -45,7 +45,6 @@ using RegionSettings = OpenSim.Framework.RegionSettings;
 
 namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 {
-    [TestFixture]
     public class ArchiverTests : OpenSimTestCase
     {
         private Guid m_lastRequestId;
@@ -60,7 +59,6 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 
         private  AutoResetEvent m_oarEvent = new AutoResetEvent(false);
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -172,7 +170,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         /// <summary>
         /// Test saving an OpenSim Region Archive.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSaveOar()
         {
             TestHelpers.InMethod();
@@ -196,7 +194,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 
             m_oarEvent.WaitOne(60000);
 
-            Assert.That(m_lastRequestId, Is.EqualTo(requestId));
+            Assert.Equal(,);
 
             byte[] archive = archiveWriteStream.ToArray();
             MemoryStream archiveReadStream = new MemoryStream(archive);
@@ -215,7 +213,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             TarArchiveReader.TarEntryType tarEntryType;
 
             byte[] data = tar.ReadEntry(out filePath, out tarEntryType);
-            Assert.That(filePath, Is.EqualTo(ArchiveConstants.CONTROL_FILE_PATH));
+            Assert.Equal(,);
 
             Dictionary<string, object> archiveOptions = new Dictionary<string, object>();
             ArchiveReadRequest arr = new ArchiveReadRequest(m_scene, (Stream)null, Guid.Empty, archiveOptions);
@@ -229,7 +227,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
                 {
                     string fileName = filePath.Remove(0, ArchiveConstants.ASSETS_PATH.Length);
 
-                    Assert.That(fileName, Is.EqualTo(expectedNcAssetFileName));
+                    Assert.Equal(,);
                     gotNcAssetFile = true;
                 }
                 else if (filePath.StartsWith(ArchiveConstants.OBJECTS_PATH))
@@ -247,7 +245,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         /// <summary>
         /// Test saving an OpenSim Region Archive with the no assets option
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSaveOarNoAssets()
         {
             TestHelpers.InMethod();
@@ -286,7 +284,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             // Don't wait for completion - with --noassets save oar happens synchronously
 //                Monitor.Wait(this, 60000);
 
-            Assert.That(m_lastRequestId, Is.EqualTo(requestId));
+            Assert.Equal(,);
 
             byte[] archive = archiveWriteStream.ToArray();
             MemoryStream archiveReadStream = new MemoryStream(archive);
@@ -301,7 +299,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             TarArchiveReader.TarEntryType tarEntryType;
 
             byte[] data = tar.ReadEntry(out filePath, out tarEntryType);
-            Assert.That(filePath, Is.EqualTo(ArchiveConstants.CONTROL_FILE_PATH));
+            Assert.Equal(,);
 
             Dictionary<string, object> archiveOptions = new Dictionary<string, object>();
             ArchiveReadRequest arr = new ArchiveReadRequest(m_scene, (Stream)null, Guid.Empty, archiveOptions);
@@ -329,7 +327,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         /// <summary>
         /// Test loading an OpenSim Region Archive.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoadOar()
         {
             TestHelpers.InMethod();
@@ -367,7 +365,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
                 if (name.EndsWith(".Resources.test-sound.wav"))
                     soundDataResourceName = name;
             }
-            Assert.That(soundDataResourceName, Is.Not.Null);
+            Assert.NotNull();
 
             byte[] soundData;
             UUID soundUuid;
@@ -395,7 +393,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 
              m_oarEvent.WaitOne(60000);
 
-            Assert.That(m_lastErrorMessage, Is.Null);
+            Assert.Null();
 
             TestLoadedRegion(part1, soundItemName, soundData);
         }
@@ -404,7 +402,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         /// Test loading an OpenSim Region Archive where the scene object parts are not ordered by link number (e.g.
         /// 2 can come after 3).
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoadOarUnorderedParts()
         {
             TestHelpers.InMethod();
@@ -444,19 +442,19 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 
              m_oarEvent.WaitOne(60000);
 
-            Assert.That(m_lastErrorMessage, Is.Null);
+            Assert.Null();
 
             SceneObjectPart part2 = m_scene.GetSceneObjectPart("obj1-Part2");
-            Assert.That(part2.LinkNum, Is.EqualTo(2));
+            Assert.Equal(,);
 
             SceneObjectPart part3 = m_scene.GetSceneObjectPart("obj1-Part3");
-            Assert.That(part3.LinkNum, Is.EqualTo(3));
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test loading an OpenSim Region Archive saved with the --publish option.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoadPublishedOar()
         {
             TestHelpers.InMethod();
@@ -494,7 +492,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 
              m_oarEvent.WaitOne(60000);
 
-            Assert.That(m_lastRequestId, Is.EqualTo(requestId));
+            Assert.Equal(,);
 
             byte[] archive = archiveWriteStream.ToArray();
             MemoryStream archiveReadStream = new MemoryStream(archive);
@@ -524,11 +522,11 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 
                  m_oarEvent.WaitOne(60000);
 
-                Assert.That(m_lastErrorMessage, Is.Null);
+                Assert.Null();
 
                 SceneObjectGroup loadedSog = scene2.GetSceneObjectGroup(part1.Name);
-                Assert.That(loadedSog.OwnerID, Is.EqualTo(estateOwner));
-                Assert.That(loadedSog.LastOwnerID, Is.EqualTo(estateOwner));
+                Assert.Equal(,);
+                Assert.Equal(,);
             }
         }
 
@@ -538,7 +536,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         /// <remarks>
         /// In this situation, the owner ID is set to the group ID.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestLoadOarDeededLand()
         {
             TestHelpers.InMethod();
@@ -592,16 +590,16 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             ILandObject rLo = m_scene.LandChannel.GetLandObject(16, 16);
             LandData rLd = rLo.LandData;
 
-            Assert.That(rLd.GlobalID, Is.EqualTo(landID));
-            Assert.That(rLd.OwnerID, Is.EqualTo(groupID));
-            Assert.That(rLd.GroupID, Is.EqualTo(groupID));
-            Assert.That(rLd.IsGroupOwned, Is.EqualTo(true));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test loading the region settings of an OpenSim Region Archive.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoadOarRegionSettings()
         {
             TestHelpers.InMethod();
@@ -661,10 +659,10 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 
              m_oarEvent.WaitOne(60000);
 
-            Assert.That(m_lastErrorMessage, Is.Null);
+            Assert.Null();
             RegionSettings loadedRs = m_scene.RegionInfo.RegionSettings;
 
-            Assert.That(loadedRs.AgentLimit, Is.EqualTo(17));
+            Assert.Equal(,);
             Assert.That(loadedRs.AllowDamage, Is.True);
             Assert.That(loadedRs.AllowLandJoinDivide, Is.True);
             Assert.That(loadedRs.AllowLandResell, Is.True);
@@ -674,31 +672,31 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             Assert.That(loadedRs.DisableCollisions, Is.True);
             Assert.That(loadedRs.DisablePhysics, Is.True);
             Assert.That(loadedRs.DisableScripts, Is.True);
-            Assert.That(loadedRs.Elevation1NW, Is.EqualTo(15.9));
-            Assert.That(loadedRs.Elevation1NE, Is.EqualTo(45.3));
-            Assert.That(loadedRs.Elevation1SE, Is.EqualTo(49));
-            Assert.That(loadedRs.Elevation1SW, Is.EqualTo(1.9));
-            Assert.That(loadedRs.Elevation2NW, Is.EqualTo(4.5));
-            Assert.That(loadedRs.Elevation2NE, Is.EqualTo(19.2));
-            Assert.That(loadedRs.Elevation2SE, Is.EqualTo(9.2));
-            Assert.That(loadedRs.Elevation2SW, Is.EqualTo(2.1));
-            Assert.That(loadedRs.ObjectBonus, Is.EqualTo(1.4));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
             Assert.That(loadedRs.RestrictPushing, Is.True);
-            Assert.That(loadedRs.TerrainLowerLimit, Is.EqualTo(-17.9));
-            Assert.That(loadedRs.TerrainRaiseLimit, Is.EqualTo(17.9));
-            Assert.That(loadedRs.TerrainTexture1, Is.EqualTo(UUID.Parse("00000000-0000-0000-0000-000000000020")));
-            Assert.That(loadedRs.TerrainTexture2, Is.EqualTo(UUID.Parse("00000000-0000-0000-0000-000000000040")));
-            Assert.That(loadedRs.TerrainTexture3, Is.EqualTo(UUID.Parse("00000000-0000-0000-0000-000000000060")));
-            Assert.That(loadedRs.TerrainTexture4, Is.EqualTo(UUID.Parse("00000000-0000-0000-0000-000000000080")));
-            Assert.That(loadedRs.WaterHeight, Is.EqualTo(23));
-            Assert.AreEqual(UUID.Zero, loadedRs.TelehubObject); // because no object was found with the original UUID
-            Assert.AreEqual(0, loadedRs.SpawnPoints().Count);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,));
+            Assert.Equal(,));
+            Assert.Equal(,));
+            Assert.Equal(,));
+            Assert.Equal(,);
+            Assert.Equal(UUID.Zero, loadedRs.TelehubObject); // because no object was found with the original UUID
+            Assert.Equal(0, loadedRs.SpawnPoints().Count);
         }
 
         /// <summary>
         /// Test merging an OpenSim Region Archive into an existing scene
         /// </summary>
-        //[Test]
+        //[Fact]
         public void TestMergeOar()
         {
             TestHelpers.InMethod();
@@ -765,7 +763,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         /// <summary>
         /// Test saving a multi-region OAR.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSaveMultiRegionOar()
         {
             TestHelpers.InMethod();
@@ -835,7 +833,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 
 
             // Check that the OAR contains the expected data
-            Assert.That(m_lastRequestId, Is.EqualTo(requestId));
+            Assert.Equal(,);
 
             byte[] archive = archiveWriteStream.ToArray();
             MemoryStream archiveReadStream = new MemoryStream(archive);
@@ -853,7 +851,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             TarArchiveReader.TarEntryType tarEntryType;
 
             byte[] data = tar.ReadEntry(out filePath, out tarEntryType);
-            Assert.That(filePath, Is.EqualTo(ArchiveConstants.CONTROL_FILE_PATH));
+            Assert.Equal(,);
 
             Dictionary<string, object> archiveOptions = new Dictionary<string, object>();
             ArchiveReadRequest arr = new ArchiveReadRequest(m_scene, (Stream)null, Guid.Empty, archiveOptions);
@@ -873,9 +871,9 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
                 else
                 {
                     // This file belongs to one of the regions. Find out which one.
-                    Assert.IsTrue(filePath.StartsWith(ArchiveConstants.REGIONS_PATH));
+                    Assert.True(filePath.StartsWith(ArchiveConstants.REGIONS_PATH));
                     string[] parts = filePath.Split(new Char[] { '/' }, 3);
-                    Assert.AreEqual(3, parts.Length);
+                    Assert.Equal(3, parts.Length);
                     string regionDirectory = parts[1];
                     string relativePath = parts[2];
                     Scene scene = regionPaths[regionDirectory];
@@ -887,7 +885,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
                 }
             }
 
-            Assert.AreEqual(scenes.Count, foundPaths.Count);
+            Assert.Equal(scenes.Count, foundPaths.Count);
             foreach (Scene scene in scenes)
             {
                 Assert.That(foundPaths[scene.RegionInfo.RegionID], Is.EquivalentTo(expectedPaths[scene.RegionInfo.RegionID]));
@@ -899,7 +897,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         /// <summary>
         /// Test loading a multi-region OAR.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoadMultiRegionOar()
         {
             TestHelpers.InMethod();
@@ -961,7 +959,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
                 if (name.EndsWith(".Resources.test-sound.wav"))
                     soundDataResourceName = name;
             }
-            Assert.That(soundDataResourceName, Is.Not.Null);
+            Assert.NotNull();
 
             byte[] soundData;
             UUID soundUuid;
@@ -1004,9 +1002,9 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 
              m_oarEvent.WaitOne(60000);
 
-            Assert.That(m_lastErrorMessage, Is.Null);
+            Assert.Null();
 
-            Assert.AreEqual(3, m_sceneHelpers.SceneManager.Scenes.Count);
+            Assert.Equal(3, m_sceneHelpers.SceneManager.Scenes.Count);
 
             TestLoadedRegion(part1, soundItemName, soundData);
         }
@@ -1033,8 +1031,8 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             Assert.That(qtmp1, Is.EqualTo(qtmp2), "object1 rotation offset not equal");
             Assert.That(
                 object1PartLoaded.OffsetPosition, Is.EqualTo(part1.OffsetPosition), "object1 offset position not equal");
-            Assert.That(object1PartLoaded.SitTargetOrientation, Is.EqualTo(part1.SitTargetOrientation));
-            Assert.That(object1PartLoaded.SitTargetPosition, Is.EqualTo(part1.SitTargetPosition));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             TaskInventoryItem loadedSoundItem = object1PartLoaded.Inventory.GetInventoryItems(soundItemName)[0];
             Assert.That(loadedSoundItem, Is.Not.Null, "loaded sound item was null");

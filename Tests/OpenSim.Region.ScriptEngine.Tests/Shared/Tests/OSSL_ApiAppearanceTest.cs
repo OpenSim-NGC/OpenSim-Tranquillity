@@ -48,14 +48,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// <summary>
     /// Tests for OSSL_Api
     /// </summary>
-    [TestFixture]
     public class OSSL_ApiAppearanceTest : OpenSimTestCase
     {
         /*
         protected Scene m_scene;
         protected XEngine.XEngine m_engine;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -81,7 +79,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             m_engine.AddRegion(m_scene);
         }
 
-        [Test]
+        [Fact]
         public void TestOsOwnerSaveAppearance()
         {
             TestHelpers.InMethod();
@@ -104,13 +102,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             osslApi.osOwnerSaveAppearance(notecardName);
 
             IList<TaskInventoryItem> items = part.Inventory.GetInventoryItems(notecardName);
-            Assert.That(items.Count, Is.EqualTo(1));
+            Assert.Equal(,);
 
             TaskInventoryItem ncItem = items[0];
-            Assert.That(ncItem.Name, Is.EqualTo(notecardName));
+            Assert.Equal(,);
 
             AssetBase ncAsset = m_scene.AssetService.Get(ncItem.AssetID.ToString());
-            Assert.That(ncAsset, Is.Not.Null);
+            Assert.NotNull();
 
             AssetNotecard anc = new AssetNotecard(UUID.Zero, ncAsset.Data);
             anc.Decode();
@@ -118,10 +116,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             AvatarAppearance savedAppearance = new AvatarAppearance();
             savedAppearance.Unpack(appearanceOsd);
 
-            Assert.That(savedAppearance.AvatarHeight, Is.EqualTo(sp.Appearance.AvatarHeight));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestOsAgentSaveAppearance()
         {
             TestHelpers.InMethod();
@@ -145,13 +143,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             osslApi.osAgentSaveAppearance(new LSL_Types.LSLString(nonOwnerId.ToString()), notecardName);
 
             IList<TaskInventoryItem> items = part.Inventory.GetInventoryItems(notecardName);
-            Assert.That(items.Count, Is.EqualTo(1));
+            Assert.Equal(,);
 
             TaskInventoryItem ncItem = items[0];
-            Assert.That(ncItem.Name, Is.EqualTo(notecardName));
+            Assert.Equal(,);
 
             AssetBase ncAsset = m_scene.AssetService.Get(ncItem.AssetID.ToString());
-            Assert.That(ncAsset, Is.Not.Null);
+            Assert.NotNull();
 
             AssetNotecard anc = new AssetNotecard(UUID.Zero, ncAsset.Data);
             anc.Decode();
@@ -159,7 +157,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             AvatarAppearance savedAppearance = new AvatarAppearance();
             savedAppearance.Unpack(appearanceOsd);
 
-            Assert.That(savedAppearance.AvatarHeight, Is.EqualTo(sp.Appearance.AvatarHeight));
+            Assert.Equal(,);
         }
         */
     }

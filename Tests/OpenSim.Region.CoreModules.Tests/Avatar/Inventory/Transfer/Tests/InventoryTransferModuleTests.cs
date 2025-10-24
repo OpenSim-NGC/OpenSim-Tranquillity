@@ -34,12 +34,10 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
 {
-    [TestFixture]
     public class InventoryTransferModuleTests : OpenSimTestCase
     {
         protected TestScene m_scene;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -52,7 +50,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
             SceneHelpers.SetupSceneModules(m_scene, config, new InventoryTransferModule());
         }
 
-        [Test]
+        [Fact]
         public void TestAcceptGivenItem()
         {
 //            TestHelpers.EnableLogging();
@@ -121,14 +119,14 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
             InventoryItemBase originalItemAfterGive
                 = UserInventoryHelpers.GetInventoryItem(m_scene.InventoryService, giverSp.UUID, "Objects/givenObj");
 
-            Assert.That(originalItemAfterGive, Is.Not.Null);
-            Assert.That(originalItemAfterGive.ID, Is.EqualTo(originalItem.ID));
+            Assert.NotNull();
+            Assert.Equal(,);
 
             // Test for item successfully making it into the receiver's inventory
             InventoryItemBase receivedItem
                 = UserInventoryHelpers.GetInventoryItem(m_scene.InventoryService, receiverSp.UUID, "Objects/givenObj");
 
-            Assert.That(receivedItem, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(receivedItem.ID, Is.Not.EqualTo(originalItem.ID));
 
             // Test that on a delete, item still exists and is accessible for the giver.
@@ -137,7 +135,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
             InventoryItemBase originalItemAfterDelete
                 = UserInventoryHelpers.GetInventoryItem(m_scene.InventoryService, giverSp.UUID, "Objects/givenObj");
 
-            Assert.That(originalItemAfterDelete, Is.Not.Null);
+            Assert.NotNull();
 
             // TODO: Test scenario where giver deletes their item first.
         }
@@ -148,7 +146,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
         /// <remarks>
         /// A rejected item still ends up in the user's trash folder.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestRejectGivenItem()
         {
 //            TestHelpers.EnableLogging();
@@ -221,8 +219,8 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
             InventoryItemBase originalItemAfterGive
                 = UserInventoryHelpers.GetInventoryItem(m_scene.InventoryService, giverSp.UUID, "Objects/givenObj");
 
-            Assert.That(originalItemAfterGive, Is.Not.Null);
-            Assert.That(originalItemAfterGive.ID, Is.EqualTo(originalItem.ID));
+            Assert.NotNull();
+            Assert.Equal(,);
 
             // Test for item successfully making it into the receiver's inventory
             InventoryItemBase receivedItem
@@ -231,9 +229,9 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
             InventoryFolderBase trashFolder
                 = m_scene.InventoryService.GetFolderForType(receiverSp.UUID, FolderType.Trash);
 
-            Assert.That(receivedItem, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(receivedItem.ID, Is.Not.EqualTo(originalItem.ID));
-            Assert.That(receivedItem.Folder, Is.EqualTo(trashFolder.ID));
+            Assert.Equal(,);
 
             // Test that on a delete, item still exists and is accessible for the giver.
             m_scene.InventoryService.PurgeFolder(trashFolder);
@@ -241,10 +239,10 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
             InventoryItemBase originalItemAfterDelete
                 = UserInventoryHelpers.GetInventoryItem(m_scene.InventoryService, giverSp.UUID, "Objects/givenObj");
 
-            Assert.That(originalItemAfterDelete, Is.Not.Null);
+            Assert.NotNull();
         }
 
-        [Test]
+        [Fact]
         public void TestAcceptGivenFolder()
         {
             TestHelpers.InMethod();
@@ -313,14 +311,14 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
             InventoryFolderBase originalFolderAfterGive
                 = UserInventoryHelpers.GetInventoryFolder(m_scene.InventoryService, giverSp.UUID, "f1");
 
-            Assert.That(originalFolderAfterGive, Is.Not.Null);
-            Assert.That(originalFolderAfterGive.ID, Is.EqualTo(originalFolder.ID));
+            Assert.NotNull();
+            Assert.Equal(,);
 
             // Test for item successfully making it into the receiver's inventory
             InventoryFolderBase receivedFolder
                 = UserInventoryHelpers.GetInventoryFolder(m_scene.InventoryService, receiverSp.UUID, "f1");
 
-            Assert.That(receivedFolder, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(receivedFolder.ID, Is.Not.EqualTo(originalFolder.ID));
 
             // Test that on a delete, item still exists and is accessible for the giver.
@@ -329,7 +327,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
             InventoryFolderBase originalFolderAfterDelete
                 = UserInventoryHelpers.GetInventoryFolder(m_scene.InventoryService, giverSp.UUID, "f1");
 
-            Assert.That(originalFolderAfterDelete, Is.Not.Null);
+            Assert.NotNull();
 
             // TODO: Test scenario where giver deletes their item first.
         }
@@ -340,7 +338,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
         /// <remarks>
         /// A rejected item still ends up in the user's trash folder.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestRejectGivenFolder()
         {
             TestHelpers.InMethod();
@@ -414,8 +412,8 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
             InventoryFolderBase originalFolderAfterGive
                 = UserInventoryHelpers.GetInventoryFolder(m_scene.InventoryService, giverSp.UUID, "f1");
 
-            Assert.That(originalFolderAfterGive, Is.Not.Null);
-            Assert.That(originalFolderAfterGive.ID, Is.EqualTo(originalFolder.ID));
+            Assert.NotNull();
+            Assert.Equal(,);
 
             // Test for folder successfully making it into the receiver's inventory
             InventoryFolderBase receivedFolder
@@ -424,9 +422,9 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
             InventoryFolderBase trashFolder
                 = m_scene.InventoryService.GetFolderForType(receiverSp.UUID, FolderType.Trash);
 
-            Assert.That(receivedFolder, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(receivedFolder.ID, Is.Not.EqualTo(originalFolder.ID));
-            Assert.That(receivedFolder.ParentID, Is.EqualTo(trashFolder.ID));
+            Assert.Equal(,);
 
             // Test that on a delete, item still exists and is accessible for the giver.
             m_scene.InventoryService.PurgeFolder(trashFolder);
@@ -434,7 +432,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
             InventoryFolderBase originalFolderAfterDelete
                 = UserInventoryHelpers.GetInventoryFolder(m_scene.InventoryService, giverSp.UUID, "f1");
 
-            Assert.That(originalFolderAfterDelete, Is.Not.Null);
+            Assert.NotNull();
         }
     }
 }

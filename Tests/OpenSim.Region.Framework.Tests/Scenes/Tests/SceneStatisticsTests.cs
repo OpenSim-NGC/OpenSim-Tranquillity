@@ -28,7 +28,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -36,18 +36,16 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
-    [TestFixture]
     public class SceneStatisticsTests : OpenSimTestCase
     {
         private TestScene m_scene;
 
-        [SetUp]
         public void Init()
         {
             m_scene = new SceneHelpers().SetupScene();
         }
 
-        [Test]
+        [Fact]
         public void TestAddRemovePhysicalLinkset()
         {
             Assert.That(m_scene.SceneGraph.GetActiveObjectsCount(), Is.EqualTo(0));

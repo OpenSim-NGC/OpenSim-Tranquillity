@@ -32,7 +32,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Framework.Serialization.Tests
 {
-    [TestFixture]
     public class RegionSettingsSerializerTests : OpenSimTestCase
     {
         private string m_serializedRs = @"<?xml version=""1.0"" encoding=""utf-16""?>
@@ -82,7 +81,6 @@ namespace OpenSim.Framework.Serialization.Tests
 
         private RegionSettings m_rs;
 
-        [SetUp]
         public void Setup()
         {
             m_rs = new RegionSettings();
@@ -120,18 +118,18 @@ namespace OpenSim.Framework.Serialization.Tests
             m_rs.AddSpawnPoint(SpawnPoint.Parse("1,-2,0.33"));
         }
 
-        [Test]
+        [Fact]
         public void TestRegionSettingsDeserialize()
         {
             TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
             RegionSettings deserRs = RegionSettingsSerializer.Deserialize(m_serializedRs, out ViewerEnvironment dummy, new EstateSettings());
-            Assert.That(deserRs, Is.Not.Null);
-            Assert.That(deserRs.TerrainTexture2, Is.EqualTo(m_rs.TerrainTexture2));
-            Assert.That(deserRs.DisablePhysics, Is.EqualTo(m_rs.DisablePhysics));
-            Assert.That(deserRs.TerrainLowerLimit, Is.EqualTo(m_rs.TerrainLowerLimit));
-            Assert.That(deserRs.TelehubObject, Is.EqualTo(m_rs.TelehubObject));
+            Assert.NotNull();
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
             Assert.That(deserRs.SpawnPoints()[0].ToString(), Is.EqualTo(m_rs.SpawnPoints()[0].ToString()));
         }
     }

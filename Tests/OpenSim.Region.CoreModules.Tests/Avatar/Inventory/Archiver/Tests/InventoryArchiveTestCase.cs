@@ -34,7 +34,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 {
-    [TestFixture]
     public class InventoryArchiveTestCase : OpenSimTestCase
     {
         protected ManualResetEvent mre = new ManualResetEvent(false);
@@ -88,7 +87,6 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();

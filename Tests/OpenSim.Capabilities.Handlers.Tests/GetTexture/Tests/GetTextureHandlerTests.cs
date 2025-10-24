@@ -37,15 +37,14 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 
-using NUnit.Framework;
+using Xunit;
 
 /*
 namespace OpenSim.Capabilities.Handlers.GetTexture.Tests
 {
-    [TestFixture]
     public class GetTextureHandlerTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestTextureNotFound()
         {
             TestHelpers.InMethod();

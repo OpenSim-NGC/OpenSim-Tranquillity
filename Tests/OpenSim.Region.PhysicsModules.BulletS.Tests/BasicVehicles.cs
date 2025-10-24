@@ -27,7 +27,7 @@
 
 using System.Collections.Generic;
 
-using NUnit.Framework;
+using Xunit;
 
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModule.BulletS;
@@ -38,7 +38,6 @@ using OpenMetaverse;
 
 namespace OpenSim.Region.PhysicsModule.BulletS.Tests
 {
-    [TestFixture]
     public class BasicVehicles : OpenSimTestCase
     {
         // Documentation on attributes: http://www.nunit.org/index.php?p=attributes&r=2.6.1

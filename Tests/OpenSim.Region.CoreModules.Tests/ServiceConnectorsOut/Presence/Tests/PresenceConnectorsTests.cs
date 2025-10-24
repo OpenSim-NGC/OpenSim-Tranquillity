@@ -32,7 +32,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence.Tests
 {
-    [TestFixture]
     public class PresenceConnectorsTests : OpenSimTestCase
     {
         LocalPresenceServicesConnector m_LocalConnector;
@@ -58,7 +57,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence.Tests
         /// <summary>
         /// Test OpenSim Presence.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestPresenceV0_1()
         {
             SetUp();
@@ -79,28 +78,28 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence.Tests
             // this is not implemented by this connector
             //m_LocalConnector.LoginAgent(user1, session1, UUID.Zero);
             PresenceInfo result = m_LocalConnector.GetAgent(session1);
-            Assert.IsNotNull(result, "Retrieved GetAgent is null");
+            Assert.NotNull(result, "Retrieved GetAgent is null");
             Assert.That(result.UserID, Is.EqualTo(user1), "Retrieved userID does not match");
 
             UUID region1 = UUID.Random();
             bool r = m_LocalConnector.ReportAgent(session1, region1);
-            Assert.IsTrue(r, "First ReportAgent returned false");
+            Assert.True(r, "First ReportAgent returned false");
             result = m_LocalConnector.GetAgent(session1);
             Assert.That(result.RegionID, Is.EqualTo(region1), "Agent is not in the right region (region1)");
 
             UUID region2 = UUID.Random();
             r = m_LocalConnector.ReportAgent(session1, region2);
-            Assert.IsTrue(r, "Second ReportAgent returned false");
+            Assert.True(r, "Second ReportAgent returned false");
             result = m_LocalConnector.GetAgent(session1);
             Assert.That(result.RegionID, Is.EqualTo(region2), "Agent is not in the right region (region2)");
 
             r = m_LocalConnector.LogoutAgent(session1);
-            Assert.IsTrue(r, "LogoutAgent returned false");
+            Assert.True(r, "LogoutAgent returned false");
             result = m_LocalConnector.GetAgent(session1);
-            Assert.IsNull(result, "Agent session is still stored after logout");
+            Assert.Null(result, "Agent session is still stored after logout");
 
             r = m_LocalConnector.ReportAgent(session1, region1);
-            Assert.IsFalse(r, "ReportAgent of non-logged in user returned true");
+            Assert.False(r, "ReportAgent of non-logged in user returned true");
         }
     }
 }

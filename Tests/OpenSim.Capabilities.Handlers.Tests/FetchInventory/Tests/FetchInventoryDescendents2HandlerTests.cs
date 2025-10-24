@@ -35,7 +35,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
 {
-    [TestFixture]
     public class FetchInventoryDescendents2HandlerTests : OpenSimTestCase
     {
         private UUID m_userID = new UUID("00000000-0000-0000-0000-000000000001");
@@ -132,7 +131,7 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             return Util.UTF8.GetString(resp.RawBuffer);
         }
 
-        [Test]
+        [Fact]
         public void Test_001_SimpleFolder()
         {
             TestHelpers.InMethod();
@@ -158,7 +157,7 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             Console.WriteLine(llsdresponse);
         }
 
-        [Test]
+        [Fact]
         public void Test_002_MultipleFolders()
         {
             TestHelpers.InMethod();
@@ -186,7 +185,7 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             Assert.That(llsdresponse.Contains("20000000-0000-0000-0000-000000000002"), Is.True, "Notecard 2 is missing from response");
         }
 
-        [Test]
+        [Fact]
         public void Test_003_Links()
         {
             TestHelpers.InMethod();
@@ -228,7 +227,7 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             Assert.Less(pos1, pos2, "Contents of source of folder link is after folder link");
         }
 
-        [Test]
+        [Fact]
         public void Test_004_DuplicateFolders()
         {
             TestHelpers.InMethod();
@@ -260,14 +259,14 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             Assert.That(llsdresponse.Contains(root_folder), "Missing root folder");
             Assert.That(llsdresponse.Contains(notecards_folder), "Missing notecards folder");
             int count = Regex.Matches(llsdresponse, root_folder).Count;
-            Assert.AreEqual(1, count, "More than 1 root folder in response");
+            Assert.Equal(1, count, "More than 1 root folder in response");
             count = Regex.Matches(llsdresponse, notecards_folder).Count;
-            Assert.AreEqual(1, count, "More than 1 notecards folder in response");
+            Assert.Equal(1, count, "More than 1 notecards folder in response");
             count = Regex.Matches(llsdresponse, notecards_category).Count;
-            Assert.AreEqual(1, count, "More than 1 notecards folder in response"); // Notecards will also be a category on root
+            Assert.Equal(1, count, "More than 1 notecards folder in response"); // Notecards will also be a category on root
         }
 
-        [Test]
+        [Fact]
         public void Test_005_FolderZero()
         {
 

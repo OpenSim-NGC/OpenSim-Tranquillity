@@ -35,13 +35,11 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 {
-    [TestFixture]
     public class InventoryArchiveLoadTests : InventoryArchiveTestCase
     {
         protected TestScene m_scene;
         protected InventoryArchiverModule m_archiverModule;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -53,7 +51,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             SceneHelpers.SetupSceneModules(m_scene, serialiserModule, m_archiverModule);
         }
 
-        [Test]
+        [Fact]
         public void TestLoadCoalesecedItem()
         {
             TestHelpers.InMethod();
@@ -73,21 +71,21 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             bool readResult = CoalescedSceneObjectsSerializer.TryFromXml(assetXml, out coa);
 
             Assert.That(readResult, Is.True);
-            Assert.That(coa.Count, Is.EqualTo(2));
+            Assert.Equal(,);
 
             List<SceneObjectGroup> coaObjects = coa.Objects;
-            Assert.That(coaObjects[0].UUID, Is.EqualTo(UUID.Parse("00000000-0000-0000-0000-000000000120")));
-            Assert.That(coaObjects[0].AbsolutePosition, Is.EqualTo(new Vector3(15, 30, 45)));
+            Assert.Equal(,));
+            Assert.Equal(,));
 
-            Assert.That(coaObjects[1].UUID, Is.EqualTo(UUID.Parse("00000000-0000-0000-0000-000000000140")));
-            Assert.That(coaObjects[1].AbsolutePosition, Is.EqualTo(new Vector3(25, 50, 75)));
+            Assert.Equal(,));
+            Assert.Equal(,));
         }
 
         /// <summary>
         /// Test case where a creator account exists for the creator UUID embedded in item metadata and serialized
         /// objects.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoadIarCreatorAccountPresent()
         {
             TestHelpers.InMethod();
@@ -99,8 +97,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             InventoryItemBase foundItem1
                 = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaLL1.PrincipalID, m_item1Name);
 
-            Assert.That(
-                foundItem1.CreatorId, Is.EqualTo(m_uaLL1.PrincipalID.ToString()),
+            Assert.Equal(,),
                 "Loaded item non-uuid creator doesn't match original");
             Assert.That(
                 foundItem1.CreatorIdAsUuid, Is.EqualTo(m_uaLL1.PrincipalID),
@@ -112,14 +109,14 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             string xmlData = Utils.BytesToString(asset1.Data);
             SceneObjectGroup sog1 = SceneObjectSerializer.FromOriginalXmlFormat(xmlData);
 
-            Assert.That(sog1.RootPart.CreatorID, Is.EqualTo(m_uaLL1.PrincipalID));
+            Assert.Equal(,);
         }
 
 //        /// <summary>
 //        /// Test loading a V0.1 OpenSim Inventory Archive (subject to change since there is no fixed format yet) where
 //        /// an account exists with the same name as the creator, though not the same id.
 //        /// </summary>
-//        [Test]
+//        [Fact]
 //        public void TestLoadIarV0_1SameNameCreator()
 //        {
 //            TestHelpers.InMethod();
@@ -132,8 +129,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 //            InventoryItemBase foundItem1
 //                = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaMT.PrincipalID, m_item1Name);
 //
-//            Assert.That(
-//                foundItem1.CreatorId, Is.EqualTo(m_uaLL2.PrincipalID.ToString()),
+//            Assert.Equal(,),
 //                "Loaded item non-uuid creator doesn't match original");
 //            Assert.That(
 //                foundItem1.CreatorIdAsUuid, Is.EqualTo(m_uaLL2.PrincipalID),
@@ -145,14 +141,14 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 //            string xmlData = Utils.BytesToString(asset1.Data);
 //            SceneObjectGroup sog1 = SceneObjectSerializer.FromOriginalXmlFormat(xmlData);
 //
-//            Assert.That(sog1.RootPart.CreatorID, Is.EqualTo(m_uaLL2.PrincipalID));
+//            Assert.Equal(,);
 //        }
 
         /// <summary>
         /// Test loading a V0.1 OpenSim Inventory Archive (subject to change since there is no fixed format yet) where
         /// the creator or an account with the creator's name does not exist within the system.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoadIarV0_1AbsentCreator()
         {
             TestHelpers.InMethod();
@@ -165,8 +161,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
                 = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaMT.PrincipalID, m_item1Name);
 
             Assert.That(foundItem1, Is.Not.Null, "Didn't find loaded item 1");
-            Assert.That(
-                foundItem1.CreatorId, Is.EqualTo(m_uaMT.PrincipalID.ToString()),
+            Assert.Equal(,),
                 "Loaded item non-uuid creator doesn't match that of the loading user");
             Assert.That(
                 foundItem1.CreatorIdAsUuid, Is.EqualTo(m_uaMT.PrincipalID),
@@ -176,7 +171,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             string xmlData = Utils.BytesToString(asset1.Data);
             SceneObjectGroup sog1 = SceneObjectSerializer.FromOriginalXmlFormat(xmlData);
 
-            Assert.That(sog1.RootPart.CreatorID, Is.EqualTo(m_uaMT.PrincipalID));
+            Assert.Equal(,);
         }
     }
 }

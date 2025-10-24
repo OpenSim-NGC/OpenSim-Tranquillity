@@ -58,19 +58,19 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             found = (SceneObjectGroup)entman[obj1];
             found.UUID.Should().Be(obj1);
-            //Assert.That(found.UUID ,Is.EqualTo(obj1));
+            //Assert.Equal(,);
 
             found = (SceneObjectGroup)entman[li1];
             found.UUID.Should().Be(obj1);
-            //Assert.That(found.UUID ,Is.EqualTo(obj1));
+            //Assert.Equal(,);
 
             found = (SceneObjectGroup)entman[obj2];
             found.UUID.Should().Be(obj2);
-            //Assert.That(found.UUID ,Is.EqualTo(obj2));
+            //Assert.Equal(,);
 
             found = (SceneObjectGroup)entman[li2];
             found.UUID.Should().Be(obj2);
-            //Assert.That(found.UUID ,Is.EqualTo(obj2));
+            //Assert.Equal(,);
 
             entman.Remove(obj1);
             entman.Remove(li2);
@@ -121,10 +121,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 if (entman.ContainsKey(sog.UUID) || entman.ContainsKey(sog.LocalId)) {
                     found = (SceneObjectGroup)entman[sog.UUID];
                     found.UUID.Should().Be(sog.UUID);
-                    //Assert.That(found.UUID,Is.EqualTo(sog.UUID));
+                    //Assert.Equal(,);
                     found = (SceneObjectGroup)entman[sog.LocalId];
                     found.UUID.Should().Be(sog.UUID);
-                    //Assert.That(found.UUID,Is.EqualTo(sog.UUID));
+                    //Assert.Equal(,);
                 }
             }
         }

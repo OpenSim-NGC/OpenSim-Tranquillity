@@ -11,7 +11,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// <summary>
     /// Tests for notecard related functions in LSL
     /// </summary>
-    [TestFixture]
     public class LSL_ApiNotecardTests : OpenSimTestCase
     {
         private Scene m_scene;
@@ -37,7 +36,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -56,7 +54,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             m_lslApi.Initialize(m_engine, m_so.RootPart, m_scriptItem);
         }
 
-        [Test]
+        [Fact]
         public void TestLlGetNotecardLine()
         {
             TestHelpers.InMethod();
@@ -76,7 +74,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             AssertValidNotecardLine(ncItem.Name, -2, "");
         }
 
-        [Test]
+        [Fact]
         public void TestLlGetNotecardLine_NoNotecard()
         {
             TestHelpers.InMethod();
@@ -84,7 +82,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             AssertInValidNotecardLine("nc", 0);
         }
 
-        [Test]
+        [Fact]
         public void TestLlGetNotecardLine_NotANotecard()
         {
             TestHelpers.InMethod();
@@ -99,14 +97,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             string key = m_lslApi.llGetNotecardLine(ncName, lineNumber);
             Assert.That(key, Is.Not.EqualTo(UUID.Zero.ToString()));
 
-            Assert.That(m_engine.PostedEvents.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 
             List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-            Assert.That(events.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             EventParams eventParams = events[0];
 
-            Assert.That(eventParams.EventName, Is.EqualTo("dataserver"));
+            Assert.Equal(,);
             Assert.That(eventParams.Params[0].ToString(), Is.EqualTo(key));
             Assert.That(eventParams.Params[1].ToString(), Is.EqualTo(assertLine));
 
@@ -116,12 +114,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         private void AssertInValidNotecardLine(string ncName, int lineNumber)
         {
             string key = m_lslApi.llGetNotecardLine(ncName, lineNumber);
-            Assert.That(key, Is.EqualTo(UUID.Zero.ToString()));
+            Assert.Equal(,));
 
-            Assert.That(m_engine.PostedEvents.Count, Is.EqualTo(0));
+            Assert.Equal(,);
         }
 
-//        [Test]
+//        [Fact]
 //        public void TestLlReleaseUrl()
 //        {
 //            TestHelpers.InMethod();
@@ -176,7 +174,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //            }
 //        }
 //
-//        [Test]
+//        [Fact]
 //        public void TestLlRequestUrl()
 //        {
 //            TestHelpers.InMethod();
@@ -192,9 +190,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //                Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 //
 //                List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-//                Assert.That(events.Count, Is.EqualTo(1));
+//                Assert.Equal(,);
 //                EventParams eventParams = events[0];
-//                Assert.That(eventParams.EventName, Is.EqualTo("http_request"));
+//                Assert.Equal(,);
 //
 //                UUID returnKey;
 //                string rawReturnKey = eventParams.Params[0].ToString();
@@ -202,7 +200,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //                returnedUri = eventParams.Params[2].ToString();
 //
 //                Assert.That(UUID.TryParse(rawReturnKey, out returnKey), Is.True);
-//                Assert.That(method, Is.EqualTo(ScriptBaseClass.URL_REQUEST_GRANTED));
+//                Assert.Equal(,);
 //                Assert.That(Uri.IsWellFormedUriString(returnedUri, UriKind.Absolute), Is.True);
 //            }
 //
@@ -222,9 +220,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //                Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 //
 //                List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-//                Assert.That(events.Count, Is.EqualTo(1));
+//                Assert.Equal(,);
 //                EventParams eventParams = events[0];
-//                Assert.That(eventParams.EventName, Is.EqualTo("http_request"));
+//                Assert.Equal(,);
 //
 //                UUID returnKey;
 //                string rawReturnKey = eventParams.Params[0].ToString();
@@ -232,8 +230,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //                string body = eventParams.Params[2].ToString();
 //
 //                Assert.That(UUID.TryParse(rawReturnKey, out returnKey), Is.True);
-//                Assert.That(method, Is.EqualTo("GET"));
-//                Assert.That(body, Is.EqualTo(""));
+//                Assert.Equal(,);
+//                Assert.Equal(,);
 //            }
 //        }
 //

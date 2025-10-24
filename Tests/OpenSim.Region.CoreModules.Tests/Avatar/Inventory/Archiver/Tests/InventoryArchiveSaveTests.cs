@@ -35,13 +35,11 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 {
-    [TestFixture]
     public class InventoryArchiveSaveTests : InventoryArchiveTestCase
     {
         protected TestScene m_scene;
         protected InventoryArchiverModule m_archiverModule;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -59,7 +57,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
         /// <remarks>
         /// At the moment, the only thing that matters is that the control file is the very first one.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestOrder()
         {
             TestHelpers.InMethod();
@@ -71,7 +69,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             TarArchiveReader.TarEntryType tarEntryType;
 
             byte[] data = tar.ReadEntry(out filePath, out tarEntryType);
-            Assert.That(filePath, Is.EqualTo(ArchiveConstants.CONTROL_FILE_PATH));
+            Assert.Equal(,);
 
             InventoryArchiveReadRequest iarr
                 = new InventoryArchiveReadRequest(UUID.Random(), null, null, null, null, null, null, (Stream)null, false);
@@ -80,7 +78,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             Assert.That(iarr.ControlFileLoaded, Is.True);
         }
 
-        [Test]
+        [Fact]
         public void TestSaveRootFolderToIar()
         {
             TestHelpers.InMethod();
@@ -133,7 +131,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             Assert.That(gotObjectsFolder, Is.True);
         }
 
-        [Test]
+        [Fact]
         public void TestSaveNonRootFolderToIar()
         {
             TestHelpers.InMethod();
@@ -217,7 +215,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
         /// Test saving a single inventory item to an IAR
         /// (subject to change since there is no fixed format yet).
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSaveItemToIar()
         {
             TestHelpers.InMethod();
@@ -291,12 +289,12 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 //
 //                    if (fileName.StartsWith(part1.Name))
 //                    {
-                        Assert.That(expectedObject1FilePath, Is.EqualTo(filePath));
+                        Assert.Equal(,);
                         gotObject1File = true;
 //                    }
 //                    else if (fileName.StartsWith(part2.Name))
 //                    {
-//                        Assert.That(fileName, Is.EqualTo(expectedObject2FileName));
+//                        Assert.Equal(,);
 //                        gotObject2File = true;
 //                    }
                 }
@@ -312,7 +310,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
         /// <summary>
         /// Test saving a single inventory item to an IAR without its asset
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSaveItemToIarNoAssets()
         {
             TestHelpers.InMethod();
@@ -387,12 +385,12 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 //
 //                    if (fileName.StartsWith(part1.Name))
 //                    {
-                        Assert.That(expectedObject1FilePath, Is.EqualTo(filePath));
+                        Assert.Equal(,);
                         gotObject1File = true;
 //                    }
 //                    else if (fileName.StartsWith(part2.Name))
 //                    {
-//                        Assert.That(fileName, Is.EqualTo(expectedObject2FileName));
+//                        Assert.Equal(,);
 //                        gotObject2File = true;
 //                    }
                 }

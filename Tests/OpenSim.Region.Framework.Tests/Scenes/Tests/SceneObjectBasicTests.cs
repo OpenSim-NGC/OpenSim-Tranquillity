@@ -36,8 +36,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// </summary>
     public class SceneObjectBasicTests : OpenSimTestCase
     {
-//        [TearDown]
-//        public void TearDown()
+//        //        public void TearDown()
 //        {
 //            Console.WriteLine("TearDown");
 //            GC.Collect();
@@ -95,14 +94,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             //m_log.Debug("retrievedPart : {0}", retrievedPart);
             // If the parts have the same UUID then we will consider them as one and the same
             retrievedSo.PrimCount.Should().Be(partsToTestCount);
-            // Assert.That(retrievedSo.PrimCount, Is.EqualTo(partsToTestCount));
+            // Assert.Equal(,);
 
             for (int i = 0; i < partsToTestCount; i++)
             {
                 retrievedParts[i].Name.Should().Be(parts[i].Name); 
                 retrievedParts[i].UUID.Should().Be(parts[i].UUID);
-                //Assert.That(retrievedParts[i].Name, Is.EqualTo(parts[i].Name));
-                //Assert.That(retrievedParts[i].UUID, Is.EqualTo(parts[i].UUID));
+                //Assert.Equal(,);
+                //Assert.Equal(,);
             }
         }
 
@@ -136,8 +135,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             //m_log.Debug("retrievedPart : {0}", retrievedPart);
             // If the parts have the same UUID then we will consider them as one and the same
-            Assert.That(retrievedPart.Name, Is.EqualTo(obj1Name));
-            Assert.That(retrievedPart.UUID, Is.EqualTo(objUuid));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
@@ -198,7 +197,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(retrievedPartID);
 
-            Assert.That(retrievedPart, Is.Null);
+            Assert.Null();
         }
 
         /// <summary>
@@ -224,16 +223,16 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneObjectGroup sog = new SceneObjectGroup(rootPart);
             sog.AddPart(linkPart);
 
-            Assert.That(sog.UUID, Is.EqualTo(rootPartUuid));
-            Assert.That(sog.RootPart.UUID, Is.EqualTo(rootPartUuid));
-            Assert.That(sog.Parts.Length, Is.EqualTo(2));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             UUID newRootPartUuid = new UUID("00000000-0000-0000-0000-000000000002");
             sog.UUID = newRootPartUuid;
 
-            Assert.That(sog.UUID, Is.EqualTo(newRootPartUuid));
-            Assert.That(sog.RootPart.UUID, Is.EqualTo(newRootPartUuid));
-            Assert.That(sog.Parts.Length, Is.EqualTo(2));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
     }
 }

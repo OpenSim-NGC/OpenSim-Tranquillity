@@ -32,7 +32,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
-    [TestFixture]
     public class SceneObjectLinkingTests : OpenSimTestCase
     {
         private static readonly ILogger m_logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<SceneObjectLinkingTests>();
@@ -40,7 +39,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         /// <summary>
         /// Links to self should be ignored.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLinkToSelf()
         {
             TestHelpers.InMethod();
@@ -54,10 +53,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             scene.LinkObjects(ownerId, sog1.LocalId, new List<uint>() { sog1.Parts[1].LocalId });
 //            sog1.LinkToGroup(sog1);
 
-            Assert.That(sog1.Parts.Length, Is.EqualTo(nParts));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestLinkDelink2SceneObjects()
         {
             TestHelpers.InMethod();
@@ -84,12 +83,12 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             grp2.RootPart.ClearUpdateSchedule();
 
             // Link grp2 to grp1.   part2 becomes child prim to grp1. grp2 is eliminated.
-            Assert.IsFalse(grp1.GroupContainsForeignPrims);
+            Assert.False(grp1.GroupContainsForeignPrims);
             grp1.LinkToGroup(grp2);
-            Assert.IsTrue(grp1.GroupContainsForeignPrims);
+            Assert.True(grp1.GroupContainsForeignPrims);
 
             scene.Backup(true);
-            Assert.IsFalse(grp1.GroupContainsForeignPrims);
+            Assert.False(grp1.GroupContainsForeignPrims);
 
             // FIXME: Can't do this test yet since group 2 still has its root part!  We can't yet null this since
             // it might cause SOG.ProcessBackup() to fail due to the race condition.  This really needs to be fixed.
@@ -144,7 +143,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.NotNull(grp3);
         }
 
-        [Test]
+        [Fact]
         public void TestLinkDelink2groups4SceneObjects()
         {
             TestHelpers.InMethod();
@@ -278,7 +277,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         /// <summary>
         /// Test that a new scene object which is already linked is correctly persisted to the persistence layer.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestNewSceneObjectLinkPersistence()
         {
             TestHelpers.InMethod();
@@ -308,8 +307,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             List<SceneObjectGroup> storedObjects = scene.SimulationDataService.LoadObjects(scene.RegionInfo.RegionID);
 
-            Assert.That(storedObjects.Count, Is.EqualTo(1));
-            Assert.That(storedObjects[0].Parts.Length, Is.EqualTo(2));
+            Assert.Equal(,);
+            Assert.Equal(,);
             Assert.That(storedObjects[0].ContainsPart(rootPartUuid));
             Assert.That(storedObjects[0].ContainsPart(linkPartUuid));
         }
@@ -317,7 +316,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         /// <summary>
         /// Test that a delink of a previously linked object is correctly persisted to the database
         /// </summary>
-        [Test]
+        [Fact]
         public void TestDelinkPersistence()
         {
             TestHelpers.InMethod();
@@ -343,25 +342,25 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneObjectGroup sog = new SceneObjectGroup(rootPart);
             scene.AddNewSceneObject(sog, true);
 
-            Assert.IsFalse(sog.GroupContainsForeignPrims);
+            Assert.False(sog.GroupContainsForeignPrims);
             sog.LinkToGroup(linkGroup);
-            Assert.IsTrue(sog.GroupContainsForeignPrims);
+            Assert.True(sog.GroupContainsForeignPrims);
 
             scene.Backup(true);
-            Assert.AreEqual(1, scene.SimulationDataService.LoadObjects(scene.RegionInfo.RegionID).Count);
+            Assert.Equal(1, scene.SimulationDataService.LoadObjects(scene.RegionInfo.RegionID).Count);
 
             // These changes should occur immediately without waiting for a backup pass
             SceneObjectGroup groupToDelete = sog.DelinkFromGroup(linkPart, false);
-            Assert.IsFalse(groupToDelete.GroupContainsForeignPrims);
+            Assert.False(groupToDelete.GroupContainsForeignPrims);
 
 /* backup is async
             scene.DeleteSceneObject(groupToDelete, false);
 
             List<SceneObjectGroup> storedObjects = scene.SimulationDataService.LoadObjects(scene.RegionInfo.RegionID);
 
-            Assert.AreEqual(1, storedObjects.Count);
-            Assert.AreEqual(1, storedObjects[0].Parts.Length);
-            Assert.IsTrue(storedObjects[0].ContainsPart(rootPartUuid));
+            Assert.Equal(1, storedObjects.Count);
+            Assert.Equal(1, storedObjects[0].Parts.Length);
+            Assert.True(storedObjects[0].ContainsPart(rootPartUuid));
 */
         }
     }

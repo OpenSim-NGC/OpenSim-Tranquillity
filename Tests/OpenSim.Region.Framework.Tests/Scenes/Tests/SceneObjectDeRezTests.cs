@@ -42,7 +42,6 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// This is at a level above the SceneObjectBasicTests, which act on the scene directly.
     /// TODO: These tests are incomplete - need to test more kinds of derez (e.g. return object).
     /// </remarks>
-    [TestFixture]
     public class SceneObjectDeRezTests : OpenSimTestCase
     {
         [OneTimeSetUp]
@@ -66,7 +65,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         /// <summary>
         /// Test deleting an object from a scene.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestDeRezSceneObject()
         {
             TestHelpers.InMethod();
@@ -93,19 +92,19 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Check that object isn't deleted until we crank the sogd handle.
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(so.LocalId);
-//            Assert.That(retrievedPart, Is.Not.Null);
+//            Assert.NotNull();
 //            Assert.That(retrievedPart.ParentGroup.IsDeleted, Is.False);
 
             sogd.InventoryDeQueueAndDelete();
 
 //            SceneObjectPart retrievedPart2 = scene.GetSceneObjectPart(so.LocalId);
-            Assert.That(retrievedPart, Is.Null);
+            Assert.Null();
         }
 
         /// <summary>
         /// Test that child and root agents correctly receive KillObject notifications.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestDeRezSceneObjectToAgents()
         {
             TestHelpers.InMethod();
@@ -154,7 +153,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         /// <remarks>
         /// This test assumes that the deleter is not a god.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestDeRezSceneObjectNotOwner()
         {
             TestHelpers.InMethod();
@@ -186,13 +185,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Object should still be in the scene.
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(part.LocalId);
-            Assert.That(retrievedPart.UUID, Is.EqualTo(part.UUID));
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test deleting an object asynchronously to user inventory.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestDeleteSceneObjectAsyncToUserInventory()
         {
             TestHelpers.InMethod();
@@ -226,7 +225,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
 //            SceneObjectPart retrievedPart = scene.GetSceneObjectPart(so.LocalId);
 
-//            Assert.That(retrievedPart, Is.Not.Null);
+//            Assert.NotNull();
 //            Assert.That(so.IsDeleted, Is.False);
 
             sogd.InventoryDeQueueAndDelete();
@@ -234,7 +233,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.That(so.IsDeleted, Is.True);
 
             SceneObjectPart retrievedPart2 = scene.GetSceneObjectPart(so.LocalId);
-            Assert.That(retrievedPart2, Is.Null);
+            Assert.Null();
 
 //            SceneSetupHelpers.DeleteSceneObjectAsync(scene, part, DeRezAction.Take, userInfo.RootFolder.ID, client);
 
@@ -243,11 +242,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                     scene.InventoryService, ua.PrincipalID, "folder1/" + myObjectName);
 
             // Check that we now have the taken part in our inventory
-            Assert.That(retrievedItem, Is.Not.Null);
+            Assert.NotNull();
 
             // Check that the taken part has actually disappeared
 //            SceneObjectPart retrievedPart = scene.GetSceneObjectPart(part.LocalId);
-//            Assert.That(retrievedPart, Is.Null);
+//            Assert.Null();
         }
     }
 }

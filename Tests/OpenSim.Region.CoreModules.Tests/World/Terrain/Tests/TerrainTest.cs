@@ -26,7 +26,7 @@
  */
 
 using System;
-using NUnit.Framework;
+using Xunit;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.Terrain.PaintBrushes;
 using OpenSim.Region.Framework.Scenes;
@@ -34,10 +34,9 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.World.Terrain.Tests
 {
-    [TestFixture]
     public class TerrainTest : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void BrushTest()
         {
             int midRegion = (int)Constants.RegionSize / 2;
@@ -90,7 +89,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain.Tests
 //            Assert.That(map[0, midRegion] == 1.0, "Lower brush should not change value at this point (0,128).");
         }
 
-        [Test]
+        [Fact]
         public void TerrainChannelTest()
         {
             TerrainChannel x = new TerrainChannel((int)Constants.RegionSize, (int)Constants.RegionSize);

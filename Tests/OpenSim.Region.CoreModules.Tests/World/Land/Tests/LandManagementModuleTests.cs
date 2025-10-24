@@ -26,7 +26,7 @@
  */
 
 using System;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -36,7 +36,7 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
 {
     public class LandManagementModuleTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestAddLandObject()
         {
             TestHelpers.InMethod();
@@ -66,21 +66,21 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
 
             {
                 ILandObject loAtCoord = lmm.GetLandObject(0, 0);
-                Assert.That(loAtCoord.LandData.LocalID, Is.EqualTo(lo.LandData.LocalID));
-                Assert.That(loAtCoord.LandData.GlobalID, Is.EqualTo(lo.LandData.GlobalID));
+                Assert.Equal(,);
+                Assert.Equal(,);
             }
 
             {
                 ILandObject loAtCoord = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
-                Assert.That(loAtCoord.LandData.LocalID, Is.EqualTo(lo.LandData.LocalID));
-                Assert.That(loAtCoord.LandData.GlobalID, Is.EqualTo(lo.LandData.GlobalID));
+                Assert.Equal(,);
+                Assert.Equal(,);
             }
         }
 
         /// <summary>
         /// Test parcels on region when no land data exists to be loaded.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoadWithNoParcels()
         {
             TestHelpers.InMethod();
@@ -98,14 +98,14 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             Assert.That(loAtCoord1.LandData.GlobalID, Is.Not.EqualTo(UUID.Zero));
 
             ILandObject loAtCoord2 = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
-            Assert.That(loAtCoord2.LandData.LocalID, Is.EqualTo(loAtCoord1.LandData.LocalID));
-            Assert.That(loAtCoord2.LandData.GlobalID, Is.EqualTo(loAtCoord1.LandData.GlobalID));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test parcels on region when a single parcel already exists but it does not cover the whole region.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoadWithSinglePartialCoveringParcel()
         {
             TestHelpers.InMethod();
@@ -128,18 +128,18 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
 
             ILandObject loAtCoord1 = lmm.GetLandObject(0, 0);
-            Assert.That(loAtCoord1.LandData.Name, Is.EqualTo(originalLo1.LandData.Name));
-            Assert.That(loAtCoord1.LandData.GlobalID, Is.EqualTo(originalLo1.LandData.GlobalID));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             ILandObject loAtCoord2 = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
-            Assert.That(loAtCoord2.LandData.LocalID, Is.EqualTo(loAtCoord1.LandData.LocalID));
-            Assert.That(loAtCoord2.LandData.GlobalID, Is.EqualTo(loAtCoord1.LandData.GlobalID));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test parcels on region when a single parcel already exists but it does not cover the whole region.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoadWithMultiplePartialCoveringParcels()
         {
             TestHelpers.InMethod();
@@ -170,13 +170,13 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
 
             ILandObject loAtCoord1 = lmm.GetLandObject(0, 0);
-            Assert.That(loAtCoord1.LandData.Name, Is.EqualTo(originalLo1.LandData.Name));
-            Assert.That(loAtCoord1.LandData.GlobalID, Is.EqualTo(originalLo1.LandData.GlobalID));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             ILandObject loAtCoord2
                 = lmm.GetLandObject((int)Constants.RegionSize - 1, (((int)Constants.RegionSize / 4) * 3) - 1);
-            Assert.That(loAtCoord2.LandData.Name, Is.EqualTo(originalLo2.LandData.Name));
-            Assert.That(loAtCoord2.LandData.GlobalID, Is.EqualTo(originalLo2.LandData.GlobalID));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             ILandObject loAtCoord3 = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
             Assert.That(loAtCoord3.LandData.LocalID, Is.Not.EqualTo(loAtCoord1.LandData.LocalID));
@@ -188,7 +188,7 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
         /// <summary>
         /// Test parcels on region when whole region is parcelled (which should normally always be the case).
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoad()
         {
             TestHelpers.InMethod();
@@ -219,18 +219,18 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
 
             {
                 ILandObject loAtCoord = lmm.GetLandObject(0, 0);
-                Assert.That(loAtCoord.LandData.Name, Is.EqualTo(originalLo1.LandData.Name));
-                Assert.That(loAtCoord.LandData.GlobalID, Is.EqualTo(originalLo1.LandData.GlobalID));
+                Assert.Equal(,);
+                Assert.Equal(,);
             }
 
             {
                 ILandObject loAtCoord = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
-                Assert.That(loAtCoord.LandData.Name, Is.EqualTo(originalLo2.LandData.Name));
-                Assert.That(loAtCoord.LandData.GlobalID, Is.EqualTo(originalLo2.LandData.GlobalID));
+                Assert.Equal(,);
+                Assert.Equal(,);
             }
         }
 
-        [Test]
+        [Fact]
         public void TestSubdivide()
         {
             TestHelpers.InMethod();
@@ -258,8 +258,8 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
 
             {
                 ILandObject loAtCoord = lmm.GetLandObject(Constants.LandUnit, Constants.LandUnit);
-                Assert.That(loAtCoord.LandData.LocalID, Is.EqualTo(lo.LandData.LocalID));
-                Assert.That(loAtCoord.LandData.GlobalID, Is.EqualTo(lo.LandData.GlobalID));
+                Assert.Equal(,);
+                Assert.Equal(,);
             }
         }
     }

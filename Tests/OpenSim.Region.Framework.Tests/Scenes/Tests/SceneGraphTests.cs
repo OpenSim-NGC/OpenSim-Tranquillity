@@ -61,7 +61,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 = scene.SceneGraph.DuplicateObject(
                     part1.LocalId, new Vector3(10, 0, 0), ownerId, UUID.Zero, Quaternion.Identity, false);
             dupeSo.Parts.Length.Should().Be(2);
-            //Assert.That(dupeSo.Parts.Length, Is.EqualTo(2));
+            //Assert.Equal(,);
 
             SceneObjectPart dupePart1 = dupeSo.GetLinkNumPart(1);
             SceneObjectPart dupePart2 = dupeSo.GetLinkNumPart(2);
@@ -72,14 +72,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             dupePart1.Flags.Should().Be(part1.Flags);
             dupePart2.Flags.Should().Be(part2.Flags);
-            //Assert.That(dupePart1.Flags, Is.EqualTo(part1.Flags));
-            //Assert.That(dupePart2.Flags, Is.EqualTo(part2.Flags));
+            //Assert.Equal(,);
+            //Assert.Equal(,);
 
             /*
-            Assert.That(part1.PhysActor, Is.Not.Null);
-            Assert.That(part2.PhysActor, Is.Not.Null);
-            Assert.That(dupePart1.PhysActor, Is.Not.Null);
-            Assert.That(dupePart2.PhysActor, Is.Not.Null);
+            Assert.NotNull();
+            Assert.NotNull();
+            Assert.NotNull();
+            Assert.NotNull();
             */
         }
     }

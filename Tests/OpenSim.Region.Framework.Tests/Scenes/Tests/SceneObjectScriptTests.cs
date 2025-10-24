@@ -34,10 +34,9 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
-    [TestFixture]
     public class SceneObjectScriptTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestAddScript()
         {
             TestHelpers.InMethod();
@@ -58,14 +57,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             SceneObjectPart partWhereScriptAdded = scene.RezNewScript(userId, itemTemplate);
 
-            Assert.That(partWhereScriptAdded, Is.Not.Null);
+            Assert.NotNull();
 
             IEntityInventory primInventory = partWhereScriptAdded.Inventory;
             Assert.That(primInventory.GetInventoryList().Count, Is.EqualTo(1));
             Assert.That(primInventory.ContainsScripts(), Is.True);
 
             IList<TaskInventoryItem> primItems = primInventory.GetInventoryItems(itemName);
-            Assert.That(primItems.Count, Is.EqualTo(1));
+            Assert.Equal(,);
         }
     }
 }

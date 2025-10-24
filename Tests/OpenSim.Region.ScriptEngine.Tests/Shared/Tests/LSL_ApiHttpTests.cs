@@ -43,7 +43,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// <summary>
     /// Tests for HTTP related functions in LSL
     /// </summary>
-    [TestFixture]
     public class LSL_ApiHttpTests : OpenSimTestCase
     {
         private Scene m_scene;
@@ -69,7 +68,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -104,13 +102,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             m_lslApi.Initialize(m_engine, so.RootPart, m_scriptItem);
         }
 
-        [TearDown]
         public void TearDown()
         {
             MainServer.Instance.Stop();
         }
 
-        [Test]
+        [Fact]
         public void TestLlReleaseUrl()
         {
             TestHelpers.InMethod();
@@ -166,7 +163,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             }
         }
 
-        [Test]
+        [Fact]
         public void TestLlRequestUrl()
         {
             TestHelpers.InMethod();
@@ -182,9 +179,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 
                 List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-                Assert.That(events.Count, Is.EqualTo(1));
+                Assert.Equal(,);
                 EventParams eventParams = events[0];
-                Assert.That(eventParams.EventName, Is.EqualTo("http_request"));
+                Assert.Equal(,);
 
                 UUID returnKey;
                 string rawReturnKey = eventParams.Params[0].ToString();
@@ -192,7 +189,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 returnedUri = eventParams.Params[2].ToString();
 
                 Assert.That(UUID.TryParse(rawReturnKey, out returnKey), Is.True);
-                Assert.That(method, Is.EqualTo(ScriptBaseClass.URL_REQUEST_GRANTED));
+                Assert.Equal(,);
                 Assert.That(Uri.IsWellFormedUriString(returnedUri, UriKind.Absolute), Is.True);
             }
 
@@ -211,9 +208,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 
                 List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-                Assert.That(events.Count, Is.EqualTo(1));
+                Assert.Equal(,);
                 EventParams eventParams = events[0];
-                Assert.That(eventParams.EventName, Is.EqualTo("http_request"));
+                Assert.Equal(,);
 
                 UUID returnKey;
                 string rawReturnKey = eventParams.Params[0].ToString();
@@ -221,8 +218,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 string body = eventParams.Params[2].ToString();
 
                 Assert.That(UUID.TryParse(rawReturnKey, out returnKey), Is.True);
-                Assert.That(method, Is.EqualTo("GET"));
-                Assert.That(body, Is.EqualTo(""));
+                Assert.Equal(,);
+                Assert.Equal(,);
             }
         }
 

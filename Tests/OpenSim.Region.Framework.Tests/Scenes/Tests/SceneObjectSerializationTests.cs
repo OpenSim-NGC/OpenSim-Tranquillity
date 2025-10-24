@@ -31,7 +31,7 @@ using System.Reflection;
 using System.Threading;
 using System.Xml;
 using System.Linq;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization.External;
@@ -45,14 +45,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// <summary>
     /// Basic scene object serialization tests.
     /// </summary>
-    [TestFixture]
     public class SceneObjectSerializationTests : OpenSimTestCase
     {
 
         /// <summary>
         /// Serialize and deserialize.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSerialDeserial()
         {
             TestHelpers.InMethod();
@@ -75,7 +74,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.That(nodes.Count, Is.EqualTo(3), "SOG serialization resulted in wrong number of SOPs");
 
             SceneObjectGroup so2 = SceneObjectSerializer.FromXml2Format(xml);
-            Assert.IsNotNull(so2, "SOG deserialization resulted in null object");
+            Assert.NotNull(so2, "SOG deserialization resulted in null object");
             Assert.That(so2.Name == so.Name, "Name of deserialized object does not match original name");
             Assert.That(so2.Description == so.Description, "Description of deserialized object does not match original name");
         }
@@ -83,7 +82,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         /// <summary>
         /// This checks for a bug reported in mantis #7514
         /// </summary>
-        [Test]
+        [Fact]
         public void TestNamespaceAttribute()
         {
             TestHelpers.InMethod();
@@ -126,8 +125,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             }
 
             SceneObjectGroup so2 = SceneObjectSerializer.FromXml2Format(xml);
-            Assert.IsNotNull(so2, "SOG deserialization resulted in null object");
-            Assert.AreNotEqual(so.RootPart.CreatorIdentification, so2.RootPart.CreatorIdentification, "RewriteSOP failed to transform CreatorData.");
+            Assert.NotNull(so2, "SOG deserialization resulted in null object");
+            Assert.NotEqual(so.RootPart.CreatorIdentification, so2.RootPart.CreatorIdentification, "RewriteSOP failed to transform CreatorData.");
             Assert.That(so2.RootPart.CreatorIdentification.Contains("http://"), "RewriteSOP failed to add the homeURL to CreatorData");
         }
     }

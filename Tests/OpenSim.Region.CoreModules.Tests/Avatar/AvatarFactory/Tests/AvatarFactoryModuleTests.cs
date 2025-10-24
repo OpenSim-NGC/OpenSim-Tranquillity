@@ -33,13 +33,12 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
 {
-    [TestFixture]
     public class AvatarFactoryModuleTests : OpenSimTestCase
     {
         /// <summary>
         /// Only partial right now since we don't yet test that it's ended up in the avatar appearance service.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSetAppearance()
         {
             TestHelpers.InMethod();
@@ -82,10 +81,10 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
             eyesFace.TextureID = bakedTextureID;
             afm.SetAppearance(sp, bakedTextureEntry, visualParams, null);
 
-            Assert.That(rebakeRequestsReceived, Is.EqualTo(0));
+            Assert.Equal(,);
 
             AssetBase eyesBake = scene.AssetService.Get(bakedTextureID.ToString());
-            Assert.That(eyesBake, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(eyesBake.Temporary, Is.True);
             Assert.That(eyesBake.Local, Is.True);
         }
@@ -97,7 +96,7 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
         /// For a mesh avatar, it appears these 'baked textures' are used.  So these should not trigger a request to
         /// rebake.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestSetAppearanceAlphaBakedTextures()
         {
             TestHelpers.InMethod();
@@ -139,10 +138,10 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
             eyesFace.TextureID = alphaTextureID;
             afm.SetAppearance(sp, bakedTextureEntry, visualParams, null);
 
-            Assert.That(rebakeRequestsReceived, Is.EqualTo(0));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestSaveBakedTextures()
         {
             TestHelpers.InMethod();
@@ -185,7 +184,7 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
             assetCache.Clear();
 
             AssetBase eyesBake = scene.AssetService.Get(eyesTextureId.ToString());
-            Assert.That(eyesBake, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(eyesBake.Temporary, Is.False);
             Assert.That(eyesBake.Local, Is.False);
         }

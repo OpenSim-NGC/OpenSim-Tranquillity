@@ -23,7 +23,7 @@
  */
 
 using System;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.Estate;
@@ -41,13 +41,12 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// TODO: Tests which run through normal functionality.  Currently, the only test is one that checks behaviour
     /// in the case of an error condition
     /// </remarks>
-    [TestFixture]
     public class SceneTelehubTests : OpenSimTestCase
     {
         /// <summary>
         /// Test for desired behaviour when a telehub has no spawn points
         /// </summary>
-        [Test]
+        [Fact]
         public void TestNoTelehubSpawnPoints()
         {
             TestHelpers.InMethod();
@@ -80,7 +79,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         /// <summary>
         /// Test for desired behaviour when the scene object nominated as a telehub object does not exist.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestNoTelehubSceneObject()
         {
             TestHelpers.InMethod();

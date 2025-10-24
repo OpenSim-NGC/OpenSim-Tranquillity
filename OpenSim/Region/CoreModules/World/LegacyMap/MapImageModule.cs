@@ -47,7 +47,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         Ellipse
     }
 
-    public struct face
+    public struct Face
     {
         public Point[] pts;
     }
@@ -57,7 +57,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         public DrawRoutine dr;
 //        public Rectangle rect;
         public SolidBrush brush;
-        public face[] trns;
+        public Face[] trns;
     }
 
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "MapImageModule")]
@@ -550,7 +550,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                                         ds.brush = new SolidBrush(mapdotspot);
                                         //ds.rect = new Rectangle(mapdrawstartX, (255 - mapdrawstartY), mapdrawendX - mapdrawstartX, mapdrawendY - mapdrawstartY);
 
-                                        ds.trns = new face[FaceA.Length];
+                                        ds.trns = new Face[FaceA.Length];
 
                                         for (int i = 0; i < FaceA.Length; i++)
                                         {
@@ -561,7 +561,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                                             working[3] = project(hm, FaceC[i], axPos);
                                             working[4] = project(hm, FaceA[i], axPos);
 
-                                            face workingface = new face();
+                                            Face workingface = new Face();
                                             workingface.pts = working;
 
                                             ds.trns[i] = workingface;

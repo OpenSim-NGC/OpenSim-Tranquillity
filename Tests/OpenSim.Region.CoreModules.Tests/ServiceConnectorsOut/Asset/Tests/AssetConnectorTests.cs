@@ -30,10 +30,9 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
 {
-    [TestFixture]
     public class AssetConnectorTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestAddAsset()
         {
             TestHelpers.InMethod();
@@ -53,15 +52,15 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
             lasc.Store(a1);
 
             AssetBase retreivedA1 = lasc.Get(a1.ID);
-            Assert.That(retreivedA1.ID, Is.EqualTo(a1.ID));
-            Assert.That(retreivedA1.Metadata.ID, Is.EqualTo(a1.Metadata.ID));
-            Assert.That(retreivedA1.Data.Length, Is.EqualTo(a1.Data.Length));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             AssetMetadata retrievedA1Metadata = lasc.GetMetadata(a1.ID);
-            Assert.That(retrievedA1Metadata.ID, Is.EqualTo(a1.ID));
+            Assert.Equal(,);
 
             byte[] retrievedA1Data = lasc.GetData(a1.ID);
-            Assert.That(retrievedA1Data.Length, Is.EqualTo(a1.Data.Length));
+            Assert.Equal(,);
 
             // TODO: Add cache and check that this does receive a copy of the asset
         }
@@ -89,20 +88,20 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
             lasc.Store(a2);
 
             AssetBase retreivedA2 = lasc.Get(a2.ID);
-            Assert.That(retreivedA2.ID, Is.EqualTo(a2.ID));
-            Assert.That(retreivedA2.Metadata.ID, Is.EqualTo(a2.Metadata.ID));
-            Assert.That(retreivedA2.Data.Length, Is.EqualTo(a2.Data.Length));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             AssetMetadata retrievedA2Metadata = lasc.GetMetadata(a2.ID);
-            Assert.That(retrievedA2Metadata.ID, Is.EqualTo(a2.ID));
+            Assert.Equal(,);
 
             byte[] retrievedA2Data = lasc.GetData(a2.ID);
-            Assert.That(retrievedA2Data.Length, Is.EqualTo(a2.Data.Length));
+            Assert.Equal(,);
 
             // TODO: Add cache and check that this does receive a copy of the asset
         }
 
-        [Test]
+        [Fact]
         public void TestAddLocalAsset()
         {
             TestHelpers.InMethod();
@@ -130,7 +129,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
             // TODO: Add cache and check that this does receive a copy of the asset
         }
 
-        [Test]
+        [Fact]
         public void TestAddTemporaryLocalAsset()
         {
             TestHelpers.InMethod();

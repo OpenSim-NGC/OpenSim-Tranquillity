@@ -53,7 +53,6 @@ using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 namespace OpenSim.Region.ClientStack.Linden.Caps.Tests
 {
     /*
-    [TestFixture]
     public class WebFetchInvDescModuleTests : OpenSimTestCase
     {
         [TestFixtureSetUp]
@@ -72,7 +71,6 @@ namespace OpenSim.Region.ClientStack.Linden.Caps.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -89,7 +87,7 @@ namespace OpenSim.Region.ClientStack.Linden.Caps.Tests
             server.Start(false);
         }
 
-        [Test]
+        [Fact]
         public void TestInventoryDescendentsFetch()
         {
             TestHelpers.InMethod();

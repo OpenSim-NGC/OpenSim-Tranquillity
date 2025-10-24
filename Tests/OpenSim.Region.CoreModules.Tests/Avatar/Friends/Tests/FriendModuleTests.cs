@@ -33,7 +33,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
 {
-    [TestFixture]
     public class FriendsModuleTests : OpenSimTestCase
     {
         private FriendsModule m_fm;
@@ -55,7 +54,6 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [SetUp]
         public void Init()
         {
             // We must clear friends data between tests since Data.Null holds it in static properties.  This is necessary
@@ -77,7 +75,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
             SceneHelpers.SetupSceneModules(m_scene, config, m_fm);
         }
 
-        [Test]
+        [Fact]
         public void TestLoginWithNoFriends()
         {
             TestHelpers.InMethod();
@@ -91,7 +89,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
             Assert.That(((TestClient)sp.ControllingClient).ReceivedOnlineNotifications.Count, Is.EqualTo(0));
         }
 
-        [Test]
+        [Fact]
         public void TestLoginWithOfflineFriends()
         {
             TestHelpers.InMethod();
@@ -127,7 +125,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
             Assert.That(((TestClient)sp1Redux.ControllingClient).ReceivedOnlineNotifications.Count, Is.EqualTo(0));
         }
 
-        [Test]
+        [Fact]
         public void TestLoginWithOnlineFriends()
         {
             TestHelpers.InMethod();
@@ -161,7 +159,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
             Assert.That(((TestClient)sp2Redux.ControllingClient).ReceivedOnlineNotifications.Count, Is.EqualTo(1));
         }
 
-        [Test]
+        [Fact]
         public void TestAddFriendshipWhileOnline()
         {
             TestHelpers.InMethod();
@@ -181,7 +179,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
             Assert.That(((TestClient)sp.ControllingClient).ReceivedOnlineNotifications.Count, Is.EqualTo(1));
         }
 
-        [Test]
+        [Fact]
         public void TestRemoveFriendshipWhileOnline()
         {
             TestHelpers.InMethod();
@@ -197,8 +195,8 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
             m_fm.RemoveFriendship(sp.ControllingClient, user2Id);
 
             TestClient user1Client = sp.ControllingClient as TestClient;
-            Assert.That(user1Client.ReceivedFriendshipTerminations.Count, Is.EqualTo(1));
-            Assert.That(user1Client.ReceivedFriendshipTerminations[0], Is.EqualTo(user2Id));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
     }
 }

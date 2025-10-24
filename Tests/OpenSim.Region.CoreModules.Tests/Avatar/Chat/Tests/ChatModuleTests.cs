@@ -38,7 +38,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests
 {
-    [TestFixture]
     public class ChatModuleTests : OpenSimTestCase
     {
         [OneTimeSetUp]
@@ -91,7 +90,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests
         /// Really, this is a combination of a child agent position update test and a chat range test.  These need
         /// to be separated later on.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestInterRegionChatDistanceEastWest()
         {
             TestHelpers.InMethod();
@@ -149,11 +148,11 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests
             }
 
             // Check child positions are correct.
-            Assert.AreEqual(
+            Assert.Equal(
                 new Vector3(sp1Position.X + sceneEast.RegionInfo.RegionSizeX, sp1Position.Y, sp1Position.Z),
                 sp1ChildClient.SceneAgent.AbsolutePosition);
 
-            Assert.AreEqual(
+            Assert.Equal(
                 new Vector3(sp2Position.X - sceneWest.RegionInfo.RegionSizeX, sp2Position.Y, sp2Position.Z),
                 sp2ChildClient.SceneAgent.AbsolutePosition);
 
@@ -183,7 +182,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests
             }
 
             // Check child position is correct.
-            Assert.AreEqual(
+            Assert.Equal(
                 new Vector3(sp1Position.X + sceneEast.RegionInfo.RegionSizeX, sp1Position.Y, sp1Position.Z),
                 sp1ChildClient.SceneAgent.AbsolutePosition);
 
@@ -198,7 +197,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests
         /// Really, this is a combination of a child agent position update test and a chat range test.  These need
         /// to be separated later on.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestInterRegionChatDistanceNorthSouth()
         {
             TestHelpers.InMethod();
@@ -256,11 +255,11 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests
             }
 
             // Check child positions are correct.
-            Assert.AreEqual(
+            Assert.Equal(
                 new Vector3(sp1Position.X, sp1Position.Y - sceneNorth.RegionInfo.RegionSizeY, sp1Position.Z),
                 sp1ChildClient.SceneAgent.AbsolutePosition);
 
-            Assert.AreEqual(
+            Assert.Equal(
                 new Vector3(sp2Position.X, sp2Position.Y + sceneSouth.RegionInfo.RegionSizeY, sp2Position.Z),
                 sp2ChildClient.SceneAgent.AbsolutePosition);
 
@@ -284,7 +283,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests
             sceneSouth.Update(6);
 
             // Check child position is correct.
-            Assert.AreEqual(
+            Assert.Equal(
                 new Vector3(sp1Position.X, sp1Position.Y - sceneNorth.RegionInfo.RegionSizeY, sp1Position.Z),
                 sp1ChildClient.SceneAgent.AbsolutePosition);
 
@@ -298,7 +297,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests
 
             speakClient.Chat(0, ChatTypeEnum.Say, testMessage);
 
-            Assert.AreEqual(testMessage, receivedMessage);
+            Assert.Equal(testMessage, receivedMessage);
         }
 
         private void TestUserOutOfRange(TestClient speakClient, string testMessage, ref string receivedMessage)
@@ -307,7 +306,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests
 
             speakClient.Chat(0, ChatTypeEnum.Say, testMessage);
 
-            Assert.AreNotEqual(testMessage, receivedMessage);
+            Assert.NotEqual(testMessage, receivedMessage);
         }
     }
 }

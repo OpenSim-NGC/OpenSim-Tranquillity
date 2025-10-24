@@ -32,7 +32,7 @@ using System.Text;
 using System.Threading;
 using System.Timers;
 using Timer = System.Timers.Timer;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
@@ -49,10 +49,9 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
-    [TestFixture]
     public class ScenePresenceCapabilityTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestChildAgentSingleRegionCapabilities()
         {
             TestHelpers.InMethod();

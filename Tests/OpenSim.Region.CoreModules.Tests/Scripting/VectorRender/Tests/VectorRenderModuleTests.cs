@@ -33,7 +33,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Scripting.VectorRender.Tests
 {
-    [TestFixture]
     public class VectorRenderModuleTests : OpenSimTestCase
     {
         Scene m_scene;
@@ -55,7 +54,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender.Tests
             SceneHelpers.SetupSceneModules(m_scene, m_dtm, m_vrm);
         }
 
-        [Test]
+        [Fact]
         public void TestDraw()
         {
             TestHelpers.InMethod();
@@ -74,7 +73,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender.Tests
             Assert.That(originalTextureID, Is.Not.EqualTo(so.RootPart.Shape.Textures.GetFace(0).TextureID));
         }
 
-        [Test]
+        [Fact]
         public void TestRepeatSameDraw()
         {
             TestHelpers.InMethod();
@@ -103,7 +102,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender.Tests
             Assert.That(firstDynamicTextureID, Is.Not.EqualTo(so.RootPart.Shape.Textures.GetFace(0).TextureID));
         }
 
-        [Test]
+        [Fact]
         public void TestRepeatSameDrawDifferentExtraParams()
         {
             TestHelpers.InMethod();
@@ -132,7 +131,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender.Tests
             Assert.That(firstDynamicTextureID, Is.Not.EqualTo(so.RootPart.Shape.Textures.GetFace(0).TextureID));
         }
 
-        [Test]
+        [Fact]
         public void TestRepeatSameDrawContainingImage()
         {
             TestHelpers.InMethod();
@@ -162,7 +161,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender.Tests
             Assert.That(firstDynamicTextureID, Is.Not.EqualTo(so.RootPart.Shape.Textures.GetFace(0).TextureID));
         }
 
-        [Test]
+        [Fact]
         public void TestDrawReusingTexture()
         {
             TestHelpers.InMethod();
@@ -181,7 +180,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender.Tests
             Assert.That(originalTextureID, Is.Not.EqualTo(so.RootPart.Shape.Textures.GetFace(0).TextureID));
         }
 
-        [Test]
+        [Fact]
         public void TestRepeatSameDrawReusingTexture()
         {
             TestHelpers.InMethod();
@@ -219,7 +218,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender.Tests
         /// As we do not set DynamicTextureModule.ReuseLowDataTextures = true in this test, it should not reuse the
         /// texture
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestRepeatSameDrawLowDataTexture()
         {
             TestHelpers.InMethod();
@@ -249,7 +248,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender.Tests
             Assert.That(firstDynamicTextureID, Is.Not.EqualTo(so.RootPart.Shape.Textures.GetFace(0).TextureID));
         }
 
-        [Test]
+        [Fact]
         public void TestRepeatSameDrawDifferentExtraParamsReusingTexture()
         {
             TestHelpers.InMethod();
@@ -278,7 +277,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender.Tests
             Assert.That(firstDynamicTextureID, Is.Not.EqualTo(so.RootPart.Shape.Textures.GetFace(0).TextureID));
         }
 
-        [Test]
+        [Fact]
         public void TestRepeatSameDrawContainingImageReusingTexture()
         {
             TestHelpers.InMethod();

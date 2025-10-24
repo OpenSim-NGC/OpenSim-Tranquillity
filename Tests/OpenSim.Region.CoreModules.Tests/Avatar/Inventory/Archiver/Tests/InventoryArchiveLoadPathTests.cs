@@ -35,13 +35,12 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 {
-    [TestFixture]
     public class InventoryArchiveLoadPathTests : InventoryArchiveTestCase
     {
         /// <summary>
         /// Test loading an IAR to various different inventory paths.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoadIarToInventoryPaths()
         {
             TestHelpers.InMethod();
@@ -86,7 +85,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
         /// <summary>
         /// Test that things work when the load path specified starts with a slash
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLoadIarPathStartsWithSlash()
         {
             TestHelpers.InMethod();
@@ -107,7 +106,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             Assert.That(foundItem1, Is.Not.Null, "Didn't find loaded item 1 in TestLoadIarFolderStartsWithSlash()");
         }
 
-        [Test]
+        [Fact]
         public void TestLoadIarPathWithEscapedChars()
         {
             TestHelpers.InMethod();
@@ -193,7 +192,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
         /// <summary>
         /// Test replication of an archive path to the user's inventory.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestNewIarPath()
         {
             TestHelpers.InMethod();
@@ -225,12 +224,12 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 
                 List<InventoryFolderBase> folder1Candidates
                     = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, ua1.PrincipalID, folder1Name);
-                Assert.That(folder1Candidates.Count, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 InventoryFolderBase folder1 = folder1Candidates[0];
                 List<InventoryFolderBase> folder2aCandidates
                     = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, folder1, folder2aName);
-                Assert.That(folder2aCandidates.Count, Is.EqualTo(1));
+                Assert.Equal(,);
             }
 
             {
@@ -242,17 +241,17 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 
                 List<InventoryFolderBase> folder1Candidates
                     = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, ua1.PrincipalID, folder1Name);
-                Assert.That(folder1Candidates.Count, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 InventoryFolderBase folder1 = folder1Candidates[0];
 
                 List<InventoryFolderBase> folder2aCandidates
                     = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, folder1, folder2aName);
-                Assert.That(folder2aCandidates.Count, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 List<InventoryFolderBase> folder2bCandidates
                     = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, folder1, folder2bName);
-                Assert.That(folder2bCandidates.Count, Is.EqualTo(1));
+                Assert.Equal(,);
             }
         }
 
@@ -260,7 +259,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
         /// Test replication of a partly existing archive path to the user's inventory.  This should create
         /// a duplicate path without the merge option.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestPartExistingIarPath()
         {
             TestHelpers.InMethod();
@@ -288,7 +287,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 
             List<InventoryFolderBase> folder1PostCandidates
                 = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, ua1.PrincipalID, folder1ExistingName);
-            Assert.That(folder1PostCandidates.Count, Is.EqualTo(2));
+            Assert.Equal(,);
 
             // FIXME: Temporarily, we're going to do something messy to make sure we pick up the created folder.
             InventoryFolderBase folder1Post = null;
@@ -300,18 +299,18 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
                     break;
                 }
             }
-//            Assert.That(folder1Post.ID, Is.EqualTo(folder1.ID));
+//            Assert.Equal(,);
 
             List<InventoryFolderBase> folder2PostCandidates
                 = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, folder1Post, "b");
-            Assert.That(folder2PostCandidates.Count, Is.EqualTo(1));
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test replication of a partly existing archive path to the user's inventory.  This should create
         /// a merged path.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestMergeIarPath()
         {
             TestHelpers.InMethod();
@@ -339,12 +338,12 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 
             List<InventoryFolderBase> folder1PostCandidates
                 = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, ua1.PrincipalID, folder1ExistingName);
-            Assert.That(folder1PostCandidates.Count, Is.EqualTo(1));
-            Assert.That(folder1PostCandidates[0].ID, Is.EqualTo(folder1.ID));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             List<InventoryFolderBase> folder2PostCandidates
                 = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, folder1PostCandidates[0], "b");
-            Assert.That(folder2PostCandidates.Count, Is.EqualTo(1));
+            Assert.Equal(,);
         }
     }
 }

@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -37,11 +37,9 @@ namespace OpenSim.Tests.Permissions
     /// <summary>
     /// Basic scene object tests (create, read and delete but not update).
     /// </summary>
-    [TestFixture]
     public class DirectTransferTests
     {
 
-        [SetUp]
         public void SetUp()
         {
             // In case we're dealing with some older version of nunit
@@ -57,7 +55,7 @@ namespace OpenSim.Tests.Permissions
         /// <summary>
         /// Test giving simple objecta with various combinations of next owner perms.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestGiveBox()
         {
             TestHelpers.InMethod();
@@ -96,7 +94,7 @@ namespace OpenSim.Tests.Permissions
 
             SceneObjectGroup box = Common.TheScene.GetSceneObjectGroups().Find(sog => sog.OwnerID == Common.TheAvatars[1].UUID && sog.Name == name);
             Common.TheInstance.PrintPerms(box);
-            Assert.That(box, Is.Not.Null);
+            Assert.NotNull();
 
             // Check Owner permissions
             Common.TheInstance.AssertPermissions(mask, (PermissionMask)box.EffectiveOwnerPerms, box.OwnerID.ToString().Substring(34) + " : " + box.Name);
@@ -109,7 +107,7 @@ namespace OpenSim.Tests.Permissions
         /// <summary>
         /// Test giving simple objecta with variour combinations of next owner perms.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestDoubleGiveWithChange()
         {
             TestHelpers.InMethod();

@@ -30,7 +30,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using log4net;
 using Nini.Config;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.Avatar.Attachments;
@@ -45,7 +45,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.OptionalModules.World.NPC.Tests
 {
-    [TestFixture]
     public class NPCModuleTests : OpenSimTestCase
     {
         private TestScene m_scene;
@@ -91,7 +90,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             SceneHelpers.SetupSceneModules(m_scene, config, m_afMod, m_umMod, m_attMod, m_npcMod, new BasicInventoryAccessModule());
         }
 
-        [Test]
+        [Fact]
         public void TestCreate()
         {
             TestHelpers.InMethod();
@@ -118,8 +117,8 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
 
             ScenePresence npc = m_scene.GetScenePresence(npcId);
 
-            Assert.That(npc, Is.Not.Null);
-            Assert.That(npc.Appearance.Texture.FaceTextures[8].TextureID, Is.EqualTo(originalFace8TextureId));
+            Assert.NotNull();
+            Assert.Equal(,);
             Assert.That(m_umMod.GetUserName(npc.UUID), Is.EqualTo(string.Format("{0} {1}", npc.Firstname, npc.Lastname)));
 
             IClientAPI client;
@@ -129,7 +128,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             Assert.That(m_scene.AuthenticateHandler.GetAgentCircuits().Count, Is.EqualTo(2));
         }
 
-        [Test]
+        [Fact]
         public void TestRemove()
         {
             TestHelpers.InMethod();
@@ -147,7 +146,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
 
             ScenePresence deletedNpc = m_scene.GetScenePresence(npcId);
 
-            Assert.That(deletedNpc, Is.Null);
+            Assert.Null();
             IClientAPI client;
             Assert.That(m_scene.TryGetClient(npcId, out client), Is.False);
 
@@ -155,7 +154,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             Assert.That(m_scene.AuthenticateHandler.GetAgentCircuits().Count, Is.EqualTo(1));
         }
 
-        [Test]
+        [Fact]
         public void TestCreateWithAttachments()
         {
             TestHelpers.InMethod();
@@ -182,21 +181,21 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             // Check scene presence status
             Assert.That(npc.HasAttachments(), Is.True);
             List<SceneObjectGroup> attachments = npc.GetAttachments();
-            Assert.That(attachments.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             SceneObjectGroup attSo = attachments[0];
 
             // Just for now, we won't test the name since this is (wrongly) the asset part name rather than the item
             // name.  TODO: Do need to fix ultimately since the item may be renamed before being passed on to an NPC.
-//            Assert.That(attSo.Name, Is.EqualTo(attName));
+//            Assert.Equal(,);
 
             Assert.That(attSo.AttachmentPoint, Is.EqualTo((byte)AttachmentPoint.Chest));
             Assert.That(attSo.IsAttachment);
             Assert.That(attSo.UsesPhysics, Is.False);
             Assert.That(attSo.IsTemporary, Is.False);
-            Assert.That(attSo.OwnerID, Is.EqualTo(npc.UUID));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestCreateWithMultiAttachments()
         {
             TestHelpers.InMethod();
@@ -226,18 +225,18 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             // Check scene presence status
             Assert.That(npc.HasAttachments(), Is.True);
             List<SceneObjectGroup> attachments = npc.GetAttachments();
-            Assert.That(attachments.Count, Is.EqualTo(2));
+            Assert.Equal(,);
 
             // Just for now, we won't test the name since this is (wrongly) the asset part name rather than the item
             // name.  TODO: Do need to fix ultimately since the item may be renamed before being passed on to an NPC.
-//            Assert.That(attSo.Name, Is.EqualTo(attName));
+//            Assert.Equal(,);
 
             TestAttachedObject(attachments[0], AttachmentPoint.Chest, npc.UUID);
             TestAttachedObject(attachments[1], AttachmentPoint.Chest, npc.UUID);
 
             // Attached objects on the same point must have different FromItemIDs to be shown to other avatars, at least
             // on Singularity 1.8.5.  Otherwise, only one (the first ObjectUpdate sent) appears.
-            Assert.AreNotEqual(attachments[0].FromItemID, attachments[1].FromItemID);
+            Assert.NotEqual(attachments[0].FromItemID, attachments[1].FromItemID);
         }
 
         private void TestAttachedObject(SceneObjectGroup attSo, AttachmentPoint attPoint, UUID ownerId)
@@ -246,10 +245,10 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             Assert.That(attSo.IsAttachment);
             Assert.That(attSo.UsesPhysics, Is.False);
             Assert.That(attSo.IsTemporary, Is.False);
-            Assert.That(attSo.OwnerID, Is.EqualTo(ownerId));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestLoadAppearance()
         {
             TestHelpers.InMethod();
@@ -280,21 +279,21 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             // Check scene presence status
             Assert.That(npc.HasAttachments(), Is.True);
             List<SceneObjectGroup> attachments = npc.GetAttachments();
-            Assert.That(attachments.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             SceneObjectGroup attSo = attachments[0];
 
             // Just for now, we won't test the name since this is (wrongly) the asset part name rather than the item
             // name.  TODO: Do need to fix ultimately since the item may be renamed before being passed on to an NPC.
-//            Assert.That(attSo.Name, Is.EqualTo(attName));
+//            Assert.Equal(,);
 
             Assert.That(attSo.AttachmentPoint, Is.EqualTo((byte)AttachmentPoint.Chest));
             Assert.That(attSo.IsAttachment);
             Assert.That(attSo.UsesPhysics, Is.False);
             Assert.That(attSo.IsTemporary, Is.False);
-            Assert.That(attSo.OwnerID, Is.EqualTo(npc.UUID));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestMove()
         {
             TestHelpers.InMethod();
@@ -309,35 +308,35 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             UUID npcId = m_npcMod.CreateNPC("John", "Smith", startPos, UUID.Zero, true, m_scene, sp.Appearance);
 
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            Assert.That(npc.AbsolutePosition, Is.EqualTo(startPos));
+            Assert.Equal(,);
 
             // For now, we'll make the scene presence fly to simplify this test, but this needs to change.
             npc.Flying = true;
 
             m_scene.Update(1);
-            Assert.That(npc.AbsolutePosition, Is.EqualTo(startPos));
+            Assert.Equal(,);
 
             Vector3 targetPos = startPos + new Vector3(0, 10, 0);
             m_npcMod.MoveToTarget(npc.UUID, m_scene, targetPos, false, false, false);
 
-            Assert.That(npc.AbsolutePosition, Is.EqualTo(startPos));
-            //Assert.That(npc.Rotation, Is.EqualTo(new Quaternion(0, 0, 0.7071068f, 0.7071068f)));
+            Assert.Equal(,);
+            //Assert.Equal(,));
             Assert.That(
                 npc.Rotation, new QuaternionToleranceConstraint(new Quaternion(0, 0, 0.7071068f, 0.7071068f), 0.000001));
 
             m_scene.Update(1);
 
             // We should really check the exact figure.
-            Assert.That(npc.AbsolutePosition.X, Is.EqualTo(startPos.X));
+            Assert.Equal(,);
             Assert.That(npc.AbsolutePosition.Y, Is.GreaterThan(startPos.Y));
-            Assert.That(npc.AbsolutePosition.Z, Is.EqualTo(startPos.Z));
+            Assert.Equal(,);
             Assert.That(npc.AbsolutePosition.Z, Is.LessThan(targetPos.X));
 
             m_scene.Update(10);
 
             double distanceToTarget = Util.GetDistanceTo(npc.AbsolutePosition, targetPos);
             Assert.That(distanceToTarget, Is.LessThan(1), "NPC not within 1 unit of target position on first move");
-            Assert.That(npc.AbsolutePosition, Is.EqualTo(targetPos));
+            Assert.Equal(,);
             Assert.That(npc.AgentControlFlags, Is.EqualTo((uint)AgentManager.ControlFlags.NONE));
 
             // Try a second movement
@@ -345,8 +344,8 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             targetPos = startPos + new Vector3(10, 0, 0);
             m_npcMod.MoveToTarget(npc.UUID, m_scene, targetPos, false, false, false);
 
-            Assert.That(npc.AbsolutePosition, Is.EqualTo(startPos));
-//            Assert.That(npc.Rotation, Is.EqualTo(new Quaternion(0, 0, 0, 1)));
+            Assert.Equal(,);
+//            Assert.Equal(,));
             Assert.That(
                 npc.Rotation, new QuaternionToleranceConstraint(new Quaternion(0, 0, 0, 1), 0.000001));
 
@@ -355,17 +354,17 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             // We should really check the exact figure.
             Assert.That(npc.AbsolutePosition.X, Is.GreaterThan(startPos.X));
             Assert.That(npc.AbsolutePosition.X, Is.LessThan(targetPos.X));
-            Assert.That(npc.AbsolutePosition.Y, Is.EqualTo(startPos.Y));
-            Assert.That(npc.AbsolutePosition.Z, Is.EqualTo(startPos.Z));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             m_scene.Update(10);
 
             distanceToTarget = Util.GetDistanceTo(npc.AbsolutePosition, targetPos);
             Assert.That(distanceToTarget, Is.LessThan(1), "NPC not within 1 unit of target position on second move");
-            Assert.That(npc.AbsolutePosition, Is.EqualTo(targetPos));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestMoveInVarRegion()
         {
             TestHelpers.InMethod();
@@ -380,28 +379,28 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             UUID npcId = m_npcMod.CreateNPC("John", "Smith", startPos, UUID.Zero, true, m_scene, sp.Appearance);
 
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            Assert.That(npc.AbsolutePosition, Is.EqualTo(startPos));
+            Assert.Equal(,);
 
             // For now, we'll make the scene presence fly to simplify this test, but this needs to change.
             npc.Flying = true;
 
             m_scene.Update(1);
-            Assert.That(npc.AbsolutePosition, Is.EqualTo(startPos));
+            Assert.Equal(,);
 
             Vector3 targetPos = startPos + new Vector3(0, 20, 0);
             m_npcMod.MoveToTarget(npc.UUID, m_scene, targetPos, false, false, false);
 
-            Assert.That(npc.AbsolutePosition, Is.EqualTo(startPos));
-            //Assert.That(npc.Rotation, Is.EqualTo(new Quaternion(0, 0, 0.7071068f, 0.7071068f)));
+            Assert.Equal(,);
+            //Assert.Equal(,));
             Assert.That(
                 npc.Rotation, new QuaternionToleranceConstraint(new Quaternion(0, 0, 0.7071068f, 0.7071068f), 0.000001));
 
             m_scene.Update(1);
 
             // We should really check the exact figure.
-            Assert.That(npc.AbsolutePosition.X, Is.EqualTo(startPos.X));
+            Assert.Equal(,);
             Assert.That(npc.AbsolutePosition.Y, Is.GreaterThan(startPos.Y));
-            Assert.That(npc.AbsolutePosition.Z, Is.EqualTo(startPos.Z));
+            Assert.Equal(,);
             Assert.That(npc.AbsolutePosition.Z, Is.LessThan(targetPos.X));
 
             for (int i = 0; i < 20; i++)
@@ -412,11 +411,11 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
 
             double distanceToTarget = Util.GetDistanceTo(npc.AbsolutePosition, targetPos);
             Assert.That(distanceToTarget, Is.LessThan(1), "NPC not within 1 unit of target position on first move");
-            Assert.That(npc.AbsolutePosition, Is.EqualTo(targetPos));
+            Assert.Equal(,);
             Assert.That(npc.AgentControlFlags, Is.EqualTo((uint)AgentManager.ControlFlags.NONE));
         }
 
-        [Test]
+        [Fact]
         public void TestSitAndStandWithSitTarget()
         {
             TestHelpers.InMethod();
@@ -435,19 +434,19 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             part.SitTargetPosition = new Vector3(0, 0, 1);
             m_npcMod.Sit(npc.UUID, part.UUID, m_scene);
 
-            Assert.That(part.SitTargetAvatar, Is.EqualTo(npcId));
-            Assert.That(npc.ParentID, Is.EqualTo(part.LocalId));
+            Assert.Equal(,);
+            Assert.Equal(,);
 //            Assert.That(
 //                npc.AbsolutePosition,
 //                Is.EqualTo(part.AbsolutePosition + part.SitTargetPosition + ScenePresence.SIT_TARGET_ADJUSTMENT));
 
             m_npcMod.Stand(npc.UUID, m_scene);
 
-            Assert.That(part.SitTargetAvatar, Is.EqualTo(UUID.Zero));
-            Assert.That(npc.ParentID, Is.EqualTo(0));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestSitAndStandWithNoSitTarget()
         {
             TestHelpers.InMethod();
@@ -468,19 +467,17 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
 
             m_npcMod.Sit(npc.UUID, part.UUID, m_scene);
 
-            Assert.That(part.SitTargetAvatar, Is.EqualTo(UUID.Zero));
-            Assert.That(npc.ParentID, Is.EqualTo(part.LocalId));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             // We should really be using the NPC size but this would mean preserving the physics actor since it is
             // removed on sit.
-            Assert.That(
-                npc.AbsolutePosition,
-                Is.EqualTo(part.AbsolutePosition + new Vector3(0, 0, sp.PhysicsActor.Size.Z / 2)));
+            Assert.Equal(,));
 
             m_npcMod.Stand(npc.UUID, m_scene);
 
-            Assert.That(part.SitTargetAvatar, Is.EqualTo(UUID.Zero));
-            Assert.That(npc.ParentID, Is.EqualTo(0));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
     }
 }

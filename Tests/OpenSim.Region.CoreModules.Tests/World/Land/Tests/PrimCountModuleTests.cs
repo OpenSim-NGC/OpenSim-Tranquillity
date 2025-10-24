@@ -33,7 +33,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.World.Land.Tests
 {
-    [TestFixture]
     public class PrimCountModuleTests : OpenSimTestCase
     {
         protected UUID m_userId = new UUID("00000000-0000-0000-0000-100000000000");
@@ -52,7 +51,6 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
         /// </summary>
         protected ILandObject m_lo2;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -80,25 +78,25 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
         /// <summary>
         /// Test that counts before we do anything are correct.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestInitialCounts()
         {
             IPrimCounts pc = m_lo.PrimCounts;
 
-            Assert.That(pc.Owner, Is.EqualTo(0));
-            Assert.That(pc.Group, Is.EqualTo(0));
-            Assert.That(pc.Others, Is.EqualTo(0));
-            Assert.That(pc.Total, Is.EqualTo(0));
-            Assert.That(pc.Selected, Is.EqualTo(0));
-            Assert.That(pc.Users[m_userId], Is.EqualTo(0));
-            Assert.That(pc.Users[m_otherUserId], Is.EqualTo(0));
-            Assert.That(pc.Simulator, Is.EqualTo(0));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test count after a parcel owner owned object is added.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestAddOwnerObject()
         {
             TestHelpers.InMethod();
@@ -109,33 +107,33 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             SceneObjectGroup sog = SceneHelpers.CreateSceneObject(3, m_userId, "a", 0x01);
             m_scene.AddNewSceneObject(sog, false);
 
-            Assert.That(pc.Owner, Is.EqualTo(3));
-            Assert.That(pc.Group, Is.EqualTo(0));
-            Assert.That(pc.Others, Is.EqualTo(0));
-            Assert.That(pc.Total, Is.EqualTo(3));
-            Assert.That(pc.Selected, Is.EqualTo(0));
-            Assert.That(pc.Users[m_userId], Is.EqualTo(3));
-            Assert.That(pc.Users[m_otherUserId], Is.EqualTo(0));
-            Assert.That(pc.Simulator, Is.EqualTo(3));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             // Add a second object and retest
             SceneObjectGroup sog2 = SceneHelpers.CreateSceneObject(2, m_userId, "b", 0x10);
             m_scene.AddNewSceneObject(sog2, false);
 
-            Assert.That(pc.Owner, Is.EqualTo(5));
-            Assert.That(pc.Group, Is.EqualTo(0));
-            Assert.That(pc.Others, Is.EqualTo(0));
-            Assert.That(pc.Total, Is.EqualTo(5));
-            Assert.That(pc.Selected, Is.EqualTo(0));
-            Assert.That(pc.Users[m_userId], Is.EqualTo(5));
-            Assert.That(pc.Users[m_otherUserId], Is.EqualTo(0));
-            Assert.That(pc.Simulator, Is.EqualTo(5));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test count after a parcel owner owned copied object is added.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestCopyOwnerObject()
         {
             TestHelpers.InMethod();
@@ -147,21 +145,21 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             m_scene.AddNewSceneObject(sog, false);
             m_scene.SceneGraph.DuplicateObject(sog.LocalId, Vector3.Zero, m_userId, UUID.Zero, Quaternion.Identity, false);
 
-            Assert.That(pc.Owner, Is.EqualTo(6));
-            Assert.That(pc.Group, Is.EqualTo(0));
-            Assert.That(pc.Others, Is.EqualTo(0));
-            Assert.That(pc.Total, Is.EqualTo(6));
-            Assert.That(pc.Selected, Is.EqualTo(0));
-            Assert.That(pc.Users[m_userId], Is.EqualTo(6));
-            Assert.That(pc.Users[m_otherUserId], Is.EqualTo(0));
-            Assert.That(pc.Simulator, Is.EqualTo(6));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test that parcel counts update correctly when an object is moved between parcels, where that movement
         /// is not done directly by the user/
         /// </summary>
-        [Test]
+        [Fact]
         public void TestMoveOwnerObject()
         {
             TestHelpers.InMethod();
@@ -177,52 +175,52 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
 
             IPrimCounts pclo1 = m_lo.PrimCounts;
 
-            Assert.That(pclo1.Owner, Is.EqualTo(2));
-            Assert.That(pclo1.Group, Is.EqualTo(0));
-            Assert.That(pclo1.Others, Is.EqualTo(0));
-            Assert.That(pclo1.Total, Is.EqualTo(2));
-            Assert.That(pclo1.Selected, Is.EqualTo(0));
-            Assert.That(pclo1.Users[m_userId], Is.EqualTo(2));
-            Assert.That(pclo1.Users[m_otherUserId], Is.EqualTo(0));
-            Assert.That(pclo1.Simulator, Is.EqualTo(5));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             IPrimCounts pclo2 = m_lo2.PrimCounts;
 
-            Assert.That(pclo2.Owner, Is.EqualTo(3));
-            Assert.That(pclo2.Group, Is.EqualTo(0));
-            Assert.That(pclo2.Others, Is.EqualTo(0));
-            Assert.That(pclo2.Total, Is.EqualTo(3));
-            Assert.That(pclo2.Selected, Is.EqualTo(0));
-            Assert.That(pclo2.Users[m_userId], Is.EqualTo(3));
-            Assert.That(pclo2.Users[m_otherUserId], Is.EqualTo(0));
-            Assert.That(pclo2.Simulator, Is.EqualTo(5));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             // Now move it back again
             sog.AbsolutePosition = new Vector3(2, 2, 2);
 
-            Assert.That(pclo1.Owner, Is.EqualTo(5));
-            Assert.That(pclo1.Group, Is.EqualTo(0));
-            Assert.That(pclo1.Others, Is.EqualTo(0));
-            Assert.That(pclo1.Total, Is.EqualTo(5));
-            Assert.That(pclo1.Selected, Is.EqualTo(0));
-            Assert.That(pclo1.Users[m_userId], Is.EqualTo(5));
-            Assert.That(pclo1.Users[m_otherUserId], Is.EqualTo(0));
-            Assert.That(pclo1.Simulator, Is.EqualTo(5));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
-            Assert.That(pclo2.Owner, Is.EqualTo(0));
-            Assert.That(pclo2.Group, Is.EqualTo(0));
-            Assert.That(pclo2.Others, Is.EqualTo(0));
-            Assert.That(pclo2.Total, Is.EqualTo(0));
-            Assert.That(pclo2.Selected, Is.EqualTo(0));
-            Assert.That(pclo2.Users[m_userId], Is.EqualTo(0));
-            Assert.That(pclo2.Users[m_otherUserId], Is.EqualTo(0));
-            Assert.That(pclo2.Simulator, Is.EqualTo(5));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test count after a parcel owner owned object is removed.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestRemoveOwnerObject()
         {
             TestHelpers.InMethod();
@@ -235,17 +233,17 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             m_scene.AddNewSceneObject(sogToDelete, false);
             m_scene.DeleteSceneObject(sogToDelete, false);
 
-            Assert.That(pc.Owner, Is.EqualTo(1));
-            Assert.That(pc.Group, Is.EqualTo(0));
-            Assert.That(pc.Others, Is.EqualTo(0));
-            Assert.That(pc.Total, Is.EqualTo(1));
-            Assert.That(pc.Selected, Is.EqualTo(0));
-            Assert.That(pc.Users[m_userId], Is.EqualTo(1));
-            Assert.That(pc.Users[m_otherUserId], Is.EqualTo(0));
-            Assert.That(pc.Simulator, Is.EqualTo(1));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestAddGroupObject()
         {
             TestHelpers.InMethod();
@@ -259,24 +257,24 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             sog.GroupID = m_groupId;
             m_scene.AddNewSceneObject(sog, false);
 
-            Assert.That(pc.Owner, Is.EqualTo(0));
-            Assert.That(pc.Group, Is.EqualTo(3));
-            Assert.That(pc.Others, Is.EqualTo(0));
-            Assert.That(pc.Total, Is.EqualTo(3));
-            Assert.That(pc.Selected, Is.EqualTo(0));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             // Is this desired behaviour?  Not totally sure.
-            Assert.That(pc.Users[m_userId], Is.EqualTo(0));
-            Assert.That(pc.Users[m_groupId], Is.EqualTo(0));
-            Assert.That(pc.Users[m_otherUserId], Is.EqualTo(3));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
-            Assert.That(pc.Simulator, Is.EqualTo(3));
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test count after a parcel owner owned object is removed.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestRemoveGroupObject()
         {
             TestHelpers.InMethod();
@@ -294,18 +292,18 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             m_scene.AddNewSceneObject(sogToDelete, false);
             m_scene.DeleteSceneObject(sogToDelete, false);
 
-            Assert.That(pc.Owner, Is.EqualTo(0));
-            Assert.That(pc.Group, Is.EqualTo(1));
-            Assert.That(pc.Others, Is.EqualTo(0));
-            Assert.That(pc.Total, Is.EqualTo(1));
-            Assert.That(pc.Selected, Is.EqualTo(0));
-            Assert.That(pc.Users[m_userId], Is.EqualTo(1));
-            Assert.That(pc.Users[m_groupId], Is.EqualTo(0));
-            Assert.That(pc.Users[m_otherUserId], Is.EqualTo(0));
-            Assert.That(pc.Simulator, Is.EqualTo(1));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestAddOthersObject()
         {
             TestHelpers.InMethod();
@@ -316,17 +314,17 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             SceneObjectGroup sog = SceneHelpers.CreateSceneObject(3, m_otherUserId, "a", 0x01);
             m_scene.AddNewSceneObject(sog, false);
 
-            Assert.That(pc.Owner, Is.EqualTo(0));
-            Assert.That(pc.Group, Is.EqualTo(0));
-            Assert.That(pc.Others, Is.EqualTo(3));
-            Assert.That(pc.Total, Is.EqualTo(3));
-            Assert.That(pc.Selected, Is.EqualTo(0));
-            Assert.That(pc.Users[m_userId], Is.EqualTo(0));
-            Assert.That(pc.Users[m_otherUserId], Is.EqualTo(3));
-            Assert.That(pc.Simulator, Is.EqualTo(3));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestRemoveOthersObject()
         {
             TestHelpers.InMethod();
@@ -339,20 +337,20 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             m_scene.AddNewSceneObject(sogToDelete, false);
             m_scene.DeleteSceneObject(sogToDelete, false);
 
-            Assert.That(pc.Owner, Is.EqualTo(0));
-            Assert.That(pc.Group, Is.EqualTo(0));
-            Assert.That(pc.Others, Is.EqualTo(1));
-            Assert.That(pc.Total, Is.EqualTo(1));
-            Assert.That(pc.Selected, Is.EqualTo(0));
-            Assert.That(pc.Users[m_userId], Is.EqualTo(0));
-            Assert.That(pc.Users[m_otherUserId], Is.EqualTo(1));
-            Assert.That(pc.Simulator, Is.EqualTo(1));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test the count is correct after is has been tainted.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestTaint()
         {
             TestHelpers.InMethod();
@@ -363,14 +361,14 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
 
             m_pcm.TaintPrimCount();
 
-            Assert.That(pc.Owner, Is.EqualTo(3));
-            Assert.That(pc.Group, Is.EqualTo(0));
-            Assert.That(pc.Others, Is.EqualTo(0));
-            Assert.That(pc.Total, Is.EqualTo(3));
-            Assert.That(pc.Selected, Is.EqualTo(0));
-            Assert.That(pc.Users[m_userId], Is.EqualTo(3));
-            Assert.That(pc.Users[m_otherUserId], Is.EqualTo(0));
-            Assert.That(pc.Simulator, Is.EqualTo(3));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
     }
 }

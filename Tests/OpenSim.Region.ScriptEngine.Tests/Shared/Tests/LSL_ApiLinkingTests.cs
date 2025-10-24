@@ -29,7 +29,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.Assets;
 using OpenMetaverse.StructuredData;
@@ -52,14 +52,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// This relates to LSL.  Actual linking functionality should be tested in the main
     /// OpenSim.Region.Framework.Scenes.Tests.SceneObjectLinkingTests.
     /// </remarks>
-    [TestFixture]
     public class LSL_ApiLinkingTests : OpenSimTestCase
     {
         /*
         protected Scene m_scene;
         protected XEngine.XEngine m_engine;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -81,7 +79,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             m_engine.AddRegion(m_scene);
         }
 
-        [Test]
+        [Fact]
         public void TestllCreateLink()
         {
             TestHelpers.InMethod();
@@ -111,11 +109,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             apiGrp1.llCreateLink(grp2.UUID.ToString(), ScriptBaseClass.TRUE);
 
-            Assert.That(grp1.Parts.Length, Is.EqualTo(4));
+            Assert.Equal(,);
             Assert.That(grp2.IsDeleted, Is.True);
         }
 
-        [Test]
+        [Fact]
         public void TestllBreakLink()
         {
             TestHelpers.InMethod();
@@ -138,13 +136,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             apiGrp1.llBreakLink(2);
 
-            Assert.That(grp1.Parts.Length, Is.EqualTo(1));
+            Assert.Equal(,);
 
             SceneObjectGroup grp2 = m_scene.GetSceneObjectGroup("grp1-Part1");
-            Assert.That(grp2, Is.Not.Null);
+            Assert.NotNull();
         }
 
-        [Test]
+        [Fact]
         public void TestllBreakAllLinks()
         {
             TestHelpers.InMethod();
@@ -169,20 +167,20 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             {
                 SceneObjectGroup nowGrp = m_scene.GetSceneObjectGroup("grp1-Part1");
-                Assert.That(nowGrp, Is.Not.Null);
-                Assert.That(nowGrp.Parts.Length, Is.EqualTo(1));
+                Assert.NotNull();
+                Assert.Equal(,);
             }
 
             {
                 SceneObjectGroup nowGrp = m_scene.GetSceneObjectGroup("grp1-Part2");
-                Assert.That(nowGrp, Is.Not.Null);
-                Assert.That(nowGrp.Parts.Length, Is.EqualTo(1));
+                Assert.NotNull();
+                Assert.Equal(,);
             }
 
             {
                 SceneObjectGroup nowGrp = m_scene.GetSceneObjectGroup("grp1-Part3");
-                Assert.That(nowGrp, Is.Not.Null);
-                Assert.That(nowGrp.Parts.Length, Is.EqualTo(1));
+                Assert.NotNull();
+                Assert.Equal(,);
             }
         }
     }

@@ -33,7 +33,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
 {
-    [TestFixture]
     public class FetchInventory2HandlerTests : OpenSimTestCase
     {
         private UUID m_userID = UUID.Random();
@@ -96,7 +95,7 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
 
         }
 
-        [Test]
+        [Fact]
         public void Test_001_RequestOne()
         {
             TestHelpers.InMethod();
@@ -122,7 +121,7 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             Console.WriteLine(llsdresponse);
         }
 
-        [Test]
+        [Fact]
         public void Test_002_RequestMany()
         {
             TestHelpers.InMethod();

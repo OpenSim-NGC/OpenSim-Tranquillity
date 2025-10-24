@@ -39,7 +39,6 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// <summary>
     /// Teleport tests in a standalone OpenSim
     /// </summary>
-    [TestFixture]
     public class ScenePresenceTeleportTests : OpenSimTestCase
     {
         [OneTimeSetUp]
@@ -58,7 +57,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [Test]
+        [Fact]
         public void TestSameRegion()
         {
             TestHelpers.InMethod();
@@ -86,18 +85,18 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 teleportLookAt,
                 (uint)TeleportFlags.ViaLocation);
 
-            Assert.That(sp.AbsolutePosition, Is.EqualTo(teleportPosition));
+            Assert.Equal(,);
 
             Assert.That(scene.GetRootAgentCount(), Is.EqualTo(1));
             Assert.That(scene.GetChildAgentCount(), Is.EqualTo(0));
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.That(sp.Lookat, Is.EqualTo(teleportLookAt));
+//            Assert.Equal(,);
         }
 
 /*
-        [Test]
+        [Fact]
         public void TestSameSimulatorIsolatedRegionsV1()
         {
             TestHelpers.InMethod();
@@ -155,9 +154,9 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.That(sceneA.GetScenePresence(userId), Is.Null);
 
             ScenePresence sceneBSp = sceneB.GetScenePresence(userId);
-            Assert.That(sceneBSp, Is.Not.Null);
-            Assert.That(sceneBSp.Scene.RegionInfo.RegionName, Is.EqualTo(sceneB.RegionInfo.RegionName));
-            Assert.That(sceneBSp.AbsolutePosition, Is.EqualTo(teleportPosition));
+            Assert.NotNull();
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             Assert.That(sceneA.GetRootAgentCount(), Is.EqualTo(0));
             Assert.That(sceneA.GetChildAgentCount(), Is.EqualTo(0));
@@ -168,11 +167,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.That(sp.Lookat, Is.EqualTo(teleportLookAt));
+//            Assert.Equal(,);
         }
 */
 
-        [Test]
+        [Fact]
         public void TestSameSimulatorIsolatedRegionsV2()
         {
             TestHelpers.InMethod();
@@ -222,10 +221,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             sceneB.Update(4);
 
             ScenePresence sceneBSp = sceneB.GetScenePresence(userId);
-            Assert.That(sceneBSp, Is.Not.Null);
-            Assert.That(sceneBSp.Scene.RegionInfo.RegionName, Is.EqualTo(sceneB.RegionInfo.RegionName));
-            Assert.That(sceneBSp.AbsolutePosition.X, Is.EqualTo(teleportPosition.X));
-            Assert.That(sceneBSp.AbsolutePosition.Y, Is.EqualTo(teleportPosition.Y));
+            Assert.NotNull();
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             //Assert.That(sceneA.GetRootAgentCount(), Is.EqualTo(0));
             //Assert.That(sceneA.GetChildAgentCount(), Is.EqualTo(0));
@@ -236,13 +235,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-            //            Assert.That(sp.Lookat, Is.EqualTo(teleportLookAt));
+            //            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test teleport procedures when the target simulator returns false when queried about access.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSameSimulatorIsolatedRegions_DeniedOnQueryAccess()
         {
             TestHelpers.InMethod();
@@ -305,10 +304,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.That(sceneB.GetScenePresence(userId), Is.Null);
 
             ScenePresence sceneASp = sceneA.GetScenePresence(userId);
-            Assert.That(sceneASp, Is.Not.Null);
-            Assert.That(sceneASp.Scene.RegionInfo.RegionName, Is.EqualTo(sceneA.RegionInfo.RegionName));
-            Assert.That(sceneASp.AbsolutePosition.X, Is.EqualTo(preTeleportPosition.X));
-            Assert.That(sceneASp.AbsolutePosition.Y, Is.EqualTo(preTeleportPosition.Y));
+            Assert.NotNull();
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             Assert.That(sceneA.GetRootAgentCount(), Is.EqualTo(1));
             Assert.That(sceneA.GetChildAgentCount(), Is.EqualTo(0));
@@ -319,7 +318,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.That(sp.Lookat, Is.EqualTo(teleportLookAt));
+//            Assert.Equal(,);
 
 //            TestHelpers.DisableLogging();
         }
@@ -327,7 +326,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         /// <summary>
         /// Test teleport procedures when the target simulator create agent step is refused.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSameSimulatorIsolatedRegions_DeniedOnCreateAgent()
         {
             TestHelpers.InMethod();
@@ -388,10 +387,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.That(sceneB.GetScenePresence(userId), Is.Null);
 
             ScenePresence sceneASp = sceneA.GetScenePresence(userId);
-            Assert.That(sceneASp, Is.Not.Null);
-            Assert.That(sceneASp.Scene.RegionInfo.RegionName, Is.EqualTo(sceneA.RegionInfo.RegionName));
-            Assert.That(sceneASp.AbsolutePosition.X, Is.EqualTo(preTeleportPosition.X));
-            Assert.That(sceneASp.AbsolutePosition.Y, Is.EqualTo(preTeleportPosition.Y));
+            Assert.NotNull();
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             Assert.That(sceneA.GetRootAgentCount(), Is.EqualTo(1));
             Assert.That(sceneA.GetChildAgentCount(), Is.EqualTo(0));
@@ -402,7 +401,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.That(sp.Lookat, Is.EqualTo(teleportLookAt));
+//            Assert.Equal(,);
 
 //            TestHelpers.DisableLogging();
         }
@@ -415,7 +414,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         /// This could be quite a common case where the source region can connect to a remove destination region
         /// (for CreateAgent) but the viewer cannot reach the destination region due to network issues.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestSameSimulatorIsolatedRegions_DestinationDidNotProcessViewerConnection()
         {
             TestHelpers.InMethod();
@@ -482,10 +481,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.That(sceneB.GetScenePresence(userId), Is.Null);
 
             ScenePresence sceneASp = sceneA.GetScenePresence(userId);
-            Assert.That(sceneASp, Is.Not.Null);
-            Assert.That(sceneASp.Scene.RegionInfo.RegionName, Is.EqualTo(sceneA.RegionInfo.RegionName));
-            Assert.That(sceneASp.AbsolutePosition.X, Is.EqualTo(preTeleportPosition.X));
-            Assert.That(sceneASp.AbsolutePosition.Y, Is.EqualTo(preTeleportPosition.Y));
+            Assert.NotNull();
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             sceneA.SceneGraph.RecalculateStats();
             sceneB.SceneGraph.RecalculateStats();
@@ -498,13 +497,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.That(sp.Lookat, Is.EqualTo(teleportLookAt));
+//            Assert.Equal(,);
 
 //            TestHelpers.DisableLogging();
         }
 
 /*
-        [Test]
+        [Fact]
         public void TestSameSimulatorNeighbouringRegionsV1()
         {
             TestHelpers.InMethod();
@@ -548,11 +547,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             ScenePresence beforeSceneASp = SceneHelpers.AddScenePresence(sceneA, tc, acd);
             beforeSceneASp.AbsolutePosition = new Vector3(30, 31, 32);
 
-            Assert.That(beforeSceneASp, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(beforeSceneASp.IsChildAgent, Is.False);
 
             ScenePresence beforeSceneBSp = sceneB.GetScenePresence(userId);
-            Assert.That(beforeSceneBSp, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(beforeSceneBSp.IsChildAgent, Is.True);
 
             // In this case, we will not receieve a second InformClientOfNeighbour since the viewer already knows
@@ -567,14 +566,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             destinationTestClients[0].CompleteMovement();
 
             ScenePresence afterSceneASp = sceneA.GetScenePresence(userId);
-            Assert.That(afterSceneASp, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(afterSceneASp.IsChildAgent, Is.True);
 
             ScenePresence afterSceneBSp = sceneB.GetScenePresence(userId);
-            Assert.That(afterSceneBSp, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(afterSceneBSp.IsChildAgent, Is.False);
-            Assert.That(afterSceneBSp.Scene.RegionInfo.RegionName, Is.EqualTo(sceneB.RegionInfo.RegionName));
-            Assert.That(afterSceneBSp.AbsolutePosition, Is.EqualTo(teleportPosition));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             Assert.That(sceneA.GetRootAgentCount(), Is.EqualTo(0));
             Assert.That(sceneA.GetChildAgentCount(), Is.EqualTo(1));
@@ -585,13 +584,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.That(sp.Lookat, Is.EqualTo(teleportLookAt));
+//            Assert.Equal(,);
 
 //            TestHelpers.DisableLogging();
         }
 */
 
-        [Test]
+        [Fact]
         public void TestSameSimulatorNeighbouringRegionsV2()
         {
             TestHelpers.InMethod();
@@ -630,11 +629,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             sceneA.Update(4);
             sceneB.Update(4);
 
-            Assert.That(beforeSceneASp, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(beforeSceneASp.IsChildAgent, Is.False);
 
             ScenePresence beforeSceneBSp = sceneB.GetScenePresence(userId);
-            Assert.That(beforeSceneBSp, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(beforeSceneBSp.IsChildAgent, Is.True);
 
             // Here, we need to make clientA's receipt of SendRegionTeleport trigger clientB's CompleteMovement().  This
@@ -658,15 +657,15 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             sceneB.Update(4);
 
             ScenePresence afterSceneASp = sceneA.GetScenePresence(userId);
-            Assert.That(afterSceneASp, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(afterSceneASp.IsChildAgent, Is.True);
 
             ScenePresence afterSceneBSp = sceneB.GetScenePresence(userId);
-            Assert.That(afterSceneBSp, Is.Not.Null);
+            Assert.NotNull();
             Assert.That(afterSceneBSp.IsChildAgent, Is.False);
-            Assert.That(afterSceneBSp.Scene.RegionInfo.RegionName, Is.EqualTo(sceneB.RegionInfo.RegionName));
-            Assert.That(afterSceneBSp.AbsolutePosition.X, Is.EqualTo(teleportPosition.X));
-            Assert.That(afterSceneBSp.AbsolutePosition.Y, Is.EqualTo(teleportPosition.Y));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             Assert.That(sceneA.GetRootAgentCount(), Is.EqualTo(0));
             Assert.That(sceneA.GetChildAgentCount(), Is.EqualTo(1));
@@ -677,7 +676,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.That(sp.Lookat, Is.EqualTo(teleportLookAt));
+//            Assert.Equal(,);
 
 //            TestHelpers.DisableLogging();
         }

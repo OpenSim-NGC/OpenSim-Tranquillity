@@ -230,13 +230,21 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
                 {
                     try
                     {
-                        List<int> layerStarts;
+                        List<int> layerStarts = new List<int>();
                         using (MemoryStream ms = new MemoryStream(j2kData))
                         {
-                            layerStarts = CoreJ2K.J2kImage.GetLayerBoundaries(ms);
+                            // Use alternative method to get layer boundaries
+                            using (var image = CoreJ2K.J2kImage.FromStream(ms))
+                            {
+                                // Get layer count and positions from the image
+                                for (int i = 0; i < image.NumLayers; i++)
+                                {
+                                    layerStarts.Add(image.GetLayerPosition(i));
+                                }
+                            }
                         }
-
-                        if (layerStarts != null && layerStarts.Count > 0)
+                        
+                        if (layerStarts.Count > 0)
                         {
                             layers = new OpenJPEG.J2KLayerInfo[layerStarts.Count];
 

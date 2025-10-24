@@ -44,13 +44,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// <remarks>
     /// TODO: Add tests for all functions
     /// </remarks>
-    [TestFixture]
     public class OSSL_ApiAttachmentTests : OpenSimTestCase
     {
         protected Scene m_scene;
         protected XEngine.XEngine m_engine;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -77,7 +75,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             m_engine.AddRegion(m_scene);
         }
 
-        [Test]
+        [Fact]
         public void TestOsForceAttachToAvatarFromInventory()
         {
             TestHelpers.InMethod();
@@ -106,9 +104,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             // Check scene presence status
             Assert.That(sp.HasAttachments(), Is.True);
             List<SceneObjectGroup> attachments = sp.GetAttachments();
-            Assert.That(attachments.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             SceneObjectGroup attSo = attachments[0];
-            Assert.That(attSo.Name, Is.EqualTo(taskInvObjItemName));
+            Assert.Equal(,);
             Assert.That(attSo.AttachmentPoint, Is.EqualTo((uint)attachPoint));
             Assert.That(attSo.IsAttachment);
             Assert.That(attSo.UsesPhysics, Is.False);
@@ -116,14 +114,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Check appearance status
             List<AvatarAttachment> attachmentsInAppearance = sp.Appearance.GetAttachments();
-            Assert.That(attachmentsInAppearance.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             Assert.That(sp.Appearance.GetAttachpoint(attachmentsInAppearance[0].ItemID), Is.EqualTo((uint)attachPoint));
         }
 
         /// <summary>
         /// Make sure we can't force attach anything other than objects.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestOsForceAttachToAvatarFromInventoryNotObject()
         {
             TestHelpers.InMethod();
@@ -162,14 +160,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             // Check scene presence status
             Assert.That(sp.HasAttachments(), Is.False);
             List<SceneObjectGroup> attachments = sp.GetAttachments();
-            Assert.That(attachments.Count, Is.EqualTo(0));
+            Assert.Equal(,);
 
             // Check appearance status
             List<AvatarAttachment> attachmentsInAppearance = sp.Appearance.GetAttachments();
-            Assert.That(attachmentsInAppearance.Count, Is.EqualTo(0));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestOsForceAttachToOtherAvatarFromInventory()
         {
             TestHelpers.InMethod();
@@ -201,14 +199,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             // Check scene presence status
             Assert.That(sp.HasAttachments(), Is.False);
             List<SceneObjectGroup> attachments = sp.GetAttachments();
-            Assert.That(attachments.Count, Is.EqualTo(0));
+            Assert.Equal(,);
 
             Assert.That(sp2.HasAttachments(), Is.True);
             List<SceneObjectGroup> attachments2 = sp2.GetAttachments();
-            Assert.That(attachments2.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             SceneObjectGroup attSo = attachments2[0];
-            Assert.That(attSo.Name, Is.EqualTo(taskInvObjItemName));
-            Assert.That(attSo.OwnerID, Is.EqualTo(ua2.PrincipalID));
+            Assert.Equal(,);
+            Assert.Equal(,);
             Assert.That(attSo.AttachmentPoint, Is.EqualTo((uint)attachPoint));
             Assert.That(attSo.IsAttachment);
             Assert.That(attSo.UsesPhysics, Is.False);
@@ -216,10 +214,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Check appearance status
             List<AvatarAttachment> attachmentsInAppearance = sp.Appearance.GetAttachments();
-            Assert.That(attachmentsInAppearance.Count, Is.EqualTo(0));
+            Assert.Equal(,);
 
             List<AvatarAttachment> attachmentsInAppearance2 = sp2.Appearance.GetAttachments();
-            Assert.That(attachmentsInAppearance2.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             Assert.That(sp2.Appearance.GetAttachpoint(attachmentsInAppearance2[0].ItemID), Is.EqualTo((uint)attachPoint));
         }
     }
