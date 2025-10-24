@@ -24,7 +24,7 @@ jobs:
       run: dotnet restore ./OpenSim.sln
 
     - name: Build
-      run: dotnet build ./OpenSim.sln --configuration Release --no-restore
+      run: dotnet publish ./OpenSim.sln --configuration Release
 
     - name: Discover test projects
       id: find-tests
