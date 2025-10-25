@@ -935,5 +935,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
             vector osListAsVector(LSL_List src, int index);
         //ApiDesc Returns a rotation that is at index(>=0) in src or zero rotation if that is not a vector
       LSL_Rotation osListAsRotation(LSL_List src, int index);
+        //ApiDesc Returns a Perlin Noise2D 
+        LSL_Float osPerlinNoise2D(LSL_Float x, LSL_Float y, LSL_Integer octaves, LSL_Float persistence);
     }
 }
