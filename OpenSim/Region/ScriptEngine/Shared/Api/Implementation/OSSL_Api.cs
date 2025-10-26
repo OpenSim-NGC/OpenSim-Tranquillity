@@ -5182,6 +5182,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             m_SoundModule.PreloadSound(sop, soundID);
             ScriptSleep(1000);
         }
+		
+		public void osTriggerSoundAtPos(LSL_String sound, LSL_Vector position, LSL_Float gain)
+		{
+            if (m_SoundModule == null)
+                return;
+
+            UUID soundID = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, sound, AssetType.Sound);
+            if (soundID.IsZero()) 
+                return;
+
+            m_SoundModule.TriggerSound(soundID, m_host.OwnerID, m_host.UUID, UUID.Zero, gain, position, m_host.RegionHandle);
+        }
 
         // get only one part
         private SceneObjectPart GetSingleLinkPart(int linkType)
@@ -6315,6 +6327,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             m_envModule.StoreOnRegion(null);
             m_envModule.WindlightRefresh(transition);
             return 1;
+        }
+
+        public LSL_Float osPerlinNoise2D(LSL_Float x, LSL_Float y, LSL_Integer octaves, LSL_Float persistence)
+        {
+            return new LSL_Float(TerrainUtil.PerlinNoise2D(x, y, octaves, persistence));
         }
 
         public void osParticleSystem(LSL_List rules)
