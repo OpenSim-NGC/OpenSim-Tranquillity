@@ -741,7 +741,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
               void osTriggerSound(LSL_Integer linknum, LSL_String sound, LSL_Float volume);
         //ApiDesc Trigger a given preloaded sound with volume and axis-aligned bounding box for a given link.
               void osTriggerSoundLimited(LSL_Integer linknum, LSL_String sound, LSL_Float volume, vector top_north_east, vector bottom_south_west);
-
+        //ApiDesc Trigger a given preloaded sound at a position
+              void osTriggerSoundAtPos(LSL_String sound, vector position, LSL_Float gain);
         //ApiDesc Detected params return of triggered user event of their set country.
         LSL_String osDetectedCountry(LSL_Integer number);
         //ApiDesc Returns the country of a user.
@@ -934,5 +935,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
             vector osListAsVector(LSL_List src, int index);
         //ApiDesc Returns a rotation that is at index(>=0) in src or zero rotation if that is not a vector
       LSL_Rotation osListAsRotation(LSL_List src, int index);
+        //ApiDesc Returns a Perlin Noise2D 
+        LSL_Float osPerlinNoise2D(LSL_Float x, LSL_Float y, LSL_Integer octaves, LSL_Float persistence);
     }
 }
