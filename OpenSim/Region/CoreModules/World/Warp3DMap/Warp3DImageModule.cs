@@ -31,6 +31,7 @@ using System.Runtime;
 using CoreJ2K;
 using SkiaSharp;
 using System.IO;
+// System.Drawing usage is isolated in Warp3DBitmapShim.cs
 using Nini.Config;
 using log4net;
 using Warp3D;
@@ -270,21 +271,13 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
 
             renderer.Render();
 
-            Bitmap bitmap = renderer.Scene.getImage();
-
-            // Convert the renderer's System.Drawing.Bitmap to SKBitmap
+            // The Warp3D renderer returns a System.Drawing.Bitmap; convert it to SKBitmap
+            // via the shim which isolates System.Drawing usage.
+            object rendererBitmap = renderer.Scene.getImage();
             SKBitmap skbitmap = null;
             try
             {
-                if (bitmap != null)
-                {
-                    using (var ms = new MemoryStream())
-                    {
-                        bitmap.Save(ms, ImageFormat.Png);
-                        ms.Position = 0;
-                        skbitmap = SKBitmap.Decode(ms);
-                    }
-                }
+                skbitmap = Warp3DBitmapShim.BitmapToSKBitmap(rendererBitmap);
             }
             catch (Exception ex)
             {
@@ -303,20 +296,11 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             GC.WaitForPendingFinalizers();
             GC.Collect();
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
-            bitmap?.Dispose();
+            if (rendererBitmap is IDisposable d) d.Dispose();
             return skbitmap ?? new SKBitmap(viewWidth, viewHeight, SKColorType.Rgb888x, SKAlphaType.Opaque);
         }
 
-        // Helper: convert SKBitmap to System.Drawing.Bitmap
-        private Bitmap SKBitmapToBitmap(SKBitmap sk)
-        {
-            if (sk == null) return null;
-            using (SKImage img = SKImage.FromBitmap(sk))
-            using (SKData data = img.Encode(SKEncodedImageFormat.Png, 100))
-            {
-                return new Bitmap(new MemoryStream(data.ToArray()));
-            }
-        }
+        // Bitmap conversion logic moved to Warp3DBitmapShim.cs to centralize System.Drawing usage.
 
         // Helper: convert J2K bytes to SKBitmap via CoreJ2K
         private SKBitmap J2kBytesToSKBitmap(byte[] j2kData)
@@ -344,12 +328,8 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                 if (sk == null)
                     return null;
 
-                // Convert SKBitmap to System.Drawing.Bitmap for OpenJPEG encoder compatibility
-                using (Bitmap bmp = SKBitmapToBitmap(sk))
-                {
-                    if (bmp != null)
-                        return OpenJPEG.EncodeFromImage(bmp, false);
-                }
+                // Encode SKBitmap to JPEG2000 using the shim (which isolates System.Drawing usage).
+                return Warp3DBitmapShim.EncodeSKBitmapToJpeg2000(sk);
             }
             catch (Exception e)
             {
@@ -477,10 +457,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                         m_scene.AssetService, m_imgDecoder, m_textureTerrain, m_textureAverageTerrain,
                         twidth, twidth))
             {
-                using (Bitmap bmp = SKBitmapToBitmap(skImage))
-                {
-                    texture = new warp_Texture(bmp);
-                }
+                texture = Warp3DBitmapShim.CreateWarpTextureFromSKBitmap(skImage);
             }
 
             warp_Material material = new warp_Material(texture);
@@ -580,9 +557,12 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                             SKBitmap skSculpt = J2kBytesToSKBitmap(sculptAsset.Data);
                             if (skSculpt is not null)
                             {
-                                using (Bitmap bmp = SKBitmapToBitmap(skSculpt))
+                                using (var bmpObj = Warp3DBitmapShim.SKBitmapToBitmap(skSculpt))
                                 {
-                                    renderMesh = m_primMesher.GenerateFacetedSculptMesh(omvPrim, bmp, lod);
+                                    if (bmpObj is System.Drawing.Bitmap bmp)
+                                    {
+                                        renderMesh = m_primMesher.GenerateFacetedSculptMesh(omvPrim, bmp, lod);
+                                    }
                                 }
                             }
                             }
@@ -823,10 +803,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                     SKBitmap skImg = J2kBytesToSKBitmap(asset.Data);
                     if (skImg != null)
                     {
-                        using (Bitmap bmp = SKBitmapToBitmap(skImg))
-                        {
-                            ret = new warp_Texture(bmp, 8); // reduce textures size to 256 * 256
-                        }
+                        ret = Warp3DBitmapShim.CreateWarpTextureFromSKBitmap(skImg, 8); // reduce textures size to 256 * 256
                     }
                 }
                 catch (Exception e)
@@ -891,7 +868,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             ulong g = 0;
             ulong b = 0;
             ulong a = 0;
-            int pixelBytes;
+            // pixelBytes not required when using managed copies
 
             try
             {
@@ -910,19 +887,19 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                 int rowBytes = sk.RowBytes;
                 int npixels = width * height;
 
-                unsafe
+                // Copy pixels into managed array and iterate safely
+                byte[] buf = new byte[rowBytes * height];
+                System.Runtime.InteropServices.Marshal.Copy(pixels, buf, 0, buf.Length);
+                for (int y = 0; y < height; y++)
                 {
-                    byte* ptr = (byte*)pixels;
-                    for (int y = 0; y < height; y++)
+                    int rowStart = y * rowBytes;
+                    for (int x = 0; x < width; x++)
                     {
-                        byte* row = ptr + y * rowBytes;
-                        for (int x = 0; x < width; x++, row += 4)
-                        {
-                            b += row[0];
-                            g += row[1];
-                            r += row[2];
-                            a += row[3];
-                        }
+                        int idx = rowStart + x * 4;
+                        b += buf[idx + 0];
+                        g += buf[idx + 1];
+                        r += buf[idx + 2];
+                        a += buf[idx + 3];
                     }
                 }
 

@@ -25,18 +25,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System;
 using System.Reflection;
 using System.Text;
+using System.Runtime.InteropServices;
 using log4net;
 using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
+using OpenMetaverse.Assets;
 using OpenMetaverse.Imaging;
-using CoreJ2K;
 using SkiaSharp;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using System.Drawing;
 
 namespace OpenSim.Region.CoreModules.Agent.TextureSender
 {
@@ -69,8 +72,6 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
 
         #region ISharedRegionModule
 
-        private bool m_useCSJ2K = true;
-
         public string Name { get { return "J2KDecoderModule"; } }
 
         public J2KDecoderModule()
@@ -79,11 +80,6 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
 
         public void Initialise(IConfigSource source)
         {
-            IConfig startupConfig = source.Configs["Startup"];
-            if (startupConfig != null)
-            {
-                m_useCSJ2K = startupConfig.GetBoolean("UseCSJ2K", m_useCSJ2K);
-            }
         }
 
         public void AddRegion(Scene scene)
@@ -180,24 +176,77 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
 
         public SKImage DecodeToImage(byte[] j2kData)
         {
-//            if (m_useCSJ2K)
-//            { 
-                return J2kImage.FromBytes(j2kData).As<SKImage>();
-//            }
-/*
-            else
+            // Decode to ManagedImage using OpenJPEG
+            ManagedImage managedImage;
+            Image image = null;
+
+            try
             {
-                ManagedImage mimage;
-                Image image;
-                if (OpenJPEG.DecodeToImage(j2kData, out mimage, out image))
+                // Use OpenJPEG for decode 
+                if (!OpenJPEG.DecodeToImage(j2kData, out managedImage, out image))
                 {
-                    mimage = null;
-                    return image;
-                }
-                else
+                    m_log.Warn("[J2KDecoderModule]: OpenJPEG decode failed");
                     return null;
+                }
+
+                // Convert ManagedImage to SKImage
+                using (var bitmap = new SKBitmap(managedImage.Width, managedImage.Height))
+                {
+                    // Use the RGB data directly if available - check Red array length to determine if color
+                    if (managedImage.Red.Length == managedImage.Width * managedImage.Height)
+                    {
+                        using (var canvas = new SKCanvas(bitmap))
+                        {
+                            canvas.Clear(SKColors.Black);
+                            IntPtr pixelsHandle = bitmap.GetPixels();
+                            int bytesPerPixel = 4; // BGRA
+                            int stride = bitmap.RowBytes;
+
+                            for (int y = 0; y < managedImage.Height; y++)
+                            {
+                                for (int x = 0; x < managedImage.Width; x++)
+                                {
+                                    int i = y * managedImage.Width + x;
+                                    Marshal.WriteByte(pixelsHandle, y * stride + x * bytesPerPixel, managedImage.Blue[i]);      // B
+                                    Marshal.WriteByte(pixelsHandle, y * stride + x * bytesPerPixel + 1, managedImage.Green[i]); // G
+                                    Marshal.WriteByte(pixelsHandle, y * stride + x * bytesPerPixel + 2, managedImage.Red[i]);   // R
+                                    Marshal.WriteByte(pixelsHandle, y * stride + x * bytesPerPixel + 3, 255);                   // A
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Grayscale
+                        using (var canvas = new SKCanvas(bitmap))
+                        {
+                            canvas.Clear(SKColors.Black);
+                            IntPtr pixelsHandle = bitmap.GetPixels();
+                            int bytesPerPixel = 4; // BGRA
+                            int stride = bitmap.RowBytes;
+
+                            for (int y = 0; y < managedImage.Height; y++)
+                            {
+                                for (int x = 0; x < managedImage.Width; x++)
+                                {
+                                    byte gray = managedImage.Red[y * managedImage.Width + x]; // Use red as grayscale
+                                    Marshal.WriteByte(pixelsHandle, y * stride + x * bytesPerPixel, gray);     // B
+                                    Marshal.WriteByte(pixelsHandle, y * stride + x * bytesPerPixel + 1, gray); // G
+                                    Marshal.WriteByte(pixelsHandle, y * stride + x * bytesPerPixel + 2, gray); // R
+                                    Marshal.WriteByte(pixelsHandle, y * stride + x * bytesPerPixel + 3, 255);  // A
+                                }
+                            }
+                        }
+                    }
+                    return SKImage.FromBitmap(bitmap);
+                }
             }
-*/
+            finally
+            {
+#if WINDOWS
+                image?.Dispose(); // Only dispose System.Drawing.Image on Windows
+#endif
+            }
         }
 
 
@@ -217,74 +266,20 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
 //                "[J2KDecoderModule]: Doing J2K decoding of {0} bytes for asset {1}", j2kData.Length, assetID);
 
             bool decodedSuccessfully = true;
-
-            //int DecodeTime = 0;
-            //DecodeTime = Environment.TickCount;
-
-            // We don't get this from CSJ2K.  Is it relevant?
-            components = 0;
+            components = 0; // Not used by OpenJPEG decode path
 
             if (!TryLoadCacheForAsset(assetID, out layers))
             {
-                if (m_useCSJ2K)
+                if (!OpenJPEG.DecodeLayerBoundaries(j2kData, out layers, out components))
                 {
-                    try
-                    {
-                        List<int> layerStarts = new List<int>();
-                        using (MemoryStream ms = new MemoryStream(j2kData))
-                        {
-                            // Use alternative method to get layer boundaries
-                            using (var image = CoreJ2K.J2kImage.FromStream(ms))
-                            {
-                                // Get layer count and positions from the image
-                                for (int i = 0; i < image.NumLayers; i++)
-                                {
-                                    layerStarts.Add(image.GetLayerPosition(i));
-                                }
-                            }
-                        }
-                        
-                        if (layerStarts.Count > 0)
-                        {
-                            layers = new OpenJPEG.J2KLayerInfo[layerStarts.Count];
-
-                            for (int i = 0; i < layerStarts.Count; i++)
-                            {
-                                OpenJPEG.J2KLayerInfo layer = new OpenJPEG.J2KLayerInfo();
-
-                                if (i == 0)
-                                    layer.Start = 0;
-                                else
-                                    layer.Start = layerStarts[i];
-
-                                if (i == layerStarts.Count - 1)
-                                    layer.End = j2kData.Length;
-                                else
-                                    layer.End = layerStarts[i + 1] - 1;
-
-                                layers[i] = layer;
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        m_log.Warn("[J2KDecoderModule]: CSJ2K threw an exception decoding texture " + assetID + ": " + ex.Message);
-                        decodedSuccessfully = false;
-                    }
-                }
-                else
-                {
-                    if (!OpenJPEG.DecodeLayerBoundaries(j2kData, out layers, out components))
-                    {
-                        m_log.Warn("[J2KDecoderModule]: OpenJPEG failed to decode texture " + assetID);
-                        decodedSuccessfully = false;
-                    }
+                    m_log.Warn("[J2KDecoderModule]: OpenJPEG failed to decode texture " + assetID);
+                    decodedSuccessfully = false;
                 }
 
                 if (layers == null || layers.Length == 0)
                 {
-                    m_log.Warn("[J2KDecoderModule]: Failed to decode layer data for texture " + assetID + ", guessing sane defaults");
-                    // Layer decoding completely failed. Guess at sane defaults for the layer boundaries
+                    m_log.Warn("[J2KDecoderModule]: Failed to decode layer data for texture " + assetID + ", using sane defaults");
+                    // Layer decoding failed, use sensible defaults for progressive loading
                     layers = CreateDefaultLayers(j2kData.Length);
                     decodedSuccessfully = false;
                 }

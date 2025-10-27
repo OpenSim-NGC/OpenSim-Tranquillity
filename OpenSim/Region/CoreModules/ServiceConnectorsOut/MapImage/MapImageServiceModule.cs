@@ -44,6 +44,8 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+using SkiaSharp;
+using OpenSim.Region.CoreModules.World.Warp3DMap;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MapImage
 {
@@ -213,45 +215,59 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MapImage
             // mapTile.Save(   // DEBUG DEBUG
             //     String.Format("maptiles/raw-{0}-{1}-{2}.jpg", regionName, scene.RegionInfo.RegionLocX, scene.RegionInfo.RegionLocY),
             //     ImageFormat.Jpeg);
+            // Convert the incoming Bitmap to SKBitmap and use SK paths for encoding/upload.
+            SKBitmap skMap = Warp3DBitmapShim.BitmapToSKBitmap(mapTile);
+            if (skMap == null)
+            {
+                m_log.WarnFormat("{0} Failed to convert Bitmap to SKBitmap for upload", LogHeader);
+                return;
+            }
+
             // If the region/maptile is legacy sized, just upload the one tile like it has always been done
-            if (mapTile.Width == Constants.RegionSize && mapTile.Height == Constants.RegionSize)
+            if (skMap.Width == Constants.RegionSize && skMap.Height == Constants.RegionSize)
             {
                 m_log.DebugFormat("{0} Upload maptile for {1}", LogHeader, scene.Name);
-                ConvertAndUploadMaptile(scene, mapTile,
+                ConvertAndUploadMaptile(scene, skMap,
                                         scene.RegionInfo.RegionLocX, scene.RegionInfo.RegionLocY,
                                         scene.RegionInfo.RegionName);
             }
             else
             {
                 m_log.DebugFormat("{0} Upload {1} maptiles for {2}", LogHeader,
-                    (mapTile.Width * mapTile.Height) / (Constants.RegionSize * Constants.RegionSize),
+                    (skMap.Width * skMap.Height) / (Constants.RegionSize * Constants.RegionSize),
                     scene.Name);
 
                 // For larger regions (varregion) we must cut the region image into legacy sized
                 //    pieces since that is how the maptile system works.
                 // Note the assumption that varregions are always a multiple of legacy size.
-                for (uint xx = 0; xx < mapTile.Width; xx += Constants.RegionSize)
+                for (uint xx = 0; xx < (uint)skMap.Width; xx += Constants.RegionSize)
                 {
-                    for (uint yy = 0; yy < mapTile.Height; yy += Constants.RegionSize)
+                    for (uint yy = 0; yy < (uint)skMap.Height; yy += Constants.RegionSize)
                     {
                         // Images are addressed from the upper left corner so have to do funny
                         //     math to pick out the sub-tile since regions are numbered from
                         //     the lower left.
-                        Rectangle rect = new Rectangle(
-                            (int)xx,
-                            mapTile.Height - (int)yy - (int)Constants.RegionSize,
-                            (int)Constants.RegionSize, (int)Constants.RegionSize);
-                        using (Bitmap subMapTile = mapTile.Clone(rect, mapTile.PixelFormat))
+                        int left = (int)xx;
+                        int top = skMap.Height - (int)yy - (int)Constants.RegionSize;
+                        int tileW = (int)Constants.RegionSize;
+                        int tileH = (int)Constants.RegionSize;
+
+                        SKRectI subset = new SKRectI(left, top, left + tileW, top + tileH);
+                        SKBitmap subMapTile = new SKBitmap();
+                        if (!skMap.ExtractSubset(subMapTile, subset))
                         {
-                            if(!ConvertAndUploadMaptile(scene, subMapTile,
+                            m_log.WarnFormat("{0} Failed to extract sub-tile at {1},{2}", LogHeader, left, top);
+                            continue;
+                        }
+
+                        if (!ConvertAndUploadMaptile(scene, subMapTile,
                                                     scene.RegionInfo.RegionLocX + (xx / Constants.RegionSize),
                                                     scene.RegionInfo.RegionLocY + (yy / Constants.RegionSize),
                                                     scene.Name))
-                            {
-                                m_log.DebugFormat("{0} Upload maptileS for {1} aborted!", LogHeader, scene.Name);
-                                return; // abort rest;
-                            }
-                        }            
+                        {
+                            m_log.DebugFormat("{0} Upload maptileS for {1} aborted!", LogHeader, scene.Name);
+                            return; // abort rest;
+                        }
                     }
                 }
             }
@@ -272,9 +288,10 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MapImage
                 return;
             }
 
-            using (Bitmap mapTile = tileGenerator.CreateMapTile())
+            // New IMapImageGenerator returns an SKBitmap (SkiaSharp). Convert or pass through.
+            using (SKBitmap mapTile = tileGenerator.CreateMapTile())
             {
-                // XXX: The MapImageModule will return a null if the user has chosen not to create map tiles and there
+                // The MapImageModule will return a null if the user has chosen not to create map tiles and there
                 // is no static map tile.
                 if (mapTile == null)
                     return;
@@ -283,14 +300,50 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MapImage
             }
         }
 
-        private bool ConvertAndUploadMaptile(IScene scene, Image tileImage, uint locX, uint locY, string regionName)
+        /// <summary>
+        /// IMapImageUploadModule implementation for SKBitmap map tiles.
+        /// Converts SKBitmap to System.Drawing.Bitmap and calls the legacy upload routine.
+        /// </summary>
+        /// <param name="scene"></param>
+        /// <param name="mapTile"></param>
+        public void UploadMapTile(IScene scene, SKBitmap mapTile)
+        {
+            if (mapTile == null)
+            {
+                m_log.WarnFormat("{0} Cannot upload null image", LogHeader);
+                return;
+            }
+
+            // Convert to System.Drawing.Bitmap using the shim which isolates System.Drawing usage
+            using (var bmp = Warp3DBitmapShim.SKBitmapToBitmap(mapTile))
+            {
+                if (bmp == null)
+                {
+                    m_log.WarnFormat("{0} Failed converting SKBitmap to Bitmap for upload", LogHeader);
+                    return;
+                }
+
+                UploadMapTile(scene, bmp);
+            }
+        }
+
+        // New SKBitmap-based upload path using SkiaSharp for JPEG encoding.
+        private bool ConvertAndUploadMaptile(IScene scene, SKBitmap tileImage, uint locX, uint locY, string regionName)
         {
             byte[] jpgData = Utils.EmptyBytes;
 
-            using (MemoryStream stream = new MemoryStream())
+            try
             {
-                tileImage.Save(stream, ImageFormat.Jpeg);
-                jpgData = stream.ToArray();
+                using (SKImage img = SKImage.FromBitmap(tileImage))
+                using (SKData data = img.Encode(SKEncodedImageFormat.Jpeg, 95))
+                {
+                    jpgData = data.ToArray();
+                }
+            }
+            catch (Exception e)
+            {
+                m_log.WarnFormat("{0} Failed encoding SKBitmap to JPEG for region {1}: {2}", LogHeader, regionName, e.Message);
+                return false;
             }
 
             if (jpgData == Utils.EmptyBytes)
@@ -307,6 +360,18 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MapImage
                 return false;
             }
             return true;
+        }
+
+        // Backwards-compatible wrapper for Image-based callers: convert to SKBitmap and forward.
+        private bool ConvertAndUploadMaptile(IScene scene, Image tileImage, uint locX, uint locY, string regionName)
+        {
+            if (tileImage == null) return false;
+            SKBitmap sk = Warp3DBitmapShim.BitmapToSKBitmap(tileImage);
+            if (sk == null) return false;
+            using (sk)
+            {
+                return ConvertAndUploadMaptile(scene, sk, locX, locY, regionName);
+            }
         }
     }
 }

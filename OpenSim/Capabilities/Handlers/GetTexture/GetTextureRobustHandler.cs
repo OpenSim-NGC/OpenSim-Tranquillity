@@ -34,6 +34,8 @@ using System.Web;
 using log4net;
 using OpenMetaverse;
 using OpenMetaverse.Imaging;
+using CoreJ2K;
+using SkiaSharp;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
@@ -313,35 +315,112 @@ namespace OpenSim.Capabilities.Handlers
         {
             m_log.DebugFormat("[GETTEXTURE]: Converting texture {0} to {1}", texture.ID, format);
             byte[] data = Array.Empty<byte>();
-
-            MemoryStream imgstream = new MemoryStream();
-            Bitmap mTexture = null;
-            ManagedImage managedImage = null;
-            Image image = null;
-
+            // Try CSJ2K (CoreJ2K) first to get an SKImage
             try
             {
-                // Taking our jpeg2000 data, decoding it, then saving it to a byte array with regular data
-                // Decode image to System.Drawing.Image
-                if (OpenJPEG.DecodeToImage(texture.Data, out managedImage, out image) && image != null)
+                SKImage skImage = null;
+
+                try
                 {
-                    // Save to bitmap
-                    mTexture = new Bitmap(image);
+                    var j2k = J2kImage.FromBytes(texture.Data);
+                    if (j2k != null)
+                        skImage = j2k.As<SKImage>();
+                }
+                catch (Exception)
+                {
+                    // CSJ2K not available or failed, fall back to OpenJPEG
+                    skImage = null;
+                }
 
-                    using(EncoderParameters myEncoderParameters = new EncoderParameters())
+                // If CSJ2K didn't produce an SKImage, try OpenJPEG.DecodeToImage and construct SKImage from ManagedImage
+                if (skImage == null)
+                {
+                    ManagedImage managedImage = null;
+                    Image image = null;
+                    try
                     {
-                        myEncoderParameters.Param[0] = new EncoderParameter(Encoder.Quality,95L);
-
-                        // Save bitmap to stream
-                        ImageCodecInfo codec = GetEncoderInfo("image/" + format);
-                        if (codec != null)
+                        if (OpenJPEG.DecodeToImage(texture.Data, out managedImage, out image))
                         {
-                            mTexture.Save(imgstream, codec, myEncoderParameters);
-                            // Write the stream to a byte array for output
-                            data = imgstream.ToArray();
+                            // If OpenJPEG returned a System.Drawing.Image (legacy), try to load via Skia from a memory stream
+                            if (image != null)
+                            {
+                                using (var ms = new MemoryStream())
+                                {
+                                    // Save System.Drawing.Image to PNG in memory and decode with Skia
+                                    image.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                                    ms.Position = 0;
+                                    skImage = SKImage.FromEncodedData(ms);
+                                }
+                            }
+                            else if (managedImage != null)
+                            {
+                                // Build an SKPixmap from managedImage RGB channels
+                                int w = managedImage.Width;
+                                int h = managedImage.Height;
+                                var pix = new byte[w * h * 4];
+                                for (int i = 0; i < w * h; i++)
+                                {
+                                    byte r = managedImage.Red != null && managedImage.Red.Length > i ? managedImage.Red[i] : (byte)0;
+                                    byte g = managedImage.Green != null && managedImage.Green.Length > i ? managedImage.Green[i] : (byte)0;
+                                    byte b = managedImage.Blue != null && managedImage.Blue.Length > i ? managedImage.Blue[i] : (byte)0;
+                                    pix[i * 4 + 0] = r;
+                                    pix[i * 4 + 1] = g;
+                                    pix[i * 4 + 2] = b;
+                                    pix[i * 4 + 3] = 255;
+                                }
+
+                                var info = new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Opaque);
+                                using (var bitmap = new SKBitmap(info))
+                                {
+                                    // Copy pixels into SKBitmap (safe, no pointers)
+                                    IntPtr dst = bitmap.GetPixels();
+                                    System.Runtime.InteropServices.Marshal.Copy(pix, 0, dst, pix.Length);
+                                    skImage = SKImage.FromBitmap(bitmap);
+                                }
+                            }
                         }
-                        else
-                            m_log.WarnFormat("[GETTEXTURE]: No such codec {0}", format);
+                    }
+                    finally
+                    {
+                        if (image != null)
+                            image.Dispose();
+
+                        if (managedImage != null)
+                            managedImage.Clear();
+                    }
+                }
+
+                if (skImage != null)
+                {
+                    SKEncodedImageFormat encFormat = SKEncodedImageFormat.Jpeg;
+                    int quality = 95;
+
+                    switch (format?.ToLowerInvariant())
+                    {
+                        case "png":
+                            encFormat = SKEncodedImageFormat.Png;
+                            break;
+                        case "jpg":
+                        case "jpeg":
+                            encFormat = SKEncodedImageFormat.Jpeg;
+                            break;
+                        case "webp":
+                            encFormat = SKEncodedImageFormat.Webp;
+                            break;
+                        case "gif":
+                            // SkiaSharp doesn't encode GIF; fall back to PNG
+                            encFormat = SKEncodedImageFormat.Png;
+                            break;
+                        default:
+                            // default to JPEG for unknown types
+                            encFormat = SKEncodedImageFormat.Jpeg;
+                            break;
+                    }
+
+                    using (var encoded = skImage.Encode(encFormat, quality))
+                    {
+                        if (encoded != null)
+                            data = encoded.ToArray();
                     }
                 }
             }
@@ -349,37 +428,8 @@ namespace OpenSim.Capabilities.Handlers
             {
                 m_log.WarnFormat("[GETTEXTURE]: Unable to convert texture {0} to {1}: {2}", texture.ID, format, e.Message);
             }
-            finally
-            {
-                // Reclaim memory, these are unmanaged resources
-                // If we encountered an exception, one or more of these will be null
-                if (mTexture != null)
-                    mTexture.Dispose();
-
-                if (image != null)
-                    image.Dispose();
-
-                if(managedImage != null)
-                    managedImage.Clear();
-
-                if (imgstream != null)
-                    imgstream.Dispose();
-            }
 
             return data;
-        }
-
-        // From msdn
-        private static ImageCodecInfo GetEncoderInfo(String mimeType)
-        {
-            ImageCodecInfo[] encoders;
-            encoders = ImageCodecInfo.GetImageEncoders();
-            for (int j = 0; j < encoders.Length; ++j)
-            {
-                if (encoders[j].MimeType == mimeType)
-                    return encoders[j];
-            }
-            return null;
         }
     }
 }
