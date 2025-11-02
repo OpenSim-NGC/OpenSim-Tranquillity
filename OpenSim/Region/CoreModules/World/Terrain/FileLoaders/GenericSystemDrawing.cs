@@ -26,8 +26,7 @@
  */
 
 using System;
-using System.Drawing;
-using System.Drawing.Imaging;
+using SkiaSharp;
 using System.IO;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -51,29 +50,45 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
 
         /// <summary>
         /// Loads a file from a specified filename on the disk,
-        /// parses the image using the System.Drawing parsers
+        /// parses the image using SkiaSharp
         /// then returns a terrain channel. Values are
-        /// returned based on HSL brightness between 0m and 128m
+        /// returned based on brightness between 0m and 128m
         /// </summary>
         /// <param name="filename">The target image to load</param>
         /// <returns>A terrain channel generated from the image.</returns>
         public virtual ITerrainChannel LoadFile(string filename)
         {
-            using(Bitmap b = new Bitmap(filename))
-                return LoadBitmap(b);
+            using (var bitmap = SKBitmap.Decode(filename))
+            {
+                if (bitmap == null)
+                    throw new IOException($"Failed to load image from {filename}");
+                return LoadBitmap(bitmap);
+            }
         }
 
         public virtual ITerrainChannel LoadFile(string filename, int offsetX, int offsetY, int fileWidth, int fileHeight, int w, int h)
         {
-            using (Bitmap bitmap = new Bitmap(filename))
+            using (var bitmap = SKBitmap.Decode(filename))
             {
+                if (bitmap == null)
+                    throw new IOException($"Failed to load image from {filename}");
+                    
                 ITerrainChannel retval = new TerrainChannel(w, h);
 
                 for (int x = 0; x < retval.Width; x++)
                 {
                     for (int y = 0; y < retval.Height; y++)
                     {
-                        retval[x, y] = bitmap.GetPixel(offsetX * retval.Width + x, (bitmap.Height - (retval.Height * (offsetY + 1))) + retval.Height - y - 1).GetBrightness() * 128;
+                        int pixelX = offsetX * retval.Width + x;
+                        int pixelY = (bitmap.Height - (retval.Height * (offsetY + 1))) + retval.Height - y - 1;
+                        
+                        if (pixelX >= 0 && pixelX < bitmap.Width && pixelY >= 0 && pixelY < bitmap.Height)
+                        {
+                            SKColor pixel = bitmap.GetPixel(pixelX, pixelY);
+                            // Get brightness: (0.299*R + 0.587*G + 0.114*B) / 255
+                            float brightness = (0.299f * pixel.Red + 0.587f * pixel.Green + 0.114f * pixel.Blue) / 255f;
+                            retval[x, y] = brightness * 128;
+                        }
                     }
                 }
 
@@ -83,11 +98,15 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
 
         public virtual ITerrainChannel LoadStream(Stream stream)
         {
-            using (Bitmap b = new Bitmap(stream))
-                return LoadBitmap(b);
+            using (var bitmap = SKBitmap.Decode(stream))
+            {
+                if (bitmap == null)
+                    throw new IOException("Failed to decode image from stream");
+                return LoadBitmap(bitmap);
+            }
         }
 
-        protected virtual ITerrainChannel LoadBitmap(Bitmap bitmap)
+        protected virtual ITerrainChannel LoadBitmap(SKBitmap bitmap)
         {
             ITerrainChannel retval = new TerrainChannel(bitmap.Width, bitmap.Height);
 
@@ -97,7 +116,10 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
                 int y;
                 for (y = 0; y < bitmap.Height; y++)
                 {
-                    retval[x, y] = bitmap.GetPixel(x, bitmap.Height - y - 1).GetBrightness() * 128;
+                    SKColor pixel = bitmap.GetPixel(x, bitmap.Height - y - 1);
+                    // Calculate brightness: (0.299*R + 0.587*G + 0.114*B) / 255
+                    float brightness = (0.299f * pixel.Red + 0.587f * pixel.Green + 0.114f * pixel.Blue) / 255f;
+                    retval[x, y] = brightness * 128;
                 }
             }
 
@@ -105,25 +127,38 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
         }
 
         /// <summary>
-        /// Exports a file to a image on the disk using a System.Drawing exporter.
+        /// Exports a file to a image on the disk using SkiaSharp.
         /// </summary>
         /// <param name="filename">The target filename</param>
         /// <param name="map">The terrain channel being saved</param>
         public virtual void SaveFile(string filename, ITerrainChannel map)
         {
-            using(Bitmap colours = CreateGrayscaleBitmapFromMap(map))
-                colours.Save(filename,ImageFormat.Png);
+            using (var bitmap = CreateGrayscaleBitmapFromMap(map))
+            {
+                using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+                {
+                    using (var file = File.Create(filename))
+                    {
+                        data.SaveTo(file);
+                    }
+                }
+            }
         }
 
         /// <summary>
-        /// Exports a stream using a System.Drawing exporter.
+        /// Exports a stream using SkiaSharp.
         /// </summary>
         /// <param name="stream">The target stream</param>
         /// <param name="map">The terrain channel being saved</param>
         public virtual void SaveStream(Stream stream, ITerrainChannel map)
         {
-            using(Bitmap colours = CreateGrayscaleBitmapFromMap(map))
-                colours.Save(stream,ImageFormat.Png);
+            using (var bitmap = CreateGrayscaleBitmapFromMap(map))
+            {
+                using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+                {
+                    data.SaveTo(stream);
+                }
+            }
         }
 
         public virtual void SaveFile(ITerrainChannel m_channel, string filename,
@@ -136,58 +171,72 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
             // "Saving the image to the same file it was constructed from is not allowed and throws an exception."
             string tempName = Path.GetTempFileName();
 
-            Bitmap existingBitmap = null;
-            Bitmap thisBitmap = null;
-            Bitmap newBitmap = null;
+            SKBitmap existingBitmap = null;
+            SKBitmap thisBitmap = null;
+            SKBitmap newBitmap = null;
 
             try
             {
                 if (File.Exists(filename))
                 {
                     File.Copy(filename, tempName, true);
-                    existingBitmap = new Bitmap(tempName);
-                    if (existingBitmap.Width != fileWidth * regionSizeX || existingBitmap.Height != fileHeight * regionSizeY)
+                    existingBitmap = SKBitmap.Decode(tempName);
+                    if (existingBitmap == null || existingBitmap.Width != fileWidth * regionSizeX || existingBitmap.Height != fileHeight * regionSizeY)
                     {
                         // old file, let's overwrite it
-                        newBitmap = new Bitmap(fileWidth * regionSizeX, fileHeight * regionSizeY);
+                        existingBitmap?.Dispose();
+                        newBitmap = new SKBitmap(fileWidth * regionSizeX, fileHeight * regionSizeY);
                     }
                     else
                     {
                         newBitmap = existingBitmap;
+                        existingBitmap = null;
                     }
                 }
                 else
                 {
-                    newBitmap = new Bitmap(fileWidth * regionSizeX, fileHeight * regionSizeY);
+                    newBitmap = new SKBitmap(fileWidth * regionSizeX, fileHeight * regionSizeY);
                 }
 
                 thisBitmap = CreateGrayscaleBitmapFromMap(m_channel);
-                //            Console.WriteLine("offsetX=" + offsetX + " offsetY=" + offsetY);
+                
                 for (int x = 0; x < regionSizeX; x++)
+                {
                     for (int y = 0; y < regionSizeY; y++)
-                        newBitmap.SetPixel(x + offsetX * regionSizeX, y + (fileHeight - 1 - offsetY) * regionSizeY, thisBitmap.GetPixel(x, y));
+                    {
+                        int destX = x + offsetX * regionSizeX;
+                        int destY = y + (fileHeight - 1 - offsetY) * regionSizeY;
+                        
+                        if (destX >= 0 && destX < newBitmap.Width && destY >= 0 && destY < newBitmap.Height)
+                        {
+                            SKColor sourcePixel = thisBitmap.GetPixel(x, y);
+                            newBitmap.SetPixel(destX, destY, sourcePixel);
+                        }
+                    }
+                }
 
                 Save(newBitmap, filename);
             }
             finally
             {
-                if (existingBitmap != null)
-                    existingBitmap.Dispose();
-
-                if (thisBitmap != null)
-                    thisBitmap.Dispose();
-
-                if (newBitmap != null)
-                    newBitmap.Dispose();
+                existingBitmap?.Dispose();
+                thisBitmap?.Dispose();
+                newBitmap?.Dispose();
 
                 if (File.Exists(tempName))
                     File.Delete(tempName);
             }
         }
 
-        protected virtual void Save(Bitmap bmp, string filename)
+        protected virtual void Save(SKBitmap bitmap, string filename)
         {
-            bmp.Save(filename, ImageFormat.Png);
+            using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+            {
+                using (var file = File.Create(filename))
+                {
+                    data.SaveTo(file);
+                }
+            }
         }
 
         #endregion
@@ -205,22 +254,22 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
 
         /// <summary>
         /// Protected method, generates a grayscale bitmap
-        /// image from a specified terrain channel.
+        /// image from a specified terrain channel using SkiaSharp.
         /// </summary>
         /// <param name="map">The terrain channel to export to bitmap</param>
-        /// <returns>A System.Drawing.Bitmap containing a grayscale image</returns>
-        protected static Bitmap CreateGrayscaleBitmapFromMap(ITerrainChannel map)
+        /// <returns>A SkiaSharp.SKBitmap containing a grayscale image</returns>
+        protected static SKBitmap CreateGrayscaleBitmapFromMap(ITerrainChannel map)
         {
-            //            Bitmap bmp = new Bitmap(map.Width, map.Height, PixelFormat.Format24bppRgb);
-            Bitmap bmp = new Bitmap(map.Width, map.Height);
+            SKBitmap bmp = new SKBitmap(map.Width, map.Height);
 
+            const int palette = 256;
 
-            const int pallete = 256;
-
-            Color[] grays = new Color[pallete];
+            // Create grayscale color palette (0-255 gray values)
+            SKColor[] grays = new SKColor[palette];
             for (int i = 0; i < grays.Length; i++)
             {
-                grays[i] = Color.FromArgb(i, i, i);
+                // RGBA format: (R, G, B, A)
+                grays[i] = new SKColor((byte)i, (byte)i, (byte)i, 255);
             }
 
             for (int y = 0; y < map.Height; y++)
@@ -237,8 +286,9 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
                     // clamp it not adding the red warning
                     if (colorindex < 0)
                         colorindex = 0;
-                    else if (colorindex >= pallete)
-                        colorindex = pallete - 1;
+                    else if (colorindex >= palette)
+                        colorindex = palette - 1;
+                    
                     bmp.SetPixel(x, map.Height - y - 1, grays[colorindex]);
                 }
             }
