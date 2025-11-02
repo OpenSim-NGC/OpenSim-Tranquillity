@@ -27,7 +27,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -304,7 +303,7 @@ namespace OpenSim.Region.Framework.Scenes
         private float m_damage = -1.0f;
         private byte[] m_TextureAnimation;
         private byte m_clickAction;
-        private Color m_color = Color.Black;
+        private uint m_textColorArgb = 0xFF000000; // Default to black, ARGB format
         private List<uint> m_lastColliders = new List<uint>();
         private bool m_lastLandCollide;
         private int m_linkNum;
@@ -1078,20 +1077,20 @@ namespace OpenSim.Region.Framework.Scenes
         }
 
         /// <value>
-        /// Text color.
+        /// Text color as ARGB packed integer.
         /// </value>
-        public Color Color
+        public uint Color
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_color; }
+            get { return m_textColorArgb; }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set { m_color = value; }
+            set { m_textColorArgb = value; }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int TextColorArgb()
         {
-            return m_color.ToArgb();
+            return (int)m_textColorArgb;
         }
 
         public osUTF8 osUTF8Text;

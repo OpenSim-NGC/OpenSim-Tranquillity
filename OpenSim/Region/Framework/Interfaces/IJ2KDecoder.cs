@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Drawing;
 using OpenMetaverse;
 using OpenMetaverse.Imaging;
 using SkiaSharp;

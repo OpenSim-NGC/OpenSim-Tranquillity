@@ -8,8 +8,10 @@
     <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
   </PropertyGroup>
   <PropertyGroup>      
+
     <MSBuildProjectExtensionsPath>$(SolutionDir)/obj/$(Configuration)/$(MSBuildProjectName)/</MSBuildProjectExtensionsPath>
     <IntermediateOutputPath>$(SolutionDir)/obj/$(Configuration)/$(MSBuildProjectName)/</IntermediateOutputPath>
+
     <OutputPath>$(SolutionDir)/build/$(Configuration)/$(AssemblyName)/</OutputPath>
     <OutDir>$(OutputPath)</OutDir>
   </PropertyGroup>
@@ -26,7 +28,7 @@
          the SkiaSharp migration is in progress. This helps compilation across the solution.
          Note: System.Drawing.Common may have platform-specific runtime requirements (libgdiplus on Linux).
     -->
-    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+    <!-- <PackageReference Include="System.Drawing.Common" Version="8.0.0" /> -->
   </ItemGroup>
 
 </Project>

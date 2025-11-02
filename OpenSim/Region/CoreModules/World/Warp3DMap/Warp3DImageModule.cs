@@ -271,17 +271,24 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
 
             renderer.Render();
 
-            // The Warp3D renderer returns a System.Drawing.Bitmap; convert it to SKBitmap
-            // via the shim which isolates System.Drawing usage.
+            // The Warp3D renderer may return SKBitmap (when using the source-built Warp3D)
+            // or System.Drawing.Bitmap (when using the prebuilt binary). Handle both.
             object rendererBitmap = renderer.Scene.getImage();
             SKBitmap skbitmap = null;
-            try
+            if (rendererBitmap is SKBitmap skb)
             {
-                skbitmap = Warp3DBitmapShim.BitmapToSKBitmap(rendererBitmap);
+                skbitmap = skb;
             }
-            catch (Exception ex)
+            else
             {
-                m_log.WarnFormat("[Warp3D] failed converting rendered image to SKBitmap: {0}", ex.Message);
+                try
+                {
+                    skbitmap = Warp3DBitmapShim.BitmapToSKBitmap(rendererBitmap);
+                }
+                catch (Exception ex)
+                {
+                    m_log.WarnFormat("[Warp3D] failed converting rendered image to SKBitmap: {0}", ex.Message);
+                }
             }
 
             renderer.Scene.destroy();
@@ -296,7 +303,6 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             GC.WaitForPendingFinalizers();
             GC.Collect();
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
-            if (rendererBitmap is IDisposable d) d.Dispose();
             return skbitmap ?? new SKBitmap(viewWidth, viewHeight, SKColorType.Rgb888x, SKAlphaType.Opaque);
         }
 

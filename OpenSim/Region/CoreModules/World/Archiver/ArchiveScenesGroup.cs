@@ -31,7 +31,6 @@ using System.Linq;
 using System.Text;
 using OpenSim.Region.Framework.Scenes;
 using OpenMetaverse;
-using System.Drawing;
 
 namespace OpenSim.Region.CoreModules.World.Archiver
 {

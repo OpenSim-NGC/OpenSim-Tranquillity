@@ -39,7 +39,6 @@ using SkiaSharp;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using System.Drawing;
 
 namespace OpenSim.Region.CoreModules.Agent.TextureSender
 {

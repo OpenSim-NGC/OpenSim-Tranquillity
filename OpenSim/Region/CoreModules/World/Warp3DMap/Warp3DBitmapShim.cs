@@ -81,24 +81,83 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         public static warp_Texture CreateWarpTextureFromSKBitmap(SKBitmap sk, int reduceLevel = 0)
         {
             if (sk == null) return null;
-
-            using (Bitmap bmp = SKBitmapToBitmap(sk))
-            {
-                if (bmp == null) return null;
-                if (reduceLevel == 0)
-                    return new warp_Texture(bmp);
-                return new warp_Texture(bmp, reduceLevel);
-            }
+            // Create warp_Texture directly from SKBitmap (new Warp3D API)
+            if (reduceLevel == 0)
+                return new warp_Texture(sk);
+            // When reduceLevel is provided, the warp_Texture implementation
+            // accepts SKBitmap and will apply reduction as needed via its API.
+            return new warp_Texture(sk, reduceLevel);
         }
 
         // Helper to encode an SKBitmap to JPEG2000 using the existing OpenJPEG helper
-        public static byte[] EncodeSKBitmapToJpeg2000(SKBitmap sk)
+        public static byte[] EncodeSKBitmapToJpeg2000(SKBitmap sk, bool lossless = false)
         {
             if (sk == null) return null;
-            using (Bitmap bmp = SKBitmapToBitmap(sk))
+
+        // Helper to convert OpenMetaverse.Imaging.ManagedImage to SKBitmap
+        public static SKBitmap ManagedImageToSKBitmap(ManagedImage managed)
+        {
+            if (managed == null) return null;
+
+            var info = new SKImageInfo(managed.Width, managed.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+            var skbitmap = new SKBitmap(info);
+
+            for (int y = 0; y < managed.Height; y++)
             {
-                if (bmp == null) return null;
-                return OpenJPEG.EncodeFromImage(bmp, false);
+                for (int x = 0; x < managed.Width; x++)
+                {
+                    int i = y * managed.Width + x;
+                    byte r = managed.Red[i];
+                    byte g = managed.Green[i];
+                    byte b = managed.Blue[i];
+                    byte a = managed.Alpha != null ? managed.Alpha[i] : (byte)255;
+                    skbitmap.SetPixel(x, y, new SKColor(r, g, b, a));
+                }
+            }
+            return skbitmap;
+        }
+
+        // Build a ManagedImage directly from the SKBitmap pixel data so we
+        // can call the OpenJPEG encoder without converting through System.Drawing.Bitmap.
+        int w = sk.Width;
+        int h = sk.Height;            // Determine whether the SKBitmap contains an alpha channel
+            bool hasAlpha = sk.Info.AlphaType != SKAlphaType.Opaque;
+
+            var channels = ManagedImage.ImageChannels.Color;
+            if (hasAlpha)
+                channels |= ManagedImage.ImageChannels.Alpha;
+
+            var managed = new ManagedImage(w, h, channels);
+            managed.Red = new byte[w * h];
+            managed.Green = new byte[w * h];
+            managed.Blue = new byte[w * h];
+            if (hasAlpha)
+                managed.Alpha = new byte[w * h];
+
+            // Extract pixels. SKBitmap stores pixels row-major; use GetPixel for clarity.
+            // This is not the highest-performance path but is safe and readable.
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int i = y * w + x;
+                    SKColor c = sk.GetPixel(x, y);
+                    managed.Red[i] = c.Red;
+                    managed.Green[i] = c.Green;
+                    managed.Blue[i] = c.Blue;
+                    if (hasAlpha)
+                        managed.Alpha[i] = c.Alpha;
+                }
+            }
+
+            try
+            {
+                return OpenJPEG.Encode(managed, lossless);
+            }
+            finally
+            {
+                // Free managed image buffers if the implementation provides Clear
+                try { managed.Clear(); } catch { }
             }
         }
     }
