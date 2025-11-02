@@ -9,10 +9,10 @@
   </PropertyGroup>
   <PropertyGroup>      
 
-    <MSBuildProjectExtensionsPath>$(SolutionDir)/obj/$(Configuration)/$(MSBuildProjectName)/</MSBuildProjectExtensionsPath>
-    <IntermediateOutputPath>$(SolutionDir)/obj/$(Configuration)/$(MSBuildProjectName)/</IntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(SolutionDir)obj\$(Configuration)\$(MSBuildProjectName)\</MSBuildProjectExtensionsPath>
+    <IntermediateOutputPath>$(SolutionDir)obj\$(Configuration)\$(MSBuildProjectName)\</IntermediateOutputPath>
 
-    <OutputPath>$(SolutionDir)/build/$(Configuration)/$(AssemblyName)/</OutputPath>
+    <OutputPath>$(SolutionDir)build\$(Configuration)\$(AssemblyName)\</OutputPath>
     <OutDir>$(OutputPath)</OutDir>
   </PropertyGroup>
 

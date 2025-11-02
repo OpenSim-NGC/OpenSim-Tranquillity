@@ -27,31 +27,104 @@ namespace Warp3D
         public static int White = unchecked((int)0xFFFFFFFF);
         public static int Grey = unchecked((int)0xFF7F7F7F);
         public static int Black = unchecked((int)0xFF000000);
-        private uint argb;
-        public readonly byte a = 0;
-        public readonly byte r = 0;
-        public readonly byte g = 0;
-        public readonly byte b = 0;
+        private uint _argb;
+        public byte a;
+        public byte r;
+        public byte g;
+        public byte b;
+
+        public warp_Color()
+        {
+            this._argb = 0;
+            this.a = 0;
+            this.r = 0;
+            this.g = 0;
+            this.b = 0;
+        }
 
         public warp_Color(byte r, byte g, byte b, byte a)
         {
+            this.a = a;
             this.r = r;
             this.g = g;
             this.b = b;
-            this.a = a;
+            this._argb = (uint)((a << 24) | (r << 16) | (g << 8) | b);
         }
 
         public warp_Color(uint argb)
         {
-                        // Arrange
+            this._argb = argb;
             this.a = (byte)((argb >> 24) & 0xFF);
             this.r = (byte)((argb >> 16) & 0xFF);
             this.g = (byte)((argb >> 8) & 0xFF);
             this.b = (byte)(argb & 0xFF);
         }
 
-        public warp_Color()
+        public void CopyFrom(warp_Color source)
         {
+            if (source == null) return;
+            this.a = source.a;
+            this.r = source.r;
+            this.g = source.g;
+            this.b = source.b;
+            this._argb = source._argb;
+        }
+
+        public static warp_Color operator +(warp_Color c1, warp_Color c2)
+        {
+            if (c1 == null || c2 == null) return new warp_Color();
+            return new warp_Color(
+                (byte)Math.Min(255, c1.r + c2.r),
+                (byte)Math.Min(255, c1.g + c2.g),
+                (byte)Math.Min(255, c1.b + c2.b),
+                (byte)Math.Min(255, c1.a + c2.a)
+            );
+        }
+
+        public static warp_Color operator -(warp_Color c1, warp_Color c2)
+        {
+            if (c1 == null || c2 == null) return new warp_Color();
+            return new warp_Color(
+                (byte)Math.Max(0, c1.r - c2.r),
+                (byte)Math.Max(0, c1.g - c2.g),
+                (byte)Math.Max(0, c1.b - c2.b),
+                (byte)Math.Max(0, c1.a - c2.a)
+            );
+        }
+
+        public static warp_Color operator *(warp_Color c, float scalar)
+        {
+            if (c == null) return new warp_Color();
+            return new warp_Color(
+                (byte)Math.Min(255, (int)(c.r * scalar)),
+                (byte)Math.Min(255, (int)(c.g * scalar)),
+                (byte)Math.Min(255, (int)(c.b * scalar)),
+                (byte)Math.Min(255, (int)(c.a * scalar))
+            );
+        }
+
+        public static bool operator ==(warp_Color c1, warp_Color c2)
+        {
+            if (ReferenceEquals(c1, c2)) return true;
+            if (c1 is null || c2 is null) return false;
+            return c1.a == c2.a && c1.r == c2.r && c1.g == c2.g && c1.b == c2.b;
+        }
+
+        public static bool operator !=(warp_Color c1, warp_Color c2)
+        {
+            return !(c1 == c2);
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is warp_Color other)
+                return this == other;
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return _argb.GetHashCode();
         }
 
         public static int random(int color, int delta)

@@ -1608,10 +1608,12 @@ namespace OpenSim.Data.SQLite
             prim.Name = row["Name"] == DBNull.Value ? string.Empty : (string)row["Name"];
             // various text fields
             prim.Text = (String)row["Text"];
-            prim.Color = Color.FromArgb(Convert.ToInt32(row["ColorA"]),
-                                        Convert.ToInt32(row["ColorR"]),
-                                        Convert.ToInt32(row["ColorG"]),
-                                        Convert.ToInt32(row["ColorB"]));
+            // Construct uint ARGB color: 0xAARRGGBB
+            int a = Convert.ToInt32(row["ColorA"]);
+            int r = Convert.ToInt32(row["ColorR"]);
+            int g = Convert.ToInt32(row["ColorG"]);
+            int b = Convert.ToInt32(row["ColorB"]);
+            prim.Color = (uint)((a << 24) | (r << 16) | (g << 8) | b);
             prim.Description = (String)row["Description"];
             prim.SitName = (String)row["SitName"];
             prim.TouchName = (String)row["TouchName"];
@@ -2112,10 +2114,16 @@ namespace OpenSim.Data.SQLite
 
             row["sitactrange"] = prim.SitActiveRange;
 
-            row["ColorR"] = Convert.ToInt32(prim.Color.R);
-            row["ColorG"] = Convert.ToInt32(prim.Color.G);
-            row["ColorB"] = Convert.ToInt32(prim.Color.B);
-            row["ColorA"] = Convert.ToInt32(prim.Color.A);
+            // Extract ARGB components from uint color (0xAARRGGBB)
+            uint color = prim.Color;
+            byte a = (byte)((color >> 24) & 0xFF);
+            byte r = (byte)((color >> 16) & 0xFF);
+            byte g = (byte)((color >> 8) & 0xFF);
+            byte b = (byte)(color & 0xFF);
+            row["ColorR"] = Convert.ToInt32(r);
+            row["ColorG"] = Convert.ToInt32(g);
+            row["ColorB"] = Convert.ToInt32(b);
+            row["ColorA"] = Convert.ToInt32(a);
             row["PayPrice"] = prim.PayPrice[0];
             row["PayButton1"] = prim.PayPrice[1];
             row["PayButton2"] = prim.PayPrice[2];

@@ -1006,10 +1006,12 @@ namespace OpenSim.Data.MySQL
                 prim.Name = String.Empty;
             // Various text fields
             prim.Text = (string)row["Text"];
-            prim.Color = Color.FromArgb((int)row["ColorA"],
-                                        (int)row["ColorR"],
-                                        (int)row["ColorG"],
-                                        (int)row["ColorB"]);
+            // Construct uint ARGB color: 0xAARRGGBB
+            int a = (int)row["ColorA"];
+            int r = (int)row["ColorR"];
+            int g = (int)row["ColorG"];
+            int b = (int)row["ColorB"];
+            prim.Color = (uint)((a << 24) | (r << 16) | (g << 8) | b);
             prim.Description = (string)row["Description"];
             prim.SitName = (string)row["SitName"];
             prim.TouchName = (string)row["TouchName"];
@@ -1461,10 +1463,16 @@ namespace OpenSim.Data.MySQL
             // the UUID of the root part for this SceneObjectGroup
             // various text fields
             cmd.Parameters.AddWithValue("Text", prim.Text);
-            cmd.Parameters.AddWithValue("ColorR", prim.Color.R);
-            cmd.Parameters.AddWithValue("ColorG", prim.Color.G);
-            cmd.Parameters.AddWithValue("ColorB", prim.Color.B);
-            cmd.Parameters.AddWithValue("ColorA", prim.Color.A);
+            // Extract ARGB components from uint color (0xAARRGGBB)
+            uint color = prim.Color;
+            byte a = (byte)((color >> 24) & 0xFF);
+            byte r = (byte)((color >> 16) & 0xFF);
+            byte g = (byte)((color >> 8) & 0xFF);
+            byte b = (byte)(color & 0xFF);
+            cmd.Parameters.AddWithValue("ColorR", (int)r);
+            cmd.Parameters.AddWithValue("ColorG", (int)g);
+            cmd.Parameters.AddWithValue("ColorB", (int)b);
+            cmd.Parameters.AddWithValue("ColorA", (int)a);
             cmd.Parameters.AddWithValue("Description", prim.Description);
             cmd.Parameters.AddWithValue("SitName", prim.SitName);
             cmd.Parameters.AddWithValue("TouchName", prim.TouchName);

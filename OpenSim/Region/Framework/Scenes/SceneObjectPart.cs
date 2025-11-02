@@ -4111,12 +4111,14 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="newalpha"></param>
         public void SetText(string text, Vector3 newcolor, double newalpha)
         {
-            Color oldcolor = Color;
+            uint oldcolor = Color;
 
-            Color = Color.FromArgb((int) (newalpha * 0xff),
-                                   (int) (newcolor.X * 0xff),
-                                   (int) (newcolor.Y * 0xff),
-                                   (int) (newcolor.Z * 0xff));
+            Color = (uint)(
+                ((int)(newalpha * 0xff) << 24) |
+                ((int)(newcolor.X * 0xff) << 16) |
+                ((int)(newcolor.Y * 0xff) << 8) |
+                ((int)(newcolor.Z * 0xff))
+            );
             osUTF8 old = osUTF8Text;
             if (string.IsNullOrEmpty(text))
             {
@@ -5490,14 +5492,19 @@ namespace OpenSim.Region.Framework.Scenes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Color4 GetTextColor()
         {
-            Color color = m_color;
-            return new Color4(color.R, color.G, color.B, color.A);
+            uint argb = m_textColorArgb;
+            byte a = (byte)((argb >> 24) & 0xFF);
+            byte r = (byte)((argb >> 16) & 0xFF);
+            byte g = (byte)((argb >> 8) & 0xFF);
+            byte b = (byte)(argb & 0xFF);
+            return new Color4(r / 255f, g / 255f, b / 255f, a / 255f);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float GetTextAlpha()
         {
-            return m_color.A * 0.0039215686f;
+            byte a = (byte)((m_textColorArgb >> 24) & 0xFF);
+            return a * 0.0039215686f;
         }
 
         public void ResetOwnerChangeFlag()

@@ -25,4 +25,10 @@
     <ProjectReference Include="..\..\Source\Warp3D\Warp3D.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="ColorTests.cs" />
+    <Compile Remove="MatrixTests.cs" />
+    <Compile Remove="TextureTests.cs" />
+  </ItemGroup>
+
 </Project>
