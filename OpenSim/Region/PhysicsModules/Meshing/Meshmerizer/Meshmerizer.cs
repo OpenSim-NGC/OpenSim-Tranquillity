@@ -36,6 +36,7 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using SkiaSharp;
+using CoreJ2K;
 using System.IO.Compression;
 using PrimMesher;
 using log4net;
@@ -656,28 +657,49 @@ namespace OpenSim.Region.PhysicsModule.Meshing
 
                 try
                 {
-                    OpenMetaverse.Imaging.ManagedImage managedImage;
-
-                    OpenMetaverse.Imaging.OpenJPEG.DecodeToImage(primShape.SculptData, out managedImage);
-
-                    if (managedImage == null)
+                    // Try CoreJ2K first
+                    SKImage skImage = null;
+                    try
                     {
-                        // In some cases it seems that the decode can return a null bitmap without throwing
-                        // an exception
-                        m_log.WarnFormat("[PHYSICS]: OpenJPEG decoded sculpt data for {0} to a null bitmap.  Ignoring.", primName);
-
-                        return false;
+                        var j2k = J2kImage.FromBytes(primShape.SculptData);
+                        if (j2k != null)
+                            skImage = j2k.As<SKImage>();
+                    }
+                    catch
+                    {
+                        skImage = null;
                     }
 
-                    if ((managedImage.Channels & OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha) != 0)
-                        managedImage.ConvertChannels(managedImage.Channels & ~OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha);
-
-                    // Try to decode the exported TGA stream directly with SkiaSharp
-                    using (var tgaStream = new MemoryStream(managedImage.ExportTGA()))
+                    if (skImage != null)
                     {
-                        idata = SKBitmap.Decode(tgaStream);
+                        idata = SKBitmap.FromImage(skImage);
                     }
-                    managedImage = null;
+                    else
+                    {
+                        // Fallback to OpenJPEG for ManagedImage conversion
+                        OpenMetaverse.Imaging.ManagedImage managedImage;
+
+                        OpenMetaverse.Imaging.OpenJPEG.DecodeToImage(primShape.SculptData, out managedImage);
+
+                        if (managedImage == null)
+                        {
+                            // In some cases it seems that the decode can return a null bitmap without throwing
+                            // an exception
+                            m_log.WarnFormat("[PHYSICS]: OpenJPEG decoded sculpt data for {0} to a null bitmap.  Ignoring.", primName);
+
+                            return false;
+                        }
+
+                        if ((managedImage.Channels & OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha) != 0)
+                            managedImage.ConvertChannels(managedImage.Channels & ~OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha);
+
+                        // Try to decode the exported TGA stream directly with SkiaSharp
+                        using (var tgaStream = new MemoryStream(managedImage.ExportTGA()))
+                        {
+                            idata = SKBitmap.Decode(tgaStream);
+                        }
+                        managedImage = null;
+                    }
 
                     if (cacheSculptMaps && idata != null)
                     {

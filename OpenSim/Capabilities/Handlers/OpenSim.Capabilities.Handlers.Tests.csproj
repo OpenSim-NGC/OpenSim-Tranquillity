@@ -30,7 +30,6 @@
     <Compile Remove="GetAssets\GetAssetsHandler.cs" />
     <Compile Remove="GetMesh\GetMeshHandler.cs" />
     <Compile Remove="GetMesh\GetMeshServerConnector.cs" />
-    <Compile Remove="GetTexture\GetTextureHandler.cs" />
     <Compile Remove="GetTexture\GetTextureRobustHandler.cs" />
     <Compile Remove="GetTexture\GetTextureServerConnector.cs" />
   </ItemGroup>

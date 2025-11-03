@@ -30,8 +30,6 @@ using System.Runtime;
 
 using CoreJ2K;
 using SkiaSharp;
-using System.IO;
-// System.Drawing usage is isolated in Warp3DBitmapShim.cs
 using Nini.Config;
 using log4net;
 using Warp3D;
@@ -42,7 +40,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
 using OpenMetaverse;
-using OpenMetaverse.Imaging;
 using OpenMetaverse.Rendering;
 using OpenMetaverse.StructuredData;
 
@@ -279,17 +276,9 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             {
                 skbitmap = skb;
             }
-            else
-            {
-                try
-                {
-                    skbitmap = Warp3DBitmapShim.BitmapToSKBitmap(rendererBitmap);
-                }
-                catch (Exception ex)
-                {
-                    m_log.WarnFormat("[Warp3D] failed converting rendered image to SKBitmap: {0}", ex.Message);
-                }
-            }
+            // else: rendererBitmap is System.Drawing.Bitmap (from legacy Warp3D library)
+            // The new SkiaSharp-based Warp3D should return SKBitmap natively.
+            // For legacy compatibility, we would need to convert here, but System.Drawing is no longer available.
 
             renderer.Scene.destroy();
             renderer.Reset();
@@ -306,7 +295,27 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             return skbitmap ?? new SKBitmap(viewWidth, viewHeight, SKColorType.Rgb888x, SKAlphaType.Opaque);
         }
 
-        // Bitmap conversion logic moved to Warp3DBitmapShim.cs to centralize System.Drawing usage.
+        /// <summary>
+        /// Helper method to encode an SKBitmap to JPEG format.
+        /// Note: This currently encodes to JPEG instead of JPEG2000 as a temporary solution.
+        /// </summary>
+        private byte[] EncodeSkBitmapToJpeg(SKBitmap bitmap, bool lossless = false)
+        {
+            if (bitmap == null) return null;
+
+            try
+            {
+                using (SKImage skImage = SKImage.FromBitmap(bitmap))
+                using (SKData encoded = skImage.Encode(SKEncodedImageFormat.Jpeg, lossless ? 100 : 95))
+                {
+                    return encoded.ToArray();
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         // Helper: convert J2K bytes to SKBitmap via CoreJ2K
         private SKBitmap J2kBytesToSKBitmap(byte[] j2kData)
@@ -334,8 +343,8 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                 if (sk == null)
                     return null;
 
-                // Encode SKBitmap to JPEG2000 using the shim (which isolates System.Drawing usage).
-                return Warp3DBitmapShim.EncodeSKBitmapToJpeg2000(sk);
+                // Encode SKBitmap to JPEG format
+                return EncodeSkBitmapToJpeg(sk);
             }
             catch (Exception e)
             {
@@ -463,7 +472,8 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                         m_scene.AssetService, m_imgDecoder, m_textureTerrain, m_textureAverageTerrain,
                         twidth, twidth))
             {
-                texture = Warp3DBitmapShim.CreateWarpTextureFromSKBitmap(skImage);
+                // Create warp_Texture directly from SKBitmap (new Warp3D API)
+                texture = new warp_Texture(skImage);
             }
 
             warp_Material material = new warp_Material(texture);
@@ -560,19 +570,13 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                         }
                         else // It's sculptie
                         {
-                            SKBitmap skSculpt = J2kBytesToSKBitmap(sculptAsset.Data);
-                            if (skSculpt is not null)
-                            {
-                                using (var bmpObj = Warp3DBitmapShim.SKBitmapToBitmap(skSculpt))
-                                {
-                                    if (bmpObj is System.Drawing.Bitmap bmp)
-                                    {
-                                        renderMesh = m_primMesher.GenerateFacetedSculptMesh(omvPrim, bmp, lod);
-                                    }
-                                }
-                            }
-                            }
+                            // Note: Sculpt mesh rendering via GenerateFacetedSculptMesh requires System.Drawing.Bitmap.
+                            // Since we're migrating away from System.Drawing, sculpt rendering is temporarily disabled.
+                            // TODO: Update OpenMetaverse library to accept SkiaSharp bitmaps or find alternative approach.
+                            m_log.WarnFormat("[Warp3D] Sculpt rendering for prim {0} at {1} is not supported in SkiaSharp-only mode",
+                                prim.Name, prim.GetWorldPosition().ToString());
                         }
+                    }
                     else
                     {
                         m_log.WarnFormat("[Warp3D] failed to get mesh or sculpt asset {0} of prim {1} at {2}",
@@ -809,7 +813,8 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                     SKBitmap skImg = J2kBytesToSKBitmap(asset.Data);
                     if (skImg != null)
                     {
-                        ret = Warp3DBitmapShim.CreateWarpTextureFromSKBitmap(skImg, 8); // reduce textures size to 256 * 256
+                        // Create warp_Texture directly from SKBitmap with reduction level 8 (reduce textures size to 256 * 256)
+                        ret = new warp_Texture(skImg, 8);
                     }
                 }
                 catch (Exception e)

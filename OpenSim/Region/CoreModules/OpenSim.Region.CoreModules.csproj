@@ -16,6 +16,7 @@
     <Reference Include="XMLRPC" HintPath="..\..\..\Library\XMLRPC.dll" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../../Source/Warp3D/Warp3D.csproj" />
     <ProjectReference Include="..\..\Capabilities\OpenSim.Capabilities.csproj" />
     <ProjectReference Include="..\..\Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\..\Data\MySQL\OpenSim.Data.MySQL.csproj" />

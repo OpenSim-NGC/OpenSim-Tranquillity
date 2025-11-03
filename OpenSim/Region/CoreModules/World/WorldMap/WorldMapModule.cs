@@ -25,18 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using SkiaSharp;
-// No longer using System.Drawing
-using OpenSim.Region.CoreModules.World.Warp3DMap;
-using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Reflection;
+using System.Collections;
+using SkiaSharp;
+using CoreJ2K;
 
-using System.Threading;
 using log4net;
 using Nini.Config;
 using OpenMetaverse;
@@ -51,9 +46,10 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.CoreModules.World.Land;
-using Caps=OpenSim.Framework.Capabilities.Caps;
-using OSDArray=OpenMetaverse.StructuredData.OSDArray;
-using OSDMap=OpenMetaverse.StructuredData.OSDMap;
+
+using Caps = OpenSim.Framework.Capabilities.Caps;
+using OSDArray = OpenMetaverse.StructuredData.OSDArray;
+using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.CoreModules.World.WorldMap
@@ -808,38 +804,27 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
             if (!m_threadsRunning)
                 return;
 
-            WebRequest mapitemsrequest = null;
-            try
-            {
-                mapitemsrequest = WebRequest.Create(httpserver);
-            }
-            catch (Exception e)
-            {
-                WebUtil.GlobalExpiringBadURLs.Add(serverURI, 120000);
-                m_blacklistedregions.Add(regionhandle, expireBlackListTime);
-                m_cachedRegionMapItemsResponses.Remove(regionhandle);
-                m_log.DebugFormat("[WORLD MAP]: Access to {0} failed with {1}", httpserver, e);
-                Interlocked.Decrement(ref nAsyncRequests);
-                return;
-            }
-
-            UUID requestID = UUID.Random();
-
-            mapitemsrequest.Method = "GET";
-            mapitemsrequest.ContentType = "application/xml+llsd";
-
             string response_mapItems_reply = null;
 
-            // get the response
             try
             {
-                using (WebResponse webResponse = mapitemsrequest.GetResponse())
+                using (HttpClient httpClient = new HttpClient())
                 {
-                    using (StreamReader sr = new StreamReader(webResponse.GetResponseStream()))
-                        response_mapItems_reply = sr.ReadToEnd().Trim();
+                    httpClient.DefaultRequestHeaders.Add("Accept", "application/xml+llsd");
+                    using (HttpResponseMessage response = httpClient.GetAsync(httpserver).Result)
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            response_mapItems_reply = response.Content.ReadAsStringAsync().Result.Trim();
+                        }
+                        else
+                        {
+                            throw new HttpRequestException($"HTTP Error: {response.StatusCode}");
+                        }
+                    }
                 }
             }
-            catch (WebException)
+            catch (HttpRequestException)
             {
                 WebUtil.GlobalExpiringBadURLs.Add(serverURI, 60000);
                 m_blacklistedurls.Add(httpserver, expireBlackListTime);
@@ -1182,8 +1167,6 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
 
             if (myMapImageJPEG.Length == 0)
             {
-                ManagedImage managedImage;
-                Image image = null;
                 SKBitmap skBitmap = null;
 
                 try
@@ -1196,15 +1179,15 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
                         return;
                     }
 
-                    // Decode image (jpeg2000) into a System.Drawing.Image then convert to SKBitmap via the shim
-                    if (OpenJPEG.DecodeToImage(mapasset.Data, out managedImage, out _))
+                    // Decode JPEG2000 image using CoreJ2K
+                    try
                     {
-                        try
+                        var j2k = J2kImage.FromBytes(mapasset.Data);
+                        if (j2k != null)
                         {
-                            skBitmap = Warp3DBitmapShim.ManagedImageToSKBitmap(managedImage);
-                            if (skBitmap != null)
+                            SKImage skImage = j2k.As<SKImage>();
+                            if (skImage != null)
                             {
-                                using (var skImage = SKImage.FromBitmap(skBitmap))
                                 using (SKData encoded = skImage.Encode(SKEncodedImageFormat.Jpeg, 95))
                                 {
                                     jpeg = encoded.ToArray();
@@ -1212,10 +1195,10 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
                                 }
                             }
                         }
-                        finally
-                        {
-                            skBitmap?.Dispose();
-                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        m_log.WarnFormat("[WORLD MAP]: Failed to decode terrain image with CoreJ2K: {0}", ex.Message);
                     }
                 }
                 catch (Exception e)
@@ -1246,18 +1229,7 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
             response.StatusCode = (int)HttpStatusCode.OK;
         }
 
-        // From msdn
-        private static ImageCodecInfo GetEncoderInfo(String mimeType)
-        {
-            ImageCodecInfo[] encoders;
-            encoders = ImageCodecInfo.GetImageEncoders();
-            for (int j = 0; j < encoders.Length; ++j)
-            {
-                if (encoders[j].MimeType == mimeType)
-                    return encoders[j];
-            }
-            return null;
-        }
+
 
         /// <summary>
         /// Export the world map
@@ -1341,9 +1313,8 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
 
                                 if (m_exportPrintRegionName)
                                 {
-                                    SKRect bounds = SKRect.Empty;
-                                    textFont.MeasureText(m_regionName, ref bounds);
-                                    canvas.DrawText(m_regionName, x + 30, spanY - y - 30 - bounds.Height, SKTextAlign.Left, textFont, textPaint);
+                                    float textWidth = textFont.MeasureText(m_regionName);
+                                    canvas.DrawText(m_regionName, x + 30, spanY - y - 30 - 32, SKTextAlign.Left, textFont, textPaint);
                                 }
                             }
                         }
@@ -1353,8 +1324,6 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
 
                     if(regions.Count > 0)
                     {
-                        ManagedImage managedImage = null;
-
                         foreach (GridRegion r in regions)
                         {
                             if(r.TerrainImage.IsZero())
@@ -1367,32 +1336,36 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
                             if(texAsset == null)
                                 continue;
 
-                            if (OpenJPEG.DecodeToImage(texAsset.Data, out managedImage, out _))
+                            try
                             {
-                                try
+                                var j2k = J2kImage.FromBytes(texAsset.Data);
+                                if (j2k != null)
                                 {
-                                    using (SKBitmap sk = Warp3DBitmapShim.ManagedImageToSKBitmap(managedImage))
+                                    SKImage skImage = j2k.As<SKImage>();
+                                    if (skImage != null)
                                     {
-                                        if (sk != null)
+                                        using (SKBitmap sk = SKBitmap.FromImage(skImage))
                                         {
-                                            int x = r.RegionLocX - startX;
-                                            int y = r.RegionLocY - startY;
-                                            int sx = r.RegionSizeX;
-                                            int sy = r.RegionSizeY;
-                                            SKRect dst = new SKRect(x, spanY - y - sy, x + sx, spanY - y);
-                                            canvas.DrawBitmap(sk, dst);
-
-                                            if (m_exportPrintRegionName && r.RegionHandle == m_regionHandle)
+                                            if (sk != null)
                                             {
-                                                SKRect bounds = SKRect.Empty;
-                                                textFont.MeasureText(r.RegionName, ref bounds);
-                                                canvas.DrawText(r.RegionName, x + 30, spanY - y - 30 - bounds.Height, SKTextAlign.Left, textFont, textPaint);
+                                                int x = r.RegionLocX - startX;
+                                                int y = r.RegionLocY - startY;
+                                                int sx = r.RegionSizeX;
+                                                int sy = r.RegionSizeY;
+                                                SKRect dst = new SKRect(x, spanY - y - sy, x + sx, spanY - y);
+                                                canvas.DrawBitmap(sk, dst);
+
+                                                if (m_exportPrintRegionName && r.RegionHandle == m_regionHandle)
+                                                {
+                                                    float textWidth = textFont.MeasureText(r.RegionName);
+                                                    canvas.DrawText(r.RegionName, x + 30, spanY - y - 30 - 32, SKTextAlign.Left, textFont, textPaint);
+                                                }
                                             }
                                         }
                                     }
                                 }
-                                catch {}
                             }
+                            catch {}
                         }
                     }
 
@@ -1403,15 +1376,14 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
                     }
                 }
 
-                }
-
-            // Save as JPEG
-            using (SKImage finalImage = SKImage.FromBitmap(mapTexture))
-            using (SKData encoded = finalImage.Encode(SKEncodedImageFormat.Jpeg, 95))
-            {
-                using (FileStream fs = File.OpenWrite(exportPath))
+                // Save as JPEG
+                using (SKImage finalImage = SKImage.FromBitmap(mapTexture))
+                using (SKData encoded = finalImage.Encode(SKEncodedImageFormat.Jpeg, 95))
                 {
-                    encoded.SaveTo(fs);
+                    using (FileStream fs = File.OpenWrite(exportPath))
+                    {
+                        encoded.SaveTo(fs);
+                    }
                 }
             }
 
@@ -1559,11 +1531,7 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
                 if (mapbmp == null)
                     return;
 
-                using (var bmp = Warp3DBitmapShim.SKBitmapToBitmap(mapbmp))
-                {
-                    if (bmp != null)
-                        GenerateMaptile(bmp);
-                }
+                GenerateMaptile(mapbmp);
 
                 if (m_mapImageServiceModule != null)
                     m_mapImageServiceModule.UploadMapTile(m_scene, mapbmp);
@@ -1576,7 +1544,7 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
             //    m_mapImageServiceModule.RemoveMapTiles(m_scene);
         }
 
-        private void GenerateMaptile(Bitmap mapbmp)
+        private void GenerateMaptile(SKBitmap mapbmp)
         {
             bool needRegionSave = false;
 
@@ -1615,23 +1583,17 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
                         if(mb > Constants.RegionSize && mb > 0)
                         {
                             float scale = (float)Constants.RegionSize/(float)mb;
-                            // Convert the System.Drawing.Bitmap to SKBitmap, resize using SKIA helper, then convert back
-                            using (SKBitmap skMap = Warp3DBitmapShim.BitmapToSKBitmap(mapbmp))
+                            // Resize using SkiaSharp
+                            using (SKBitmap scaledSk = Util.ResizeImageSolid(mapbmp, (int)(bx * scale), (int)(by * scale)))
                             {
-                                using (SKBitmap scaledSk = Util.ResizeImageSolid(skMap, (int)(bx * scale), (int)(by * scale)))
-                                {
-                                    using (Bitmap scaledbmp = Warp3DBitmapShim.SKBitmapToBitmap(scaledSk))
-                                    {
-                                        data = OpenJPEG.EncodeFromImage(scaledbmp, true);
-                                    }
-                                }
+                                data = EncodeSkBitmapToJpeg(scaledSk, true);
                             }
                         }
                         else
-                            data = Warp3DBitmapShim.EncodeSKBitmapToJpeg2000(skMap, true);
+                            data = EncodeSkBitmapToJpeg(mapbmp, true);
                     }
                     else
-                        data = Warp3DBitmapShim.EncodeSKBitmapToJpeg2000(mapbmp, true);
+                        data = EncodeSkBitmapToJpeg(mapbmp, true);
 
                     if (data != null && data.Length > 0)
                     {
@@ -1796,7 +1758,7 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
 
                 try
                 {
-                    return Warp3DBitmapShim.EncodeSKBitmapToJpeg2000(overlay, false);
+                    return EncodeSkBitmapToJpeg(overlay, false);
                 }
                 catch (Exception e)
                 {
@@ -1805,6 +1767,28 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Helper method to encode an SKBitmap to JPEG format.
+        /// Note: This currently encodes to JPEG instead of JPEG2000 as a temporary solution.
+        /// </summary>
+        private byte[] EncodeSkBitmapToJpeg(SKBitmap bitmap, bool lossless = false)
+        {
+            if (bitmap == null) return null;
+
+            try
+            {
+                using (SKImage skImage = SKImage.FromBitmap(bitmap))
+                using (SKData encoded = skImage.Encode(SKEncodedImageFormat.Jpeg, lossless ? 100 : 95))
+                {
+                    return encoded.ToArray();
+                }
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 

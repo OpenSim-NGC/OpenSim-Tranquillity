@@ -36,6 +36,7 @@ using OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using SkiaSharp;
+using CoreJ2K;
 using System.Threading;
 using System.IO.Compression;
 using PrimMesher;
@@ -708,24 +709,45 @@ namespace OpenSim.Region.PhysicsModule.ubODEMeshing
 
             try
             {
-                OpenMetaverse.Imaging.ManagedImage managedImage;
-                OpenMetaverse.Imaging.OpenJPEG.DecodeToImage(primShape.SculptData, out managedImage);
-
-                if (managedImage == null)
+                // Try CoreJ2K first
+                SKImage skImage = null;
+                try
                 {
-                    m_log.WarnFormat("[PHYSICS]: OpenJPEG decoded sculpt data for {0} to a null bitmap.  Ignoring.", primName);
-                    return false;
+                    var j2k = J2kImage.FromBytes(primShape.SculptData);
+                    if (j2k != null)
+                        skImage = j2k.As<SKImage>();
+                }
+                catch
+                {
+                    skImage = null;
                 }
 
-                if ((managedImage.Channels & OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha) != 0)
-                    managedImage.ConvertChannels(managedImage.Channels & ~OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha);
-
-                using (var tgaStream = new MemoryStream(managedImage.ExportTGA()))
+                if (skImage != null)
                 {
-                    idata = SKBitmap.Decode(tgaStream);
+                    idata = SKBitmap.FromImage(skImage);
                 }
+                else
+                {
+                    // Fallback to OpenJPEG for ManagedImage conversion
+                    OpenMetaverse.Imaging.ManagedImage managedImage;
+                    OpenMetaverse.Imaging.OpenJPEG.DecodeToImage(primShape.SculptData, out managedImage);
 
-                managedImage = null;
+                    if (managedImage == null)
+                    {
+                        m_log.WarnFormat("[PHYSICS]: OpenJPEG decoded sculpt data for {0} to a null bitmap.  Ignoring.", primName);
+                        return false;
+                    }
+
+                    if ((managedImage.Channels & OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha) != 0)
+                        managedImage.ConvertChannels(managedImage.Channels & ~OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha);
+
+                    using (var tgaStream = new MemoryStream(managedImage.ExportTGA()))
+                    {
+                        idata = SKBitmap.Decode(tgaStream);
+                    }
+
+                    managedImage = null;
+                }
             }
             catch (DllNotFoundException e)
             {

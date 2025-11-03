@@ -26,8 +26,7 @@
  */
 
 using System;
-using System.Drawing;
-using System.Drawing.Imaging;
+using SkiaSharp;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -56,7 +55,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
 
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private static object thisLock = new object();
-        private static Graphics m_graph = null; // just to get chars sizes
+        private static SKTypeface m_typeface = null; // SkiaSharp typeface for measurements
 
         private Scene m_scene;
         private IDynamicTextureManager m_textureManager;
@@ -123,14 +122,41 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
         {
             lock (thisLock)
             {
-                using (Font myFont = new Font(fontName, fontSize))
+                var typeface = SKTypeface.FromFamilyName(fontName, SKFontStyle.Normal);
+                using (var font = new SKFont(typeface, fontSize))
                 {
-                    SizeF stringSize = new SizeF();
-
-                    stringSize = m_graph.MeasureString(text, myFont);
-                    xSize = stringSize.Width;
-                    ySize = stringSize.Height;
+                    var bounds = font.MeasureText(text);
+                    xSize = bounds.Width;
+                    ySize = bounds.Height;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Parse color from hex or name
+        /// </summary>
+        private static SKColor ParseColor(string value, SKColor defaultColor)
+        {
+            int hex = 0;
+            if (int.TryParse(value, System.Globalization.NumberStyles.HexNumber, 
+                System.Globalization.CultureInfo.InvariantCulture, out hex))
+            {
+                return new SKColor((uint)hex);
+            }
+            
+            // Try to parse named colors
+            switch (value.ToLower())
+            {
+                case "white": return SKColors.White;
+                case "black": return SKColors.Black;
+                case "red": return SKColors.Red;
+                case "green": return SKColors.Green;
+                case "blue": return SKColors.Blue;
+                case "yellow": return SKColors.Yellow;
+                case "cyan": return SKColors.Cyan;
+                case "magenta": return SKColors.Magenta;
+                case "gray": return SKColors.Gray;
+                default: return defaultColor;
             }
         }
 
@@ -151,10 +177,9 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
             // is shut down.
             lock(thisLock)
             {
-                if(m_graph == null)
+                if(m_typeface == null)
                 {
-                    Bitmap bitmap = new Bitmap(32, 32, PixelFormat.Format32bppArgb);
-                    m_graph = Graphics.FromImage(bitmap);
+                    m_typeface = SKTypeface.FromFamilyName(m_fontName, SKFontStyle.Normal);
                 }
             }
         }
@@ -210,7 +235,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
             int width = 256;
             int height = 256;
             int alpha = 255; // 0 is transparent
-            Color bgColor = Color.White;  // Default background color
+            SKColor bgColor = SKColors.White;  // Default background color
             char altDataDelim = ';';
 
             char[] paramDelimiter = { ',' };
@@ -394,6 +419,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
 
                 try
                 {
+                    // Use OpenJPEG for encoding System.Drawing.Bitmap to JPEG2000
                     imageJ2000 = OpenJPEG.EncodeFromImage(bitmap, lossless);
                 }
                 catch (Exception e)
