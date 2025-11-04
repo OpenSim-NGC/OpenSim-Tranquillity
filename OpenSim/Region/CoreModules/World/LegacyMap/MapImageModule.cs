@@ -28,8 +28,6 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using log4net;
 using Mono.Addins;
@@ -149,45 +147,12 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                 {
                     if (skBitmap != null)
                     {
-                        // Convert to RGB24 format
-                        var info = new SKImageInfo(skBitmap.Width, skBitmap.Height, SKColorType.Rgb888x, SKAlphaType.Opaque);
-                        using (var rgb = new SKBitmap(info))
+                        // Convert SKBitmap to SKImage and encode as JPEG
+                        // TODO: Replace with CoreJ2K encoding when encoder becomes available
+                        using (var image = SKImage.FromBitmap(skBitmap))
                         {
-                            skBitmap.CopyTo(rgb);
-                            
-                            // Convert to byte array in RGB24 format
-                            var rgbBytes = new byte[rgb.Width * rgb.Height * 3];
-                            var sourcePtr = rgb.GetPixels();
-                            var destIndex = 0;
-
-                            unsafe
-                            {
-                                byte* srcPtr = (byte*)sourcePtr.ToPointer();
-                                // Copy RGB components, skipping alpha
-                                for (int i = 0; i < rgb.Width * rgb.Height * 4; i += 4)
-                                {
-                                    rgbBytes[destIndex++] = srcPtr[i];     // R
-                                    rgbBytes[destIndex++] = srcPtr[i + 1]; // G 
-                                    rgbBytes[destIndex++] = srcPtr[i + 2]; // B
-                                }
-                            }
-
-                            // Create ManagedImage for OpenJPEG encoding
-                            var managedImage = new ManagedImage(rgb.Width, rgb.Height, ManagedImage.ImageChannels.Color);
-                            managedImage.Red = new byte[rgb.Width * rgb.Height];
-                            managedImage.Green = new byte[rgb.Width * rgb.Height];
-                            managedImage.Blue = new byte[rgb.Width * rgb.Height];
-
-                            // De-interleave RGB data
-                            for (int i = 0; i < rgb.Width * rgb.Height; i++)
-                            {
-                                managedImage.Red[i] = rgbBytes[i * 3];
-                                managedImage.Green[i] = rgbBytes[i * 3 + 1];
-                                managedImage.Blue[i] = rgbBytes[i * 3 + 2];
-                            }
-
-                            // Encode to JPEG2000
-                            return OpenJPEG.Encode(managedImage, false);
+                            var encoded = image.Encode(SKEncodedImageFormat.Jpeg, 100);
+                            return encoded.ToArray();
                         }
                     }
                 }
