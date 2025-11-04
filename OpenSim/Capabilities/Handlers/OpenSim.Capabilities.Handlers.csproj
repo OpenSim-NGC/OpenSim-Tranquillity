@@ -26,7 +26,6 @@
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.2.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.9" />
-    <PackageReference Include="OpenJpegDotNet" Version="2.4.0.20210725" />
     <PackageReference Include="SkiaSharp" Version="3.119.1" />
     <PackageReference Include="CoreJ2K.Skia" Version="1.1.2.50" />
   </ItemGroup>

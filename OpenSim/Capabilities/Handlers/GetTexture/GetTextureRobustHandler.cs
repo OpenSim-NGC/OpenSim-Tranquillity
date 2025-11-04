@@ -25,17 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections.Specialized;
 using System.Reflection;
-using System.IO;
 using System.Net;
 using System.Web;
+
 using log4net;
 using OpenMetaverse;
-using OpenMetaverse.Imaging;
 using CoreJ2K;
 using SkiaSharp;
+
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
@@ -330,64 +329,6 @@ namespace OpenSim.Capabilities.Handlers
                 {
                     // CSJ2K not available or failed, fall back to OpenJPEG
                     skImage = null;
-                }
-
-                // If CSJ2K didn't produce an SKImage, try OpenJPEG.DecodeToImage and construct SKImage from ManagedImage
-                if (skImage == null)
-                {
-                    ManagedImage managedImage = null;
-                    Image image = null;
-                    try
-                    {
-                        if (OpenJPEG.DecodeToImage(texture.Data, out managedImage, out image))
-                        {
-                            // If OpenJPEG returned a System.Drawing.Image (legacy), try to load via Skia from a memory stream
-                            if (image != null)
-                            {
-                                using (var ms = new MemoryStream())
-                                {
-                                    // Save System.Drawing.Image to PNG in memory and decode with Skia
-                                    image.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                                    ms.Position = 0;
-                                    skImage = SKImage.FromEncodedData(ms);
-                                }
-                            }
-                            else if (managedImage != null)
-                            {
-                                // Build an SKPixmap from managedImage RGB channels
-                                int w = managedImage.Width;
-                                int h = managedImage.Height;
-                                var pix = new byte[w * h * 4];
-                                for (int i = 0; i < w * h; i++)
-                                {
-                                    byte r = managedImage.Red != null && managedImage.Red.Length > i ? managedImage.Red[i] : (byte)0;
-                                    byte g = managedImage.Green != null && managedImage.Green.Length > i ? managedImage.Green[i] : (byte)0;
-                                    byte b = managedImage.Blue != null && managedImage.Blue.Length > i ? managedImage.Blue[i] : (byte)0;
-                                    pix[i * 4 + 0] = r;
-                                    pix[i * 4 + 1] = g;
-                                    pix[i * 4 + 2] = b;
-                                    pix[i * 4 + 3] = 255;
-                                }
-
-                                var info = new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Opaque);
-                                using (var bitmap = new SKBitmap(info))
-                                {
-                                    // Copy pixels into SKBitmap (safe, no pointers)
-                                    IntPtr dst = bitmap.GetPixels();
-                                    System.Runtime.InteropServices.Marshal.Copy(pix, 0, dst, pix.Length);
-                                    skImage = SKImage.FromBitmap(bitmap);
-                                }
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        if (image != null)
-                            image.Dispose();
-
-                        if (managedImage != null)
-                            managedImage.Clear();
-                    }
                 }
 
                 if (skImage != null)

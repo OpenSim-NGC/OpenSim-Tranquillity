@@ -31,6 +31,7 @@ using System.Linq;
 using System.Text;
 using OpenSim.Region.Framework.Scenes;
 using OpenMetaverse;
+using SkiaSharp;
 
 namespace OpenSim.Region.CoreModules.World.Archiver
 {
@@ -58,14 +59,14 @@ namespace OpenSim.Region.CoreModules.World.Archiver
         /// <summary>
         /// The grid coordinates of the regions' bounding box.
         /// </summary>
-        public Rectangle Rect { get; set; }
+        public SKRect Rect { get; set; }
 
 
         public ArchiveScenesGroup()
         {
             Regions = new SortedDictionary<uint, SortedDictionary<uint, Scene>>();
             m_regionDirs = new Dictionary<UUID, string>();
-            Rect = new Rectangle(0, 0, 0, 0);
+            Rect = new SKRect(0, 0, 0, 0);
         }
 
         public void AddScene(Scene scene)
@@ -109,7 +110,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                 lastX = (lastX == null) ? curLastX : (lastX > curLastX) ? lastX : curLastX;
             }
 
-            Rect = new Rectangle((int)firstX, (int)firstY, (int)(lastX - firstX + 1), (int)(lastY - firstY + 1));
+            Rect = SKRect.Create((int)firstX, (int)firstY, (int)(lastX - firstX + 1), (int)(lastY - firstY + 1));
 
 
             // Calculate the subdirectory in which each region will be stored in the archive
@@ -119,8 +120,8 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             {
                 // We add the region's coordinates to ensure uniqueness even if multiple regions have the same name
                 string path = string.Format("{0}_{1}_{2}",
-                    scene.RegionInfo.RegionLocX - Rect.X + 1,
-                    scene.RegionInfo.RegionLocY - Rect.Y + 1,
+                    scene.RegionInfo.RegionLocX - (uint)Rect.Left + 1,
+                    scene.RegionInfo.RegionLocY - (uint)Rect.Top + 1,
                     scene.RegionInfo.RegionName.Replace(' ', '_'));
                 m_regionDirs[scene.RegionInfo.RegionID] = path;
             });
@@ -158,7 +159,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
         /// <param name="location">A location in the grid</param>
         /// <param name="scene">The scene at this location</param>
         /// <returns>Whether the scene was found</returns>
-        public bool TryGetScene(Point location, out Scene scene)
+        public bool TryGetScene(SKPoint location, out Scene scene)
         {
             SortedDictionary<uint, Scene> row;
             if (Regions.TryGetValue((uint)location.Y, out row))

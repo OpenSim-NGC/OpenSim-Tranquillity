@@ -25,15 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using OpenSim.Region.Framework.Scenes;
 using OpenMetaverse;
 using log4net;
 using System.Reflection;
 using OpenSim.Framework.Serialization;
+using SkiaSharp;
 
 namespace OpenSim.Region.CoreModules.World.Archiver
 {
@@ -57,7 +54,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             /// <summary>
             /// The region's coordinates (relative to the South-West corner of the block).
             /// </summary>
-            public Point Location { get; set; }
+            public SKPoint Location { get; set; }
 
             /// <summary>
             /// The UUID of the original scene from which this archived region was saved.
@@ -131,7 +128,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             int x = (int)((m_curX == null) ? 0 : m_curX);
             int y = (int)((m_curY == null) ? 0 : m_curY);
 
-            m_curRegion.Location = new Point(x, y);
+            m_curRegion.Location = new SKPoint(x, y);
             m_curRegion.OriginalID = id;
             // 'curRegion' will be saved in 'm_directory2region' when SetRegionDir() is called
         }
@@ -165,10 +162,10 @@ namespace OpenSim.Region.CoreModules.World.Archiver
         {
             foreach (RegionInfo archivedRegion in m_directory2region.Values)
             {
-                Point location = new Point((int)rootScene.RegionInfo.RegionLocX,
+                SKPoint location = new SKPoint((int)rootScene.RegionInfo.RegionLocX,
                             (int)rootScene.RegionInfo.RegionLocY);
 
-                location.Offset(archivedRegion.Location);
+                location = location + archivedRegion.Location;
 
                 Scene scene;
                 if (simulatorScenes.TryGetScene(location, out scene))

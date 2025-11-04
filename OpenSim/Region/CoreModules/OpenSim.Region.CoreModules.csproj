@@ -36,6 +36,7 @@
     <ProjectReference Include="..\..\Services\Interfaces\OpenSim.Services.Interfaces.csproj" />
     <ProjectReference Include="..\..\..\ThirdParty\SmartThreadPool\SmartThreadPool.csproj" />
   </ItemGroup>
+  
   <ItemGroup>
     <Compile Remove="Asset\Tests\FlotsamAssetCacheTests.cs" />
     <Compile Remove="Avatar\Attachments\Tests\AttachmentsModuleTests.cs" />
