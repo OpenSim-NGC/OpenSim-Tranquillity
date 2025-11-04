@@ -121,9 +121,9 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                 var typeface = SKTypeface.FromFamilyName(fontName, SKFontStyle.Normal);
                 using (var font = new SKFont(typeface, fontSize))
                 {
-                    var bounds = font.MeasureText(text);
-                    xSize = bounds.Width;
-                    ySize = bounds.Height;
+                    xSize = (int)font.MeasureText(text);
+                    // For height, use the font metrics
+                    ySize = (int)(font.Metrics.Descent - font.Metrics.Ascent);
                 }
             }
         }
@@ -242,7 +242,6 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
 
             string[] nvps = extraParams.Split(paramDelimiter);
 
-            bool lossless = false;
             int temp = -1;
             foreach (string pair in nvps)
             {
@@ -334,10 +333,6 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                          break;
                     case "altdatadelim":
                         altDataDelim = value.ToCharArray()[0];
-                        break;
-                    case "lossless":
-                        if (value.ToLower() == "true")
-                            lossless = true;
                         break;
                     case "":
                          // blank string has been passed do nothing just use defaults
