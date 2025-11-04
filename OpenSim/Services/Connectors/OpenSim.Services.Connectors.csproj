@@ -7,6 +7,8 @@
     <Copyright>OpenSimulator developers</Copyright>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="3.119.1" />
+    <PackageReference Include="CoreJ2K.Skia" Version="1.1.2.50" />
     <PackageReference Include="log4net" Version="3.2.0" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
@@ -17,9 +19,6 @@
     <Reference Include="OpenMetaverse" HintPath="..\..\..\Library\OpenMetaverse.dll" />
     <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\..\Library\OpenMetaverse.StructuredData.dll" />
     <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\Library\OpenMetaverseTypes.dll" />
-    <Reference Include="SkiaSharp">
-      <HintPath>..\..\..\..\..\..\..\..\.nuget\packages\skiasharp\3.119.1\ref\net8.0\SkiaSharp.dll</HintPath>
-    </Reference>
     <Reference Include="XMLRPC" HintPath="..\..\..\Library\XMLRPC.dll" />
   </ItemGroup>
   <ItemGroup>
