@@ -25,8 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Nini.Config;
 using OpenSim.Framework;
+using OpenSim.Region.CoreModules.Asset;
 using OpenSim.Tests.Common;
+using Xunit;
 
 namespace OpenSim.Region.CoreModules.Asset.Tests
 {
@@ -35,8 +38,8 @@ namespace OpenSim.Region.CoreModules.Asset.Tests
     /// </summary>
     public class FlotsamAssetCacheTests : OpenSimTestCase
     {
-        protected TestScene m_scene;
-        protected FlotsamAssetCache m_cache;
+        protected TestScene? m_scene;
+        protected FlotsamAssetCache? m_cache;
 
         public override void SetUp()
         {
@@ -66,14 +69,14 @@ namespace OpenSim.Region.CoreModules.Asset.Tests
 
             // Check we don't get anything before the asset is put in the cache
             AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
-            Assert.Null();
+            Assert.Null(retrievedAsset);
 
             m_cache.Store(asset);
 
             // Check that asset is now in cache
             retrievedAsset = m_cache.Get(asset.ID.ToString());
-            Assert.NotNull();
-            Assert.Equal(,);
+            Assert.NotNull(retrievedAsset);
+            Assert.Equal(asset.ID, retrievedAsset.ID);
         }
 
         [Fact]
@@ -90,7 +93,7 @@ namespace OpenSim.Region.CoreModules.Asset.Tests
             m_cache.Expire(asset.ID);
 
             AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
-            Assert.Null();
+            Assert.Null(retrievedAsset);
         }
 
         [Fact]
@@ -107,7 +110,7 @@ namespace OpenSim.Region.CoreModules.Asset.Tests
             m_cache.Clear();
 
             AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
-            Assert.Null();
+            Assert.Null(retrievedAsset);
         }
     }
 }

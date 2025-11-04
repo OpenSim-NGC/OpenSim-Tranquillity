@@ -28,10 +28,12 @@
 using OpenMetaverse;
 
 using OpenSim.Framework;
+using OpenSim.Region.CoreModules.Avatar.Inventory.Archiver;
 using OpenSim.Region.CoreModules.World.Serialiser;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
+using Xunit;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 {
@@ -224,12 +226,12 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 
                 List<InventoryFolderBase> folder1Candidates
                     = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, ua1.PrincipalID, folder1Name);
-                Assert.Equal(,);
+                Assert.Single(folder1Candidates);
 
                 InventoryFolderBase folder1 = folder1Candidates[0];
                 List<InventoryFolderBase> folder2aCandidates
                     = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, folder1, folder2aName);
-                Assert.Equal(,);
+                Assert.Single(folder2aCandidates);
             }
 
             {
@@ -241,17 +243,17 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 
                 List<InventoryFolderBase> folder1Candidates
                     = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, ua1.PrincipalID, folder1Name);
-                Assert.Equal(,);
+                Assert.Single(folder1Candidates);
 
                 InventoryFolderBase folder1 = folder1Candidates[0];
 
                 List<InventoryFolderBase> folder2aCandidates
                     = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, folder1, folder2aName);
-                Assert.Equal(,);
+                Assert.Single(folder2aCandidates);
 
                 List<InventoryFolderBase> folder2bCandidates
                     = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, folder1, folder2bName);
-                Assert.Equal(,);
+                Assert.Single(folder2bCandidates);
             }
         }
 
@@ -287,7 +289,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 
             List<InventoryFolderBase> folder1PostCandidates
                 = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, ua1.PrincipalID, folder1ExistingName);
-            Assert.Equal(,);
+            Assert.True(folder1PostCandidates.Count >= 1);
 
             // FIXME: Temporarily, we're going to do something messy to make sure we pick up the created folder.
             InventoryFolderBase folder1Post = null;
@@ -303,7 +305,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 
             List<InventoryFolderBase> folder2PostCandidates
                 = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, folder1Post, "b");
-            Assert.Equal(,);
+            Assert.Single(folder2PostCandidates);
         }
 
         /// <summary>
@@ -338,12 +340,12 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 
             List<InventoryFolderBase> folder1PostCandidates
                 = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, ua1.PrincipalID, folder1ExistingName);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Single(folder1PostCandidates);
+            Assert.True(folder1PostCandidates[0].ID == folder1.ID);
 
             List<InventoryFolderBase> folder2PostCandidates
                 = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, folder1PostCandidates[0], "b");
-            Assert.Equal(,);
+            Assert.Single(folder2PostCandidates);
         }
     }
 }

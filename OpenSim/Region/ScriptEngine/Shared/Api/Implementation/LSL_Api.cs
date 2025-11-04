@@ -16828,18 +16828,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
                                 // When part is sculpt, create mesh
                                 // Quirk: Generated sculpt mesh is about 2.8% smaller in X and Y than visual sculpt.
+                                // TODO: Sculpt mesh rendering requires OpenMetaverse library to accept SkiaSharp bitmaps
+                                // For now, sculpt rendering is disabled in SkiaSharp-only mode
                                 else if (omvPrim.Sculpt != null && omvPrim.Sculpt.Type != SculptType.Mesh && sculptAsset != null)
                                 {
-                                    IJ2KDecoder imgDecoder = World.RequestModuleInterface<IJ2KDecoder>();
-                                    if (imgDecoder != null)
-                                    {
-                                        Image sculpt = imgDecoder.DecodeToImage(sculptAsset);
-                                        if (sculpt != null)
-                                        {
-                                            mesh = primMesher.GenerateFacetedSculptMesh(omvPrim, (Bitmap)sculpt, m_sculptLodInCastRay);
-                                            sculpt.Dispose();
-                                        }
-                                    }
+                                    m_log.WarnFormat("[LSL API] Sculpt rendering for prim {0} is not supported in SkiaSharp-only mode", 
+                                        omvPrim.ID.ToString());
                                 }
 
                                 // When part is shape, create mesh

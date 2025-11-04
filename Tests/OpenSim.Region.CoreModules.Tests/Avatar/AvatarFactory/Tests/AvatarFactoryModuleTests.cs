@@ -28,8 +28,10 @@
 using OpenMetaverse;
 
 using OpenSim.Framework;
+using OpenSim.Region.CoreModules.Avatar.AvatarFactory;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
+using Xunit;
 
 namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
 {
@@ -81,12 +83,12 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
             eyesFace.TextureID = bakedTextureID;
             afm.SetAppearance(sp, bakedTextureEntry, visualParams, null);
 
-            Assert.Equal(,);
+            Assert.Equal(0, rebakeRequestsReceived);
 
             AssetBase eyesBake = scene.AssetService.Get(bakedTextureID.ToString());
-            Assert.NotNull();
-            Assert.That(eyesBake.Temporary, Is.True);
-            Assert.That(eyesBake.Local, Is.True);
+            Assert.NotNull(eyesBake);
+            Assert.True(eyesBake.Temporary);
+            Assert.True(eyesBake.Local);
         }
 
         /// <summary>
@@ -138,7 +140,7 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
             eyesFace.TextureID = alphaTextureID;
             afm.SetAppearance(sp, bakedTextureEntry, visualParams, null);
 
-            Assert.Equal(,);
+            Assert.Equal(0, rebakeRequestsReceived);
         }
 
         [Fact]
@@ -184,9 +186,9 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
             assetCache.Clear();
 
             AssetBase eyesBake = scene.AssetService.Get(eyesTextureId.ToString());
-            Assert.NotNull();
-            Assert.That(eyesBake.Temporary, Is.False);
-            Assert.That(eyesBake.Local, Is.False);
+            Assert.NotNull(eyesBake);
+            Assert.False(eyesBake.Temporary);
+            Assert.False(eyesBake.Local);
         }
     }
 }

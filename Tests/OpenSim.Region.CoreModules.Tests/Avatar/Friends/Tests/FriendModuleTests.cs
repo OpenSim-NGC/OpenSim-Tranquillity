@@ -27,9 +27,12 @@
 
 using OpenMetaverse;
 
+using Nini.Config;
 using OpenSim.Framework;
+using OpenSim.Region.CoreModules.Avatar.Friends;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
+using Xunit;
 
 namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
 {
@@ -194,9 +197,10 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends.Tests
             m_fm.AddFriendship(sp.ControllingClient, user2Id);
             m_fm.RemoveFriendship(sp.ControllingClient, user2Id);
 
-            TestClient user1Client = sp.ControllingClient as TestClient;
-            Assert.Equal(,);
-            Assert.Equal(,);
+            TestClient? user1Client = sp.ControllingClient as TestClient;
+            Assert.NotNull(user1Client);
+            Assert.Single(user1Client.ReceivedOfflineNotifications);
+            Assert.Empty(user1Client.ReceivedOnlineNotifications);
         }
     }
 }
