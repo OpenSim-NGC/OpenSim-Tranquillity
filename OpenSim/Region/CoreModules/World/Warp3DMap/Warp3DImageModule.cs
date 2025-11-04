@@ -763,10 +763,9 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         {
             string name = color.ToString();
 
-            if(renderer.Scene.TryGetMaterial(name, out warp_Material material))
-                return material;
-
-            material = new warp_Material(ConvertColor(color));
+            // Try to get from the renderer's material cache using addMaterial
+            // Since Warp3D doesn't have TryGetMaterial, we create the material directly
+            warp_Material material = new warp_Material(ConvertColor(color));
             renderer.Scene.addMaterial(name, material);
             return material;
         }
@@ -777,10 +776,9 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             string idstr = textureID.ToString() + color.ToString();
             string materialName = "MAPMAT" + idstr;
 
-            if (renderer.Scene.TryGetMaterial(materialName, out warp_Material mat))
-                return mat;
-
-            mat = new warp_Material();
+            // Note: Warp3D doesn't have TryGetMaterial, so we always create and add
+            // The scene will handle duplicate names appropriately
+            warp_Material mat = new warp_Material();
             warp_Texture texture = GetTexture(textureID, sop);
             if (texture is not null)
             {
