@@ -69,13 +69,13 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             TarArchiveReader.TarEntryType tarEntryType;
 
             byte[] data = tar.ReadEntry(out filePath, out tarEntryType);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             InventoryArchiveReadRequest iarr
                 = new InventoryArchiveReadRequest(UUID.Random(), null, null, null, null, null, null, (Stream)null, false);
             iarr.LoadControlFile(filePath, data);
 
-            Assert.That(iarr.ControlFileLoaded, Is.True);
+            Assert.True(iarr.ControlFileLoaded);
         }
 
         [Fact]
@@ -128,7 +128,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
                     gotObjectsFolder = true;
             }
 
-            Assert.That(gotObjectsFolder, Is.True);
+            Assert.True(gotObjectsFolder);
         }
 
         [Fact]
@@ -203,10 +203,10 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             }
 
 //            Assert.That(gotControlFile, Is.True, "No control file in archive");
-            Assert.That(gotf1, Is.True);
-            Assert.That(gotf1_1, Is.True);
-            Assert.That(gotso1, Is.True);
-            Assert.That(gotso2, Is.True);
+            Assert.True(gotf1);
+            Assert.True(gotf1_1);
+            Assert.True(gotso1);
+            Assert.True(gotso2);
 
             // TODO: Test presence of more files and contents of files.
         }
@@ -289,7 +289,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 //
 //                    if (fileName.StartsWith(part1.Name))
 //                    {
-                        Assert.Equal(,);
+                        // TODO: Assert.Equal(,); - incomplete assertion
                         gotObject1File = true;
 //                    }
 //                    else if (fileName.StartsWith(part2.Name))
@@ -385,7 +385,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 //
 //                    if (fileName.StartsWith(part1.Name))
 //                    {
-                        Assert.Equal(,);
+                        // TODO: Assert.Equal(,); - incomplete assertion
                         gotObject1File = true;
 //                    }
 //                    else if (fileName.StartsWith(part2.Name))

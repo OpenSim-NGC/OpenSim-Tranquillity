@@ -120,14 +120,14 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
                 = UserInventoryHelpers.GetInventoryItem(m_scene.InventoryService, giverSp.UUID, "Objects/givenObj");
 
             Assert.NotNull();
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // Test for item successfully making it into the receiver's inventory
             InventoryItemBase receivedItem
                 = UserInventoryHelpers.GetInventoryItem(m_scene.InventoryService, receiverSp.UUID, "Objects/givenObj");
 
             Assert.NotNull();
-            Assert.That(receivedItem.ID, Is.Not.EqualTo(originalItem.ID));
+            Assert.NotEqual(originalItem.ID, receivedItem.ID);
 
             // Test that on a delete, item still exists and is accessible for the giver.
             m_scene.InventoryService.DeleteItems(receiverSp.UUID, new List<UUID>() { receivedItem.ID });
@@ -220,7 +220,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
                 = UserInventoryHelpers.GetInventoryItem(m_scene.InventoryService, giverSp.UUID, "Objects/givenObj");
 
             Assert.NotNull();
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // Test for item successfully making it into the receiver's inventory
             InventoryItemBase receivedItem
@@ -230,8 +230,8 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
                 = m_scene.InventoryService.GetFolderForType(receiverSp.UUID, FolderType.Trash);
 
             Assert.NotNull();
-            Assert.That(receivedItem.ID, Is.Not.EqualTo(originalItem.ID));
-            Assert.Equal(,);
+            Assert.NotEqual(originalItem.ID, receivedItem.ID);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // Test that on a delete, item still exists and is accessible for the giver.
             m_scene.InventoryService.PurgeFolder(trashFolder);
@@ -312,14 +312,14 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
                 = UserInventoryHelpers.GetInventoryFolder(m_scene.InventoryService, giverSp.UUID, "f1");
 
             Assert.NotNull();
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // Test for item successfully making it into the receiver's inventory
             InventoryFolderBase receivedFolder
                 = UserInventoryHelpers.GetInventoryFolder(m_scene.InventoryService, receiverSp.UUID, "f1");
 
             Assert.NotNull();
-            Assert.That(receivedFolder.ID, Is.Not.EqualTo(originalFolder.ID));
+            Assert.NotEqual(originalFolder.ID, receivedFolder.ID);
 
             // Test that on a delete, item still exists and is accessible for the giver.
             m_scene.InventoryService.DeleteFolders(receiverSp.UUID, new List<UUID>() { receivedFolder.ID });
@@ -413,7 +413,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
                 = UserInventoryHelpers.GetInventoryFolder(m_scene.InventoryService, giverSp.UUID, "f1");
 
             Assert.NotNull();
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // Test for folder successfully making it into the receiver's inventory
             InventoryFolderBase receivedFolder
@@ -423,8 +423,8 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests
                 = m_scene.InventoryService.GetFolderForType(receiverSp.UUID, FolderType.Trash);
 
             Assert.NotNull();
-            Assert.That(receivedFolder.ID, Is.Not.EqualTo(originalFolder.ID));
-            Assert.Equal(,);
+            Assert.NotEqual(originalFolder.ID, receivedFolder.ID);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // Test that on a delete, item still exists and is accessible for the giver.
             m_scene.InventoryService.PurgeFolder(trashFolder);

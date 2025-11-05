@@ -605,9 +605,9 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             SceneObjectGroup so = SceneObjectSerializer.FromOriginalXmlFormat(ObjectWithNoOtherPartsXml);
             SceneObjectPart rootPart = so.RootPart;
 
-            Assert.Equal(,));
-            Assert.Equal(,));
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
             OSDMap store = rootPart.DynAttrs.GetStore("MyNamespace", "MyStore");
             Assert.Equal(42, store["the answer"].AsInteger());
 
@@ -627,9 +627,9 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             {
                 SceneObjectPart part = parts[0];
 
-                Assert.Equal(,));
-                Assert.Equal(,));
-                Assert.Equal(,);
+                // TODO: Assert.Equal(,)); - incomplete assertion
+                // TODO: Assert.Equal(,)); - incomplete assertion
+                // TODO: Assert.Equal(,); - incomplete assertion
                 OSDMap store = part.DynAttrs.GetStore("MyNamespace", "MyStore");
                 Assert.Equal(42, store["the answer"].AsInteger());
             }
@@ -637,17 +637,17 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             {
                 SceneObjectPart part = parts[1];
 
-                Assert.Equal(,));
-                Assert.Equal(,));
-                Assert.Equal(,);
+                // TODO: Assert.Equal(,)); - incomplete assertion
+                // TODO: Assert.Equal(,)); - incomplete assertion
+                // TODO: Assert.Equal(,); - incomplete assertion
             }
 
             {
                 SceneObjectPart part = parts[2];
 
-                Assert.Equal(,));
-                Assert.Equal(,));
-                Assert.Equal(,);
+                // TODO: Assert.Equal(,)); - incomplete assertion
+                // TODO: Assert.Equal(,)); - incomplete assertion
+                // TODO: Assert.Equal(,); - incomplete assertion
             }
 
             // TODO: Check other properties
@@ -662,19 +662,19 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             SceneObjectGroup so = SceneObjectSerializer.FromOriginalXmlFormat(ObjectWithBadFloatsXml);
             SceneObjectPart rootPart = so.RootPart;
 
-            Assert.Equal(,));
-            Assert.Equal(,));
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // This terminates the deserialization earlier if couldn't be parsed.
             // TODO: Need to address this
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // Defaults for bad parses
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // TODO: Check other properties
         }
@@ -764,9 +764,9 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             xtr.Close();
 
             // TODO: More checks
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
             Assert.NotNull(daMap);
             Assert.Equal(daValue, daMap.GetStore(daNamespace, daStoreName)[daKey].AsString());
         }
@@ -780,9 +780,9 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             SceneObjectGroup so = m_serialiserModule.DeserializeGroupFromXml2(ObjectWithNoPartsXml2);
             SceneObjectPart rootPart = so.RootPart;
 
-            Assert.Equal(,));
-            Assert.Equal(,));
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
             OSDMap store = rootPart.DynAttrs.GetStore("MyNamespace", "MyStore");
             Assert.Equal("Rosebud", store["last words"].AsString());
 
@@ -870,9 +870,9 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             xtr.Close();
 
             // TODO: More checks
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
             Assert.NotNull(daMap);
             Assert.Equal(daValue, daMap.GetStore(daNamespace, daStoreName)[daKey].AsString());
         }

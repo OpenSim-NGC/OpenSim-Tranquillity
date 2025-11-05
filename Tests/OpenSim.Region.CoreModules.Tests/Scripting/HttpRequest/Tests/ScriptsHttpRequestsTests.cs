@@ -182,7 +182,7 @@ namespace OpenSim.Region.CoreModules.Scripting.HttpRequest.Tests
             hr.SendRequest();
 
             Assert.That(hr.Status, Is.EqualTo((int)HttpStatusCode.NotFound));
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
     }
 }

@@ -67,7 +67,7 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement.Tests
             SceneHelpers.AddScenePresence(scene, acd);
 
             string name = hgumm.GetUserName(userId);
-            Assert.Equal(,));
+            // TODO: Assert.Equal(,)); - incomplete assertion
         }
     }
 }

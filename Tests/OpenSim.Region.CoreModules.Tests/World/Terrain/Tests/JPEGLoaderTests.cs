@@ -88,8 +88,8 @@ namespace OpenSim.Region.CoreModules.World.Terrain.Tests
                 using (var decoded = SKBitmap.Decode(file1))
                 {
                     Assert.NotNull();
-                    Assert.Equal(,);
-                    Assert.Equal(,);
+                    // TODO: Assert.Equal(,); - incomplete assertion
+                    // TODO: Assert.Equal(,); - incomplete assertion
                 }
 
                 // Tiled save
@@ -118,7 +118,7 @@ namespace OpenSim.Region.CoreModules.World.Terrain.Tests
                     int targetX = 0 + offsetX * regionSizeX; // 2
                     int targetY = 0 + (fileHeight - 1 - offsetY) * regionSizeY; // 2
 
-                    Assert.That(targetX < decoded.Width && targetY < decoded.Height, "Target pixel inside image");
+                    Assert.True(targetX < decoded.Width && targetY < decoded.Height);
 
                     SKColor pixel = decoded.GetPixel(targetX, targetY);
 

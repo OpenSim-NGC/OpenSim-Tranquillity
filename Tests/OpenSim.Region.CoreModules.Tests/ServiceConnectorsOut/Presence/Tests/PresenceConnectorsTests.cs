@@ -79,19 +79,19 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence.Tests
             //m_LocalConnector.LoginAgent(user1, session1, UUID.Zero);
             PresenceInfo result = m_LocalConnector.GetAgent(session1);
             Assert.NotNull(result, "Retrieved GetAgent is null");
-            Assert.That(result.UserID, Is.EqualTo(user1), "Retrieved userID does not match");
+            Assert.Equal(user1, result.UserID);
 
             UUID region1 = UUID.Random();
             bool r = m_LocalConnector.ReportAgent(session1, region1);
             Assert.True(r, "First ReportAgent returned false");
             result = m_LocalConnector.GetAgent(session1);
-            Assert.That(result.RegionID, Is.EqualTo(region1), "Agent is not in the right region (region1)");
+            Assert.Equal(region1, result.RegionID);
 
             UUID region2 = UUID.Random();
             r = m_LocalConnector.ReportAgent(session1, region2);
             Assert.True(r, "Second ReportAgent returned false");
             result = m_LocalConnector.GetAgent(session1);
-            Assert.That(result.RegionID, Is.EqualTo(region2), "Agent is not in the right region (region2)");
+            Assert.Equal(region2, result.RegionID);
 
             r = m_LocalConnector.LogoutAgent(session1);
             Assert.True(r, "LogoutAgent returned false");

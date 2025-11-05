@@ -83,14 +83,14 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
         {
             IPrimCounts pc = m_lo.PrimCounts;
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         /// <summary>
@@ -107,27 +107,27 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             SceneObjectGroup sog = SceneHelpers.CreateSceneObject(3, m_userId, "a", 0x01);
             m_scene.AddNewSceneObject(sog, false);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // Add a second object and retest
             SceneObjectGroup sog2 = SceneHelpers.CreateSceneObject(2, m_userId, "b", 0x10);
             m_scene.AddNewSceneObject(sog2, false);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         /// <summary>
@@ -145,14 +145,14 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             m_scene.AddNewSceneObject(sog, false);
             m_scene.SceneGraph.DuplicateObject(sog.LocalId, Vector3.Zero, m_userId, UUID.Zero, Quaternion.Identity, false);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         /// <summary>
@@ -175,46 +175,46 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
 
             IPrimCounts pclo1 = m_lo.PrimCounts;
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             IPrimCounts pclo2 = m_lo2.PrimCounts;
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // Now move it back again
             sog.AbsolutePosition = new Vector3(2, 2, 2);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         /// <summary>
@@ -233,14 +233,14 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             m_scene.AddNewSceneObject(sogToDelete, false);
             m_scene.DeleteSceneObject(sogToDelete, false);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         [Fact]
@@ -257,18 +257,18 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             sog.GroupID = m_groupId;
             m_scene.AddNewSceneObject(sog, false);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // Is this desired behaviour?  Not totally sure.
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         /// <summary>
@@ -292,15 +292,15 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             m_scene.AddNewSceneObject(sogToDelete, false);
             m_scene.DeleteSceneObject(sogToDelete, false);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         [Fact]
@@ -314,14 +314,14 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             SceneObjectGroup sog = SceneHelpers.CreateSceneObject(3, m_otherUserId, "a", 0x01);
             m_scene.AddNewSceneObject(sog, false);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         [Fact]
@@ -337,14 +337,14 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             m_scene.AddNewSceneObject(sogToDelete, false);
             m_scene.DeleteSceneObject(sogToDelete, false);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         /// <summary>
@@ -361,14 +361,14 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
 
             m_pcm.TaintPrimCount();
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
     }
 }

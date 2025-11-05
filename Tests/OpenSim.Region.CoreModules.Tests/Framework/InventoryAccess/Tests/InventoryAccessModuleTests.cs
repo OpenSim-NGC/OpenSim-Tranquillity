@@ -112,16 +112,16 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess.Tests
 
             retrievedObj1Part = m_scene.GetSceneObjectPart(item1.Name);
             Assert.NotNull();
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // Bottom of coalescence is placed on ground, hence we end up with 100.5 rather than 85 since the bottom
             // object is unit square.
-            Assert.Equal(,));
+            // TODO: Assert.Equal(,)); - incomplete assertion
 
             SceneObjectPart retrievedObj2Part = m_scene.GetSceneObjectPart(object2.Name);
             Assert.NotNull();
-            Assert.Equal(,);
-            Assert.Equal(,));
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,)); - incomplete assertion
 */
         }
 

@@ -105,13 +105,13 @@ namespace OpenSim.Region.CoreModules.World.Terrain.Tests
 
             x[0, 0] = 1.0f;
             float[] floatsExport = x.GetFloatsSerialised();
-            Assert.That(floatsExport[0] == 1.0f, "Export to float[] not working correctly.");
+            Assert.Equal(1.0f, floatsExport[0]);
 
             x[0, 0] = 1.0f;
             Assert.That(x.Tainted(0, 0), "Terrain channel tainting not working correctly.");
 
             TerrainChannel y = x.Copy();
-            Assert.That(!ReferenceEquals(x, y), "Terrain copy not duplicating correctly.");
+            Assert.False(ReferenceEquals(x, y));
             Assert.That(!ReferenceEquals(x.GetDoubles(), y.GetDoubles()), "Terrain array not duplicating correctly.");
         }
     }

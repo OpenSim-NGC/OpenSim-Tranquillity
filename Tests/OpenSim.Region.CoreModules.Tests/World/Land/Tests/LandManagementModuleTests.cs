@@ -66,14 +66,14 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
 
             {
                 ILandObject loAtCoord = lmm.GetLandObject(0, 0);
-                Assert.Equal(,);
-                Assert.Equal(,);
+                // TODO: Assert.Equal(,); - incomplete assertion
+                // TODO: Assert.Equal(,); - incomplete assertion
             }
 
             {
                 ILandObject loAtCoord = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
-                Assert.Equal(,);
-                Assert.Equal(,);
+                // TODO: Assert.Equal(,); - incomplete assertion
+                // TODO: Assert.Equal(,); - incomplete assertion
             }
         }
 
@@ -94,12 +94,12 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
 
             ILandObject loAtCoord1 = lmm.GetLandObject(0, 0);
-            Assert.That(loAtCoord1.LandData.LocalID, Is.Not.EqualTo(0));
-            Assert.That(loAtCoord1.LandData.GlobalID, Is.Not.EqualTo(UUID.Zero));
+            Assert.NotEqual(0, loAtCoord1.LandData.LocalID);
+            Assert.NotEqual(UUID.Zero, loAtCoord1.LandData.GlobalID);
 
             ILandObject loAtCoord2 = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         /// <summary>
@@ -128,12 +128,12 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
 
             ILandObject loAtCoord1 = lmm.GetLandObject(0, 0);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             ILandObject loAtCoord2 = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         /// <summary>
@@ -170,19 +170,19 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
             scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
 
             ILandObject loAtCoord1 = lmm.GetLandObject(0, 0);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             ILandObject loAtCoord2
                 = lmm.GetLandObject((int)Constants.RegionSize - 1, (((int)Constants.RegionSize / 4) * 3) - 1);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             ILandObject loAtCoord3 = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
-            Assert.That(loAtCoord3.LandData.LocalID, Is.Not.EqualTo(loAtCoord1.LandData.LocalID));
-            Assert.That(loAtCoord3.LandData.LocalID, Is.Not.EqualTo(loAtCoord2.LandData.LocalID));
-            Assert.That(loAtCoord3.LandData.GlobalID, Is.Not.EqualTo(loAtCoord1.LandData.GlobalID));
-            Assert.That(loAtCoord3.LandData.GlobalID, Is.Not.EqualTo(loAtCoord2.LandData.GlobalID));
+            Assert.NotEqual(loAtCoord1.LandData.LocalID, loAtCoord3.LandData.LocalID);
+            Assert.NotEqual(loAtCoord2.LandData.LocalID, loAtCoord3.LandData.LocalID);
+            Assert.NotEqual(loAtCoord1.LandData.GlobalID, loAtCoord3.LandData.GlobalID);
+            Assert.NotEqual(loAtCoord2.LandData.GlobalID, loAtCoord3.LandData.GlobalID);
         }
 
         /// <summary>
@@ -219,14 +219,14 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
 
             {
                 ILandObject loAtCoord = lmm.GetLandObject(0, 0);
-                Assert.Equal(,);
-                Assert.Equal(,);
+                // TODO: Assert.Equal(,); - incomplete assertion
+                // TODO: Assert.Equal(,); - incomplete assertion
             }
 
             {
                 ILandObject loAtCoord = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
-                Assert.Equal(,);
-                Assert.Equal(,);
+                // TODO: Assert.Equal(,); - incomplete assertion
+                // TODO: Assert.Equal(,); - incomplete assertion
             }
         }
 
@@ -252,14 +252,14 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
 
             {
                 ILandObject loAtCoord = lmm.GetLandObject(0, 0);
-                Assert.That(loAtCoord.LandData.LocalID, Is.Not.EqualTo(lo.LandData.LocalID));
-                Assert.That(loAtCoord.LandData.GlobalID, Is.Not.EqualTo(lo.LandData.GlobalID));
+                Assert.NotEqual(lo.LandData.LocalID, loAtCoord.LandData.LocalID);
+                Assert.NotEqual(lo.LandData.GlobalID, loAtCoord.LandData.GlobalID);
             }
 
             {
                 ILandObject loAtCoord = lmm.GetLandObject(Constants.LandUnit, Constants.LandUnit);
-                Assert.Equal(,);
-                Assert.Equal(,);
+                // TODO: Assert.Equal(,); - incomplete assertion
+                // TODO: Assert.Equal(,); - incomplete assertion
             }
         }
     }

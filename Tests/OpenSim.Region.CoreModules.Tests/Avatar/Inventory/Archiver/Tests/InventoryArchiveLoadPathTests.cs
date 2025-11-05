@@ -63,7 +63,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             InventoryItemBase foundItem1
                 = InventoryArchiveUtils.FindItemByPath(scene.InventoryService, m_uaMT.PrincipalID, m_item1Name);
 
-            Assert.That(foundItem1, Is.Not.Null, "Didn't find loaded item 1");
+            Assert.NotNull(foundItem1);
 
             // Now try loading to a root child folder
             UserInventoryHelpers.CreateInventoryFolder(scene.InventoryService, m_uaMT.PrincipalID, "xA", false);
@@ -72,7 +72,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 
             InventoryItemBase foundItem2
                 = InventoryArchiveUtils.FindItemByPath(scene.InventoryService, m_uaMT.PrincipalID, "xA/" + m_item1Name);
-            Assert.That(foundItem2, Is.Not.Null, "Didn't find loaded item 2");
+            Assert.NotNull(foundItem2);
 
             // Now try loading to a more deeply nested folder
             UserInventoryHelpers.CreateInventoryFolder(scene.InventoryService, m_uaMT.PrincipalID, "xB/xC", false);
@@ -81,7 +81,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 
             InventoryItemBase foundItem3
                 = InventoryArchiveUtils.FindItemByPath(scene.InventoryService, m_uaMT.PrincipalID, "xB/xC/" + m_item1Name);
-            Assert.That(foundItem3, Is.Not.Null, "Didn't find loaded item 3");
+            Assert.NotNull(foundItem3);
         }
 
         /// <summary>
@@ -105,7 +105,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
                 = InventoryArchiveUtils.FindItemByPath(
                     scene.InventoryService, m_uaMT.PrincipalID, "/Objects/" + m_item1Name);
 
-            Assert.That(foundItem1, Is.Not.Null, "Didn't find loaded item 1 in TestLoadIarFolderStartsWithSlash()");
+            Assert.NotNull(foundItem1);
         }
 
         [Fact]
@@ -182,13 +182,11 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
                 = InventoryArchiveUtils.FindItemByPath(
                     scene.InventoryService, userId, "Scripts/Objects/" + humanEscapedItemName);
 
-            Assert.That(foundItem1, Is.Not.Null, "Didn't find loaded item 1");
+            Assert.NotNull(foundItem1);
 //            Assert.That(
 //                foundItem1.CreatorId, Is.EqualTo(userUuid),
 //                "Loaded item non-uuid creator doesn't match that of the loading user");
-            Assert.That(
-                foundItem1.Name, Is.EqualTo(itemName),
-                "Loaded item name doesn't match saved name");
+            Assert.Equal(itemName, foundItem1.Name);
         }
 
         /// <summary>

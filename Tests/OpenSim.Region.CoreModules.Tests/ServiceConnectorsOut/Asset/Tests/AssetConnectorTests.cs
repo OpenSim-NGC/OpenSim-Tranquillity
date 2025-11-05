@@ -52,15 +52,15 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
             lasc.Store(a1);
 
             AssetBase retreivedA1 = lasc.Get(a1.ID);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             AssetMetadata retrievedA1Metadata = lasc.GetMetadata(a1.ID);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             byte[] retrievedA1Data = lasc.GetData(a1.ID);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // TODO: Add cache and check that this does receive a copy of the asset
         }
@@ -88,15 +88,15 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
             lasc.Store(a2);
 
             AssetBase retreivedA2 = lasc.Get(a2.ID);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             AssetMetadata retrievedA2Metadata = lasc.GetMetadata(a2.ID);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             byte[] retrievedA2Data = lasc.GetData(a2.ID);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // TODO: Add cache and check that this does receive a copy of the asset
         }

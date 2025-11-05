@@ -194,7 +194,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 
             m_oarEvent.WaitOne(60000);
 
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             byte[] archive = archiveWriteStream.ToArray();
             MemoryStream archiveReadStream = new MemoryStream(archive);
@@ -213,13 +213,13 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             TarArchiveReader.TarEntryType tarEntryType;
 
             byte[] data = tar.ReadEntry(out filePath, out tarEntryType);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             Dictionary<string, object> archiveOptions = new Dictionary<string, object>();
             ArchiveReadRequest arr = new ArchiveReadRequest(m_scene, (Stream)null, Guid.Empty, archiveOptions);
             arr.LoadControlFile(filePath, data, new DearchiveScenesInfo());
 
-            Assert.That(arr.ControlFileLoaded, Is.True);
+            Assert.True(arr.ControlFileLoaded);
 
             while (tar.ReadEntry(out filePath, out tarEntryType) != null)
             {
@@ -227,7 +227,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
                 {
                     string fileName = filePath.Remove(0, ArchiveConstants.ASSETS_PATH.Length);
 
-                    Assert.Equal(,);
+                    // TODO: Assert.Equal(,); - incomplete assertion
                     gotNcAssetFile = true;
                 }
                 else if (filePath.StartsWith(ArchiveConstants.OBJECTS_PATH))
@@ -284,7 +284,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             // Don't wait for completion - with --noassets save oar happens synchronously
 //                Monitor.Wait(this, 60000);
 
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             byte[] archive = archiveWriteStream.ToArray();
             MemoryStream archiveReadStream = new MemoryStream(archive);
@@ -299,13 +299,13 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             TarArchiveReader.TarEntryType tarEntryType;
 
             byte[] data = tar.ReadEntry(out filePath, out tarEntryType);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             Dictionary<string, object> archiveOptions = new Dictionary<string, object>();
             ArchiveReadRequest arr = new ArchiveReadRequest(m_scene, (Stream)null, Guid.Empty, archiveOptions);
             arr.LoadControlFile(filePath, data, new DearchiveScenesInfo());
 
-            Assert.That(arr.ControlFileLoaded, Is.True);
+            Assert.True(arr.ControlFileLoaded);
 
             while (tar.ReadEntry(out filePath, out tarEntryType) != null)
             {
@@ -445,10 +445,10 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             Assert.Null();
 
             SceneObjectPart part2 = m_scene.GetSceneObjectPart("obj1-Part2");
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             SceneObjectPart part3 = m_scene.GetSceneObjectPart("obj1-Part3");
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         /// <summary>
@@ -492,7 +492,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 
              m_oarEvent.WaitOne(60000);
 
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             byte[] archive = archiveWriteStream.ToArray();
             MemoryStream archiveReadStream = new MemoryStream(archive);
@@ -525,8 +525,8 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
                 Assert.Null();
 
                 SceneObjectGroup loadedSog = scene2.GetSceneObjectGroup(part1.Name);
-                Assert.Equal(,);
-                Assert.Equal(,);
+                // TODO: Assert.Equal(,); - incomplete assertion
+                // TODO: Assert.Equal(,); - incomplete assertion
             }
         }
 
@@ -590,10 +590,10 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             ILandObject rLo = m_scene.LandChannel.GetLandObject(16, 16);
             LandData rLd = rLo.LandData;
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
 
         /// <summary>
@@ -662,33 +662,33 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             Assert.Null();
             RegionSettings loadedRs = m_scene.RegionInfo.RegionSettings;
 
-            Assert.Equal(,);
-            Assert.That(loadedRs.AllowDamage, Is.True);
-            Assert.That(loadedRs.AllowLandJoinDivide, Is.True);
-            Assert.That(loadedRs.AllowLandResell, Is.True);
-            Assert.That(loadedRs.BlockFly, Is.True);
-            Assert.That(loadedRs.BlockShowInSearch, Is.True);
-            Assert.That(loadedRs.BlockTerraform, Is.True);
-            Assert.That(loadedRs.DisableCollisions, Is.True);
-            Assert.That(loadedRs.DisablePhysics, Is.True);
-            Assert.That(loadedRs.DisableScripts, Is.True);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.That(loadedRs.RestrictPushing, Is.True);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,));
-            Assert.Equal(,));
-            Assert.Equal(,));
-            Assert.Equal(,));
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            Assert.True(loadedRs.AllowDamage);
+            Assert.True(loadedRs.AllowLandJoinDivide);
+            Assert.True(loadedRs.AllowLandResell);
+            Assert.True(loadedRs.BlockFly);
+            Assert.True(loadedRs.BlockShowInSearch);
+            Assert.True(loadedRs.BlockTerraform);
+            Assert.True(loadedRs.DisableCollisions);
+            Assert.True(loadedRs.DisablePhysics);
+            Assert.True(loadedRs.DisableScripts);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            Assert.True(loadedRs.RestrictPushing);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
             Assert.Equal(UUID.Zero, loadedRs.TelehubObject); // because no object was found with the original UUID
             Assert.Equal(0, loadedRs.SpawnPoints().Count);
         }
@@ -749,14 +749,14 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
                 m_oarEvent.WaitOne(60000);
 
                 SceneObjectPart object1Existing = m_scene.GetSceneObjectPart(part1.Name);
-                Assert.That(object1Existing, Is.Not.Null, "object1 was not present after merge");
-                Assert.That(object1Existing.Name, Is.EqualTo(part1.Name), "object1 names not identical after merge");
-                Assert.That(object1Existing.GroupPosition, Is.EqualTo(part1.GroupPosition), "object1 group position not equal after merge");
+                Assert.NotNull(object1Existing);
+                Assert.Equal(part1.Name, object1Existing.Name);
+                Assert.Equal(part1.GroupPosition, object1Existing.GroupPosition);
 
                 SceneObjectPart object2PartMerged = m_scene.GetSceneObjectPart(part2.Name);
-                Assert.That(object2PartMerged, Is.Not.Null, "object2 was not present after merge");
-                Assert.That(object2PartMerged.Name, Is.EqualTo(part2.Name), "object2 names not identical after merge");
-                Assert.That(object2PartMerged.GroupPosition, Is.EqualTo(part2.GroupPosition), "object2 group position not equal after merge");
+                Assert.NotNull(object2PartMerged);
+                Assert.Equal(part2.Name, object2PartMerged.Name);
+                Assert.Equal(part2.GroupPosition, object2PartMerged.GroupPosition);
             }
         }
 
@@ -833,7 +833,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
 
 
             // Check that the OAR contains the expected data
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             byte[] archive = archiveWriteStream.ToArray();
             MemoryStream archiveReadStream = new MemoryStream(archive);
@@ -851,13 +851,13 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
             TarArchiveReader.TarEntryType tarEntryType;
 
             byte[] data = tar.ReadEntry(out filePath, out tarEntryType);
-            Assert.Equal(,);
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             Dictionary<string, object> archiveOptions = new Dictionary<string, object>();
             ArchiveReadRequest arr = new ArchiveReadRequest(m_scene, (Stream)null, Guid.Empty, archiveOptions);
             arr.LoadControlFile(filePath, data, new DearchiveScenesInfo());
 
-            Assert.That(arr.ControlFileLoaded, Is.True);
+            Assert.True(arr.ControlFileLoaded);
 
             while (tar.ReadEntry(out filePath, out tarEntryType) != null)
             {
@@ -1013,9 +1013,9 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
         {
             SceneObjectPart object1PartLoaded = m_scene.GetSceneObjectPart(part1.Name);
 
-            Assert.That(object1PartLoaded, Is.Not.Null, "object1 was not loaded");
-            Assert.That(object1PartLoaded.Name, Is.EqualTo(part1.Name), "object1 names not identical");
-            Assert.That(object1PartLoaded.GroupPosition, Is.EqualTo(part1.GroupPosition), "object1 group position not equal");
+            Assert.NotNull(object1PartLoaded);
+            Assert.Equal(part1.Name, object1PartLoaded.Name);
+            Assert.Equal(part1.GroupPosition, object1PartLoaded.GroupPosition);
 
             Quaternion qtmp1 = new Quaternion (
                 (float)Math.Round(object1PartLoaded.RotationOffset.X,5),
@@ -1028,17 +1028,16 @@ namespace OpenSim.Region.CoreModules.World.Archiver.Tests
                 (float)Math.Round(part1.RotationOffset.Z,5),
                 (float)Math.Round(part1.RotationOffset.W,5));
 
-            Assert.That(qtmp1, Is.EqualTo(qtmp2), "object1 rotation offset not equal");
-            Assert.That(
-                object1PartLoaded.OffsetPosition, Is.EqualTo(part1.OffsetPosition), "object1 offset position not equal");
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(qtmp2, qtmp1);
+            Assert.Equal(part1.OffsetPosition, object1PartLoaded.OffsetPosition);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             TaskInventoryItem loadedSoundItem = object1PartLoaded.Inventory.GetInventoryItems(soundItemName)[0];
-            Assert.That(loadedSoundItem, Is.Not.Null, "loaded sound item was null");
+            Assert.NotNull(loadedSoundItem);
             AssetBase loadedSoundAsset = m_scene.AssetService.Get(loadedSoundItem.AssetID.ToString());
-            Assert.That(loadedSoundAsset, Is.Not.Null, "loaded sound asset was null");
-            Assert.That(loadedSoundAsset.Data, Is.EqualTo(soundData), "saved and loaded sound data do not match");
+            Assert.NotNull(loadedSoundAsset);
+            Assert.Equal(soundData, loadedSoundAsset.Data);
 
             Assert.Greater(m_scene.LandChannel.AllParcels().Count, 0, "incorrect number of parcels");
         }
