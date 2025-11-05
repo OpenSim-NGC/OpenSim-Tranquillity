@@ -73,7 +73,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             SceneHelpers.AddScenePresence(scene, ua);
 
-            Assert.That(scene.GetScenePresence(loggingInUserId), Is.Not.Null);
+            Assert.True(scene.GetScenePresence(loggingInUserId));
         }
 
         /// <summary>
@@ -110,7 +110,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             SceneHelpers.AddScenePresence(scene, ua);
 
-            Assert.That(scene.GetScenePresence(loggingInUserId), Is.Not.Null);
+            Assert.True(scene.GetScenePresence(loggingInUserId));
         }
     }
 }

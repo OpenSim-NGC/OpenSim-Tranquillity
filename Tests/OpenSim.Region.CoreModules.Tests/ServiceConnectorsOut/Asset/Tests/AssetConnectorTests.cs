@@ -26,6 +26,7 @@
  */
 
 using OpenSim.Framework;
+using Nini.Config;
 using OpenSim.Tests.Common;
 using Xunit;
 
@@ -123,9 +124,9 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
 
             lasc.Store(a1);
 
-            Assert.That(lasc.Get(a1.ID), Is.Null);
-            Assert.That(lasc.GetData(a1.ID), Is.Null);
-            Assert.That(lasc.GetMetadata(a1.ID), Is.Null);
+            Assert.Null(lasc.Get(a1.ID));
+            Assert.Null(lasc.GetData(a1.ID));
+            Assert.Null(lasc.GetMetadata(a1.ID));
 
             // TODO: Add cache and check that this does receive a copy of the asset
         }
@@ -153,9 +154,9 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
 
             lasc.Store(a1);
 
-            Assert.That(lasc.Get(a1.ID), Is.Null);
-            Assert.That(lasc.GetData(a1.ID), Is.Null);
-            Assert.That(lasc.GetMetadata(a1.ID), Is.Null);
+            Assert.Null(lasc.Get(a1.ID));
+            Assert.Null(lasc.GetData(a1.ID));
+            Assert.Null(lasc.GetMetadata(a1.ID));
 
             // TODO: Add cache and check that this does receive a copy of the asset
         }

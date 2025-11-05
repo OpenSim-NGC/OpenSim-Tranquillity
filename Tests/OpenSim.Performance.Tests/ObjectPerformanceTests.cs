@@ -128,7 +128,7 @@ namespace OpenSim.Tests.Performance
             for (int i = 1; i <= objectsToAdd; i++)
             {
                 SceneObjectGroup so = SceneHelpers.CreateSceneObject(primsInEachObject, ownerId, "part_", i);
-                Assert.That(scene.AddNewSceneObject(so, false), Is.True, string.Format("Object {0} was not created", i));
+                Assert.That(scene.AddNewSceneObject(so, false), string.Format("Object {0} was not created", i));
             }
 
             TimeSpan elapsed = DateTime.Now - start;

@@ -131,9 +131,9 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 //            Assert.Equal(,),
 //                "Loaded item non-uuid creator doesn't match original");
 //            Assert.That(
-//                foundItem1.CreatorIdAsUuid, Is.EqualTo(m_uaLL2.PrincipalID),
+//                foundItem1.CreatorIdAsUuid),
 //                "Loaded item uuid creator doesn't match original");
-//            Assert.That(foundItem1.Owner, Is.EqualTo(m_uaMT.PrincipalID),
+//            Assert.True(foundItem1.Owner),
 //                "Loaded item owner doesn't match inventory reciever");
 //
 //            AssetBase asset1 = m_scene.AssetService.Get(foundItem1.AssetID.ToString());

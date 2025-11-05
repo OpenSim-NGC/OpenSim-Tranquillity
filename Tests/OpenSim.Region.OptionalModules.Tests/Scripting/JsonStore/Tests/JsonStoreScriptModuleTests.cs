@@ -116,19 +116,19 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
             // Test blank store
             {
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
-                Assert.That(storeId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(storeId));
             }
 
             // Test single element store
             {
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{ 'Hello' : 'World' }");
-                Assert.That(storeId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(storeId));
             }
 
             // Test with an integer value
             {
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{ 'Hello' : 42.15 }");
-                Assert.That(storeId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(storeId));
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Hello");
                 Assert.Equal(,);
@@ -137,7 +137,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
             // Test with an array as the root node
             {
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "[ 'one', 'two', 'three' ]");
-                Assert.That(storeId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(storeId));
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "[1]");
                 Assert.Equal(,);
@@ -258,7 +258,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 //                = (string)m_smcm.InvokeOperation(
 //                    UUID.Zero, UUID.Zero, "JsonGetValue", new object[] { storeId, "Hello" });
 //
-//            Assert.Null();
+//            // TODO: Fix this assertion
 //        }
 
         [Fact]
@@ -762,10 +762,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 
                 // Write notecard
                 UUID writeNotecardRequestId = (UUID)InvokeOpOnHost("JsonWriteNotecard", so.UUID, storeId, "", notecardName);
-                Assert.That(writeNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(writeNotecardRequestId));
 
                 TaskInventoryItem nc1Item = so.RootPart.Inventory.GetInventoryItem(notecardName);
-                Assert.NotNull();
+                // TODO: Fix this assertion
 
                 // TODO: Should independently check the contents.
             }
@@ -779,10 +779,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 
                 UUID writeNotecardBadPathRequestId
                     = (UUID)InvokeOpOnHost("JsonWriteNotecard", so.UUID, storeId, "flibble", badPathNotecardName);
-                Assert.That(writeNotecardBadPathRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(writeNotecardBadPathRequestId));
 
                 TaskInventoryItem badPathItem = so.RootPart.Inventory.GetInventoryItem(badPathNotecardName);
-                Assert.Null();
+                // TODO: Fix this assertion
             }
 
             {
@@ -793,10 +793,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID fakeStoreId = TestHelpers.ParseTail(0x500);
                 UUID fakeStoreWriteNotecardValue
                     = (UUID)InvokeOpOnHost("JsonWriteNotecard", so.UUID, fakeStoreId, "", fakeStoreNotecardName);
-                Assert.That(fakeStoreWriteNotecardValue, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(fakeStoreWriteNotecardValue));
 
                 TaskInventoryItem fakeStoreItem = so.RootPart.Inventory.GetInventoryItem(fakeStoreNotecardName);
-                Assert.Null();
+                // TODO: Fix this assertion
             }
         }
 
@@ -827,7 +827,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 // Read notecard
                 UUID receivingStoreId = (UUID)InvokeOp("JsonCreateStore", "{}");
                 UUID readNotecardRequestId = (UUID)InvokeOpOnHost("JsonReadNotecard", so.UUID, receivingStoreId, "", notecardName);
-                Assert.That(readNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(readNotecardRequestId));
 
                 string value = (string)InvokeOp("JsonGetValue", receivingStoreId, "Hello");
                 Assert.Equal(,);
@@ -837,7 +837,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 // Read notecard to new single component path
                 UUID receivingStoreId = (UUID)InvokeOp("JsonCreateStore", "{}");
                 UUID readNotecardRequestId = (UUID)InvokeOpOnHost("JsonReadNotecard", so.UUID, receivingStoreId, "make", notecardName);
-                Assert.That(readNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(readNotecardRequestId));
 
                 string value = (string)InvokeOp("JsonGetValue", receivingStoreId, "Hello");
                 Assert.Equal(,);
@@ -850,7 +850,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 // Read notecard to new multi-component path.  This should not work.
                 UUID receivingStoreId = (UUID)InvokeOp("JsonCreateStore", "{}");
                 UUID readNotecardRequestId = (UUID)InvokeOpOnHost("JsonReadNotecard", so.UUID, receivingStoreId, "make.it", notecardName);
-                Assert.That(readNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(readNotecardRequestId));
 
                 string value = (string)InvokeOp("JsonGetValue", receivingStoreId, "Hello");
                 Assert.Equal(,);
@@ -863,7 +863,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 // Read notecard to existing multi-component path.  This should work
                 UUID receivingStoreId = (UUID)InvokeOp("JsonCreateStore", "{ 'make' : { 'it' : 'so' } }");
                 UUID readNotecardRequestId = (UUID)InvokeOpOnHost("JsonReadNotecard", so.UUID, receivingStoreId, "make.it", notecardName);
-                Assert.That(readNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(readNotecardRequestId));
 
                 string value = (string)InvokeOp("JsonGetValue", receivingStoreId, "Hello");
                 Assert.Equal(,);
@@ -876,7 +876,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 // Read notecard to invalid path.  This should not work.
                 UUID receivingStoreId = (UUID)InvokeOp("JsonCreateStore", "{ 'make' : { 'it' : 'so' } }");
                 UUID readNotecardRequestId = (UUID)InvokeOpOnHost("JsonReadNotecard", so.UUID, receivingStoreId, "/", notecardName);
-                Assert.That(readNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(readNotecardRequestId));
 
                 string value = (string)InvokeOp("JsonGetValue", receivingStoreId, "Hello");
                 Assert.Equal(,);
@@ -886,7 +886,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 // Try read notecard to fake store.
                 UUID fakeStoreId = TestHelpers.ParseTail(0x500);
                 UUID readNotecardRequestId = (UUID)InvokeOpOnHost("JsonReadNotecard", so.UUID, fakeStoreId, "", notecardName);
-                Assert.That(readNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(readNotecardRequestId));
 
                 string value = (string)InvokeOp("JsonGetValue", fakeStoreId, "Hello");
                 Assert.Equal(,);

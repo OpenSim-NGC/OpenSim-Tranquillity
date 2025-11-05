@@ -68,9 +68,9 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 //            packetHandler.InPacket(new AgentAnimationPacket());
 //            LLQueItem receivedPacket = packetHandler.PacketQueue.Dequeue();
 //
-//            Assert.NotNull();
-//            Assert.That(receivedPacket.Incoming, Is.True);
-//            Assert.That(receivedPacket.Packet, Is.TypeOf(typeof(AgentAnimationPacket)));
+//            // TODO: Fix this assertion
+//            Assert.True(receivedPacket.Incoming);
+//            Assert.True(receivedPacket.Packet)));
 //        }
 //
 //        /// <summary>

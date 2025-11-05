@@ -203,7 +203,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
                     gotso2 = true;
             }
 
-//            Assert.That(gotControlFile, Is.True, "No control file in archive");
+//            Assert.True(gotControlFile);
             Assert.True(gotf1);
             Assert.True(gotf1_1);
             Assert.True(gotso1);
@@ -301,9 +301,9 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
                 }
             }
 
-//            Assert.That(gotControlFile, Is.True, "No control file in archive");
-            Assert.That(gotObject1File, Is.True, "No item1 file in archive");
-//            Assert.That(gotObject2File, Is.True, "No object2 file in archive");
+//            Assert.True(gotControlFile);
+            Assert.True(gotObject1File);
+//            Assert.True(gotObject2File);
 
             // TODO: Test presence of more files and contents of files.
         }
@@ -401,9 +401,9 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
                 }
             }
 
-//            Assert.That(gotControlFile, Is.True, "No control file in archive");
-            Assert.That(gotObject1File, Is.True, "No item1 file in archive");
-//            Assert.That(gotObject2File, Is.True, "No object2 file in archive");
+//            Assert.True(gotControlFile);
+            Assert.True(gotObject1File);
+//            Assert.True(gotObject2File);
 
             // TODO: Test presence of more files and contents of files.
         }

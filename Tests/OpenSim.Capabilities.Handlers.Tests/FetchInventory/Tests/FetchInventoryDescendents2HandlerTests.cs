@@ -148,12 +148,12 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
 
             string llsdresponse = dorequest(handler, request);
 
-            Assert.That(llsdresponse != null, Is.True, "Incorrect null response");
-            Assert.That(llsdresponse != string.Empty, Is.True, "Incorrect empty response");
-            Assert.That(llsdresponse.Contains(m_userID.ToString()), Is.True, "Response should contain userID");
+            Assert.True(llsdresponse != null);
+            Assert.True(llsdresponse != string.Empty);
+            Assert.True(llsdresponse.Contains(m_userID.ToString()));
 
             string descendents = "descendents</key><integer>" + m_rootDescendents + "</integer>";
-            Assert.That(llsdresponse.Contains(descendents), Is.True, "Incorrect number of descendents");
+            Assert.True(llsdresponse.Contains(descendents));
             Console.WriteLine(llsdresponse);
         }
 
@@ -177,12 +177,12 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             Console.WriteLine(llsdresponse);
 
             string descendents = "descendents</key><integer>" + m_rootDescendents + "</integer>";
-            Assert.That(llsdresponse.Contains(descendents), Is.True, "Incorrect number of descendents for root folder");
+            Assert.True(llsdresponse.Contains(descendents));
             descendents = "descendents</key><integer>2</integer>";
-            Assert.That(llsdresponse.Contains(descendents), Is.True, "Incorrect number of descendents for Notecard folder");
+            Assert.True(llsdresponse.Contains(descendents));
 
-            Assert.That(llsdresponse.Contains("10000000-0000-0000-0000-000000000001"), Is.True, "Notecard 1 is missing from response");
-            Assert.That(llsdresponse.Contains("20000000-0000-0000-0000-000000000002"), Is.True, "Notecard 2 is missing from response");
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000001"));
+            Assert.True(llsdresponse.Contains("20000000-0000-0000-0000-000000000002"));
         }
 
         [Fact]
@@ -200,13 +200,13 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             Console.WriteLine(llsdresponse);
 
             string descendents = "descendents</key><integer>2</integer>";
-            Assert.That(llsdresponse.Contains(descendents), Is.True, "Incorrect number of descendents for Test Folder");
+            Assert.True(llsdresponse.Contains(descendents));
 
             // Make sure that the note card link is included
-            Assert.That(llsdresponse.Contains("Link to notecard"), Is.True, "Link to notecard is missing");
+            Assert.True(llsdresponse.Contains("Link to notecard"));
 
             //Make sure the notecard item itself is included
-            Assert.That(llsdresponse.Contains("Test Notecard 2"), Is.True, "Notecard 2 item (the source) is missing");
+            Assert.True(llsdresponse.Contains("Test Notecard 2")) is missing");
 
             // Make sure that the source item is before the link item
             int pos1 = llsdresponse.IndexOf("Test Notecard 2");
@@ -214,12 +214,12 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             Assert.Less(pos1, pos2, "Source of link is after link");
 
             // Make sure the folder link is included
-            Assert.That(llsdresponse.Contains("Link to Objects folder"), Is.True, "Link to Objects folder is missing");
+            Assert.True(llsdresponse.Contains("Link to Objects folder"));
 
 /* contents of link folder are not supposed to be listed
             // Make sure the objects inside the Objects folder are included
             // Note: I'm not entirely sure this is needed, but that's what I found in the implementation
-            Assert.That(llsdresponse.Contains("Some Object"), Is.True, "Some Object item (contents of the source) is missing");
+            Assert.True(llsdresponse.Contains("Some Object")) is missing");
 */
             // Make sure that the source item is before the link item
             pos1 = llsdresponse.IndexOf("Some Object");
@@ -282,10 +282,10 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
 
             string llsdresponse = dorequest(handler, request);
 
-            Assert.That(llsdresponse != null, Is.True, "Incorrect null response");
-            Assert.That(llsdresponse != string.Empty, Is.True, "Incorrect empty response");
+            Assert.True(llsdresponse != null);
+            Assert.True(llsdresponse != string.Empty);
             // we do return a answer now
-            //Assert.That(llsdresponse.Contains("bad_folders</key><array><uuid>00000000-0000-0000-0000-000000000000"), Is.True, "Folder Zero should be a bad folder");
+            //Assert.True(llsdresponse.Contains("bad_folders</key><array><uuid>00000000-0000-0000-0000-000000000000"));
 
             Console.WriteLine(llsdresponse);
         }

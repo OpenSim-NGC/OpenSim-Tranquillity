@@ -84,16 +84,16 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // We should really check the exact figure.
             Assert.Equal(,);
-            Assert.That(sp.AbsolutePosition.Y, Is.GreaterThan(startPos.Y));
+            Assert.True(sp.AbsolutePosition.Y));
             Assert.Equal(,);
-            Assert.That(sp.AbsolutePosition.Z, Is.LessThan(targetPos.X));
+            Assert.True(sp.AbsolutePosition.Z));
 
             m_scene.Update(50);
 
             double distanceToTarget = Util.GetDistanceTo(sp.AbsolutePosition, targetPos);
-            Assert.That(distanceToTarget, Is.LessThan(1), "Avatar not within 1 unit of target position on first move");
+            Assert.True(distanceToTarget), "Avatar not within 1 unit of target position on first move");
             Assert.Equal(,);
-            Assert.That(sp.AgentControlFlags, Is.EqualTo((uint)AgentManager.ControlFlags.NONE));
+            Assert.True(sp.AgentControlFlags)AgentManager.ControlFlags.NONE));
 
             // Try a second movement
             startPos = sp.AbsolutePosition;
@@ -107,15 +107,15 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_scene.Update(1);
 
             // We should really check the exact figure.
-            Assert.That(sp.AbsolutePosition.X, Is.GreaterThan(startPos.X));
-            Assert.That(sp.AbsolutePosition.X, Is.LessThan(targetPos.X));
+            Assert.True(sp.AbsolutePosition.X));
+            Assert.True(sp.AbsolutePosition.X));
             Assert.Equal(,);
             Assert.Equal(,);
 
             m_scene.Update(50);
 
             distanceToTarget = Util.GetDistanceTo(sp.AbsolutePosition, targetPos);
-            Assert.That(distanceToTarget, Is.LessThan(1), "Avatar not within 1 unit of target position on second move");
+            Assert.True(distanceToTarget), "Avatar not within 1 unit of target position on second move");
             Assert.Equal(,);
         }
     }

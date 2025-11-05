@@ -160,7 +160,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 new SceneObjectPart(UUID.Zero, PrimitiveBaseShape.Default,
                 Vector3.Zero, Quaternion.Identity,
                 Vector3.Zero) { Name = obj1Name, UUID = objUuid };
-            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part1), false), Is.True);
+            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part1), false));
 
             LSL_Api apiGrp1 = new LSL_Api();
             apiGrp1.Initialize(m_engine, part1, null);

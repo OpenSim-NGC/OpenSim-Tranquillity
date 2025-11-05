@@ -69,7 +69,6 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
         protected string m_item1Name = "Ray Gun Item";
         protected string m_coaItemName = "Coalesced Item";
 
-        [OneTimeSetUp]
         public void FixtureSetup()
         {
             // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
@@ -78,7 +77,6 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             ConstructDefaultIarBytesForTestLoad();
         }
 
-        [OneTimeTearDown]
         public void TearDown()
         {
             // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple

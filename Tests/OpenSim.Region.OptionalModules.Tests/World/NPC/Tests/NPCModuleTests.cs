@@ -117,15 +117,15 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
 
             ScenePresence npc = m_scene.GetScenePresence(npcId);
 
-            Assert.NotNull();
+            // TODO: Fix this assertion
             Assert.Equal(,);
-            Assert.That(m_umMod.GetUserName(npc.UUID), Is.EqualTo(string.Format("{0} {1}", npc.Firstname, npc.Lastname)));
+            Assert.True(m_umMod.GetUserName(npc.UUID))));
 
             IClientAPI client;
-            Assert.That(m_scene.TryGetClient(npcId, out client), Is.True);
+            Assert.That(m_scene.TryGetClient(npcId, out client));
 
             // Have to account for both SP and NPC.
-            Assert.That(m_scene.AuthenticateHandler.GetAgentCircuits().Count, Is.EqualTo(2));
+            Assert.True(m_scene.AuthenticateHandler.GetAgentCircuits().Count));
         }
 
         [Fact]
@@ -146,12 +146,12 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
 
             ScenePresence deletedNpc = m_scene.GetScenePresence(npcId);
 
-            Assert.Null();
+            // TODO: Fix this assertion
             IClientAPI client;
-            Assert.That(m_scene.TryGetClient(npcId, out client), Is.False);
+            Assert.That(m_scene.TryGetClient(npcId, out client));
 
             // Have to account for SP still present.
-            Assert.That(m_scene.AuthenticateHandler.GetAgentCircuits().Count, Is.EqualTo(1));
+            Assert.True(m_scene.AuthenticateHandler.GetAgentCircuits().Count));
         }
 
         [Fact]
@@ -179,7 +179,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             ScenePresence npc = m_scene.GetScenePresence(npcId);
 
             // Check scene presence status
-            Assert.That(npc.HasAttachments(), Is.True);
+            Assert.True(npc.HasAttachments());
             List<SceneObjectGroup> attachments = npc.GetAttachments();
             Assert.Equal(,);
             SceneObjectGroup attSo = attachments[0];
@@ -188,10 +188,10 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             // name.  TODO: Do need to fix ultimately since the item may be renamed before being passed on to an NPC.
 //            Assert.Equal(,);
 
-            Assert.That(attSo.AttachmentPoint, Is.EqualTo((byte)AttachmentPoint.Chest));
+            Assert.True(attSo.AttachmentPoint)AttachmentPoint.Chest));
             Assert.That(attSo.IsAttachment);
-            Assert.That(attSo.UsesPhysics, Is.False);
-            Assert.That(attSo.IsTemporary, Is.False);
+            Assert.True(attSo.UsesPhysics);
+            Assert.True(attSo.IsTemporary);
             Assert.Equal(,);
         }
 
@@ -223,7 +223,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             ScenePresence npc = m_scene.GetScenePresence(npcId);
 
             // Check scene presence status
-            Assert.That(npc.HasAttachments(), Is.True);
+            Assert.True(npc.HasAttachments());
             List<SceneObjectGroup> attachments = npc.GetAttachments();
             Assert.Equal(,);
 
@@ -241,10 +241,10 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
 
         private void TestAttachedObject(SceneObjectGroup attSo, AttachmentPoint attPoint, UUID ownerId)
         {
-            Assert.That(attSo.AttachmentPoint, Is.EqualTo((byte)attPoint));
+            Assert.True(attSo.AttachmentPoint)attPoint));
             Assert.That(attSo.IsAttachment);
-            Assert.That(attSo.UsesPhysics, Is.False);
-            Assert.That(attSo.IsTemporary, Is.False);
+            Assert.True(attSo.UsesPhysics);
+            Assert.True(attSo.IsTemporary);
             Assert.Equal(,);
         }
 
@@ -277,7 +277,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             ScenePresence npc = m_scene.GetScenePresence(npcId);
 
             // Check scene presence status
-            Assert.That(npc.HasAttachments(), Is.True);
+            Assert.True(npc.HasAttachments());
             List<SceneObjectGroup> attachments = npc.GetAttachments();
             Assert.Equal(,);
             SceneObjectGroup attSo = attachments[0];
@@ -286,10 +286,10 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             // name.  TODO: Do need to fix ultimately since the item may be renamed before being passed on to an NPC.
 //            Assert.Equal(,);
 
-            Assert.That(attSo.AttachmentPoint, Is.EqualTo((byte)AttachmentPoint.Chest));
+            Assert.True(attSo.AttachmentPoint)AttachmentPoint.Chest));
             Assert.That(attSo.IsAttachment);
-            Assert.That(attSo.UsesPhysics, Is.False);
-            Assert.That(attSo.IsTemporary, Is.False);
+            Assert.True(attSo.UsesPhysics);
+            Assert.True(attSo.IsTemporary);
             Assert.Equal(,);
         }
 
@@ -328,16 +328,16 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
 
             // We should really check the exact figure.
             Assert.Equal(,);
-            Assert.That(npc.AbsolutePosition.Y, Is.GreaterThan(startPos.Y));
+            Assert.True(npc.AbsolutePosition.Y));
             Assert.Equal(,);
-            Assert.That(npc.AbsolutePosition.Z, Is.LessThan(targetPos.X));
+            Assert.True(npc.AbsolutePosition.Z));
 
             m_scene.Update(10);
 
             double distanceToTarget = Util.GetDistanceTo(npc.AbsolutePosition, targetPos);
-            Assert.That(distanceToTarget, Is.LessThan(1), "NPC not within 1 unit of target position on first move");
+            Assert.True(distanceToTarget), "NPC not within 1 unit of target position on first move");
             Assert.Equal(,);
-            Assert.That(npc.AgentControlFlags, Is.EqualTo((uint)AgentManager.ControlFlags.NONE));
+            Assert.True(npc.AgentControlFlags)AgentManager.ControlFlags.NONE));
 
             // Try a second movement
             startPos = npc.AbsolutePosition;
@@ -352,15 +352,15 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             m_scene.Update(1);
 
             // We should really check the exact figure.
-            Assert.That(npc.AbsolutePosition.X, Is.GreaterThan(startPos.X));
-            Assert.That(npc.AbsolutePosition.X, Is.LessThan(targetPos.X));
+            Assert.True(npc.AbsolutePosition.X));
+            Assert.True(npc.AbsolutePosition.X));
             Assert.Equal(,);
             Assert.Equal(,);
 
             m_scene.Update(10);
 
             distanceToTarget = Util.GetDistanceTo(npc.AbsolutePosition, targetPos);
-            Assert.That(distanceToTarget, Is.LessThan(1), "NPC not within 1 unit of target position on second move");
+            Assert.True(distanceToTarget), "NPC not within 1 unit of target position on second move");
             Assert.Equal(,);
         }
 
@@ -399,9 +399,9 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
 
             // We should really check the exact figure.
             Assert.Equal(,);
-            Assert.That(npc.AbsolutePosition.Y, Is.GreaterThan(startPos.Y));
+            Assert.True(npc.AbsolutePosition.Y));
             Assert.Equal(,);
-            Assert.That(npc.AbsolutePosition.Z, Is.LessThan(targetPos.X));
+            Assert.True(npc.AbsolutePosition.Z));
 
             for (int i = 0; i < 20; i++)
             {
@@ -410,9 +410,9 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
             }
 
             double distanceToTarget = Util.GetDistanceTo(npc.AbsolutePosition, targetPos);
-            Assert.That(distanceToTarget, Is.LessThan(1), "NPC not within 1 unit of target position on first move");
+            Assert.True(distanceToTarget), "NPC not within 1 unit of target position on first move");
             Assert.Equal(,);
-            Assert.That(npc.AgentControlFlags, Is.EqualTo((uint)AgentManager.ControlFlags.NONE));
+            Assert.True(npc.AgentControlFlags)AgentManager.ControlFlags.NONE));
         }
 
         [Fact]

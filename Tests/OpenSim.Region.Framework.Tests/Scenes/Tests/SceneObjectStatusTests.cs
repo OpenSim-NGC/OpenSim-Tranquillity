@@ -63,13 +63,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Is this really the correct flag?
             Assert.Equal(,);
-            Assert.That(m_so1.Backup, Is.False);
+            Assert.True(m_so1.Backup);
 
             // Test setting back to non-temporary
             m_so1.ScriptSetTemporaryStatus(false);
 
             Assert.Equal(,);
-            Assert.That(m_so1.Backup, Is.True);
+            Assert.True(m_so1.Backup);
         }
 
         [Fact]

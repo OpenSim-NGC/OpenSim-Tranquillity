@@ -61,11 +61,11 @@ namespace OpenSim.Region.CoreModules.World.Terrain.Tests
 
             effect.PaintEffect(map, allowMask, midRegion, midRegion, -1.0f, 5, 6.0f,
                 0, midRegion - 1,0, (int)Constants.RegionSize -1);
-            Assert.That(map[127, midRegion] > 0.0, "Raise brush should raising value at this point (127,128).");
-            Assert.That(map[124, midRegion] > 0.0, "Raise brush should raising value at this point (124,128).");
-            Assert.That(map[120, midRegion] == 0.0, "Raise brush should not change value at this point (120,128).");
-            Assert.That(map[128, midRegion] == 0.0, "Raise brush should not change value at this point (128,128).");
-//            Assert.That(map[0, midRegion] == 0.0, "Raise brush should not change value at this point (0,128).");
+            Assert.True(map[127, midRegion] > 0.0);
+            Assert.True(map[124, midRegion] > 0.0);
+            Assert.True(map[120, midRegion] == 0.0);
+            Assert.True(map[128, midRegion] == 0.0);
+//            Assert.True(map[0, midRegion] == 0.0);
             //
             // Test LowerSphere
             //
@@ -81,38 +81,38 @@ namespace OpenSim.Region.CoreModules.World.Terrain.Tests
 
             effect.PaintEffect(map, allowMask, midRegion, midRegion, -1.0f, 5, 6.0f,
                 0, (int)Constants.RegionSize -1,0, (int)Constants.RegionSize -1);
-            Assert.That(map[127, midRegion] >= 0.0, "Lower should not lowering value below 0.0 at this point (127,128).");
-            Assert.That(map[127, midRegion] == 0.0, "Lower brush should lowering value to 0.0 at this point (127,128).");
-            Assert.That(map[125, midRegion] < 1.0, "Lower brush should lowering value at this point (124,128).");
-            Assert.That(map[120, midRegion] == 1.0, "Lower brush should not change value at this point (120,128).");
-            Assert.That(map[128, midRegion] == 1.0, "Lower brush should not change value at this point (128,128).");
-//            Assert.That(map[0, midRegion] == 1.0, "Lower brush should not change value at this point (0,128).");
+            Assert.True(map[127, midRegion] >= 0.0);
+            Assert.True(map[127, midRegion] == 0.0);
+            Assert.True(map[125, midRegion] < 1.0);
+            Assert.True(map[120, midRegion] == 1.0);
+            Assert.True(map[128, midRegion] == 1.0);
+//            Assert.True(map[0, midRegion] == 1.0);
         }
 
         [Fact]
         public void TerrainChannelTest()
         {
             TerrainChannel x = new TerrainChannel((int)Constants.RegionSize, (int)Constants.RegionSize);
-            Assert.That(x[0, 0] == 0.0, "Terrain not initialising correctly.");
+            Assert.True(x[0, 0] == 0.0);
 
             x[0, 0] = 1.0f;
-            Assert.That(x[0, 0] == 1.0, "Terrain not setting values correctly.");
+            Assert.True(x[0, 0] == 1.0);
 
             x[0, 0] = 0;
             x[0, 0] += 5.0f;
             x[0, 0] -= 1.0f;
-            Assert.That(x[0, 0] == 4.0f, "Terrain addition/subtraction error.");
+            Assert.True(x[0, 0] == 4.0f);
 
             x[0, 0] = 1.0f;
             float[] floatsExport = x.GetFloatsSerialised();
             Assert.Equal(1.0f, floatsExport[0]);
 
             x[0, 0] = 1.0f;
-            Assert.That(x.Tainted(0, 0), "Terrain channel tainting not working correctly.");
+            Assert.True(x.Tainted(0, 0));
 
             TerrainChannel y = x.Copy();
             Assert.False(ReferenceEquals(x, y));
-            Assert.That(!ReferenceEquals(x.GetDoubles(), y.GetDoubles()), "Terrain array not duplicating correctly.");
+            Assert.True(!ReferenceEquals(x.GetDoubles(), y.GetDoubles()));
         }
     }
 }

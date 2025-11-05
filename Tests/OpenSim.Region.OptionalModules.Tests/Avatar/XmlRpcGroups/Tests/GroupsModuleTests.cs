@@ -104,7 +104,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups.Tests
                     eventsResponse = eqgm.GetEvents(UUID.Zero, sp.UUID);
             }
 
-            Assert.That((int)eventsResponse["int_response_code"], Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.True((int)eventsResponse["int_response_code"])HttpStatusCode.OK));
 
 //            Console.WriteLine("Response [{0}]", (string)eventsResponse["str_response_string"]);
 
@@ -120,7 +120,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups.Tests
                     foundUpdate = true;
             }
 
-            Assert.That(foundUpdate, Is.True, "Did not find AgentGroupDataUpdate in response");
+            Assert.True(foundUpdate);
 
             // TODO: More checking of more actual event data.
 */

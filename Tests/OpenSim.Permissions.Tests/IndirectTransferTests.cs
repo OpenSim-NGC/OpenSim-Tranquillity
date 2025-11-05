@@ -100,7 +100,7 @@ namespace OpenSim.Tests.Permissions
             for (int i = 0; i < 6; i++)
             {
                 InventoryItemBase item = Common.TheInstance.GetItemFromInventory(Common.TheAvatars[1].UUID, "Objects", names[i]);
-                Assert.NotNull();
+                // TODO: Fix this assertion
                 Common.TheInstance.AssertPermissions(perms[i], (PermissionMask)item.BasePermissions, Common.TheInstance.IdStr(item));
             }
         }
@@ -109,7 +109,7 @@ namespace OpenSim.Tests.Permissions
         {
             // Find the object inworld
             SceneObjectGroup box = objs.Find(sog => sog.Name == name && sog.OwnerID == Common.TheAvatars[0].UUID);
-            Assert.That(box, Is.Not.Null, name);
+            Assert.True(box);
 
             // A2's inventory (index 1)
             Common.TheInstance.TakeCopyToInventory(1, box);
@@ -118,7 +118,7 @@ namespace OpenSim.Tests.Permissions
         private void MakeCopyable(List<SceneObjectGroup> objs, string name)
         {
             SceneObjectGroup box = objs.Find(sog => sog.Name == name && sog.OwnerID == Common.TheAvatars[0].UUID);
-            Assert.That(box, Is.Not.Null, name);
+            Assert.True(box);
 
             // field = 8 is Everyone 
             // set = 1 means add the permission; set = 0 means remove permission

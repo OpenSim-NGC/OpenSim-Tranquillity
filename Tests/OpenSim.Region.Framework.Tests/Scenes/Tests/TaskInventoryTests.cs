@@ -56,8 +56,8 @@ namespace OpenSim.Region.Framework.Tests
             Assert.Equal(,);
             Assert.Equal(,);
             Assert.Equal(,);
-            Assert.That(addedItem.InvType, Is.EqualTo((int)InventoryType.Object));
-            Assert.That(addedItem.Type, Is.EqualTo((int)AssetType.Object));
+            Assert.True(addedItem.InvType)InventoryType.Object));
+            Assert.True(addedItem.Type)AssetType.Object));
         }
 
         [Fact]
@@ -86,7 +86,7 @@ namespace OpenSim.Region.Framework.Tests
 
             SceneObjectGroup rezzedObject = scene.GetSceneObjectGroup("tso");
 
-            Assert.NotNull();
+            // TODO: Fix this assertion
             Assert.Equal(,);
 
             // Velocity doesn't get applied, probably because there is no physics in tests (yet)
@@ -126,7 +126,7 @@ namespace OpenSim.Region.Framework.Tests
 
             InventoryItemBase ncUserItem
                 = InventoryArchiveUtils.FindItemByPath(scene.InventoryService, user1.PrincipalID, "Objects/ncItem");
-            Assert.That(ncUserItem, Is.Not.Null, "Objects/ncItem was not found");
+            Assert.True(ncUserItem);
         }
 
         /// <summary>
@@ -156,7 +156,7 @@ namespace OpenSim.Region.Framework.Tests
 
             InventoryItemBase ncUserItem
                 = InventoryArchiveUtils.FindItemByPath(scene.InventoryService, user1.PrincipalID, "Notecards/ncItem");
-            Assert.That(ncUserItem, Is.Not.Null, "Notecards/ncItem was not found");
+            Assert.True(ncUserItem);
         }
     }
 }

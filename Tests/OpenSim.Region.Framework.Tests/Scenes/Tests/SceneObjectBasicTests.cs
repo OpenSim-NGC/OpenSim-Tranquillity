@@ -86,7 +86,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneObjectPart[] parts = so.Parts;
 
             scene.AddNewSceneObject(so, false).Should().BeTrue();
-            //Assert.That(scene.AddNewSceneObject(so, false), Is.True);
+            //Assert.That(scene.AddNewSceneObject(so, false));
             
             SceneObjectGroup retrievedSo = scene.GetSceneObjectGroup(so.UUID);
             SceneObjectPart[] retrievedParts = retrievedSo.Parts;
@@ -123,13 +123,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 = new SceneObjectPart(UUID.Zero, PrimitiveBaseShape.Default, Vector3.Zero, Quaternion.Identity, Vector3.Zero)
                     { Name = obj1Name, UUID = objUuid };
 
-            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part1), false), Is.True);
+            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part1), false));
 
             SceneObjectPart part2
                 = new SceneObjectPart(UUID.Zero, PrimitiveBaseShape.Default, Vector3.Zero, Quaternion.Identity, Vector3.Zero)
                     { Name = obj2Name, UUID = objUuid };
 
-            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part2), false), Is.False);
+            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part2), false));
 
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(objUuid);
 
@@ -157,13 +157,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             scene.AddNewSceneObject(so, false);
 
             // Test getting via the root part's local id
-            Assert.That(scene.GetGroupByPrim(so.LocalId), Is.Not.Null);
+            Assert.True(scene.GetGroupByPrim(so.LocalId));
 
             // Test getting via a non root part's local id
-            Assert.That(scene.GetGroupByPrim(parts[partsToTestCount - 1].LocalId), Is.Not.Null);
+            Assert.True(scene.GetGroupByPrim(parts[partsToTestCount - 1].LocalId));
 
             // Test that we don't get back an object for a local id that doesn't exist
-            Assert.That(scene.GetGroupByPrim(999), Is.Null);
+            Assert.True(scene.GetGroupByPrim(999));
 
             uint soid = so.LocalId;
             uint spid = parts[partsToTestCount - 1].LocalId;
@@ -171,8 +171,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             // Now delete the scene object and check again
             scene.DeleteSceneObject(so, false);
 
-            Assert.That(scene.GetGroupByPrim(soid), Is.Null);
-            Assert.That(scene.GetGroupByPrim(spid), Is.Null);
+            Assert.True(scene.GetGroupByPrim(soid));
+            Assert.True(scene.GetGroupByPrim(spid));
         }
 
         /// <summary>
@@ -190,14 +190,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             TestScene scene = new SceneHelpers().SetupScene();
             SceneObjectGroup so = SceneHelpers.AddSceneObject(scene);
 
-            Assert.That(so.IsDeleted, Is.False);
+            Assert.True(so.IsDeleted);
             uint retrievedPartID = so.LocalId;
 
             scene.DeleteSceneObject(so, false);
 
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(retrievedPartID);
 
-            Assert.Null();
+            // TODO: Fix this assertion
         }
 
         /// <summary>

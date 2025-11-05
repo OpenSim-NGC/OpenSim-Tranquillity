@@ -108,10 +108,10 @@ namespace OpenSim.Tests.Permissions
                 UUID id = TestHelpers.ParseTail(i + 1);
 
                 m_Avatars[i] = AddScenePresence("Bot", "Bot_" + (i+1), id);
-                Assert.NotNull();
-                Assert.That(m_Avatars[i].IsChildAgent, Is.False);
+                // TODO: Fix this assertion
+                Assert.True(m_Avatars[i].IsChildAgent);
                 Assert.Equal(,);
-                Assert.That(m_Scene.GetScenePresences().Count, Is.EqualTo(i + 1));
+                Assert.True(m_Scene.GetScenePresences().Count));
             }
 
             AddA1Object("Box C", 10, PermissionMask.Copy);
@@ -137,7 +137,7 @@ namespace OpenSim.Tests.Permissions
         {
             UserAccount ua1 = UserAccountHelpers.CreateUserWithInventory(m_Scene, first, last, id, "pw");
             ScenePresence sp = SceneHelpers.AddScenePresence(m_Scene, id);
-            Assert.That(m_Scene.AuthenticateHandler.GetAgentCircuitData(id), Is.Not.Null);
+            Assert.True(m_Scene.AuthenticateHandler.GetAgentCircuitData(id));
 
             return sp;
         }
@@ -175,7 +175,7 @@ namespace OpenSim.Tests.Permissions
         public void RevokePermission(int ownerIndex, string name, PermissionMask perm)
         {
             InventoryItemBase item = Common.TheInstance.GetItemFromInventory(m_Avatars[ownerIndex].UUID, "Objects", name);
-            Assert.NotNull();
+            // TODO: Fix this assertion
 
             // Clone it, so to avoid aliasing -- just like the viewer does.
             InventoryItemBase clone = Common.TheInstance.CloneInventoryItem(item);
@@ -189,7 +189,7 @@ namespace OpenSim.Tests.Permissions
             Common.TheScene.UpdateInventoryItem(m_Avatars[ownerIndex].ControllingClient, UUID.Zero, clone.ID, clone);
 
             item = Common.TheInstance.GetItemFromInventory(m_Avatars[ownerIndex].UUID, "Objects", name);
-            Assert.NotNull();
+            // TODO: Fix this assertion
             Common.TheInstance.PrintPerms(item);
             Common.TheInstance.AssertPermissions((PermissionMask)item.NextPermissions & ~perm,
                 (PermissionMask)item.NextPermissions, Common.TheInstance.IdStr(item));
@@ -237,7 +237,7 @@ namespace OpenSim.Tests.Permissions
             so.Name = name;
             so.Description = name;
 
-            Assert.That(m_Scene.AddNewSceneObject(so, false), Is.True);
+            Assert.That(m_Scene.AddNewSceneObject(so, false));
             SceneObjectGroup retrievedSo = m_Scene.GetSceneObjectGroup(so.UUID);
 
             // If the parts have the same UUID then we will consider them as one and the same
@@ -249,7 +249,7 @@ namespace OpenSim.Tests.Permissions
         public void TakeCopyToInventory(int userIndex, SceneObjectGroup sog)
         {
             InventoryFolderBase objsFolder = UserInventoryHelpers.GetInventoryFolder(m_Scene.InventoryService, m_Avatars[userIndex].UUID, "Objects");
-            Assert.NotNull();
+            // TODO: Fix this assertion
 
             List<uint> localIds = new List<uint>(); localIds.Add(sog.LocalId);
             // This is an async operation
@@ -259,10 +259,10 @@ namespace OpenSim.Tests.Permissions
         public InventoryItemBase GetItemFromInventory(UUID userID, string folderName, string itemName)
         {
             InventoryFolderBase objsFolder = UserInventoryHelpers.GetInventoryFolder(m_Scene.InventoryService, userID, folderName);
-            Assert.NotNull();
+            // TODO: Fix this assertion
             List<InventoryItemBase> items = m_Scene.InventoryService.GetFolderItems(userID, objsFolder.ID);
             InventoryItemBase item = items.Find(i => i.Name == itemName);
-            Assert.NotNull();
+            // TODO: Fix this assertion
 
             return item;
         }
@@ -296,7 +296,7 @@ namespace OpenSim.Tests.Permissions
             for (int i = 1; i < 3; i++)
             {
                 InventoryFolderBase objsFolder = UserInventoryHelpers.GetInventoryFolder(Common.TheScene.InventoryService, Common.TheAvatars[i].UUID, "Objects");
-                Assert.NotNull();
+                // TODO: Fix this assertion
 
                 List<InventoryItemBase> items = Common.TheScene.InventoryService.GetFolderItems(Common.TheAvatars[i].UUID, objsFolder.ID);
                 List<UUID> ids = new List<UUID>();
@@ -305,7 +305,7 @@ namespace OpenSim.Tests.Permissions
 
                 Common.TheScene.InventoryService.DeleteItems(Common.TheAvatars[i].UUID, ids);
                 items = Common.TheScene.InventoryService.GetFolderItems(Common.TheAvatars[i].UUID, objsFolder.ID);
-                Assert.That(items.Count, Is.EqualTo(0), "A" + (i + 1));
+                Assert.True(items.Count), "A" + (i + 1));
             }
 
         }

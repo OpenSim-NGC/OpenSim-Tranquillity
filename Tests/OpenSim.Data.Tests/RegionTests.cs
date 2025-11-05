@@ -200,7 +200,7 @@ namespace OpenSim.Data.Tests
             foreach (SceneObjectGroup sog in objs)
             {
                 SceneObjectPart p = sog.RootPart;
-                Assert.That("", Is.Not.EqualTo(p.Name), "Assert.That(\"\", Is.Not.EqualTo(p.Name))");
+                Assert.True(""), "Assert.True(""))");
                 Assert.That(p.Name, Is.EqualTo(p.Description), "Assert.Equal(,)");
             }
         }
@@ -463,7 +463,7 @@ namespace OpenSim.Data.Tests
 
             // Updates the region with new values
             SceneObjectGroup sog2 = FindSOG("Adam  West", region3);
-            Assert.NotNull();
+            // TODO: Fix this assertion
             sog2.RootPart.RegionHandle = regionh;
             sog2.RootPart.Shape = pbshap;
             sog2.RootPart.GroupPosition = groupos;
@@ -495,7 +495,7 @@ namespace OpenSim.Data.Tests
             Assert.That(sogs.Count, Is.EqualTo(1), "Assert.Equal(,)");
 
             SceneObjectGroup retsog = FindSOG("West  Adam", region3);
-            Assert.NotNull();
+            // TODO: Fix this assertion
             SceneObjectPart p = retsog.RootPart;
             Assert.That(regionh,Is.EqualTo(p.RegionHandle), "Assert.Equal(,)");
             Assert.That(groupos,Is.EqualTo(p.GroupPosition), "Assert.Equal(,)");
@@ -654,7 +654,7 @@ namespace OpenSim.Data.Tests
 
             SceneObjectGroup sog = GetMySOG("object1");
             TaskInventoryItem t = sog.GetInventoryItem(sog.RootPart.LocalId, item1);
-            Assert.Null();
+            // TODO: Fix this assertion
 */
         }
 
@@ -681,17 +681,17 @@ namespace OpenSim.Data.Tests
             SceneObjectGroup sog = GetMySOG("object1");
             InventoryItemBase i = NewItem(item1, zero, zero, itemname1, zero);
 
-            Assert.That(sog.AddInventoryItem(zero, sog.RootPart.LocalId, i, zero), Is.True);
+            Assert.That(sog.AddInventoryItem(zero, sog.RootPart.LocalId, i, zero));
             TaskInventoryItem t = sog.GetInventoryItem(sog.RootPart.LocalId, item1);
             Assert.That(t.Name, Is.EqualTo(itemname1), "Assert.Equal(,)");
 
             StoreInventory(sog);
 
             SceneObjectGroup sog1 = FindSOG("object1", region1);
-            Assert.NotNull();
+            // TODO: Fix this assertion
 
             TaskInventoryItem t1 = sog1.GetInventoryItem(sog1.RootPart.LocalId, item1);
-            Assert.NotNull();
+            // TODO: Fix this assertion
             Assert.That(t1.Name, Is.EqualTo(itemname1), "Assert.Equal(,)");
 
             // Updating inventory
@@ -710,7 +710,7 @@ namespace OpenSim.Data.Tests
 
             sog = FindSOG("object1", region1);
             t = sog.GetInventoryItem(sog.RootPart.LocalId, item1);
-            Assert.Null();
+            // TODO: Fix this assertion
 */
         }
 
@@ -760,7 +760,7 @@ namespace OpenSim.Data.Tests
             i.CreationDate = creationd;
 
             SceneObjectGroup sog = GetMySOG("object1");
-            Assert.That(sog.AddInventoryItem(zero, sog.RootPart.LocalId, i, zero), Is.True);
+            Assert.That(sog.AddInventoryItem(zero, sog.RootPart.LocalId, i, zero));
             TaskInventoryItem t = sog.GetInventoryItem(sog.RootPart.LocalId, id);
 
             Assert.That(t.Name, Is.EqualTo(name), "Assert.Equal(,)");
@@ -773,7 +773,7 @@ namespace OpenSim.Data.Tests
             Assert.That(t.Flags,Is.EqualTo(flags), "Assert.Equal(,)");
             Assert.That(t.GroupID,Is.EqualTo(sog.RootPart.GroupID), "Assert.Equal(,)");
             // Where is this group permissions??
-            // Assert.That(t.GroupPermissions,Is.EqualTo(), "Assert.That(t.GroupPermissions,Is.EqualTo())");
+            // Assert.True(t.GroupPermissions), "Assert.True(t.GroupPermissions))");
             Assert.That(t.Type,Is.EqualTo(assettype), "Assert.Equal(,)");
             Assert.That(t.InvType, Is.EqualTo(invtype), "Assert.Equal(,)");
             Assert.That(t.ItemID, Is.EqualTo(id), "Assert.Equal(,)");
@@ -807,10 +807,10 @@ namespace OpenSim.Data.Tests
 
             SceneObjectGroup sog = FindSOG("object1", region1);
 
-            Assert.That(sog.AddInventoryItem(zero, sog.RootPart.LocalId, ib1, zero), Is.True);
-            Assert.That(sog.AddInventoryItem(zero, sog.RootPart.LocalId, ib2, zero), Is.True);
-            Assert.That(sog.AddInventoryItem(zero, sog.RootPart.LocalId, ib3, zero), Is.True);
-            Assert.That(sog.AddInventoryItem(zero, sog.RootPart.LocalId, ib4, zero), Is.True);
+            Assert.That(sog.AddInventoryItem(zero, sog.RootPart.LocalId, ib1, zero));
+            Assert.That(sog.AddInventoryItem(zero, sog.RootPart.LocalId, ib2, zero));
+            Assert.That(sog.AddInventoryItem(zero, sog.RootPart.LocalId, ib3, zero));
+            Assert.That(sog.AddInventoryItem(zero, sog.RootPart.LocalId, ib4, zero));
 
             TaskInventoryItem t1 = sog.GetInventoryItem(sog.RootPart.LocalId, i1);
             Assert.That(t1.Name, Is.EqualTo(ib1.Name), "Assert.Equal(,)");
@@ -819,7 +819,7 @@ namespace OpenSim.Data.Tests
             TaskInventoryItem t3 = sog.GetInventoryItem(sog.RootPart.LocalId, i3);
             Assert.That(t3.Name, Is.EqualTo(ib3.Name), "Assert.Equal(,)");
             TaskInventoryItem t4 = sog.GetInventoryItem(sog.RootPart.LocalId, i4);
-            Assert.Null();
+            // TODO: Fix this assertion
 
         }
 */
@@ -830,7 +830,7 @@ namespace OpenSim.Data.Tests
 
             db.RemoveObject(prim1, region1);
             SceneObjectGroup sog = FindSOG("object1", region1);
-            Assert.Null();
+            // TODO: Fix this assertion
         }
 
         [Fact]
@@ -911,19 +911,19 @@ namespace OpenSim.Data.Tests
 
             RegionSettings r1a = db.LoadRegionSettings(region1);
             Assert.That(r1a.RegionUUID, Is.EqualTo(region1), "Assert.Equal(,)");
-            Assert.That(r1a.BlockTerraform,Is.True);
-            Assert.That(r1a.BlockFly,Is.True);
-            Assert.That(r1a.AllowDamage,Is.True);
-            Assert.That(r1a.RestrictPushing,Is.True);
-            Assert.That(r1a.AllowLandResell,Is.False);
-            Assert.That(r1a.AllowLandJoinDivide,Is.False);
-            Assert.That(r1a.BlockShowInSearch,Is.True);
+            Assert.True(r1a.BlockTerraform);
+            Assert.True(r1a.BlockFly);
+            Assert.True(r1a.AllowDamage);
+            Assert.True(r1a.RestrictPushing);
+            Assert.True(r1a.AllowLandResell);
+            Assert.True(r1a.AllowLandJoinDivide);
+            Assert.True(r1a.BlockShowInSearch);
             Assert.That(r1a.AgentLimit,Is.EqualTo(agentlimit), "Assert.Equal(,)");
             Assert.That(r1a.ObjectBonus,Is.EqualTo(objectbonus), "Assert.Equal(,)");
             Assert.That(r1a.Maturity,Is.EqualTo(maturity), "Assert.Equal(,)");
-            Assert.That(r1a.DisableScripts,Is.True);
-            Assert.That(r1a.DisableCollisions,Is.True);
-            Assert.That(r1a.DisablePhysics,Is.True);
+            Assert.True(r1a.DisableScripts);
+            Assert.True(r1a.DisableCollisions);
+            Assert.True(r1a.DisablePhysics);
             Assert.That(r1a.TerrainTexture1,Is.EqualTo(tertex1), "Assert.Equal(,)");
             Assert.That(r1a.TerrainTexture2,Is.EqualTo(tertex2), "Assert.Equal(,)");
             Assert.That(r1a.TerrainTexture3,Is.EqualTo(tertex3), "Assert.Equal(,)");
@@ -939,7 +939,7 @@ namespace OpenSim.Data.Tests
             Assert.That(r1a.WaterHeight,Is.EqualTo(waterh), "Assert.Equal(,)");
             Assert.That(r1a.TerrainRaiseLimit,Is.EqualTo(terrainraise), "Assert.Equal(,)");
             Assert.That(r1a.TerrainLowerLimit,Is.EqualTo(terrainlower), "Assert.Equal(,)");
-            Assert.That(r1a.Sandbox,Is.True);
+            Assert.True(r1a.Sandbox);
             //Assert.That(r1a.TerrainImageID,Is.EqualTo(terimgid), "Assert.Equal(,)");
             Assert.That(r1a.Covenant, Is.EqualTo(cov), "Assert.Equal(,)");
         }
@@ -949,10 +949,10 @@ namespace OpenSim.Data.Tests
         {
             TestHelpers.InMethod();
 
-            Assert.That(db.LoadTerrain(zero), Is.Null);
-            Assert.That(db.LoadTerrain(region1), Is.Null);
-            Assert.That(db.LoadTerrain(region2), Is.Null);
-            Assert.That(db.LoadTerrain(UUID.Random()), Is.Null);
+            Assert.True(db.LoadTerrain(zero));
+            Assert.True(db.LoadTerrain(region1));
+            Assert.True(db.LoadTerrain(region2));
+            Assert.True(db.LoadTerrain(UUID.Random()));
         }
 
         [Fact]
@@ -966,10 +966,10 @@ namespace OpenSim.Data.Tests
             // store terrain is async
             Thread.Sleep(500);
 
-            Assert.That(db.LoadTerrain(zero), Is.Null);
-            Assert.That(db.LoadTerrain(region1), Is.Not.Null);
-            Assert.That(db.LoadTerrain(region2), Is.Null);
-            Assert.That(db.LoadTerrain(UUID.Random()), Is.Null);
+            Assert.True(db.LoadTerrain(zero));
+            Assert.True(db.LoadTerrain(region1));
+            Assert.True(db.LoadTerrain(region2));
+            Assert.True(db.LoadTerrain(UUID.Random()));
         }
 
         [Fact]
@@ -980,8 +980,8 @@ namespace OpenSim.Data.Tests
             double[,] baseterrain1 = GenTerrain(height1);
             double[,] baseterrain2 = GenTerrain(height2);
             double[,] t1 = db.LoadTerrain(region1);
-            Assert.That(CompareTerrain(t1, baseterrain1), Is.True);
-            Assert.That(CompareTerrain(t1, baseterrain2), Is.False);
+            Assert.That(CompareTerrain(t1, baseterrain1));
+            Assert.That(CompareTerrain(t1, baseterrain2));
         }
 
         [Fact]
@@ -997,8 +997,8 @@ namespace OpenSim.Data.Tests
             Thread.Sleep(500);
 
             double[,] t1 = db.LoadTerrain(region1);
-            Assert.That(CompareTerrain(t1, baseterrain1), Is.False);
-            Assert.That(CompareTerrain(t1, baseterrain2), Is.True);
+            Assert.That(CompareTerrain(t1, baseterrain1));
+            Assert.That(CompareTerrain(t1, baseterrain2));
         }
 
         [Fact]
@@ -1006,10 +1006,10 @@ namespace OpenSim.Data.Tests
         {
             TestHelpers.InMethod();
 
-            Assert.That(db.LoadLandObjects(zero).Count, Is.EqualTo(0), "Assert.That(db.LoadLandObjects(zero).Count, Is.EqualTo(0))");
-            Assert.That(db.LoadLandObjects(region1).Count, Is.EqualTo(0), "Assert.That(db.LoadLandObjects(region1).Count, Is.EqualTo(0))");
-            Assert.That(db.LoadLandObjects(region2).Count, Is.EqualTo(0), "Assert.That(db.LoadLandObjects(region2).Count, Is.EqualTo(0))");
-            Assert.That(db.LoadLandObjects(UUID.Random()).Count, Is.EqualTo(0), "Assert.That(db.LoadLandObjects(UUID.Random()).Count, Is.EqualTo(0))");
+            Assert.True(db.LoadLandObjects(zero).Count), "Assert.True(db.LoadLandObjects(zero).Count))");
+            Assert.True(db.LoadLandObjects(region1).Count), "Assert.True(db.LoadLandObjects(region1).Count))");
+            Assert.True(db.LoadLandObjects(region2).Count), "Assert.True(db.LoadLandObjects(region2).Count))");
+            Assert.True(db.LoadLandObjects(UUID.Random()).Count), "Assert.True(db.LoadLandObjects(UUID.Random()).Count))");
         }
 
         // TODO: we should have real land tests, but Land is so

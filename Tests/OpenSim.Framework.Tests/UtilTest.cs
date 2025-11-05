@@ -157,14 +157,14 @@ namespace OpenSim.Framework.Tests
             string string2 = "This is another";
 
             // Two consecutive runs should equal the same
-            Assert.That(Util.GetHashGuid(string1, "secret1"), Is.EqualTo(Util.GetHashGuid(string1, "secret1")));
-            Assert.That(Util.GetHashGuid(string2, "secret1"), Is.EqualTo(Util.GetHashGuid(string2, "secret1")));
+            Assert.That(Util.GetHashGuid(string1, "secret1"), "secret1")));
+            Assert.That(Util.GetHashGuid(string2, "secret1"), "secret1")));
 
             // Varying data should not eqal the same
-            Assert.That(Util.GetHashGuid(string2, "secret1"), Is.Not.EqualTo(Util.GetHashGuid(string1, "secret1")));
+            Assert.That(Util.GetHashGuid(string2, "secret1"), "secret1")));
 
             // Varying secrets should not eqal the same
-            Assert.That(Util.GetHashGuid(string1, "secret2"), Is.Not.EqualTo(Util.GetHashGuid(string1, "secret1")));
+            Assert.That(Util.GetHashGuid(string1, "secret2"), "secret1")));
         }
 
         [Fact]

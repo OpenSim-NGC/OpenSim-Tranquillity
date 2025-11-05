@@ -117,25 +117,25 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             {
                 // Check that the initial number of URLs is correct
-                Assert.That(m_lslApi.llGetFreeURLs().value, Is.EqualTo(m_urlModule.TotalUrls - 1));
+                Assert.True(m_lslApi.llGetFreeURLs().value));
             }
 
             {
                 // Check releasing a non-url
                 m_lslApi.llReleaseURL("GARBAGE");
-                Assert.That(m_lslApi.llGetFreeURLs().value, Is.EqualTo(m_urlModule.TotalUrls - 1));
+                Assert.True(m_lslApi.llGetFreeURLs().value));
             }
 
             {
                 // Check releasing a non-existing url
                 m_lslApi.llReleaseURL("http://example.com");
-                Assert.That(m_lslApi.llGetFreeURLs().value, Is.EqualTo(m_urlModule.TotalUrls - 1));
+                Assert.True(m_lslApi.llGetFreeURLs().value));
             }
 
             {
                 // Check URL release
                 m_lslApi.llReleaseURL(returnedUri);
-                Assert.That(m_lslApi.llGetFreeURLs().value, Is.EqualTo(m_urlModule.TotalUrls));
+                Assert.True(m_lslApi.llGetFreeURLs().value));
 
                 HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(returnedUri);
 
@@ -153,13 +153,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                     gotExpectedException = true;
                 }
 
-                Assert.That(gotExpectedException, Is.True);
+                Assert.True(gotExpectedException);
             }
 
             {
                 // Check releasing the same URL again
                 m_lslApi.llReleaseURL(returnedUri);
-                Assert.That(m_lslApi.llGetFreeURLs().value, Is.EqualTo(m_urlModule.TotalUrls));
+                Assert.True(m_lslApi.llGetFreeURLs().value));
             }
         }
 
@@ -169,12 +169,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             TestHelpers.InMethod();
 
             string requestId = m_lslApi.llRequestURL();
-            Assert.That(requestId, Is.Not.EqualTo(UUID.Zero.ToString()));
+            Assert.True(requestId)));
             string returnedUri;
 
             {
                 // Check that URL is correctly set up
-                Assert.That(m_lslApi.llGetFreeURLs().value, Is.EqualTo(m_urlModule.TotalUrls - 1));
+                Assert.True(m_lslApi.llGetFreeURLs().value));
 
                 Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 
@@ -188,9 +188,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 string method = eventParams.Params[1].ToString();
                 returnedUri = eventParams.Params[2].ToString();
 
-                Assert.That(UUID.TryParse(rawReturnKey, out returnKey), Is.True);
+                Assert.That(UUID.TryParse(rawReturnKey, out returnKey));
                 Assert.Equal(,);
-                Assert.That(Uri.IsWellFormedUriString(returnedUri, UriKind.Absolute), Is.True);
+                Assert.That(Uri.IsWellFormedUriString(returnedUri, UriKind.Absolute));
             }
 
             {
@@ -217,7 +217,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 string method = eventParams.Params[1].ToString();
                 string body = eventParams.Params[2].ToString();
 
-                Assert.That(UUID.TryParse(rawReturnKey, out returnKey), Is.True);
+                Assert.That(UUID.TryParse(rawReturnKey, out returnKey));
                 Assert.Equal(,);
                 Assert.Equal(,);
             }
@@ -233,7 +233,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 {
                     using (StreamReader reader = new StreamReader(stream))
                     {
-                        Assert.That(reader.ReadToEnd(), Is.EqualTo(expectedResponse));
+                        Assert.True(reader.ReadToEnd()));
                     }
                 }
             }

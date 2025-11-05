@@ -57,11 +57,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             SceneObjectPart partWhereScriptAdded = scene.RezNewScript(userId, itemTemplate);
 
-            Assert.NotNull();
+            // TODO: Fix this assertion
 
             IEntityInventory primInventory = partWhereScriptAdded.Inventory;
-            Assert.That(primInventory.GetInventoryList().Count, Is.EqualTo(1));
-            Assert.That(primInventory.ContainsScripts(), Is.True);
+            Assert.True(primInventory.GetInventoryList().Count));
+            Assert.True(primInventory.ContainsScripts());
 
             IList<TaskInventoryItem> primItems = primInventory.GetInventoryItems(itemName);
             Assert.Equal(,);

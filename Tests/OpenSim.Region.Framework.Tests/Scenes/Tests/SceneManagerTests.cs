@@ -41,7 +41,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             sh.SceneManager.Close();
             scene.ShuttingDown.Should().BeTrue();
-            //Assert.That(scene.ShuttingDown, Is.True);
+            //Assert.True(scene.ShuttingDown);
         }
     }
 }

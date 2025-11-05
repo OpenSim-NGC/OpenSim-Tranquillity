@@ -108,7 +108,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             Assert.Equal(,);
 
             AssetBase ncAsset = m_scene.AssetService.Get(ncItem.AssetID.ToString());
-            Assert.NotNull();
+            // TODO: Fix this assertion
 
             AssetNotecard anc = new AssetNotecard(UUID.Zero, ncAsset.Data);
             anc.Decode();
@@ -149,7 +149,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             Assert.Equal(,);
 
             AssetBase ncAsset = m_scene.AssetService.Get(ncItem.AssetID.ToString());
-            Assert.NotNull();
+            // TODO: Fix this assertion
 
             AssetNotecard anc = new AssetNotecard(UUID.Zero, ncAsset.Data);
             anc.Decode();

@@ -64,12 +64,12 @@ namespace Robust.Tests
             Assert.True(success, "Failed to create user inventory");
 
             m_rootFolderID = m_Connector.GetRootFolder(m_userID).ID;
-            Assert.That(UUID.Zero, Is.Not.EqualTo(m_rootFolderID), "Root folder ID must not be UUID.Zero");
+            Assert.True(UUID.Zero), "Root folder ID must not be UUID.Zero");
 
             InventoryFolderBase of = m_Connector.GetFolderForType(m_userID, FolderType.Object);
             Assert.NotNull(of, "Failed to retrieve Objects folder");
             m_objectsFolder = of.ID;
-            Assert.That(UUID.Zero, Is.Not.EqualTo(m_objectsFolder), "Objects folder ID must not be UUID.Zero");
+            Assert.True(UUID.Zero), "Objects folder ID must not be UUID.Zero");
 
             // Add an object
             InventoryItemBase item = new InventoryItemBase(new UUID("b0000000-0000-0000-0000-00000000000b"), m_userID);
@@ -84,7 +84,7 @@ namespace Robust.Tests
             InventoryFolderBase ncf = m_Connector.GetFolderForType(m_userID, FolderType.Notecard);
             Assert.NotNull(of, "Failed to retrieve Notecards folder");
             m_notecardsFolder = ncf.ID;
-            Assert.That(UUID.Zero, Is.Not.EqualTo(m_notecardsFolder), "Notecards folder ID must not be UUID.Zero");
+            Assert.True(UUID.Zero), "Notecards folder ID must not be UUID.Zero");
             m_notecardsFolder = ncf.ID;
 
             // Add a notecard
@@ -136,7 +136,7 @@ namespace Robust.Tests
 
             coll = m_Connector.GetFolderContent(m_userID, folder.ID);
             Assert.NotNull(coll, "Failed to retrieve contents of Test Folder");
-            Assert.That(coll.Items.Count + coll.Folders.Count, Is.EqualTo(2), "Test Folder is expected to have exactly 2 things inside");
+            Assert.True(coll.Items.Count + coll.Folders.Count), "Test Folder is expected to have exactly 2 things inside");
 
         }
 
@@ -149,7 +149,7 @@ namespace Robust.Tests
             // Prefetch Notecard 1, will be cached from here on
             InventoryItemBase item = m_Connector.GetItem(m_userID, new UUID("10000000-0000-0000-0000-000000000001"));
             Assert.NotNull(item, "Failed to get Notecard 1");
-            Assert.That(item.Name, Is.EqualTo("Test Notecard 1"), "Wrong name for Notecard 1");
+            Assert.True(item.Name), "Wrong name for Notecard 1");
 
             UUID[] uuids = new UUID[2];
             uuids[0] = item.ID;
@@ -170,7 +170,7 @@ namespace Robust.Tests
             items = m_Connector.GetMultipleItems(m_userID, uuids);
             Assert.NotNull(items, "(Three times) Failed to get multiple items");
             Assert.True(items.Length == 2, "(Three times) Requested 2 items, but didn't receive 2 items");
-            Assert.That(items[0].Name, Is.EqualTo("Test Notecard 1"), "(Three times) Wrong name for Notecard 1");
+            Assert.True(items[0].Name), "(Three times) Wrong name for Notecard 1");
             Assert.Null(items[1], "(Three times) Expecting 2nd item to be null");
 
             // Now both don't exist
@@ -185,7 +185,7 @@ namespace Robust.Tests
             items = m_Connector.GetMultipleItems(m_userID, uuids);
             Assert.NotNull(items, "(Four times) Failed to get multiple items");
             Assert.True(items.Length == 2, "(Four times) Requested 2 items, but didn't receive 2 items");
-            Assert.That(items[1].Name, Is.EqualTo("Some Object"), "(Four times) Wrong name for Some Object");
+            Assert.True(items[1].Name), "(Four times) Wrong name for Some Object");
             Assert.Null(items[0], "(Four times) Expecting 1st item to be null");
         }
     }

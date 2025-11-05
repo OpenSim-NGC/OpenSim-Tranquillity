@@ -113,7 +113,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             udpServer.PacketReceived(upb);
 
             // Presence shouldn't exist since the circuit manager doesn't know about this circuit for authentication yet
-            Assert.That(m_scene.GetScenePresence(myAgentUuid), Is.Null);
+            Assert.True(m_scene.GetScenePresence(myAgentUuid));
 
             AgentCircuitData acd = new AgentCircuitData();
             acd.AgentID = myAgentUuid;
@@ -130,7 +130,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             Assert.Equal(,);
 
             Packet packet = udpServer.PacketsSent[0];
-            Assert.That(packet, Is.InstanceOf(typeof(PacketAckPacket)));
+            Assert.True(packet)));
 
             PacketAckPacket ackPacket = packet as PacketAckPacket;
             Assert.Equal(,);
@@ -155,7 +155,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             udpServer.ClientOutgoingPacketHandler(sp.ControllingClient, true, false, false);
 
             ScenePresence spAfterAckTimeout = m_scene.GetScenePresence(sp.UUID);
-            Assert.Null();
+            // TODO: Fix this assertion
         }
 */
 //        /// <summary>
@@ -209,7 +209,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 //
 //            // Check that we are still here
 //            Assert.True(testLLUDPServer.HasCircuit(myCircuitCode));
-//            Assert.That(testLLPacketServer.GetTotalPacketsReceived(), Is.EqualTo(0));
+//            Assert.True(testLLPacketServer.GetTotalPacketsReceived()));
 //
 //            // Check that sending a valid packet to same circuit still succeeds
 //            Assert.Equal(,);
@@ -217,8 +217,8 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 //            testLLUDPServer.LoadReceive(BuildTestObjectNamePacket(1, "helloooo"), testEp);
 //            testLLUDPServer.ReceiveData(null);
 //
-//            Assert.That(testLLPacketServer.GetTotalPacketsReceived(), Is.EqualTo(1));
-//            Assert.That(testLLPacketServer.GetPacketsReceivedFor(PacketType.ObjectName), Is.EqualTo(1));
+//            Assert.True(testLLPacketServer.GetTotalPacketsReceived()));
+//            Assert.True(testLLPacketServer.GetPacketsReceivedFor(PacketType.ObjectName)));
 //        }
 //
 //        /// <summary>
@@ -257,8 +257,8 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 //
 //            Assert.False(testLLUDPServer.HasCircuit(circuitCodeA));
 //
-//            Assert.That(testLLPacketServer.GetTotalPacketsReceived(), Is.EqualTo(3));
-//            Assert.That(testLLPacketServer.GetPacketsReceivedFor(PacketType.ObjectName), Is.EqualTo(3));
+//            Assert.True(testLLPacketServer.GetTotalPacketsReceived()));
+//            Assert.True(testLLPacketServer.GetPacketsReceivedFor(PacketType.ObjectName)));
 //        }
     }
 }

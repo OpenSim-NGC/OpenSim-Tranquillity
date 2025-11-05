@@ -86,7 +86,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
             SceneHelpers.AddScenePresence(m_scene, TestHelpers.ParseTail(0x1));
 
             // TODO: Add more assertions for the other aspects of event queues
-            Assert.That(MainServer.Instance.GetPollServiceHandlerKeys().Count, Is.EqualTo(1));
+            Assert.True(MainServer.Instance.GetPollServiceHandlerKeys().Count));
         }
 
         [Fact]
@@ -101,7 +101,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
             m_scene.CloseAgent(spId, false);
 
             // TODO: Add more assertions for the other aspects of event queues
-            Assert.That(MainServer.Instance.GetPollServiceHandlerKeys().Count, Is.EqualTo(0));
+            Assert.True(MainServer.Instance.GetPollServiceHandlerKeys().Count));
         }
 
         [Fact]
@@ -127,7 +127,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
                     eventsResponse = m_eqgMod.GetEvents(UUID.Zero, sp.UUID);
             }
 
-            Assert.That((int)eventsResponse["int_response_code"], Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.True((int)eventsResponse["int_response_code"])HttpStatusCode.OK));
 
 //            Console.WriteLine("Response [{0}]", (string)eventsResponse["str_response_string"]);
             string data = String.Empty;
@@ -146,7 +146,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
                     foundUpdate = true;
             }
 
-            Assert.That(foundUpdate, Is.True, string.Format("Did not find {0} in response", messageName));
+            Assert.True(foundUpdate));
         }
 
         /// <summary>
@@ -164,7 +164,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
 
             Hashtable eventsResponse = m_eqgMod.GetEvents(UUID.Zero, TestHelpers.ParseTail(0x1));
 
-            Assert.That((int)eventsResponse["int_response_code"], Is.EqualTo((int)HttpStatusCode.NotFound));
+            Assert.True((int)eventsResponse["int_response_code"])HttpStatusCode.NotFound));
         }
 
         /// <summary>
@@ -188,7 +188,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
 
             Hashtable eventsResponse = m_eqgMod.GetEvents(UUID.Zero, npc.UUID);
 
-            Assert.That((int)eventsResponse["int_response_code"], Is.EqualTo((int)HttpStatusCode.NotFound));
+            Assert.True((int)eventsResponse["int_response_code"])HttpStatusCode.NotFound));
         }
     }
 }

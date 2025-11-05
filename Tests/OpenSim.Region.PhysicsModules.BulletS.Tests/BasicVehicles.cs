@@ -139,13 +139,13 @@ namespace OpenSim.Region.PhysicsModule.BulletS.Tests
             /*
             float finalRoll, finalPitch, finalYaw;
             TestVehicle.Orientation.GetEulerAngles(out finalRoll, out finalPitch, out finalYaw);
-            Assert.That(finalRoll, Is.InRange(-0.01f, 0.01f));
-            Assert.That(finalPitch, Is.InRange(-0.01f, 0.01f));
-            Assert.That(finalYaw, Is.InRange(initYaw - 0.1f, initYaw + 0.1f));
+            Assert.True(finalRoll));
+            Assert.True(finalPitch));
+            Assert.True(finalYaw));
              */
 
             Vector3 upPointer = Vector3.UnitZ * TestVehicle.Orientation;
-            Assert.That(upPointer.Z, Is.GreaterThan(0.99f));
+            Assert.True(upPointer.Z));
         }
     }
 }

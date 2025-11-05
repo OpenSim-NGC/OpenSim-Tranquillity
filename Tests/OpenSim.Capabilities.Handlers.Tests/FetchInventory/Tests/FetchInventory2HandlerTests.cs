@@ -112,12 +112,12 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
 
             string llsdresponse = handler.FetchInventoryRequest(request, "/FETCH", string.Empty, req, resp);
 
-            Assert.That(llsdresponse != null, Is.True, "Incorrect null response");
-            Assert.That(llsdresponse != string.Empty, Is.True, "Incorrect empty response");
-            Assert.That(llsdresponse.Contains(m_userID.ToString()), Is.True, "Response should contain userID");
+            Assert.True(llsdresponse != null);
+            Assert.True(llsdresponse != string.Empty);
+            Assert.True(llsdresponse.Contains(m_userID.ToString()));
 
-            Assert.That(llsdresponse.Contains("10000000-0000-0000-0000-000000000001"), Is.True, "Response does not contain item uuid");
-            Assert.That(llsdresponse.Contains("Notecard 1"), Is.True, "Response does not contain item Name");
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000001"));
+            Assert.True(llsdresponse.Contains("Notecard 1"));
             Console.WriteLine(llsdresponse);
         }
 
@@ -142,16 +142,16 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
 
             string llsdresponse = handler.FetchInventoryRequest(request, "/FETCH", string.Empty, req, resp);
 
-            Assert.That(llsdresponse != null, Is.True, "Incorrect null response");
-            Assert.That(llsdresponse != string.Empty, Is.True, "Incorrect empty response");
-            Assert.That(llsdresponse.Contains(m_userID.ToString()), Is.True, "Response should contain userID");
+            Assert.True(llsdresponse != null);
+            Assert.True(llsdresponse != string.Empty);
+            Assert.True(llsdresponse.Contains(m_userID.ToString()));
 
             Console.WriteLine(llsdresponse);
-            Assert.That(llsdresponse.Contains("10000000-0000-0000-0000-000000000001"), Is.True, "Response does not contain notecard 1");
-            Assert.That(llsdresponse.Contains("10000000-0000-0000-0000-000000000002"), Is.True, "Response does not contain notecard 2");
-            Assert.That(llsdresponse.Contains("10000000-0000-0000-0000-000000000003"), Is.True, "Response does not contain notecard 3");
-            Assert.That(llsdresponse.Contains("10000000-0000-0000-0000-000000000004"), Is.True, "Response does not contain notecard 4");
-            Assert.That(llsdresponse.Contains("10000000-0000-0000-0000-000000000005"), Is.True, "Response does not contain notecard 5");
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000001"));
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000002"));
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000003"));
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000004"));
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000005"));
         }
 
     }

@@ -589,7 +589,6 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
         protected Scene m_scene;
         protected SerialiserModule m_serialiserModule;
 
-        [OneTimeSetUp]
         public void Init()
         {
             m_serialiserModule = new SerialiserModule();

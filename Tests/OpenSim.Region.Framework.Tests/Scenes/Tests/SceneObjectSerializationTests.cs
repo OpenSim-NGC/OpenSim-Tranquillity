@@ -71,7 +71,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             XmlDocument doc = new XmlDocument();
             doc.LoadXml(xml);
             XmlNodeList nodes = doc.GetElementsByTagName("SceneObjectPart");
-            Assert.That(nodes.Count, Is.EqualTo(3), "SOG serialization resulted in wrong number of SOPs");
+            Assert.True(nodes.Count), "SOG serialization resulted in wrong number of SOPs");
 
             SceneObjectGroup so2 = SceneObjectSerializer.FromXml2Format(xml);
             Assert.NotNull(so2, "SOG deserialization resulted in null object");
@@ -110,18 +110,18 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             doc.LoadXml(xml);
 
             XmlNodeList nodes = doc.GetElementsByTagName("SceneObjectPart");
-            Assert.That(nodes.Count, Is.GreaterThan(0), "SOG serialization resulted in no SOPs");
+            Assert.True(nodes.Count), "SOG serialization resulted in no SOPs");
             foreach (XmlAttribute a in nodes[0].Attributes)
             {
                 int count = a.Name.Count(c => c == ':');
-                Assert.That(count, Is.EqualTo(1), "Cannot have multiple ':' in attribute name in SOP");
+                Assert.True(count), "Cannot have multiple ':' in attribute name in SOP");
             }
             nodes = doc.GetElementsByTagName("CreatorData");
-            Assert.That(nodes.Count, Is.GreaterThan(0), "SOG serialization resulted in no CreatorData");
+            Assert.True(nodes.Count), "SOG serialization resulted in no CreatorData");
             foreach (XmlAttribute a in nodes[0].Attributes)
             {
                 int count = a.Name.Count(c => c == ':');
-                Assert.That(count, Is.EqualTo(1), "Cannot have multiple ':' in attribute name in CreatorData");
+                Assert.True(count), "Cannot have multiple ':' in attribute name in CreatorData");
             }
 
             SceneObjectGroup so2 = SceneObjectSerializer.FromXml2Format(xml);

@@ -117,7 +117,7 @@ namespace OpenSim.Framework.Serialization.Tests
 
             Dictionary<string, object> options = new Dictionary<string, object>();
             LandData ld = LandDataSerializer.Deserialize(LandDataSerializer.Serialize(this.land, options));
-            Assert.That(ld, Is.Not.Null, "Deserialize(string) returned null");
+            Assert.True(ld) returned null");
 //            Assert.Equal(,);
 //            Assert.Equal(,);
             Assert.Equal(,);
@@ -126,12 +126,12 @@ namespace OpenSim.Framework.Serialization.Tests
             Assert.Equal(,);
             Assert.Equal(,);
             Assert.Equal(,);
-            Assert.That(ld.GlobalID, Is.EqualTo(land.GlobalID), "Reified LandData.GlobalID != original LandData.GlobalID");
+            Assert.True(ld.GlobalID), "Reified LandData.GlobalID != original LandData.GlobalID");
             Assert.Equal(,);
             Assert.Equal(,);
             Assert.Equal(,);
             Assert.Equal(,);
-            Assert.That(ld.Name, Is.EqualTo(land.Name), "Reified LandData.Name != original LandData.Name");
+            Assert.True(ld.Name), "Reified LandData.Name != original LandData.Name");
             Assert.Equal(,);
             Assert.Equal(,);
             Assert.Equal(,);

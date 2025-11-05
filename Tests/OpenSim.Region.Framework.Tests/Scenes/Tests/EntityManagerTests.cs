@@ -79,10 +79,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             entman.ContainsKey(li1).Should().BeFalse();
             entman.ContainsKey(obj2).Should().BeFalse();
             entman.ContainsKey(li2).Should().BeFalse();
-            // Assert.That(entman.ContainsKey(obj1), Is.False);
-            // Assert.That(entman.ContainsKey(li1), Is.False);
-            // Assert.That(entman.ContainsKey(obj2), Is.False);
-            // Assert.That(entman.ContainsKey(li2), Is.False);
+            // Assert.True(entman.ContainsKey(obj1));
+            // Assert.True(entman.ContainsKey(li1));
+            // Assert.True(entman.ContainsKey(obj2));
+            // Assert.True(entman.ContainsKey(li2));
         }
 
         [Fact]

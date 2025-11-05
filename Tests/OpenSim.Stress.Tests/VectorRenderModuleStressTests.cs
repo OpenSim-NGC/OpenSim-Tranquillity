@@ -110,7 +110,7 @@ namespace OpenSim.Tests.Stress
                         string.Format("PenColour BLACK; MoveTo 40,220; FontSize 32; Text {0};", text),
                         "");
 
-                    Assert.That(originalTextureID, Is.Not.EqualTo(so.RootPart.Shape.Textures.GetFace(0).TextureID));
+                    Assert.True(originalTextureID).TextureID));
 
                     Pass++;
                 }

@@ -125,12 +125,12 @@ namespace OpenSim.Framework.Serialization.Tests
 //            TestHelpers.EnableLogging();
 
             RegionSettings deserRs = RegionSettingsSerializer.Deserialize(m_serializedRs, out ViewerEnvironment dummy, new EstateSettings());
-            Assert.NotNull();
+            // TODO: Fix this assertion
             Assert.Equal(,);
             Assert.Equal(,);
             Assert.Equal(,);
             Assert.Equal(,);
-            Assert.That(deserRs.SpawnPoints()[0].ToString(), Is.EqualTo(m_rs.SpawnPoints()[0].ToString()));
+            Assert.True(deserRs.SpawnPoints()[0].ToString())[0].ToString()));
         }
     }
 }

@@ -184,7 +184,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 
             Assert.NotNull(foundItem1);
 //            Assert.That(
-//                foundItem1.CreatorId, Is.EqualTo(userUuid),
+//                foundItem1.CreatorId),
 //                "Loaded item non-uuid creator doesn't match that of the loading user");
             Assert.Equal(itemName, foundItem1.Name);
         }

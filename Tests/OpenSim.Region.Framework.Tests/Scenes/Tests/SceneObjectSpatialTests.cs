@@ -80,7 +80,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             Assert.Equal(,);
             Assert.Equal(,);
-            Assert.That(so.RootPart.GetWorldPosition(), Is.EqualTo(partPosition));
+            Assert.True(so.RootPart.GetWorldPosition()));
             Assert.Equal(,);
             Assert.Equal(,);
         }
@@ -106,7 +106,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneObjectPart childPart = so.Parts[1];
             Assert.Equal(,);
             Assert.Equal(,);
-            Assert.That(childPart.GetWorldPosition(), Is.EqualTo(childPosition));
+            Assert.True(childPart.GetWorldPosition()));
             Assert.Equal(,);
             Assert.Equal(,);
         }
@@ -139,7 +139,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.Equal(,);
 
             Assert.Equal(,);
-            Assert.That(childPart.GetWorldPosition(), Is.EqualTo(childPosition));
+            Assert.True(childPart.GetWorldPosition()));
 
             // Relative to root part as (0, 0, 0)
             Assert.Equal(,);

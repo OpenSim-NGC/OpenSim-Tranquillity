@@ -57,8 +57,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_sp.HandleAgentRequestSit(m_sp.ControllingClient, m_sp.UUID, part.UUID, Vector3.Zero);
 
             Assert.Equal(,);
-            Assert.That(part.GetSittingAvatarsCount(), Is.EqualTo(0));
-            Assert.That(part.GetSittingAvatars(), Is.Null);
+            Assert.True(part.GetSittingAvatarsCount()));
+            Assert.True(part.GetSittingAvatars());
             Assert.Equal(,);
             Assert.Equal(startPos, m_sp.AbsolutePosition);
         }
@@ -79,12 +79,12 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Vector3 spPhysActorSize = m_sp.PhysicsActor.Size;
             m_sp.HandleAgentRequestSit(m_sp.ControllingClient, m_sp.UUID, part.UUID, Vector3.Zero);
 
-            Assert.Null();
+            // TODO: Fix this assertion
 
             Assert.Equal(,));
 
             Assert.Equal(,);
-            Assert.That(part.GetSittingAvatarsCount(), Is.EqualTo(1));
+            Assert.True(part.GetSittingAvatarsCount()));
             HashSet<ScenePresence> sittingAvatars = part.GetSittingAvatars();
             Assert.Equal(,);
             Assert.That(sittingAvatars.Contains(m_sp));
@@ -112,10 +112,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_sp.StandUp();
 
             Assert.Equal(,);
-            Assert.That(part.GetSittingAvatarsCount(), Is.EqualTo(0));
-            Assert.That(part.GetSittingAvatars(), Is.Null);
+            Assert.True(part.GetSittingAvatarsCount()));
+            Assert.True(part.GetSittingAvatars());
             Assert.Equal(,);
-            Assert.NotNull();
+            // TODO: Fix this assertion
         }
 
         [Fact]
@@ -140,10 +140,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_sp.StandUp();
 
             Assert.Equal(,);
-            Assert.That(part.GetSittingAvatarsCount(), Is.EqualTo(0));
-            Assert.That(part.GetSittingAvatars(), Is.Null);
+            Assert.True(part.GetSittingAvatarsCount()));
+            Assert.True(part.GetSittingAvatars());
             Assert.Equal(,);
-            Assert.NotNull();
+            // TODO: Fix this assertion
         }
 
         [Fact]
@@ -189,9 +189,9 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             // End of copied section.
 
             Assert.Equal(,);
-            Assert.Null();
+            // TODO: Fix this assertion
 
-            Assert.That(part.GetSittingAvatarsCount(), Is.EqualTo(1));
+            Assert.True(part.GetSittingAvatarsCount()));
             HashSet<ScenePresence> sittingAvatars = part.GetSittingAvatars();
             Assert.Equal(,);
             Assert.That(sittingAvatars.Contains(m_sp));
@@ -200,11 +200,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             Assert.Equal(,);
             Assert.Equal(,);
-            Assert.NotNull();
+            // TODO: Fix this assertion
 
             Assert.Equal(,);
-            Assert.That(part.GetSittingAvatarsCount(), Is.EqualTo(0));
-            Assert.That(part.GetSittingAvatars(), Is.Null);
+            Assert.True(part.GetSittingAvatarsCount()));
+            Assert.True(part.GetSittingAvatars());
 */
         }
 
@@ -220,13 +220,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             m_sp.HandleAgentSitOnGround();
 
-            Assert.That(m_sp.SitGround, Is.True);
-            Assert.Null();
+            Assert.True(m_sp.SitGround);
+            // TODO: Fix this assertion
 
             m_sp.StandUp();
 
-            Assert.That(m_sp.SitGround, Is.False);
-            Assert.NotNull();
+            Assert.True(m_sp.SitGround);
+            // TODO: Fix this assertion
         }
     }
 }

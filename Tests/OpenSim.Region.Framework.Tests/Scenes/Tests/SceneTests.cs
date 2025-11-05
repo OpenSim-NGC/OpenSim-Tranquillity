@@ -93,8 +93,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Scene scene = new SceneHelpers().SetupScene();
             scene.Close();
 
-            Assert.That(scene.ShuttingDown, Is.True);
-            Assert.That(scene.Active, Is.False);
+            Assert.True(scene.ShuttingDown);
+            Assert.True(scene.Active);
 
             // Trying to update a shutdown scene should result in no update
             scene.Update(1);

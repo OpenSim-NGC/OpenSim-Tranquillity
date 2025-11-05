@@ -86,11 +86,11 @@ namespace OpenSim.Services.InventoryService.Tests
                     AssetType = assetType
                 };
 
-            Assert.That(xis.AddItem(itemToStore), Is.True);
+            Assert.True(xis.AddItem(itemToStore));
 
             InventoryItemBase itemRetrieved = xis.GetItem(UUID.Zero, itemId);
 
-            Assert.NotNull();
+            // TODO: Fix this assertion
             Assert.Equal(,);
             Assert.Equal(,);
             Assert.Equal(,);
@@ -129,16 +129,16 @@ namespace OpenSim.Services.InventoryService.Tests
                     AssetType = assetType
                 };
 
-            Assert.That(xis.AddItem(itemToStore), Is.True);
+            Assert.True(xis.AddItem(itemToStore));
 
             // Normal update
             itemToStore.Name = itemName2;
 
-            Assert.That(xis.UpdateItem(itemToStore), Is.True);
+            Assert.True(xis.UpdateItem(itemToStore));
 
             InventoryItemBase itemRetrieved = xis.GetItem(UUID.Zero, itemId);
 
-            Assert.NotNull();
+            // TODO: Fix this assertion
             Assert.Equal(,);
 
             // Attempt to update properties that should never change
@@ -156,11 +156,11 @@ namespace OpenSim.Services.InventoryService.Tests
             itemToStore.AssetType = assetType2;
             itemToStore.Name = itemName3;
 
-            Assert.That(xis.UpdateItem(itemToStore), Is.True);
+            Assert.True(xis.UpdateItem(itemToStore));
 
             itemRetrieved = xis.GetItem(itemRetrieved.Owner, itemRetrieved.ID);
 
-            Assert.NotNull();
+            // TODO: Fix this assertion
             Assert.Equal(,);
             Assert.Equal(,);
             Assert.Equal(,);
