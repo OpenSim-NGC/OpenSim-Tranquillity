@@ -23,6 +23,10 @@
       <HintPath>..\..\bin\XMLRPC.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Nini">
+      <HintPath>..\..\bin\Nini.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
   
   <ItemGroup>

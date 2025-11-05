@@ -26,6 +26,8 @@
  */
 
 using OpenMetaverse;
+using Xunit;
+using Nini.Config;
 
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.Serialiser;
@@ -37,8 +39,8 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 {
     public class InventoryArchiveLoadTests : InventoryArchiveTestCase
     {
-        protected TestScene m_scene;
-        protected InventoryArchiverModule m_archiverModule;
+        protected TestScene m_scene = null!;
+        protected InventoryArchiverModule m_archiverModule = null!;
 
         public override void SetUp()
         {
@@ -63,22 +65,22 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             InventoryItemBase coaItem
                 = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaLL1.PrincipalID, m_coaItemName);
 
-            Assert.That(coaItem, Is.Not.Null, "Didn't find loaded item 1");
+            Assert.NotNull(coaItem);
 
             string assetXml = AssetHelpers.ReadAssetAsString(m_scene.AssetService, coaItem.AssetID);
 
             CoalescedSceneObjects coa;
             bool readResult = CoalescedSceneObjectsSerializer.TryFromXml(assetXml, out coa);
 
-            Assert.That(readResult, Is.True);
-            Assert.Equal(,);
+            Assert.True(readResult);
+            Assert.NotNull(coa);
 
             List<SceneObjectGroup> coaObjects = coa.Objects;
-            Assert.Equal(,));
-            Assert.Equal(,));
+            Assert.Single(coaObjects);
+            Assert.Equal(1, coaObjects[0].PrimCount);
 
-            Assert.Equal(,));
-            Assert.Equal(,));
+            Assert.NotNull(coaObjects[0]);
+            Assert.Single(coaObjects[0].Parts);
         }
 
         /// <summary>
@@ -97,19 +99,16 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             InventoryItemBase foundItem1
                 = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaLL1.PrincipalID, m_item1Name);
 
-            Assert.Equal(,),
-                "Loaded item non-uuid creator doesn't match original");
-            Assert.That(
-                foundItem1.CreatorIdAsUuid, Is.EqualTo(m_uaLL1.PrincipalID),
-                "Loaded item uuid creator doesn't match original");
-            Assert.That(foundItem1.Owner, Is.EqualTo(m_uaLL1.PrincipalID),
-                "Loaded item owner doesn't match inventory reciever");
+            Assert.NotNull(foundItem1);
+            Assert.Equal(m_uaLL1.Name, foundItem1.CreatorId);
+            Assert.Equal(m_uaLL1.PrincipalID, foundItem1.CreatorIdAsUuid);
+            Assert.Equal(m_uaLL1.PrincipalID, foundItem1.Owner);
 
             AssetBase asset1 = m_scene.AssetService.Get(foundItem1.AssetID.ToString());
             string xmlData = Utils.BytesToString(asset1.Data);
             SceneObjectGroup sog1 = SceneObjectSerializer.FromOriginalXmlFormat(xmlData);
 
-            Assert.Equal(,);
+            Assert.Equal(m_uaLL1.PrincipalID, sog1.OwnerID);
         }
 
 //        /// <summary>
@@ -160,18 +159,15 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             InventoryItemBase foundItem1
                 = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaMT.PrincipalID, m_item1Name);
 
-            Assert.That(foundItem1, Is.Not.Null, "Didn't find loaded item 1");
-            Assert.Equal(,),
-                "Loaded item non-uuid creator doesn't match that of the loading user");
-            Assert.That(
-                foundItem1.CreatorIdAsUuid, Is.EqualTo(m_uaMT.PrincipalID),
-                "Loaded item uuid creator doesn't match that of the loading user");
+            Assert.NotNull(foundItem1);
+            Assert.Equal(m_uaMT.Name, foundItem1.CreatorId);
+            Assert.Equal(m_uaMT.PrincipalID, foundItem1.CreatorIdAsUuid);
 
             AssetBase asset1 = m_scene.AssetService.Get(foundItem1.AssetID.ToString());
             string xmlData = Utils.BytesToString(asset1.Data);
             SceneObjectGroup sog1 = SceneObjectSerializer.FromOriginalXmlFormat(xmlData);
 
-            Assert.Equal(,);
+            Assert.Equal(m_uaMT.PrincipalID, sog1.OwnerID);
         }
     }
 }
