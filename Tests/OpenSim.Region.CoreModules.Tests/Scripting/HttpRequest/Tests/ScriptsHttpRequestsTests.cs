@@ -28,6 +28,7 @@
 using System.Net;
 using System.Runtime.Serialization;
 using System.Text;
+using Xunit;
 
 using OpenSim.Framework;
 using OpenSim.Tests.Common;

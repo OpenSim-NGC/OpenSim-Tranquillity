@@ -26,6 +26,7 @@
  */
 
 using OpenMetaverse;
+using Xunit;
 
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;

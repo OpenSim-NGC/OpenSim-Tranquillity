@@ -26,6 +26,7 @@
  */
 
 using OpenMetaverse;
+using Xunit;
 
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.Avatar.Inventory.Archiver;

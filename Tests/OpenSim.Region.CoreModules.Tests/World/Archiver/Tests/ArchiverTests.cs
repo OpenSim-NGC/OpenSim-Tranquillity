@@ -28,6 +28,7 @@
 using System.Reflection;
 using OpenMetaverse;
 using OpenMetaverse.Assets;
+using Xunit;
 
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization.External;

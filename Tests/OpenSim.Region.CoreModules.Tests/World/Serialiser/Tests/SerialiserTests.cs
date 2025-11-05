@@ -26,6 +26,7 @@
  */
 
 using System.Xml;
+using Xunit;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;

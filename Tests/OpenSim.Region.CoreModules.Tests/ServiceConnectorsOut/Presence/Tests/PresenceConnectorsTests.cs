@@ -26,6 +26,7 @@
  */
 
 using OpenMetaverse;
+using Xunit;
 
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
 using OpenSim.Tests.Common;

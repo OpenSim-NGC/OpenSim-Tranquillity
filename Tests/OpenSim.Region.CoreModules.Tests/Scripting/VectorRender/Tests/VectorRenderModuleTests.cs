@@ -26,6 +26,7 @@
  */
 
 using OpenMetaverse;
+using Xunit;
 
 using OpenSim.Region.CoreModules.Scripting.DynamicTexture;
 using OpenSim.Region.Framework.Scenes;

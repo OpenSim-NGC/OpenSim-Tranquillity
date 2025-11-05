@@ -27,6 +27,7 @@
 
 using OpenSim.Framework;
 using OpenSim.Tests.Common;
+using Xunit;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
 {
