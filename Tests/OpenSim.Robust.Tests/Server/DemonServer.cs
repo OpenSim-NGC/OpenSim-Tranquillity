@@ -42,7 +42,6 @@ namespace Robust.Tests
 
         public static string Address = "http://localhost:8888";
 
-        [SetUp]
         public void StartDemon()
         {
             if (File.Exists("Robust.Tests.log"))
@@ -56,7 +55,6 @@ namespace Robust.Tests
             Console.WriteLine("**** Setup Finished ****");
         }
 
-        [TearDown]
         public void StopDemon()
         {
             Console.WriteLine("**** Killing demon Robust Server ****");

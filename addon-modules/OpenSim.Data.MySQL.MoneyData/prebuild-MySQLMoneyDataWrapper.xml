@@ -18,7 +18,6 @@
       <Reference name="System"/>
       <Reference name="System.Xml"/>
       <Reference name="System.Data"/>
-      <Reference name="System.Drawing"/>
       <Reference name="System.Runtime.Remoting"/>	  
       <Reference name="Nini" path="../../../bin/"/>
       <Reference name="Mono.Addins" path="../../../bin/"/>

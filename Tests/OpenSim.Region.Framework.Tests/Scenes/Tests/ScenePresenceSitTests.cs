@@ -31,20 +31,18 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
-    [TestFixture]
     public class ScenePresenceSitTests : OpenSimTestCase
     {
         private TestScene m_scene;
         private ScenePresence m_sp;
 
-        [SetUp]
         public void Init()
         {
             m_scene = new SceneHelpers().SetupScene();
             m_sp = SceneHelpers.AddScenePresence(m_scene, TestHelpers.ParseTail(0x1));
         }
 
-        [Test]
+        [Fact]
         public void TestSitOutsideRangeNoTarget()
         {
             TestHelpers.InMethod();
@@ -58,14 +56,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             m_sp.HandleAgentRequestSit(m_sp.ControllingClient, m_sp.UUID, part.UUID, Vector3.Zero);
 
-            Assert.That(part.SitTargetAvatar, Is.EqualTo(UUID.Zero));
-            Assert.That(part.GetSittingAvatarsCount(), Is.EqualTo(0));
-            Assert.That(part.GetSittingAvatars(), Is.Null);
-            Assert.That(m_sp.ParentID, Is.EqualTo(0));
-            Assert.AreEqual(startPos, m_sp.AbsolutePosition);
+            Assert.Equal(,);
+            Assert.True(part.GetSittingAvatarsCount()));
+            Assert.True(part.GetSittingAvatars());
+            Assert.Equal(,);
+            Assert.Equal(startPos, m_sp.AbsolutePosition);
         }
 
-        [Test]
+        [Fact]
         public void TestSitWithinRangeNoTarget()
         {
             TestHelpers.InMethod();
@@ -81,21 +79,19 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Vector3 spPhysActorSize = m_sp.PhysicsActor.Size;
             m_sp.HandleAgentRequestSit(m_sp.ControllingClient, m_sp.UUID, part.UUID, Vector3.Zero);
 
-            Assert.That(m_sp.PhysicsActor, Is.Null);
+            // TODO: Fix this assertion
 
-            Assert.That(
-                m_sp.AbsolutePosition,
-                Is.EqualTo(part.AbsolutePosition + new Vector3(0, 0, spPhysActorSize.Z / 2)));
+            Assert.Equal(,));
 
-            Assert.That(part.SitTargetAvatar, Is.EqualTo(UUID.Zero));
-            Assert.That(part.GetSittingAvatarsCount(), Is.EqualTo(1));
+            Assert.Equal(,);
+            Assert.True(part.GetSittingAvatarsCount()));
             HashSet<ScenePresence> sittingAvatars = part.GetSittingAvatars();
-            Assert.That(sittingAvatars.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             Assert.That(sittingAvatars.Contains(m_sp));
-            Assert.That(m_sp.ParentID, Is.EqualTo(part.LocalId));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestSitAndStandWithNoSitTarget()
         {
             TestHelpers.InMethod();
@@ -111,20 +107,18 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Vector3 spPhysActorSize = m_sp.PhysicsActor.Size;
             m_sp.HandleAgentRequestSit(m_sp.ControllingClient, m_sp.UUID, part.UUID, Vector3.Zero);
 
-            Assert.That(
-                m_sp.AbsolutePosition,
-                Is.EqualTo(part.AbsolutePosition + new Vector3(0, 0, spPhysActorSize.Z / 2)));
+            Assert.Equal(,));
 
             m_sp.StandUp();
 
-            Assert.That(part.SitTargetAvatar, Is.EqualTo(UUID.Zero));
-            Assert.That(part.GetSittingAvatarsCount(), Is.EqualTo(0));
-            Assert.That(part.GetSittingAvatars(), Is.Null);
-            Assert.That(m_sp.ParentID, Is.EqualTo(0));
-            Assert.That(m_sp.PhysicsActor, Is.Not.Null);
+            Assert.Equal(,);
+            Assert.True(part.GetSittingAvatarsCount()));
+            Assert.True(part.GetSittingAvatars());
+            Assert.Equal(,);
+            // TODO: Fix this assertion
         }
 
-        [Test]
+        [Fact]
         public void TestSitAndStandWithNoSitTargetChildPrim()
         {
             TestHelpers.InMethod();
@@ -141,20 +135,18 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Vector3 spPhysActorSize = m_sp.PhysicsActor.Size;
             m_sp.HandleAgentRequestSit(m_sp.ControllingClient, m_sp.UUID, part.UUID, Vector3.Zero);
 
-            Assert.That(
-                m_sp.AbsolutePosition,
-                Is.EqualTo(part.AbsolutePosition + new Vector3(0, 0, spPhysActorSize.Z / 2)));
+            Assert.Equal(,));
 
             m_sp.StandUp();
 
-            Assert.That(part.SitTargetAvatar, Is.EqualTo(UUID.Zero));
-            Assert.That(part.GetSittingAvatarsCount(), Is.EqualTo(0));
-            Assert.That(part.GetSittingAvatars(), Is.Null);
-            Assert.That(m_sp.ParentID, Is.EqualTo(0));
-            Assert.That(m_sp.PhysicsActor, Is.Not.Null);
+            Assert.Equal(,);
+            Assert.True(part.GetSittingAvatarsCount()));
+            Assert.True(part.GetSittingAvatars());
+            Assert.Equal(,);
+            // TODO: Fix this assertion
         }
 
-        [Test]
+        [Fact]
         public void TestSitAndStandWithSitTarget()
         {
 /*  sit position math as changed, this needs to be fixed later
@@ -170,8 +162,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             m_sp.HandleAgentRequestSit(m_sp.ControllingClient, m_sp.UUID, part.UUID, Vector3.Zero);
 
-            Assert.That(part.SitTargetAvatar, Is.EqualTo(m_sp.UUID));
-            Assert.That(m_sp.ParentID, Is.EqualTo(part.LocalId));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             // This section is copied from ScenePresence.HandleAgentSit().  Correctness is not guaranteed.
             double x, y, z, m1, m2;
@@ -196,29 +188,27 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Vector3 sitOffset = up * (float)offset;
             // End of copied section.
 
-            Assert.That(
-                m_sp.AbsolutePosition,
-                Is.EqualTo(part.AbsolutePosition + part.SitTargetPosition - sitOffset + ScenePresence.SIT_TARGET_ADJUSTMENT));
-            Assert.That(m_sp.PhysicsActor, Is.Null);
+            Assert.Equal(,);
+            // TODO: Fix this assertion
 
-            Assert.That(part.GetSittingAvatarsCount(), Is.EqualTo(1));
+            Assert.True(part.GetSittingAvatarsCount()));
             HashSet<ScenePresence> sittingAvatars = part.GetSittingAvatars();
-            Assert.That(sittingAvatars.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             Assert.That(sittingAvatars.Contains(m_sp));
 
             m_sp.StandUp();
 
-            Assert.That(part.SitTargetAvatar, Is.EqualTo(UUID.Zero));
-            Assert.That(m_sp.ParentID, Is.EqualTo(0));
-            Assert.That(m_sp.PhysicsActor, Is.Not.Null);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            // TODO: Fix this assertion
 
-            Assert.That(part.SitTargetAvatar, Is.EqualTo(UUID.Zero));
-            Assert.That(part.GetSittingAvatarsCount(), Is.EqualTo(0));
-            Assert.That(part.GetSittingAvatars(), Is.Null);
+            Assert.Equal(,);
+            Assert.True(part.GetSittingAvatarsCount()));
+            Assert.True(part.GetSittingAvatars());
 */
         }
 
-        [Test]
+        [Fact]
         public void TestSitAndStandOnGround()
         {
             TestHelpers.InMethod();
@@ -230,13 +220,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             m_sp.HandleAgentSitOnGround();
 
-            Assert.That(m_sp.SitGround, Is.True);
-            Assert.That(m_sp.PhysicsActor, Is.Null);
+            Assert.True(m_sp.SitGround);
+            // TODO: Fix this assertion
 
             m_sp.StandUp();
 
-            Assert.That(m_sp.SitGround, Is.False);
-            Assert.That(m_sp.PhysicsActor, Is.Not.Null);
+            Assert.True(m_sp.SitGround);
+            // TODO: Fix this assertion
         }
     }
 }

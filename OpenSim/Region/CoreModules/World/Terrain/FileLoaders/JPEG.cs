@@ -25,9 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using SkiaSharp;
 using System;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using OpenSim.Region.Framework.Interfaces;
 
@@ -59,8 +58,13 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
 
         public void SaveFile(string filename, ITerrainChannel map)
         {
-            using(Bitmap colours = CreateBitmapFromMap(map))
-                colours.Save(filename,ImageFormat.Jpeg);
+            using (SKBitmap colours = CreateBitmapFromMap(map))
+            using (SKFileWStream stream = new SKFileWStream(filename))
+            using (SKPixmap pixmap = colours.PeekPixels())
+            {
+                SKJpegEncoderOptions options = new SKJpegEncoderOptions(90); // quality 0-100
+                pixmap.Encode(stream, SKEncodedImageFormat.Jpeg, options.Quality);
+            }
         }
 
         /// <summary>
@@ -70,8 +74,13 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
         /// <param name="map">The terrain channel being saved</param>
         public void SaveStream(Stream stream, ITerrainChannel map)
         {
-            using(Bitmap colours = CreateBitmapFromMap(map))
-                colours.Save(stream,ImageFormat.Jpeg);
+            using (SKBitmap colours = CreateBitmapFromMap(map))
+            using (SKWStream skStream = new SKManagedWStream(stream))
+            using (SKPixmap pixmap = colours.PeekPixels())
+            {
+                SKJpegEncoderOptions options = new SKJpegEncoderOptions(90); // quality 0-100
+                pixmap.Encode(skStream, SKEncodedImageFormat.Jpeg, options.Quality);
+            }
         }
 
         public virtual void SaveFile(ITerrainChannel m_channel, string filename,
@@ -79,7 +88,89 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
                              int fileWidth, int fileHeight,
                              int regionSizeX, int regionSizeY)
         {
-            throw new System.Exception("Not Implemented");
+            // We need to do this because saving directly to the same file we read from
+            // can cause issues on some platforms. Create a temp copy if the file exists.
+            string tempName = Path.GetTempFileName();
+
+            SKBitmap existingBitmap = null;
+            SKBitmap thisBitmap = null;
+            SKBitmap newBitmap = null;
+
+            int expectedWidth = fileWidth * regionSizeX;
+            int expectedHeight = fileHeight * regionSizeY;
+
+            try
+            {
+                if (File.Exists(filename))
+                {
+                    File.Copy(filename, tempName, true);
+                    existingBitmap = SKBitmap.Decode(tempName);
+
+                    if (existingBitmap == null || existingBitmap.Width != expectedWidth || existingBitmap.Height != expectedHeight)
+                    {
+                        // old file or decode failed, create a fresh target
+                        if (existingBitmap != null)
+                        {
+                            existingBitmap.Dispose();
+                            existingBitmap = null;
+                        }
+
+                        newBitmap = new SKBitmap(expectedWidth, expectedHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+                    }
+                    else
+                    {
+                        // reuse decoded bitmap as the base
+                        newBitmap = existingBitmap;
+                    }
+                }
+                else
+                {
+                    newBitmap = new SKBitmap(expectedWidth, expectedHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+                }
+
+                // Create an image of the provided channel
+                thisBitmap = CreateBitmapFromMap(m_channel);
+
+                // Copy this region into the target image at the tile offset
+                for (int x = 0; x < thisBitmap.Width; x++)
+                {
+                    for (int y = 0; y < thisBitmap.Height; y++)
+                    {
+                        int targetX = x + offsetX * regionSizeX;
+                        int targetY = y + (fileHeight - 1 - offsetY) * regionSizeY;
+
+                        // Bounds-check just in case
+                        if (targetX >= 0 && targetX < newBitmap.Width && targetY >= 0 && targetY < newBitmap.Height)
+                        {
+                            SKColor c = thisBitmap.GetPixel(x, y);
+                            newBitmap.SetPixel(targetX, targetY, c);
+                        }
+                    }
+                }
+
+                // Save the composed image as JPEG
+                using (var img = SKImage.FromBitmap(newBitmap))
+                using (var fs = File.Open(filename, FileMode.Create, FileAccess.Write))
+                using (var data = img.Encode(SKEncodedImageFormat.Jpeg, 90))
+                {
+                    data.SaveTo(fs);
+                }
+            }
+            finally
+            {
+                if (existingBitmap != null)
+                    existingBitmap.Dispose();
+
+                if (thisBitmap != null)
+                    thisBitmap.Dispose();
+
+                // If newBitmap is a different object to existingBitmap we must dispose it too
+                if (newBitmap != null && newBitmap != existingBitmap)
+                    newBitmap.Dispose();
+
+                if (File.Exists(tempName))
+                    File.Delete(tempName);
+            }
         }
 
         #endregion
@@ -92,21 +183,21 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
         //Returns true if this extension is supported for terrain save-tile
         public bool SupportsTileSave()
         {
-            return false;
+            return true;
         }
 
-        private static Bitmap CreateBitmapFromMap(ITerrainChannel map)
+        private static SKBitmap CreateBitmapFromMap(ITerrainChannel map)
         {
             int pallete;
-            Bitmap bmp;
-            Color[] colours;
+            SKBitmap bmp;
+            SKColor[] colours;
 
-            using (Bitmap gradientmapLd = new Bitmap("defaultstripe.png"))
+            using (SKBitmap gradientmapLd = SKBitmap.Decode("defaultstripe.png"))
             {
                 pallete = gradientmapLd.Height;
 
-                bmp = new Bitmap(map.Width, map.Height);
-                colours = new Color[pallete];
+                bmp = new SKBitmap(map.Width, map.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+                colours = new SKColor[pallete];
 
                 for (int i = 0; i < pallete; i++)
                 {

@@ -34,7 +34,7 @@ namespace OpenSim.Framework.Tests
     {
         private bool m_RegionSettingsOnSaveEventFired;
 
-        [Test]
+        [Fact]
         public void ChildAgentDataUpdate01()
         {
             // code coverage
@@ -42,7 +42,7 @@ namespace OpenSim.Framework.Tests
             Assert.That(cadu.alwaysrun is false, "Default is false");
         }
 
-        [Test]
+        [Fact]
         public void AgentPositionTest01()
         {
             UUID AgentId1 = UUID.Random();
@@ -123,7 +123,7 @@ namespace OpenSim.Framework.Tests
             Assert.That(position2.Size == position1.Size, "Size didn't unpack the same way it packed");
         }
 
-        [Test]
+        [Fact]
         public void RegionSettingsTest01()
         {
             RegionSettings settings = new RegionSettings();
@@ -145,7 +145,7 @@ namespace OpenSim.Framework.Tests
             m_RegionSettingsOnSaveEventFired = true;
         }
 
-        [Test]
+        [Fact]
         public void InventoryItemBaseConstructorTest01()
         {
             InventoryItemBase b1 = new InventoryItemBase();
@@ -165,7 +165,7 @@ namespace OpenSim.Framework.Tests
 
         }
 
-        [Test]
+        [Fact]
         public void AssetMetaDataNonNullContentTypeTest01()
         {
             AssetMetadata assetMetadata = new AssetMetadata();
@@ -179,7 +179,7 @@ namespace OpenSim.Framework.Tests
             assetMetadata.CreationDate = fixedTime;
         }
 
-        [Test]
+        [Fact]
         public void EstateSettingsMundateTests()
         {
             EstateSettings es = new EstateSettings();
@@ -227,7 +227,7 @@ namespace OpenSim.Framework.Tests
 
         }
 
-        [Test]
+        [Fact]
         public void InventoryFolderBaseConstructorTest01()
         {
             UUID uuid1 = UUID.Random();
@@ -241,7 +241,7 @@ namespace OpenSim.Framework.Tests
             Assert.That(fld.Owner == uuid2, "ID,Owner constructor failed to save value in ID field.");
         }
 
-        [Test]
+        [Fact]
         public void AsssetBaseConstructorTest01()
         {
             AssetBase abase = new AssetBase();
@@ -269,7 +269,7 @@ namespace OpenSim.Framework.Tests
             Assert.That(abase.ID == itemID.ToString(),"ID should be MetaData.FullID.ToString() when string.empty or null is provided to the ID property");
         }
 
-        [Test]
+        [Fact]
         public void CultureSetCultureTest01()
         {
             CultureInfo ci = new CultureInfo("en-US", false);

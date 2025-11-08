@@ -33,7 +33,6 @@ using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -1253,7 +1252,7 @@ namespace OpenSim.Region.Framework.Scenes
             set { m_rootPart.Damage = value; }
         }
 
-        public Color Color
+        public uint Color
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return m_rootPart.Color; }
@@ -2300,10 +2299,12 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void SetText(string text, Vector3 color, double alpha)
         {
-            Color = Color.FromArgb(0xff - (int) (alpha * 0xff),
-                                   (int) (color.X * 0xff),
-                                   (int) (color.Y * 0xff),
-                                   (int) (color.Z * 0xff));
+            Color = (uint)(
+                ((0xff - (int)(alpha * 0xff)) << 24) |
+                (((int)(color.X * 0xff)) << 16) |
+                (((int)(color.Y * 0xff)) << 8) |
+                ((int)(color.Z * 0xff))
+            );
             Text = text;
 
             HasGroupChanged = true;

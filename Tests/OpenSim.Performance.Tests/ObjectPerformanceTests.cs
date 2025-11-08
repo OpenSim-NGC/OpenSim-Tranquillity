@@ -40,17 +40,15 @@ namespace OpenSim.Tests.Performance
     /// how much memory is free, etc.  In some cases, later larger tests will apparently take less time than smaller
     /// earlier tests.
     /// </remarks>
-    [TestFixture]
     public class ObjectPerformanceTests : OpenSimTestCase
     {
-        [TearDown]
         public void TearDown()
         {
             GC.Collect();
             GC.WaitForPendingFinalizers();
         }
 
-//        [Test]
+//        [Fact]
 //        public void Test0000Clean()
 //        {
 //            TestHelpers.InMethod();
@@ -59,7 +57,7 @@ namespace OpenSim.Tests.Performance
 //            TestAddObjects(200000);
 //        }
 
-        [Test]
+        [Fact]
         public void Test_0001_10K_1PrimObjects()
         {
             TestHelpers.InMethod();
@@ -68,7 +66,7 @@ namespace OpenSim.Tests.Performance
             TestAddObjects(1, 10000);
         }
 
-        [Test]
+        [Fact]
         public void Test_0002_100K_1PrimObjects()
         {
             TestHelpers.InMethod();
@@ -77,7 +75,7 @@ namespace OpenSim.Tests.Performance
             TestAddObjects(1, 100000);
         }
 
-        [Test]
+        [Fact]
         public void Test_0003_200K_1PrimObjects()
         {
             TestHelpers.InMethod();
@@ -86,7 +84,7 @@ namespace OpenSim.Tests.Performance
             TestAddObjects(1, 200000);
         }
 
-        [Test]
+        [Fact]
         public void Test_0011_100_100PrimObjects()
         {
             TestHelpers.InMethod();
@@ -95,7 +93,7 @@ namespace OpenSim.Tests.Performance
             TestAddObjects(100, 100);
         }
 
-        [Test]
+        [Fact]
         public void Test_0012_1K_100PrimObjects()
         {
             TestHelpers.InMethod();
@@ -104,7 +102,7 @@ namespace OpenSim.Tests.Performance
             TestAddObjects(100, 1000);
         }
 
-        [Test]
+        [Fact]
         public void Test_0013_2K_100PrimObjects()
         {
             TestHelpers.InMethod();
@@ -130,7 +128,7 @@ namespace OpenSim.Tests.Performance
             for (int i = 1; i <= objectsToAdd; i++)
             {
                 SceneObjectGroup so = SceneHelpers.CreateSceneObject(primsInEachObject, ownerId, "part_", i);
-                Assert.That(scene.AddNewSceneObject(so, false), Is.True, string.Format("Object {0} was not created", i));
+                Assert.That(scene.AddNewSceneObject(so, false), string.Format("Object {0} was not created", i));
             }
 
             TimeSpan elapsed = DateTime.Now - start;

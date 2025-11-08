@@ -27,15 +27,13 @@
 
 using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.Reflection;
 using System.IO;
 using log4net;
 using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
-using OpenMetaverse.Imaging;
+using SkiaSharp;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Interfaces;
@@ -115,13 +113,16 @@ namespace OpenSim.Region.OptionalModules.World.WorldView
             if (!m_Enabled)
                 return Array.Empty<byte>();
 
-            using (Bitmap bmp = m_Generator.CreateViewImage(pos, rot, fov, width, height, usetex))
+            using (SKBitmap skBitmap = m_Generator.CreateViewImage(pos, rot, fov, width, height, usetex))
             {
-                using (MemoryStream str = new MemoryStream())
-                {
-                    bmp.Save(str, ImageFormat.Jpeg);
+                if (skBitmap == null)
+                    return Array.Empty<byte>();
 
-                    return str.ToArray();
+                // Convert SKBitmap to SKImage and encode to JPEG
+                using (SKImage skImage = SKImage.FromBitmap(skBitmap))
+                using (SKData encoded = skImage.Encode(SKEncodedImageFormat.Jpeg, 95))
+                {
+                    return encoded.ToArray();
                 }
             }
         }

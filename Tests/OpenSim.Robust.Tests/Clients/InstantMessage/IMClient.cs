@@ -30,7 +30,7 @@ using System.Collections.Generic;
 using System.Text;
 
 using OpenMetaverse;
-using NUnit.Framework;
+using Xunit;
 
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
@@ -38,10 +38,9 @@ using OpenSim.Services.Connectors.InstantMessage;
 
 namespace Robust.Tests
 {
-    [TestFixture]
     public class IMClient
     {
-        [Test]
+        [Fact]
         public void HGIM_001()
         {
             GridInstantMessage im = new GridInstantMessage();
@@ -51,7 +50,7 @@ namespace Robust.Tests
             im.imSessionID = new Guid();
 
             bool success = InstantMessageServiceConnector.SendInstantMessage(DemonServer.Address, im, String.Empty);
-            Assert.IsFalse(success, "Sending of IM succeeded, but it should have failed");
+            Assert.False(success, "Sending of IM succeeded, but it should have failed");
         }
 
     }

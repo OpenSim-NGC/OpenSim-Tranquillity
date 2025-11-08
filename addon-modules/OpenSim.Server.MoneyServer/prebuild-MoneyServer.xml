@@ -19,7 +19,6 @@
       <Reference name="System.Core"/>
       <Reference name="System.Xml"/>
       <Reference name="System.Data"/>
-      <Reference name="System.Drawing"/>
       <Reference name="System.Runtime.Remoting"/>
       <Reference name="Mono.Security.dll" path="../../../bin/lib/NET/"/>
       <Reference name="Nini" path="../../../bin/"/>      

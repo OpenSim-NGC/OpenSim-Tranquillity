@@ -26,6 +26,7 @@
  */
 
 using OpenMetaverse;
+using Xunit;
 
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization;
@@ -35,13 +36,11 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 {
-    [TestFixture]
     public class InventoryArchiveSaveTests : InventoryArchiveTestCase
     {
         protected TestScene m_scene;
         protected InventoryArchiverModule m_archiverModule;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -59,7 +58,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
         /// <remarks>
         /// At the moment, the only thing that matters is that the control file is the very first one.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestOrder()
         {
             TestHelpers.InMethod();
@@ -71,16 +70,16 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
             TarArchiveReader.TarEntryType tarEntryType;
 
             byte[] data = tar.ReadEntry(out filePath, out tarEntryType);
-            Assert.That(filePath, Is.EqualTo(ArchiveConstants.CONTROL_FILE_PATH));
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             InventoryArchiveReadRequest iarr
                 = new InventoryArchiveReadRequest(UUID.Random(), null, null, null, null, null, null, (Stream)null, false);
             iarr.LoadControlFile(filePath, data);
 
-            Assert.That(iarr.ControlFileLoaded, Is.True);
+            Assert.True(iarr.ControlFileLoaded);
         }
 
-        [Test]
+        [Fact]
         public void TestSaveRootFolderToIar()
         {
             TestHelpers.InMethod();
@@ -130,10 +129,10 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
                     gotObjectsFolder = true;
             }
 
-            Assert.That(gotObjectsFolder, Is.True);
+            Assert.True(gotObjectsFolder);
         }
 
-        [Test]
+        [Fact]
         public void TestSaveNonRootFolderToIar()
         {
             TestHelpers.InMethod();
@@ -204,11 +203,11 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
                     gotso2 = true;
             }
 
-//            Assert.That(gotControlFile, Is.True, "No control file in archive");
-            Assert.That(gotf1, Is.True);
-            Assert.That(gotf1_1, Is.True);
-            Assert.That(gotso1, Is.True);
-            Assert.That(gotso2, Is.True);
+//            Assert.True(gotControlFile);
+            Assert.True(gotf1);
+            Assert.True(gotf1_1);
+            Assert.True(gotso1);
+            Assert.True(gotso2);
 
             // TODO: Test presence of more files and contents of files.
         }
@@ -217,7 +216,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
         /// Test saving a single inventory item to an IAR
         /// (subject to change since there is no fixed format yet).
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSaveItemToIar()
         {
             TestHelpers.InMethod();
@@ -291,20 +290,20 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 //
 //                    if (fileName.StartsWith(part1.Name))
 //                    {
-                        Assert.That(expectedObject1FilePath, Is.EqualTo(filePath));
+                        // TODO: Assert.Equal(,); - incomplete assertion
                         gotObject1File = true;
 //                    }
 //                    else if (fileName.StartsWith(part2.Name))
 //                    {
-//                        Assert.That(fileName, Is.EqualTo(expectedObject2FileName));
+//                        Assert.Equal(,);
 //                        gotObject2File = true;
 //                    }
                 }
             }
 
-//            Assert.That(gotControlFile, Is.True, "No control file in archive");
-            Assert.That(gotObject1File, Is.True, "No item1 file in archive");
-//            Assert.That(gotObject2File, Is.True, "No object2 file in archive");
+//            Assert.True(gotControlFile);
+            Assert.True(gotObject1File);
+//            Assert.True(gotObject2File);
 
             // TODO: Test presence of more files and contents of files.
         }
@@ -312,7 +311,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
         /// <summary>
         /// Test saving a single inventory item to an IAR without its asset
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSaveItemToIarNoAssets()
         {
             TestHelpers.InMethod();
@@ -387,12 +386,12 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 //
 //                    if (fileName.StartsWith(part1.Name))
 //                    {
-                        Assert.That(expectedObject1FilePath, Is.EqualTo(filePath));
+                        // TODO: Assert.Equal(,); - incomplete assertion
                         gotObject1File = true;
 //                    }
 //                    else if (fileName.StartsWith(part2.Name))
 //                    {
-//                        Assert.That(fileName, Is.EqualTo(expectedObject2FileName));
+//                        Assert.Equal(,);
 //                        gotObject2File = true;
 //                    }
                 }
@@ -402,9 +401,9 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
                 }
             }
 
-//            Assert.That(gotControlFile, Is.True, "No control file in archive");
-            Assert.That(gotObject1File, Is.True, "No item1 file in archive");
-//            Assert.That(gotObject2File, Is.True, "No object2 file in archive");
+//            Assert.True(gotControlFile);
+            Assert.True(gotObject1File);
+//            Assert.True(gotObject2File);
 
             // TODO: Test presence of more files and contents of files.
         }

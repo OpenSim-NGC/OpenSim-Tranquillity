@@ -37,7 +37,6 @@ namespace OpenSim.Tests.Performance
     /// how much memory is free, etc.  In some cases, later larger tests will apparently take less time than smaller
     /// earlier tests.
     /// </remarks>
-    [TestFixture]
     public class ScriptPerformanceTests : OpenSimTestCase
     {
         /*
@@ -48,7 +47,6 @@ namespace OpenSim.Tests.Performance
         private int m_expectedChatMessages;
         private List<OSChatMessage> m_osChatMessagesReceived = new List<OSChatMessage>();
 
-        [SetUp]
         public void Init()
         {
             //AppDomain.CurrentDomain.SetData("APPBASE", Environment.CurrentDirectory + "/bin");
@@ -77,7 +75,6 @@ namespace OpenSim.Tests.Performance
             m_scene.StartScripts();
         }
 
-        [TearDown]
         public void TearDown()
         {
             m_scene.Close();
@@ -86,7 +83,7 @@ namespace OpenSim.Tests.Performance
             GC.WaitForPendingFinalizers();
         }
 
-        [Test]
+        [Fact]
         public void TestCompileAndStart100Scripts()
         {
             TestHelpers.InMethod();
@@ -111,7 +108,7 @@ namespace OpenSim.Tests.Performance
 
             m_chatEvent.WaitOne(40000 + scriptsToCreate * 1000);
 
-            Assert.That(m_osChatMessagesReceived.Count, Is.EqualTo(m_expectedChatMessages));
+            Assert.Equal(,);
 
             foreach (OSChatMessage msg in m_osChatMessagesReceived)
                 Assert.That(

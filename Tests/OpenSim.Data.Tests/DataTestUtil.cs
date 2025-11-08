@@ -29,7 +29,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using OpenMetaverse;
-using NUnit.Framework;
+using Xunit;
 
 namespace OpenSim.Data.Tests
 {

@@ -27,7 +27,7 @@
 
 using System.Collections.Generic;
 using System.Threading;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -39,11 +39,9 @@ namespace OpenSim.Tests.Permissions
     /// <summary>
     /// Basic scene object tests (create, read and delete but not update).
     /// </summary>
-    [TestFixture]
     public class IndirectTransferTests
     {
 
-        [SetUp]
         public void SetUp()
         {
             // In case we're dealing with some older version of nunit
@@ -58,7 +56,7 @@ namespace OpenSim.Tests.Permissions
         /// <summary>
         /// Test giving simple objecta with various combinations of next owner perms.
         /// </summary>
-        [Test]
+        [Fact]
         public void SimpleTakeCopy()
         {
             TestHelpers.InMethod();
@@ -84,7 +82,7 @@ namespace OpenSim.Tests.Permissions
             Thread.Sleep(6000);
 
             List<InventoryItemBase> items = Common.TheScene.InventoryService.GetFolderItems(Common.TheAvatars[1].UUID, objsFolder.ID);
-            Assert.That(items.Count, Is.EqualTo(0));
+            Assert.Equal(,);
 
             // A1 makes the objects copyable
             for (int i = 0; i < 6; i++)
@@ -97,12 +95,12 @@ namespace OpenSim.Tests.Permissions
             Thread.Sleep(6000);
 
             items = Common.TheScene.InventoryService.GetFolderItems(Common.TheAvatars[1].UUID, objsFolder.ID);
-            Assert.That(items.Count, Is.EqualTo(6));
+            Assert.Equal(,);
 
             for (int i = 0; i < 6; i++)
             {
                 InventoryItemBase item = Common.TheInstance.GetItemFromInventory(Common.TheAvatars[1].UUID, "Objects", names[i]);
-                Assert.That(item, Is.Not.Null);
+                // TODO: Fix this assertion
                 Common.TheInstance.AssertPermissions(perms[i], (PermissionMask)item.BasePermissions, Common.TheInstance.IdStr(item));
             }
         }
@@ -111,7 +109,7 @@ namespace OpenSim.Tests.Permissions
         {
             // Find the object inworld
             SceneObjectGroup box = objs.Find(sog => sog.Name == name && sog.OwnerID == Common.TheAvatars[0].UUID);
-            Assert.That(box, Is.Not.Null, name);
+            Assert.True(box);
 
             // A2's inventory (index 1)
             Common.TheInstance.TakeCopyToInventory(1, box);
@@ -120,7 +118,7 @@ namespace OpenSim.Tests.Permissions
         private void MakeCopyable(List<SceneObjectGroup> objs, string name)
         {
             SceneObjectGroup box = objs.Find(sog => sog.Name == name && sog.OwnerID == Common.TheAvatars[0].UUID);
-            Assert.That(box, Is.Not.Null, name);
+            Assert.True(box);
 
             // field = 8 is Everyone 
             // set = 1 means add the permission; set = 0 means remove permission

@@ -27,7 +27,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -304,7 +303,7 @@ namespace OpenSim.Region.Framework.Scenes
         private float m_damage = -1.0f;
         private byte[] m_TextureAnimation;
         private byte m_clickAction;
-        private Color m_color = Color.Black;
+        private uint m_textColorArgb = 0xFF000000; // Default to black, ARGB format
         private List<uint> m_lastColliders = new List<uint>();
         private bool m_lastLandCollide;
         private int m_linkNum;
@@ -1078,20 +1077,20 @@ namespace OpenSim.Region.Framework.Scenes
         }
 
         /// <value>
-        /// Text color.
+        /// Text color as ARGB packed integer.
         /// </value>
-        public Color Color
+        public uint Color
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_color; }
+            get { return m_textColorArgb; }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set { m_color = value; }
+            set { m_textColorArgb = value; }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int TextColorArgb()
         {
-            return m_color.ToArgb();
+            return (int)m_textColorArgb;
         }
 
         public osUTF8 osUTF8Text;
@@ -4112,12 +4111,14 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="newalpha"></param>
         public void SetText(string text, Vector3 newcolor, double newalpha)
         {
-            Color oldcolor = Color;
+            uint oldcolor = Color;
 
-            Color = Color.FromArgb((int) (newalpha * 0xff),
-                                   (int) (newcolor.X * 0xff),
-                                   (int) (newcolor.Y * 0xff),
-                                   (int) (newcolor.Z * 0xff));
+            Color = (uint)(
+                ((int)(newalpha * 0xff) << 24) |
+                ((int)(newcolor.X * 0xff) << 16) |
+                ((int)(newcolor.Y * 0xff) << 8) |
+                ((int)(newcolor.Z * 0xff))
+            );
             osUTF8 old = osUTF8Text;
             if (string.IsNullOrEmpty(text))
             {
@@ -5491,14 +5492,19 @@ namespace OpenSim.Region.Framework.Scenes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Color4 GetTextColor()
         {
-            Color color = m_color;
-            return new Color4(color.R, color.G, color.B, color.A);
+            uint argb = m_textColorArgb;
+            byte a = (byte)((argb >> 24) & 0xFF);
+            byte r = (byte)((argb >> 16) & 0xFF);
+            byte g = (byte)((argb >> 8) & 0xFF);
+            byte b = (byte)(argb & 0xFF);
+            return new Color4(r / 255f, g / 255f, b / 255f, a / 255f);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float GetTextAlpha()
         {
-            return m_color.A * 0.0039215686f;
+            byte a = (byte)((m_textColorArgb >> 24) & 0xFF);
+            return a * 0.0039215686f;
         }
 
         public void ResetOwnerChangeFlag()

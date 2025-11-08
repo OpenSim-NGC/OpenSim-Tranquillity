@@ -20,6 +20,8 @@
     <Folder Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="3.119.1" />
+    <PackageReference Include="CoreJ2K.Skia" Version="1.1.2.50" />
     <ProjectReference Include="..\..\Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\..\Framework\Console\OpenSim.Framework.Console.csproj" />
     <ProjectReference Include="..\..\Framework\Servers\HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />

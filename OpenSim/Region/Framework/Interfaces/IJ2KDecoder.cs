@@ -25,13 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Drawing;
 using OpenMetaverse;
 using OpenMetaverse.Imaging;
+using SkiaSharp;
 
 namespace OpenSim.Region.Framework.Interfaces
 {
-    public delegate void DecodedCallback(UUID AssetId, OpenJPEG.J2KLayerInfo[] layers);
+    /// <summary>
+    /// Layer information for JPEG2000 decoded image
+    /// </summary>
+    public struct J2KLayerInfo
+    {
+        public int End;
+        public int Start;
+        public int DiscardLevel;
+    }
+
+    public delegate void DecodedCallback(UUID AssetId, J2KLayerInfo[] layers);
 
     public interface IJ2KDecoder
     {
@@ -53,13 +63,13 @@ namespace OpenSim.Region.Framework.Interfaces
         /// <param name="layers">layer data</param>
         /// <param name="components">number of components</param>
         /// <returns>true if decode was successful.  false otherwise.</returns>
-        bool Decode(UUID assetID, byte[] j2kData, out OpenJPEG.J2KLayerInfo[] layers, out int components);
+        bool Decode(UUID assetID, byte[] j2kData, out J2KLayerInfo[] layers, out int components);
 
         /// <summary>
         /// Provides a synchronous decode direct to an image object
         /// </summary>
         /// <param name="j2kData"></param>
         /// <returns>decoded image or 'null' of unsuccessful</returns>
-        Image DecodeToImage(byte[] j2kData);
+        SKImage DecodeToImage(byte[] j2kData);
     }
 }

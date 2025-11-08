@@ -25,13 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using NUnit.Framework;
+using Xunit;
 
 using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.PhysicsModule.BulletS.Tests
 {
-    [TestFixture]
     public class BulletSimTests : OpenSimTestCase
     {
         // Documentation on attributes: http://www.nunit.org/index.php?p=attributes&r=2.6.1

@@ -35,14 +35,13 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
-    [TestFixture]
     public class SceneObjectUserGroupTests
     {
         /// <summary>
         /// Test share with group object functionality
         /// </summary>
         /// <remarks>This test is not yet fully implemented</remarks>
-        [Test]
+        [Fact]
         public void TestShareWithGroup()
         {
             TestHelpers.InMethod();
