@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Tests.Common;
@@ -90,7 +90,7 @@ namespace OpenSim.Data.Tests
 
         #region 0Tests
 
-        [Test]
+        [Fact]
         public void T010_EstateSettingsSimpleStorage_MinimumParameterSet()
         {
             TestHelpers.InMethod();
@@ -123,7 +123,7 @@ namespace OpenSim.Data.Tests
                 );
         }
 
-        [Test]
+        [Fact]
         public void T011_EstateSettingsSimpleStorage_MaximumParameterSet()
         {
             TestHelpers.InMethod();
@@ -156,7 +156,7 @@ namespace OpenSim.Data.Tests
                 );
         }
 
-        [Test]
+        [Fact]
         public void T012_EstateSettingsSimpleStorage_AccurateParameterSet()
         {
             TestHelpers.InMethod();
@@ -189,7 +189,7 @@ namespace OpenSim.Data.Tests
                 );
         }
 
-        [Test]
+        [Fact]
         public void T012_EstateSettingsRandomStorage()
         {
             TestHelpers.InMethod();
@@ -210,7 +210,7 @@ namespace OpenSim.Data.Tests
             Assert.That(loadedSettings, Constraints.PropertyCompareConstraint(originalSettings));
         }
 
-        [Test]
+        [Fact]
         public void T020_EstateSettingsManagerList()
         {
             TestHelpers.InMethod();
@@ -226,12 +226,12 @@ namespace OpenSim.Data.Tests
             // Loading settings to another instance variable.
             EstateSettings loadedSettings = db.LoadEstateSettings(REGION_ID, true);
 
-            Assert.AreEqual(2, loadedSettings.EstateManagers.Length);
-            Assert.AreEqual(MANAGER_ID_1, loadedSettings.EstateManagers[0]);
-            Assert.AreEqual(MANAGER_ID_2, loadedSettings.EstateManagers[1]);
+            Assert.Equal(2, loadedSettings.EstateManagers.Length);
+            Assert.Equal(MANAGER_ID_1, loadedSettings.EstateManagers[0]);
+            Assert.Equal(MANAGER_ID_2, loadedSettings.EstateManagers[1]);
         }
 
-        [Test]
+        [Fact]
         public void T021_EstateSettingsUserList()
         {
             TestHelpers.InMethod();
@@ -247,12 +247,12 @@ namespace OpenSim.Data.Tests
             // Loading settings to another instance variable.
             EstateSettings loadedSettings = db.LoadEstateSettings(REGION_ID, true);
 
-            Assert.AreEqual(2, loadedSettings.EstateAccess.Length);
-            Assert.AreEqual(USER_ID_1, loadedSettings.EstateAccess[0]);
-            Assert.AreEqual(USER_ID_2, loadedSettings.EstateAccess[1]);
+            Assert.Equal(2, loadedSettings.EstateAccess.Length);
+            Assert.Equal(USER_ID_1, loadedSettings.EstateAccess[0]);
+            Assert.Equal(USER_ID_2, loadedSettings.EstateAccess[1]);
         }
 
-        [Test]
+        [Fact]
         public void T022_EstateSettingsGroupList()
         {
             TestHelpers.InMethod();
@@ -268,12 +268,12 @@ namespace OpenSim.Data.Tests
             // Loading settings to another instance variable.
             EstateSettings loadedSettings = db.LoadEstateSettings(REGION_ID, true);
 
-            Assert.AreEqual(2, loadedSettings.EstateAccess.Length);
-            Assert.AreEqual(GROUP_ID_1, loadedSettings.EstateGroups[0]);
-            Assert.AreEqual(GROUP_ID_2, loadedSettings.EstateGroups[1]);
+            Assert.Equal(2, loadedSettings.EstateAccess.Length);
+            Assert.Equal(GROUP_ID_1, loadedSettings.EstateGroups[0]);
+            Assert.Equal(GROUP_ID_2, loadedSettings.EstateGroups[1]);
         }
 
-        [Test]
+        [Fact]
         public void T022_EstateSettingsBanList()
         {
             TestHelpers.InMethod();
@@ -295,10 +295,10 @@ namespace OpenSim.Data.Tests
             // Loading settings to another instance variable.
             EstateSettings loadedSettings = db.LoadEstateSettings(REGION_ID, true);
 
-            Assert.AreEqual(2, loadedSettings.EstateBans.Length);
-            Assert.AreEqual(DataTestUtil.UUID_MIN, loadedSettings.EstateBans[0].BannedUserID);
+            Assert.Equal(2, loadedSettings.EstateBans.Length);
+            Assert.Equal(DataTestUtil.UUID_MIN, loadedSettings.EstateBans[0].BannedUserID);
 
-            Assert.AreEqual(DataTestUtil.UUID_MAX, loadedSettings.EstateBans[1].BannedUserID);
+            Assert.Equal(DataTestUtil.UUID_MAX, loadedSettings.EstateBans[1].BannedUserID);
 
         }
 
@@ -481,29 +481,29 @@ namespace OpenSim.Data.Tests
             UUID estateOwner
             )
         {
-            Assert.AreEqual(estateName, estateSettings.EstateName);
-            Assert.AreEqual(parentEstateID, estateSettings.ParentEstateID);
+            Assert.Equal(estateName, estateSettings.EstateName);
+            Assert.Equal(parentEstateID, estateSettings.ParentEstateID);
 
             DataTestUtil.AssertFloatEqualsWithTolerance(billableFactor, estateSettings.BillableFactor);
 
-            Assert.AreEqual(pricePerMeter, estateSettings.PricePerMeter);
-            Assert.AreEqual(redirectGridX, estateSettings.RedirectGridX);
-            Assert.AreEqual(redirectGridY, estateSettings.RedirectGridY);
+            Assert.Equal(pricePerMeter, estateSettings.PricePerMeter);
+            Assert.Equal(redirectGridX, estateSettings.RedirectGridX);
+            Assert.Equal(redirectGridY, estateSettings.RedirectGridY);
 
-            Assert.AreEqual(allowVoice, estateSettings.AllowVoice);
-            Assert.AreEqual(allowDirectTeleport, estateSettings.AllowDirectTeleport);
-            Assert.AreEqual(resetHomeOnTeleport, estateSettings.ResetHomeOnTeleport);
-            Assert.AreEqual(denyAnonymous, estateSettings.DenyAnonymous);
-            Assert.AreEqual(denyIdentified, estateSettings.DenyIdentified);
-            Assert.AreEqual(denyTransacted, estateSettings.DenyTransacted);
-            Assert.AreEqual(denyMinors, estateSettings.DenyMinors);
-            Assert.AreEqual(abuseEmailToEstateOwner, estateSettings.AbuseEmailToEstateOwner);
-            Assert.AreEqual(blockDwell, estateSettings.BlockDwell);
-            Assert.AreEqual(estateSkipScripts, estateSettings.EstateSkipScripts);
-            Assert.AreEqual(taxFree, estateSettings.TaxFree);
-            Assert.AreEqual(publicAccess, estateSettings.PublicAccess);
-            Assert.AreEqual(abuseEmail, estateSettings.AbuseEmail);
-            Assert.AreEqual(estateOwner, estateSettings.EstateOwner);
+            Assert.Equal(allowVoice, estateSettings.AllowVoice);
+            Assert.Equal(allowDirectTeleport, estateSettings.AllowDirectTeleport);
+            Assert.Equal(resetHomeOnTeleport, estateSettings.ResetHomeOnTeleport);
+            Assert.Equal(denyAnonymous, estateSettings.DenyAnonymous);
+            Assert.Equal(denyIdentified, estateSettings.DenyIdentified);
+            Assert.Equal(denyTransacted, estateSettings.DenyTransacted);
+            Assert.Equal(denyMinors, estateSettings.DenyMinors);
+            Assert.Equal(abuseEmailToEstateOwner, estateSettings.AbuseEmailToEstateOwner);
+            Assert.Equal(blockDwell, estateSettings.BlockDwell);
+            Assert.Equal(estateSkipScripts, estateSettings.EstateSkipScripts);
+            Assert.Equal(taxFree, estateSettings.TaxFree);
+            Assert.Equal(publicAccess, estateSettings.PublicAccess);
+            Assert.Equal(abuseEmail, estateSettings.AbuseEmail);
+            Assert.Equal(estateOwner, estateSettings.EstateOwner);
         }
 
         #endregion

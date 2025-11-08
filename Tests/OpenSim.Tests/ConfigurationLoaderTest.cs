@@ -26,13 +26,12 @@
  */
 
 using System.IO;
-using NUnit.Framework;
+using Xunit;
 using OpenSim.Framework;
 using OpenSim.Tests.Common;
 
 namespace OpenSim.Tests
 {
-    [TestFixture]
     public class ConfigurationLoaderTests : OpenSimTestCase
     {
         private const string m_testSubdirectory = "test";
@@ -43,7 +42,6 @@ namespace OpenSim.Tests
         /// <summary>
         /// Set up a test directory.
         /// </summary>
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -58,7 +56,6 @@ namespace OpenSim.Tests
         /// <summary>
         /// Remove the test directory.
         /// </summary>
-        [TearDown]
         public void TearDown()
         {
             Directory.SetCurrentDirectory(m_workingDirectory);
@@ -68,7 +65,7 @@ namespace OpenSim.Tests
         /// <summary>
         /// Test the including of ini files with absolute and relative paths.
         /// </summary>
-        [Test]
+        [Fact]
         public void IncludeTests()
         {
             const string mainIniFile = "OpenSimDefaults.ini";
@@ -131,7 +128,7 @@ namespace OpenSim.Tests
             source.Source.Configs.Remove(config);
 
             // Finally, we are able to check the result
-            Assert.AreEqual(m_config.ToString(), source.Source.ToString(),
+            Assert.Equal(m_config.ToString(), source.Source.ToString(),
                 "Configuration with includes does not contain all settings.");
         }
 

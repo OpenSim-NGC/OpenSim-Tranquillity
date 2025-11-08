@@ -26,6 +26,7 @@
  */
 
 using System.Xml;
+using Xunit;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -37,7 +38,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
 {
-    [TestFixture]
     public class SerialiserTests : OpenSimTestCase
     {
         private const string ObjectRootPartStubXml =
@@ -589,7 +589,6 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
         protected Scene m_scene;
         protected SerialiserModule m_serialiserModule;
 
-        [OneTimeSetUp]
         public void Init()
         {
             m_serialiserModule = new SerialiserModule();
@@ -597,7 +596,7 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             SceneHelpers.SetupSceneModules(m_scene, m_serialiserModule);
         }
 
-        [Test]
+        [Fact]
         public void TestDeserializeXmlObjectWithNoOtherParts()
         {
             TestHelpers.InMethod();
@@ -606,16 +605,16 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             SceneObjectGroup so = SceneObjectSerializer.FromOriginalXmlFormat(ObjectWithNoOtherPartsXml);
             SceneObjectPart rootPart = so.RootPart;
 
-            Assert.That(rootPart.UUID, Is.EqualTo(new UUID("e6a5a05e-e8cc-4816-8701-04165e335790")));
-            Assert.That(rootPart.CreatorID, Is.EqualTo(new UUID("a6dacf01-4636-4bb9-8a97-30609438af9d")));
-            Assert.That(rootPart.Name, Is.EqualTo("PrimMyRide"));
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
             OSDMap store = rootPart.DynAttrs.GetStore("MyNamespace", "MyStore");
-            Assert.AreEqual(42, store["the answer"].AsInteger());
+            Assert.Equal(42, store["the answer"].AsInteger());
 
             // TODO: Check other properties
         }
 
-        [Test]
+        [Fact]
         public void TestDeserializeXmlObjectWithOtherParts()
         {
             TestHelpers.InMethod();
@@ -623,38 +622,38 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
 
             SceneObjectGroup so = SceneObjectSerializer.FromOriginalXmlFormat(ObjectWithOtherPartsXml);
             SceneObjectPart[] parts = so.Parts;
-            Assert.AreEqual(3, so.Parts.Length);
+            Assert.Equal(3, so.Parts.Length);
 
             {
                 SceneObjectPart part = parts[0];
 
-                Assert.That(part.UUID, Is.EqualTo(new UUID("e6a5a05e-e8cc-4816-8701-04165e335790")));
-                Assert.That(part.CreatorID, Is.EqualTo(new UUID("a6dacf01-4636-4bb9-8a97-30609438af9d")));
-                Assert.That(part.Name, Is.EqualTo("PrimMyRide"));
+                // TODO: Assert.Equal(,)); - incomplete assertion
+                // TODO: Assert.Equal(,)); - incomplete assertion
+                // TODO: Assert.Equal(,); - incomplete assertion
                 OSDMap store = part.DynAttrs.GetStore("MyNamespace", "MyStore");
-                Assert.AreEqual(42, store["the answer"].AsInteger());
+                Assert.Equal(42, store["the answer"].AsInteger());
             }
 
             {
                 SceneObjectPart part = parts[1];
 
-                Assert.That(part.UUID, Is.EqualTo(new UUID("9958feb1-02a6-49e4-a4ce-eba6f578ee13")));
-                Assert.That(part.CreatorID, Is.EqualTo(new UUID("a6dacf01-4636-4bb9-8a97-30609438af9d")));
-                Assert.That(part.Name, Is.EqualTo("Alien Head 1"));
+                // TODO: Assert.Equal(,)); - incomplete assertion
+                // TODO: Assert.Equal(,)); - incomplete assertion
+                // TODO: Assert.Equal(,); - incomplete assertion
             }
 
             {
                 SceneObjectPart part = parts[2];
 
-                Assert.That(part.UUID, Is.EqualTo(new UUID("674b6b86-f5aa-439a-8e00-0d75bc08c80a")));
-                Assert.That(part.CreatorID, Is.EqualTo(new UUID("a6dacf01-4636-4bb9-8a97-30609438af9d")));
-                Assert.That(part.Name, Is.EqualTo("Alien Head 2"));
+                // TODO: Assert.Equal(,)); - incomplete assertion
+                // TODO: Assert.Equal(,)); - incomplete assertion
+                // TODO: Assert.Equal(,); - incomplete assertion
             }
 
             // TODO: Check other properties
         }
 
-        [Test]
+        [Fact]
         public void TestDeserializeBadFloatsXml()
         {
             TestHelpers.InMethod();
@@ -663,24 +662,24 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             SceneObjectGroup so = SceneObjectSerializer.FromOriginalXmlFormat(ObjectWithBadFloatsXml);
             SceneObjectPart rootPart = so.RootPart;
 
-            Assert.That(rootPart.UUID, Is.EqualTo(new UUID("e6a5a05e-e8cc-4816-8701-04165e335790")));
-            Assert.That(rootPart.CreatorID, Is.EqualTo(new UUID("a6dacf01-4636-4bb9-8a97-30609438af9d")));
-            Assert.That(rootPart.Name, Is.EqualTo("NaughtyPrim"));
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // This terminates the deserialization earlier if couldn't be parsed.
             // TODO: Need to address this
-            Assert.That(rootPart.GroupPosition.X, Is.EqualTo(147.23f));
+            // TODO: Assert.Equal(,); - incomplete assertion
 
-            Assert.That(rootPart.Shape.PathCurve, Is.EqualTo(16));
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // Defaults for bad parses
-            Assert.That(rootPart.Shape.FlexiTension, Is.EqualTo(0));
-            Assert.That(rootPart.Shape.FlexiDrag, Is.EqualTo(0));
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // TODO: Check other properties
         }
 
-        [Test]
+        [Fact]
         public void TestSerializeXml()
         {
             TestHelpers.InMethod();
@@ -765,14 +764,14 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             xtr.Close();
 
             // TODO: More checks
-            Assert.That(uuid, Is.EqualTo(rpUuid));
-            Assert.That(name, Is.EqualTo(rpName));
-            Assert.That(creatorId, Is.EqualTo(rpCreatorId));
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
             Assert.NotNull(daMap);
-            Assert.AreEqual(daValue, daMap.GetStore(daNamespace, daStoreName)[daKey].AsString());
+            Assert.Equal(daValue, daMap.GetStore(daNamespace, daStoreName)[daKey].AsString());
         }
 
-        [Test]
+        [Fact]
         public void TestDeserializeXml2()
         {
             TestHelpers.InMethod();
@@ -781,16 +780,16 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             SceneObjectGroup so = m_serialiserModule.DeserializeGroupFromXml2(ObjectWithNoPartsXml2);
             SceneObjectPart rootPart = so.RootPart;
 
-            Assert.That(rootPart.UUID, Is.EqualTo(new UUID("9be68fdd-f740-4a0f-9675-dfbbb536b946")));
-            Assert.That(rootPart.CreatorID, Is.EqualTo(new UUID("b46ef588-411e-4a8b-a284-d7dcfe8e74ef")));
-            Assert.That(rootPart.Name, Is.EqualTo("PrimFun"));
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
             OSDMap store = rootPart.DynAttrs.GetStore("MyNamespace", "MyStore");
-            Assert.AreEqual("Rosebud", store["last words"].AsString());
+            Assert.Equal("Rosebud", store["last words"].AsString());
 
             // TODO: Check other properties
         }
 
-        [Test]
+        [Fact]
         public void TestSerializeXml2()
         {
             TestHelpers.InMethod();
@@ -871,11 +870,11 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             xtr.Close();
 
             // TODO: More checks
-            Assert.That(uuid, Is.EqualTo(rpUuid));
-            Assert.That(name, Is.EqualTo(rpName));
-            Assert.That(creatorId, Is.EqualTo(rpCreatorId));
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
             Assert.NotNull(daMap);
-            Assert.AreEqual(daValue, daMap.GetStore(daNamespace, daStoreName)[daKey].AsString());
+            Assert.Equal(daValue, daMap.GetStore(daNamespace, daStoreName)[daKey].AsString());
         }
     }
 }

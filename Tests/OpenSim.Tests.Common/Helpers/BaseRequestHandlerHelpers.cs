@@ -45,10 +45,10 @@ namespace OpenSim.Tests.Common
             handler.GetParam("").Should().BeEmpty("Failed on empty path");
             handler.GetParam("s").Should().BeEmpty("Failed on short URL");
             handler.GetParam("corruptUrl").Should().BeEmpty("Failed on Corrupt URL");
-            //Assert.AreEqual(String.Empty, handler.GetParam(null), "Failed on null path.");
-            //Assert.AreEqual(String.Empty, handler.GetParam(""), "Failed on empty path.");
-            //Assert.AreEqual(String.Empty, handler.GetParam("s"), "Failed on short url.");
-            //Assert.AreEqual(String.Empty, handler.GetParam("corruptUrl"), "Failed on corruptUrl.");
+            //Assert.Equal(String.Empty, handler.GetParam(null), "Failed on null path.");
+            //Assert.Equal(String.Empty, handler.GetParam(""), "Failed on empty path.");
+            //Assert.Equal(String.Empty, handler.GetParam("s"), "Failed on short url.");
+            //Assert.Equal(String.Empty, handler.GetParam("corruptUrl"), "Failed on corruptUrl.");
 
             handler.GetParam(assetsPath).Should().BeEmpty("");
             handler.GetParam(assetsPath + "/").Should().Be("/");
@@ -56,27 +56,27 @@ namespace OpenSim.Tests.Common
             handler.GetParam(assetsPath + "/b/").Should().Be("/b/");
             handler.GetParam(assetsPath + "/c/d").Should().Be("/c/d");
             handler.GetParam(assetsPath + "/e/f/").Should().Be("/e/f/");          
-            //Assert.AreEqual(String.Empty, handler.GetParam(assetsPath));
-            //Assert.AreEqual("/", handler.GetParam(assetsPath + "/"));
-            //Assert.AreEqual("/a", handler.GetParam(assetsPath + "/a"));
-            //Assert.AreEqual("/b/", handler.GetParam(assetsPath + "/b/"));
-            //Assert.AreEqual("/c/d", handler.GetParam(assetsPath + "/c/d"));
-            //Assert.AreEqual("/e/f/", handler.GetParam(assetsPath + "/e/f/"));
+            //Assert.Equal(String.Empty, handler.GetParam(assetsPath));
+            //Assert.Equal("/", handler.GetParam(assetsPath + "/"));
+            //Assert.Equal("/a", handler.GetParam(assetsPath + "/a"));
+            //Assert.Equal("/b/", handler.GetParam(assetsPath + "/b/"));
+            //Assert.Equal("/c/d", handler.GetParam(assetsPath + "/c/d"));
+            //Assert.Equal("/e/f/", handler.GetParam(assetsPath + "/e/f/"));
         }
 
         public static void BaseTestSplitParams(BaseRequestHandler handler, string assetsPath)
         {
-            // Assert.AreEqual(m_emptyStringArray, handler.SplitParams(null), "Failed on null.");
-            // Assert.AreEqual(m_emptyStringArray, handler.SplitParams(""), "Failed on empty path.");
-            // Assert.AreEqual(m_emptyStringArray, handler.SplitParams("corruptUrl"), "Failed on corrupt url.");
+            // Assert.Equal(m_emptyStringArray, handler.SplitParams(null), "Failed on null.");
+            // Assert.Equal(m_emptyStringArray, handler.SplitParams(""), "Failed on empty path.");
+            // Assert.Equal(m_emptyStringArray, handler.SplitParams("corruptUrl"), "Failed on corrupt url.");
 
-            // Assert.AreEqual(m_emptyStringArray, handler.SplitParams(assetsPath), "Failed on empty params.");
-            // Assert.AreEqual(m_emptyStringArray, handler.SplitParams(assetsPath + "/"), "Failed on single slash.");
+            // Assert.Equal(m_emptyStringArray, handler.SplitParams(assetsPath), "Failed on empty params.");
+            // Assert.Equal(m_emptyStringArray, handler.SplitParams(assetsPath + "/"), "Failed on single slash.");
 
-            // Assert.AreEqual(new string[] { "a" }, handler.SplitParams(assetsPath + "/a"), "Failed on first segment.");
-            // Assert.AreEqual(new string[] { "b" }, handler.SplitParams(assetsPath + "/b/"), "Failed on second slash.");
-            // Assert.AreEqual(new string[] { "c", "d" }, handler.SplitParams(assetsPath + "/c/d"), "Failed on second segment.");
-            // Assert.AreEqual(new string[] { "e", "f" }, handler.SplitParams(assetsPath + "/e/f/"), "Failed on trailing slash.");
+            // Assert.Equal(new string[] { "a" }, handler.SplitParams(assetsPath + "/a"), "Failed on first segment.");
+            // Assert.Equal(new string[] { "b" }, handler.SplitParams(assetsPath + "/b/"), "Failed on second slash.");
+            // Assert.Equal(new string[] { "c", "d" }, handler.SplitParams(assetsPath + "/c/d"), "Failed on second segment.");
+            // Assert.Equal(new string[] { "e", "f" }, handler.SplitParams(assetsPath + "/e/f/"), "Failed on trailing slash.");
         }
 
         public static byte[] EmptyByteArray = new byte[] {};

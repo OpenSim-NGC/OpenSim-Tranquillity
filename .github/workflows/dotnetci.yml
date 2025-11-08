@@ -2,7 +2,7 @@ name: dotnet console app build
 
 on:
   push:
-    branches: [ main, develop, dotnet-publish ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
 
@@ -21,27 +21,14 @@ jobs:
       run: dotnet --version
 
     - name: Restore dependencies
-      run: dotnet restore ./OpenSim.sln
+      run: dotnet restore ./Tranquillity.sln
 
     - name: Build
-      run: dotnet publish ./OpenSim.sln --configuration Release
+      run: dotnet build ./Tranquillity.sln --configuration Release
 
-#    - name: Discover test projects
-#      id: find-tests
-#      run: |
-#        echo "::set-output name=has_tests::$(if ls **/*Tests/*.csproj 1> /dev/null 2>&1; then echo true; else echo false; fi)"
-#    - name: Test (if present)
-#      if: steps.find-tests.outputs.has_tests == 'true'
-#      run: dotnet test ./OpenSim.sln --no-build --verbosity normal
+#    - name: Tests
+#      run: dotnet test ./Tranquillity.sln --verbosity normal
 
+#    - name: Publish
+#      run: dotnet publish ./Tranquillity.sln --configuration Release
 
-#    - name: Run Tests
-#      run: dotnet test --logger "trx;LogFileName=<TestResults.trx>"
-#
-#      - name: Create the package
-#        run: dotnet pack --configuration Release <my project>
-#      - name: Publish the package to GPR
-#        run: dotnet nuget push <my project>/bin/Release/*.nupkg
-#
-#    - name: Publish the package to GPR
-#      run: dotnet nuget push <my project>/bin/Release/*.nupkg

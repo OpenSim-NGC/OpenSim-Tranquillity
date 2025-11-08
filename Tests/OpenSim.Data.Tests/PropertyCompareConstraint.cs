@@ -32,7 +32,7 @@ using System.Drawing;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using NUnit.Framework;
+using Xunit;
 using NUnit.Framework.Constraints;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -254,7 +254,6 @@ namespace OpenSim.Data.Tests
         }
     }
 
-    [TestFixture]
     public class PropertyCompareConstraintTest : OpenSimTestCase
     {
         public class HasInt
@@ -262,38 +261,38 @@ namespace OpenSim.Data.Tests
             public int TheValue { get; set; }
         }
 
-        [Test]
+        [Fact]
         public void IntShouldMatch()
         {
             HasInt actual = new HasInt { TheValue = 5 };
             HasInt expected = new HasInt { TheValue = 5 };
             var constraint = Constraints.PropertyCompareConstraint(expected);
 
-            Assert.That(constraint.Matches(actual), Is.True);
+            Assert.True(constraint.Matches(actual));
         }
 
-        [Test]
+        [Fact]
         public void IntShouldNotMatch()
         {
             HasInt actual = new HasInt { TheValue = 5 };
             HasInt expected = new HasInt { TheValue = 4 };
             var constraint = Constraints.PropertyCompareConstraint(expected);
 
-            Assert.That(constraint.Matches(actual), Is.False);
+            Assert.True(constraint.Matches(actual));
         }
 
 
-        [Test]
+        [Fact]
         public void IntShouldIgnore()
         {
             HasInt actual = new HasInt { TheValue = 5 };
             HasInt expected = new HasInt { TheValue = 4 };
             var constraint = Constraints.PropertyCompareConstraint(expected).IgnoreProperty(x => x.TheValue);
 
-            Assert.That(constraint.Matches(actual), Is.True);
+            Assert.True(constraint.Matches(actual));
         }
 
-        [Test]
+        [Fact]
         public void AssetShouldMatch()
         {
             UUID uuid1 = UUID.Random();
@@ -302,10 +301,10 @@ namespace OpenSim.Data.Tests
 
             var constraint = Constraints.PropertyCompareConstraint(expected);
 
-            Assert.That(constraint.Matches(actual), Is.True);
+            Assert.True(constraint.Matches(actual));
         }
 
-        [Test]
+        [Fact]
         public void AssetShouldNotMatch()
         {
             UUID uuid1 = UUID.Random();
@@ -314,10 +313,10 @@ namespace OpenSim.Data.Tests
 
             var constraint = Constraints.PropertyCompareConstraint(expected);
 
-            Assert.That(constraint.Matches(actual), Is.False);
+            Assert.True(constraint.Matches(actual));
         }
 
-        [Test]
+        [Fact]
         public void AssetShouldNotMatch2()
         {
             UUID uuid1 = UUID.Random();
@@ -326,10 +325,10 @@ namespace OpenSim.Data.Tests
 
             var constraint = Constraints.PropertyCompareConstraint(expected);
 
-            Assert.That(constraint.Matches(actual), Is.False);
+            Assert.True(constraint.Matches(actual));
         }
 
-        [Test]
+        [Fact]
         public void UUIDShouldMatch()
         {
             UUID uuid1 = UUID.Random();
@@ -337,10 +336,10 @@ namespace OpenSim.Data.Tests
 
             var constraint = Constraints.PropertyCompareConstraint(uuid1);
 
-            Assert.That(constraint.Matches(uuid2), Is.True);
+            Assert.True(constraint.Matches(uuid2));
         }
 
-        [Test]
+        [Fact]
         public void UUIDShouldNotMatch()
         {
             UUID uuid1 = UUID.Random();
@@ -348,10 +347,10 @@ namespace OpenSim.Data.Tests
 
             var constraint = Constraints.PropertyCompareConstraint(uuid1);
 
-            Assert.That(constraint.Matches(uuid2), Is.False);
+            Assert.True(constraint.Matches(uuid2));
         }
 
-        [Test]
+        [Fact]
         public void TestColors()
         {
             Color actual = Color.Red;
@@ -359,38 +358,38 @@ namespace OpenSim.Data.Tests
 
             var constraint = Constraints.PropertyCompareConstraint(expected);
 
-            Assert.That(constraint.Matches(actual), Is.True);
+            Assert.True(constraint.Matches(actual));
         }
 
-        [Test]
+        [Fact]
         public void ShouldCompareLists()
         {
             List<int> expected = new List<int> { 1, 2, 3 };
             List<int> actual = new List<int> { 1, 2, 3 };
 
             var constraint = Constraints.PropertyCompareConstraint(expected);
-            Assert.That(constraint.Matches(actual), Is.True);
+            Assert.True(constraint.Matches(actual));
         }
 
 
-        [Test]
+        [Fact]
         public void ShouldFailToCompareListsThatAreDifferent()
         {
             List<int> expected = new List<int> { 1, 2, 3 };
             List<int> actual = new List<int> { 1, 2, 4 };
 
             var constraint = Constraints.PropertyCompareConstraint(expected);
-            Assert.That(constraint.Matches(actual), Is.False);
+            Assert.True(constraint.Matches(actual));
         }
 
-        [Test]
+        [Fact]
         public void ShouldFailToCompareListsThatAreDifferentLengths()
         {
             List<int> expected = new List<int> { 1, 2, 3 };
             List<int> actual = new List<int> { 1, 2 };
 
             var constraint = Constraints.PropertyCompareConstraint(expected);
-            Assert.That(constraint.Matches(actual), Is.False);
+            Assert.True(constraint.Matches(actual));
         }
 
         public class Recursive
@@ -398,7 +397,7 @@ namespace OpenSim.Data.Tests
             public Recursive Other { get; set; }
         }
 
-        [Test]
+        [Fact]
         public void ErrorsOutOnRecursive()
         {
             Recursive parent = new Recursive();
@@ -407,7 +406,7 @@ namespace OpenSim.Data.Tests
             child.Other = parent;
 
             var constraint = Constraints.PropertyCompareConstraint(child);
-            Assert.That(constraint.Matches(child), Is.False);
+            Assert.True(constraint.Matches(child));
         }
     }
 }

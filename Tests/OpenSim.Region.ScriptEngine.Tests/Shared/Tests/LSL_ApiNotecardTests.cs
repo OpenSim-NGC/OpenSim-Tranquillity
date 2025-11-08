@@ -11,7 +11,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// <summary>
     /// Tests for notecard related functions in LSL
     /// </summary>
-    [TestFixture]
     public class LSL_ApiNotecardTests : OpenSimTestCase
     {
         private Scene m_scene;
@@ -37,7 +36,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -56,7 +54,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             m_lslApi.Initialize(m_engine, m_so.RootPart, m_scriptItem);
         }
 
-        [Test]
+        [Fact]
         public void TestLlGetNotecardLine()
         {
             TestHelpers.InMethod();
@@ -76,7 +74,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             AssertValidNotecardLine(ncItem.Name, -2, "");
         }
 
-        [Test]
+        [Fact]
         public void TestLlGetNotecardLine_NoNotecard()
         {
             TestHelpers.InMethod();
@@ -84,7 +82,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             AssertInValidNotecardLine("nc", 0);
         }
 
-        [Test]
+        [Fact]
         public void TestLlGetNotecardLine_NotANotecard()
         {
             TestHelpers.InMethod();
@@ -97,18 +95,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         private void AssertValidNotecardLine(string ncName, int lineNumber, string assertLine)
         {
             string key = m_lslApi.llGetNotecardLine(ncName, lineNumber);
-            Assert.That(key, Is.Not.EqualTo(UUID.Zero.ToString()));
+            Assert.True(key)));
 
-            Assert.That(m_engine.PostedEvents.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 
             List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-            Assert.That(events.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             EventParams eventParams = events[0];
 
-            Assert.That(eventParams.EventName, Is.EqualTo("dataserver"));
-            Assert.That(eventParams.Params[0].ToString(), Is.EqualTo(key));
-            Assert.That(eventParams.Params[1].ToString(), Is.EqualTo(assertLine));
+            Assert.Equal(,);
+            Assert.True(eventParams.Params[0].ToString()));
+            Assert.True(eventParams.Params[1].ToString()));
 
             m_engine.ClearPostedEvents();
         }
@@ -116,12 +114,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         private void AssertInValidNotecardLine(string ncName, int lineNumber)
         {
             string key = m_lslApi.llGetNotecardLine(ncName, lineNumber);
-            Assert.That(key, Is.EqualTo(UUID.Zero.ToString()));
+            Assert.Equal(,));
 
-            Assert.That(m_engine.PostedEvents.Count, Is.EqualTo(0));
+            Assert.Equal(,);
         }
 
-//        [Test]
+//        [Fact]
 //        public void TestLlReleaseUrl()
 //        {
 //            TestHelpers.InMethod();
@@ -131,25 +129,25 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //
 //            {
 //                // Check that the initial number of URLs is correct
-//                Assert.That(m_lslApi.llGetFreeURLs().value, Is.EqualTo(m_urlModule.TotalUrls - 1));
+//                Assert.True(m_lslApi.llGetFreeURLs().value));
 //            }
 //
 //            {
 //                // Check releasing a non-url
 //                m_lslApi.llReleaseURL("GARBAGE");
-//                Assert.That(m_lslApi.llGetFreeURLs().value, Is.EqualTo(m_urlModule.TotalUrls - 1));
+//                Assert.True(m_lslApi.llGetFreeURLs().value));
 //            }
 //
 //            {
 //                // Check releasing a non-existing url
 //                m_lslApi.llReleaseURL("http://example.com");
-//                Assert.That(m_lslApi.llGetFreeURLs().value, Is.EqualTo(m_urlModule.TotalUrls - 1));
+//                Assert.True(m_lslApi.llGetFreeURLs().value));
 //            }
 //
 //            {
 //                // Check URL release
 //                m_lslApi.llReleaseURL(returnedUri);
-//                Assert.That(m_lslApi.llGetFreeURLs().value, Is.EqualTo(m_urlModule.TotalUrls));
+//                Assert.True(m_lslApi.llGetFreeURLs().value));
 //
 //                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(returnedUri);
 //
@@ -166,44 +164,44 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //                        gotExpectedException = response.StatusCode == HttpStatusCode.NotFound;
 //                }
 //
-//                Assert.That(gotExpectedException, Is.True);
+//                Assert.True(gotExpectedException);
 //            }
 //
 //            {
 //                // Check releasing the same URL again
 //                m_lslApi.llReleaseURL(returnedUri);
-//                Assert.That(m_lslApi.llGetFreeURLs().value, Is.EqualTo(m_urlModule.TotalUrls));
+//                Assert.True(m_lslApi.llGetFreeURLs().value));
 //            }
 //        }
 //
-//        [Test]
+//        [Fact]
 //        public void TestLlRequestUrl()
 //        {
 //            TestHelpers.InMethod();
 //
 //            string requestId = m_lslApi.llRequestURL();
-//            Assert.That(requestId, Is.Not.EqualTo(UUID.Zero.ToString()));
+//            Assert.True(requestId)));
 //            string returnedUri;
 //
 //            {
 //                // Check that URL is correctly set up
-//                Assert.That(m_lslApi.llGetFreeURLs().value, Is.EqualTo(m_urlModule.TotalUrls - 1));
+//                Assert.True(m_lslApi.llGetFreeURLs().value));
 //
 //                Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 //
 //                List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-//                Assert.That(events.Count, Is.EqualTo(1));
+//                Assert.Equal(,);
 //                EventParams eventParams = events[0];
-//                Assert.That(eventParams.EventName, Is.EqualTo("http_request"));
+//                Assert.Equal(,);
 //
 //                UUID returnKey;
 //                string rawReturnKey = eventParams.Params[0].ToString();
 //                string method = eventParams.Params[1].ToString();
 //                returnedUri = eventParams.Params[2].ToString();
 //
-//                Assert.That(UUID.TryParse(rawReturnKey, out returnKey), Is.True);
-//                Assert.That(method, Is.EqualTo(ScriptBaseClass.URL_REQUEST_GRANTED));
-//                Assert.That(Uri.IsWellFormedUriString(returnedUri, UriKind.Absolute), Is.True);
+//                Assert.That(UUID.TryParse(rawReturnKey, out returnKey));
+//                Assert.Equal(,);
+//                Assert.That(Uri.IsWellFormedUriString(returnedUri, UriKind.Absolute));
 //            }
 //
 //            {
@@ -222,18 +220,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //                Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 //
 //                List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-//                Assert.That(events.Count, Is.EqualTo(1));
+//                Assert.Equal(,);
 //                EventParams eventParams = events[0];
-//                Assert.That(eventParams.EventName, Is.EqualTo("http_request"));
+//                Assert.Equal(,);
 //
 //                UUID returnKey;
 //                string rawReturnKey = eventParams.Params[0].ToString();
 //                string method = eventParams.Params[1].ToString();
 //                string body = eventParams.Params[2].ToString();
 //
-//                Assert.That(UUID.TryParse(rawReturnKey, out returnKey), Is.True);
-//                Assert.That(method, Is.EqualTo("GET"));
-//                Assert.That(body, Is.EqualTo(""));
+//                Assert.That(UUID.TryParse(rawReturnKey, out returnKey));
+//                Assert.Equal(,);
+//                Assert.Equal(,);
 //            }
 //        }
 //
@@ -247,7 +245,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //                {
 //                    using (StreamReader reader = new StreamReader(stream))
 //                    {
-//                        Assert.That(reader.ReadToEnd(), Is.EqualTo(expectedResponse));
+//                        Assert.True(reader.ReadToEnd()));
 //                    }
 //                }
 //            }

@@ -29,7 +29,7 @@ namespace OpenSim.Framework.Tests
 {
     public class PrimeNumberHelperTests
     {
-        [Test]
+        [Fact]
         public void TestGetPrime()
         {
             int prime1 = PrimeNumberHelper.GetPrime(7919);
@@ -41,7 +41,7 @@ namespace OpenSim.Framework.Tests
 
         }
 
-        [Test]
+        [Fact]
         public void Test1000SmallPrimeNumbers()
         {
             int[] primes = {

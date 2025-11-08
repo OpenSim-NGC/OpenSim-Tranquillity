@@ -26,7 +26,6 @@
  */
 
 using System;
-using System.Drawing;
 using System.IO;
 using OpenMetaverse;
 
@@ -169,7 +168,7 @@ namespace OpenSim.Region.Framework.Interfaces
         /// <summary>
         /// Size of texture.
         /// </summary>
-        Size Size { get; }
+        (int Width, int Height) Size { get; }
 
         /// <summary>
         /// Signal whether the texture is reuseable (i.e. whether the same input data will always generate the same

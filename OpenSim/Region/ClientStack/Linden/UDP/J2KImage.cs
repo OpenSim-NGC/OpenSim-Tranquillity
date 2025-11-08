@@ -65,7 +65,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         public IAssetService AssetService;
         public UUID AgentID;
         public IInventoryAccessModule InventoryAccessModule;
-        private OpenJPEG.J2KLayerInfo[] m_layers;
+        private J2KLayerInfo[] m_layers;
 
         /// <summary>
         /// Has this request decoded the asset data?
@@ -175,7 +175,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                         {
                             if (m_asset == null)
                             {
-                                J2KDecodedCallback(TextureID, new OpenJPEG.J2KLayerInfo[0]);
+                                J2KDecodedCallback(TextureID, new J2KLayerInfo[0]);
                             }
                             else
                             {
@@ -185,7 +185,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                         }
                         else
                         {
-                            J2KDecodedCallback(TextureID, new OpenJPEG.J2KLayerInfo[0]);
+                            J2KDecodedCallback(TextureID, new J2KLayerInfo[0]);
                         }
                     }
                 }
@@ -375,7 +375,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             return result;
         }
 
-        private void J2KDecodedCallback(UUID AssetId, OpenJPEG.J2KLayerInfo[] layers)
+        private void J2KDecodedCallback(UUID AssetId, J2KLayerInfo[] layers)
         {
             m_layers = layers;
             IsDecoded = true;

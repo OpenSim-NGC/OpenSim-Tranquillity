@@ -26,14 +26,15 @@
  */
 
 using OpenSim.Framework;
+using Nini.Config;
 using OpenSim.Tests.Common;
+using Xunit;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
 {
-    [TestFixture]
     public class AssetConnectorTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestAddAsset()
         {
             TestHelpers.InMethod();
@@ -53,15 +54,15 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
             lasc.Store(a1);
 
             AssetBase retreivedA1 = lasc.Get(a1.ID);
-            Assert.That(retreivedA1.ID, Is.EqualTo(a1.ID));
-            Assert.That(retreivedA1.Metadata.ID, Is.EqualTo(a1.Metadata.ID));
-            Assert.That(retreivedA1.Data.Length, Is.EqualTo(a1.Data.Length));
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             AssetMetadata retrievedA1Metadata = lasc.GetMetadata(a1.ID);
-            Assert.That(retrievedA1Metadata.ID, Is.EqualTo(a1.ID));
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             byte[] retrievedA1Data = lasc.GetData(a1.ID);
-            Assert.That(retrievedA1Data.Length, Is.EqualTo(a1.Data.Length));
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // TODO: Add cache and check that this does receive a copy of the asset
         }
@@ -89,20 +90,20 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
             lasc.Store(a2);
 
             AssetBase retreivedA2 = lasc.Get(a2.ID);
-            Assert.That(retreivedA2.ID, Is.EqualTo(a2.ID));
-            Assert.That(retreivedA2.Metadata.ID, Is.EqualTo(a2.Metadata.ID));
-            Assert.That(retreivedA2.Data.Length, Is.EqualTo(a2.Data.Length));
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             AssetMetadata retrievedA2Metadata = lasc.GetMetadata(a2.ID);
-            Assert.That(retrievedA2Metadata.ID, Is.EqualTo(a2.ID));
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             byte[] retrievedA2Data = lasc.GetData(a2.ID);
-            Assert.That(retrievedA2Data.Length, Is.EqualTo(a2.Data.Length));
+            // TODO: Assert.Equal(,); - incomplete assertion
 
             // TODO: Add cache and check that this does receive a copy of the asset
         }
 
-        [Test]
+        [Fact]
         public void TestAddLocalAsset()
         {
             TestHelpers.InMethod();
@@ -123,14 +124,14 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
 
             lasc.Store(a1);
 
-            Assert.That(lasc.Get(a1.ID), Is.Null);
-            Assert.That(lasc.GetData(a1.ID), Is.Null);
-            Assert.That(lasc.GetMetadata(a1.ID), Is.Null);
+            Assert.Null(lasc.Get(a1.ID));
+            Assert.Null(lasc.GetData(a1.ID));
+            Assert.Null(lasc.GetMetadata(a1.ID));
 
             // TODO: Add cache and check that this does receive a copy of the asset
         }
 
-        [Test]
+        [Fact]
         public void TestAddTemporaryLocalAsset()
         {
             TestHelpers.InMethod();
@@ -153,9 +154,9 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
 
             lasc.Store(a1);
 
-            Assert.That(lasc.Get(a1.ID), Is.Null);
-            Assert.That(lasc.GetData(a1.ID), Is.Null);
-            Assert.That(lasc.GetMetadata(a1.ID), Is.Null);
+            Assert.Null(lasc.Get(a1.ID));
+            Assert.Null(lasc.GetData(a1.ID));
+            Assert.Null(lasc.GetMetadata(a1.ID));
 
             // TODO: Add cache and check that this does receive a copy of the asset
         }

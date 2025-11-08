@@ -1392,13 +1392,29 @@ namespace OpenSim.Region.ScriptEngine.Yengine
 
         /**
          * @brief List fonts available.
+         *        Uses SkiaSharp for cross-platform font support.
+         *        TODO: Implement full system font enumeration.
          */
         public LSL_List xmrFontsAvailable()
         {
-            System.Drawing.FontFamily[] families = System.Drawing.FontFamily.Families;
-            object[] output = new object[families.Length];
-            for(int i = 0; i < families.Length; i++)
-                output[i] = new LSL_String(families[i].Name);
+            // Return a basic set of common fonts that are likely available across platforms
+            string[] commonFonts = new string[]
+            {
+                "Arial",
+                "Helvetica", 
+                "Times New Roman",
+                "Courier New",
+                "Courier",
+                "Georgia",
+                "Verdana",
+                "Comic Sans MS",
+                "Trebuchet MS",
+                "Impact"
+            };
+            
+            object[] output = new object[commonFonts.Length];
+            for(int i = 0; i < commonFonts.Length; i++)
+                output[i] = new LSL_String(commonFonts[i]);
 
             return new LSL_List(output);
         }

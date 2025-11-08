@@ -26,13 +26,12 @@
  */
 
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenSim.Tests.Common;
 using OpenSim.Region.ScriptEngine.Shared;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Tests
 {
-    [TestFixture]
     public class LSL_TypesTestLSLString : OpenSimTestCase
     {
         private Dictionary<double, string> m_doubleStringSet;
@@ -68,7 +67,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests constructing a LSLString from an LSLFloat.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestConstructFromLSLFloat()
         {
             TestHelpers.InMethod();
@@ -78,14 +77,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             foreach (KeyValuePair<double, string> number in m_doubleStringSet)
             {
                 testString = new LSL_Types.LSLString(new LSL_Types.LSLFloat(number.Key));
-                Assert.AreEqual(number.Value, testString.m_string);
+                Assert.Equal(number.Value, testString.m_string);
             }
         }
 
         /// <summary>
         /// Tests constructing a LSLString from an LSLFloat.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestExplicitCastLSLFloatToLSLString()
         {
             TestHelpers.InMethod();
@@ -95,14 +94,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             foreach (KeyValuePair<double, string> number in m_doubleStringSet)
             {
                 testString = (LSL_Types.LSLString) new LSL_Types.LSLFloat(number.Key);
-                Assert.AreEqual(number.Value, testString.m_string);
+                Assert.Equal(number.Value, testString.m_string);
             }
         }
 
         /// <summary>
         /// Test constructing a Quaternion from a string.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestExplicitCastLSLStringToQuaternion()
         {
             TestHelpers.InMethod();
@@ -114,14 +113,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             LSL_Types.Quaternion stringQuaternion = (LSL_Types.Quaternion) quaternionString;
             LSL_Types.Quaternion LSLStringQuaternion = (LSL_Types.Quaternion) quaternionLSLString;
 
-            Assert.AreEqual(expectedQuaternion, stringQuaternion);
-            Assert.AreEqual(expectedQuaternion, LSLStringQuaternion);
+            Assert.Equal(expectedQuaternion, stringQuaternion);
+            Assert.Equal(expectedQuaternion, LSLStringQuaternion);
         }
 
         /// <summary>
         /// Tests boolean correctly cast explicitly to LSLString.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestImplicitCastBooleanToLSLFloat()
         {
             TestHelpers.InMethod();
@@ -129,16 +128,16 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             LSL_Types.LSLString testString;
 
             testString = (LSL_Types.LSLString) (1 == 0);
-            Assert.AreEqual("0", testString.m_string);
+            Assert.Equal("0", testString.m_string);
 
             testString = (LSL_Types.LSLString) (1 == 1);
-            Assert.AreEqual("1", testString.m_string);
+            Assert.Equal("1", testString.m_string);
 
             testString = (LSL_Types.LSLString) false;
-            Assert.AreEqual("0", testString.m_string);
+            Assert.Equal("0", testString.m_string);
 
             testString = (LSL_Types.LSLString) true;
-            Assert.AreEqual("1", testString.m_string);
+            Assert.Equal("1", testString.m_string);
         }
     }
 }

@@ -97,7 +97,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             sceneA.GetSceneObjectGroup(so1Id).Should().BeNull();
             sceneB.GetSceneObjectGroup(so1Id).Should().NotBeNull();
-            //Assert.IsNull(sceneA.GetSceneObjectGroup(so1Id));
+            //Assert.Null(sceneA.GetSceneObjectGroup(so1Id));
             //Assert.NotNull(sceneB.GetSceneObjectGroup(so1Id));
         }
 
@@ -167,7 +167,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             ScenePresence sp1SceneAPostCross = sceneA.GetScenePresence(userId);
             sp1SceneAPostCross.IsChildAgent.Should().BeTrue("sp1SceneAPostCross.IsChildAgent unexpectedly false");
-            //Assert.IsTrue(sp1SceneAPostCross.IsChildAgent, "sp1SceneAPostCross.IsChildAgent unexpectedly false");
+            //Assert.True(sp1SceneAPostCross.IsChildAgent, "sp1SceneAPostCross.IsChildAgent unexpectedly false");
 
             ScenePresence sp1SceneBPostCross = sceneB.GetScenePresence(userId);
             TestClient sceneBTc = ((TestClient)sp1SceneBPostCross.ControllingClient);
@@ -177,19 +177,19 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             sceneB.Update(4);
 
             sp1SceneBPostCross.IsChildAgent.Should().BeFalse("sp1SceneAPostCross.IsChildAgent unexpectedly true");
-            //Assert.IsFalse(sp1SceneBPostCross.IsChildAgent, "sp1SceneAPostCross.IsChildAgent unexpectedly true");
+            //Assert.False(sp1SceneBPostCross.IsChildAgent, "sp1SceneAPostCross.IsChildAgent unexpectedly true");
 
             sp1SceneBPostCross.IsSatOnObject.Should().BeTrue();
-            //Assert.IsTrue(sp1SceneBPostCross.IsSatOnObject);
+            //Assert.True(sp1SceneBPostCross.IsSatOnObject);
             
             sceneA.GetSceneObjectGroup(so1Id).Should().BeNull("uck");
-            //Assert.IsNull(sceneA.GetSceneObjectGroup(so1Id), "uck");
+            //Assert.Null(sceneA.GetSceneObjectGroup(so1Id), "uck");
 
             so1PostCross = sceneB.GetSceneObjectGroup(so1Id);
             so1PostCross.Should().NotBeNull();
             so1PostCross.GetSittingAvatarsCount().Should().Be(1);
             //Assert.NotNull(so1PostCross);
-            //Assert.AreEqual(1, so1PostCross.GetSittingAvatarsCount());
+            //Assert.Equal(1, so1PostCross.GetSittingAvatarsCount());
 
             Vector3 so1PostCrossPos = so1PostCross.AbsolutePosition;
 
@@ -206,7 +206,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             {
                 ScenePresence sp1SceneBPostReCross = sceneB.GetScenePresence(userId);
                 sp1SceneBPostReCross.IsChildAgent.Should().BeTrue("sp1SceneBPostReCross.IsChildAgent unexpectedly false");
-                //Assert.IsTrue(sp1SceneBPostReCross.IsChildAgent, "sp1SceneBPostReCross.IsChildAgent unexpectedly false");
+                //Assert.True(sp1SceneBPostReCross.IsChildAgent, "sp1SceneBPostReCross.IsChildAgent unexpectedly false");
 
                 ScenePresence sp1SceneAPostReCross = sceneA.GetScenePresence(userId);
                 TestClient sceneATc = ((TestClient)sp1SceneAPostReCross.ControllingClient);
@@ -214,18 +214,18 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
                 sp1SceneAPostReCross.IsChildAgent.Should().BeTrue("sp1SceneAPostCross.IsChildAgent unexpectedly true");
                 sp1SceneAPostReCross.IsSatOnObject.Should().BeTrue("");
-                //Assert.IsFalse(sp1SceneAPostReCross.IsChildAgent, "sp1SceneAPostCross.IsChildAgent unexpectedly true");
-                //Assert.IsTrue(sp1SceneAPostReCross.IsSatOnObject);
+                //Assert.False(sp1SceneAPostReCross.IsChildAgent, "sp1SceneAPostCross.IsChildAgent unexpectedly true");
+                //Assert.True(sp1SceneAPostReCross.IsSatOnObject);
 
                 sceneB.GetSceneObjectGroup(so1Id).Should().BeNull("uck2");
                 SceneObjectGroup so1PostReCross = sceneA.GetSceneObjectGroup(so1Id);
                 so1PostReCross.Should().NotBeNull("");
                 so1PostReCross.GetSittingAvatarsCount().Should().Be(1);
 
-                //Assert.IsNull(sceneB.GetSceneObjectGroup(so1Id), "uck2");
+                //Assert.Null(sceneB.GetSceneObjectGroup(so1Id), "uck2");
                 //SceneObjectGroup so1PostReCross = sceneA.GetSceneObjectGroup(so1Id);
                 //Assert.NotNull(so1PostReCross);
-                //Assert.AreEqual(1, so1PostReCross.GetSittingAvatarsCount());
+                //Assert.Equal(1, so1PostReCross.GetSittingAvatarsCount());
             }
         }
 
@@ -287,7 +287,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             
             sceneA.GetSceneObjectGroup(so1Id).Should().BeNull();
             sceneB.GetSceneObjectGroup(so1Id).Should().NotBeNull();
-            //Assert.IsNull(sceneA.GetSceneObjectGroup(so1Id));
+            //Assert.Null(sceneA.GetSceneObjectGroup(so1Id));
             //Assert.NotNull(sceneB.GetSceneObjectGroup(so1Id));
         }
     }

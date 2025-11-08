@@ -35,7 +35,8 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using System.Drawing;
+using SkiaSharp;
+using CoreJ2K;
 using System.Threading;
 using System.IO.Compression;
 using PrimMesher;
@@ -701,23 +702,51 @@ namespace OpenSim.Region.PhysicsModule.ubODEMeshing
             coords = new List<Vector3>();
             faces = new List<Face>();
             PrimMesher.SculptMesh sculptMesh;
-            Image idata;
+            SKBitmap idata = null;
 
             if (primShape.SculptData == null || primShape.SculptData.Length == 0)
                 return false;
 
             try
             {
-                OpenMetaverse.Imaging.OpenJPEG.DecodeToImage(primShape.SculptData, out OpenMetaverse.Imaging.ManagedImage unusedData, out idata);
-
-                unusedData = null;
-
-                if (idata == null)
+                // Try CoreJ2K first
+                SKImage skImage = null;
+                try
                 {
-                    // In some cases it seems that the decode can return a null bitmap without throwing
-                    // an exception
-                    m_log.WarnFormat("[PHYSICS]: OpenJPEG decoded sculpt data for {0} to a null bitmap.  Ignoring.", primName);
-                    return false;
+                    var j2k = J2kImage.FromBytes(primShape.SculptData);
+                    if (j2k != null)
+                        skImage = j2k.As<SKImage>();
+                }
+                catch
+                {
+                    skImage = null;
+                }
+
+                if (skImage != null)
+                {
+                    idata = SKBitmap.FromImage(skImage);
+                }
+                else
+                {
+                    // Fallback to OpenJPEG for ManagedImage conversion
+                    OpenMetaverse.Imaging.ManagedImage managedImage;
+                    OpenMetaverse.Imaging.OpenJPEG.DecodeToImage(primShape.SculptData, out managedImage);
+
+                    if (managedImage == null)
+                    {
+                        m_log.WarnFormat("[PHYSICS]: OpenJPEG decoded sculpt data for {0} to a null bitmap.  Ignoring.", primName);
+                        return false;
+                    }
+
+                    if ((managedImage.Channels & OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha) != 0)
+                        managedImage.ConvertChannels(managedImage.Channels & ~OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha);
+
+                    using (var tgaStream = new MemoryStream(managedImage.ExportTGA()))
+                    {
+                        idata = SKBitmap.Decode(tgaStream);
+                    }
+
+                    managedImage = null;
                 }
             }
             catch (DllNotFoundException e)
@@ -748,9 +777,9 @@ namespace OpenSim.Region.PhysicsModule.ubODEMeshing
             bool mirror = ((primShape.SculptType & 128) != 0);
             bool invert = ((primShape.SculptType & 64) != 0);
 
-            sculptMesh = new PrimMesher.SculptMesh((Bitmap)idata, sculptType, (int)lod, mirror, invert);
+            sculptMesh = new PrimMesher.SculptMesh(idata, sculptType, (int)lod, mirror, invert);
 
-            idata.Dispose();
+            idata?.Dispose();
 
 //            sculptMesh.DumpRaw(baseDir, primName, "primMesh");
 

@@ -24,7 +24,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-//#define SPAM
 
 using System;
 using System.Collections.Generic;
@@ -36,8 +35,8 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using System.Drawing;
-using System.Drawing.Imaging;
+using SkiaSharp;
+using CoreJ2K;
 using System.IO.Compression;
 using PrimMesher;
 using log4net;
@@ -54,11 +53,7 @@ namespace OpenSim.Region.PhysicsModule.Meshing
 
         // Setting baseDir to a path will enable the dumping of raw files
         // raw files can be imported by blender so a visual inspection of the results can be done
-#if SPAM
-        const string baseDir = "rawFiles";
-#else
         private const string baseDir = null; //"rawFiles";
-#endif
         private bool m_Enabled = false;
 
         // If 'true', lots of DEBUG logging of asset parsing details
@@ -633,7 +628,7 @@ namespace OpenSim.Region.PhysicsModule.Meshing
             coords = new List<Coord>();
             faces = new List<Face>();
             PrimMesher.SculptMesh sculptMesh;
-            Image idata = null;
+            SKBitmap idata = null;
             string decodedSculptFileName = "";
 
             if (cacheSculptMaps && !primShape.SculptTexture.IsZero())
@@ -643,7 +638,7 @@ namespace OpenSim.Region.PhysicsModule.Meshing
                 {
                     if (File.Exists(decodedSculptFileName))
                     {
-                        idata = Image.FromFile(decodedSculptFileName);
+                        idata = SKBitmap.Decode(decodedSculptFileName);
                     }
                 }
                 catch (Exception e)
@@ -662,29 +657,59 @@ namespace OpenSim.Region.PhysicsModule.Meshing
 
                 try
                 {
-                    OpenMetaverse.Imaging.ManagedImage managedImage;
-
-                    OpenMetaverse.Imaging.OpenJPEG.DecodeToImage(primShape.SculptData, out managedImage);
-
-                    if (managedImage == null)
+                    // Try CoreJ2K first
+                    SKImage skImage = null;
+                    try
                     {
-                        // In some cases it seems that the decode can return a null bitmap without throwing
-                        // an exception
-                        m_log.WarnFormat("[PHYSICS]: OpenJPEG decoded sculpt data for {0} to a null bitmap.  Ignoring.", primName);
-
-                        return false;
+                        var j2k = J2kImage.FromBytes(primShape.SculptData);
+                        if (j2k != null)
+                            skImage = j2k.As<SKImage>();
+                    }
+                    catch
+                    {
+                        skImage = null;
                     }
 
-                    if ((managedImage.Channels & OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha) != 0)
-                        managedImage.ConvertChannels(managedImage.Channels & ~OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha);
-
-                    Bitmap imgData = OpenMetaverse.Imaging.LoadTGAClass.LoadTGA(new MemoryStream(managedImage.ExportTGA()));
-                    idata = (Image)imgData;
-                    managedImage = null;
-
-                    if (cacheSculptMaps)
+                    if (skImage != null)
                     {
-                        try { idata.Save(decodedSculptFileName, ImageFormat.MemoryBmp); }
+                        idata = SKBitmap.FromImage(skImage);
+                    }
+                    else
+                    {
+                        // Fallback to OpenJPEG for ManagedImage conversion
+                        OpenMetaverse.Imaging.ManagedImage managedImage;
+
+                        OpenMetaverse.Imaging.OpenJPEG.DecodeToImage(primShape.SculptData, out managedImage);
+
+                        if (managedImage == null)
+                        {
+                            // In some cases it seems that the decode can return a null bitmap without throwing
+                            // an exception
+                            m_log.WarnFormat("[PHYSICS]: OpenJPEG decoded sculpt data for {0} to a null bitmap.  Ignoring.", primName);
+
+                            return false;
+                        }
+
+                        if ((managedImage.Channels & OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha) != 0)
+                            managedImage.ConvertChannels(managedImage.Channels & ~OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha);
+
+                        // Try to decode the exported TGA stream directly with SkiaSharp
+                        using (var tgaStream = new MemoryStream(managedImage.ExportTGA()))
+                        {
+                            idata = SKBitmap.Decode(tgaStream);
+                        }
+                        managedImage = null;
+                    }
+
+                    if (cacheSculptMaps && idata != null)
+                    {
+                        try
+                        {
+                            using var image = SKImage.FromBitmap(idata);
+                            using var dataEncoded = image.Encode(SKEncodedImageFormat.Png, 100);
+                            using var fs = File.OpenWrite(decodedSculptFileName);
+                            dataEncoded.SaveTo(fs);
+                        }
                         catch (Exception e) { m_log.Error("[SCULPT]: unable to cache sculpt map " + decodedSculptFileName + " " + e.Message); }
                     }
                 }
@@ -728,9 +753,9 @@ namespace OpenSim.Region.PhysicsModule.Meshing
             bool mirror = ((primShape.SculptType & 128) != 0);
             bool invert = ((primShape.SculptType & 64) != 0);
 
-            sculptMesh = new PrimMesher.SculptMesh((Bitmap)idata, sculptType, (int)lod, false, mirror, invert);
+            sculptMesh = new PrimMesher.SculptMesh(idata, sculptType, (int)lod, false, mirror, invert);
 
-            idata.Dispose();
+            idata?.Dispose();
 
             sculptMesh.DumpRaw(baseDir, primName, "primMesh");
 
@@ -842,9 +867,7 @@ namespace OpenSim.Region.PhysicsModule.Meshing
                     if (profileBegin < 0.0f) profileBegin = 0.0f;
                     if (profileEnd > 1.0f) profileEnd = 1.0f;
                 }
-#if SPAM
-            m_log.Debug("****** PrimMesh Parameters (Linear) ******\n" + primMesh.ParamsToDisplayString());
-#endif
+
                 try
                 {
                     primMesh.ExtrudeLinear();
@@ -873,9 +896,7 @@ namespace OpenSim.Region.PhysicsModule.Meshing
                     if (profileBegin < 0.0f) profileBegin = 0.0f;
                     if (profileEnd > 1.0f) profileEnd = 1.0f;
                 }
-#if SPAM
-            m_log.Debug("****** PrimMesh Parameters (Circular) ******\n" + primMesh.ParamsToDisplayString());
-#endif
+
                 try
                 {
                     primMesh.ExtrudeCircular();
@@ -958,10 +979,6 @@ namespace OpenSim.Region.PhysicsModule.Meshing
 
         public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool shouldCache)
         {
-#if SPAM
-            m_log.DebugFormat("[MESH]: Creating mesh for {0}", primName);
-#endif
-
             Mesh mesh = null;
             ulong key = 0;
 
@@ -987,10 +1004,6 @@ namespace OpenSim.Region.PhysicsModule.Meshing
             {
                 if ((!isPhysical) && size.X < minSizeForComplexMesh && size.Y < minSizeForComplexMesh && size.Z < minSizeForComplexMesh)
                 {
-#if SPAM
-                m_log.Debug("Meshmerizer: prim " + primName + " has a size of " + size.ToString() + " which is below threshold of " +
-                            minSizeForComplexMesh.ToString() + " - creating simple bounding box");
-#endif
                     mesh = CreateBoundingBoxMesh(mesh);
                     mesh.DumpRaw(baseDir, primName, "Z extruded");
                 }

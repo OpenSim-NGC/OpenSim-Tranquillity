@@ -35,7 +35,6 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
     /// <summary>
     /// This will contain basic tests for the LindenUDP client stack
     /// </summary>
-    [TestFixture]
     public class BasicCircuitTests : OpenSimTestCase
     {
         private Scene m_scene;
@@ -56,7 +55,6 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -85,7 +83,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
         /// Test adding a client to the stack
         /// </summary>
 /*        
-        [Test]
+        [Fact]
         public void TestAddClient()
         {
             TestHelpers.InMethod();
@@ -115,7 +113,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             udpServer.PacketReceived(upb);
 
             // Presence shouldn't exist since the circuit manager doesn't know about this circuit for authentication yet
-            Assert.That(m_scene.GetScenePresence(myAgentUuid), Is.Null);
+            Assert.True(m_scene.GetScenePresence(myAgentUuid));
 
             AgentCircuitData acd = new AgentCircuitData();
             acd.AgentID = myAgentUuid;
@@ -127,19 +125,19 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 
             // Should succeed now
             ScenePresence sp = m_scene.GetScenePresence(myAgentUuid);
-            Assert.That(sp.UUID, Is.EqualTo(myAgentUuid));
+            Assert.Equal(,);
 
-            Assert.That(udpServer.PacketsSent.Count, Is.EqualTo(1));
+            Assert.Equal(,);
 
             Packet packet = udpServer.PacketsSent[0];
-            Assert.That(packet, Is.InstanceOf(typeof(PacketAckPacket)));
+            Assert.True(packet)));
 
             PacketAckPacket ackPacket = packet as PacketAckPacket;
-            Assert.That(ackPacket.Packets.Length, Is.EqualTo(1));
-            Assert.That(ackPacket.Packets[0].ID, Is.EqualTo(0));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestLogoutClientDueToAck()
         {
             TestHelpers.InMethod();
@@ -157,13 +155,13 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             udpServer.ClientOutgoingPacketHandler(sp.ControllingClient, true, false, false);
 
             ScenePresence spAfterAckTimeout = m_scene.GetScenePresence(sp.UUID);
-            Assert.That(spAfterAckTimeout, Is.Null);
+            // TODO: Fix this assertion
         }
 */
 //        /// <summary>
 //        /// Test removing a client from the stack
 //        /// </summary>
-//        [Test]
+//        [Fact]
 //        public void TestRemoveClient()
 //        {
 //            TestHelper.InMethod();
@@ -177,17 +175,17 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 //            AddClient(myCircuitCode, new IPEndPoint(IPAddress.Loopback, 1000), testLLUDPServer, acm);
 //
 //            testLLUDPServer.RemoveClientCircuit(myCircuitCode);
-//            Assert.IsFalse(testLLUDPServer.HasCircuit(myCircuitCode));
+//            Assert.False(testLLUDPServer.HasCircuit(myCircuitCode));
 //
 //            // Check that removing a non-existent circuit doesn't have any bad effects
 //            testLLUDPServer.RemoveClientCircuit(101);
-//            Assert.IsFalse(testLLUDPServer.HasCircuit(101));
+//            Assert.False(testLLUDPServer.HasCircuit(101));
 //        }
 //
 //        /// <summary>
 //        /// Make sure that the client stack reacts okay to malformed packets
 //        /// </summary>
-//        [Test]
+//        [Fact]
 //        public void TestMalformedPacketSend()
 //        {
 //            TestHelper.InMethod();
@@ -210,24 +208,24 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 //            testLLUDPServer.ReceiveData(null);
 //
 //            // Check that we are still here
-//            Assert.IsTrue(testLLUDPServer.HasCircuit(myCircuitCode));
-//            Assert.That(testLLPacketServer.GetTotalPacketsReceived(), Is.EqualTo(0));
+//            Assert.True(testLLUDPServer.HasCircuit(myCircuitCode));
+//            Assert.True(testLLPacketServer.GetTotalPacketsReceived()));
 //
 //            // Check that sending a valid packet to same circuit still succeeds
-//            Assert.That(scene.ObjectNameCallsReceived, Is.EqualTo(0));
+//            Assert.Equal(,);
 //
 //            testLLUDPServer.LoadReceive(BuildTestObjectNamePacket(1, "helloooo"), testEp);
 //            testLLUDPServer.ReceiveData(null);
 //
-//            Assert.That(testLLPacketServer.GetTotalPacketsReceived(), Is.EqualTo(1));
-//            Assert.That(testLLPacketServer.GetPacketsReceivedFor(PacketType.ObjectName), Is.EqualTo(1));
+//            Assert.True(testLLPacketServer.GetTotalPacketsReceived()));
+//            Assert.True(testLLPacketServer.GetPacketsReceivedFor(PacketType.ObjectName)));
 //        }
 //
 //        /// <summary>
 //        /// Test that the stack continues to work even if some client has caused a
 //        /// SocketException on Socket.BeginReceive()
 //        /// </summary>
-//        [Test]
+//        [Fact]
 //        public void TestExceptionOnBeginReceive()
 //        {
 //            TestHelper.InMethod();
@@ -257,10 +255,10 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 //            testLLUDPServer.LoadReceive(BuildTestObjectNamePacket(2, "packet3"), epB);
 //            testLLUDPServer.ReceiveData(null);
 //
-//            Assert.IsFalse(testLLUDPServer.HasCircuit(circuitCodeA));
+//            Assert.False(testLLUDPServer.HasCircuit(circuitCodeA));
 //
-//            Assert.That(testLLPacketServer.GetTotalPacketsReceived(), Is.EqualTo(3));
-//            Assert.That(testLLPacketServer.GetPacketsReceivedFor(PacketType.ObjectName), Is.EqualTo(3));
+//            Assert.True(testLLPacketServer.GetTotalPacketsReceived()));
+//            Assert.True(testLLPacketServer.GetPacketsReceivedFor(PacketType.ObjectName)));
 //        }
     }
 }

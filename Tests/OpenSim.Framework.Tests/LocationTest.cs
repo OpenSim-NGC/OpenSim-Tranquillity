@@ -29,7 +29,7 @@ namespace OpenSim.Framework.Tests
 {
     public class LocationTest
     {
-        [Test]
+        [Fact]
         public void locationRegionHandleRegionHandle()
         {
             //1099511628032000
@@ -44,7 +44,7 @@ namespace OpenSim.Framework.Tests
             Assert.That(TestLocation1 != TestLocation2);
         }
 
-        [Test]
+        [Fact]
         public void locationXYRegionHandle()
         {
             Location TestLocation1 = new Location(255000,256000);

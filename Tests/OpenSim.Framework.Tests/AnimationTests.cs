@@ -43,7 +43,6 @@ namespace OpenSim.Framework.Tests
         {
         }
 
-        [SetUp]
         public void Setup()
         {
             animUUID1 = UUID.Random();
@@ -60,7 +59,7 @@ namespace OpenSim.Framework.Tests
             // throw new NotImplementedException();
         }
 
-        [Test]
+        [Fact]
         public void AnimationOSDTest()
         {
             Assert.That(anim1.AnimID==animUUID1 && anim1.ObjectID == objUUID1 && anim1.SequenceNum ==1, "The Animation Constructor didn't set the fields correctly");

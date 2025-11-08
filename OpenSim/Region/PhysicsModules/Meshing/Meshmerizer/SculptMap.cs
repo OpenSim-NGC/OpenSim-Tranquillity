@@ -25,173 +25,155 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// to build without references to System.Drawing, comment this out
-#define SYSTEM_DRAWING
+using SkiaSharp;
 
-using System;
-using System.Collections.Generic;
-using System.Text;
+namespace PrimMesher;
 
-#if SYSTEM_DRAWING
-using System.Drawing;
-using System.Drawing.Imaging;
-
-namespace PrimMesher
+public class SculptMap
 {
-    public class SculptMap
+    public int width;
+    public int height;
+    public byte[] redBytes;
+    public byte[] greenBytes;
+    public byte[] blueBytes;
+
+    public SculptMap()
     {
-        public int width;
-        public int height;
-        public byte[] redBytes;
-        public byte[] greenBytes;
-        public byte[] blueBytes;
+    }
 
-        public SculptMap()
+    // SkiaSharp version of SculptMap(Bitmap bm, int lod)
+    // Requires SkiaSharp NuGet package and using SkiaSharp;
+    public SculptMap(SKBitmap bm, int lod)
+    {
+        int bmW = bm.Width;
+        int bmH = bm.Height;
+
+        if (bmW == 0 || bmH == 0)
+            throw new Exception("SculptMap: bitmap has no data");
+
+        int numLodPixels = lod * lod;
+
+        bool smallMap = bmW * bmH <= numLodPixels;
+        bool needsScaling = false;
+
+        width = bmW;
+        height = bmH;
+        while (width * height > numLodPixels * 4)
         {
+            width >>= 1;
+            height >>= 1;
+            needsScaling = true;
         }
 
-        public SculptMap(Bitmap bm, int lod)
+        try
         {
-            int bmW = bm.Width;
-            int bmH = bm.Height;
-
-            if (bmW == 0 || bmH == 0)
-                throw new Exception("SculptMap: bitmap has no data");
-
-            int numLodPixels = lod * lod;  // (32 * 2)^2  = 64^2 pixels for default sculpt map image
-
-            bool smallMap = bmW * bmH <= numLodPixels;
-            bool needsScaling = false;
-
-            width = bmW;
-            height = bmH;
-            while (width * height > numLodPixels * 4)
+            if (needsScaling)
             {
-                width >>= 1;
-                height >>= 1;
-                needsScaling = true;
-            }
-
-            try
-            {
-                if (needsScaling)
-                    bm = ScaleImage(bm, width, height);
-            }
-
-            catch (Exception e)
-            {
-                throw new Exception("Exception in ScaleImage(): e: " + e.ToString());
-            }
-
-            if (width * height > numLodPixels)
-            {
-                width >>= 1;
-                height >>= 1;
-            }
-
-            int numBytes = (width + 1) * (height + 1);
-            redBytes = new byte[numBytes];
-            greenBytes = new byte[numBytes];
-            blueBytes = new byte[numBytes];
-
-            int byteNdx = 0;
-
-            try
-            {
-                for (int y = 0; y <= height; y++)
+                SKBitmap scaled = new SKBitmap(width, height, bm.ColorType, bm.AlphaType);
+                using (var canvas = new SKCanvas(scaled))
                 {
-                    for (int x = 0; x <= width; x++)
-                    {
-                        Color c;
-
-                        if (smallMap)
-                            c = bm.GetPixel(x < width ? x : x - 1,
-                                            y < height ? y : y - 1);
-                        else
-                            c = bm.GetPixel(x < width ? x * 2 : x * 2 - 1,
-                                            y < height ? y * 2 : y * 2 - 1);
-
-                        redBytes[byteNdx] = c.R;
-                        greenBytes[byteNdx] = c.G;
-                        blueBytes[byteNdx] = c.B;
-
-                        ++byteNdx;
-                    }
+                    canvas.DrawBitmap(bm, new SKRect(0, 0, width, height));
                 }
+                bm.Dispose();
+                bm = scaled;
             }
-            catch (Exception e)
-            {
-                throw new Exception("Caught exception processing byte arrays in SculptMap(): e: " + e.ToString());
-            }
-
-            width++;
-            height++;
+        }
+        catch (Exception e)
+        {
+            throw new Exception("Exception in ScaleImage(): e: " + e.ToString());
         }
 
-        public List<List<Coord>> ToRows(bool mirror)
+        if (width * height > numLodPixels)
         {
-            int numRows = height;
-            int numCols = width;
+            width >>= 1;
+            height >>= 1;
+        }
 
-            List<List<Coord>> rows = new List<List<Coord>>(numRows);
+        int numBytes = (width + 1) * (height + 1);
+        redBytes = new byte[numBytes];
+        greenBytes = new byte[numBytes];
+        blueBytes = new byte[numBytes];
 
-            float pixScale = 1.0f / 255;
+        int byteNdx = 0;
 
-            int rowNdx, colNdx;
-            int smNdx = 0;
-
-
-            for (rowNdx = 0; rowNdx < numRows; rowNdx++)
+        try
+        {
+            for (int y = 0; y <= height; y++)
             {
-                List<Coord> row = new List<Coord>(numCols);
-                for (colNdx = 0; colNdx < numCols; colNdx++)
+                for (int x = 0; x <= width; x++)
                 {
+                    SKColor c;
 
-                    if (mirror)
-                        row.Add(new Coord(-((float)redBytes[smNdx] * pixScale - 0.5f), ((float)greenBytes[smNdx] * pixScale - 0.5f), (float)blueBytes[smNdx] * pixScale - 0.5f));
+                    if (smallMap)
+                        c = bm.GetPixel(x < width ? x : x - 1,
+                                y < height ? y : y - 1);
                     else
-                        row.Add(new Coord((float)redBytes[smNdx] * pixScale - 0.5f, (float)greenBytes[smNdx] * pixScale - 0.5f, (float)blueBytes[smNdx] * pixScale - 0.5f));
+                        c = bm.GetPixel(x < width ? x * 2 : x * 2 - 1,
+                                y < height ? y * 2 : y * 2 - 1);
 
-                    ++smNdx;
+                    redBytes[byteNdx] = c.Red;
+                    greenBytes[byteNdx] = c.Green;
+                    blueBytes[byteNdx] = c.Blue;
+
+                    ++byteNdx;
                 }
-                rows.Add(row);
             }
-            return rows;
         }
-
-        private Bitmap ScaleImage(Bitmap srcImage, int destWidth, int destHeight)
+        catch (Exception e)
         {
-
-            Bitmap scaledImage = new Bitmap(destWidth, destHeight, PixelFormat.Format24bppRgb);
-
-            Color c;
-            float xscale = srcImage.Width / destWidth;
-            float yscale = srcImage.Height / destHeight;
-
-            float sy = 0.5f;
-            for (int y = 0; y < destHeight; y++)
-            {
-                float sx = 0.5f;
-                for (int x = 0; x < destWidth; x++)
-                {
-                    try
-                    {
-                        c = srcImage.GetPixel((int)(sx), (int)(sy));
-                        scaledImage.SetPixel(x, y, Color.FromArgb(c.R, c.G, c.B));
-                    }
-                    catch (IndexOutOfRangeException)
-                    {
-                    }
-
-                    sx += xscale;
-                }
-                sy += yscale;
-            }
-            srcImage.Dispose();
-            return scaledImage;
+            throw new Exception("Caught exception processing byte arrays in SculptMap(): e: " + e.ToString());
         }
 
+        width++;
+        height++;
     }
 
+    public List<List<Coord>> ToRows(bool mirror)
+    {
+        int numRows = height;
+        int numCols = width;
+
+        List<List<Coord>> rows = new List<List<Coord>>(numRows);
+
+        float pixScale = 1.0f / 255;
+
+        int rowNdx, colNdx;
+        int smNdx = 0;
+
+
+        for (rowNdx = 0; rowNdx < numRows; rowNdx++)
+        {
+            List<Coord> row = new List<Coord>(numCols);
+            for (colNdx = 0; colNdx < numCols; colNdx++)
+            {
+
+                if (mirror)
+                    row.Add(new Coord(-((float)redBytes[smNdx] * pixScale - 0.5f), ((float)greenBytes[smNdx] * pixScale - 0.5f), (float)blueBytes[smNdx] * pixScale - 0.5f));
+                else
+                    row.Add(new Coord((float)redBytes[smNdx] * pixScale - 0.5f, (float)greenBytes[smNdx] * pixScale - 0.5f, (float)blueBytes[smNdx] * pixScale - 0.5f));
+
+                ++smNdx;
+            }
+
+            rows.Add(row);
+        }
+        return rows;
     }
-#endif
+
+    // Rewritten ScaleImage using SkiaSharp
+    // Scales the input SKBitmap to the specified width and height.
+    // Returns a new SKBitmap; disposes the source image.
+    private SKBitmap ScaleImage(SKBitmap srcImage, int destWidth, int destHeight)
+    {
+        SKBitmap scaledImage = new SKBitmap(destWidth, destHeight, srcImage.ColorType, srcImage.AlphaType);
+
+        using (var canvas = new SKCanvas(scaledImage))
+        {
+            // Draw the source image onto the canvas, scaling to fit the destination size.
+            canvas.DrawBitmap(srcImage, new SKRect(0, 0, destWidth, destHeight));
+        }
+        srcImage.Dispose();
+        return scaledImage;
+    }
+}
+

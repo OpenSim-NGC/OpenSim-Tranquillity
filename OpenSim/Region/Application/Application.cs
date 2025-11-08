@@ -76,8 +76,6 @@ namespace OpenSim
             Culture.SetCurrentCulture();
             Culture.SetDefaultCurrentCulture();
 
-            AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
-
             ServicePointManager.DefaultConnectionLimit = 32;
             ServicePointManager.MaxServicePointIdleTime = 30000;
 

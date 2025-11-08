@@ -33,14 +33,22 @@
     <ProjectReference Include="..\..\Services\UserAccountService\OpenSim.Services.UserAccountService.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="$(SolutionDir)\bin\**" CopyToPublishDirectory="Always" />
-    <Content Include="Resources/OpenSim.addin.xml" CopyToOutputDirectory="Always" />
-  </ItemGroup>
-  <ItemGroup>
     <PackageReference Include="log4net" Version="3.2.0" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.Setup" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.9" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <Content Include="$(SolutionDir)\bin\**" CopyToPublishDirectory="Always" />
+    <Content Include="Resources/OpenSim.addin.xml" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+  
+  <Target Name="CopyNativeLibraries" AfterTargets="Publish">
+    <ItemGroup>
+      <NativeLibsToCopy Include="$(SolutionDir)Library\lib64\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NativeLibsToCopy)" DestinationFolder="$(PublishDir)\lib64\%(RecursiveDir)" />
+  </Target>
 </Project>

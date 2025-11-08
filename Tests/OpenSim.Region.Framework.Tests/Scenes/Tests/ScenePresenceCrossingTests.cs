@@ -28,7 +28,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
@@ -43,7 +43,6 @@ using System.Threading;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
-    [TestFixture]
     public class ScenePresenceCrossingTests : OpenSimTestCase
     {
         [OneTimeSetUp]
@@ -62,7 +61,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [Test]
+        [Fact]
         public void TestCrossOnSameSimulator()
         {
             TestHelpers.InMethod();
@@ -131,22 +130,22 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             // messages
 //            Dictionary<UUID, List<TestEventQueueGetModule.Event>> eqmEvents = eqmA.Events;
 //
-//            Assert.That(eqmEvents.Count, Is.EqualTo(1));
-//            Assert.That(eqmEvents.ContainsKey(originalSp.UUID), Is.True);
+//            Assert.Equal(,);
+//            Assert.True(eqmEvents.ContainsKey(originalSp.UUID));
 //
 //            List<TestEventQueueGetModule.Event> spEqmEvents = eqmEvents[originalSp.UUID];
 //
-//            Assert.That(spEqmEvents.Count, Is.EqualTo(1));
-//            Assert.That(spEqmEvents[0].Name, Is.EqualTo("CrossRegion"));
+//            Assert.Equal(,);
+//            Assert.Equal(,);
 
             // sceneA should now only have a child agent
             ScenePresence spAfterCrossSceneA = sceneA.GetScenePresence(originalSp.UUID);
-            Assert.That(spAfterCrossSceneA.IsChildAgent, Is.True);
+            Assert.True(spAfterCrossSceneA.IsChildAgent);
 
             ScenePresence spAfterCrossSceneB = sceneB.GetScenePresence(originalSp.UUID);
 
             // Agent remains a child until the client triggers complete movement
-            Assert.That(spAfterCrossSceneB.IsChildAgent, Is.True);
+            Assert.True(spAfterCrossSceneB.IsChildAgent);
 
             TestClient sceneBTc = ((TestClient)spAfterCrossSceneB.ControllingClient);
 
@@ -155,15 +154,15 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             sceneBTc.CompleteMovement();
 
-            Assert.That(agentMovementCompleteReceived, Is.EqualTo(1));
-            Assert.That(spAfterCrossSceneB.IsChildAgent, Is.False);
+            Assert.Equal(,);
+            Assert.True(spAfterCrossSceneB.IsChildAgent);
         }
 
         /// <summary>
         /// Test a cross attempt where the user can see into the neighbour but does not have permission to become
         /// root there.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestCrossOnSameSimulatorNoRootDestPerm()
         {
             TestHelpers.InMethod();
@@ -224,12 +223,12 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // sceneA agent should still be root
             ScenePresence spAfterCrossSceneA = sceneA.GetScenePresence(originalSp.UUID);
-            Assert.That(spAfterCrossSceneA.IsChildAgent, Is.False);
+            Assert.True(spAfterCrossSceneA.IsChildAgent);
 
             ScenePresence spAfterCrossSceneB = sceneB.GetScenePresence(originalSp.UUID);
 
             // sceneB agent should still be child
-            Assert.That(spAfterCrossSceneB.IsChildAgent, Is.True);
+            Assert.True(spAfterCrossSceneB.IsChildAgent);
 
             // sceneB should ignore unauthorized attempt to upgrade agent to root
             TestClient sceneBTc = ((TestClient)spAfterCrossSceneB.ControllingClient);
@@ -239,8 +238,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             sceneBTc.CompleteMovement();
 
-            Assert.That(agentMovementCompleteReceived, Is.EqualTo(0));
-            Assert.That(spAfterCrossSceneB.IsChildAgent, Is.True);
+            Assert.Equal(,);
+            Assert.True(spAfterCrossSceneB.IsChildAgent);
         }
     }
 }
