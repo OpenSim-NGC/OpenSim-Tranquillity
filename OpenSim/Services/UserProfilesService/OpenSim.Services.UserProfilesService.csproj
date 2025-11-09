@@ -8,11 +8,11 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.2.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.9" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Nini" HintPath="..\..\..\Library\Nini.dll" />
-    <Reference Include="OpenMetaverse"  HintPath="..\..\..\Library\OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverse" HintPath="..\..\..\Library\OpenMetaverse.dll" />
     <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\..\Library\OpenMetaverse.StructuredData.dll" />
     <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\Library\OpenMetaverseTypes.dll" />
   </ItemGroup>
