@@ -28,6 +28,7 @@
 using System.Drawing;
 using OpenSim.Framework;
 using OpenMetaverse;
+using SkiaSharp;
 
 namespace OpenSim.Region.Framework.Interfaces
 {
@@ -75,8 +76,8 @@ namespace OpenSim.Region.Framework.Interfaces
 
     public interface IMapImageGenerator
     {
-        Bitmap CreateMapTile();
-        Bitmap CreateViewImage(Vector3 camPos, Vector3 camDir, float fov, int width, int height, bool useTextures);
+        SKBitmap CreateMapTile();
+        SKBitmap CreateViewImage(Vector3 camPos, Vector3 camDir, float fov, int width, int height, bool useTextures);
         byte[] WriteJpeg2000Image();
     }
 }

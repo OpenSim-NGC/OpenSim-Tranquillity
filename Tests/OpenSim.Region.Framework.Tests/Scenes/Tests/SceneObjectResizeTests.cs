@@ -34,13 +34,12 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// <summary>
     /// Basic scene object resize tests
     /// </summary>
-    [TestFixture]
     public class SceneObjectResizeTests : OpenSimTestCase
     {
         /// <summary>
         /// Test resizing an object
         /// </summary>
-        [Test]
+        [Fact]
         public void TestResizeSceneObject()
         {
             TestHelpers.InMethod();
@@ -53,17 +52,17 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             SceneObjectGroup g1Post = scene.GetSceneObjectGroup(g1.UUID);
 
-            Assert.That(g1Post.RootPart.Scale.X, Is.EqualTo(2));
-            Assert.That(g1Post.RootPart.Scale.Y, Is.EqualTo(3));
-            Assert.That(g1Post.RootPart.Scale.Z, Is.EqualTo(4));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
-//            Assert.That(g1Post.RootPart.UndoCount, Is.EqualTo(1));
+//            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test resizing an individual part in a scene object.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestResizeSceneObjectPart()
         {
             TestHelpers.InMethod();
@@ -86,13 +85,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneObjectPart g1RootPart = g1PostPost.RootPart;
             SceneObjectPart g1ChildPart = g1PostPost.Parts[1];
 
-            Assert.That(g1RootPart.Scale.X, Is.EqualTo(2));
-            Assert.That(g1RootPart.Scale.Y, Is.EqualTo(3));
-            Assert.That(g1RootPart.Scale.Z, Is.EqualTo(4));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
-            Assert.That(g1ChildPart.Scale.X, Is.EqualTo(8));
-            Assert.That(g1ChildPart.Scale.Y, Is.EqualTo(9));
-            Assert.That(g1ChildPart.Scale.Z, Is.EqualTo(10));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
     }
 }

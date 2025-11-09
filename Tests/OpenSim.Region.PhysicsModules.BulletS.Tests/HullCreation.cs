@@ -32,7 +32,6 @@ using OpenMetaverse;
 
 namespace OpenSim.Region.PhysicsModule.BulletS.Tests
 {
-    [TestFixture]
     public class HullCreation : OpenSimTestCase
     {
         // Documentation on attributes: http://www.nunit.org/index.php?p=attributes&r=2.6.1

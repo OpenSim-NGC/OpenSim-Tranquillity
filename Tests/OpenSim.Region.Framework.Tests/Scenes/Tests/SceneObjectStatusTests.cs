@@ -28,7 +28,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -39,7 +39,6 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// <summary>
     /// Basic scene object status tests
     /// </summary>
-    [TestFixture]
     public class SceneObjectStatusTests : OpenSimTestCase
     {
         private TestScene m_scene;
@@ -47,7 +46,6 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         private SceneObjectGroup m_so1;
         private SceneObjectGroup m_so2;
 
-        [SetUp]
         public void Init()
         {
             m_scene = new SceneHelpers().SetupScene();
@@ -55,7 +53,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_so2 = SceneHelpers.CreateSceneObject(1, m_ownerId, "so2", 0x20);
         }
 
-        [Test]
+        [Fact]
         public void TestSetTemporary()
         {
             TestHelpers.InMethod();
@@ -64,17 +62,17 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_so1.ScriptSetTemporaryStatus(true);
 
             // Is this really the correct flag?
-            Assert.That(m_so1.RootPart.Flags, Is.EqualTo(PrimFlags.TemporaryOnRez));
-            Assert.That(m_so1.Backup, Is.False);
+            Assert.Equal(,);
+            Assert.True(m_so1.Backup);
 
             // Test setting back to non-temporary
             m_so1.ScriptSetTemporaryStatus(false);
 
-            Assert.That(m_so1.RootPart.Flags, Is.EqualTo(PrimFlags.None));
-            Assert.That(m_so1.Backup, Is.True);
+            Assert.Equal(,);
+            Assert.True(m_so1.Backup);
         }
 
-        [Test]
+        [Fact]
         public void TestSetPhantomSinglePrim()
         {
             TestHelpers.InMethod();
@@ -82,19 +80,19 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_scene.AddSceneObject(m_so1);
 
             SceneObjectPart rootPart = m_so1.RootPart;
-            Assert.That(rootPart.Flags, Is.EqualTo(PrimFlags.None));
+            Assert.Equal(,);
 
             m_so1.ScriptSetPhantomStatus(true);
 
 //            Console.WriteLine("so.RootPart.Flags [{0}]", so.RootPart.Flags);
-            Assert.That(rootPart.Flags, Is.EqualTo(PrimFlags.Phantom));
+            Assert.Equal(,);
 
             m_so1.ScriptSetPhantomStatus(false);
 
-            Assert.That(rootPart.Flags, Is.EqualTo(PrimFlags.None));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestSetNonPhysicsVolumeDetectSinglePrim()
         {
             TestHelpers.InMethod();
@@ -102,20 +100,20 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_scene.AddSceneObject(m_so1);
 
             SceneObjectPart rootPart = m_so1.RootPart;
-            Assert.That(rootPart.Flags, Is.EqualTo(PrimFlags.None));
+            Assert.Equal(,);
 
             m_so1.ScriptSetVolumeDetect(true);
 
 //            Console.WriteLine("so.RootPart.Flags [{0}]", so.RootPart.Flags);
             // PrimFlags.JointLP2P is incorrect it now means VolumeDetect (as defined by viewers)
-            Assert.That(rootPart.Flags, Is.EqualTo(PrimFlags.Phantom | PrimFlags.JointLP2P));
+            Assert.Equal(,);
 
             m_so1.ScriptSetVolumeDetect(false);
 
-            Assert.That(rootPart.Flags, Is.EqualTo(PrimFlags.None));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestSetPhysicsSinglePrim()
         {
             TestHelpers.InMethod();
@@ -123,18 +121,18 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_scene.AddSceneObject(m_so1);
 
             SceneObjectPart rootPart = m_so1.RootPart;
-            Assert.That(rootPart.Flags, Is.EqualTo(PrimFlags.None));
+            Assert.Equal(,);
 
             m_so1.ScriptSetPhysicsStatus(true);
 
-            Assert.That(rootPart.Flags, Is.EqualTo(PrimFlags.Physics));
+            Assert.Equal(,);
 
             m_so1.ScriptSetPhysicsStatus(false);
 
-            Assert.That(rootPart.Flags, Is.EqualTo(PrimFlags.None));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestSetPhysicsVolumeDetectSinglePrim()
         {
             TestHelpers.InMethod();
@@ -142,20 +140,20 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_scene.AddSceneObject(m_so1);
 
             SceneObjectPart rootPart = m_so1.RootPart;
-            Assert.That(rootPart.Flags, Is.EqualTo(PrimFlags.None));
+            Assert.Equal(,);
 
             m_so1.ScriptSetPhysicsStatus(true);
             m_so1.ScriptSetVolumeDetect(true);
 
             // PrimFlags.JointLP2P is incorrect it now means VolumeDetect (as defined by viewers)
-            Assert.That(rootPart.Flags, Is.EqualTo(PrimFlags.Phantom | PrimFlags.Physics | PrimFlags.JointLP2P));
+            Assert.Equal(,);
 
             m_so1.ScriptSetVolumeDetect(false);
 
-            Assert.That(rootPart.Flags, Is.EqualTo(PrimFlags.Physics));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestSetPhysicsLinkset()
         {
             TestHelpers.InMethod();
@@ -167,24 +165,24 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             m_so1.ScriptSetPhysicsStatus(true);
 
-            Assert.That(m_so1.RootPart.Flags, Is.EqualTo(PrimFlags.Physics));
-            Assert.That(m_so1.Parts[1].Flags, Is.EqualTo(PrimFlags.Physics));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             m_so1.ScriptSetPhysicsStatus(false);
 
-            Assert.That(m_so1.RootPart.Flags, Is.EqualTo(PrimFlags.None));
-            Assert.That(m_so1.Parts[1].Flags, Is.EqualTo(PrimFlags.None));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             m_so1.ScriptSetPhysicsStatus(true);
 
-            Assert.That(m_so1.RootPart.Flags, Is.EqualTo(PrimFlags.Physics));
-            Assert.That(m_so1.Parts[1].Flags, Is.EqualTo(PrimFlags.Physics));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test that linking results in the correct physical status for all linkees.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLinkPhysicsBothPhysical()
         {
             TestHelpers.InMethod();
@@ -197,14 +195,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             m_scene.LinkObjects(m_ownerId, m_so1.LocalId, new List<uint>() { m_so2.LocalId });
 
-            Assert.That(m_so1.RootPart.Flags, Is.EqualTo(PrimFlags.Physics));
-            Assert.That(m_so1.Parts[1].Flags, Is.EqualTo(PrimFlags.Physics));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test that linking results in the correct physical status for all linkees.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLinkPhysicsRootPhysicalOnly()
         {
             TestHelpers.InMethod();
@@ -216,14 +214,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             m_scene.LinkObjects(m_ownerId, m_so1.LocalId, new List<uint>() { m_so2.LocalId });
 
-            Assert.That(m_so1.RootPart.Flags, Is.EqualTo(PrimFlags.Physics));
-            Assert.That(m_so1.Parts[1].Flags, Is.EqualTo(PrimFlags.Physics));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test that linking results in the correct physical status for all linkees.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLinkPhysicsChildPhysicalOnly()
         {
             TestHelpers.InMethod();
@@ -235,8 +233,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             m_scene.LinkObjects(m_ownerId, m_so1.LocalId, new List<uint>() { m_so2.LocalId });
 
-            Assert.That(m_so1.RootPart.Flags, Is.EqualTo(PrimFlags.None));
-            Assert.That(m_so1.Parts[1].Flags, Is.EqualTo(PrimFlags.None));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
     }
 }

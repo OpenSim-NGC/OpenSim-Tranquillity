@@ -413,7 +413,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             set { m_startpos = value; }
         }
         public float StartFar { get; set; }
-        public float FOV { get; set; } = 1.25f;
+        public float FOV { get; set; } = 1.04f;
         public int viewHeight { get; set; } = 480;
         public int viewWidth { get; set; } = 640;
 
@@ -3787,14 +3787,15 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             OutPacket(reply, ThrottleOutPacketType.Land);
         }
 
-        public void SendScriptTeleportRequest(string objName, string simName, Vector3 pos, Vector3 lookAt)
+        public void SendScriptTeleportRequest(string objName, string simName, Vector3 pos, int options)
         {
             ScriptTeleportRequestPacket packet = (ScriptTeleportRequestPacket)PacketPool.Instance.GetPacket(PacketType.ScriptTeleportRequest);
-
+            packet.Header.Zerocoded = true;
             packet.Data.ObjectName = Utils.StringToBytes(objName);
             packet.Data.SimName = Utils.StringToBytes(simName);
             packet.Data.SimPosition = pos;
-            packet.Data.LookAt = lookAt;
+            packet.Data.LookAt = Vector3.Zero;
+            packet.Options = options == 3 ? [] : [ new(){Flags = (uint)options } ];
 
             OutPacket(packet, ThrottleOutPacketType.Task);
         }

@@ -1,45 +1,34 @@
-name: dotnet package
+name: dotnet console app build
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ master ]
+    branches: [ main, develop ]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        dotnet-version: [ '8.0.x' ]
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Setup .NET ${{matrix.dotnet-version }}
+    - uses: actions/checkout@v4 # Checkout the repository
+    - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ matrix.dotnet-version }}
-    
+        dotnet-version: '8.0.x' # Specify the desired .NET SDK version
+
     - name: Display dotnet version
       run: dotnet --version
 
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore ./Tranquillity.sln
 
     - name: Build
-      run: dotnet build --configuration Release
+      run: dotnet build ./Tranquillity.sln --configuration Release
 
-#    - name: Run Tests
-#      run: dotnet test --logger "trx;LogFileName=<TestResults.trx>"
-#
-#      - name: Create the package
-#        run: dotnet pack --configuration Release <my project>
-#      - name: Publish the package to GPR
-#        run: dotnet nuget push <my project>/bin/Release/*.nupkg
-#
-#    - name: Publish the package to GPR
-#      run: dotnet nuget push <my project>/bin/Release/*.nupkg
+#    - name: Tests
+#      run: dotnet test ./Tranquillity.sln --verbosity normal
+
+#    - name: Publish
+#      run: dotnet publish ./Tranquillity.sln --configuration Release
+

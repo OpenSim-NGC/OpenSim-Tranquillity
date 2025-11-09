@@ -31,6 +31,7 @@ using OpenMetaverse;
 using OpenMetaverse.Assets;
 using OpenMetaverse.Packets;
 using OpenMetaverse.Rendering;
+using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.Land;
 using OpenSim.Region.Framework.Interfaces;
@@ -42,24 +43,23 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.ScriptBase;
-using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Hypergrid;
+using OpenSim.Services.Interfaces;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
-using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using AssetLandmark = OpenSim.Framework.AssetLandmark;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
-using MappingType = OpenMetaverse.MappingType;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
 using LSL_Key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
@@ -67,13 +67,12 @@ using LSL_List = OpenSim.Region.ScriptEngine.Shared.LSL_Types.list;
 using LSL_Rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
 using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
+using MappingType = OpenMetaverse.MappingType;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
 using PrimType = OpenSim.Region.Framework.Scenes.PrimType;
 using RegionFlags = OpenSim.Framework.RegionFlags;
 using RegionInfo = OpenSim.Framework.RegionInfo;
-using System.Runtime.CompilerServices;
-using OpenMetaverse.StructuredData;
 
 #pragma warning disable IDE1006
 
@@ -1706,35 +1705,25 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             SetScale(m_host, scale);
         }
 
-        protected void SetScale(SceneObjectPart part, LSL_Vector scale)
+        protected void SetScale(SceneObjectPart part, LSL_Vector lscale)
         {
-            // TODO: this needs to trigger a persistance save as well
             if (part is null || part.ParentGroup.IsDeleted)
                 return;
 
-            // First we need to check whether or not we need to clamp the size of a physics-enabled prim
+            Vector3 scale = lscale;
             PhysicsActor pa = part.ParentGroup.RootPart.PhysActor;
             if (pa != null && pa.IsPhysical)
-            {
-                scale.x = Math.Max(World.m_minPhys, Math.Min(World.m_maxPhys, scale.x));
-                scale.y = Math.Max(World.m_minPhys, Math.Min(World.m_maxPhys, scale.y));
-                scale.z = Math.Max(World.m_minPhys, Math.Min(World.m_maxPhys, scale.z));
-            }
+                scale.Clamp(World.m_minPhys, World.m_maxPhys);
             else
-            {
-                // If not physical, then we clamp the scale to the non-physical min/max
-                scale.x = Math.Max(World.m_minNonphys, Math.Min(World.m_maxNonphys, scale.x));
-                scale.y = Math.Max(World.m_minNonphys, Math.Min(World.m_maxNonphys, scale.y));
-                scale.z = Math.Max(World.m_minNonphys, Math.Min(World.m_maxNonphys, scale.z));
-            }
+                scale.Clamp(World.m_minNonphys, World.m_maxNonphys);
 
             Vector3 tmp = part.Scale;
-            tmp.X = (float)scale.x;
-            tmp.Y = (float)scale.y;
-            tmp.Z = (float)scale.z;
-            part.Scale = tmp;
-            part.ParentGroup.HasGroupChanged = true;
-            part.SendFullUpdateToAllClients();
+            part.Scale = scale;
+            if(scale.NotEqual(tmp))
+            {
+                part.ParentGroup.HasGroupChanged = true;
+                part.SendFullUpdateToAllClients();
+            }
         }
 
         public LSL_Vector llGetScale()
@@ -1744,9 +1733,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public void llSetClickAction(int action)
         {
+            byte old = m_host.ClickAction;
             m_host.ClickAction = (byte)action;
-            m_host.ParentGroup.HasGroupChanged = true;
-            m_host.ScheduleFullUpdate();
+            if(m_host.ClickAction != old)
+            {
+                m_host.ParentGroup.HasGroupChanged = true;
+                m_host.ScheduleFullUpdate();
+            }
             return;
         }
 
@@ -2437,7 +2430,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         {
             if (face == ScriptBaseClass.ALL_SIDES)
                 face = 0;
-            if (face < 0)
+            else if (face < 0)
                 return ScriptBaseClass.NULL_KEY;
 
             Primitive.TextureEntry tex = part.Shape.Textures;
@@ -4179,7 +4172,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             if (!World.TryGetScenePresence(m_item.PermsGranter, out ScenePresence target))
                 return;
 
-            if (target.UUID != grp.OwnerID)
+            if (target.UUID.NotEqual(grp.OwnerID))
             {
                 uint effectivePerms = grp.EffectiveOwnerPerms;
 
@@ -4410,10 +4403,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public void llSetBuoyancy(double buoyancy)
         {
-
             if (!m_host.ParentGroup.IsDeleted)
             {
-                m_host.ParentGroup.RootPart.SetBuoyancy((float)buoyancy);
+                m_host.ParentGroup.SetBuoyancy((float)buoyancy);
             }
         }
 
@@ -7749,402 +7741,407 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         {
             if (rules.Length == 0)
             {
+                int len = part.ParticleSystem.Length;
                 part.RemoveParticleSystem();
-                part.ParentGroup.HasGroupChanged = true;
-            }
-            else
-            {
-                Primitive.ParticleSystem prules = getNewParticleSystemWithSLDefaultValues();
-                LSL_Vector tempv;
-                float tempf;
-                int tmpi;
-
-                for (int i = 0; i < rules.Length; i += 2)
+                if(len > 0)
                 {
-                    int psystype;
-                    try
-                    {
-                        psystype = rules.GetIntegerItem(i);
-                    }
-                    catch (InvalidCastException)
-                    {
-                        Error(originFunc, string.Format("Error running particle system params index #{0}: particle system parameter type must be integer", i));
-                        return;
-                    }
-                    switch (psystype)
-                    {
-                        case ScriptBaseClass.PSYS_PART_FLAGS:
-                            try
-                            {
-                                prules.PartDataFlags = (Primitive.ParticleSystem.ParticleDataFlags)(uint)rules.GetIntegerItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_PART_FLAGS: arg #{0} - parameter 1 must be integer", i + 1));
-                                return;
-                            }
-                            break;
-
-                        case ScriptBaseClass.PSYS_PART_START_COLOR:
-                            try
-                            {
-                                tempv = rules.GetVector3Item(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_PART_START_COLOR: arg #{0} - parameter 1 must be vector", i + 1));
-                                return;
-                            }
-                            prules.PartStartColor.R = (float)tempv.x;
-                            prules.PartStartColor.G = (float)tempv.y;
-                            prules.PartStartColor.B = (float)tempv.z;
-                            break;
-
-                        case ScriptBaseClass.PSYS_PART_START_ALPHA:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_PART_START_ALPHA: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.PartStartColor.A = tempf;
-                            break;
-
-                        case ScriptBaseClass.PSYS_PART_END_COLOR:
-                            try
-                            {
-                                tempv = rules.GetVector3Item(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_PART_END_COLOR: arg #{0} - parameter 1 must be vector", i + 1));
-                                return;
-                            }
-                            prules.PartEndColor.R = (float)tempv.x;
-                            prules.PartEndColor.G = (float)tempv.y;
-                            prules.PartEndColor.B = (float)tempv.z;
-                            break;
-
-                        case ScriptBaseClass.PSYS_PART_END_ALPHA:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_PART_END_ALPHA: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.PartEndColor.A = tempf;
-                            break;
-
-                        case ScriptBaseClass.PSYS_PART_START_SCALE:
-                            try
-                            {
-                                tempv = rules.GetVector3Item(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_PART_START_SCALE: arg #{0} - parameter 1 must be vector", i + 1));
-                                return;
-                            }
-                            prules.PartStartScaleX = validParticleScale((float)tempv.x);
-                            prules.PartStartScaleY = validParticleScale((float)tempv.y);
-                            break;
-
-                        case ScriptBaseClass.PSYS_PART_END_SCALE:
-                            try
-                            {
-                                tempv = rules.GetVector3Item(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_PART_END_SCALE: arg #{0} - parameter 1 must be vector", i + 1));
-                                return;
-                            }
-                            prules.PartEndScaleX = validParticleScale((float)tempv.x);
-                            prules.PartEndScaleY = validParticleScale((float)tempv.y);
-                            break;
-
-                        case ScriptBaseClass.PSYS_PART_MAX_AGE:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_PART_MAX_AGE: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.PartMaxAge = tempf;
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_ACCEL:
-                            try
-                            {
-                                tempv = rules.GetVector3Item(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_ACCEL: arg #{0} - parameter 1 must be vector", i + 1));
-                                return;
-                            }
-                            prules.PartAcceleration.X = (float)tempv.x;
-                            prules.PartAcceleration.Y = (float)tempv.y;
-                            prules.PartAcceleration.Z = (float)tempv.z;
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_PATTERN:
-                            try
-                            {
-                                tmpi = rules.GetIntegerItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_PATTERN: arg #{0} - parameter 1 must be integer", i + 1));
-                                return;
-                            }
-                            prules.Pattern = (Primitive.ParticleSystem.SourcePattern)tmpi;
-                            break;
-
-                        // PSYS_SRC_INNERANGLE and PSYS_SRC_ANGLE_BEGIN use the same variables. The
-                        // PSYS_SRC_OUTERANGLE and PSYS_SRC_ANGLE_END also use the same variable. The
-                        // client tells the difference between the two by looking at the 0x02 bit in
-                        // the PartFlags variable.
-                        case ScriptBaseClass.PSYS_SRC_INNERANGLE:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_INNERANGLE: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.InnerAngle = tempf;
-                            prules.PartFlags &= 0xFFFFFFFD; // Make sure new angle format is off.
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_OUTERANGLE:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_OUTERANGLE: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.OuterAngle = tempf;
-                            prules.PartFlags &= 0xFFFFFFFD; // Make sure new angle format is off.
-                            break;
-
-                        case ScriptBaseClass.PSYS_PART_BLEND_FUNC_SOURCE:
-                            try
-                            {
-                                tmpi = rules.GetIntegerItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_PART_BLEND_FUNC_SOURCE: arg #{0} - parameter 1 must be integer", i + 1));
-                                return;
-                            }
-                            prules.BlendFuncSource = (byte)tmpi;
-                            break;
-
-                        case ScriptBaseClass.PSYS_PART_BLEND_FUNC_DEST:
-                            try
-                            {
-                                tmpi = rules.GetIntegerItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_PART_BLEND_FUNC_DEST: arg #{0} - parameter 1 must be integer", i + 1));
-                                return;
-                            }
-                            prules.BlendFuncDest = (byte)tmpi;
-                            break;
-
-                        case ScriptBaseClass.PSYS_PART_START_GLOW:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_PART_START_GLOW: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.PartStartGlow = tempf;
-                            break;
-
-                        case ScriptBaseClass.PSYS_PART_END_GLOW:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_PART_END_GLOW: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.PartEndGlow = tempf;
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_TEXTURE:
-                            try
-                            {
-                                prules.Texture = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, rules.GetStrictStringItem(i + 1));
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_TEXTURE: arg #{0} - parameter 1 must be string or key", i + 1));
-                                return;
-                            }
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_BURST_RATE:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_BURST_RATE: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.BurstRate = tempf;
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_BURST_PART_COUNT:
-                            try
-                            {
-                                prules.BurstPartCount = (byte)rules.GetIntegerItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_BURST_PART_COUNT: arg #{0} - parameter 1 must be integer", i + 1));
-                                return;
-                            }
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_BURST_RADIUS:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_BURST_RADIUS: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.BurstRadius = tempf;
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_BURST_SPEED_MIN:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_BURST_SPEED_MIN: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.BurstSpeedMin = tempf;
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_BURST_SPEED_MAX:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_BURST_SPEED_MAX: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.BurstSpeedMax = tempf;
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_MAX_AGE:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_MAX_AGE: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.MaxAge = tempf;
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_TARGET_KEY:
-                            if (UUID.TryParse(rules.Data[i + 1].ToString(), out UUID key))
-                            {
-                                prules.Target = key;
-                            }
-                            else
-                            {
-                                prules.Target = part.UUID;
-                            }
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_OMEGA:
-                            // AL: This is an assumption, since it is the only thing that would match.
-                            try
-                            {
-                                tempv = rules.GetVector3Item(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_OMEGA: arg #{0} - parameter 1 must be vector", i + 1));
-                                return;
-                            }
-                            prules.AngularVelocity.X = (float)tempv.x;
-                            prules.AngularVelocity.Y = (float)tempv.y;
-                            prules.AngularVelocity.Z = (float)tempv.z;
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_ANGLE_BEGIN:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch(InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_ANGLE_BEGIN: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.InnerAngle = tempf;
-                            prules.PartFlags |= 0x02; // Set new angle format.
-                            break;
-
-                        case ScriptBaseClass.PSYS_SRC_ANGLE_END:
-                            try
-                            {
-                                tempf = rules.GetStrictFloatItem(i + 1);
-                            }
-                            catch (InvalidCastException)
-                            {
-                                Error(originFunc, string.Format("Error running rule PSYS_SRC_ANGLE_END: arg #{0} - parameter 1 must be float", i + 1));
-                                return;
-                            }
-                            prules.OuterAngle = tempf;
-                            prules.PartFlags |= 0x02; // Set new angle format.
-                            break;
-                    }
-                }
-                prules.CRC = 1;
-
-                part.AddNewParticleSystem(prules, expire);
-                if(!expire || prules.MaxAge != 0 || prules.MaxAge > 300)
                     part.ParentGroup.HasGroupChanged = true;
+                    part.SendFullUpdateToAllClients();
+                }
+                return;
             }
+
+            Primitive.ParticleSystem prules = getNewParticleSystemWithSLDefaultValues();
+            LSL_Vector tempv;
+            float tempf;
+            int tmpi;
+
+            for (int i = 0; i < rules.Length; i += 2)
+            {
+                int psystype;
+                try
+                {
+                    psystype = rules.GetIntegerItem(i);
+                }
+                catch (InvalidCastException)
+                {
+                    Error(originFunc, string.Format("Error running particle system params index #{0}: particle system parameter type must be integer", i));
+                    return;
+                }
+                switch (psystype)
+                {
+                    case ScriptBaseClass.PSYS_PART_FLAGS:
+                        try
+                        {
+                            prules.PartDataFlags = (Primitive.ParticleSystem.ParticleDataFlags)(uint)rules.GetIntegerItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_PART_FLAGS: arg #{0} - parameter 1 must be integer", i + 1));
+                            return;
+                        }
+                        break;
+
+                    case ScriptBaseClass.PSYS_PART_START_COLOR:
+                        try
+                        {
+                            tempv = rules.GetVector3Item(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_PART_START_COLOR: arg #{0} - parameter 1 must be vector", i + 1));
+                            return;
+                        }
+                        prules.PartStartColor.R = (float)tempv.x;
+                        prules.PartStartColor.G = (float)tempv.y;
+                        prules.PartStartColor.B = (float)tempv.z;
+                        break;
+
+                    case ScriptBaseClass.PSYS_PART_START_ALPHA:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_PART_START_ALPHA: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.PartStartColor.A = tempf;
+                        break;
+
+                    case ScriptBaseClass.PSYS_PART_END_COLOR:
+                        try
+                        {
+                            tempv = rules.GetVector3Item(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_PART_END_COLOR: arg #{0} - parameter 1 must be vector", i + 1));
+                            return;
+                        }
+                        prules.PartEndColor.R = (float)tempv.x;
+                        prules.PartEndColor.G = (float)tempv.y;
+                        prules.PartEndColor.B = (float)tempv.z;
+                        break;
+
+                    case ScriptBaseClass.PSYS_PART_END_ALPHA:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_PART_END_ALPHA: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.PartEndColor.A = tempf;
+                        break;
+
+                    case ScriptBaseClass.PSYS_PART_START_SCALE:
+                        try
+                        {
+                            tempv = rules.GetVector3Item(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_PART_START_SCALE: arg #{0} - parameter 1 must be vector", i + 1));
+                            return;
+                        }
+                        prules.PartStartScaleX = validParticleScale((float)tempv.x);
+                        prules.PartStartScaleY = validParticleScale((float)tempv.y);
+                        break;
+
+                    case ScriptBaseClass.PSYS_PART_END_SCALE:
+                        try
+                        {
+                            tempv = rules.GetVector3Item(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_PART_END_SCALE: arg #{0} - parameter 1 must be vector", i + 1));
+                            return;
+                        }
+                        prules.PartEndScaleX = validParticleScale((float)tempv.x);
+                        prules.PartEndScaleY = validParticleScale((float)tempv.y);
+                        break;
+
+                    case ScriptBaseClass.PSYS_PART_MAX_AGE:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_PART_MAX_AGE: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.PartMaxAge = tempf;
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_ACCEL:
+                        try
+                        {
+                            tempv = rules.GetVector3Item(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_ACCEL: arg #{0} - parameter 1 must be vector", i + 1));
+                            return;
+                        }
+                        prules.PartAcceleration.X = (float)tempv.x;
+                        prules.PartAcceleration.Y = (float)tempv.y;
+                        prules.PartAcceleration.Z = (float)tempv.z;
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_PATTERN:
+                        try
+                        {
+                            tmpi = rules.GetIntegerItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_PATTERN: arg #{0} - parameter 1 must be integer", i + 1));
+                            return;
+                        }
+                        prules.Pattern = (Primitive.ParticleSystem.SourcePattern)tmpi;
+                        break;
+
+                    // PSYS_SRC_INNERANGLE and PSYS_SRC_ANGLE_BEGIN use the same variables. The
+                    // PSYS_SRC_OUTERANGLE and PSYS_SRC_ANGLE_END also use the same variable. The
+                    // client tells the difference between the two by looking at the 0x02 bit in
+                    // the PartFlags variable.
+                    case ScriptBaseClass.PSYS_SRC_INNERANGLE:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_INNERANGLE: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.InnerAngle = tempf;
+                        prules.PartFlags &= 0xFFFFFFFD; // Make sure new angle format is off.
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_OUTERANGLE:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_OUTERANGLE: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.OuterAngle = tempf;
+                        prules.PartFlags &= 0xFFFFFFFD; // Make sure new angle format is off.
+                        break;
+
+                    case ScriptBaseClass.PSYS_PART_BLEND_FUNC_SOURCE:
+                        try
+                        {
+                            tmpi = rules.GetIntegerItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_PART_BLEND_FUNC_SOURCE: arg #{0} - parameter 1 must be integer", i + 1));
+                            return;
+                        }
+                        prules.BlendFuncSource = (byte)tmpi;
+                        break;
+
+                    case ScriptBaseClass.PSYS_PART_BLEND_FUNC_DEST:
+                        try
+                        {
+                            tmpi = rules.GetIntegerItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_PART_BLEND_FUNC_DEST: arg #{0} - parameter 1 must be integer", i + 1));
+                            return;
+                        }
+                        prules.BlendFuncDest = (byte)tmpi;
+                        break;
+
+                    case ScriptBaseClass.PSYS_PART_START_GLOW:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_PART_START_GLOW: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.PartStartGlow = tempf;
+                        break;
+
+                    case ScriptBaseClass.PSYS_PART_END_GLOW:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_PART_END_GLOW: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.PartEndGlow = tempf;
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_TEXTURE:
+                        try
+                        {
+                            prules.Texture = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, rules.GetStrictStringItem(i + 1));
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_TEXTURE: arg #{0} - parameter 1 must be string or key", i + 1));
+                            return;
+                        }
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_BURST_RATE:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_BURST_RATE: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.BurstRate = tempf;
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_BURST_PART_COUNT:
+                        try
+                        {
+                            prules.BurstPartCount = (byte)rules.GetIntegerItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_BURST_PART_COUNT: arg #{0} - parameter 1 must be integer", i + 1));
+                            return;
+                        }
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_BURST_RADIUS:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_BURST_RADIUS: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.BurstRadius = tempf;
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_BURST_SPEED_MIN:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_BURST_SPEED_MIN: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.BurstSpeedMin = tempf;
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_BURST_SPEED_MAX:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_BURST_SPEED_MAX: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.BurstSpeedMax = tempf;
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_MAX_AGE:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_MAX_AGE: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.MaxAge = tempf;
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_TARGET_KEY:
+                        if (UUID.TryParse(rules.Data[i + 1].ToString(), out UUID key))
+                        {
+                            prules.Target = key;
+                        }
+                        else
+                        {
+                            prules.Target = part.UUID;
+                        }
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_OMEGA:
+                        // AL: This is an assumption, since it is the only thing that would match.
+                        try
+                        {
+                            tempv = rules.GetVector3Item(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_OMEGA: arg #{0} - parameter 1 must be vector", i + 1));
+                            return;
+                        }
+                        prules.AngularVelocity.X = (float)tempv.x;
+                        prules.AngularVelocity.Y = (float)tempv.y;
+                        prules.AngularVelocity.Z = (float)tempv.z;
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_ANGLE_BEGIN:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_ANGLE_BEGIN: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.InnerAngle = tempf;
+                        prules.PartFlags |= 0x02; // Set new angle format.
+                        break;
+
+                    case ScriptBaseClass.PSYS_SRC_ANGLE_END:
+                        try
+                        {
+                            tempf = rules.GetStrictFloatItem(i + 1);
+                        }
+                        catch (InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule PSYS_SRC_ANGLE_END: arg #{0} - parameter 1 must be float", i + 1));
+                            return;
+                        }
+                        prules.OuterAngle = tempf;
+                        prules.PartFlags |= 0x02; // Set new angle format.
+                        break;
+                }
+            }
+            prules.CRC = 1;
+
+            part.AddNewParticleSystem(prules, expire);
+            if(!expire || prules.MaxAge != 0 || prules.MaxAge > 300)
+                part.ParentGroup.HasGroupChanged = true;
+
             part.SendFullUpdateToAllClients();
         }
 
@@ -8337,9 +8334,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             if (rot.s == 0 && rot.x == 0 && rot.y == 0 && rot.z == 0)
                 rot.s = 1; // ZERO_ROTATION = 0,0,0,1
 
+            Vector3 oldpos = part.SitTargetPosition;
+            Quaternion oldrot = part.SitTargetOrientation;
             part.SitTargetPosition = offset;
             part.SitTargetOrientation = rot;
-            part.ParentGroup.HasGroupChanged = true;
+            part.ParentGroup.HasGroupChanged = oldpos.NotEqual(part.SitTargetPosition) || oldrot.NotEqual(part.SitTargetOrientation);
         }
 
         public void llSitTarget(LSL_Vector offset, LSL_Rotation rot)
@@ -14072,7 +14071,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             if ((m_item.PermsMask & ScriptBaseClass.PERMISSION_TRACK_CAMERA) == 0)
             {
-                Error("llGetCameraAspect", "No permissions to track the camera");
+                Error("llGetCameraFOV", "No permissions to track the camera");
                 return LSL_Float.Zero;
             }
 
@@ -14143,24 +14142,84 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         public void llMapDestination(string simname, LSL_Vector pos, LSL_Vector lookAt)
         {
             DetectParams detectedParams = m_ScriptEngine.GetDetectParams(m_item.ItemID, 0);
-            if (detectedParams == null)
+            if (detectedParams is null)
             {
-                if (m_host.ParentGroup.IsAttachment == true)
+                if (m_host.ParentGroup.IsAttachment)
                 {
-                    detectedParams = new DetectParams
-                    {
-                        Key = m_host.OwnerID
-                    };
+                    detectedParams = new DetectParams { Key = m_host.OwnerID };
                 }
                 else
-                {
                     return;
+            }
+
+            ScenePresence avatar = World.GetScenePresence(detectedParams.Key);
+            //lookat does nothing
+            avatar?.ControllingClient.SendScriptTeleportRequest(m_host.Name,
+                    simname, pos, ScriptBaseClass.BEACON_FOCUS_MAP | ScriptBaseClass.BEACON_SHOW_MAP);
+            ScriptSleep(m_sleepMsOnMapDestination);
+        }
+
+        public void llMapBeacon(string simname, LSL_Vector pos, LSL_List loptions)
+        {
+            DetectParams detectedParams = m_ScriptEngine.GetDetectParams(m_item.ItemID, 0);
+            if (detectedParams is null)
+            {
+                if (m_host.ParentGroup.IsAttachment)
+                {
+                    detectedParams = new DetectParams { Key = m_host.OwnerID };
+                }
+                else
+                    return;
+            }
+
+            int options = 0;
+            if(loptions is not null && loptions.Length > 0)
+            {
+                if(loptions.Length != 3)
+                    throw new InvalidCastException("Unknown llMapBeacon rules");
+                try
+                {
+                    int cmd = loptions.GetLSLIntegerItem(0);
+                    if( cmd == ScriptBaseClass.BEACON_MAP)
+                    {
+                        int open_map;
+                        int focus_map;
+                        try
+                        {
+                            open_map = loptions.GetLSLIntegerItem(1);
+                        }
+                        catch (InvalidCastException)
+                        {
+                            throw new InvalidCastException("llMapBeacon open_map must be a 0 or 1");
+                        }
+                        try
+                        {
+                            focus_map = loptions.GetLSLIntegerItem(2);
+                        }
+                        catch (InvalidCastException)
+                        {
+                            throw new InvalidCastException("llMapBeacon focus_map must be a 0 or 1 ");
+                        }
+
+                        if (open_map != 0)
+                        {
+                            options = ScriptBaseClass.BEACON_SHOW_MAP;
+                            if (focus_map != 0)
+                                options |= ScriptBaseClass.BEACON_FOCUS_MAP;
+                        }
+                    }
+                    else
+                        throw new InvalidCastException($"Unknown llMapBeacon rule {cmd}");
+                }
+                catch (InvalidCastException)
+                {
+                    throw new InvalidCastException($"Invalid llMapBeacon rule");
                 }
             }
 
             ScenePresence avatar = World.GetScenePresence(detectedParams.Key);
             avatar?.ControllingClient.SendScriptTeleportRequest(m_host.Name,
-                    simname, pos, lookAt);
+                    simname, pos, options);
             ScriptSleep(m_sleepMsOnMapDestination);
         }
 
@@ -16189,24 +16248,22 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         private ContactResult? GroundIntersection(Vector3 rayStart, Vector3 rayEnd)
         {
-            double[,] heightfield = World.Heightmap.GetDoubles();
-            List<ContactResult> contacts = new();
+            TerrainData heightfield = World.Heightmap.GetTerrainData();
+            List<ContactResult> contacts = [];
 
-            double min = 2048.0;
-            double max = 0.0;
+            float min = float.MaxValue;
+            float max = float.MinValue;
 
             // Find the min and max of the heightfield
             for (int x = 0 ; x < World.Heightmap.Width ; x++)
             {
                 for (int y = 0 ; y < World.Heightmap.Height ; y++)
-                {
-                    if (heightfield[x, y] > max)
-                        max = heightfield[x, y];
-                    if (heightfield[x, y] < min)
-                        min = heightfield[x, y];
+                { 
+                    float h =  World.Heightmap[x, y];
+                    if (h > max) max = h;
+                    if (h < min) min = h;
                 }
             }
-
 
             // A ray extends past rayEnd, but doesn't go back before
             // rayStart. If the start is above the highest point of the ground
@@ -16218,28 +16275,32 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             if (rayStart.Z < min && rayEnd.Z <= rayStart.Z)
                 return null;
 
-            List<Tri> trilist = new();
+            List<Tri> trilist = [];
 
             // Create our triangle list
-            for (int x = 1 ; x < World.Heightmap.Width ; x++)
+            for (int x = 1 ; x < heightfield.SizeX ; x++)
             {
-                for (int y = 1 ; y < World.Heightmap.Height ; y++)
+                for (int y = 1 ; y < heightfield.SizeY ; y++)
                 {
-                    Tri t1 = new();
-                    Tri t2 = new();
 
-                    Vector3 p1 = new(x-1, y-1, (float)heightfield[x-1, y-1]);
-                    Vector3 p2 = new(x, y-1, (float)heightfield[x, y-1]);
-                    Vector3 p3 = new(x, y, (float)heightfield[x, y]);
-                    Vector3 p4 = new(x-1, y, (float)heightfield[x-1, y]);
+                    Vector3 p1 = new(x-1, y-1, heightfield[x-1, y-1]);
+                    Vector3 p2 = new(x, y-1, heightfield[x, y-1]);
+                    Vector3 p3 = new(x, y, heightfield[x, y]);
+                    Vector3 p4 = new(x-1, y, heightfield[x-1, y]);
 
-                    t1.p1 = p1;
-                    t1.p2 = p2;
-                    t1.p3 = p3;
+                    Tri t1 = new()
+                    {
+                        p1 = p1,
+                        p2 = p2,
+                        p3 = p3
+                    };
 
-                    t2.p1 = p3;
-                    t2.p2 = p4;
-                    t2.p3 = p1;
+                    Tri t2 = new()
+                    {
+                        p1 = p3,
+                        p2 = p4,
+                        p3 = p1
+                    };
 
                     trilist.Add(t1);
                     trilist.Add(t2);
@@ -16260,22 +16321,22 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     continue;
 
                 Vector3 w0 = rayStart - t.p1;
-                double a = -Vector3.Dot(n, w0);
-                double b = Vector3.Dot(n, rayDirection);
+                float a = -Vector3.Dot(n, w0);
+                float b = Vector3.Dot(n, rayDirection);
 
                 // Not intersecting the plane, or in plane (same thing)
                 // Ignoring this MAY cause the ground to not be detected
                 // sometimes
-                if (Math.Abs(b) < 0.000001)
+                if (MathF.Abs(b) < 0.000001)
                     continue;
 
-                double r = a / b;
+                float r = a / b;
 
                 // ray points away from plane
                 if (r < 0.0)
                     continue;
 
-                Vector3 ip = rayStart + Vector3.Multiply(rayDirection, (float)r);
+                Vector3 ip = rayStart + Vector3.Multiply(rayDirection, r);
 
                 float uu = Vector3.Dot(u, u);
                 float uv = Vector3.Dot(u, v);
@@ -16767,18 +16828,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
                                 // When part is sculpt, create mesh
                                 // Quirk: Generated sculpt mesh is about 2.8% smaller in X and Y than visual sculpt.
+                                // TODO: Sculpt mesh rendering requires OpenMetaverse library to accept SkiaSharp bitmaps
+                                // For now, sculpt rendering is disabled in SkiaSharp-only mode
                                 else if (omvPrim.Sculpt != null && omvPrim.Sculpt.Type != SculptType.Mesh && sculptAsset != null)
                                 {
-                                    IJ2KDecoder imgDecoder = World.RequestModuleInterface<IJ2KDecoder>();
-                                    if (imgDecoder != null)
-                                    {
-                                        Image sculpt = imgDecoder.DecodeToImage(sculptAsset);
-                                        if (sculpt != null)
-                                        {
-                                            mesh = primMesher.GenerateFacetedSculptMesh(omvPrim, (Bitmap)sculpt, m_sculptLodInCastRay);
-                                            sculpt.Dispose();
-                                        }
-                                    }
+                                    m_log.WarnFormat("[LSL API] Sculpt rendering for prim {0} is not supported in SkiaSharp-only mode", 
+                                        omvPrim.ID.ToString());
                                 }
 
                                 // When part is shape, create mesh
@@ -21181,6 +21236,170 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     break;
             }
             return new LSL_String();
+        }
+
+        public LSL_String llGetRenderMaterial(LSL_Integer lface )
+        {
+            return GetMaterial(m_host, lface.value);
+        }
+
+        protected static LSL_String GetMaterial(SceneObjectPart part, int face)
+        {
+            if (part.Shape.RenderMaterials is null ||
+                    part.Shape.RenderMaterials.entries is null ||
+                    part.Shape.RenderMaterials.entries.Length == 0)
+                return ScriptBaseClass.NULL_KEY;
+
+            if (face == ScriptBaseClass.ALL_SIDES)
+                face = 0;
+            else if (face < 0)
+                return ScriptBaseClass.NULL_KEY;
+            else if (face >= GetNumberOfSides(part))
+                return ScriptBaseClass.NULL_KEY;
+
+            UUID asset = UUID.Zero;
+            try
+            {
+                var re = part.Shape.RenderMaterials.entries
+                    .First(entry => entry.te_index == face);  
+                asset = re.id;              
+            }
+            catch (ArgumentNullException)
+            {
+                return ScriptBaseClass.NULL_KEY;
+            }
+
+            lock (part.TaskInventory)
+            {
+                part.TaskInventory.LockItemsForRead(true);
+                try
+                { 
+                    foreach (KeyValuePair<UUID, TaskInventoryItem> inv in part.TaskInventory.Where(inv => inv.Value.Type == (int)AssetType.Material && inv.Value.AssetID.Equals(asset)))
+                    {
+                        return inv.Value.Name.ToString();
+                    }
+                }
+                finally { part.TaskInventory.LockItemsForRead(false); }
+            }
+
+            if((part.ParentGroup.EffectiveOwnerPerms & (uint)PermissionMask.All) != (uint)PermissionMask.All)
+                return ScriptBaseClass.NULL_KEY;
+
+            return asset.ToString();
+        }
+
+        public LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer lface)
+        {
+            SceneObjectPart part;
+            if (linknum == ScriptBaseClass.LINK_ROOT)
+                part = m_host.ParentGroup.RootPart;
+            else if (linknum == ScriptBaseClass.LINK_THIS)
+                part = m_host;
+            else
+                part = m_host.ParentGroup.GetLinkNumPart(linknum);
+            if(part is null)
+                return 0;
+
+            if (part.Shape.RenderMaterials is null ||
+                    part.Shape.RenderMaterials.entries is null ||
+                    part.Shape.RenderMaterials.entries.Length == 0)
+                return 0;
+
+            int face = lface.value;
+            if (face == ScriptBaseClass.ALL_SIDES)
+            {
+                int nsides = GetNumberOfSides(part);
+                bool[] pbr = new bool[nsides];
+                foreach(Primitive.RenderMaterials.RenderMaterialEntry re in part.Shape.RenderMaterials.entries)
+                {
+                    if(re.te_index > 0 && re.te_index < pbr.Length && re.id.IsNotZero())
+                        pbr[re.te_index] = true;
+                }
+                foreach(bool b in pbr)
+                {
+                    if (!b)
+                        return 0;
+                }
+                return 1;
+            }
+
+            if (face < 0)
+                return 0;
+            else if (face >= GetNumberOfSides(part))
+                return 0;
+            foreach(Primitive.RenderMaterials.RenderMaterialEntry re in part.Shape.RenderMaterials.entries)
+            {
+                if(re.te_index == face)
+                    return re.id.IsZero() ? 0 : 1;
+            }
+            return 0;
+        }
+
+        public LSL_Vector llWorldPosToHUD(LSL_Vector wp)
+        {
+            if(!m_host.ParentGroup.IsAttachment)
+                return LSL_Vector.Zero;
+
+            uint atp = m_host.ParentGroup.AttachmentPoint;
+            if(atp < (uint)AttachmentPoint.HUDCenter2 || atp > (uint)AttachmentPoint.HUDBottomRight)
+                return LSL_Vector.Zero;
+
+            if (m_item.PermsGranter.NotEqual(m_host.OwnerID) ||
+                (m_item.PermsMask & ScriptBaseClass.PERMISSION_TRACK_CAMERA) == 0)
+            {
+                Error("llGetCameraPos", "No permissions to track the camera");
+                return LSL_Vector.Zero;
+            }
+
+            ScenePresence sp = World.GetScenePresence(m_host.OwnerID);
+            if(sp is null)
+                return LSL_Vector.Zero;
+
+            int h = sp.ControllingClient.viewHeight;
+            float aspect = h > 0 ?(float)sp.ControllingClient.viewWidth / h : 1f;
+
+            Vector3 totarget = (Vector3)wp - sp.CameraPosition;
+            float at = totarget.Dot(sp.CameraAtAxis);
+            float left = totarget.Dot(sp.CameraLeftAxis);
+            float up = totarget.Dot(sp.CameraUpAxis);
+
+            float fov = at * MathF.Tan(sp.ControllingClient.FOV * 0.5f);
+            
+            if (fov > 0)
+            {
+                fov = 0.45f / fov;
+                left *= fov;
+                up *= fov;
+            }
+
+            switch(atp)
+            {
+                case (uint)AttachmentPoint.HUDTop:
+                    up -= 0.5f;
+                    break;
+                case (uint)AttachmentPoint.HUDTopLeft:
+                    up -= 0.5f;
+                    left -= 0.5f * aspect;
+                    break;
+                case (uint)AttachmentPoint.HUDTopRight:
+                    up -= 0.5f;
+                    left += 0.5f * aspect;
+                    break;
+                case (uint)AttachmentPoint.HUDBottom:
+                    up += 0.5f;
+                    break;
+                case (uint)AttachmentPoint.HUDBottomLeft:
+                    up += 0.5f;
+                    left -= 0.5f * aspect;
+                    break;
+                case (uint)AttachmentPoint.HUDBottomRight:
+                    up += 0.5f;
+                    left += 0.5f * aspect;
+                    break;
+                default:
+                    break;
+            }
+            return new(at > 0 ? 1 : -1, left, up);
         }
 
         static string HMAC_SHA224(string key, string message)

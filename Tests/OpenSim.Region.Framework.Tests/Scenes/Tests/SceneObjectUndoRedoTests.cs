@@ -28,7 +28,7 @@
 /*  undo has changed, this tests dont apply without large changes
 using System;
 using System.Reflection;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -41,7 +41,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// </summary>
     public class SceneObjectUndoRedoTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestUndoRedoResizeSceneObject()
         {
             TestHelpers.InMethod();
@@ -58,24 +58,24 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             // which is the way that AddSceneObject() sets up the object (i.e. it creates the SOP first).  However,
             // this is somewhat by chance.  Really, we shouldn't be storing undo states at all if the object is not
             // in a scene.
-            Assert.That(g1.RootPart.UndoCount, Is.EqualTo(0));
+            Assert.Equal(,);
 
             g1.GroupResize(firstSize);
-            Assert.That(g1.RootPart.UndoCount, Is.EqualTo(1));
+            Assert.Equal(,);
 
             g1.GroupResize(secondSize);
-            Assert.That(g1.RootPart.UndoCount, Is.EqualTo(2));
+            Assert.Equal(,);
 
             g1.RootPart.Undo();
-            Assert.That(g1.RootPart.UndoCount, Is.EqualTo(1));
-            Assert.That(g1.GroupScale, Is.EqualTo(firstSize));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             g1.RootPart.Redo();
-            Assert.That(g1.RootPart.UndoCount, Is.EqualTo(2));
-            Assert.That(g1.GroupScale, Is.EqualTo(secondSize));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestUndoLimit()
         {
             TestHelpers.InMethod();
@@ -98,11 +98,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             g1.RootPart.Undo();
             g1.RootPart.Undo();
 
-            Assert.That(g1.RootPart.UndoCount, Is.EqualTo(0));
-            Assert.That(g1.GroupScale, Is.EqualTo(secondSize));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestNoUndoOnObjectsNotInScene()
         {
             TestHelpers.InMethod();
@@ -119,14 +119,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             g1.GroupResize(firstSize);
             g1.GroupResize(secondSize);
 
-            Assert.That(g1.RootPart.UndoCount, Is.EqualTo(0));
+            Assert.Equal(,);
 
             g1.RootPart.Undo();
 
-            Assert.That(g1.GroupScale, Is.EqualTo(secondSize));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestUndoBeyondAvailable()
         {
             TestHelpers.InMethod();
@@ -140,21 +140,21 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             g1.RootPart.Undo();
 
-            Assert.That(g1.RootPart.UndoCount, Is.EqualTo(0));
-            Assert.That(g1.GroupScale, Is.EqualTo(originalSize));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             g1.GroupResize(newSize);
-            Assert.That(g1.RootPart.UndoCount, Is.EqualTo(1));
-            Assert.That(g1.GroupScale, Is.EqualTo(newSize));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             g1.RootPart.Undo();
             g1.RootPart.Undo();
 
-            Assert.That(g1.RootPart.UndoCount, Is.EqualTo(0));
-            Assert.That(g1.GroupScale, Is.EqualTo(originalSize));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestRedoBeyondAvailable()
         {
             TestHelpers.InMethod();
@@ -168,16 +168,16 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             g1.RootPart.Redo();
 
-            Assert.That(g1.RootPart.UndoCount, Is.EqualTo(0));
-            Assert.That(g1.GroupScale, Is.EqualTo(originalSize));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             g1.GroupResize(newSize);
             g1.RootPart.Undo();
             g1.RootPart.Redo();
             g1.RootPart.Redo();
 
-            Assert.That(g1.RootPart.UndoCount, Is.EqualTo(1));
-            Assert.That(g1.GroupScale, Is.EqualTo(newSize));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
     }
 }

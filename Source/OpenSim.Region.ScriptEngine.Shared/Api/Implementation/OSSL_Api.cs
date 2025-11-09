@@ -1758,20 +1758,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public void osParcelSetDetails(LSL_Vector pos, LSL_List rules)
         {
-            const string functionName = "osParcelSetDetails";
-            CheckThreatLevel(ThreatLevel.High, functionName);
-            OSSLDeprecated(functionName, "osSetParcelDetails");
-            SetParcelDetails(pos, rules, functionName);
+            CheckThreatLevel(ThreatLevel.High, "osParcelSetDetails");
+            OSSLDeprecated("osParcelSetDetails", "osSetParcelDetails");
+            SetParcelDetails(pos, rules);
         }
 
         public void osSetParcelDetails(LSL_Vector pos, LSL_List rules)
         {
-            const string functionName = "osSetParcelDetails";
-            CheckThreatLevel(ThreatLevel.High, functionName);
-            SetParcelDetails(pos, rules, functionName);
+            CheckThreatLevel(ThreatLevel.High, "osSetParcelDetails");
+            SetParcelDetails(pos, rules);
         }
 
-        private void SetParcelDetails(LSL_Vector pos, LSL_List rules, string functionName)
+        private void SetParcelDetails(LSL_Vector pos, LSL_List rules)
         {
             // Get a reference to the land data and make sure the owner of the script
             // can modify it
@@ -5166,6 +5164,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             m_SoundModule.PreloadSound(sop, soundID);
             ScriptSleep(1000);
         }
+		
+		public void osTriggerSoundAtPos(LSL_String sound, LSL_Vector position, LSL_Float gain)
+		{
+            if (m_SoundModule == null)
+                return;
+
+            UUID soundID = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, sound, AssetType.Sound);
+            if (soundID.IsZero()) 
+                return;
+
+            m_SoundModule.TriggerSound(soundID, m_host.OwnerID, m_host.UUID, UUID.Zero, gain, position, m_host.RegionHandle);
+        }
 
         // get only one part
         private SceneObjectPart GetSingleLinkPart(int linkType)
@@ -6299,6 +6309,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             m_envModule.StoreOnRegion(null);
             m_envModule.WindlightRefresh(transition);
             return 1;
+        }
+
+        public LSL_Float osPerlinNoise2D(LSL_Float x, LSL_Float y, LSL_Integer octaves, LSL_Float persistence)
+        {
+            return new LSL_Float(TerrainUtil.PerlinNoise2D(x, y, octaves, persistence));
         }
 
         public void osParticleSystem(LSL_List rules)

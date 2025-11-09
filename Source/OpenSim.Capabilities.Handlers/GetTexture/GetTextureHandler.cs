@@ -25,13 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.Reflection;
 using System.IO;
+
 using log4net;
+
+using SkiaSharp;
+using CoreJ2K;
 using OpenMetaverse;
 using OpenMetaverse.Imaging;
 using OpenSim.Framework;
@@ -287,34 +288,62 @@ namespace OpenSim.Capabilities.Handlers
             byte[] data = Array.Empty<byte>();
 
             MemoryStream imgstream = new MemoryStream();
-            Bitmap mTexture = null;
+            SKBitmap mTexture = null;
             ManagedImage managedImage = null;
-            Image image = null;
 
             try
             {
                 // Taking our jpeg2000 data, decoding it, then saving it to a byte array with regular data
-
-                // Decode image to System.Drawing.Image
-                if (OpenJPEG.DecodeToImage(texture.Data, out managedImage, out image) && image != null)
+                // Decode image to SKBitmap
+                SKImage skImage = null;
+                try
                 {
-                    // Save to bitmap
-                    mTexture = new Bitmap(image);
+                    // Try CoreJ2K first
+                    var j2k = J2kImage.FromBytes(texture.Data);
+                    if (j2k != null)
+                        skImage = j2k.As<SKImage>();
+                }
+                catch
+                {
+                    skImage = null;
+                }
 
-                    using(EncoderParameters myEncoderParameters = new EncoderParameters())
+                if (skImage != null)
+                {
+                    mTexture = SKBitmap.FromImage(skImage);
+                }
+                else if (OpenJPEG.DecodeToImage(texture.Data, out managedImage))
+                {
+                    // Fallback: Create SKBitmap from decoded managed image
+                    mTexture = new SKBitmap(managedImage.Width, managedImage.Height, SKColorType.Rgba8888, SKAlphaType.Opaque);
+                }
+
+                if (mTexture != null)
+                {
+                    // Determine encoding format
+                    SKEncodedImageFormat encodingFormat = SKEncodedImageFormat.Png;
+                    switch (format.ToLower())
                     {
-                        myEncoderParameters.Param[0] = new EncoderParameter(Encoder.Quality,95L);
+                        case "png":
+                            encodingFormat = SKEncodedImageFormat.Png;
+                            break;
+                        case "jpg":
+                        case "jpeg":
+                            encodingFormat = SKEncodedImageFormat.Jpeg;
+                            break;
+                        case "webp":
+                            encodingFormat = SKEncodedImageFormat.Webp;
+                            break;
+                        default:
+                            m_log.WarnFormat("[GETTEXTURE]: Unknown format {0}, using PNG", format);
+                            encodingFormat = SKEncodedImageFormat.Png;
+                            break;
+                    }
 
-                        // Save bitmap to stream
-                        ImageCodecInfo codec = GetEncoderInfo("image/" + format);
-                        if (codec != null)
-                        {
-                            mTexture.Save(imgstream, codec, myEncoderParameters);
-                        // Write the stream to a byte array for output
-                            data = imgstream.ToArray();
-                        }
-                        else
-                            m_log.WarnFormat("[GETTEXTURE]: No such codec {0}", format);
+                    // Encode bitmap to stream
+                    using (var encoded = mTexture.Encode(encodingFormat, 95))
+                    {
+                        data = encoded.ToArray();
                     }
                 }
             }
@@ -329,10 +358,7 @@ namespace OpenSim.Capabilities.Handlers
                 if (mTexture != null)
                     mTexture.Dispose();
 
-                if (image != null)
-                    image.Dispose();
-
-                if(managedImage != null)
+                if (managedImage != null)
                     managedImage.Clear();
                 if (imgstream != null)
                     imgstream.Dispose();
@@ -341,17 +367,19 @@ namespace OpenSim.Capabilities.Handlers
             return data;
         }
 
-        // From msdn
-        private static ImageCodecInfo GetEncoderInfo(String mimeType)
+        // Helper method for format validation (no longer needed but kept for compatibility)
+        private static bool ValidateFormat(string format)
         {
-            ImageCodecInfo[] encoders;
-            encoders = ImageCodecInfo.GetImageEncoders();
-            for (int j = 0; j < encoders.Length; ++j)
+            switch (format.ToLower())
             {
-                if (encoders[j].MimeType == mimeType)
-                    return encoders[j];
+                case "png":
+                case "jpg":
+                case "jpeg":
+                case "webp":
+                    return true;
+                default:
+                    return false;
             }
-            return null;
         }
     }
 }

@@ -53,7 +53,6 @@ using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 namespace OpenSim.Region.ClientStack.Linden.Caps.Tests
 {
     /*
-    [TestFixture]
     public class WebFetchInvDescModuleTests : OpenSimTestCase
     {
         [TestFixtureSetUp]
@@ -72,7 +71,6 @@ namespace OpenSim.Region.ClientStack.Linden.Caps.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -89,7 +87,7 @@ namespace OpenSim.Region.ClientStack.Linden.Caps.Tests
             server.Start(false);
         }
 
-        [Test]
+        [Fact]
         public void TestInventoryDescendentsFetch()
         {
             TestHelpers.InMethod();
@@ -154,7 +152,7 @@ namespace OpenSim.Region.ClientStack.Linden.Caps.Tests
 
             // A sanity check that the response has the expected number of descendents for a default inventory
             // TODO: Need a more thorough check.
-            Assert.That((int)folderOsd["descendents"], Is.EqualTo(16));
+            Assert.True((int)folderOsd["descendents"]));
         }
     }
      */

@@ -23,44 +23,46 @@
       <HintPath>..\..\Library\XMLRPC.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Nini">
+      <HintPath>..\..\Library\Nini.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
+  
   <ItemGroup>
-    <ProjectReference Include="..\..\Source\OpenSim.Data\OpenSim.Data.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Framework.Monitoring\OpenSim.Framework.Monitoring.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Framework.Serialization\OpenSim.Framework.Serialization.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModule.SharedBase\OpenSim.Region.PhysicsModule.SharedBase.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Framework\Servers\OpenSim.Framework.Servers.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Framework\Servers\HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Services\Interfaces\OpenSim.Services.Interfaces.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Region\Framework\OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Region\CoreModules\OpenSim.Region.CoreModules.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Region\PhysicsModules\SharedBase\OpenSim.Region.PhysicsModules.SharedBase.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Region\PhysicsModules\BasicPhysics\OpenSim.Region.PhysicsModule.BasicPhysics.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Data\Null\OpenSim.Data.Null.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Data\OpenSim.Data.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Region\ScriptEngine\Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Region\OptionalModules\OpenSim.Region.OptionalModules.csproj" />
     <ProjectReference Include="..\..\Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj" />
   </ItemGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="World\Archiver\Tests\Resources\test-sound.wav" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.7" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="coverlet.collector" Version="6.0.4">
       <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.7" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="NUnit" Version="4.3.2" />
-    <PackageReference Include="NUnit.Analyzers" Version="4.9.2">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Using Include="NUnit.Framework" />
-  </ItemGroup>
+  <!-- xUnit tests - no Using element required -->
 
 </Project>

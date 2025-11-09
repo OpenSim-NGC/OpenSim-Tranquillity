@@ -28,7 +28,7 @@
 using System;
 using System.Threading;
 using System.Xml;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.Framework.InventoryAccess;
@@ -39,11 +39,10 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.CoreModules.Framework.InventoryAccess.Tests
 {
-    [TestFixture]
     public class HGAssetMapperTests : OpenSimTestCase
     {
         /*
-        [Test]
+        [Fact]
         public void TestPostAssetRewrite()
         {
             TestHelpers.InMethod();
@@ -89,7 +88,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess.Tests
 
             // Check transformed asset.
             AssetBase ncAssetGet = scene.AssetService.Get(assetId.ToString());
-            Assert.AreEqual(foreignUrl, ncAssetGet.CreatorID);
+            Assert.Equal(foreignUrl, ncAssetGet.CreatorID);
             string xmlData = Utils.BytesToString(ncAssetGet.Data);
             XmlDocument ncAssetGetXmlDoc = new XmlDocument();
             ncAssetGetXmlDoc.LoadXml(xmlData);
@@ -98,20 +97,20 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess.Tests
 
             XmlNodeList creatorDataNodes = ncAssetGetXmlDoc.GetElementsByTagName("CreatorData");
 
-            Assert.AreEqual(soPartsCount, creatorDataNodes.Count);
+            Assert.Equal(soPartsCount, creatorDataNodes.Count);
             //Console.WriteLine("creatorDataNodes {0}", creatorDataNodes.Count);
 
             foreach (XmlNode creatorDataNode in creatorDataNodes)
             {
-                Assert.AreEqual(
+                Assert.Equal(
                     string.Format("{0};{1} {2}", homeUrl, ua.FirstName, ua.LastName), creatorDataNode.InnerText);
             }
 
             // Check that saved script nodes have attributes
             XmlNodeList savedScriptStateNodes = ncAssetGetXmlDoc.GetElementsByTagName("SavedScriptState");
 
-            Assert.AreEqual(1, savedScriptStateNodes.Count);
-            Assert.AreEqual(1, savedScriptStateNodes[0].Attributes.Count);
+            Assert.Equal(1, savedScriptStateNodes.Count);
+            Assert.Equal(1, savedScriptStateNodes[0].Attributes.Count);
             XmlNode uuidAttribute = savedScriptStateNodes[0].Attributes.GetNamedItem("UUID");
             Assert.NotNull(uuidAttribute);
             // XXX: To check the actual UUID attribute we would have to do some work to retreive the UUID of the task
@@ -139,7 +138,7 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess.Tests
             scene.RezNewScript(userId, itemTemplate, script);
 
 //            Console.WriteLine("HERE");
-            Assert.IsTrue(chatEvent.WaitOne(60000), "Chat event in HGAssetMapperTests.RezScript not received");
+            Assert.True(chatEvent.WaitOne(60000), "Chat event in HGAssetMapperTests.RezScript not received");
         }
         */
     }

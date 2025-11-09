@@ -31,7 +31,7 @@ using System.Text;
 using System.Reflection;
 
 using OpenMetaverse;
-using NUnit.Framework;
+using Xunit;
 
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
@@ -39,10 +39,9 @@ using OpenSim.Services.Connectors;
 
 namespace Robust.Tests
 {
-    [TestFixture]
     public class UserAccountsClient
     {
-        [Test]
+        [Fact]
         public void UserAccounts_001()
         {
             UserAccountServicesConnector m_Connector = new UserAccountServicesConnector(DemonServer.Address);
@@ -52,33 +51,33 @@ namespace Robust.Tests
             string email = "foo@bar.com";
 
             UserAccount account = m_Connector.CreateUser(first, last, "123", email, UUID.Zero);
-            Assert.IsNotNull(account, "Failed to create account " + first + " " + last);
+            Assert.NotNull(account, "Failed to create account " + first + " " + last);
             UUID user1 = account.PrincipalID;
 
             account = m_Connector.GetUserAccount(UUID.Zero, user1);
             Assert.NotNull(account, "Failed to retrieve account for user id " + user1);
-            Assert.AreEqual(account.FirstName, first, "First name does not match");
-            Assert.AreEqual(account.LastName, last, "Last name does not match");
+            Assert.Equal(account.FirstName, first, "First name does not match");
+            Assert.Equal(account.LastName, last, "Last name does not match");
 
             account = m_Connector.GetUserAccount(UUID.Zero, first, last);
-            Assert.IsNotNull(account, "Failed to retrieve account for user " + first + " " + last);
-            Assert.AreEqual(account.FirstName, first, "First name does not match (bis)");
-            Assert.AreEqual(account.LastName, last, "Last name does not match (bis)");
+            Assert.NotNull(account, "Failed to retrieve account for user " + first + " " + last);
+            Assert.Equal(account.FirstName, first, "First name does not match (bis)");
+            Assert.Equal(account.LastName, last, "Last name does not match (bis)");
 
             account.Email = "user@example.com";
             bool success = m_Connector.StoreUserAccount(account);
-            Assert.IsTrue(success, "Failed to store existing account");
+            Assert.True(success, "Failed to store existing account");
 
             account = m_Connector.GetUserAccount(UUID.Zero, user1);
             Assert.NotNull(account, "Failed to retrieve account for user id " + user1);
-            Assert.AreEqual(account.Email, "user@example.com", "Incorrect email");
+            Assert.Equal(account.Email, "user@example.com", "Incorrect email");
 
             account = new UserAccount(UUID.Zero, "DoesNot", "Exist", "xxx@xxx.com");
             success = m_Connector.StoreUserAccount(account);
-            Assert.IsFalse(success, "Storing a non-existing account must fail");
+            Assert.False(success, "Storing a non-existing account must fail");
 
             account = m_Connector.GetUserAccount(UUID.Zero, "DoesNot", "Exist");
-            Assert.IsNull(account, "Account DoesNot Exist must not be there");
+            Assert.Null(account, "Account DoesNot Exist must not be there");
 
         }
 

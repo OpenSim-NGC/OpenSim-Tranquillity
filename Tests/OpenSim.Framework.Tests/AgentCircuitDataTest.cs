@@ -31,7 +31,6 @@ using OpenMetaverse.StructuredData;
 
 namespace OpenSim.Framework.Tests
 {
-    [TestFixture]
     public class AgentCircuitDataTest : IDisposable
     {
         private UUID AgentId;
@@ -51,7 +50,6 @@ namespace OpenSim.Framework.Tests
         {
         }
 
-        [SetUp]
         public void Setup()
         {
             AgentId = UUID.Random();
@@ -230,7 +228,7 @@ namespace OpenSim.Framework.Tests
         /// The idea is that if the current json serializer cannot parse the old serialization, then the underlying types
         /// have changed and are incompatible.
         /// </summary>
-        [Test]
+        [Fact]
         public void HistoricalAgentCircuitDataOSDConversion()
         {
             string oldSerialization = "{\"agent_id\":\"522675bd-8214-40c1-b3ca-9c7f7fd170be\",\"base_folder\":\"c40b5f5f-476f-496b-bd69-b5a539c434d8\",\"caps_path\":\"http://www.opensimulator.org/Caps/Foo\",\"children_seeds\":[{\"handle\":\"18446744073709551615\",\"seed\":\"http://www.opensimulator.org/Caps/Foo2\"}],\"child\":false,\"circuit_code\":\"949030\",\"first_name\":\"CoolAvatarTest\",\"last_name\":\"test\",\"inventory_folder\":\"c40b5f5f-476f-496b-bd69-b5a539c434d8\",\"secure_session_id\":\"1e608e2b-0ddb-41f6-be0f-926f61cd3e0a\",\"session_id\":\"aa06f798-9d70-4bdb-9bbf-012a02ee2baf\",\"start_pos\":\"<5, 23, 125>\"}";
@@ -288,7 +286,7 @@ namespace OpenSim.Framework.Tests
        /// <summary>
        /// Test to ensure that the packing and unpacking methods work.
        /// </summary>
-       [Test]
+       [Fact]
        public void TestAgentCircuitDataOSDConversion()
        {
            AgentCircuitData Agent1Data = new AgentCircuitData();

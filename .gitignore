@@ -5,13 +5,8 @@ scaffold.sh
 # Runtime Settings
 launchSettings.json
 
-# Dotnet Core
-*.swp
-*.*~
-project.lock.json
-.DS_Store
-*.pyc
-nupkg/
+build/
+publish/
 
 # Visual Studio Code
 .vscode/

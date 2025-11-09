@@ -47,6 +47,14 @@ namespace OpenSim.Tests.Common
             }
         }
 
+        /// <summary>
+        /// For subclasses that override SetUp() - provides per-test setup functionality.
+        /// </summary>
+        public virtual void SetUp()
+        {
+            // Override in subclasses for per-test setup
+        }
+
         public virtual void Dispose()
         {
             // Do "global" teardown here; Called after every test method.

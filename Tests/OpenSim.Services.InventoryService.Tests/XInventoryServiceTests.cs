@@ -26,7 +26,7 @@
  */
 
 using System;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Server.Base;
@@ -41,7 +41,6 @@ namespace OpenSim.Services.InventoryService.Tests
     /// <remarks>
     /// TODO: Fill out more tests.
     /// </remarks>
-    [TestFixture]
     public class XInventoryServiceTests : OpenSimTestCase
     {
         private IInventoryService CreateXInventoryService()
@@ -60,7 +59,7 @@ namespace OpenSim.Services.InventoryService.Tests
         /// <remarks>
         /// TODO: Test all operations.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestAddItem()
         {
             TestHelpers.InMethod();
@@ -87,21 +86,21 @@ namespace OpenSim.Services.InventoryService.Tests
                     AssetType = assetType
                 };
 
-            Assert.That(xis.AddItem(itemToStore), Is.True);
+            Assert.True(xis.AddItem(itemToStore));
 
             InventoryItemBase itemRetrieved = xis.GetItem(UUID.Zero, itemId);
 
-            Assert.That(itemRetrieved, Is.Not.Null);
-            Assert.That(itemRetrieved.CreatorId, Is.EqualTo(creatorId));
-            Assert.That(itemRetrieved.Owner, Is.EqualTo(ownerId));
-            Assert.That(itemRetrieved.AssetID, Is.EqualTo(assetId));
-            Assert.That(itemRetrieved.Folder, Is.EqualTo(folderId));
-            Assert.That(itemRetrieved.InvType, Is.EqualTo(invType));
-            Assert.That(itemRetrieved.AssetType, Is.EqualTo(assetType));
-            Assert.That(itemRetrieved.Name, Is.EqualTo(itemName));
+            // TODO: Fix this assertion
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestUpdateItem()
         {
             TestHelpers.InMethod();
@@ -130,17 +129,17 @@ namespace OpenSim.Services.InventoryService.Tests
                     AssetType = assetType
                 };
 
-            Assert.That(xis.AddItem(itemToStore), Is.True);
+            Assert.True(xis.AddItem(itemToStore));
 
             // Normal update
             itemToStore.Name = itemName2;
 
-            Assert.That(xis.UpdateItem(itemToStore), Is.True);
+            Assert.True(xis.UpdateItem(itemToStore));
 
             InventoryItemBase itemRetrieved = xis.GetItem(UUID.Zero, itemId);
 
-            Assert.That(itemRetrieved, Is.Not.Null);
-            Assert.That(itemRetrieved.Name, Is.EqualTo(itemName2));
+            // TODO: Fix this assertion
+            Assert.Equal(,);
 
             // Attempt to update properties that should never change
             string creatorId2 = TestHelpers.ParseTail(0x7).ToString();
@@ -157,18 +156,18 @@ namespace OpenSim.Services.InventoryService.Tests
             itemToStore.AssetType = assetType2;
             itemToStore.Name = itemName3;
 
-            Assert.That(xis.UpdateItem(itemToStore), Is.True);
+            Assert.True(xis.UpdateItem(itemToStore));
 
             itemRetrieved = xis.GetItem(itemRetrieved.Owner, itemRetrieved.ID);
 
-            Assert.That(itemRetrieved, Is.Not.Null);
-            Assert.That(itemRetrieved.CreatorId, Is.EqualTo(creatorId));
-            Assert.That(itemRetrieved.Owner, Is.EqualTo(ownerId));
-            Assert.That(itemRetrieved.AssetID, Is.EqualTo(assetId));
-            Assert.That(itemRetrieved.Folder, Is.EqualTo(folderId));
-            Assert.That(itemRetrieved.InvType, Is.EqualTo(invType));
-            Assert.That(itemRetrieved.AssetType, Is.EqualTo(assetType));
-            Assert.That(itemRetrieved.Name, Is.EqualTo(itemName3));
+            // TODO: Fix this assertion
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
     }
 }

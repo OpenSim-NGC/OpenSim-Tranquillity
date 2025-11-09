@@ -30,8 +30,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -56,6 +54,7 @@ using OpenMetaverse.StructuredData;
 using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
+using SkiaSharp;
 
 namespace OpenSim.Framework
 {
@@ -4596,51 +4595,18 @@ namespace OpenSim.Framework
             m_log.Error($"{message} Failed XML ({length} bytes) = {xml}");
         }
 
-        // public static SKBitmap ResizeImageSolid(SKBitmap image, int width, int height)
-        // {
-        //     SKBitmap result = new SKBitmap(width, height);
-        //
-        //     using (SKCanvas canvas = new SKCanvas(result))
-        //     {
-        //         canvas.Clear(SKColors.Transparent);
-        //
-        //         SKPaint paint = new SKPaint
-        //         {
-        //             FilterQuality = SKFilterQuality.High,
-        //             IsAntialias = true
-        //         };
-        //
-        //         SKRect destRect = new SKRect(0, 0, width, height);
-        //         SKRect srcRect = new SKRect(0, 0, image.Width, image.Height);
-        //
-        //         canvas.DrawBitmap(image, srcRect, destRect, paint);
-        //     }
-        //     
-        //     return result;
-        // }
-
-        /// <summary>
-        /// Performs a high quality image resize
-        /// </summary>
-        /// <param name="image">Image to resize</param>
-        /// <param name="width">New width</param>
-        /// <param name="height">New height</param>
-        /// <returns>Resized image</returns>
-        public static Bitmap ResizeImageSolid(Image image, int width, int height)
+        public static SKBitmap ResizeImageSolid(SKBitmap image, int width, int height)
         {
-            Bitmap result = new(width, height, PixelFormat.Format24bppRgb);
+            SKBitmap result = new(width, height, SKColorType.Rgb888x, SKAlphaType.Opaque);
 
-            using (ImageAttributes atrib = new())
-            using (Graphics graphics = Graphics.FromImage(result))
+            using (SKCanvas canvas = new(result))
+            using (SKPaint paint = new())
             {
-                atrib.SetWrapMode(System.Drawing.Drawing2D.WrapMode.TileFlipXY);
-                graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
-                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-                graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                paint.IsAntialias = true;
+                paint.FilterQuality = SKFilterQuality.High;
 
-                graphics.DrawImage(image, new Rectangle(0, 0, result.Width, result.Height),
-                    0, 0, image.Width, image.Height, GraphicsUnit.Pixel, atrib);
+                canvas.Clear(SKColors.Transparent);
+                canvas.DrawBitmap(image, new SKRect(0, 0, width, height), paint);
             }
 
             return result;

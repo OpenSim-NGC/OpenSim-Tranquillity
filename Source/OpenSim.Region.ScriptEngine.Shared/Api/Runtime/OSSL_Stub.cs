@@ -1335,6 +1335,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void osTriggerSoundAtPos(LSL_String sound, vector position, LSL_Float gain)
+        {
+            m_OSSL_Functions.osTriggerSoundAtPos(sound, position, gain);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void osStopSound(LSL_Integer linknum)
         {
             m_OSSL_Functions.osStopSound(linknum);

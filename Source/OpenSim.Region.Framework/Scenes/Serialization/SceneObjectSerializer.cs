@@ -28,7 +28,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Frozen;
-using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Xml;
@@ -724,11 +723,11 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
             reader.ReadStartElement("Color");
             if (reader.Name == "R")
             {
-                float r = reader.ReadElementContentAsFloat("R", string.Empty);
-                float g = reader.ReadElementContentAsFloat("G", string.Empty);
-                float b = reader.ReadElementContentAsFloat("B", string.Empty);
-                float a = reader.ReadElementContentAsFloat("A", string.Empty);
-                obj.Color = Color.FromArgb((int)a, (int)r, (int)g, (int)b);
+                int r = (int)reader.ReadElementContentAsFloat("R", string.Empty);
+                int g = (int)reader.ReadElementContentAsFloat("G", string.Empty);
+                int b = (int)reader.ReadElementContentAsFloat("B", string.Empty);
+                int a = (int)reader.ReadElementContentAsFloat("A", string.Empty);
+                obj.Color = (uint)((a << 24) | (r << 16) | (g << 8) | b);
                 reader.ReadEndElement();
             }
         }
@@ -1594,10 +1593,14 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
             writer.WriteElementString("Description", sop.Description);
 
             writer.WriteStartElement("Color");
-            writer.WriteElementString("R", sop.Color.R.ToString(Culture.FormatProvider));
-            writer.WriteElementString("G", sop.Color.G.ToString(Culture.FormatProvider));
-            writer.WriteElementString("B", sop.Color.B.ToString(Culture.FormatProvider));
-            writer.WriteElementString("A", sop.Color.A.ToString(Culture.FormatProvider));
+            byte r = (byte)((sop.Color >> 16) & 0xFF);
+            byte g = (byte)((sop.Color >> 8) & 0xFF);
+            byte b = (byte)(sop.Color & 0xFF);
+            byte a = (byte)((sop.Color >> 24) & 0xFF);
+            writer.WriteElementString("R", r.ToString(Culture.FormatProvider));
+            writer.WriteElementString("G", g.ToString(Culture.FormatProvider));
+            writer.WriteElementString("B", b.ToString(Culture.FormatProvider));
+            writer.WriteElementString("A", a.ToString(Culture.FormatProvider));
             writer.WriteEndElement();
 
             writer.WriteElementString("Text", sop.Text);

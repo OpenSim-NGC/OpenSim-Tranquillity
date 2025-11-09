@@ -547,6 +547,13 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             XmlElement experienceKey = (XmlElement)scriptStateN.SelectSingleNode("ExperienceKey");
             if (experienceKey is not null)
                 m_Item.ExperienceID = UUID.Parse(experienceKey.InnerText);
+                
+            XmlElement localHeapN = (XmlElement)scriptStateN.SelectSingleNode("LHeapUse");
+            if (localHeapN != null)
+                m_localsHeapUsed = int.Parse(localHeapN.InnerText);
+            //XmlElement stkN = (XmlElement)scriptStateN.SelectSingleNode("stkLft");
+            //if (stkN != null)
+            //    m_StackLeft = int.Parse(stkN.InnerText);
 
             XmlElement permissionsN = (XmlElement)scriptStateN.SelectSingleNode("Permissions");
             m_Item.PermsGranter = new UUID(permissionsN.GetAttribute("granter"));

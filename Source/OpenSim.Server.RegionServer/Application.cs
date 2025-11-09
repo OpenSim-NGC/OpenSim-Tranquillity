@@ -76,41 +76,6 @@ namespace OpenSim
             Culture.SetCurrentCulture();
             Culture.SetDefaultCurrentCulture();
 
-            AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
-
-            var targetdll = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
-                        "System.Drawing.Common.dll");
-            string src = targetdll + (Util.IsWindows() ? ".win" : ".linux");
-            try
-            {
-                if (!File.Exists(targetdll))
-                    File.Copy(src, targetdll);
-                else
-                {
-                    FileInfo targetInfo = new(targetdll);
-                    FileInfo srcInfo = new(src);
-                    if(targetInfo.Length != srcInfo.Length)
-                        File.Copy(src, targetdll, true);
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.Error("Failed to copy System.Drawing.Common.dll for current platform" + e.Message);
-                throw;
-            }
-
-            // pre load System.Drawing.Common.dll for the platform
-            // this will fail if a newer version is present on GAC, bin folder, etc, since LoadFrom only accepts the path, if it cannot find it elsewhere
-            try
-            {
-                Assembly asmb = Assembly.LoadFrom(targetdll);
-            }
-            catch (Exception e)
-            {
-                m_log.Error("Failed to load System.Drawing.Common.dll for current platform" + e.Message);
-                throw;
-            }
-
             ServicePointManager.DefaultConnectionLimit = 32;
             ServicePointManager.MaxServicePointIdleTime = 30000;
 

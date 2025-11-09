@@ -8,24 +8,19 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Nini">
-      <HintPath>..\..\Library\Nini.dll</HintPath>
-    </Reference>
-    <Reference Include="OpenMetaverse">
-      <HintPath>..\..\Library\OpenMetaverse.dll</HintPath>
-    </Reference>
-    <Reference Include="OpenMetaverse.StructuredData">
-      <HintPath>..\..\Library\OpenMetaverse.StructuredData.dll</HintPath>
-    </Reference>
-    <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\Library\OpenMetaverseTypes.dll</HintPath>
-    </Reference>
+    <Reference Include="Nini" HintPath="..\..\..\Library\Nini.dll" />
+    <Reference Include="OpenMetaverse" HintPath="..\..\..\Library\OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\..\Library\OpenMetaverse.StructuredData.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\Library\OpenMetaverseTypes.dll" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="log4net" Version="3.2.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.7" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.9" />
   </ItemGroup>
 </Project>

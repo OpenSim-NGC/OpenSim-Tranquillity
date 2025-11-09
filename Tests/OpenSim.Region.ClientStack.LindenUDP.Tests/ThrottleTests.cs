@@ -28,7 +28,6 @@
 namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 {
     /*
-    [TestFixture]
     public class ThrottleTests : OpenSimTestCase
     {
         [TestFixtureSetUp]
@@ -47,7 +46,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [Test]
+        [Fact]
         public void TestSetRequestDripRate()
         {
 
@@ -64,7 +63,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 
         }
 
-        [Test]
+        [Fact]
         public void TestSetRequestDripRateWithMax()
         {
             TestHelpers.InMethod();
@@ -82,7 +81,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             AssertRates(tb, 10000, 0, 10000, 10000);
         }
 
-        [Test]
+        [Fact]
         public void TestSetRequestDripRateWithChildren()
         {
             TestHelpers.InMethod();
@@ -114,13 +113,13 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
         private void AssertRates(
             TokenBucket tb, double requestedDripRate, double totalDripRequest, double dripRate, double maxDripRate)
         {
-            Assert.AreEqual((int)requestedDripRate, tb.RequestedDripRate, "Requested drip rate");
-            Assert.AreEqual((int)totalDripRequest, tb.TotalDripRequest, "Total drip request");
-            Assert.AreEqual((int)dripRate, tb.DripRate, "Drip rate");
-            Assert.AreEqual((int)maxDripRate, tb.MaxDripRate, "Max drip rate");
+            Assert.Equal((int)requestedDripRate, tb.RequestedDripRate, "Requested drip rate");
+            Assert.Equal((int)totalDripRequest, tb.TotalDripRequest, "Total drip request");
+            Assert.Equal((int)dripRate, tb.DripRate, "Drip rate");
+            Assert.Equal((int)maxDripRate, tb.MaxDripRate, "Max drip rate");
         }
 
-        [Test]
+        [Fact]
         public void TestClientThrottleSetNoLimit()
         {
             TestHelpers.InMethod();
@@ -158,7 +157,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
                 textureBytes, assetBytes, totalBytes, 0, 0);
         }
 
-        [Test]
+        [Fact]
         public void TestClientThrottleAdaptiveNoLimit()
         {
             TestHelpers.InMethod();
@@ -227,7 +226,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
         /// <summary>
         /// Test throttle setttings where max client throttle has been limited server side.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSingleClientThrottleRegionLimited()
         {
             TestHelpers.InMethod();
@@ -286,7 +285,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
         /// <summary>
         /// Test throttle setttings where max client throttle has been limited server side.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestClientThrottlePerClientLimited()
         {
             TestHelpers.InMethod();
@@ -322,7 +321,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
                 textureBytes / 2, assetBytes / 2, totalBytes, 0, totalBytes);
         }
 
-        [Test]
+        [Fact]
         public void TestClientThrottlePerClientAndRegionLimited()
         {
             TestHelpers.InMethod();
@@ -392,16 +391,16 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 //                                "Resend={0}, Land={1}, Wind={2}, Cloud={3}, Task={4}, Texture={5}, Asset={6}, TOTAL = {7}",
 //                                ci.resendThrottle, ci.landThrottle, ci.windThrottle, ci.cloudThrottle, ci.taskThrottle, ci.textureThrottle, ci.assetThrottle, ci.totalThrottle);
 
-            Assert.AreEqual((int)resendBytes, ci.resendThrottle, "Resend");
-            Assert.AreEqual((int)landBytes, ci.landThrottle, "Land");
-            Assert.AreEqual((int)windBytes, ci.windThrottle, "Wind");
-            Assert.AreEqual((int)cloudBytes, ci.cloudThrottle, "Cloud");
-            Assert.AreEqual((int)taskBytes, ci.taskThrottle, "Task");
-            Assert.AreEqual((int)textureBytes, ci.textureThrottle, "Texture");
-            Assert.AreEqual((int)assetBytes, ci.assetThrottle, "Asset");
-            Assert.AreEqual((int)totalBytes, ci.totalThrottle, "Total");
-            Assert.AreEqual((int)targetBytes, ci.targetThrottle, "Target");
-            Assert.AreEqual((int)maxBytes, ci.maxThrottle, "Max");
+            Assert.Equal((int)resendBytes, ci.resendThrottle, "Resend");
+            Assert.Equal((int)landBytes, ci.landThrottle, "Land");
+            Assert.Equal((int)windBytes, ci.windThrottle, "Wind");
+            Assert.Equal((int)cloudBytes, ci.cloudThrottle, "Cloud");
+            Assert.Equal((int)taskBytes, ci.taskThrottle, "Task");
+            Assert.Equal((int)textureBytes, ci.textureThrottle, "Texture");
+            Assert.Equal((int)assetBytes, ci.assetThrottle, "Asset");
+            Assert.Equal((int)totalBytes, ci.totalThrottle, "Total");
+            Assert.Equal((int)targetBytes, ci.targetThrottle, "Target");
+            Assert.Equal((int)maxBytes, ci.maxThrottle, "Max");
         }
 
         private void SetThrottles(

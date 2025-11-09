@@ -25,25 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Reflection;
 using System.Xml;
 using System.Xml.Serialization;
 using System.Text;
-using System.Collections.Generic;
-using log4net;
-using Nini.Config;
-using OpenSim.Framework;
-using OpenSim.Framework.AssemblyLoader;
-using OpenMetaverse;
-using Mono.Addins;
-using OpenSim.Framework.Servers.HttpServer;
-using OpenSim.Framework.Servers;
-using OpenMetaverse.StructuredData;
-using System.Runtime.Loader; // LitJson is hidden on this
 
-[assembly:AddinRoot("Robust", OpenSim.VersionInfo.AssemblyVersionNumber)]
+[assembly: AddinRoot("Robust", OpenSim.VersionInfo.AssemblyVersionNumber)]
 namespace OpenSim.Server.Base
 {
     [TypeExtensionPoint(Path="/Robust/Connector", Name="RobustConnector")]
@@ -224,10 +211,10 @@ namespace OpenSim.Server.Base
             //if (dllName.Length == 0)
             //    Util.PrintCallStack();
 
-            string className = String.Empty;
+            string className = string.Empty;
 
             // The path for a dynamic plugin will contain ":" on Windows
-            string[] parts = dllName.Split (new char[] {':'});
+            string[] parts = dllName.Split(':');
 
             if (parts.Length < 3)
             {
@@ -239,15 +226,15 @@ namespace OpenSim.Server.Base
             else
             {
                 // This is Windows - we must replace the ":" in the path
-                dllName = String.Format ("{0}:{1}", parts [0], parts [1]);
+                dllName = $"{parts[0]}:{parts[1]}";
                 if (parts.Length > 2)
                     className = parts[2];
             }
 
             // Handle extra string arguments in a more generic way
-            if (dllName.Contains("@"))
+            if (dllName.Contains('@'))
             {
-                string[] dllNameParts = dllName.Split(new char[] {'@'});
+                string[] dllNameParts = dllName.Split('@');
                 dllName = dllNameParts[dllNameParts.Length - 1];
                 List<Object> argList = new List<Object>(args);
                 for (int i = 0 ; i < dllNameParts.Length - 1 ; ++i)
@@ -340,35 +327,34 @@ namespace OpenSim.Server.Base
 
         public static Dictionary<string, object> ParseQueryString(string query)
         {
-            string[] terms = query.Split(new char[] {'&'});
+            string[] terms = query.Split('&');
 
-            int nterms = terms.Length;
-            if (nterms == 0)
-                return new Dictionary<string, object>();
+            if (terms.Length == 0)
+                return [];
 
-            Dictionary<string, object> result = new Dictionary<string, object>(nterms);
+            Dictionary<string, object> result = new(terms.Length);
             string name;
 
-            for(int i = 0; i < nterms; ++i)
+            for (int i = 0; i < terms.Length; ++i)
             {
-                string[] elems = terms[i].Split(new char[] {'='});
+                string[] elems = terms[i].Split('=');
 
                 if (elems.Length == 0)
                     continue;
 
-                if(String.IsNullOrWhiteSpace(elems[0]))
+                if (string.IsNullOrWhiteSpace(elems[0]))
                     continue;
 
                 name = System.Web.HttpUtility.UrlDecode(elems[0]);
 
                 if (name.EndsWith("[]"))
                 {
-                    name = name.Substring(0, name.Length - 2);
-                    if(String.IsNullOrWhiteSpace(name))
+                    name = name[..^2];
+                    if (name.Length == 0)
                         continue;
-                    if (result.ContainsKey(name))
+                    if (result.TryGetValue(name, out object resultname))
                     {
-                        if (result[name] is not List<string> l)
+                        if (resultname is not List<string> l)
                             continue;
 
                         if (elems.Length > 1 && !string.IsNullOrWhiteSpace(elems[1]))
@@ -378,11 +364,11 @@ namespace OpenSim.Server.Base
                     }
                     else
                     {
-                        List<string> newList = new List<string>();
-                        if (elems.Length > 1 && !String.IsNullOrWhiteSpace(elems[1]))
-                            newList.Add(System.Web.HttpUtility.UrlDecode(elems[1]));
-                        else
-                            newList.Add(String.Empty);
+                        List<string> newList =
+                        [
+                            elems.Length > 1 && !string.IsNullOrWhiteSpace(elems[1]) ?
+                                   System.Web.HttpUtility.UrlDecode(elems[1]) : string.Empty,
+                        ];
                         result[name] = newList;
                     }
                 }
@@ -390,10 +376,10 @@ namespace OpenSim.Server.Base
                 {
                     if (!result.ContainsKey(name))
                     {
-                        if (elems.Length > 1 && !String.IsNullOrWhiteSpace(elems[1]))
+                        if (elems.Length > 1 && !string.IsNullOrWhiteSpace(elems[1]))
                             result[name] = System.Web.HttpUtility.UrlDecode(elems[1]);
                         else
-                            result[name] = String.Empty;
+                            result[name] = string.Empty;
                     }
                 }
             }
@@ -447,6 +433,7 @@ namespace OpenSim.Server.Base
                 {
                     if (sb.Length != 0)
                         sb.Append('&');
+
                     sb.Append(System.Web.HttpUtility.UrlEncode(kvp.Key));
  
                     pvalue = kvp.Value.ToString();
