@@ -6,6 +6,10 @@ namespace OpenSim.Data.Model.Region;
 
 public partial class OpenSimRegionContext : DbContext
 {
+    public OpenSimRegionContext()
+    {
+    }
+
     public OpenSimRegionContext(DbContextOptions<OpenSimRegionContext> options)
         : base(options)
     {
@@ -306,6 +310,16 @@ public partial class OpenSimRegionContext : DbContext
             entity.Property(e => e.VelocityX).HasDefaultValueSql("'0'");
             entity.Property(e => e.VelocityY).HasDefaultValueSql("'0'");
             entity.Property(e => e.VelocityZ).HasDefaultValueSql("'0'");
+
+            entity.Property(e => e.AllowUnsit)
+                .HasColumnName("allowunsit");
+
+            entity.Property(e => e.ScriptedSitOnly)
+                .HasColumnName("scriptedsitonly");
+
+            entity.Property(e => e.StartStr)
+                .HasColumnName("startstr")
+                .HasColumnType("text");
         });
 
         modelBuilder.Entity<Primitem>(entity =>
