@@ -18,13 +18,14 @@
 	</PackageReference>
 	<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.10" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.10" />
-	<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.10" />
+	  <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.10" />
-	<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.10" />
+	  <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.10" />
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
-	<PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="9.0.0" />
-	<PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
+	  <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="9.0.0" />
+	  <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
   </ItemGroup>
 
 </Project>
