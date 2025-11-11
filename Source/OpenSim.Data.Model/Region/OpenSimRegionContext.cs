@@ -221,7 +221,7 @@ public partial class OpenSimRegionContext : DbContext
                 .HasMaxLength(36)
                 .IsFixedLength()
                 .HasColumnName("LastOwnerID");
-            entity.Property(e => e.Linksetdata)
+            entity.Property(e => e.LinksetData)
                 .HasColumnType("mediumtext")
                 .HasColumnName("linksetdata");
             entity.Property(e => e.LoopedSound)
@@ -561,25 +561,25 @@ public partial class OpenSimRegionContext : DbContext
                 .HasColumnName("terrain_texture_4");
             entity.Property(e => e.UseEstateSun).HasColumnName("use_estate_sun");
             entity.Property(e => e.WaterHeight).HasColumnName("water_height");            
-            entity.Property(e => e.TerrainPBR1)
+            entity.Property(e => e.TerrainPbr1)
                 .HasColumnName("TerrainPBR1")
                 .IsRequired()
                 .HasMaxLength(36)
                 .IsFixedLength()
                 .HasDefaultValueSql("'00000000-0000-0000-0000-000000000000'");
-            entity.Property(e => e.TerrainPBR2)
+            entity.Property(e => e.TerrainPbr2)
                 .HasColumnName("TerrainPBR2")
                 .IsRequired()
                 .HasMaxLength(36)
                 .IsFixedLength()
                 .HasDefaultValueSql("'00000000-0000-0000-0000-000000000000'");
-            entity.Property(e => e.TerrainPBR3)
+            entity.Property(e => e.TerrainPbr3)
                 .HasColumnName("TerrainPBR3")
                 .IsRequired()
                 .HasMaxLength(36)
                 .IsFixedLength()
                 .HasDefaultValueSql("'00000000-0000-0000-0000-000000000000'");
-            entity.Property(e => e.TerrainPBR4)
+            entity.Property(e => e.TerrainPbr4)
                 .HasColumnName("TerrainPBR4")
                 .IsRequired()
                 .HasMaxLength(36)
