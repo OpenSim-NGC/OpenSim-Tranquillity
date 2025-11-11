@@ -1,4 +1,4 @@
-namespace OpenSIm.Data.Model.Core;
+namespace OpenSim.Data.Model.Core;
 
 public partial class Experience
 {

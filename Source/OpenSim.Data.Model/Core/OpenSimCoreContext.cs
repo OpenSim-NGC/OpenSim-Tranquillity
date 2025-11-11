@@ -100,14 +100,14 @@ public partial class OpenSimCoreContext : DbContext
 
         modelBuilder.Entity<Asset>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.HasKey(e => e.AssetId).HasName("PRIMARY");
 
             entity
                 .ToTable("assets")
                 .HasCharSet("utf8mb3")
                 .UseCollation("utf8mb3_general_ci");
 
-            entity.Property(e => e.Id)
+            entity.Property(e => e.AssetId)
                 .HasMaxLength(36)
                 .HasDefaultValueSql("'00000000-0000-0000-0000-000000000000'")
                 .IsFixedLength()
