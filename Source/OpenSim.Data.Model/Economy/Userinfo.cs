@@ -9,16 +9,10 @@ namespace OpenSim.Data.Model.Economy;
 public partial class Userinfo
 {
     public string User { get; set; }
-
     public string Simip { get; set; }
-
     public string Avatar { get; set; }
-
-    public string Pass { get; set; }
-
+    public string Pass { get; set; } = String.Empty;
     public sbyte Type { get; set; }
-
     public sbyte Class { get; set; }
-
-    public string Serverurl { get; set; }
+    public string Serverurl { get; set; } = String.Empty;
 }

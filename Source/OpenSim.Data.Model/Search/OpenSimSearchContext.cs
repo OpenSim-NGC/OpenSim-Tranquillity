@@ -6,6 +6,10 @@ namespace OpenSim.Data.Model.Search;
 
 public partial class OpenSimSearchContext : DbContext
 {
+    public OpenSimSearchContext()
+    {
+    }
+
     public OpenSimSearchContext(DbContextOptions<OpenSimSearchContext> options)
         : base(options)
     {

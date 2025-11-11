@@ -6,6 +6,10 @@ namespace OpenSim.Data.Model.Economy;
 
 public partial class OpenSimEconomyContext : DbContext
 {
+    public OpenSimEconomyContext()
+    {
+    }
+
     public OpenSimEconomyContext(DbContextOptions<OpenSimEconomyContext> options)
         : base(options)
     {
