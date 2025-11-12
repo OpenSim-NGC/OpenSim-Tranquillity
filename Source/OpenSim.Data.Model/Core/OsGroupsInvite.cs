@@ -5,9 +5,9 @@ namespace OpenSim.Data.Model.Core;
 
 public partial class OsGroupsInvite
 {
-    public string InviteId { get; set; }
-    public string GroupId { get; set; }
-    public string RoleId { get; set; }
-    public string PrincipalId { get; set; }
-    public DateTime Tmstamp { get; set; }
+    public string InviteId { get; set; } = String.Empty;
+    public string GroupId { get; set; } = String.Empty; 
+    public string RoleId { get; set; } = String.Empty;
+    public string PrincipalId { get; set; } = String.Empty;
+    public DateTime Tmstamp { get; set; } = DateTime.Now;
 }

@@ -551,7 +551,7 @@ public partial class OpenSimCoreContext : DbContext
 
         modelBuilder.Entity<Fsasset>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.HasKey(e => e.AssetId).HasName("PRIMARY");
 
             entity.HasIndex(e => e.AccessTime, "idx_fsassets_access_time");
             
@@ -560,7 +560,7 @@ public partial class OpenSimCoreContext : DbContext
                 .HasCharSet("utf8mb3")
                 .UseCollation("utf8mb3_general_ci");
 
-            entity.Property(e => e.Id)
+            entity.Property(e => e.AssetId)
                 .HasMaxLength(36)
                 .IsFixedLength()
                 .HasColumnName("id");

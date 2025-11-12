@@ -12,8 +12,8 @@ public partial class Asset
     public bool Temporary { get; set; }
     public byte[] Data { get; set; }
     public string AssetId { get; set; } = "00000000-0000-0000-0000-000000000000";
-    public int? CreateTime { get; set; }
+    public int? CreateTime { get; set; } = 0;
     public int? AccessTime { get; set; } = 0;
     public int AssetFlags { get; set; }
-    public string CreatorId { get; set; }
+    public string CreatorId { get; set; } = String.Empty;
 }

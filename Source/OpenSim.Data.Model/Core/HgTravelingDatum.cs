@@ -7,9 +7,9 @@ public partial class HgTravelingDatum
 {
     public string SessionId { get; set; }
     public string UserId { get; set; }
-    public string GridExternalName { get; set; }
-    public string ServiceToken { get; set; }
-    public string ClientIpaddress { get; set; }
-    public string MyIpaddress { get; set; }
-    public DateTime Tmstamp { get; set; }
+    public string GridExternalName { get; set; } = String.Empty;
+    public string ServiceToken { get; set; } = String.Empty;
+    public string ClientIpaddress { get; set; } = String.Empty;
+    public string MyIpaddress { get; set; } = String.Empty;
+    public DateTime Tmstamp { get; set; } = DateTime.Now;
 }

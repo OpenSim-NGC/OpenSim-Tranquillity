@@ -10,6 +10,6 @@ public partial class Estateban
     public string BannedIp { get; set; }
     public string BannedIpHostMask { get; set; }
     public string BannedNameMask { get; set; }
-    public string BanningUuid { get; set; }
+    public string BanningUuid { get; set; } = "00000000-0000-0000-0000-000000000000";
     public int BanTime { get; set; }
 }

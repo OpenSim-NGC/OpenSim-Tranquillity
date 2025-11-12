@@ -5,6 +5,6 @@ namespace OpenSim.Data.Model.Core;
 
 public partial class OsGroupsPrincipal
 {
-    public string PrincipalId { get; set; }
-    public string ActiveGroupId { get; set; }
+    public string PrincipalId { get; set; } = String.Empty;
+    public string ActiveGroupId { get; set; } = String.Empty;
 }

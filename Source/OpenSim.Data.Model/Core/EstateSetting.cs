@@ -29,8 +29,8 @@ public partial class EstateSetting
     public string AbuseEmail { get; set; }
     public string EstateOwner { get; set; }
     public sbyte DenyMinors { get; set; }
-    public sbyte AllowLandmark { get; set; }
-    public sbyte AllowParcelChanges { get; set; }
-    public sbyte AllowSetHome { get; set; }
+    public sbyte AllowLandmark { get; set; } = 1;
+    public sbyte AllowParcelChanges { get; set; } = 1;
+    public sbyte AllowSetHome { get; set; } = 1;
     public sbyte AllowEnviromentOverride { get; set; }
 }

@@ -14,6 +14,6 @@ public partial class UserAccount
     public int? Created { get; set; }
     public int UserLevel { get; set; }
     public int UserFlags { get; set; }
-    public string UserTitle { get; set; }
-    public int Active { get; set; }
+    public string UserTitle { get; set; } = String.Empty;
+    public int Active { get; set; } = 1;
 }

@@ -31,15 +31,15 @@ public partial class Region
     public string RegionMapTexture { get; set; }
     public int? ServerHttpPort { get; set; }
     public int? ServerRemotingPort { get; set; }
-    public string OwnerUuid { get; set; }
+    public string OwnerUuid { get; set; } = "00000000-0000-0000-0000-000000000000";
     public string OriginUuid { get; set; }
-    public uint? Access { get; set; }
-    public string ScopeId { get; set; }
+    public uint? Access { get; set; } = 1;
+    public string ScopeId { get; set; } = "00000000-0000-0000-0000-000000000000";
     public int SizeX { get; set; }
     public int SizeY { get; set; }
     public int Flags { get; set; }
     public int LastSeen { get; set; }
-    public string PrincipalId { get; set; }
+    public string PrincipalId { get; set; } = "00000000-0000-0000-0000-000000000000";
     public string Token { get; set; }
     public string ParcelMapTexture { get; set; }
 }

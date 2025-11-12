@@ -5,7 +5,7 @@ namespace OpenSim.Data.Model.Core;
 
 public partial class OsGroupsRolemembership
 {
-    public string GroupId { get; set; }
-    public string RoleId { get; set; }
-    public string PrincipalId { get; set; }
+    public string GroupId { get; set; } = String.Empty;
+    public string RoleId { get; set; } = String.Empty;
+    public string PrincipalId { get; set; } = String.Empty;
 }
