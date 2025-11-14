@@ -5,8 +5,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. 
  */
 
-using System;
-using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
