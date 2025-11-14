@@ -1,5 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿/* Copyright (c) 2025 Utopia Skye LLC
+
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. 
+ */
+
 using Microsoft.EntityFrameworkCore;
 
 namespace OpenSim.Data.Model.Core;
@@ -551,7 +556,7 @@ public partial class OpenSimCoreContext : DbContext
 
         modelBuilder.Entity<Fsasset>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.HasKey(e => e.AssetId).HasName("PRIMARY");
 
             entity.HasIndex(e => e.AccessTime, "idx_fsassets_access_time");
             
@@ -560,7 +565,7 @@ public partial class OpenSimCoreContext : DbContext
                 .HasCharSet("utf8mb3")
                 .UseCollation("utf8mb3_general_ci");
 
-            entity.Property(e => e.Id)
+            entity.Property(e => e.AssetId)
                 .HasMaxLength(36)
                 .IsFixedLength()
                 .HasColumnName("id");
