@@ -4,28 +4,24 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="OpenMetaverse">
       <HintPath>..\..\Library\OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverse.StructuredData">
       <HintPath>..\..\Library\OpenMetaverse.StructuredData.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverseTypes">
       <HintPath>..\..\Library\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="XMLRPC">
       <HintPath>..\..\Library\XMLRPC.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="Nini">
       <HintPath>..\..\Library\Nini.dll</HintPath>
-      <Private>False</Private>
     </Reference>
   </ItemGroup>
   
@@ -62,7 +58,5 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
   </ItemGroup>
-
-  <!-- xUnit tests - no Using element required -->
 
 </Project>
