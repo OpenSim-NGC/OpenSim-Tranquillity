@@ -5,6 +5,7 @@
     <Company>http://opensimulator.org</Company>
     <Product>OpenSim</Product>
     <Copyright>OpenSimulator developers</Copyright>
+    <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
   </PropertyGroup>
 
   <ItemGroup>

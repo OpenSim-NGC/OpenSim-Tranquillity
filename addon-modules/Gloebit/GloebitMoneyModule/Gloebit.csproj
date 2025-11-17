@@ -1,10 +1,15 @@
-<Project Sdk="Microsoft.NET.Sdk">
+  <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+    <AssemblyTitle>Gloebit</AssemblyTitle>
+    <Product>Gloebit</Product>
+    <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
   </PropertyGroup>
+
   <!-- <Target Name="CopyFiles">
     <Copy SourceFiles="@(FilesToCopy_0000)" DestinationFolder="../../../bin/" />
   </Target> -->
+
   <ItemGroup>
     <Reference Include="Nini" HintPath="..\..\..\Library\Nini.dll" />
     <Reference Include="log4net" HintPath="..\..\..\Library\log4net.dll" />
@@ -13,6 +18,7 @@
     <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\Library\OpenMetaverseTypes.dll" />
     <Reference Include="XMLRPC" HintPath="..\..\..\Library\XMLRPC.dll" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\..\OpenSim\Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\..\..\OpenSim\Data\MySQL\OpenSim.Data.MySQL.csproj" />
@@ -28,6 +34,7 @@
     <ProjectReference Include="..\..\..\OpenSim\Services\Interfaces\OpenSim.Services.Interfaces.csproj" />
     <ProjectReference Include="..\..\..\Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
   </ItemGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="Resources\GloebitSubscriptionsMySQL.migrations" />
     <EmbeddedResource Include="Resources\GloebitSubscriptionsPGSQL.migrations" />
@@ -39,6 +46,7 @@
     <EmbeddedResource Include="Resources\GloebitUsersPGSQL.migrations" />
     <EmbeddedResource Include="Resources\GloebitUsersSQLite.migrations" />
   </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.2.0" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
@@ -47,4 +55,5 @@
     <PackageReference Include="Npgsql" Version="9.0.4" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
   </ItemGroup>
+
 </Project>
