@@ -24,10 +24,9 @@
     <ProjectReference Include="..\..\..\OpenSim\Region\CoreModules\OpenSim.Region.CoreModules.csproj" />
     <ProjectReference Include="..\..\..\OpenSim\Region\Framework\OpenSim.Region.Framework.csproj" />
     <ProjectReference Include="..\..\..\OpenSim\Region\OptionalModules\OpenSim.Region.OptionalModules.csproj" />
-    <ProjectReference Include="..\..\..\OpenSim\Region\ScriptEngine\Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
-    <ProjectReference Include="..\..\..\OpenSim\Region\ScriptEngine\Shared\Api\Runtime\OpenSim.Region.ScriptEngine.Shared.Api.Runtime.csproj" />
     <ProjectReference Include="..\..\..\OpenSim\Server\Base\OpenSim.Server.Base.csproj" />
     <ProjectReference Include="..\..\..\OpenSim\Services\Interfaces\OpenSim.Services.Interfaces.csproj" />
+    <ProjectReference Include="..\..\..\Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\GloebitSubscriptionsMySQL.migrations" />
