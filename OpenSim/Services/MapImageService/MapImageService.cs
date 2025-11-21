@@ -81,10 +81,18 @@ namespace OpenSim.Services.MapImageService
                         using (MemoryStream ms = new MemoryStream())
                         using (SKImage image = SKImage.FromBitmap(m_WaterBitmap))
                         {
-                            SKData encoded = image.Encode(SKEncodedImageFormat.Jpeg, JPEG_QUALITY);
-                            encoded.SaveTo(ms);
-                            ms.Seek(0, SeekOrigin.Begin);
-                            m_WaterJPEGBytes = ms.ToArray();
+                            if (image != null)
+                            {
+                                using (SKData encoded = image.Encode(SKEncodedImageFormat.Jpeg, JPEG_QUALITY))
+                                {
+                                    if (encoded != null)
+                                    {
+                                        encoded.SaveTo(ms);
+                                        ms.Seek(0, SeekOrigin.Begin);
+                                        m_WaterJPEGBytes = ms.ToArray();
+                                    }
+                                }
+                            }
                         }
                     }
                 }
