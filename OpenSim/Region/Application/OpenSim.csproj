@@ -44,7 +44,14 @@
     <Content Include="$(SolutionDir)\bin\**" CopyToPublishDirectory="Always" />
     <Content Include="Resources/OpenSim.addin.xml" CopyToOutputDirectory="Always" />
   </ItemGroup>
-  
+
+  <Target Name="CopyNativeDllConfig" AfterTargets="Publish">
+    <ItemGroup>
+      <NativeConfigToCopy Include="$(SolutionDir)Library\*.dll.config" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NativeConfigToCopy)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" />
+  </Target>
+
   <Target Name="CopyNativeLibraries" AfterTargets="Publish">
     <ItemGroup>
       <NativeLibsToCopy Include="$(SolutionDir)Library\lib64\**\*.*" />
