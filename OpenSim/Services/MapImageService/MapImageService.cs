@@ -227,12 +227,12 @@ namespace OpenSim.Services.MapImageService
             }
         }
 
-
         private string GetFileName(int zoomLevel, int x, int y, UUID scopeID)
         {
             string path = Path.Combine(m_TilesStoragePath, scopeID.ToString());
             return Path.Combine(path, string.Format("map-{0}-{1}-{2}-objects.{3}", zoomLevel, x, y, "jpg"));
         }
+
         private string GetFileName(int zoomLevel, int x, int y, ReadOnlySpan<char> path)
         {
             return Path.Combine(path.ToString(), string.Format("map-{0}-{1}-{2}-objects.{3}", zoomLevel, x, y, "jpg"));

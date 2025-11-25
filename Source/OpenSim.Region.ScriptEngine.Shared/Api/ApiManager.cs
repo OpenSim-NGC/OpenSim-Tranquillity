@@ -25,45 +25,36 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
-using log4net;
 using OpenSim.Region.ScriptEngine.Interfaces;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Api
 {
     public class ApiManager
     {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
         private Dictionary<string,Type> m_Apis = new Dictionary<string,Type>();
 
         public string[] GetApis()
         {
             if (m_Apis.Count <= 0)
             {
-                Assembly a = Assembly.GetExecutingAssembly();
+                Assembly assembly = Assembly.GetExecutingAssembly();
 
-                Type[] types = a.GetExportedTypes();
-
-                foreach (Type t in types.AsSpan())
+                // Get all exported types and filter for only classes
+                IEnumerable<Type> classes = 
+                    from type in assembly.GetExportedTypes()
+                        where typeof(IScriptApi).IsAssignableFrom(type) && type.IsClass && !type.IsAbstract
+                        select type;
+                
+                foreach (Type t in classes)
                 {
-                    var name = t.ToString().AsSpan();
-                    int idx = name.LastIndexOf('.');
-                    if (idx != -1)
-                        name = name[(idx+1)..];
-
-                    if (name.EndsWith("_Api"))
+                    if (t.Name.EndsWith("_Api"))
                     {
-                        string sname = new string(name[..^4]);
+                        string sname = t.Name[..^4];
                         m_Apis[sname] = t;
                     }
                 }
             }
-
-//            m_log.DebugFormat("[API MANAGER]: Found {0} apis", m_Apis.Keys.Count);
 
             return new List<string>(m_Apis.Keys).ToArray();
         }
