@@ -32,10 +32,9 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// <summary>
     /// Scene presence animation tests
     /// </summary>
-    [TestFixture]
     public class ScenePresenceAnimationTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestFlyingAnimation()
         {
             TestHelpers.InMethod();
@@ -46,7 +45,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             sp.Flying = true;
             sp.Animator.UpdateMovementAnimations();
 
-            Assert.That(sp.Animator.CurrentMovementAnimation, Is.EqualTo("HOVER"));
+            Assert.Equal(,);
         }
     }
 }

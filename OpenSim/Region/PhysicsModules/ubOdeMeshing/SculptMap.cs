@@ -1,36 +1,9 @@
 ﻿/*
- * Copyright (c) Contributors
- * See CONTRIBUTORS.TXT for a full list of copyright holders.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the OpenSimulator Project nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE DEVELOPERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SkiaSharp-based SculptMap
  */
-
 using System;
 using System.Collections.Generic;
-
-using System.Drawing;
-using System.Drawing.Imaging;
-
+using SkiaSharp;
 using OpenMetaverse;
 
 namespace PrimMesher
@@ -47,7 +20,7 @@ namespace PrimMesher
         {
         }
 
-        public SculptMap(Bitmap bm, int lod)
+        public SculptMap(SKBitmap bm, int lod)
         {
             int bmW = bm.Width;
             int bmH = bm.Height;
@@ -55,7 +28,7 @@ namespace PrimMesher
             if (bmW == 0 || bmH == 0)
                 throw new Exception("SculptMap: bitmap has no data");
 
-            int numLodPixels = lod * lod;  // (32 * 2)^2  = 64^2 pixels for default sculpt map image
+            int numLodPixels = lod * lod;
 
             bool needsScaling = false;
             bool smallMap = false;
@@ -88,7 +61,6 @@ namespace PrimMesher
             blueBytes = new byte[numBytes];
 
             int byteNdx = 0;
-            Color c;
 
             try
             {
@@ -96,26 +68,28 @@ namespace PrimMesher
                 {
                     for (int x = 0; x < width; x++)
                     {
+                        SKColor c;
                         if (smallMap)
-                            c = bm.GetPixel(x,  y < height ? y : y - 1);
+                            c = bm.GetPixel(x, y < height ? y : y - 1);
                         else
                             c = bm.GetPixel(x * 2, y < height ? y * 2 : y * 2 - 1);
 
-                        redBytes[byteNdx] = c.R;
-                        greenBytes[byteNdx] = c.G;
-                        blueBytes[byteNdx] = c.B;
+                        redBytes[byteNdx] = c.Red;
+                        greenBytes[byteNdx] = c.Green;
+                        blueBytes[byteNdx] = c.Blue;
 
                         ++byteNdx;
                     }
 
+                    SKColor c2;
                     if (smallMap)
-                        c = bm.GetPixel(width - 1, y < height ? y : y - 1);
+                        c2 = bm.GetPixel(width - 1, y < height ? y : y - 1);
                     else
-                        c = bm.GetPixel(width * 2 - 1, y < height ? y * 2 : y * 2 - 1);
+                        c2 = bm.GetPixel(width * 2 - 1, y < height ? y * 2 : y * 2 - 1);
 
-                    redBytes[byteNdx] = c.R;
-                    greenBytes[byteNdx] = c.G;
-                    blueBytes[byteNdx] = c.B;
+                    redBytes[byteNdx] = c2.Red;
+                    greenBytes[byteNdx] = c2.Green;
+                    blueBytes[byteNdx] = c2.Blue;
 
                     ++byteNdx;
                 }
@@ -129,7 +103,7 @@ namespace PrimMesher
 
             width++;
             height++;
-            if(needsScaling)
+            if (needsScaling)
                 bm.Dispose();
         }
 
@@ -142,15 +116,13 @@ namespace PrimMesher
 
             float pixScale = 1.0f / 255;
 
-            int rowNdx, colNdx;
             int smNdx = 0;
 
-            for (rowNdx = 0; rowNdx < numRows; rowNdx++)
+            for (int rowNdx = 0; rowNdx < numRows; rowNdx++)
             {
                 List<Vector3> row = new List<Vector3>(numCols);
-                for (colNdx = 0; colNdx < numCols; colNdx++)
+                for (int colNdx = 0; colNdx < numCols; colNdx++)
                 {
-
                     if (mirror)
                         row.Add(new Vector3(-((float)redBytes[smNdx] * pixScale - 0.5f), ((float)greenBytes[smNdx] * pixScale - 0.5f), (float)blueBytes[smNdx] * pixScale - 0.5f));
                     else
@@ -163,13 +135,9 @@ namespace PrimMesher
             return rows;
         }
 
-        private Bitmap ScaleImage(Bitmap srcImage, int destWidth, int destHeight)
+        private SKBitmap ScaleImage(SKBitmap srcImage, int destWidth, int destHeight)
         {
-            Bitmap scaledImage = new Bitmap(destWidth, destHeight, PixelFormat.Format24bppRgb);
-
-            Color c;
-
-            // will let last step to be eventually diferent, as seems to be in sl
+            SKBitmap scaledImage = new SKBitmap(destWidth, destHeight, srcImage.ColorType, srcImage.AlphaType);
 
             float xscale = (float)srcImage.Width / (float)destWidth;
             float yscale = (float)srcImage.Height / (float)destHeight;
@@ -180,17 +148,16 @@ namespace PrimMesher
             int lastdy = destHeight - 1;
 
             float sy = 0.5f;
-            float sx;
 
             for (int y = 0; y < lastdy; y++)
             {
-                sx = 0.5f;
+                float sx = 0.5f;
                 for (int x = 0; x < lastdx; x++)
                 {
                     try
                     {
-                        c = srcImage.GetPixel((int)(sx), (int)(sy));
-                        scaledImage.SetPixel(x, y, Color.FromArgb(c.R, c.G, c.B));
+                        SKColor c = srcImage.GetPixel((int)(sx), (int)(sy));
+                        scaledImage.SetPixel(x, y, new SKColor(c.Red, c.Green, c.Blue));
                     }
                     catch (IndexOutOfRangeException)
                     {
@@ -199,8 +166,8 @@ namespace PrimMesher
                 }
                 try
                 {
-                    c = srcImage.GetPixel(lastsx, (int)(sy));
-                    scaledImage.SetPixel(lastdx, y, Color.FromArgb(c.R, c.G, c.B));
+                    SKColor c = srcImage.GetPixel(lastsx, (int)(sy));
+                    scaledImage.SetPixel(lastdx, y, new SKColor(c.Red, c.Green, c.Blue));
                 }
                 catch (IndexOutOfRangeException)
                 {
@@ -209,24 +176,24 @@ namespace PrimMesher
                 sy += yscale;
             }
 
-            sx = 0.5f;
+            float sx2 = 0.5f;
             for (int x = 0; x < lastdx; x++)
             {
                 try
                 {
-                    c = srcImage.GetPixel((int)(sx), lastsy);
-                    scaledImage.SetPixel(x, lastdy, Color.FromArgb(c.R, c.G, c.B));
+                    SKColor c = srcImage.GetPixel((int)(sx2), lastsy);
+                    scaledImage.SetPixel(x, lastdy, new SKColor(c.Red, c.Green, c.Blue));
                 }
                 catch (IndexOutOfRangeException)
                 {
                 }
 
-                sx += xscale;
+                sx2 += xscale;
             }
             try
             {
-                c = srcImage.GetPixel(lastsx, lastsy);
-                scaledImage.SetPixel(lastdx, lastdy, Color.FromArgb(c.R, c.G, c.B));
+                SKColor c = srcImage.GetPixel(lastsx, lastsy);
+                scaledImage.SetPixel(lastdx, lastdy, new SKColor(c.Red, c.Green, c.Blue));
             }
             catch (IndexOutOfRangeException)
             {

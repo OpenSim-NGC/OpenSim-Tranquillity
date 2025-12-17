@@ -28,7 +28,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -39,13 +39,11 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Tests
 {
-    [TestFixture]
     public class LSL_ApiUserTests : OpenSimTestCase
     {
         private Scene m_scene;
         private MockScriptEngine m_engine;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -56,7 +54,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             SceneHelpers.SetupSceneModules(m_scene, m_engine);
         }
 
-        [Test]
+        [Fact]
         public void TestLlRequestAgentDataOnline()
         {
             TestHelpers.InMethod();
@@ -82,12 +80,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 Assert.That(m_engine.PostedEvents.ContainsKey(scriptItem.ItemID));
 
                 List<EventParams> events = m_engine.PostedEvents[scriptItem.ItemID];
-                Assert.That(events.Count, Is.EqualTo(1));
+                Assert.Equal(,);
                 EventParams eventParams = events[0];
-                Assert.That(eventParams.EventName, Is.EqualTo("dataserver"));
+                Assert.Equal(,);
 
                 string data = eventParams.Params[1].ToString();
-                Assert.AreEqual(0, int.Parse(data));
+                Assert.Equal(0, int.Parse(data));
 
                 m_engine.PostedEvents.Clear();
             }
@@ -101,12 +99,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 Assert.That(m_engine.PostedEvents.ContainsKey(scriptItem.ItemID));
 
                 List<EventParams> events = m_engine.PostedEvents[scriptItem.ItemID];
-                Assert.That(events.Count, Is.EqualTo(1));
+                Assert.Equal(,);
                 EventParams eventParams = events[0];
-                Assert.That(eventParams.EventName, Is.EqualTo("dataserver"));
+                Assert.Equal(,);
 
                 string data = eventParams.Params[1].ToString();
-                Assert.AreEqual(0, int.Parse(data));
+                Assert.Equal(0, int.Parse(data));
 
                 m_engine.PostedEvents.Clear();
             }
@@ -122,12 +120,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 Assert.That(m_engine.PostedEvents.ContainsKey(scriptItem.ItemID));
 
                 List<EventParams> events = m_engine.PostedEvents[scriptItem.ItemID];
-                Assert.That(events.Count, Is.EqualTo(1));
+                Assert.Equal(,);
                 EventParams eventParams = events[0];
-                Assert.That(eventParams.EventName, Is.EqualTo("dataserver"));
+                Assert.Equal(,);
 
                 string data = eventParams.Params[1].ToString();
-                Assert.AreEqual(1, int.Parse(data));
+                Assert.Equal(1, int.Parse(data));
 
                 m_engine.PostedEvents.Clear();
             }
@@ -142,12 +140,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 Assert.That(m_engine.PostedEvents.ContainsKey(scriptItem.ItemID));
 
                 List<EventParams> events = m_engine.PostedEvents[scriptItem.ItemID];
-                Assert.That(events.Count, Is.EqualTo(1));
+                Assert.Equal(,);
                 EventParams eventParams = events[0];
-                Assert.That(eventParams.EventName, Is.EqualTo("dataserver"));
+                Assert.Equal(,);
 
                 string data = eventParams.Params[1].ToString();
-                Assert.AreEqual(0, int.Parse(data));
+                Assert.Equal(0, int.Parse(data));
 
                 m_engine.PostedEvents.Clear();
             }

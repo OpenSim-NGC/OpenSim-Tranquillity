@@ -34,7 +34,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 {
-    [TestFixture]
     public class LLImageManagerTests : OpenSimTestCase
     {
         private AssetBase m_testImageAsset;
@@ -75,7 +74,6 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -92,7 +90,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             llim = new LLImageManager(tc, scene.AssetService, j2kdm);
         }
 
-        [Test]
+        [Fact]
         public void TestSendImage()
         {
             TestHelpers.InMethod();
@@ -110,10 +108,10 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             llim.EnqueueReq(args);
             llim.ProcessImageQueue(20);
 
-            Assert.That(tc.SentImageDataPackets.Count, Is.EqualTo(1));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestDiscardImage()
         {
             TestHelpers.InMethod();
@@ -140,10 +138,10 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 
             llim.ProcessImageQueue(20);
 
-            Assert.That(tc.SentImageDataPackets.Count, Is.EqualTo(0));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestMissingImage()
         {
             TestHelpers.InMethod();
@@ -159,8 +157,8 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             llim.EnqueueReq(args);
             llim.ProcessImageQueue(20);
 
-            Assert.That(tc.SentImageDataPackets.Count, Is.EqualTo(0));
-            Assert.That(tc.SentImageNotInDatabasePackets.Count, Is.EqualTo(1));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
     }
 }

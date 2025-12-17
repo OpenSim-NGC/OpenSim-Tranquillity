@@ -29,7 +29,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-using System.Drawing;
+using SkiaSharp;
 
 using OpenMetaverse;
 
@@ -43,11 +43,12 @@ namespace PrimMesher
         public enum SculptType { sphere = 1, torus = 2, plane = 3, cylinder = 4 };
 
 
-        public SculptMesh(Bitmap sculptBitmap, SculptType sculptType, int lod, bool mirror, bool invert)
+        public SculptMesh(SKBitmap sculptBitmap, SculptType sculptType, int lod, bool mirror, bool invert)
         {
             if (mirror)
                 invert = !invert;
 
+            // Use the shared SculptMap implementation (Meshing/SculptMap.cs)
             SculptMap smap = new SculptMap(sculptBitmap, lod);
 
             List<List<Vector3>> rows = smap.ToRows(mirror);

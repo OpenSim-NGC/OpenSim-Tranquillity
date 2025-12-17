@@ -9,30 +9,13 @@
     <Copyright>OpenSimulator developers</Copyright>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="NDesk.Options">
-      <HintPath>..\..\..\bin\NDesk.Options.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Nini">
-      <HintPath>..\..\..\bin\Nini.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverse">
-      <HintPath>..\..\..\bin\OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverse.StructuredData">
-      <HintPath>..\..\..\bin\OpenMetaverse.StructuredData.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\..\bin\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="XMLRPC">
-      <HintPath>..\..\..\bin\XMLRPC.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <Reference Include="NDesk.Options" HintPath="..\..\..\Library\NDesk.Options.dll" />
+    <Reference Include="log4net" HintPath="..\..\..\Library\log4net.dll" />
+    <Reference Include="Nini" HintPath="..\..\..\Library\Nini.dll" />
+    <Reference Include="OpenMetaverse" HintPath="..\..\..\Library\OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\..\Library\OpenMetaverse.StructuredData.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\Library\OpenMetaverseTypes.dll" />
+    <Reference Include="XMLRPC" HintPath="..\..\..\Library\XMLRPC.dll" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Data\OpenSim.Data.csproj" />
@@ -50,19 +33,29 @@
     <ProjectReference Include="..\..\Services\UserAccountService\OpenSim.Services.UserAccountService.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="$(SolutionDir)\bin\**">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
-	<Content Include="Resources/OpenSim.addin.xml">
-	  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	</Content>
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="log4net" Version="3.1.0" />
+    <PackageReference Include="log4net" Version="3.2.0" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.Setup" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <Content Include="$(SolutionDir)\bin\**" CopyToPublishDirectory="Always" />
+    <Content Include="Resources/OpenSim.addin.xml" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+
+  <Target Name="CopyNativeDllConfig" AfterTargets="Publish">
+    <ItemGroup>
+      <NativeConfigToCopy Include="$(SolutionDir)Library\*.dll.config" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NativeConfigToCopy)" DestinationFolder="$(PublishDir)\%(RecursiveDir)" />
+  </Target>
+
+  <Target Name="CopyNativeLibraries" AfterTargets="Publish">
+    <ItemGroup>
+      <NativeLibsToCopy Include="$(SolutionDir)Library\lib64\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NativeLibsToCopy)" DestinationFolder="$(PublishDir)\lib64\%(RecursiveDir)" />
+  </Target>
 </Project>

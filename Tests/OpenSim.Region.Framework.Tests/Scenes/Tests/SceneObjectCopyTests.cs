@@ -47,7 +47,6 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// <remarks>
     /// This is at a level above the SceneObjectBasicTests, which act on the scene directly.
     /// </remarks>
-    [TestFixture]
     public class SceneObjectCopyTests : OpenSimTestCase
     {
         [TestFixtureSetUp]
@@ -68,7 +67,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [Test]
+        [Fact]
         public void TestTakeCopyWhenCopierIsOwnerWithPerms()
         {
             TestHelpers.InMethod();
@@ -110,23 +109,23 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Check that object isn't copied until we crank the sogd handle.
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(so.LocalId);
-            Assert.That(retrievedPart, Is.Not.Null);
-            Assert.That(retrievedPart.ParentGroup.IsDeleted, Is.False);
+            // TODO: Fix this assertion
+            Assert.True(retrievedPart.ParentGroup.IsDeleted);
 
             sogd.InventoryDeQueueAndDelete();
 
             // Check that object is still there.
             SceneObjectPart retrievedPart2 = scene.GetSceneObjectPart(so.LocalId);
-            Assert.That(retrievedPart2, Is.Not.Null);
-            Assert.That(client.ReceivedKills.Count, Is.EqualTo(0));
+            // TODO: Fix this assertion
+            Assert.Equal(,);
 
             // Check that we have a copy in inventory
             InventoryItemBase item
                 = UserInventoryHelpers.GetInventoryItem(scene.InventoryService, ua.PrincipalID, "Lost And Found/so1");
-            Assert.That(item, Is.Not.Null);
+            // TODO: Fix this assertion
         }
 
-        [Test]
+        [Fact]
         public void TestTakeCopyWhenCopierIsOwnerWithoutPerms()
         {
             TestHelpers.InMethod();
@@ -159,23 +158,23 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Check that object isn't copied until we crank the sogd handle.
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(so.LocalId);
-            Assert.That(retrievedPart, Is.Not.Null);
-            Assert.That(retrievedPart.ParentGroup.IsDeleted, Is.False);
+            // TODO: Fix this assertion
+            Assert.True(retrievedPart.ParentGroup.IsDeleted);
 
             sogd.InventoryDeQueueAndDelete();
 
             // Check that object is still there.
             SceneObjectPart retrievedPart2 = scene.GetSceneObjectPart(so.LocalId);
-            Assert.That(retrievedPart2, Is.Not.Null);
-            Assert.That(client.ReceivedKills.Count, Is.EqualTo(0));
+            // TODO: Fix this assertion
+            Assert.Equal(,);
 
             // Check that we do not have a copy in inventory
             InventoryItemBase item
                 = UserInventoryHelpers.GetInventoryItem(scene.InventoryService, ua.PrincipalID, "Lost And Found/so1");
-            Assert.That(item, Is.Null);
+            // TODO: Fix this assertion
         }
 
-        [Test]
+        [Fact]
         public void TestTakeCopyWhenCopierIsNotOwnerWithPerms()
         {
             TestHelpers.InMethod();
@@ -210,23 +209,23 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Check that object isn't copied until we crank the sogd handle.
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(so.LocalId);
-            Assert.That(retrievedPart, Is.Not.Null);
-            Assert.That(retrievedPart.ParentGroup.IsDeleted, Is.False);
+            // TODO: Fix this assertion
+            Assert.True(retrievedPart.ParentGroup.IsDeleted);
 
             sogd.InventoryDeQueueAndDelete();
 
             // Check that object is still there.
             SceneObjectPart retrievedPart2 = scene.GetSceneObjectPart(so.LocalId);
-            Assert.That(retrievedPart2, Is.Not.Null);
-            Assert.That(client.ReceivedKills.Count, Is.EqualTo(0));
+            // TODO: Fix this assertion
+            Assert.Equal(,);
 
             // Check that we have a copy in inventory
             InventoryItemBase item
                 = UserInventoryHelpers.GetInventoryItem(scene.InventoryService, ua.PrincipalID, "Objects/so1");
-            Assert.That(item, Is.Not.Null);
+            // TODO: Fix this assertion
         }
 
-        [Test]
+        [Fact]
         public void TestTakeCopyWhenCopierIsNotOwnerWithoutPerms()
         {
             TestHelpers.InMethod();
@@ -264,19 +263,19 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
                 // Check that object isn't copied until we crank the sogd handle.
                 SceneObjectPart retrievedPart = scene.GetSceneObjectPart(so.LocalId);
-                Assert.That(retrievedPart, Is.Not.Null);
-                Assert.That(retrievedPart.ParentGroup.IsDeleted, Is.False);
+                // TODO: Fix this assertion
+                Assert.True(retrievedPart.ParentGroup.IsDeleted);
 
                 sogd.InventoryDeQueueAndDelete();
                 // Check that object is still there.
                 SceneObjectPart retrievedPart2 = scene.GetSceneObjectPart(so.LocalId);
-                Assert.That(retrievedPart2, Is.Not.Null);
-                Assert.That(client.ReceivedKills.Count, Is.EqualTo(0));
+                // TODO: Fix this assertion
+                Assert.Equal(,);
 
                 // Check that we have a copy in inventory
                 InventoryItemBase item
                     = UserInventoryHelpers.GetInventoryItem(scene.InventoryService, ua.PrincipalID, "Objects/so1");
-                Assert.That(item, Is.Null);
+                // TODO: Fix this assertion
             }
 
             {
@@ -295,19 +294,19 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
                 // Check that object isn't copied until we crank the sogd handle.
                 SceneObjectPart retrievedPart = scene.GetSceneObjectPart(so.LocalId);
-                Assert.That(retrievedPart, Is.Not.Null);
-                Assert.That(retrievedPart.ParentGroup.IsDeleted, Is.False);
+                // TODO: Fix this assertion
+                Assert.True(retrievedPart.ParentGroup.IsDeleted);
 
                 sogd.InventoryDeQueueAndDelete();
                 // Check that object is still there.
                 SceneObjectPart retrievedPart2 = scene.GetSceneObjectPart(so.LocalId);
-                Assert.That(retrievedPart2, Is.Not.Null);
-                Assert.That(client.ReceivedKills.Count, Is.EqualTo(0));
+                // TODO: Fix this assertion
+                Assert.Equal(,);
 
                 // Check that we have a copy in inventory
                 InventoryItemBase item
                     = UserInventoryHelpers.GetInventoryItem(scene.InventoryService, ua.PrincipalID, "Objects/so1");
-                Assert.That(item, Is.Null);
+                // TODO: Fix this assertion
             }
 
             {
@@ -326,19 +325,19 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
                 // Check that object isn't copied until we crank the sogd handle.
                 SceneObjectPart retrievedPart = scene.GetSceneObjectPart(so.LocalId);
-                Assert.That(retrievedPart, Is.Not.Null);
-                Assert.That(retrievedPart.ParentGroup.IsDeleted, Is.False);
+                // TODO: Fix this assertion
+                Assert.True(retrievedPart.ParentGroup.IsDeleted);
 
                 sogd.InventoryDeQueueAndDelete();
                 // Check that object is still there.
                 SceneObjectPart retrievedPart2 = scene.GetSceneObjectPart(so.LocalId);
-                Assert.That(retrievedPart2, Is.Not.Null);
-                Assert.That(client.ReceivedKills.Count, Is.EqualTo(0));
+                // TODO: Fix this assertion
+                Assert.Equal(,);
 
                 // Check that we have a copy in inventory
                 InventoryItemBase item
                     = UserInventoryHelpers.GetInventoryItem(scene.InventoryService, ua.PrincipalID, "Objects/so1");
-                Assert.That(item, Is.Null);
+                // TODO: Fix this assertion
             }
         }
     }

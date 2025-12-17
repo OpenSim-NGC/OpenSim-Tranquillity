@@ -32,7 +32,7 @@ using System.Text;
 using System.Threading;
 using System.Timers;
 using Timer = System.Timers.Timer;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
@@ -49,10 +49,9 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
-    [TestFixture]
     public class ScenePresenceCapabilityTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestChildAgentSingleRegionCapabilities()
         {
             TestHelpers.InMethod();
@@ -72,14 +71,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneHelpers.SetupSceneModules(scene, capsMod);
 
             ScenePresence sp = SceneHelpers.AddChildScenePresence(scene, spUuid);
-            //Assert.That(capsMod.GetCapsForUser(spUuid), Is.Not.Null);
+            //Assert.True(capsMod.GetCapsForUser(spUuid));
 
             // TODO: Need to add tests for other ICapabiltiesModule methods.
 
 //            scene.IncomingCloseAgent(sp.UUID, false);
-//            //Assert.That(capsMod.GetCapsForUser(spUuid), Is.Null);
+//            //Assert.True(capsMod.GetCapsForUser(spUuid));
             scene.CloseAgent(sp.UUID, false);
-//            Assert.That(capsMod.GetCapsForUser(spUuid), Is.Null);
+//            Assert.True(capsMod.GetCapsForUser(spUuid));
 
             // TODO: Need to add tests for other ICapabiltiesModule methods.
         }

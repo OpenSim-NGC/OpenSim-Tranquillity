@@ -25,21 +25,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Nini.Config;
 using OpenSim.Framework;
+using OpenSim.Region.CoreModules.Asset;
 using OpenSim.Tests.Common;
+using Xunit;
 
 namespace OpenSim.Region.CoreModules.Asset.Tests
 {
     /// <summary>
     /// At the moment we're only test the in-memory part of the FlotsamAssetCache.  This is a considerable weakness.
     /// </summary>
-    [TestFixture]
     public class FlotsamAssetCacheTests : OpenSimTestCase
     {
-        protected TestScene m_scene;
-        protected FlotsamAssetCache m_cache;
+        protected TestScene? m_scene;
+        protected FlotsamAssetCache? m_cache;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -57,7 +58,7 @@ namespace OpenSim.Region.CoreModules.Asset.Tests
             SceneHelpers.SetupSceneModules(m_scene, config, m_cache);
         }
 
-        [Test]
+        [Fact]
         public void TestCacheAsset()
         {
             TestHelpers.InMethod();
@@ -68,17 +69,17 @@ namespace OpenSim.Region.CoreModules.Asset.Tests
 
             // Check we don't get anything before the asset is put in the cache
             AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
-            Assert.That(retrievedAsset, Is.Null);
+            Assert.Null(retrievedAsset);
 
             m_cache.Store(asset);
 
             // Check that asset is now in cache
             retrievedAsset = m_cache.Get(asset.ID.ToString());
-            Assert.That(retrievedAsset, Is.Not.Null);
-            Assert.That(retrievedAsset.ID, Is.EqualTo(asset.ID));
+            Assert.NotNull(retrievedAsset);
+            Assert.Equal(asset.ID, retrievedAsset.ID);
         }
 
-        [Test]
+        [Fact]
         public void TestExpireAsset()
         {
             TestHelpers.InMethod();
@@ -92,10 +93,10 @@ namespace OpenSim.Region.CoreModules.Asset.Tests
             m_cache.Expire(asset.ID);
 
             AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
-            Assert.That(retrievedAsset, Is.Null);
+            Assert.Null(retrievedAsset);
         }
 
-        [Test]
+        [Fact]
         public void TestClearCache()
         {
             TestHelpers.InMethod();
@@ -109,7 +110,7 @@ namespace OpenSim.Region.CoreModules.Asset.Tests
             m_cache.Clear();
 
             AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
-            Assert.That(retrievedAsset, Is.Null);
+            Assert.Null(retrievedAsset);
         }
     }
 }

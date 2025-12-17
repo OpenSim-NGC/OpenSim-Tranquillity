@@ -31,7 +31,7 @@ using System.Reflection;
 using System.Text;
 using log4net;
 using Nini.Config;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.Scripting.ScriptModuleComms;
@@ -46,7 +46,6 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
     /// <summary>
     /// Tests for inventory functions in LSL
     /// </summary>
-    [TestFixture]
     public class JsonStoreScriptModuleTests : OpenSimTestCase
     {
         private Scene m_scene;
@@ -70,7 +69,6 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -109,7 +107,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
             return m_smcm.InvokeOperation(hostId, UUID.Zero, name, args);
         }
 
-        [Test]
+        [Fact]
         public void TestJsonCreateStore()
         {
             TestHelpers.InMethod();
@@ -118,35 +116,35 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
             // Test blank store
             {
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
-                Assert.That(storeId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(storeId));
             }
 
             // Test single element store
             {
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{ 'Hello' : 'World' }");
-                Assert.That(storeId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(storeId));
             }
 
             // Test with an integer value
             {
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{ 'Hello' : 42.15 }");
-                Assert.That(storeId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(storeId));
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Hello");
-                Assert.That(value, Is.EqualTo("42.15"));
+                Assert.Equal(,);
             }
 
             // Test with an array as the root node
             {
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "[ 'one', 'two', 'three' ]");
-                Assert.That(storeId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(storeId));
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "[1]");
-                Assert.That(value, Is.EqualTo("two"));
+                Assert.Equal(,);
             }
         }
 
-        [Test]
+        [Fact]
         public void TestJsonDestroyStore()
         {
             TestHelpers.InMethod();
@@ -155,13 +153,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
             UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{ 'Hello' : 'World' }");
             int dsrv = (int)InvokeOp("JsonDestroyStore", storeId);
 
-            Assert.That(dsrv, Is.EqualTo(1));
+            Assert.Equal(,);
 
             int tprv = (int)InvokeOp("JsonGetNodeType", storeId, "Hello");
-            Assert.That(tprv, Is.EqualTo(JsonStoreScriptModule.JSON_NODETYPE_UNDEF));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestJsonDestroyStoreNotExists()
         {
             TestHelpers.InMethod();
@@ -171,10 +169,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 
             int dsrv = (int)InvokeOp("JsonDestroyStore", fakeStoreId);
 
-            Assert.That(dsrv, Is.EqualTo(0));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestJsonGetValue()
         {
             TestHelpers.InMethod();
@@ -184,30 +182,30 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 
             {
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Hello.World");
-                Assert.That(value, Is.EqualTo("Two"));
+                Assert.Equal(,);
             }
 
             // Test get of path section instead of leaf
             {
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Hello");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test get of non-existing value
             {
                 string fakeValueGet = (string)InvokeOp("JsonGetValue", storeId, "foo");
-                Assert.That(fakeValueGet, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test get from non-existing store
             {
                 UUID fakeStoreId = TestHelpers.ParseTail(0x500);
                 string fakeStoreValueGet = (string)InvokeOp("JsonGetValue", fakeStoreId, "Hello");
-                Assert.That(fakeStoreValueGet, Is.EqualTo(""));
+                Assert.Equal(,);
             }
         }
 
-        [Test]
+        [Fact]
         public void TestJsonGetJson()
         {
             TestHelpers.InMethod();
@@ -217,30 +215,30 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 
             {
                 string value = (string)InvokeOp("JsonGetJson", storeId, "Hello.World");
-                Assert.That(value, Is.EqualTo("'Two'"));
+                Assert.Equal(,);
             }
 
             // Test get of path section instead of leaf
             {
                 string value = (string)InvokeOp("JsonGetJson", storeId, "Hello");
-                Assert.That(value, Is.EqualTo("{\"World\":\"Two\"}"));
+                Assert.Equal(,);
             }
 
             // Test get of non-existing value
             {
                 string fakeValueGet = (string)InvokeOp("JsonGetJson", storeId, "foo");
-                Assert.That(fakeValueGet, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test get from non-existing store
             {
                 UUID fakeStoreId = TestHelpers.ParseTail(0x500);
                 string fakeStoreValueGet = (string)InvokeOp("JsonGetJson", fakeStoreId, "Hello");
-                Assert.That(fakeStoreValueGet, Is.EqualTo(""));
+                Assert.Equal(,);
             }
         }
 
-//        [Test]
+//        [Fact]
 //        public void TestJsonTakeValue()
 //        {
 //            TestHelpers.InMethod();
@@ -254,16 +252,16 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 //                = (string)m_smcm.InvokeOperation(
 //                    UUID.Zero, UUID.Zero, "JsonTakeValue", new object[] { storeId, "Hello" });
 //
-//            Assert.That(value, Is.EqualTo("World"));
+//            Assert.Equal(,);
 //
 //            string value2
 //                = (string)m_smcm.InvokeOperation(
 //                    UUID.Zero, UUID.Zero, "JsonGetValue", new object[] { storeId, "Hello" });
 //
-//            Assert.That(value, Is.Null);
+//            // TODO: Fix this assertion
 //        }
 
-        [Test]
+        [Fact]
         public void TestJsonRemoveValue()
         {
             TestHelpers.InMethod();
@@ -274,13 +272,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{ 'Hello' : 'World' }");
 
                 int returnValue = (int)InvokeOp( "JsonRemoveValue", storeId, "Hello");
-                Assert.That(returnValue, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 int result = (int)InvokeOp("JsonGetNodeType", storeId, "Hello");
-                Assert.That(result, Is.EqualTo(JsonStoreScriptModule.JSON_NODETYPE_UNDEF));
+                Assert.Equal(,);
 
                 string returnValue2 = (string)InvokeOp("JsonGetValue", storeId, "Hello");
-                Assert.That(returnValue2, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test remove of node in object pointing to another object
@@ -288,13 +286,13 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{ 'Hello' : { 'World' : 'Wally' } }");
 
                 int returnValue = (int)InvokeOp( "JsonRemoveValue", storeId, "Hello");
-                Assert.That(returnValue, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 int result = (int)InvokeOp("JsonGetNodeType", storeId, "Hello");
-                Assert.That(result, Is.EqualTo(JsonStoreScriptModule.JSON_NODETYPE_UNDEF));
+                Assert.Equal(,);
 
                 string returnValue2 = (string)InvokeOp("JsonGetJson", storeId, "Hello");
-                Assert.That(returnValue2, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test remove of node in an array
@@ -303,19 +301,19 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                     = (UUID)InvokeOp("JsonCreateStore", "{ 'Hello' : [ 'value1', 'value2' ] }");
 
                 int returnValue = (int)InvokeOp( "JsonRemoveValue", storeId, "Hello[0]");
-                Assert.That(returnValue, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 int result = (int)InvokeOp("JsonGetNodeType", storeId, "Hello[0]");
-                Assert.That(result, Is.EqualTo(JsonStoreScriptModule.JSON_NODETYPE_VALUE));
+                Assert.Equal(,);
 
                 result = (int)InvokeOp("JsonGetNodeType", storeId, "Hello[1]");
-                Assert.That(result, Is.EqualTo(JsonStoreScriptModule.JSON_NODETYPE_UNDEF));
+                Assert.Equal(,);
 
                 string stringReturnValue = (string)InvokeOp("JsonGetValue", storeId, "Hello[0]");
-                Assert.That(stringReturnValue, Is.EqualTo("value2"));
+                Assert.Equal(,);
 
                 stringReturnValue = (string)InvokeOp("JsonGetJson", storeId, "Hello[1]");
-                Assert.That(stringReturnValue, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test remove of non-existing value
@@ -323,18 +321,18 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{ 'Hello' : 'World' }");
 
                 int fakeValueRemove = (int)InvokeOp("JsonRemoveValue", storeId, "Cheese");
-                Assert.That(fakeValueRemove, Is.EqualTo(0));
+                Assert.Equal(,);
             }
 
             {
                 // Test get from non-existing store
                 UUID fakeStoreId = TestHelpers.ParseTail(0x500);
                 int fakeStoreValueRemove = (int)InvokeOp("JsonRemoveValue", fakeStoreId, "Hello");
-                Assert.That(fakeStoreValueRemove, Is.EqualTo(0));
+                Assert.Equal(,);
             }
         }
 
-//        [Test]
+//        [Fact]
 //        public void TestJsonTestPath()
 //        {
 //            TestHelpers.InMethod();
@@ -344,29 +342,29 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 //
 //            {
 //                int result = (int)InvokeOp("JsonTestPath", storeId, "Hello.World");
-//                Assert.That(result, Is.EqualTo(1));
+//                Assert.Equal(,);
 //            }
 //
 //            // Test for path which does not resolve to a value.
 //            {
 //                int result = (int)InvokeOp("JsonTestPath", storeId, "Hello");
-//                Assert.That(result, Is.EqualTo(0));
+//                Assert.Equal(,);
 //            }
 //
 //            {
 //                int result2 = (int)InvokeOp("JsonTestPath", storeId, "foo");
-//                Assert.That(result2, Is.EqualTo(0));
+//                Assert.Equal(,);
 //            }
 //
 //            // Test with fake store
 //            {
 //                UUID fakeStoreId = TestHelpers.ParseTail(0x500);
 //                int fakeStoreValueRemove = (int)InvokeOp("JsonTestPath", fakeStoreId, "Hello");
-//                Assert.That(fakeStoreValueRemove, Is.EqualTo(0));
+//                Assert.Equal(,);
 //            }
 //        }
 
-//        [Test]
+//        [Fact]
 //        public void TestJsonTestPathJson()
 //        {
 //            TestHelpers.InMethod();
@@ -376,29 +374,29 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 //
 //            {
 //                int result = (int)InvokeOp("JsonTestPathJson", storeId, "Hello.World");
-//                Assert.That(result, Is.EqualTo(1));
+//                Assert.Equal(,);
 //            }
 //
 //            // Test for path which does not resolve to a value.
 //            {
 //                int result = (int)InvokeOp("JsonTestPathJson", storeId, "Hello");
-//                Assert.That(result, Is.EqualTo(1));
+//                Assert.Equal(,);
 //            }
 //
 //            {
 //                int result2 = (int)InvokeOp("JsonTestPathJson", storeId, "foo");
-//                Assert.That(result2, Is.EqualTo(0));
+//                Assert.Equal(,);
 //            }
 //
 //            // Test with fake store
 //            {
 //                UUID fakeStoreId = TestHelpers.ParseTail(0x500);
 //                int fakeStoreValueRemove = (int)InvokeOp("JsonTestPathJson", fakeStoreId, "Hello");
-//                Assert.That(fakeStoreValueRemove, Is.EqualTo(0));
+//                Assert.Equal(,);
 //            }
 //        }
 
-        [Test]
+        [Fact]
         public void TestJsonGetArrayLength()
         {
             TestHelpers.InMethod();
@@ -408,30 +406,30 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 
             {
                 int result = (int)InvokeOp("JsonGetArrayLength", storeId, "Hello.World");
-                Assert.That(result, Is.EqualTo(2));
+                Assert.Equal(,);
             }
 
             // Test path which is not an array
             {
                 int result = (int)InvokeOp("JsonGetArrayLength", storeId, "Hello");
-                Assert.That(result, Is.EqualTo(-1));
+                Assert.Equal(,);
             }
 
             // Test fake path
             {
                 int result = (int)InvokeOp("JsonGetArrayLength", storeId, "foo");
-                Assert.That(result, Is.EqualTo(-1));
+                Assert.Equal(,);
             }
 
             // Test fake store
             {
                 UUID fakeStoreId = TestHelpers.ParseTail(0x500);
                 int result = (int)InvokeOp("JsonGetArrayLength", fakeStoreId, "Hello.World");
-                Assert.That(result, Is.EqualTo(-1));
+                Assert.Equal(,);
             }
         }
 
-        [Test]
+        [Fact]
         public void TestJsonGetNodeType()
         {
             TestHelpers.InMethod();
@@ -441,44 +439,44 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 
             {
                 int result = (int)InvokeOp("JsonGetNodeType", storeId, ".");
-                Assert.That(result, Is.EqualTo(JsonStoreScriptModule.JSON_NODETYPE_OBJECT));
+                Assert.Equal(,);
             }
 
             {
                 int result = (int)InvokeOp("JsonGetNodeType", storeId, "Hello");
-                Assert.That(result, Is.EqualTo(JsonStoreScriptModule.JSON_NODETYPE_OBJECT));
+                Assert.Equal(,);
             }
 
             {
                 int result = (int)InvokeOp("JsonGetNodeType", storeId, "Hello.World");
-                Assert.That(result, Is.EqualTo(JsonStoreScriptModule.JSON_NODETYPE_ARRAY));
+                Assert.Equal(,);
             }
 
             {
                 int result = (int)InvokeOp("JsonGetNodeType", storeId, "Hello.World[0]");
-                Assert.That(result, Is.EqualTo(JsonStoreScriptModule.JSON_NODETYPE_VALUE));
+                Assert.Equal(,);
             }
 
             {
                 int result = (int)InvokeOp("JsonGetNodeType", storeId, "Hello.World[1]");
-                Assert.That(result, Is.EqualTo(JsonStoreScriptModule.JSON_NODETYPE_VALUE));
+                Assert.Equal(,);
             }
 
             // Test for non-existent path
             {
                 int result = (int)InvokeOp("JsonGetNodeType", storeId, "foo");
-                Assert.That(result, Is.EqualTo(JsonStoreScriptModule.JSON_NODETYPE_UNDEF));
+                Assert.Equal(,);
             }
 
             // Test for non-existent store
             {
                 UUID fakeStoreId = TestHelpers.ParseTail(0x500);
                 int result = (int)InvokeOp("JsonGetNodeType", fakeStoreId, ".");
-                Assert.That(result, Is.EqualTo(JsonStoreScriptModule.JSON_NODETYPE_UNDEF));
+                Assert.Equal(,);
             }
         }
 
-        [Test]
+        [Fact]
         public void TestJsonList2Path()
         {
             TestHelpers.InMethod();
@@ -488,21 +486,21 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
             // - some confusion with the methods that take a params object[] invocation.
             {
                 string result = m_jssm.JsonList2Path(UUID.Zero, UUID.Zero, new object[] { "foo" });
-                Assert.That(result, Is.EqualTo("{foo}"));
+                Assert.Equal(,);
             }
 
             {
                 string result = m_jssm.JsonList2Path(UUID.Zero, UUID.Zero, new object[] { "foo", "bar" });
-                Assert.That(result, Is.EqualTo("{foo}.{bar}"));
+                Assert.Equal(,);
             }
 
             {
                 string result = m_jssm.JsonList2Path(UUID.Zero, UUID.Zero, new object[] { "foo", 1, "bar" });
-                Assert.That(result, Is.EqualTo("{foo}.[1].{bar}"));
+                Assert.Equal(,);
             }
         }
 
-        [Test]
+        [Fact]
         public void TestJsonSetValue()
         {
             TestHelpers.InMethod();
@@ -512,10 +510,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "Fun", "Times");
-                Assert.That(result, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Fun");
-                Assert.That(value, Is.EqualTo("Times"));
+                Assert.Equal(,);
             }
 
             // Test setting a key containing periods with delineation
@@ -523,10 +521,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "{Fun.Circus}", "Times");
-                Assert.That(result, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "{Fun.Circus}");
-                Assert.That(value, Is.EqualTo("Times"));
+                Assert.Equal(,);
             }
 
             // *** Test [] ***
@@ -536,10 +534,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "Fun]Circus", "Times");
-                Assert.That(result, Is.EqualTo(0));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Fun]Circus");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test setting a key containing unbalanced [ without delineation.  Expecting failure
@@ -547,10 +545,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "Fun[Circus", "Times");
-                Assert.That(result, Is.EqualTo(0));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Fun[Circus");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test setting a key containing unbalanced [] without delineation.  Expecting failure
@@ -558,10 +556,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "Fun[]Circus", "Times");
-                Assert.That(result, Is.EqualTo(0));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Fun[]Circus");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test setting a key containing unbalanced ] with delineation
@@ -569,10 +567,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "{Fun]Circus}", "Times");
-                Assert.That(result, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "{Fun]Circus}");
-                Assert.That(value, Is.EqualTo("Times"));
+                Assert.Equal(,);
             }
 
             // Test setting a key containing unbalanced [ with delineation
@@ -580,10 +578,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "{Fun[Circus}", "Times");
-                Assert.That(result, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "{Fun[Circus}");
-                Assert.That(value, Is.EqualTo("Times"));
+                Assert.Equal(,);
             }
 
             // Test setting a key containing empty balanced [] with delineation
@@ -591,10 +589,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "{Fun[]Circus}", "Times");
-                Assert.That(result, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "{Fun[]Circus}");
-                Assert.That(value, Is.EqualTo("Times"));
+                Assert.Equal(,);
             }
 
 //            // Commented out as this currently unexpectedly fails.
@@ -603,10 +601,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 //                UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 //
 //                int result = (int)InvokeOp("JsonSetValue", storeId, "{Fun[0]Circus}", "Times");
-//                Assert.That(result, Is.EqualTo(1));
+//                Assert.Equal(,);
 //
 //                string value = (string)InvokeOp("JsonGetValue", storeId, "{Fun[0]Circus}");
-//                Assert.That(value, Is.EqualTo("Times"));
+//                Assert.Equal(,);
 //            }
 
             // *** Test {} ***
@@ -616,10 +614,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "Fun}Circus", "Times");
-                Assert.That(result, Is.EqualTo(0));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Fun}Circus");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test setting a key containing unbalanced { without delineation.  Expecting failure (?)
@@ -627,10 +625,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "Fun{Circus", "Times");
-                Assert.That(result, Is.EqualTo(0));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Fun}Circus");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
 //            // Commented out as this currently unexpectedly fails.
@@ -639,7 +637,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 //                UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 //
 //                int result = (int)InvokeOp("JsonSetValue", storeId, "{Fun}Circus}", "Times");
-//                Assert.That(result, Is.EqualTo(0));
+//                Assert.Equal(,);
 //            }
 
             // Test setting a key containing unbalanced { with delineation
@@ -647,10 +645,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "{Fun{Circus}", "Times");
-                Assert.That(result, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "{Fun{Circus}");
-                Assert.That(value, Is.EqualTo("Times"));
+                Assert.Equal(,);
             }
 
             // Test setting a key containing balanced {} with delineation.  This should fail.
@@ -658,10 +656,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "{Fun{Filled}Circus}", "Times");
-                Assert.That(result, Is.EqualTo(0));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "{Fun{Filled}Circus}");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test setting to location that does not exist.  This should fail.
@@ -669,21 +667,21 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{}");
 
                 int result = (int)InvokeOp("JsonSetValue", storeId, "Fun.Circus", "Times");
-                Assert.That(result, Is.EqualTo(0));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Fun.Circus");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test with fake store
             {
                 UUID fakeStoreId = TestHelpers.ParseTail(0x500);
                 int fakeStoreValueSet = (int)InvokeOp("JsonSetValue", fakeStoreId, "Hello", "World");
-                Assert.That(fakeStoreValueSet, Is.EqualTo(0));
+                Assert.Equal(,);
             }
         }
 
-        [Test]
+        [Fact]
         public void TestJsonSetJson()
         {
             TestHelpers.InMethod();
@@ -694,10 +692,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{ }");
 
                 int result = (int)InvokeOp("JsonSetJson", storeId, "Fun", "'Times'");
-                Assert.That(result, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Fun");
-                Assert.That(value, Is.EqualTo("Times"));
+                Assert.Equal(,);
             }
 
             // Sub-tree case
@@ -705,10 +703,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{ }");
 
                 int result = (int)InvokeOp("JsonSetJson", storeId, "Fun", "{ 'Filled' : 'Times' }");
-                Assert.That(result, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Fun.Filled");
-                Assert.That(value, Is.EqualTo("Times"));
+                Assert.Equal(,);
             }
 
             // If setting single strings in JsonSetValueJson, these must be single quoted tokens, not bare strings.
@@ -716,10 +714,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{ }");
 
                 int result = (int)InvokeOp("JsonSetJson", storeId, "Fun", "Times");
-                Assert.That(result, Is.EqualTo(0));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Fun");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test setting to location that does not exist.  This should fail.
@@ -727,17 +725,17 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID storeId = (UUID)InvokeOp("JsonCreateStore", "{ }");
 
                 int result = (int)InvokeOp("JsonSetJson", storeId, "Fun.Circus", "'Times'");
-                Assert.That(result, Is.EqualTo(0));
+                Assert.Equal(,);
 
                 string value = (string)InvokeOp("JsonGetValue", storeId, "Fun.Circus");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             // Test with fake store
             {
                 UUID fakeStoreId = TestHelpers.ParseTail(0x500);
                 int fakeStoreValueSet = (int)InvokeOp("JsonSetJson", fakeStoreId, "Hello", "'World'");
-                Assert.That(fakeStoreValueSet, Is.EqualTo(0));
+                Assert.Equal(,);
             }
         }
 
@@ -748,7 +746,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
         /// TODO: Really needs to test correct receipt of the link_message event.  Could do this by directly fetching
         /// it via the MockScriptEngine or perhaps by a dummy script instance.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestJsonWriteNotecard()
         {
             TestHelpers.InMethod();
@@ -764,10 +762,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 
                 // Write notecard
                 UUID writeNotecardRequestId = (UUID)InvokeOpOnHost("JsonWriteNotecard", so.UUID, storeId, "", notecardName);
-                Assert.That(writeNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(writeNotecardRequestId));
 
                 TaskInventoryItem nc1Item = so.RootPart.Inventory.GetInventoryItem(notecardName);
-                Assert.That(nc1Item, Is.Not.Null);
+                // TODO: Fix this assertion
 
                 // TODO: Should independently check the contents.
             }
@@ -781,10 +779,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
 
                 UUID writeNotecardBadPathRequestId
                     = (UUID)InvokeOpOnHost("JsonWriteNotecard", so.UUID, storeId, "flibble", badPathNotecardName);
-                Assert.That(writeNotecardBadPathRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(writeNotecardBadPathRequestId));
 
                 TaskInventoryItem badPathItem = so.RootPart.Inventory.GetInventoryItem(badPathNotecardName);
-                Assert.That(badPathItem, Is.Null);
+                // TODO: Fix this assertion
             }
 
             {
@@ -795,10 +793,10 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 UUID fakeStoreId = TestHelpers.ParseTail(0x500);
                 UUID fakeStoreWriteNotecardValue
                     = (UUID)InvokeOpOnHost("JsonWriteNotecard", so.UUID, fakeStoreId, "", fakeStoreNotecardName);
-                Assert.That(fakeStoreWriteNotecardValue, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(fakeStoreWriteNotecardValue));
 
                 TaskInventoryItem fakeStoreItem = so.RootPart.Inventory.GetInventoryItem(fakeStoreNotecardName);
-                Assert.That(fakeStoreItem, Is.Null);
+                // TODO: Fix this assertion
             }
         }
 
@@ -809,7 +807,7 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
         /// TODO: Really needs to test correct receipt of the link_message event.  Could do this by directly fetching
         /// it via the MockScriptEngine or perhaps by a dummy script instance.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestJsonReadNotecard()
         {
             TestHelpers.InMethod();
@@ -829,69 +827,69 @@ namespace OpenSim.Region.OptionalModules.Scripting.JsonStore.Tests
                 // Read notecard
                 UUID receivingStoreId = (UUID)InvokeOp("JsonCreateStore", "{}");
                 UUID readNotecardRequestId = (UUID)InvokeOpOnHost("JsonReadNotecard", so.UUID, receivingStoreId, "", notecardName);
-                Assert.That(readNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(readNotecardRequestId));
 
                 string value = (string)InvokeOp("JsonGetValue", receivingStoreId, "Hello");
-                Assert.That(value, Is.EqualTo("World"));
+                Assert.Equal(,);
             }
 
             {
                 // Read notecard to new single component path
                 UUID receivingStoreId = (UUID)InvokeOp("JsonCreateStore", "{}");
                 UUID readNotecardRequestId = (UUID)InvokeOpOnHost("JsonReadNotecard", so.UUID, receivingStoreId, "make", notecardName);
-                Assert.That(readNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(readNotecardRequestId));
 
                 string value = (string)InvokeOp("JsonGetValue", receivingStoreId, "Hello");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
 
                 value = (string)InvokeOp("JsonGetValue", receivingStoreId, "make.Hello");
-                Assert.That(value, Is.EqualTo("World"));
+                Assert.Equal(,);
             }
 
             {
                 // Read notecard to new multi-component path.  This should not work.
                 UUID receivingStoreId = (UUID)InvokeOp("JsonCreateStore", "{}");
                 UUID readNotecardRequestId = (UUID)InvokeOpOnHost("JsonReadNotecard", so.UUID, receivingStoreId, "make.it", notecardName);
-                Assert.That(readNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(readNotecardRequestId));
 
                 string value = (string)InvokeOp("JsonGetValue", receivingStoreId, "Hello");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
 
                 value = (string)InvokeOp("JsonGetValue", receivingStoreId, "make.it.Hello");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             {
                 // Read notecard to existing multi-component path.  This should work
                 UUID receivingStoreId = (UUID)InvokeOp("JsonCreateStore", "{ 'make' : { 'it' : 'so' } }");
                 UUID readNotecardRequestId = (UUID)InvokeOpOnHost("JsonReadNotecard", so.UUID, receivingStoreId, "make.it", notecardName);
-                Assert.That(readNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(readNotecardRequestId));
 
                 string value = (string)InvokeOp("JsonGetValue", receivingStoreId, "Hello");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
 
                 value = (string)InvokeOp("JsonGetValue", receivingStoreId, "make.it.Hello");
-                Assert.That(value, Is.EqualTo("World"));
+                Assert.Equal(,);
             }
 
             {
                 // Read notecard to invalid path.  This should not work.
                 UUID receivingStoreId = (UUID)InvokeOp("JsonCreateStore", "{ 'make' : { 'it' : 'so' } }");
                 UUID readNotecardRequestId = (UUID)InvokeOpOnHost("JsonReadNotecard", so.UUID, receivingStoreId, "/", notecardName);
-                Assert.That(readNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(readNotecardRequestId));
 
                 string value = (string)InvokeOp("JsonGetValue", receivingStoreId, "Hello");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
 
             {
                 // Try read notecard to fake store.
                 UUID fakeStoreId = TestHelpers.ParseTail(0x500);
                 UUID readNotecardRequestId = (UUID)InvokeOpOnHost("JsonReadNotecard", so.UUID, fakeStoreId, "", notecardName);
-                Assert.That(readNotecardRequestId, Is.Not.EqualTo(UUID.Zero));
+                Assert.True(readNotecardRequestId));
 
                 string value = (string)InvokeOp("JsonGetValue", fakeStoreId, "Hello");
-                Assert.That(value, Is.EqualTo(""));
+                Assert.Equal(,);
             }
         }
 

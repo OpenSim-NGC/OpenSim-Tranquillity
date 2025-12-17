@@ -31,7 +31,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Tests.Common;
@@ -158,17 +158,16 @@ namespace OpenSim.Data.Tests
         }
     }
 
-    [TestFixture]
     public class PropertyScramblerTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestScramble()
         {
             AssetBase actual = new AssetBase(UUID.Random(), "asset one", (sbyte)AssetType.Texture, UUID.Zero.ToString());
             new PropertyScrambler<AssetBase>().Scramble(actual);
         }
 
-        [Test]
+        [Fact]
         public void DontScramble()
         {
             UUID uuid = UUID.Random();
@@ -178,7 +177,7 @@ namespace OpenSim.Data.Tests
                 .DontScramble(x => x.FullID)
                 .DontScramble(x => x.ID)
                 .Scramble(asset);
-            Assert.That(asset.FullID, Is.EqualTo(uuid));
+            Assert.Equal(,);
         }
     }
 }

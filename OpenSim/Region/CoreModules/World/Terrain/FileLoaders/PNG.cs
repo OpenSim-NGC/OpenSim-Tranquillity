@@ -25,30 +25,46 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Drawing;
-using System.Drawing.Imaging;
+using SkiaSharp;
 using System.IO;
 using OpenSim.Region.Framework.Interfaces;
 
 namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
 {
+    /// <summary>
+    /// PNG terrain file loader using SkiaSharp.
+    /// Saves and loads terrain from PNG images.
+    /// </summary>
     internal class PNG : GenericSystemDrawing
     {
         public override void SaveFile(string filename, ITerrainChannel map)
         {
-            using(Bitmap colours = CreateGrayscaleBitmapFromMap(map))
-                colours.Save(filename,ImageFormat.Png);
+            using(var bitmap = CreateGrayscaleBitmapFromMap(map))
+            {
+                using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+                {
+                    using (var file = File.Create(filename))
+                    {
+                        data.SaveTo(file);
+                    }
+                }
+            }
         }
 
         /// <summary>
-        /// Exports a stream using a System.Drawing exporter.
+        /// Exports a stream using SkiaSharp PNG encoder.
         /// </summary>
         /// <param name="stream">The target stream</param>
         /// <param name="map">The terrain channel being saved</param>
         public override void SaveStream(Stream stream, ITerrainChannel map)
         {
-            using(Bitmap colours = CreateGrayscaleBitmapFromMap(map))
-                colours.Save(stream,ImageFormat.Png);
+            using(var bitmap = CreateGrayscaleBitmapFromMap(map))
+            {
+                using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+                {
+                    data.SaveTo(stream);
+                }
+            }
         }
 
         public override string ToString()

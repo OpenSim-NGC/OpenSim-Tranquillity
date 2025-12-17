@@ -32,7 +32,7 @@ using System.Text;
 using System.Threading;
 using System.Timers;
 using Timer=System.Timers.Timer;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -46,10 +46,9 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// <summary>
     /// Scene presence tests
     /// </summary>
-    [TestFixture]
     public class SceneTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestCreateScene()
         {
             TestHelpers.InMethod();
@@ -57,7 +56,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             new SceneHelpers().SetupScene();
         }
 
-        [Test]
+        [Fact]
         public void TestCreateVarScene()
         {
             TestHelpers.InMethod();
@@ -68,14 +67,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Scene scene
                 = new SceneHelpers().SetupScene("scene", regionUuid, 1000, 1000, sizeX, sizeY, new IniConfigSource());
 
-            Assert.AreEqual(sizeX, scene.RegionInfo.RegionSizeX);
-            Assert.AreEqual(sizeY, scene.RegionInfo.RegionSizeY);
+            Assert.Equal(sizeX, scene.RegionInfo.RegionSizeX);
+            Assert.Equal(sizeY, scene.RegionInfo.RegionSizeY);
         }
 
         /// <summary>
         /// Very basic scene update test.  Should become more elaborate with time.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestUpdateScene()
         {
             TestHelpers.InMethod();
@@ -83,10 +82,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Scene scene = new SceneHelpers().SetupScene();
             scene.Update(1);
 
-            Assert.That(scene.Frame, Is.EqualTo(1));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestShutdownScene()
         {
             TestHelpers.InMethod();
@@ -94,13 +93,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Scene scene = new SceneHelpers().SetupScene();
             scene.Close();
 
-            Assert.That(scene.ShuttingDown, Is.True);
-            Assert.That(scene.Active, Is.False);
+            Assert.True(scene.ShuttingDown);
+            Assert.True(scene.Active);
 
             // Trying to update a shutdown scene should result in no update
             scene.Update(1);
 
-            Assert.That(scene.Frame, Is.EqualTo(0));
+            Assert.Equal(,);
         }
     }
 }

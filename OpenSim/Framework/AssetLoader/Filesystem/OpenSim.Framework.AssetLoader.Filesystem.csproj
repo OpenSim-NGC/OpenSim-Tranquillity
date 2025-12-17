@@ -7,14 +7,8 @@
     <Copyright>OpenSimulator developers</Copyright>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Nini">
-      <HintPath>..\..\..\..\bin\Nini.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\..\..\bin\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <Reference Include="Nini" HintPath="..\..\..\..\Library\Nini.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\..\Library\OpenMetaverseTypes.dll" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\OpenSim.Framework.csproj" />
@@ -24,6 +18,7 @@
     <Folder Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.1.0" />
+    <PackageReference Include="log4net" Version="3.2.0" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
   </ItemGroup>
 </Project>

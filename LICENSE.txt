@@ -1,3 +1,5 @@
+Code Originating in the OpenSimulator project is copyright that project:
+
 Copyright (c) Contributors, http://opensimulator.org/ 
 See CONTRIBUTORS.TXT for a full list of copyright holders.
 
@@ -23,3 +25,17 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
 IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Various other files are copyright their authors.  In particular substantive
+changes and new files in the Tranquillity code base are copyright:
+
+/* Copyright (c) 2025 Utopia Skye LLC
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. 
+ */
+
+ Various sources in the Addons directory are copyright their individual authors.
+ See the files in question for copyright/license information.
+

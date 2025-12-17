@@ -890,52 +890,41 @@ namespace OpenSim.Region.ClientStack.Linden
 
                         Primitive.TextureEntry textureEntry = new(Primitive.TextureEntry.WHITE_TEXTURE);
 
+                        const float EPSILON = 1e-6f;
                         for (uint face = 0; face < face_list.Count; face++)
                         {
                             OSDMap faceMap = (OSDMap)face_list[(int)face];
 
                             Primitive.TextureEntryFace f = textureEntry.CreateFace(face); //clone the default
-                            if (faceMap.TryGetValue("fullbright", out tmp))
-                                f.Fullbright = tmp.AsBoolean();
-                            if (faceMap.TryGetValue("diffuse_color", out tmp))
-                                f.RGBA = tmp.AsColor4();
 
-                            int textureNum = faceMap["image"].AsInteger();
-                            float imagerot = faceMap["imagerot"].AsInteger();
-                            float offsets = (float)faceMap["offsets"].AsReal();
-                            float offsett = (float)faceMap["offsett"].AsReal();
-                            float scales = (float)faceMap["scales"].AsReal();
-                            float scalet = (float)faceMap["scalet"].AsReal();
+                            if (faceMap.TryGetBool("fullbright", out bool fullbright))
+                                f.Fullbright = fullbright;
 
-                            if (imagerot != 0)
+                            if (faceMap.TryGetColor4("diffuse_color", out Color4 rgba))
+                                f.RGBA = rgba;
+
+                            if(faceMap.TryGetInt("image", out int textureNum) && textureNum >= 0 && textureNum < textures.Count)
+                                f.TextureID = textures[textureNum];
+
+                            if(faceMap.TryGetFloat("imagerot", out float imagerot) && Math.Abs(imagerot) > EPSILON)
                                 f.Rotation = imagerot;
 
-                            if (offsets != 0)
+                            if(faceMap.TryGetFloat("offsets", out float offsets) && Math.Abs(offsets) > EPSILON)
                                 f.OffsetU = offsets;
 
-                            if (offsett != 0)
+                            if(faceMap.TryGetFloat("offsett", out float offsett) && Math.Abs(offsett) > EPSILON)
                                 f.OffsetV = offsett;
 
-                            if (scales != 0)
+                            if(faceMap.TryGetFloat("scales", out float scales) && Math.Abs(scales) > EPSILON)
                                 f.RepeatU = scales;
 
-                            if (scalet != 0)
+                            if(faceMap.TryGetFloat("scalet", out float scalet) && Math.Abs(scalet) > EPSILON)
                                 f.RepeatV = scalet;
 
-                            if (textures.Count > textureNum)
-                                f.TextureID = textures[textureNum];
- 
                             textureEntry.FaceTextures[face] = f;
                         }
 
-                        if(face_list.Count > 0)
-                        {
-                            int last = face_list.Count - 1;
-                            // we do need a better te compacting code
-                            textureEntry.DefaultTexture = textureEntry.FaceTextures[last];
-                            textureEntry.FaceTextures[last] = null;
-                            pbs.TextureEntry = textureEntry.GetBytes(last);
-                        }
+                        pbs.TextureEntry = textureEntry.GetBytes(face_list.Count);
 
                         Vector3 position = inner_instance_list["position"].AsVector3();
                         Quaternion rotation = inner_instance_list["rotation"].AsQuaternion();

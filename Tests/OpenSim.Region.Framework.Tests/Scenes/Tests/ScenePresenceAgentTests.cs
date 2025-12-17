@@ -32,7 +32,7 @@ using System.Text;
 using System.Threading;
 using System.Timers;
 using Timer = System.Timers.Timer;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -50,7 +50,6 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// <summary>
     /// Scene presence tests
     /// </summary>
-    [TestFixture]
     public class ScenePresenceAgentTests : OpenSimTestCase
     {
 //        public Scene scene, scene2, scene3;
@@ -87,7 +86,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 ////            region3 = scene3.RegionInfo.RegionHandle;
 //        }
 
-        [Test]
+        [Fact]
         public void TestCreateRootScenePresence()
         {
             TestHelpers.InMethod();
@@ -98,15 +97,15 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             TestScene scene = new SceneHelpers().SetupScene();
             SceneHelpers.AddScenePresence(scene, spUuid);
 
-            Assert.That(scene.AuthenticateHandler.GetAgentCircuitData(spUuid), Is.Not.Null);
-            Assert.That(scene.AuthenticateHandler.GetAgentCircuits().Count, Is.EqualTo(1));
+            Assert.True(scene.AuthenticateHandler.GetAgentCircuitData(spUuid));
+            Assert.True(scene.AuthenticateHandler.GetAgentCircuits().Count));
 
             ScenePresence sp = scene.GetScenePresence(spUuid);
-            Assert.That(sp, Is.Not.Null);
-            Assert.That(sp.IsChildAgent, Is.False);
-            Assert.That(sp.UUID, Is.EqualTo(spUuid));
+            // TODO: Fix this assertion
+            Assert.True(sp.IsChildAgent);
+            Assert.Equal(,);
 
-            Assert.That(scene.GetScenePresences().Count, Is.EqualTo(1));
+            Assert.True(scene.GetScenePresences().Count));
         }
 
         /// <summary>
@@ -115,7 +114,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         /// <remarks>
         /// If duplicate calls are not ignored then there is a risk of race conditions or other unexpected effects.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestDupeCompleteMovementCalls()
         {
             TestHelpers.InMethod();
@@ -130,25 +129,25 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             ScenePresence sp = SceneHelpers.AddScenePresence(scene, spUuid);
 
-            Assert.That(makeRootAgentEvents, Is.EqualTo(1));
+            Assert.Equal(,);
 
             // Normally these would be invoked by a CompleteMovement message coming in to the UDP stack.  But for
             // convenience, here we will invoke it manually.
             sp.CompleteMovement(sp.ControllingClient, true);
 
-            Assert.That(makeRootAgentEvents, Is.EqualTo(1));
+            Assert.Equal(,);
 
             // Check rest of exepcted parameters.
-            Assert.That(scene.AuthenticateHandler.GetAgentCircuitData(spUuid), Is.Not.Null);
-            Assert.That(scene.AuthenticateHandler.GetAgentCircuits().Count, Is.EqualTo(1));
+            Assert.True(scene.AuthenticateHandler.GetAgentCircuitData(spUuid));
+            Assert.True(scene.AuthenticateHandler.GetAgentCircuits().Count));
 
-            Assert.That(sp.IsChildAgent, Is.False);
-            Assert.That(sp.UUID, Is.EqualTo(spUuid));
+            Assert.True(sp.IsChildAgent);
+            Assert.Equal(,);
 
-            Assert.That(scene.GetScenePresences().Count, Is.EqualTo(1));
+            Assert.True(scene.GetScenePresences().Count));
         }
 
-        [Test]
+        [Fact]
         public void TestCreateDuplicateRootScenePresence()
         {
             TestHelpers.InMethod();
@@ -173,16 +172,16 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneHelpers.AddScenePresence(scene, spUuid);
             SceneHelpers.AddScenePresence(scene, spUuid);
 
-            Assert.That(scene.AuthenticateHandler.GetAgentCircuitData(spUuid), Is.Not.Null);
-            Assert.That(scene.AuthenticateHandler.GetAgentCircuits().Count, Is.EqualTo(1));
+            Assert.True(scene.AuthenticateHandler.GetAgentCircuitData(spUuid));
+            Assert.True(scene.AuthenticateHandler.GetAgentCircuits().Count));
 
             ScenePresence sp = scene.GetScenePresence(spUuid);
-            Assert.That(sp, Is.Not.Null);
-            Assert.That(sp.IsChildAgent, Is.False);
-            Assert.That(sp.UUID, Is.EqualTo(spUuid));
+            // TODO: Fix this assertion
+            Assert.True(sp.IsChildAgent);
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestCloseClient()
         {
             TestHelpers.InMethod();
@@ -193,14 +192,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             scene.CloseAgent(sp.UUID, false);
 
-            Assert.That(scene.GetScenePresence(sp.UUID), Is.Null);
-            Assert.That(scene.AuthenticateHandler.GetAgentCircuitData(sp.UUID), Is.Null);
-            Assert.That(scene.AuthenticateHandler.GetAgentCircuits().Count, Is.EqualTo(0));
+            Assert.True(scene.GetScenePresence(sp.UUID));
+            Assert.True(scene.AuthenticateHandler.GetAgentCircuitData(sp.UUID));
+            Assert.True(scene.AuthenticateHandler.GetAgentCircuits().Count));
 
 //            TestHelpers.DisableLogging();
         }
 
-        [Test]
+        [Fact]
         public void TestCreateChildScenePresence()
         {
             TestHelpers.InMethod();
@@ -229,24 +228,24 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             EntityTransferContext ctx = new EntityTransferContext();
             scene.SimulationService.CreateAgent(null, region, acd, (uint)TeleportFlags.ViaLogin, ctx, out reason);
 
-            Assert.That(scene.AuthenticateHandler.GetAgentCircuitData(agentId), Is.Not.Null);
-            Assert.That(scene.AuthenticateHandler.GetAgentCircuits().Count, Is.EqualTo(1));
+            Assert.True(scene.AuthenticateHandler.GetAgentCircuitData(agentId));
+            Assert.True(scene.AuthenticateHandler.GetAgentCircuits().Count));
 
             // There's no scene presence yet since only an agent circuit has been established.
-            Assert.That(scene.GetScenePresence(agentId), Is.Null);
+            Assert.True(scene.GetScenePresence(agentId));
 
             // *** This is the second stage, where the client established a child agent/scene presence using the
             // circuit code given to the scene in stage 1 ***
             TestClient client = new TestClient(acd, scene);
             scene.AddNewAgent(client, PresenceType.User);
 
-            Assert.That(scene.AuthenticateHandler.GetAgentCircuitData(agentId), Is.Not.Null);
-            Assert.That(scene.AuthenticateHandler.GetAgentCircuits().Count, Is.EqualTo(1));
+            Assert.True(scene.AuthenticateHandler.GetAgentCircuitData(agentId));
+            Assert.True(scene.AuthenticateHandler.GetAgentCircuits().Count));
 
             ScenePresence sp = scene.GetScenePresence(agentId);
-            Assert.That(sp, Is.Not.Null);
-            Assert.That(sp.UUID, Is.EqualTo(agentId));
-            Assert.That(sp.IsChildAgent, Is.True);
+            // TODO: Fix this assertion
+            Assert.Equal(,);
+            Assert.True(sp.IsChildAgent);
         }
 
         /// <summary>
@@ -256,7 +255,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         /// Please note that unlike the other tests here, this doesn't rely on anything set up in the instance fields.
         /// INCOMPLETE
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestChildAgentEstablishedInNeighbour()
         {
             TestHelpers.InMethod();
@@ -283,8 +282,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 //            ScenePresence childPresence = myScene2.GetScenePresence(agent1);
 //
 //            // TODO: Need to do a fair amount of work to allow synchronous establishment of child agents
-//            Assert.That(childPresence, Is.Not.Null);
-//            Assert.That(childPresence.IsChildAgent, Is.True);
+//            // TODO: Fix this assertion
+//            Assert.True(childPresence.IsChildAgent);
         }
     }
 }

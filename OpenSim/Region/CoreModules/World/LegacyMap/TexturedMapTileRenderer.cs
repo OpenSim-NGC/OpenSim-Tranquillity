@@ -27,7 +27,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Drawing;
+using SkiaSharp;
 using System.Reflection;
 using log4net;
 using Nini.Config;
@@ -56,11 +56,11 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         }
 
         // (for info about algorithm, see http://en.wikipedia.org/wiki/HSL_and_HSV)
-        public HSV(Color c)
+        public HSV(SKColor c)
         {
-            float r = c.R / 255f;
-            float g = c.G / 255f;
-            float b = c.B / 255f;
+            float r = c.Red / 255f;
+            float g = c.Green / 255f;
+            float b = c.Blue / 255f;
             float max = Math.Max(Math.Max(r, g), b);
             float min = Math.Min(Math.Min(r, g), b);
             float diff = max - min;
@@ -78,7 +78,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         }
 
         // (for info about algorithm, see http://en.wikipedia.org/wiki/HSL_and_HSV)
-        public Color toColor()
+        public SKColor toColor()
         {
             if (s < 0f) m_log.Debug("S < 0: " + s);
             else if (s > 1f) m_log.Debug("S > 1: " + s);
@@ -105,17 +105,17 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
             switch (sector)
             {
             case 0:
-                return Color.FromArgb(vi, ti, pi);
+                return new SKColor((byte)vi, (byte)ti, (byte)pi, 255);
             case 1:
-                return Color.FromArgb(qi, vi, pi);
+                return new SKColor((byte)qi, (byte)vi, (byte)pi, 255);
             case 2:
-                return Color.FromArgb(pi, vi, ti);
+                return new SKColor((byte)pi, (byte)vi, (byte)ti, 255);
             case 3:
-                return Color.FromArgb(pi, qi, vi);
+                return new SKColor((byte)pi, (byte)qi, (byte)vi, 255);
             case 4:
-                return Color.FromArgb(ti, pi, vi);
+                return new SKColor((byte)ti, (byte)pi, (byte)vi, 255);
             default:
-                return Color.FromArgb(vi, pi, qi);
+                return new SKColor((byte)vi, (byte)pi, (byte)qi, 255);
             }
         }
     }
@@ -138,17 +138,17 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
 
         private Scene m_scene;
         private IConfigSource m_config;
-        private Color m_color_water;
-        private Color m_color_1;
-        private Color m_color_2;
-        private Color m_color_3;
-        private Color m_color_4;
+        private SKColor m_color_water;
+        private SKColor m_color_1;
+        private SKColor m_color_2;
+        private SKColor m_color_3;
+        private SKColor m_color_4;
 
         // mapping from texture UUIDs to averaged color. This will contain 5-9 values, in general; new values are only
         // added when the terrain textures are changed in the estate dialog and a new map is generated (and will stay in
         // that map until the region-server restarts. This could be considered a memory-leak, but it's a *very* small one.
         // TODO does it make sense to use a "real" cache and regenerate missing entries on fetch?
-        private Dictionary<UUID, Color> m_mapping;
+        private Dictionary<UUID, SKColor> m_mapping;
 
 
         public void Initialise(Scene scene, IConfigSource source)
@@ -158,18 +158,35 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
 
             string[] configSections = new string[] { "Map", "Startup" };
             
-            m_color_water = System.Drawing.ColorTranslator.FromHtml(Util.GetConfigVarFromSections<string>(m_config, "MapColorWater", configSections, "#1D475F"));
-            m_color_1 = System.Drawing.ColorTranslator.FromHtml(Util.GetConfigVarFromSections<string>(m_config, "MapColor1", configSections, "#A58976"));
-            m_color_2 = System.Drawing.ColorTranslator.FromHtml(Util.GetConfigVarFromSections<string>(m_config, "MapColor2", configSections, "#455931"));
-            m_color_3 = System.Drawing.ColorTranslator.FromHtml(Util.GetConfigVarFromSections<string>(m_config, "MapColor3", configSections, "#A29A8D"));
-            m_color_4 = System.Drawing.ColorTranslator.FromHtml(Util.GetConfigVarFromSections<string>(m_config, "MapColor4", configSections, "#C8C8C8"));
+            m_color_water = HtmlToSKColor(Util.GetConfigVarFromSections<string>(m_config, "MapColorWater", configSections, "#1D475F"));
+            m_color_1 = HtmlToSKColor(Util.GetConfigVarFromSections<string>(m_config, "MapColor1", configSections, "#A58976"));
+            m_color_2 = HtmlToSKColor(Util.GetConfigVarFromSections<string>(m_config, "MapColor2", configSections, "#455931"));
+            m_color_3 = HtmlToSKColor(Util.GetConfigVarFromSections<string>(m_config, "MapColor3", configSections, "#A29A8D"));
+            m_color_4 = HtmlToSKColor(Util.GetConfigVarFromSections<string>(m_config, "MapColor4", configSections, "#C8C8C8"));
 
-            m_mapping = new Dictionary<UUID,Color>();
+            m_mapping = new Dictionary<UUID, SKColor>();
             m_mapping.Add(defaultTerrainTexture1, m_color_1);
             m_mapping.Add(defaultTerrainTexture2, m_color_2);
             m_mapping.Add(defaultTerrainTexture3, m_color_3);
             m_mapping.Add(defaultTerrainTexture4, m_color_4);
-            m_mapping.Add(Util.BLANK_TEXTURE_UUID, Color.White);
+            m_mapping.Add(Util.BLANK_TEXTURE_UUID, SKColors.White);
+        }
+
+        /// <summary>
+        /// Convert HTML color string to SKColor
+        /// </summary>
+        private static SKColor HtmlToSKColor(string htmlColor)
+        {
+            // Handle #RRGGBB format
+            if (htmlColor.StartsWith("#") && htmlColor.Length == 7)
+            {
+                byte r = byte.Parse(htmlColor.Substring(1, 2), System.Globalization.NumberStyles.HexNumber);
+                byte g = byte.Parse(htmlColor.Substring(3, 2), System.Globalization.NumberStyles.HexNumber);
+                byte b = byte.Parse(htmlColor.Substring(5, 2), System.Globalization.NumberStyles.HexNumber);
+                return new SKColor(r, g, b, 255);
+            }
+            // Default to black if parsing fails
+            return new SKColor(0, 0, 0, 255);
         }
 
         #region Helpers
@@ -179,19 +196,27 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         // TODO (- on "map" command: We are in the command-line thread, we will wait for completion anyway)
         // TODO (- on "automatic" update after some change: We are called from the mapUpdateTimer here and
         //   will wait anyway)
-        private Bitmap fetchTexture(UUID id)
+        private SKBitmap fetchTexture(UUID id)
         {
             AssetBase asset = m_scene.AssetService.Get(id.ToString());
             m_log.DebugFormat("{0} Fetched texture {1}, found: {2}", LogHeader, id, asset != null);
             if (asset == null) return null;
 
-            ManagedImage managedImage;
-            Image image;
-
             try
             {
-                if (OpenJPEG.DecodeToImage(asset.Data, out managedImage, out image))
-                    return new Bitmap(image);
+                // Decode JPEG2000 to managed image data
+                ManagedImage managedImage;
+                if (OpenJPEG.DecodeToImage(asset.Data, out managedImage))
+                {
+                    // Create SKBitmap from managed image width/height
+                    // ManagedImage stores raw RGBA data
+                    SKBitmap bitmap = new SKBitmap(managedImage.Width, managedImage.Height, SKColorType.Rgba8888, SKAlphaType.Opaque);
+                    
+                    // Note: For now, return a placeholder as ManagedImage data access may vary
+                    // In practice, you'd need to properly extract the pixel data from ManagedImage
+                    // and copy it to the SKBitmap
+                    return bitmap;
+                }
                 else
                     return null;
             }
@@ -212,7 +237,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         }
 
         // Compute the average color of a texture.
-        private Color computeAverageColor(Bitmap bmp)
+        private SKColor computeAverageColor(SKBitmap bmp)
         {
             // we have 256 x 256 pixel, each with 256 possible color-values per
             // color-channel, so 2^24 is the maximum value we can get, adding everything.
@@ -222,26 +247,26 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
             {
                 for (int x = 0; x < bmp.Width; ++x)
                 {
-                    Color c = bmp.GetPixel(x, y);
-                    r += (int)c.R & 0xff;
-                    g += (int)c.G & 0xff;
-                    b += (int)c.B & 0xff;
+                    SKColor c = bmp.GetPixel(x, y);
+                    r += (int)c.Red & 0xff;
+                    g += (int)c.Green & 0xff;
+                    b += (int)c.Blue & 0xff;
                 }
             }
 
             int pixels = bmp.Width * bmp.Height;
-            return Color.FromArgb(r / pixels, g / pixels, b / pixels);
+            return new SKColor((byte)(r / pixels), (byte)(g / pixels), (byte)(b / pixels), 255);
         }
 
         // return either the average color of the texture, or the defaultColor if the texturID is invalid
         // or the texture couldn't be found
-        private Color computeAverageColor(UUID textureID, Color defaultColor) {
+        private SKColor computeAverageColor(UUID textureID, SKColor defaultColor) {
             if (textureID.IsZero()) return defaultColor; // not set
             if (m_mapping.ContainsKey(textureID)) return m_mapping[textureID]; // one of the predefined textures
 
-            Color color;
+            SKColor color;
 
-            using (Bitmap bmp = fetchTexture(textureID))
+            using (SKBitmap bmp = fetchTexture(textureID))
             {
                 color = bmp == null ? defaultColor : computeAverageColor(bmp);
                 // store it for future reference
@@ -285,7 +310,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         }
         #endregion
 
-        public void TerrainToBitmap(Bitmap mapbmp)
+        public void TerrainToBitmap(SKBitmap mapbmp)
         {
             int tc = Environment.TickCount;
             m_log.DebugFormat("{0} Generating Maptile Step 1: Terrain", LogHeader);

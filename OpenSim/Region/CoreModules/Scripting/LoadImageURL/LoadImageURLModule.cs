@@ -26,7 +26,7 @@
  */
 
 using System;
-using System.Drawing;
+using SkiaSharp;
 using System.IO;
 using System.Net;
 using Nini.Config;
@@ -175,143 +175,133 @@ namespace OpenSim.Region.CoreModules.Scripting.LoadImageURL
             if (!m_outboundUrlFilter.CheckAllowed(new Uri(url)))
                 return false;
 
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-            request.AllowAutoRedirect = false;
-
-            if(m_proxy is not null)
-                request.Proxy = m_proxy;
-
-            RequestState state = new RequestState(request, requestID);
-            // IAsyncResult result = request.BeginGetResponse(new AsyncCallback(HttpRequestReturn), state);
-            request.BeginGetResponse(HttpRequestReturn, state);
+            var client = new System.Net.Http.HttpClient();
+            var requestState = new RequestState(url, requestID);
+            client.GetAsync(url).ContinueWith((task) => HttpRequestReturn(task, requestState));
             return true;
         }
 
-        private void HttpRequestReturn(IAsyncResult result)
+        private void HttpRequestReturn(System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> task, RequestState state)
         {
             if (m_textureManager == null)
                 return;
 
-            RequestState state = (RequestState) result.AsyncState;
-            WebRequest request = (WebRequest) state.Request;
-            Stream stream = null;
             byte[] imageJ2000 = Array.Empty<byte>();
-            Size newSize = new Size(0, 0);
-            HttpWebResponse response = null;
+            (int width, int height) newSize = (0, 0);
 
             try
             {
-                response = (HttpWebResponse)request.EndGetResponse(result);
-                if (response != null && response.StatusCode == HttpStatusCode.OK)
+                if (task.IsCompletedSuccessfully)
                 {
-                    stream = response.GetResponseStream();
-                    if (stream != null)
+                    var response = task.Result;
+                    if (response.IsSuccessStatusCode)
                     {
-                        try
+                        var content = response.Content.ReadAsStreamAsync().Result;
+                        if (content != null)
                         {
-                            using(Bitmap image = new Bitmap(stream))
+                            try
                             {
-                                // TODO: make this a bit less hard coded
-                                if((image.Height < 64) && (image.Width < 64))
+                                var image = SKImage.FromEncodedData(content);
+                                if (image != null)
                                 {
-                                    newSize.Width = 32;
-                                    newSize.Height = 32;
-                                }
-                                else if((image.Height < 128) && (image.Width < 128))
-                                {
-                                    newSize.Width = 64;
-                                    newSize.Height = 64;
-                                }
-                                else if((image.Height < 256) && (image.Width < 256))
-                                {
-                                    newSize.Width = 128;
-                                    newSize.Height = 128;
-                                }
-                                else if((image.Height < 512 && image.Width < 512))
-                                {
-                                    newSize.Width = 256;
-                                    newSize.Height = 256;
-                                }
-                                else if((image.Height < 1024 && image.Width < 1024))
-                                {
-                                    newSize.Width = 512;
-                                    newSize.Height = 512;
-                                }
-                                else
-                                {
-                                    newSize.Width = 1024;
-                                    newSize.Height = 1024;
-                                }
+                                    // TODO: make this a bit less hard coded
+                                    if ((image.Height < 64) && (image.Width < 64))
+                                    {
+                                        newSize.width = 32;
+                                        newSize.height = 32;
+                                    }
+                                    else if ((image.Height < 128) && (image.Width < 128))
+                                    {
+                                        newSize.width = 64;
+                                        newSize.height = 64;
+                                    }
+                                    else if ((image.Height < 256) && (image.Width < 256))
+                                    {
+                                        newSize.width = 128;
+                                        newSize.height = 128;
+                                    }
+                                    else if ((image.Height < 512 && image.Width < 512))
+                                    {
+                                        newSize.width = 256;
+                                        newSize.height = 256;
+                                    }
+                                    else if ((image.Height < 1024 && image.Width < 1024))
+                                    {
+                                        newSize.width = 512;
+                                        newSize.height = 512;
+                                    }
+                                    else
+                                    {
+                                        newSize.width = 1024;
+                                        newSize.height = 1024;
+                                    }
 
-                                if(newSize.Width != image.Width || newSize.Height != image.Height)
-                                {
-                                    using(Bitmap resize = new Bitmap(image, newSize))
-                                     imageJ2000 = OpenJPEG.EncodeFromImage(resize, false);
+                                    if (newSize.width != image.Width || newSize.height != image.Height)
+                                    {
+                                        // Resize the image using SkiaSharp
+                                        var info = new SKImageInfo(newSize.width, newSize.height);
+                                        using (var surface = SKSurface.Create(info))
+                                        {
+                                            var canvas = surface.Canvas;
+                                            var srcRect = SKRect.Create(0, 0, image.Width, image.Height);
+                                            var dstRect = SKRect.Create(0, 0, newSize.width, newSize.height);
+                                            canvas.DrawImage(image, srcRect, dstRect);
+                                            canvas.Flush();
+
+                                            using (var resized = surface.Snapshot())
+                                            {
+                                                var encoded = resized.Encode(SKEncodedImageFormat.Jpeg, 100);
+                                                imageJ2000 = encoded.ToArray();
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        var encoded = image.Encode(SKEncodedImageFormat.Jpeg, 100);
+                                        imageJ2000 = encoded.ToArray();
+                                    }
+
+                                    image.Dispose();
                                 }
-                                else
-                                    imageJ2000 = OpenJPEG.EncodeFromImage(image, false);
+                            }
+                            catch (Exception)
+                            {
+                                m_log.Error("[LOADIMAGEURLMODULE]: Image Conversion Failed.  Empty byte data returned!");
                             }
                         }
-                        catch (Exception)
+                        else
                         {
-                            m_log.Error("[LOADIMAGEURLMODULE]: OpenJpeg Conversion Failed.  Empty byte data returned!");
+                            m_log.WarnFormat("[LOADIMAGEURLMODULE] No data returned");
                         }
                     }
-                    else
-                    {
-                        m_log.WarnFormat("[LOADIMAGEURLMODULE] No data returned");
-                    }
+                    response.Dispose();
                 }
-            }
-            catch (WebException)
-            {
             }
             catch (Exception e)
             {
                 m_log.ErrorFormat("[LOADIMAGEURLMODULE]: unexpected exception {0}", e.Message);
             }
-            finally
-            {
-                if (stream != null)
-                    stream.Close();
 
-                if (response != null)
-                {
-                    if (response.StatusCode == HttpStatusCode.MovedPermanently
-                            || response.StatusCode == HttpStatusCode.Found
-                            || response.StatusCode == HttpStatusCode.SeeOther
-                            || response.StatusCode == HttpStatusCode.TemporaryRedirect)
-                    {
-                        string redirectedUrl = response.Headers["Location"];
+            m_log.DebugFormat("[LOADIMAGEURLMODULE]: Returning {0} bytes of image data for request {1}",
+                              imageJ2000.Length, state.RequestID);
 
-                        MakeHttpRequest(redirectedUrl, state.RequestID);
-                    }
-                    else
-                    {
-                        m_log.DebugFormat("[LOADIMAGEURLMODULE]: Returning {0} bytes of image data for request {1}",
-                                          imageJ2000.Length, state.RequestID);
-
-                        m_textureManager.ReturnData(
-                            state.RequestID,
-                            new OpenSim.Region.CoreModules.Scripting.DynamicTexture.DynamicTexture(
-                            request.RequestUri, null, imageJ2000, newSize, false));
-                    }
-                    response.Close();
-                }
-            }
+            m_textureManager.ReturnData(
+                state.RequestID,
+                new OpenSim.Region.CoreModules.Scripting.DynamicTexture.DynamicTexture(
+                state.Url, null, imageJ2000, newSize, false));
         }
 
         #region Nested type: RequestState
 
         public class RequestState
         {
-            public HttpWebRequest Request = null;
+            public string Url = null;
             public UUID RequestID = UUID.Zero;
             public int TimeOfRequest = 0;
 
-            public RequestState(HttpWebRequest request, UUID requestID)
+            public RequestState(string url, UUID requestID)
             {
-                Request = request;
+                Url = url;
                 RequestID = requestID;
                 TimeOfRequest = Util.UnixTimeSinceEpoch();
             }

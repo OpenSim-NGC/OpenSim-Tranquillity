@@ -2,80 +2,40 @@
 
 get or update source from git
 
- `git clone git://opensimulator.org/git/opensim`
-	
-
-
-# Building on Windows
-
-## Requirements
-  For building under Windows, the following is required:
-  * [Microsoft DotNet 6.0](https://dotnet.microsoft.com/en-us/download), version 6.0 or later. 
-
-  dotnet 8.0 is the LTS version and is recommended.
-  To building under Windows, the following is required:
-
-  * [dotnet 8.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
-
-optionally also
-
-  * [Visual Studio .NET](https://visualstudio.microsoft.com/vs/features/net-development/), version 2022 or later
+ `git clone https://github.com/OpenSim-NGC/OpenSim-Tranquillity.git`
   
-
 ### Building
  Prebuild is no longer used.  There is a top level Solution (sln) and csproj files for each
- of the projects in the solution.  To run a build use either Visual Studio Community (recommended on Windows)
- or from a CLI run:`
+ of the projects in the solution.  The projects are designed to be publishable which 
+ optimizes the build for a specific platform.  Future versions will support building into a '
+ container and AOT compilation:
  
- dotnet build --configuration Debug
- dotnet build --configuration Release
+ To run a build from a CLI run:
 
-Either command will do a NuGet restore (dotnet restore) to restore any required NuGet package references prior to
-kicking off a build using a current version of msbuild.  The Csproj and SLN files are all designed to use the new
-format for Msbuild which is simplified and really directly replaces what prebuild provided.
+ dotnet publish --configuration Debug -r linux-x64
+ dotnet publish --configuration Release -r linux-x64
 
-run 
-  `compile.bat`
+ dotnet publish --configuration Debug -r win-x64
+ dotnet publish --configuration Release -r win-x64
 
-Or load the generated OpenSim.sln into Visual Studio or Visual Studio Code and build the solution.
+If no configuration is specified the default is a release build. If no platform is specified default 
+is the platform being used for the compilation.
 
-Configure, see below
+The output from the publish will be in build/<Configuration>/net8.0/<platform>/
 
-The resulting build will be generated to ./build/{Debug|Release}/
+Where Configuration is either Debug or Release and Platform is either linux-x64 or win-x64 as shown above.
 
-# Building on Linux / Mac
-
-## Requirements
-
- * [dotnet 8.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
- * libgdiplus 
- 
- if you have mono 6.x complete, you already have libgdiplus, otherwise you need to install it
- using a package manager for your operating system, like apt, brew, macports, etc
- for example on debian:
- 
- `apt-get update && apt-get install -y apt-utils libgdiplus libc6-dev`
-
-### Building
- Prebuild is no longer used.  There is a top level Solution (sln) and csproj files for each
- of the projects in the solution.  To run a build from a CLI run:
- 
- dotnet build --configuration Debug
- dotnet build --configuration Release
-
-Either command will do a NuGet restore (dotnet restore) to restore any required NuGet package references prior to
+Either configuration will do a NuGet restore (dotnet restore) to restore any required NuGet package references prior to
 kicking off a build using a current version of msbuild.  The Csproj and SLN files are all designed to use the new
 format for Msbuild which is simplified and really directly replaces what prebuild provided.
 
 Configure. See below
 
-The resulting build will be generated to ./build/{Debug|Release}/
-
 For rebuilding and debugging use the dotnet command options
   *  clean:  `dotnet clean
   *  restore: dotnet restore
-  *  debug:   dotnet build --configuration Debug
-  *  release: dotnet build --configuration Release
+  *  debug:   dotnet publish --configuration Debug
+  *  release: dotnet publish --configuration Release
 
 # Configure #
 ## Standalone mode ##
@@ -93,12 +53,6 @@ Each grid may have its own requirements, so FOLLOW your Grid instructions!
 in general:
 Copy `OpenSim.ini.example` to `OpenSim.ini` in the `bin/` directory, and verify the `[Const]` section, correcting for your case
  
-On `[Architecture]` section uncomment only the line with Grid.ini if you do now want HG, or the line with GridHypergrid.ini if you do
+On `[Architecture]` section uncomment only the line with Grid.ini if you do not want HG, or the line with GridHypergrid.ini if you do
 
 and copy the `GridCommon.ini.example` file to `GridCommon.ini` inside the `bin/config-include` directory and edit as necessary
-
-
-
-# References
-
-* http://opensimulator.org/wiki/Configuration

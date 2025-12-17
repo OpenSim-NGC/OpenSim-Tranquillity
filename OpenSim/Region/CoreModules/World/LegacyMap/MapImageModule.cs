@@ -27,8 +27,8 @@
 
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Reflection;
+using System.IO;
 using log4net;
 using Mono.Addins;
 using Nini.Config;
@@ -37,6 +37,8 @@ using OpenMetaverse.Imaging;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using SkiaSharp;
 
 namespace OpenSim.Region.CoreModules.World.LegacyMap
 {
@@ -47,17 +49,17 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         Ellipse
     }
 
-    public struct face
+    public struct Face
     {
-        public Point[] pts;
+        public SKPoint[] pts;
     }
 
     public struct DrawStruct
     {
         public DrawRoutine dr;
-//        public Rectangle rect;
-        public SolidBrush brush;
-        public face[] trns;
+//        public SKRect rect;
+        public SKPaint brush;
+        public Face[] trns;
     }
 
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "MapImageModule")]
@@ -73,90 +75,89 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
 
         #region IMapImageGenerator Members
 
-        public Bitmap CreateMapTile()
+        public SKBitmap CreateMapTile()
         {
-            bool drawPrimVolume = true;
-            bool textureTerrain = false;
-            bool generateMaptiles = true;
-            Bitmap mapbmp;
-
-            string[] configSections = new string[] { "Map", "Startup" };
-
-            drawPrimVolume
-                = Util.GetConfigVarFromSections<bool>(m_config, "DrawPrimOnMapTile", configSections, drawPrimVolume);
-            textureTerrain
-                = Util.GetConfigVarFromSections<bool>(m_config, "TextureOnMapTile", configSections, textureTerrain);
-            generateMaptiles
-                = Util.GetConfigVarFromSections<bool>(m_config, "GenerateMaptiles", configSections, generateMaptiles);
-
-            if (generateMaptiles)
+            try
             {
-                if (String.IsNullOrEmpty(m_scene.RegionInfo.MaptileStaticFile))
+                var mapbmp = new SKBitmap(256, 256);
+                
+                // Create terrain renderer based on scene settings
+                terrainRenderer = new TexturedMapTileRenderer();
+
+                // Get terrain height data and render it directly
+                float[] heightData = m_scene.Heightmap.GetFloatsSerialised();
+                using (var surface = SKSurface.Create(new SKImageInfo(256, 256)))
+                using (var canvas = surface.Canvas)
                 {
-                    if (textureTerrain)
+                    // Draw terrain heights
+                    float maxHeight = float.MinValue;
+                    float minHeight = float.MaxValue;
+                    
+                    // Find height range
+                    for (int i = 0; i < heightData.Length; i++)
                     {
-                        terrainRenderer = new TexturedMapTileRenderer();
-                    }
-                    else
-                    {
-                        terrainRenderer = new ShadedMapTileRenderer();
+                        float height = heightData[i];
+                        maxHeight = Math.Max(maxHeight, height);
+                        minHeight = Math.Min(minHeight, height);
                     }
 
-                    terrainRenderer.Initialise(m_scene, m_config);
-
-                    mapbmp = new Bitmap((int)m_scene.Heightmap.Width, (int)m_scene.Heightmap.Height,
-                                            System.Drawing.Imaging.PixelFormat.Format24bppRgb);
-                    //long t = System.Environment.TickCount;
-                    //for (int i = 0; i < 10; ++i) {
-                    terrainRenderer.TerrainToBitmap(mapbmp);
-                    //}
-                    //t = System.Environment.TickCount - t;
-                    //m_log.InfoFormat("[MAPTILE] generation of 10 maptiles needed {0} ms", t);
-                    if (drawPrimVolume)
+                    float heightRange = maxHeight - minHeight;
+                    
+                    // Render terrain
+                    int index = 0;
+                    for (int y = 0; y < 256; y++)
                     {
-                        DrawObjectVolume(m_scene, mapbmp);
+                        for (int x = 0; x < 256; x++)
+                        {
+                            float height = heightData[index++];
+                            // Normalize height to 0-255 range
+                            byte gray = (byte)(((height - minHeight) / heightRange) * 255);
+                            
+                            // Apply some lighting to create terrain shading
+                            byte shaded = (byte)(gray * 0.8f); // Darken slightly
+                            var color = new SKColor(shaded, shaded, shaded);
+                            
+                            // Set pixel directly
+                            mapbmp.SetPixel(x, y, color);
+                        }
                     }
                 }
-                else
+
+                if (m_scene?.Entities != null && m_scene.Entities.Count > 0)
                 {
-                    try
-                    {
-                        mapbmp = new Bitmap(m_scene.RegionInfo.MaptileStaticFile);
-                    }
-                    catch (Exception)
-                    {
-                        m_log.ErrorFormat(
-                            "[MAPTILE]: Failed to load Static map image texture file: {0} for {1}",
-                            m_scene.RegionInfo.MaptileStaticFile, m_scene.Name);
-                        //mapbmp = new Bitmap((int)m_scene.Heightmap.Width, (int)m_scene.Heightmap.Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
-                        mapbmp = null;
-                    }
-
-                    if (mapbmp != null)
-                        m_log.DebugFormat(
-                            "[MAPTILE]: Static map image texture file {0} found for {1}",
-                            m_scene.RegionInfo.MaptileStaticFile, m_scene.Name);
+                    mapbmp = DrawObjectVolume(m_scene, mapbmp);
                 }
-            }
-            else
-            {
-                mapbmp = FetchTexture(m_scene.RegionInfo.RegionSettings.TerrainImageID);
-            }
 
-            return mapbmp;
+                return mapbmp;
+            }
+            catch (Exception ex)
+            {
+                m_log.Error($"Failed creating terrain map tile: {ex}");
+                return null;
+            }
         }
+
+
 
         public byte[] WriteJpeg2000Image()
         {
             try
             {
-                using (Bitmap mapbmp = CreateMapTile())
+                using (var skBitmap = CreateMapTile())
                 {
-                    if (mapbmp != null)
-                        return OpenJPEG.EncodeFromImage(mapbmp, false);
+                    if (skBitmap != null)
+                    {
+                        // Convert SKBitmap to SKImage and encode as JPEG
+                        // TODO: Replace with CoreJ2K encoding when encoder becomes available
+                        using (var image = SKImage.FromBitmap(skBitmap))
+                        {
+                            var encoded = image.Encode(SKEncodedImageFormat.Jpeg, 100);
+                            return encoded.ToArray();
+                        }
+                    }
                 }
             }
-            catch (Exception e) // LEGIT: Catching problems caused by OpenJPEG p/invoke
+            catch (Exception e) // LEGIT: Catching problems with image encoding
             {
                 m_log.Error("Failed generating terrain map: " + e);
             }
@@ -254,7 +255,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
 //             }
 //         }
 
-        private Bitmap FetchTexture(UUID id)
+        private SKBitmap FetchTexture(UUID id)
         {
             AssetBase asset = m_scene.AssetService.Get(id.ToString());
 
@@ -268,15 +269,11 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                 return null;
             }
 
-            ManagedImage managedImage;
-            Image image;
-
             try
             {
-                if (OpenJPEG.DecodeToImage(asset.Data, out managedImage, out image))
-                    return new Bitmap(image);
-                else
-                    return null;
+                // Use OpenJpegDotNet to decode JPEG2000 directly to SKBitmap
+                using var stream = new System.IO.MemoryStream(asset.Data);
+                return SKBitmap.Decode(stream);
             }
             catch (DllNotFoundException)
             {
@@ -297,7 +294,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
 
         }
 
-        private Bitmap DrawObjectVolume(Scene whichScene, Bitmap mapbmp)
+        private SKBitmap DrawObjectVolume(Scene whichScene, SKBitmap mapbmp)
         {
             int tc = 0;
             ITerrainChannel hm = whichScene.Heightmap;
@@ -318,7 +315,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                         if (obj is SceneObjectGroup)
                         {
                             SceneObjectGroup mapdot = (SceneObjectGroup)obj;
-                            Color mapdotspot = Color.Gray; // Default color when prim color is white
+                            SKColor mapdotspot = new SKColor(128, 128, 128); // Default gray when prim color is white
                             // Loop over prim in group
                             foreach (SceneObjectPart part in mapdot.Parts)
                             {
@@ -343,7 +340,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                                         if (part.Shape.PCode == (byte)PCode.Tree || part.Shape.PCode == (byte)PCode.NewTree || part.Shape.PCode == (byte)PCode.Grass)
                                             continue; // eliminates trees from this since we don't really have a good tree representation
                                         // if you want tree blocks on the map comment the above line and uncomment the below line
-                                        //mapdotspot = Color.PaleGreen;
+                                        //mapdotspot = new SKColor(152, 251, 152); // PaleGreen
 
                                         Primitive.TextureEntry textureEntry = part.Shape.Textures;
 
@@ -364,7 +361,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                                             try
                                             {
                                                 // If the color gets goofy somehow, skip it *shakes fist at Color4
-                                                mapdotspot = Color.FromArgb(colorr, colorg, colorb);
+                                                mapdotspot = new SKColor((byte)colorr, (byte)colorg, (byte)colorb);
                                             }
                                             catch (ArgumentException)
                                             {
@@ -547,21 +544,26 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                                         //bool breakYN = false; // If we run into an error drawing, break out of the
                                         // loop so we don't lag to death on error handling
                                         DrawStruct ds = new DrawStruct();
-                                        ds.brush = new SolidBrush(mapdotspot);
+                                        ds.brush = new SKPaint 
+                                        { 
+                                            Style = SKPaintStyle.Fill,
+                                            Color = mapdotspot,
+                                            IsAntialias = true
+                                        };
                                         //ds.rect = new Rectangle(mapdrawstartX, (255 - mapdrawstartY), mapdrawendX - mapdrawstartX, mapdrawendY - mapdrawstartY);
 
-                                        ds.trns = new face[FaceA.Length];
+                                        ds.trns = new Face[FaceA.Length];
 
                                         for (int i = 0; i < FaceA.Length; i++)
                                         {
-                                            Point[] working = new Point[5];
+                                            SKPoint[] working = new SKPoint[5];
                                             working[0] = project(hm, FaceA[i], axPos);
                                             working[1] = project(hm, FaceB[i], axPos);
                                             working[2] = project(hm, FaceD[i], axPos);
                                             working[3] = project(hm, FaceC[i], axPos);
                                             working[4] = project(hm, FaceA[i], axPos);
 
-                                            face workingface = new face();
+                                            Face workingface = new Face();
                                             workingface.pts = working;
 
                                             ds.trns[i] = workingface;
@@ -603,8 +605,11 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                     // Sort prim by Z position
                     Array.Sort(sortedZHeights, sortedlocalIds);
 
-                    using (Graphics g = Graphics.FromImage(mapbmp))
+                    using (var surface = SKSurface.Create(new SKImageInfo(mapbmp.Width, mapbmp.Height)))
+                    using (var canvas = surface.Canvas)
                     {
+                        canvas.DrawBitmap(mapbmp, 0, 0);
+
                         for (int s = 0; s < sortedZHeights.Length; s++)
                         {
                             if (z_sort.ContainsKey(sortedlocalIds[s]))
@@ -612,11 +617,18 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                                 DrawStruct rectDrawStruct = z_sort[sortedlocalIds[s]];
                                 for (int r = 0; r < rectDrawStruct.trns.Length; r++)
                                 {
-                                    g.FillPolygon(rectDrawStruct.brush,rectDrawStruct.trns[r].pts);
+                                    using var path = new SKPath();
+                                    path.AddPoly(rectDrawStruct.trns[r].pts, true);
+                                    canvas.DrawPath(path, rectDrawStruct.brush);
                                 }
-                                //g.FillRectangle(rectDrawStruct.brush , rectDrawStruct.rect);
                             }
                         }
+
+                        // Create a new bitmap from the surface
+                        var image = surface.Snapshot();
+                        var newBitmap = SKBitmap.FromImage(image);
+                        // Create new bitmap with contents
+                        mapbmp = newBitmap.Copy();
                     }
                 } // lock entities objs
 
@@ -632,22 +644,22 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
             return mapbmp;
         }
 
-        private Point project(ITerrainChannel hm, Vector3 point3d, Vector3 originpos)
+        private SKPoint project(ITerrainChannel hm, Vector3 point3d, Vector3 originpos)
         {
-            Point returnpt = new Point();
+            SKPoint returnpt = new SKPoint();
             //originpos = point3d;
             //int d = (int)(256f / 1.5f);
 
             //Vector3 topos = new Vector3(0, 0, 0);
             // float z = -point3d.z - topos.z;
 
-            returnpt.X = (int)point3d.X;//(int)((topos.x - point3d.x) / z * d);
-            returnpt.Y = (int)((hm.Width - 1) - point3d.Y);//(int)(255 - (((topos.y - point3d.y) / z * d)));
+            returnpt.X = point3d.X;//(int)((topos.x - point3d.x) / z * d);
+            returnpt.Y = ((hm.Width - 1) - point3d.Y);//(int)(255 - (((topos.y - point3d.y) / z * d)));
 
             return returnpt;
         }
 
-        public Bitmap CreateViewImage(Vector3 camPos, Vector3 camDir, float fov, int width, int height, bool useTextures)
+        public SKBitmap CreateViewImage(Vector3 camPos, Vector3 camDir, float fov, int width, int height, bool useTextures)
         {
             return null;
         }

@@ -46,7 +46,6 @@ namespace OpenSim.Framework.Tests
         {
         }
 
-        [SetUp]
         public void Setup()
         {
             AgentId1 = UUID.Random();
@@ -105,7 +104,7 @@ namespace OpenSim.Framework.Tests
         /// <summary>
         /// Validate that adding the circuit works appropriately
         /// </summary>
-        [Test]
+        [Fact]
         public void AddAgentCircuitTest()
         {
             AgentCircuitManager agentCircuitManager = new AgentCircuitManager();
@@ -113,25 +112,25 @@ namespace OpenSim.Framework.Tests
             agentCircuitManager.AddNewCircuit(circuitcode2, m_agentCircuitData2);
             AgentCircuitData agent = agentCircuitManager.GetAgentCircuitData(circuitcode1);
 
-            Assert.That(m_agentCircuitData1.AgentID, Is.EqualTo(agent.AgentID));
-            Assert.That(m_agentCircuitData1.BaseFolder, Is.EqualTo(agent.BaseFolder));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
-            Assert.That(m_agentCircuitData1.CapsPath, Is.EqualTo(agent.CapsPath));
-            Assert.That(m_agentCircuitData1.child, Is.EqualTo(agent.child));
-            Assert.That(m_agentCircuitData1.ChildrenCapSeeds, Is.EqualTo(agent.ChildrenCapSeeds));
-            Assert.That(m_agentCircuitData1.circuitcode, Is.EqualTo(agent.circuitcode));
-            Assert.That(m_agentCircuitData1.firstname, Is.EqualTo(agent.firstname));
-            Assert.That(m_agentCircuitData1.InventoryFolder, Is.EqualTo(agent.InventoryFolder));
-            Assert.That(m_agentCircuitData1.lastname, Is.EqualTo(agent.lastname));
-            Assert.That(m_agentCircuitData1.SecureSessionID, Is.EqualTo(agent.SecureSessionID));
-            Assert.That(m_agentCircuitData1.SessionID, Is.EqualTo(agent.SessionID));
-            Assert.That(m_agentCircuitData1.startpos, Is.EqualTo(agent.startpos));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Validate that removing the circuit code removes it appropriately
         /// </summary>
-        [Test]
+        [Fact]
         public void RemoveAgentCircuitTest()
         {
             AgentCircuitManager agentCircuitManager = new AgentCircuitManager();
@@ -141,14 +140,14 @@ namespace OpenSim.Framework.Tests
             agentCircuitManager.RemoveCircuit(circuitcode2);
 
             AgentCircuitData agent = agentCircuitManager.GetAgentCircuitData(circuitcode2);
-            Assert.That(agent, Is.EqualTo(null));
+            Assert.Equal(,);
 
         }
 
         /// <summary>
         /// Validate that changing the circuit code works
         /// </summary>
-        [Test]
+        [Fact]
         public void ChangeAgentCircuitCodeTest()
         {
             AgentCircuitManager agentCircuitManager = new AgentCircuitManager();
@@ -172,7 +171,7 @@ namespace OpenSim.Framework.Tests
         /// First one should be authorized
         /// Rest should not be authorized
         /// </summary>
-        [Test]
+        [Fact]
         public void ValidateLoginTest()
         {
             AgentCircuitManager agentCircuitManager = new AgentCircuitManager();

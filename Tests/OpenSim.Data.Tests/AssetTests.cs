@@ -26,7 +26,7 @@
  */
 
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Tests.Common;
@@ -91,18 +91,18 @@ namespace OpenSim.Data.Tests
         }
 
 
-        [Test]
+        [Fact]
         public void T001_LoadEmpty()
         {
             TestHelpers.InMethod();
 
             bool[] exist = m_db.AssetsExist(new[] { uuid1, uuid2, uuid3 });
-            Assert.IsFalse(exist[0]);
-            Assert.IsFalse(exist[1]);
-            Assert.IsFalse(exist[2]);
+            Assert.False(exist[0]);
+            Assert.False(exist[1]);
+            Assert.False(exist[2]);
         }
 
-        [Test]
+        [Fact]
         public void T010_StoreReadVerifyAssets()
         {
             TestHelpers.InMethod();
@@ -161,9 +161,9 @@ namespace OpenSim.Data.Tests
             Assert.That(a3b, Constraints.PropertyCompareConstraint(a3a));
 
             bool[] exist = m_db.AssetsExist(new[] { uuid1, uuid2, uuid3 });
-            Assert.IsTrue(exist[0]);
-            Assert.IsTrue(exist[1]);
-            Assert.IsTrue(exist[2]);
+            Assert.True(exist[0]);
+            Assert.True(exist[1]);
+            Assert.True(exist[2]);
 
             List<AssetMetadata> metadatas = m_db.FetchAssetMetadataSet(0, 1000);
 
@@ -174,15 +174,15 @@ namespace OpenSim.Data.Tests
             if (metadatas.Count < 1000)
             {
                 AssetMetadata metadata = metadatas.Find(x => x.FullID == uuid1);
-                Assert.That(metadata.Name, Is.EqualTo(a1b.Name));
-                Assert.That(metadata.Description, Is.EqualTo(a1b.Description));
-                Assert.That(metadata.Type, Is.EqualTo(a1b.Type));
-                Assert.That(metadata.Temporary, Is.EqualTo(a1b.Temporary));
-                Assert.That(metadata.FullID, Is.EqualTo(a1b.FullID));
+                Assert.Equal(,);
+                Assert.Equal(,);
+                Assert.Equal(,);
+                Assert.Equal(,);
+                Assert.Equal(,);
             }
         }
 
-        [Test]
+        [Fact]
         public void T020_CheckForWeirdCreatorID()
         {
             TestHelpers.InMethod();

@@ -29,7 +29,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.Assets;
 using OpenMetaverse.StructuredData;
@@ -49,14 +49,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// <summary>
     /// Tests for inventory functions in LSL
     /// </summary>
-    [TestFixture]
     /*
     public class LSL_ApiInventoryTests : OpenSimTestCase
     {
         protected Scene m_scene;
         protected XEngine.XEngine m_engine;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -86,7 +84,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Test giving inventory from an object to an object where both are owned by the same user.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLlGiveInventoryO2OSameOwner()
         {
             TestHelpers.InMethod();
@@ -113,17 +111,17 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Item has copy permissions so original should stay intact.
             List<TaskInventoryItem> originalItems = so1.RootPart.Inventory.GetInventoryItems();
-            Assert.That(originalItems.Count, Is.EqualTo(1));
+            Assert.Equal(,);
 
             List<TaskInventoryItem> copiedItems = so2.RootPart.Inventory.GetInventoryItems(inventoryItemName);
-            Assert.That(copiedItems.Count, Is.EqualTo(1));
-            Assert.That(copiedItems[0].Name, Is.EqualTo(inventoryItemName));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test giving inventory from an object to an object where they have different owners
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLlGiveInventoryO2ODifferentOwners()
         {
             TestHelpers.InMethod();
@@ -154,11 +152,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             {
                 // Item has copy permissions so original should stay intact.
                 List<TaskInventoryItem> originalItems = so1.RootPart.Inventory.GetInventoryItems();
-                Assert.That(originalItems.Count, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 // Should have not copied
                 List<TaskInventoryItem> copiedItems = so2.RootPart.Inventory.GetInventoryItems(inventoryItemName);
-                Assert.That(copiedItems.Count, Is.EqualTo(0));
+                Assert.Equal(,);
             }
 
             // *** Secondly, we turn on allow inventory drop in the target and retest. ***
@@ -168,19 +166,19 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             {
                 // Item has copy permissions so original should stay intact.
                 List<TaskInventoryItem> originalItems = so1.RootPart.Inventory.GetInventoryItems();
-                Assert.That(originalItems.Count, Is.EqualTo(1));
+                Assert.Equal(,);
 
                 // Should now have copied.
                 List<TaskInventoryItem> copiedItems = so2.RootPart.Inventory.GetInventoryItems(inventoryItemName);
-                Assert.That(copiedItems.Count, Is.EqualTo(1));
-                Assert.That(copiedItems[0].Name, Is.EqualTo(inventoryItemName));
+                Assert.Equal(,);
+                Assert.Equal(,);
             }
         }
 
         /// <summary>
         /// Test giving inventory from an object to an avatar that is not the object's owner.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLlGiveInventoryO2DifferentAvatar()
         {
             TestHelpers.InMethod();
@@ -207,14 +205,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 = UserInventoryHelpers.GetInventoryItem(
                     m_scene.InventoryService, user2Id, string.Format("Objects/{0}", inventoryItemName));
 
-            Assert.IsNotNull(receivedItem);
+            Assert.NotNull(receivedItem);
         }
 
         /// <summary>
         /// Test giving inventory from an object to an avatar that is not the object's owner and where the next
         /// permissions do not include mod.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestLlGiveInventoryO2DifferentAvatarNoMod()
         {
             TestHelpers.InMethod();
@@ -243,11 +241,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 = UserInventoryHelpers.GetInventoryItem(
                     m_scene.InventoryService, user2Id, string.Format("Objects/{0}", inventoryItemName));
 
-            Assert.IsNotNull(receivedItem);
-            Assert.AreEqual(0, receivedItem.CurrentPermissions & (uint)PermissionMask.Modify);
+            Assert.NotNull(receivedItem);
+            Assert.Equal(0, receivedItem.CurrentPermissions & (uint)PermissionMask.Modify);
         }
 
-        [Test]
+        [Fact]
         public void TestLlRemoteLoadScriptPin()
         {
             TestHelpers.InMethod();
@@ -267,31 +265,31 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Test that we cannot load a script when the target pin has never been set (i.e. it is zero)
             api.llRemoteLoadScriptPin(targetSo.UUID.ToString(), "script", 0, 0, 0);
-            Assert.IsNull(targetSo.RootPart.Inventory.GetInventoryItem("script"));
+            Assert.Null(targetSo.RootPart.Inventory.GetInventoryItem("script"));
 
             // Test that we cannot load a script when the given pin does not match the target
             targetSo.RootPart.ScriptAccessPin = 5;
             api.llRemoteLoadScriptPin(targetSo.UUID.ToString(), "script", 3, 0, 0);
-            Assert.IsNull(targetSo.RootPart.Inventory.GetInventoryItem("script"));
+            Assert.Null(targetSo.RootPart.Inventory.GetInventoryItem("script"));
 
             // Test that we cannot load into a prim with a different owner
             otherOwnedTargetSo.RootPart.ScriptAccessPin = 3;
             api.llRemoteLoadScriptPin(otherOwnedTargetSo.UUID.ToString(), "script", 3, 0, 0);
-            Assert.IsNull(otherOwnedTargetSo.RootPart.Inventory.GetInventoryItem("script"));
+            Assert.Null(otherOwnedTargetSo.RootPart.Inventory.GetInventoryItem("script"));
 
             // Test that we can load a script when given pin and dest pin match.
             targetSo.RootPart.ScriptAccessPin = 3;
             api.llRemoteLoadScriptPin(targetSo.UUID.ToString(), "script", 3, 0, 0);
             TaskInventoryItem insertedItem = targetSo.RootPart.Inventory.GetInventoryItem("script");
-            Assert.IsNotNull(insertedItem);
+            Assert.NotNull(insertedItem);
 
             // Test that we can no longer load if access pin is unset
             targetSo.RootPart.Inventory.RemoveInventoryItem(insertedItem.ItemID);
-            Assert.IsNull(targetSo.RootPart.Inventory.GetInventoryItem("script"));
+            Assert.Null(targetSo.RootPart.Inventory.GetInventoryItem("script"));
 
             targetSo.RootPart.ScriptAccessPin = 0;
             api.llRemoteLoadScriptPin(otherOwnedTargetSo.UUID.ToString(), "script", 3, 0, 0);
-            Assert.IsNull(otherOwnedTargetSo.RootPart.Inventory.GetInventoryItem("script"));
+            Assert.Null(otherOwnedTargetSo.RootPart.Inventory.GetInventoryItem("script"));
         }
     }
     */

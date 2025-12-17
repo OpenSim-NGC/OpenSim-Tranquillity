@@ -42,14 +42,12 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.ClientStack.Linden.Tests
 {
-    [TestFixture]
     public class EventQueueTests : OpenSimTestCase
     {
         private TestScene m_scene;
         private EventQueueGetModule m_eqgMod;
         private NPCModule m_npcMod;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -79,7 +77,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
             SceneHelpers.SetupSceneModules(m_scene, config, capsModule, m_eqgMod, m_npcMod);
         }
 
-        [Test]
+        [Fact]
         public void TestAddForClient()
         {
             TestHelpers.InMethod();
@@ -88,10 +86,10 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
             SceneHelpers.AddScenePresence(m_scene, TestHelpers.ParseTail(0x1));
 
             // TODO: Add more assertions for the other aspects of event queues
-            Assert.That(MainServer.Instance.GetPollServiceHandlerKeys().Count, Is.EqualTo(1));
+            Assert.True(MainServer.Instance.GetPollServiceHandlerKeys().Count));
         }
 
-        [Test]
+        [Fact]
         public void TestRemoveForClient()
         {
             TestHelpers.InMethod();
@@ -103,10 +101,10 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
             m_scene.CloseAgent(spId, false);
 
             // TODO: Add more assertions for the other aspects of event queues
-            Assert.That(MainServer.Instance.GetPollServiceHandlerKeys().Count, Is.EqualTo(0));
+            Assert.True(MainServer.Instance.GetPollServiceHandlerKeys().Count));
         }
 
-        [Test]
+        [Fact]
         public void TestEnqueueMessage()
         {
             TestHelpers.InMethod();
@@ -129,7 +127,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
                     eventsResponse = m_eqgMod.GetEvents(UUID.Zero, sp.UUID);
             }
 
-            Assert.That((int)eventsResponse["int_response_code"], Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.True((int)eventsResponse["int_response_code"])HttpStatusCode.OK));
 
 //            Console.WriteLine("Response [{0}]", (string)eventsResponse["str_response_string"]);
             string data = String.Empty;
@@ -148,13 +146,13 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
                     foundUpdate = true;
             }
 
-            Assert.That(foundUpdate, Is.True, string.Format("Did not find {0} in response", messageName));
+            Assert.True(foundUpdate));
         }
 
         /// <summary>
         /// Test an attempt to put a message on the queue of a user that is not in the region.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestEnqueueMessageNoUser()
         {
             TestHelpers.InMethod();
@@ -166,13 +164,13 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
 
             Hashtable eventsResponse = m_eqgMod.GetEvents(UUID.Zero, TestHelpers.ParseTail(0x1));
 
-            Assert.That((int)eventsResponse["int_response_code"], Is.EqualTo((int)HttpStatusCode.NotFound));
+            Assert.True((int)eventsResponse["int_response_code"])HttpStatusCode.NotFound));
         }
 
         /// <summary>
         /// NPCs do not currently have an event queue but a caller may try to send a message anyway, so check behaviour.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestEnqueueMessageToNpc()
         {
             TestHelpers.InMethod();
@@ -190,7 +188,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
 
             Hashtable eventsResponse = m_eqgMod.GetEvents(UUID.Zero, npc.UUID);
 
-            Assert.That((int)eventsResponse["int_response_code"], Is.EqualTo((int)HttpStatusCode.NotFound));
+            Assert.True((int)eventsResponse["int_response_code"])HttpStatusCode.NotFound));
         }
     }
 }

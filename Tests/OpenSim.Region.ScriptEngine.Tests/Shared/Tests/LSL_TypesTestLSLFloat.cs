@@ -26,13 +26,12 @@
  */
 
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenSim.Tests.Common;
 using OpenSim.Region.ScriptEngine.Shared;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Tests
 {
-    [TestFixture]
     public class LSL_TypesTestLSLFloat : OpenSimTestCase
     {
         // Used for testing equality of two floats.
@@ -210,7 +209,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests constructing a LSLFloat from an integer.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestConstructFromInt()
         {
             TestHelpers.InMethod();
@@ -227,7 +226,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests constructing a LSLFloat from a double.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestConstructFromDouble()
         {
             TestHelpers.InMethod();
@@ -244,7 +243,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests LSLFloat is correctly cast explicitly to integer.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestExplicitCastLSLFloatToInt()
         {
             TestHelpers.InMethod();
@@ -254,14 +253,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             foreach (KeyValuePair<double, int> number in m_doubleIntSet)
             {
                 testNumber = (int) new LSL_Types.LSLFloat(number.Key);
-                Assert.AreEqual(number.Value, testNumber, "Converting double " + number.Key + ", expecting int " + number.Value);
+                Assert.Equal(number.Value, testNumber, "Converting double " + number.Key + ", expecting int " + number.Value);
             }
         }
 
         /// <summary>
         /// Tests LSLFloat is correctly cast explicitly to unsigned integer.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestExplicitCastLSLFloatToUint()
         {
             TestHelpers.InMethod();
@@ -271,14 +270,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             foreach (KeyValuePair<double, int> number in m_doubleUintSet)
             {
                 testNumber = (uint) new LSL_Types.LSLFloat(number.Key);
-                Assert.AreEqual(number.Value, testNumber, "Converting double " + number.Key + ", expecting uint " + number.Value);
+                Assert.Equal(number.Value, testNumber, "Converting double " + number.Key + ", expecting uint " + number.Value);
             }
         }
 
         /// <summary>
         /// Tests LSLFloat is correctly cast implicitly to Boolean if non-zero.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestImplicitCastLSLFloatToBooleanTrue()
         {
             TestHelpers.InMethod();
@@ -291,14 +290,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 testFloat = new LSL_Types.LSLFloat(number);
                 testBool = testFloat;
 
-                Assert.IsTrue(testBool);
+                Assert.True(testBool);
             }
         }
 
         /// <summary>
         /// Tests LSLFloat is correctly cast implicitly to Boolean if zero.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestImplicitCastLSLFloatToBooleanFalse()
         {
             TestHelpers.InMethod();
@@ -306,13 +305,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             LSL_Types.LSLFloat testFloat = new LSL_Types.LSLFloat(0.0);
             bool testBool = testFloat;
 
-            Assert.IsFalse(testBool);
+            Assert.False(testBool);
         }
 
         /// <summary>
         /// Tests integer is correctly cast implicitly to LSLFloat.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestImplicitCastIntToLSLFloat()
         {
             TestHelpers.InMethod();
@@ -329,7 +328,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests LSLInteger is correctly cast implicitly to LSLFloat.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestImplicitCastLSLIntegerToLSLFloat()
         {
             TestHelpers.InMethod();
@@ -346,7 +345,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests LSLInteger is correctly cast explicitly to LSLFloat.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestExplicitCastLSLIntegerToLSLFloat()
         {
             TestHelpers.InMethod();
@@ -363,7 +362,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests string is correctly cast explicitly to LSLFloat.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestExplicitCastStringToLSLFloat()
         {
             TestHelpers.InMethod();
@@ -380,7 +379,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests LSLString is correctly cast implicitly to LSLFloat.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestExplicitCastLSLStringToLSLFloat()
         {
             TestHelpers.InMethod();
@@ -397,7 +396,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests double is correctly cast implicitly to LSLFloat.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestImplicitCastDoubleToLSLFloat()
         {
             TestHelpers.InMethod();
@@ -414,7 +413,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests LSLFloat is correctly cast implicitly to double.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestImplicitCastLSLFloatToDouble()
         {
             TestHelpers.InMethod();
@@ -434,7 +433,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests LSLFloat is correctly cast explicitly to float
         /// </summary>
-        [Test]
+        [Fact]
         public void TestExplicitCastLSLFloatToFloat()
         {
             TestHelpers.InMethod();
@@ -456,7 +455,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests the equality (==) operator.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestEqualsOperator()
         {
             TestHelpers.InMethod();
@@ -467,17 +466,17 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             {
                 testFloatA = new LSL_Types.LSLFloat(number);
                 testFloatB = new LSL_Types.LSLFloat(number);
-                Assert.IsTrue(testFloatA == testFloatB);
+                Assert.True(testFloatA == testFloatB);
 
                 testFloatB = new LSL_Types.LSLFloat(number + 1.0);
-                Assert.IsFalse(testFloatA == testFloatB);
+                Assert.False(testFloatA == testFloatB);
             }
         }
 
         /// <summary>
         /// Tests the inequality (!=) operator.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestNotEqualOperator()
         {
             TestHelpers.InMethod();
@@ -488,17 +487,17 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             {
                 testFloatA = new LSL_Types.LSLFloat(number);
                 testFloatB = new LSL_Types.LSLFloat(number + 1.0);
-                Assert.IsTrue(testFloatA != testFloatB);
+                Assert.True(testFloatA != testFloatB);
 
                 testFloatB = new LSL_Types.LSLFloat(number);
-                Assert.IsFalse(testFloatA != testFloatB);
+                Assert.False(testFloatA != testFloatB);
             }
         }
 
         /// <summary>
         /// Tests the increment operator.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestIncrementOperator()
         {
             TestHelpers.InMethod();
@@ -524,7 +523,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests the decrement operator.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestDecrementOperator()
         {
             TestHelpers.InMethod();
@@ -550,7 +549,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests LSLFloat.ToString().
         /// </summary>
-        [Test]
+        [Fact]
         public void TestToString()
         {
             TestHelpers.InMethod();
@@ -560,14 +559,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             foreach (KeyValuePair<double, string> number in m_doubleStringSet)
             {
                 testFloat = new LSL_Types.LSLFloat(number.Key);
-                Assert.AreEqual(number.Value, testFloat.ToString());
+                Assert.Equal(number.Value, testFloat.ToString());
             }
         }
 
         /// <summary>
         /// Tests addition of two LSLFloats.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestAddTwoLSLFloats()
         {
             TestHelpers.InMethod();
@@ -584,7 +583,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests subtraction of two LSLFloats.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSubtractTwoLSLFloats()
         {
             TestHelpers.InMethod();
@@ -601,7 +600,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests multiplication of two LSLFloats.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestMultiplyTwoLSLFloats()
         {
             TestHelpers.InMethod();
@@ -618,7 +617,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests division of two LSLFloats.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestDivideTwoLSLFloats()
         {
             TestHelpers.InMethod();
@@ -638,7 +637,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Tests boolean correctly cast implicitly to LSLFloat.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestImplicitCastBooleanToLSLFloat()
         {
             TestHelpers.InMethod();

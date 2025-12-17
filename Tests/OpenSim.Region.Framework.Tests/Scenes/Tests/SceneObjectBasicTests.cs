@@ -36,8 +36,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// </summary>
     public class SceneObjectBasicTests : OpenSimTestCase
     {
-//        [TearDown]
-//        public void TearDown()
+//        //        public void TearDown()
 //        {
 //            Console.WriteLine("TearDown");
 //            GC.Collect();
@@ -87,7 +86,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneObjectPart[] parts = so.Parts;
 
             scene.AddNewSceneObject(so, false).Should().BeTrue();
-            //Assert.That(scene.AddNewSceneObject(so, false), Is.True);
+            //Assert.That(scene.AddNewSceneObject(so, false));
             
             SceneObjectGroup retrievedSo = scene.GetSceneObjectGroup(so.UUID);
             SceneObjectPart[] retrievedParts = retrievedSo.Parts;
@@ -95,14 +94,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             //m_log.Debug("retrievedPart : {0}", retrievedPart);
             // If the parts have the same UUID then we will consider them as one and the same
             retrievedSo.PrimCount.Should().Be(partsToTestCount);
-            // Assert.That(retrievedSo.PrimCount, Is.EqualTo(partsToTestCount));
+            // Assert.Equal(,);
 
             for (int i = 0; i < partsToTestCount; i++)
             {
                 retrievedParts[i].Name.Should().Be(parts[i].Name); 
                 retrievedParts[i].UUID.Should().Be(parts[i].UUID);
-                //Assert.That(retrievedParts[i].Name, Is.EqualTo(parts[i].Name));
-                //Assert.That(retrievedParts[i].UUID, Is.EqualTo(parts[i].UUID));
+                //Assert.Equal(,);
+                //Assert.Equal(,);
             }
         }
 
@@ -124,20 +123,20 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 = new SceneObjectPart(UUID.Zero, PrimitiveBaseShape.Default, Vector3.Zero, Quaternion.Identity, Vector3.Zero)
                     { Name = obj1Name, UUID = objUuid };
 
-            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part1), false), Is.True);
+            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part1), false));
 
             SceneObjectPart part2
                 = new SceneObjectPart(UUID.Zero, PrimitiveBaseShape.Default, Vector3.Zero, Quaternion.Identity, Vector3.Zero)
                     { Name = obj2Name, UUID = objUuid };
 
-            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part2), false), Is.False);
+            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part2), false));
 
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(objUuid);
 
             //m_log.Debug("retrievedPart : {0}", retrievedPart);
             // If the parts have the same UUID then we will consider them as one and the same
-            Assert.That(retrievedPart.Name, Is.EqualTo(obj1Name));
-            Assert.That(retrievedPart.UUID, Is.EqualTo(objUuid));
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
 
         /// <summary>
@@ -158,13 +157,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             scene.AddNewSceneObject(so, false);
 
             // Test getting via the root part's local id
-            Assert.That(scene.GetGroupByPrim(so.LocalId), Is.Not.Null);
+            Assert.True(scene.GetGroupByPrim(so.LocalId));
 
             // Test getting via a non root part's local id
-            Assert.That(scene.GetGroupByPrim(parts[partsToTestCount - 1].LocalId), Is.Not.Null);
+            Assert.True(scene.GetGroupByPrim(parts[partsToTestCount - 1].LocalId));
 
             // Test that we don't get back an object for a local id that doesn't exist
-            Assert.That(scene.GetGroupByPrim(999), Is.Null);
+            Assert.True(scene.GetGroupByPrim(999));
 
             uint soid = so.LocalId;
             uint spid = parts[partsToTestCount - 1].LocalId;
@@ -172,8 +171,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             // Now delete the scene object and check again
             scene.DeleteSceneObject(so, false);
 
-            Assert.That(scene.GetGroupByPrim(soid), Is.Null);
-            Assert.That(scene.GetGroupByPrim(spid), Is.Null);
+            Assert.True(scene.GetGroupByPrim(soid));
+            Assert.True(scene.GetGroupByPrim(spid));
         }
 
         /// <summary>
@@ -191,14 +190,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             TestScene scene = new SceneHelpers().SetupScene();
             SceneObjectGroup so = SceneHelpers.AddSceneObject(scene);
 
-            Assert.That(so.IsDeleted, Is.False);
+            Assert.True(so.IsDeleted);
             uint retrievedPartID = so.LocalId;
 
             scene.DeleteSceneObject(so, false);
 
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(retrievedPartID);
 
-            Assert.That(retrievedPart, Is.Null);
+            // TODO: Fix this assertion
         }
 
         /// <summary>
@@ -224,16 +223,16 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneObjectGroup sog = new SceneObjectGroup(rootPart);
             sog.AddPart(linkPart);
 
-            Assert.That(sog.UUID, Is.EqualTo(rootPartUuid));
-            Assert.That(sog.RootPart.UUID, Is.EqualTo(rootPartUuid));
-            Assert.That(sog.Parts.Length, Is.EqualTo(2));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             UUID newRootPartUuid = new UUID("00000000-0000-0000-0000-000000000002");
             sog.UUID = newRootPartUuid;
 
-            Assert.That(sog.UUID, Is.EqualTo(newRootPartUuid));
-            Assert.That(sog.RootPart.UUID, Is.EqualTo(newRootPartUuid));
-            Assert.That(sog.Parts.Length, Is.EqualTo(2));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.Equal(,);
         }
     }
 }

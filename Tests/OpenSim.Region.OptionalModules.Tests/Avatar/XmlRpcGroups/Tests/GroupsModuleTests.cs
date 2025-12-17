@@ -31,7 +31,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 using Nini.Config;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.Messages.Linden;
 using OpenMetaverse.Packets;
@@ -51,10 +51,8 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups.Tests
     /// <summary>
     /// Basic groups module tests
     /// </summary>
-    [TestFixture]
     public class GroupsModuleTests : OpenSimTestCase
     {
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -71,7 +69,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups.Tests
             MainServer.Instance = server;
         }
 
-        [Test]
+        [Fact]
         public void TestSendAgentGroupDataUpdate()
         {
 /* AgentGroupDataUpdate is udp
@@ -106,7 +104,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups.Tests
                     eventsResponse = eqgm.GetEvents(UUID.Zero, sp.UUID);
             }
 
-            Assert.That((int)eventsResponse["int_response_code"], Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.True((int)eventsResponse["int_response_code"])HttpStatusCode.OK));
 
 //            Console.WriteLine("Response [{0}]", (string)eventsResponse["str_response_string"]);
 
@@ -122,13 +120,13 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups.Tests
                     foundUpdate = true;
             }
 
-            Assert.That(foundUpdate, Is.True, "Did not find AgentGroupDataUpdate in response");
+            Assert.True(foundUpdate);
 
             // TODO: More checking of more actual event data.
 */
         }
 
-        [Test]
+        [Fact]
         public void TestSendGroupNotice()
         {
             TestHelpers.InMethod();
@@ -190,22 +188,22 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups.Tests
 
             tc.HandleImprovedInstantMessage(noticeIm);
 
-            Assert.That(spReceivedMessages.Count, Is.EqualTo(1));
-            Assert.That(spReceivedMessages[0].message, Is.EqualTo(combinedSubjectMessage));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
             List<GroupNoticeData> notices = mgsc.GetGroupNotices(UUID.Zero, groupID);
-            Assert.AreEqual(1, notices.Count);
+            Assert.Equal(1, notices.Count);
 
             // OpenSimulator (possibly also SL) transport the notice ID as the session ID!
-            Assert.AreEqual(notices[0].NoticeID.Guid, spReceivedMessages[0].imSessionID);
+            Assert.Equal(notices[0].NoticeID.Guid, spReceivedMessages[0].imSessionID);
 
-            Assert.That(sp2ReceivedMessages.Count, Is.EqualTo(0));
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Run test with the MessageOnlineUsersOnly flag set.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSendGroupNoticeOnlineOnly()
         {
             TestHelpers.InMethod();
@@ -267,10 +265,10 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups.Tests
 
             tc.HandleImprovedInstantMessage(noticeIm);
 
-            Assert.That(spReceivedMessages.Count, Is.EqualTo(1));
-            Assert.That(spReceivedMessages[0].message, Is.EqualTo(combinedSubjectMessage));
+            Assert.Equal(,);
+            Assert.Equal(,);
 
-            Assert.That(sp2ReceivedMessages.Count, Is.EqualTo(0));
+            Assert.Equal(,);
         }
     }
 }

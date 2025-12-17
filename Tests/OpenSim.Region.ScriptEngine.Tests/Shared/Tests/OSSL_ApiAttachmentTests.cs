@@ -44,13 +44,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// <remarks>
     /// TODO: Add tests for all functions
     /// </remarks>
-    [TestFixture]
     public class OSSL_ApiAttachmentTests : OpenSimTestCase
     {
         protected Scene m_scene;
         protected XEngine.XEngine m_engine;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -77,7 +75,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             m_engine.AddRegion(m_scene);
         }
 
-        [Test]
+        [Fact]
         public void TestOsForceAttachToAvatarFromInventory()
         {
             TestHelpers.InMethod();
@@ -104,26 +102,26 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             osslApi.osForceAttachToAvatarFromInventory(taskInvObjItemName, (int)attachPoint);
 
             // Check scene presence status
-            Assert.That(sp.HasAttachments(), Is.True);
+            Assert.True(sp.HasAttachments());
             List<SceneObjectGroup> attachments = sp.GetAttachments();
-            Assert.That(attachments.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             SceneObjectGroup attSo = attachments[0];
-            Assert.That(attSo.Name, Is.EqualTo(taskInvObjItemName));
-            Assert.That(attSo.AttachmentPoint, Is.EqualTo((uint)attachPoint));
+            Assert.Equal(,);
+            Assert.True(attSo.AttachmentPoint)attachPoint));
             Assert.That(attSo.IsAttachment);
-            Assert.That(attSo.UsesPhysics, Is.False);
-            Assert.That(attSo.IsTemporary, Is.False);
+            Assert.True(attSo.UsesPhysics);
+            Assert.True(attSo.IsTemporary);
 
             // Check appearance status
             List<AvatarAttachment> attachmentsInAppearance = sp.Appearance.GetAttachments();
-            Assert.That(attachmentsInAppearance.Count, Is.EqualTo(1));
-            Assert.That(sp.Appearance.GetAttachpoint(attachmentsInAppearance[0].ItemID), Is.EqualTo((uint)attachPoint));
+            Assert.Equal(,);
+            Assert.True(sp.Appearance.GetAttachpoint(attachmentsInAppearance[0].ItemID))attachPoint));
         }
 
         /// <summary>
         /// Make sure we can't force attach anything other than objects.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestOsForceAttachToAvatarFromInventoryNotObject()
         {
             TestHelpers.InMethod();
@@ -157,19 +155,19 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 exceptionCaught = true;
             }
 
-            Assert.That(exceptionCaught, Is.True);
+            Assert.True(exceptionCaught);
 
             // Check scene presence status
-            Assert.That(sp.HasAttachments(), Is.False);
+            Assert.True(sp.HasAttachments());
             List<SceneObjectGroup> attachments = sp.GetAttachments();
-            Assert.That(attachments.Count, Is.EqualTo(0));
+            Assert.Equal(,);
 
             // Check appearance status
             List<AvatarAttachment> attachmentsInAppearance = sp.Appearance.GetAttachments();
-            Assert.That(attachmentsInAppearance.Count, Is.EqualTo(0));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestOsForceAttachToOtherAvatarFromInventory()
         {
             TestHelpers.InMethod();
@@ -199,28 +197,28 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             osslApi.osForceAttachToOtherAvatarFromInventory(sp2.UUID.ToString(), taskInvObjItemName, (int)attachPoint);
 
             // Check scene presence status
-            Assert.That(sp.HasAttachments(), Is.False);
+            Assert.True(sp.HasAttachments());
             List<SceneObjectGroup> attachments = sp.GetAttachments();
-            Assert.That(attachments.Count, Is.EqualTo(0));
+            Assert.Equal(,);
 
-            Assert.That(sp2.HasAttachments(), Is.True);
+            Assert.True(sp2.HasAttachments());
             List<SceneObjectGroup> attachments2 = sp2.GetAttachments();
-            Assert.That(attachments2.Count, Is.EqualTo(1));
+            Assert.Equal(,);
             SceneObjectGroup attSo = attachments2[0];
-            Assert.That(attSo.Name, Is.EqualTo(taskInvObjItemName));
-            Assert.That(attSo.OwnerID, Is.EqualTo(ua2.PrincipalID));
-            Assert.That(attSo.AttachmentPoint, Is.EqualTo((uint)attachPoint));
+            Assert.Equal(,);
+            Assert.Equal(,);
+            Assert.True(attSo.AttachmentPoint)attachPoint));
             Assert.That(attSo.IsAttachment);
-            Assert.That(attSo.UsesPhysics, Is.False);
-            Assert.That(attSo.IsTemporary, Is.False);
+            Assert.True(attSo.UsesPhysics);
+            Assert.True(attSo.IsTemporary);
 
             // Check appearance status
             List<AvatarAttachment> attachmentsInAppearance = sp.Appearance.GetAttachments();
-            Assert.That(attachmentsInAppearance.Count, Is.EqualTo(0));
+            Assert.Equal(,);
 
             List<AvatarAttachment> attachmentsInAppearance2 = sp2.Appearance.GetAttachments();
-            Assert.That(attachmentsInAppearance2.Count, Is.EqualTo(1));
-            Assert.That(sp2.Appearance.GetAttachpoint(attachmentsInAppearance2[0].ItemID), Is.EqualTo((uint)attachPoint));
+            Assert.Equal(,);
+            Assert.True(sp2.Appearance.GetAttachpoint(attachmentsInAppearance2[0].ItemID))attachPoint));
         }
     }
 }

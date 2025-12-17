@@ -25,30 +25,47 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Drawing;
-using System.Drawing.Imaging;
+using SkiaSharp;
 using System.IO;
 using OpenSim.Region.Framework.Interfaces;
 
 namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
 {
+    /// <summary>
+    /// GIF terrain file loader using SkiaSharp.
+    /// Saves and loads terrain from GIF images.
+    /// Note: SkiaSharp does not support GIF encoding, so PNG is used as the fallback format.
+    /// </summary>
     internal class GIF : GenericSystemDrawing
     {
         public override void SaveFile(string filename, ITerrainChannel map)
         {
-            using(Bitmap colours = CreateGrayscaleBitmapFromMap(map))
-                colours.Save(filename,ImageFormat.Gif);
+            using(var bitmap = CreateGrayscaleBitmapFromMap(map))
+            {
+                using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+                {
+                    using (var file = File.Create(filename))
+                    {
+                        data.SaveTo(file);
+                    }
+                }
+            }
         }
 
         /// <summary>
-        /// Exports a stream using a System.Drawing exporter.
+        /// Exports a stream using SkiaSharp PNG encoder (GIF not supported).
         /// </summary>
         /// <param name="stream">The target stream</param>
         /// <param name="map">The terrain channel being saved</param>
         public override void SaveStream(Stream stream, ITerrainChannel map)
         {
-            using(Bitmap colours = CreateGrayscaleBitmapFromMap(map))
-                colours.Save(stream,ImageFormat.Gif);
+            using(var bitmap = CreateGrayscaleBitmapFromMap(map))
+            {
+                using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+                {
+                    data.SaveTo(stream);
+                }
+            }
         }
 
         public override string ToString()
@@ -60,6 +77,17 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
         public override bool SupportsTileSave()
         {
             return false;
+        }
+
+        protected override void Save(SKBitmap bitmap, string filename)
+        {
+            using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+            {
+                using (var file = File.Create(filename))
+                {
+                    data.SaveTo(file);
+                }
+            }
         }
     }
 }

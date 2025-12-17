@@ -8,9 +8,9 @@
     <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
   </PropertyGroup>
   <PropertyGroup>      
-    <MSBuildProjectExtensionsPath>$(SolutionDir)/obj/$(Configuration)/$(MSBuildProjectName)/</MSBuildProjectExtensionsPath>
-    <IntermediateOutputPath>$(SolutionDir)/obj/$(Configuration)/$(MSBuildProjectName)/</IntermediateOutputPath>
-    <OutputPath>$(SolutionDir)/build/$(Configuration)/$(AssemblyName)/</OutputPath>
+    <MSBuildProjectExtensionsPath>$(SolutionDir)obj\$(Configuration)\$(MSBuildProjectName)\</MSBuildProjectExtensionsPath>
+    <IntermediateOutputPath>$(SolutionDir)obj\$(Configuration)\$(MSBuildProjectName)\</IntermediateOutputPath>
+    <OutputPath>$(SolutionDir)build\$(Configuration)\$(AssemblyName)\</OutputPath>
     <OutDir>$(OutputPath)</OutDir>
   </PropertyGroup>
 

@@ -26,7 +26,7 @@
  */
 
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenSim.Tests.Common;
 using OpenSim.Region.ScriptEngine.Shared;
 
@@ -35,10 +35,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// <summary>
     /// Tests for Vector3
     /// </summary>
-    [TestFixture]
     public class LSL_TypesTestVector3 : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestDotProduct()
         {
             TestHelpers.InMethod();
@@ -56,7 +55,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             {
                 parts = ex.Key.Split(delim, System.StringSplitOptions.None);
                 result = new LSL_Types.Vector3(parts[0]) * new LSL_Types.Vector3(parts[1]);
-                Assert.AreEqual(ex.Value, result);
+                Assert.Equal(ex.Value, result);
             }
         }
     }

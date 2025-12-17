@@ -1,94 +1,69 @@
-﻿using System;
-using System.Collections.Generic;
+﻿/* Copyright (c) 2025 Utopia Skye LLC
+
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. 
+ */
+
 using Microsoft.EntityFrameworkCore;
 
 namespace OpenSim.Data.Model.Core;
 
 public partial class OpenSimCoreContext : DbContext
 {
+    public OpenSimCoreContext()
+    {
+    }
+    
     public OpenSimCoreContext(DbContextOptions<OpenSimCoreContext> options)
         : base(options)
     {
     }
 
     public virtual DbSet<AgentPref> AgentPrefs { get; set; }
-
     public virtual DbSet<Asset> Assets { get; set; }
-
     public virtual DbSet<Auth> Auths { get; set; }
-
     public virtual DbSet<Avatar> Avatars { get; set; }
-
     public virtual DbSet<Classified> Classifieds { get; set; }
-
     public virtual DbSet<EstateGroup> EstateGroups { get; set; }
-
     public virtual DbSet<EstateManager> EstateManagers { get; set; }
-
     public virtual DbSet<EstateMap> EstateMaps { get; set; }
-
     public virtual DbSet<EstateSetting> EstateSettings { get; set; }
-
     public virtual DbSet<EstateUser> EstateUsers { get; set; }
-
     public virtual DbSet<Estateban> Estatebans { get; set; }
-
+    public virtual DbSet<EstateAllowedExperience> EstateAllowedExperiences { get; set; }
+    public virtual DbSet<EstateKeyExperience> EstateKeyExperiences { get; set; }
+    public virtual DbSet<Experience> Experiences { get; set; }
+    public virtual DbSet<ExperienceKVP> ExperienceKVPs { get; set; }
+    public virtual DbSet<ExperiencePermission> ExperiencePermissions { get; set; }
     public virtual DbSet<Friend> Friends { get; set; }
-
     public virtual DbSet<Fsasset> Fsassets { get; set; }
-
     public virtual DbSet<GloebitSubscription> GloebitSubscriptions { get; set; }
-
     public virtual DbSet<GloebitTransaction> GloebitTransactions { get; set; }
-
     public virtual DbSet<GloebitUser> GloebitUsers { get; set; }
-
     public virtual DbSet<GridUser> GridUsers { get; set; }
-
     public virtual DbSet<HgTravelingDatum> HgTravelingData { get; set; }
-
     public virtual DbSet<ImOffline> ImOfflines { get; set; }
-
     public virtual DbSet<Inventoryfolder> Inventoryfolders { get; set; }
-
     public virtual DbSet<Inventoryitem> Inventoryitems { get; set; }
-
     public virtual DbSet<Migration> Migrations { get; set; }
-
     public virtual DbSet<MuteList> MuteLists { get; set; }
-
     public virtual DbSet<OsGroupsGroup> OsGroupsGroups { get; set; }
-
     public virtual DbSet<OsGroupsInvite> OsGroupsInvites { get; set; }
-
     public virtual DbSet<OsGroupsMembership> OsGroupsMemberships { get; set; }
-
     public virtual DbSet<OsGroupsNotice> OsGroupsNotices { get; set; }
-
     public virtual DbSet<OsGroupsPrincipal> OsGroupsPrincipals { get; set; }
-
     public virtual DbSet<OsGroupsRole> OsGroupsRoles { get; set; }
-
     public virtual DbSet<OsGroupsRolemembership> OsGroupsRolememberships { get; set; }
-
     public virtual DbSet<Presence> Presences { get; set; }
-
     public virtual DbSet<Region> Regions { get; set; }
-
     public virtual DbSet<Token> Tokens { get; set; }
-
     public virtual DbSet<UserAccount> UserAccounts { get; set; }
-
     public virtual DbSet<UserAlias> UserAliases { get; set; }
-
     public virtual DbSet<Userdatum> Userdata { get; set; }
-
     public virtual DbSet<Usernote> Usernotes { get; set; }
-
     public virtual DbSet<Userpick> Userpicks { get; set; }
-
     public virtual DbSet<Userprofile> Userprofiles { get; set; }
-
     public virtual DbSet<Usersetting> Usersettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -130,14 +105,14 @@ public partial class OpenSimCoreContext : DbContext
 
         modelBuilder.Entity<Asset>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.HasKey(e => e.AssetId).HasName("PRIMARY");
 
             entity
                 .ToTable("assets")
                 .HasCharSet("utf8mb3")
                 .UseCollation("utf8mb3_general_ci");
 
-            entity.Property(e => e.Id)
+            entity.Property(e => e.AssetId)
                 .HasMaxLength(36)
                 .HasDefaultValueSql("'00000000-0000-0000-0000-000000000000'")
                 .IsFixedLength()
@@ -416,6 +391,143 @@ public partial class OpenSimCoreContext : DbContext
             entity.Property(e => e.EstateId).HasColumnName("EstateID");
         });
 
+        modelBuilder.Entity<EstateAllowedExperience>(entity =>
+        {
+            entity.ToTable("estate_allowed_experiences");
+
+            entity.HasKey(e => new { e.uuid, e.EstateId });
+
+            entity.Property(e => e.uuid)
+                .HasMaxLength(36)
+                .IsFixedLength()
+                .HasColumnName("uuid");
+
+            entity.Property(e => e.EstateId)
+                .HasColumnName("EstateID");
+        });
+
+        modelBuilder.Entity<EstateKeyExperience>(entity =>
+        {
+            entity.ToTable("estate_key_experiences");
+
+            entity.HasKey(e => new { e.uuid, e.EstateId });
+
+            entity.Property(e => e.uuid)
+                .HasMaxLength(36)
+                .IsFixedLength()
+                .HasColumnName("uuid");
+
+            entity.Property(e => e.EstateId)
+                .HasColumnName("EstateID");
+        });
+
+        modelBuilder.Entity<Experience>(entity =>
+        {
+            entity.HasKey(e => e.public_id);
+
+            entity.ToTable("experiences");
+
+            entity.Property(e => e.public_id)
+                .IsRequired()
+                .HasMaxLength(36)
+                .IsFixedLength()
+                .HasColumnName("public_id");
+
+            entity.Property(e => e.owner_id)
+                .IsRequired()
+                .HasMaxLength(36)
+                .IsFixedLength()
+                .HasColumnName("owner_id");
+
+            entity.Property(e => e.name)
+                .IsRequired()
+                .HasMaxLength(42)
+                .HasColumnName("name");
+
+            entity.Property(e => e.description)
+                .IsRequired()
+                .HasMaxLength(128)
+                .HasColumnName("description");
+
+            entity.Property(e => e.group_id)
+                .IsRequired()
+                .HasMaxLength(36)
+                .IsFixedLength()
+                .HasColumnName("group_id");
+
+            entity.Property(e => e.logo)
+                .IsRequired()
+                .HasMaxLength(36)
+                .IsFixedLength()
+                .HasColumnName("logo");
+
+            entity.Property(e => e.marketplace)
+                .IsRequired()
+                .HasMaxLength(256)
+                .HasColumnName("marketplace");
+
+            entity.Property(e => e.slurl)
+                .IsRequired()
+                .HasMaxLength(256)
+                .HasColumnName("slurl");
+
+            entity.Property(e => e.maturity)
+                .IsRequired()
+                .HasColumnName("maturity");
+
+            entity.Property(e => e.properties)
+                .IsRequired()
+                .HasColumnName("properties");
+        });
+
+        modelBuilder.Entity<ExperienceKVP>(entity =>
+        {
+            entity.ToTable("experience_kv");
+            
+            // This was a composite key but needed to be split due to max key length
+            entity.HasKey(e => new { e.experience, e.key });
+
+            entity.Property(e => e.experience)
+                .IsRequired()
+                .HasMaxLength(36)
+                .IsFixedLength()
+                .HasColumnName("experience");
+
+            entity.Property(e => e.key)
+                .IsRequired()
+                .HasMaxLength(1011)
+                .HasColumnName("key");
+
+            entity.Property(e => e.value)
+                .IsRequired()
+                .HasMaxLength(4095)
+                .HasColumnName("value");
+        });
+
+        modelBuilder.Entity<ExperiencePermission>(entity =>
+        {
+            entity.ToTable("experience_permissions");
+
+            entity.HasKey(e => new { e.experience, e.avatar });
+
+            entity.Property(e => e.experience)
+                .IsRequired()
+                .HasMaxLength(36)
+                .IsFixedLength()
+                .HasColumnName("experience");
+
+            entity.Property(e => e.avatar)
+                .IsRequired()
+                .HasMaxLength(36)
+                .IsFixedLength()
+                .HasColumnName("avatar");
+
+            entity.Property(e => e.allow)
+                .IsRequired()
+                .HasColumnName("allow")
+                .HasColumnType("bit(1)");
+        });
+
         modelBuilder.Entity<Friend>(entity =>
         {
             entity.HasKey(e => new { e.PrincipalId, e.Friend1 })
@@ -444,7 +556,7 @@ public partial class OpenSimCoreContext : DbContext
 
         modelBuilder.Entity<Fsasset>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.HasKey(e => e.AssetId).HasName("PRIMARY");
 
             entity.HasIndex(e => e.AccessTime, "idx_fsassets_access_time");
             
@@ -453,7 +565,7 @@ public partial class OpenSimCoreContext : DbContext
                 .HasCharSet("utf8mb3")
                 .UseCollation("utf8mb3_general_ci");
 
-            entity.Property(e => e.Id)
+            entity.Property(e => e.AssetId)
                 .HasMaxLength(36)
                 .IsFixedLength()
                 .HasColumnName("id");

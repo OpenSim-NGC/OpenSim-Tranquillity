@@ -31,7 +31,7 @@ using System.Text;
 using System.Reflection;
 
 using OpenMetaverse;
-using NUnit.Framework;
+using Xunit;
 
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
@@ -40,14 +40,13 @@ using OpenSim.Services.Connectors;
 
 namespace Robust.Tests
 {
-    [TestFixture]
     public class GridClient
     {
 //        private static readonly ILog m_log =
 //                LogManager.GetLogger(
 //                MethodBase.GetCurrentMethod().DeclaringType);
 
-        [Test]
+        [Fact]
         public void Grid_001()
         {
             GridServicesConnector m_Connector = new GridServicesConnector(DemonServer.Address);
@@ -57,65 +56,65 @@ namespace Robust.Tests
             GridRegion r3 = CreateRegion("Test Region 3", 1005, 1000);
 
             string msg = m_Connector.RegisterRegion(UUID.Zero, r1);
-            Assert.AreEqual(msg, string.Empty, "Region 1 failed to register");
+            Assert.Equal(msg, string.Empty, "Region 1 failed to register");
 
             msg = m_Connector.RegisterRegion(UUID.Zero, r2);
-            Assert.AreEqual(msg, string.Empty, "Region 2 failed to register");
+            Assert.Equal(msg, string.Empty, "Region 2 failed to register");
 
             msg = m_Connector.RegisterRegion(UUID.Zero, r3);
-            Assert.AreEqual(msg, string.Empty, "Region 3 failed to register");
+            Assert.Equal(msg, string.Empty, "Region 3 failed to register");
 
             bool success;
             success = m_Connector.DeregisterRegion(r3.RegionID);
-            Assert.AreEqual(success, true, "Region 3 failed to deregister");
+            Assert.Equal(success, true, "Region 3 failed to deregister");
 
             msg = m_Connector.RegisterRegion(UUID.Zero, r3);
-            Assert.AreEqual(msg, string.Empty, "Region 3 failed to re-register");
+            Assert.Equal(msg, string.Empty, "Region 3 failed to re-register");
 
             List<GridRegion> regions = m_Connector.GetNeighbours(UUID.Zero, r1.RegionID);
-            Assert.AreNotEqual(regions, null, "GetNeighbours of region 1 failed");
-            Assert.AreEqual(regions.Count, 1, "Region 1 should have 1 neighbor");
-            Assert.AreEqual(regions[0].RegionName, "Test Region 2", "Region 1 has the wrong neighbor");
+            Assert.NotEqual(regions, null, "GetNeighbours of region 1 failed");
+            Assert.Equal(regions.Count, 1, "Region 1 should have 1 neighbor");
+            Assert.Equal(regions[0].RegionName, "Test Region 2", "Region 1 has the wrong neighbor");
 
             GridRegion region = m_Connector.GetRegionByUUID(UUID.Zero, r2.RegionID);
-            Assert.AreNotEqual(region, null, "GetRegionByUUID for region 2 failed");
-            Assert.AreEqual(region.RegionName, "Test Region 2", "GetRegionByUUID of region 2 returned wrong region");
+            Assert.NotEqual(region, null, "GetRegionByUUID for region 2 failed");
+            Assert.Equal(region.RegionName, "Test Region 2", "GetRegionByUUID of region 2 returned wrong region");
 
             region = m_Connector.GetRegionByUUID(UUID.Zero, UUID.Random());
-            Assert.AreEqual(region, null, "Region with randon id should not exist");
+            Assert.Equal(region, null, "Region with randon id should not exist");
 
             region = m_Connector.GetRegionByName(UUID.Zero, r3.RegionName);
-            Assert.AreNotEqual(region, null, "GetRegionByUUID for region 3 failed");
-            Assert.AreEqual(region.RegionName, "Test Region 3", "GetRegionByUUID of region 3 returned wrong region");
+            Assert.NotEqual(region, null, "GetRegionByUUID for region 3 failed");
+            Assert.Equal(region.RegionName, "Test Region 3", "GetRegionByUUID of region 3 returned wrong region");
 
             region = m_Connector.GetRegionByName(UUID.Zero, "Foo");
-            Assert.AreEqual(region, null, "Region Foo should not exist");
+            Assert.Equal(region, null, "Region Foo should not exist");
 
             regions = m_Connector.GetRegionsByName(UUID.Zero, "Test", 10);
-            Assert.AreNotEqual(regions, null, "GetRegionsByName failed");
-            Assert.AreEqual(regions.Count, 3, "GetRegionsByName should return 3");
+            Assert.NotEqual(regions, null, "GetRegionsByName failed");
+            Assert.Equal(regions.Count, 3, "GetRegionsByName should return 3");
 
             regions = m_Connector.GetRegionRange(UUID.Zero,
                 (int)Util.RegionToWorldLoc(900), (int)Util.RegionToWorldLoc(1002),
                 (int)Util.RegionToWorldLoc(900), (int)Util.RegionToWorldLoc(1002) );
-            Assert.AreNotEqual(regions, null, "GetRegionRange failed");
-            Assert.AreEqual(regions.Count, 2, "GetRegionRange should return 2");
+            Assert.NotEqual(regions, null, "GetRegionRange failed");
+            Assert.Equal(regions.Count, 2, "GetRegionRange should return 2");
 
             regions = m_Connector.GetRegionRange(UUID.Zero,
                 (int)Util.RegionToWorldLoc(900), (int)Util.RegionToWorldLoc(950),
                 (int)Util.RegionToWorldLoc(900), (int)Util.RegionToWorldLoc(950) );
-            Assert.AreNotEqual(regions, null, "GetRegionRange (bis) failed");
-            Assert.AreEqual(regions.Count, 0, "GetRegionRange (bis) should return 0");
+            Assert.NotEqual(regions, null, "GetRegionRange (bis) failed");
+            Assert.Equal(regions.Count, 0, "GetRegionRange (bis) should return 0");
 
             // Deregister them all
             success = m_Connector.DeregisterRegion(r1.RegionID);
-            Assert.AreEqual(success, true, "Region 1 failed to deregister");
+            Assert.Equal(success, true, "Region 1 failed to deregister");
 
             success = m_Connector.DeregisterRegion(r2.RegionID);
-            Assert.AreEqual(success, true, "Region 2 failed to deregister");
+            Assert.Equal(success, true, "Region 2 failed to deregister");
 
             success = m_Connector.DeregisterRegion(r3.RegionID);
-            Assert.AreEqual(success, true, "Region 3 failed to deregister");
+            Assert.Equal(success, true, "Region 3 failed to deregister");
         }
 
         private static GridRegion CreateRegion(string name, uint xcell, uint ycell)

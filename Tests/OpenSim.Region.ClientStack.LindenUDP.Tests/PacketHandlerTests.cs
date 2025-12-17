@@ -32,10 +32,9 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
     /// <summary>
     /// Tests for the LL packet handler
     /// </summary>
-    [TestFixture]
     public class PacketHandlerTests : OpenSimTestCase
     {
-//        [Test]
+//        [Fact]
 //        /// <summary>
 //        /// More a placeholder, really
 //        /// </summary>
@@ -69,9 +68,9 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 //            packetHandler.InPacket(new AgentAnimationPacket());
 //            LLQueItem receivedPacket = packetHandler.PacketQueue.Dequeue();
 //
-//            Assert.That(receivedPacket, Is.Not.Null);
-//            Assert.That(receivedPacket.Incoming, Is.True);
-//            Assert.That(receivedPacket.Packet, Is.TypeOf(typeof(AgentAnimationPacket)));
+//            // TODO: Fix this assertion
+//            Assert.True(receivedPacket.Incoming);
+//            Assert.True(receivedPacket.Packet)));
 //        }
 //
 //        /// <summary>

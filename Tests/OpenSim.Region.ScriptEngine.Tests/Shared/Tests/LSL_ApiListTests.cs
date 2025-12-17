@@ -27,7 +27,7 @@
 
 using System;
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenSim.Framework;
 using OpenSim.Tests.Common;
 using OpenSim.Region.ScriptEngine.Shared;
@@ -43,12 +43,10 @@ using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Tests
 {
-    [TestFixture]
     public class LSL_ApiListTests : OpenSimTestCase
     {
         private LSL_Api m_lslApi;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -72,7 +70,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             m_lslApi.Initialize(engine, part, null);
         }
 
-        [Test]
+        [Fact]
         public void TestllListFindList()
         {
             TestHelpers.InMethod();
@@ -82,37 +80,37 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             {
                 // Test for a single item that should be found
                 int result = m_lslApi.llListFindList(src, new LSL_List(new LSL_Integer(4)));
-                Assert.That(result, Is.EqualTo(-1));
+                Assert.Equal(,);
             }
 
             {
                 // Test for a single item that should be found
                 int result = m_lslApi.llListFindList(src, new LSL_List(new LSL_Integer(2)));
-                Assert.That(result, Is.EqualTo(1));
+                Assert.Equal(,);
             }
 
             {
                 // Test for a constant that should be found
                 int result = m_lslApi.llListFindList(src, new LSL_List(ScriptBaseClass.AGENT));
-                Assert.That(result, Is.EqualTo(0));
+                Assert.Equal(,);
             }
 
             {
                 // Test for a list that should be found
                 int result = m_lslApi.llListFindList(src, new LSL_List(new LSL_Integer(2), new LSL_Integer(3)));
-                Assert.That(result, Is.EqualTo(1));
+                Assert.Equal(,);
             }
 
             {
                 // Test for a single item not in the list
                 int result = m_lslApi.llListFindList(src, new LSL_List(new LSL_Integer(4)));
-                Assert.That(result, Is.EqualTo(-1));
+                Assert.Equal(,);
             }
 
             {
                 // Test for something that should not be cast
                 int result = m_lslApi.llListFindList(src, new LSL_List(new LSL_String("4")));
-                Assert.That(result, Is.EqualTo(-1));
+                Assert.Equal(,);
             }
 
             {
@@ -120,7 +118,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 int result
                     = m_lslApi.llListFindList(
                         src, new LSL_List(new LSL_Integer(2), new LSL_Integer(3), new LSL_Integer(4)));
-                Assert.That(result, Is.EqualTo(-1));
+                Assert.Equal(,);
             }
 
             {
@@ -131,7 +129,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 int result
                     = m_lslApi.llListFindList(srcWithConstants, new LSL_List(new LSL_Integer(1), new LSL_Integer(2)));
 
-                Assert.That(result, Is.EqualTo(1));
+                Assert.Equal(,);
             }
          }
      }
