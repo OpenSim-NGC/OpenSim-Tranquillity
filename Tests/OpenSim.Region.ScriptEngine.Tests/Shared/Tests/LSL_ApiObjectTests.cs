@@ -47,7 +47,6 @@ using LSL_List = OpenSim.Region.ScriptEngine.Shared.LSL_Types.list;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Tests
 {
-    [TestFixture]
     public class LSL_ApiObjectTests : OpenSimTestCase
     {
         /*
@@ -57,7 +56,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         protected Scene m_scene;
         protected XEngine.XEngine m_engine;
 
-        [SetUp]
         public override void SetUp()
         {
             base.SetUp();
@@ -74,7 +72,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             m_engine.AddRegion(m_scene);
         }
 
-        [Test]
+        [Fact]
         public void TestllGetLinkPrimitiveParams()
         {
             TestHelpers.InMethod();
@@ -94,7 +92,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 LSL_List resList
                     = apiGrp1.llGetLinkPrimitiveParams(1, new LSL_List(new LSL_Integer(ScriptBaseClass.PRIM_ROTATION)));
 
-                Assert.That(resList.Length, Is.EqualTo(1));
+                Assert.Equal(,);
             }
 
             // Check 2 prim case
@@ -108,7 +106,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                             new LSL_Integer(2),
                             new LSL_Integer(ScriptBaseClass.PRIM_ROTATION)));
 
-                Assert.That(resList.Length, Is.EqualTo(2));
+                Assert.Equal(,);
             }
 
             // Check invalid parameters are ignored
@@ -116,7 +114,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 LSL_List resList
                     = apiGrp1.llGetLinkPrimitiveParams(3, new LSL_List(new LSL_Integer(ScriptBaseClass.PRIM_ROTATION)));
 
-                Assert.That(resList.Length, Is.EqualTo(0));
+                Assert.Equal(,);
             }
 
             // Check all parameters are ignored if an initial bad link is given
@@ -130,7 +128,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                             new LSL_Integer(1),
                             new LSL_Integer(ScriptBaseClass.PRIM_ROTATION)));
 
-                Assert.That(resList.Length, Is.EqualTo(0));
+                Assert.Equal(,);
             }
 
             // Check only subsequent parameters are ignored when we hit the first bad link number
@@ -144,11 +142,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                             new LSL_Integer(3),
                             new LSL_Integer(ScriptBaseClass.PRIM_ROTATION)));
 
-                Assert.That(resList.Length, Is.EqualTo(1));
+                Assert.Equal(,);
             }
         }
 
-        [Test]
+        [Fact]
         // llSetPrimitiveParams and llGetPrimitiveParams test.
         public void TestllSetPrimitiveParams()
         {
@@ -162,7 +160,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 new SceneObjectPart(UUID.Zero, PrimitiveBaseShape.Default,
                 Vector3.Zero, Quaternion.Identity,
                 Vector3.Zero) { Name = obj1Name, UUID = objUuid };
-            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part1), false), Is.True);
+            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part1), false));
 
             LSL_Api apiGrp1 = new LSL_Api();
             apiGrp1.Initialize(m_engine, part1, null);
@@ -281,12 +279,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Validate settings.
             CheckllSetPrimitiveParamsVector(primSize, api.llList2Vector(primParams, 0), primTest + " prim size");
-            Assert.AreEqual(primType, api.llList2Integer(primParams, 1),
+            Assert.Equal(primType, api.llList2Integer(primParams, 1),
                 "TestllSetPrimitiveParams " + primTest + " prim type check fail");
-            Assert.AreEqual(primHoleType, api.llList2Integer(primParams, 2),
+            Assert.Equal(primHoleType, api.llList2Integer(primParams, 2),
                 "TestllSetPrimitiveParams " + primTest + " prim hole default check fail");
             CheckllSetPrimitiveParamsVector(primCut, api.llList2Vector(primParams, 3), primTest + " prim cut");
-            Assert.AreEqual(primHollowCheck, api.llList2Float(primParams, 4), FLOAT_ACCURACY,
+            Assert.Equal(primHollowCheck, api.llList2Float(primParams, 4), FLOAT_ACCURACY,
                 "TestllSetPrimitiveParams " + primTest + " prim hollow check fail");
             CheckllSetPrimitiveParamsVector(primTwist, api.llList2Vector(primParams, 5), primTest + " prim twist");
             CheckllSetPrimitiveParamsVector(primTaper, api.llList2Vector(primParams, 6), primTest + " prim taper");
@@ -309,12 +307,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Validate settings.
             CheckllSetPrimitiveParamsVector(primSize, api.llList2Vector(primParams, 0), primTest + " prim size");
-            Assert.AreEqual(primType, api.llList2Integer(primParams, 1),
+            Assert.Equal(primType, api.llList2Integer(primParams, 1),
                 "TestllSetPrimitiveParams " + primTest + " prim type check fail");
-            Assert.AreEqual(primHoleType, api.llList2Integer(primParams, 2),
+            Assert.Equal(primHoleType, api.llList2Integer(primParams, 2),
                 "TestllSetPrimitiveParams " + primTest + " prim hole default check fail");
             CheckllSetPrimitiveParamsVector(primCut, api.llList2Vector(primParams, 3), primTest + " prim cut");
-            Assert.AreEqual(primHollowCheck, api.llList2Float(primParams, 4), FLOAT_ACCURACY,
+            Assert.Equal(primHollowCheck, api.llList2Float(primParams, 4), FLOAT_ACCURACY,
                 "TestllSetPrimitiveParams " + primTest + " prim hollow check fail");
             CheckllSetPrimitiveParamsVector(primTwist, api.llList2Vector(primParams, 5), primTest + " prim twist");
             CheckllSetPrimitiveParamsVector(primDimple, api.llList2Vector(primParams, 6), primTest + " prim dimple");
@@ -339,23 +337,23 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Valdate settings.
             CheckllSetPrimitiveParamsVector(primSize, api.llList2Vector(primParams, 0), primTest + " prim size");
-            Assert.AreEqual(primType, api.llList2Integer(primParams, 1),
+            Assert.Equal(primType, api.llList2Integer(primParams, 1),
                 "TestllSetPrimitiveParams " + primTest + " prim type check fail");
-            Assert.AreEqual(primHoleType, api.llList2Integer(primParams, 2),
+            Assert.Equal(primHoleType, api.llList2Integer(primParams, 2),
                 "TestllSetPrimitiveParams " + primTest + " prim hole default check fail");
             CheckllSetPrimitiveParamsVector(primCut, api.llList2Vector(primParams, 3), primTest + " prim cut");
-            Assert.AreEqual(primHollowCheck, api.llList2Float(primParams, 4), FLOAT_ACCURACY,
+            Assert.Equal(primHollowCheck, api.llList2Float(primParams, 4), FLOAT_ACCURACY,
                 "TestllSetPrimitiveParams " + primTest + " prim hollow check fail");
             CheckllSetPrimitiveParamsVector(primTwist, api.llList2Vector(primParams, 5), primTest + " prim twist");
             CheckllSetPrimitiveParamsVector(primHoleSize, api.llList2Vector(primParams, 6), primTest + " prim hole size");
             CheckllSetPrimitiveParamsVector(primShear, api.llList2Vector(primParams, 7), primTest + " prim shear");
             CheckllSetPrimitiveParamsVector(primProfCut, api.llList2Vector(primParams, 8), primTest + " prim profile cut");
             CheckllSetPrimitiveParamsVector(primTaper, api.llList2Vector(primParams, 9), primTest + " prim taper");
-            Assert.AreEqual(primRev, api.llList2Float(primParams, 10), FLOAT_ACCURACY,
+            Assert.Equal(primRev, api.llList2Float(primParams, 10), FLOAT_ACCURACY,
                 "TestllSetPrimitiveParams " + primTest + " prim revolutions fail");
-            Assert.AreEqual(primRadius, api.llList2Float(primParams, 11), FLOAT_ACCURACY,
+            Assert.Equal(primRadius, api.llList2Float(primParams, 11), FLOAT_ACCURACY,
                 "TestllSetPrimitiveParams " + primTest + " prim radius fail");
-            Assert.AreEqual(primSkew, api.llList2Float(primParams, 12), FLOAT_ACCURACY,
+            Assert.Equal(primSkew, api.llList2Float(primParams, 12), FLOAT_ACCURACY,
                 "TestllSetPrimitiveParams " + primTest + " prim skew fail");
         }
 
@@ -373,22 +371,22 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Validate settings.
             CheckllSetPrimitiveParamsVector(primSize, api.llList2Vector(primParams, 0), primTest + " prim size");
-            Assert.AreEqual(primType, api.llList2Integer(primParams, 1),
+            Assert.Equal(primType, api.llList2Integer(primParams, 1),
                 "TestllSetPrimitiveParams " + primTest + " prim type check fail");
-            Assert.AreEqual(primMap, (string)api.llList2String(primParams, 2),
+            Assert.Equal(primMap, (string)api.llList2String(primParams, 2),
                 "TestllSetPrimitiveParams " + primTest + " prim map check fail");
-            Assert.AreEqual(primSculptType, api.llList2Integer(primParams, 3),
+            Assert.Equal(primSculptType, api.llList2Integer(primParams, 3),
                 "TestllSetPrimitiveParams " + primTest + " prim type scuplt check fail");
         }
 
         public void CheckllSetPrimitiveParamsVector(LSL_Types.Vector3 vecCheck, LSL_Types.Vector3 vecReturned, string msg)
         {
             // Check each vector component against expected result.
-            Assert.AreEqual(vecCheck.x, vecReturned.x, VECTOR_COMPONENT_ACCURACY,
+            Assert.Equal(vecCheck.x, vecReturned.x, VECTOR_COMPONENT_ACCURACY,
                 "TestllSetPrimitiveParams " + msg + " vector check fail on x component");
-            Assert.AreEqual(vecCheck.y, vecReturned.y, VECTOR_COMPONENT_ACCURACY,
+            Assert.Equal(vecCheck.y, vecReturned.y, VECTOR_COMPONENT_ACCURACY,
                 "TestllSetPrimitiveParams " + msg + " vector check fail on y component");
-            Assert.AreEqual(vecCheck.z, vecReturned.z, VECTOR_COMPONENT_ACCURACY,
+            Assert.Equal(vecCheck.z, vecReturned.z, VECTOR_COMPONENT_ACCURACY,
                 "TestllSetPrimitiveParams " + msg + " vector check fail on z component");
         }
 

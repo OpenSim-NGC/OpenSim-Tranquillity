@@ -138,7 +138,7 @@ namespace OpenSim.Region.OptionalModules.Agent.TextureSender
                 return;
             }
 
-            OpenJPEG.J2KLayerInfo[] layers;
+            J2KLayerInfo[] layers;
             int components;
             if (decoder.Decode(assetId, asset.Data, out layers, out components))
             {

@@ -25,15 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
 using System.Reflection;
 using System.Runtime;
 
-using CSJ2K;
+using CoreJ2K;
+using SkiaSharp;
 using Nini.Config;
 using log4net;
 using Warp3D;
@@ -44,8 +40,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
 using OpenMetaverse;
-using OpenMetaverse.Assets;
-using OpenMetaverse.Imaging;
 using OpenMetaverse.Rendering;
 using OpenMetaverse.StructuredData;
 
@@ -187,7 +181,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         private float fov;
         private bool orto;
 
-        public Bitmap CreateMapTile()
+    public SKBitmap CreateMapTile()
         {
             List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
             if (renderers.Count > 0)
@@ -206,15 +200,21 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             cameraDir = -Vector3.UnitZ;
             orto = true;
 
-            Bitmap tile = GenImage();
-            // image may be reloaded elsewhere, so no compression format
+            SKBitmap tile = GenImage();
+            // image may be reloaded elsewhere, so save a PNG copy for debugging
             string filename = "MAP-" + m_scene.RegionInfo.RegionID.ToString() + ".png";
-            tile.Save(filename,ImageFormat.Png);
+            try
+            {
+                using (SKImage img = SKImage.FromBitmap(tile))
+                using (SKData data = img.Encode(SKEncodedImageFormat.Png, 100))
+                    File.WriteAllBytes(filename, data.ToArray());
+            }
+            catch { }
             m_primMesher = null;
             return tile;
         }
 
-        public Bitmap CreateViewImage(Vector3 camPos, Vector3 camDir, float pfov, int width, int height, bool useTextures)
+    public SKBitmap CreateViewImage(Vector3 camPos, Vector3 camDir, float pfov, int width, int height, bool useTextures)
         {
             List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
             if (renderers.Count > 0)
@@ -229,12 +229,12 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             fov = pfov;
             orto = false;
 
-            Bitmap tile = GenImage();
+            SKBitmap tile = GenImage();
             m_primMesher = null;
             return tile;
         }
 
-        private Bitmap GenImage()
+    private SKBitmap GenImage()
         {
             m_colors= new Dictionary<UUID, int>();
             m_warpTextures= new Dictionary<UUID, warp_Texture>();
@@ -242,7 +242,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             WarpRenderer renderer = new WarpRenderer();
 
             if (!renderer.CreateScene(viewWidth, viewHeight))
-                return new Bitmap(viewWidth, viewHeight);
+                return new SKBitmap(viewWidth, viewHeight, SKColorType.Rgb888x, SKAlphaType.Opaque);
 
             #region Camera
 
@@ -268,7 +268,17 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
 
             renderer.Render();
 
-            Bitmap bitmap = renderer.Scene.getImage();
+            // The Warp3D renderer may return SKBitmap (when using the source-built Warp3D)
+            // or System.Drawing.Bitmap (when using the prebuilt binary). Handle both.
+            object rendererBitmap = renderer.Scene.getImage();
+            SKBitmap skbitmap = null;
+            if (rendererBitmap is SKBitmap skb)
+            {
+                skbitmap = skb;
+            }
+            // else: rendererBitmap is System.Drawing.Bitmap (from legacy Warp3D library)
+            // The new SkiaSharp-based Warp3D should return SKBitmap natively.
+            // For legacy compatibility, we would need to convert here, but System.Drawing is no longer available.
 
             renderer.Scene.destroy();
             renderer.Reset();
@@ -282,15 +292,59 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             GC.WaitForPendingFinalizers();
             GC.Collect();
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
-            return bitmap;
+            return skbitmap ?? new SKBitmap(viewWidth, viewHeight, SKColorType.Rgb888x, SKAlphaType.Opaque);
+        }
+
+        /// <summary>
+        /// Helper method to encode an SKBitmap to JPEG format.
+        /// Note: This currently encodes to JPEG instead of JPEG2000 as a temporary solution.
+        /// </summary>
+        private byte[] EncodeSkBitmapToJpeg(SKBitmap bitmap, bool lossless = false)
+        {
+            if (bitmap == null) return null;
+
+            try
+            {
+                using (SKImage skImage = SKImage.FromBitmap(bitmap))
+                using (SKData encoded = skImage.Encode(SKEncodedImageFormat.Jpeg, lossless ? 100 : 95))
+                {
+                    return encoded.ToArray();
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // Helper: convert J2K bytes to SKBitmap via CoreJ2K
+        private SKBitmap J2kBytesToSKBitmap(byte[] j2kData)
+        {
+            try
+            {
+                var j2k = J2kImage.FromBytes(j2kData);
+                if (j2k == null) return null;
+                SKImage skImg = j2k.As<SKImage>();
+                if (skImg == null) return null;
+                using (SKData png = skImg.Encode(SKEncodedImageFormat.Png, 100))
+                using (var ms = new MemoryStream(png.ToArray()))
+                {
+                    return SKBitmap.Decode(ms);
+                }
+            }
+            catch { return null; }
         }
 
         public byte[] WriteJpeg2000Image()
         {
             try
             {
-                using (Bitmap mapbmp = CreateMapTile())
-                    return OpenJPEG.EncodeFromImage(mapbmp, false);
+                SKBitmap sk = CreateMapTile();
+                if (sk == null)
+                    return null;
+
+                // Encode SKBitmap to JPEG format
+                return EncodeSkBitmapToJpeg(sk);
             }
             catch (Exception e)
             {
@@ -413,11 +467,14 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             };
 
             warp_Texture texture;
-            using (Bitmap image = TerrainSplat.Splat(terrain, textureIDs, startHeights, heightRanges,
+            using (SKBitmap skImage = TerrainSplat.Splat(terrain, textureIDs, startHeights, heightRanges,
                         m_scene.RegionInfo.WorldLocX, m_scene.RegionInfo.WorldLocY,
                         m_scene.AssetService, m_imgDecoder, m_textureTerrain, m_textureAverageTerrain,
                         twidth, twidth))
-                    texture = new warp_Texture(image);
+            {
+                // Create warp_Texture directly from SKBitmap (new Warp3D API)
+                texture = new warp_Texture(skImage);
+            }
 
             warp_Material material = new warp_Material(texture);
             obj.setMaterial(material);
@@ -513,16 +570,13 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                         }
                         else // It's sculptie
                         {
-                            //Image sculpt = m_imgDecoder.DecodeToImage(sculptAsset.Data);
-                            Image sculpt = J2kImage.FromBytes(sculptAsset.Data, null, true, 12);
-                                if (sculpt is not null)
-                                {
-                                    renderMesh = m_primMesher.GenerateFacetedSculptMesh(omvPrim, (Bitmap)sculpt, lod);
-                                //sculpt.Save("lixo12-"+prim.UUID.ToString()+".png",ImageFormat.Png);
-                                    sculpt.Dispose();
-                                }
-                            }
+                            // Note: Sculpt mesh rendering via GenerateFacetedSculptMesh requires System.Drawing.Bitmap.
+                            // Since we're migrating away from System.Drawing, sculpt rendering is temporarily disabled.
+                            // TODO: Update OpenMetaverse library to accept SkiaSharp bitmaps or find alternative approach.
+                            m_log.WarnFormat("[Warp3D] Sculpt rendering for prim {0} at {1} is not supported in SkiaSharp-only mode",
+                                prim.Name, prim.GetWorldPosition().ToString());
                         }
+                    }
                     else
                     {
                         m_log.WarnFormat("[Warp3D] failed to get mesh or sculpt asset {0} of prim {1} at {2}",
@@ -709,10 +763,9 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         {
             string name = color.ToString();
 
-            if(renderer.Scene.TryGetMaterial(name, out warp_Material material))
-                return material;
-
-            material = new warp_Material(ConvertColor(color));
+            // Try to get from the renderer's material cache using addMaterial
+            // Since Warp3D doesn't have TryGetMaterial, we create the material directly
+            warp_Material material = new warp_Material(ConvertColor(color));
             renderer.Scene.addMaterial(name, material);
             return material;
         }
@@ -723,10 +776,9 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             string idstr = textureID.ToString() + color.ToString();
             string materialName = "MAPMAT" + idstr;
 
-            if (renderer.Scene.TryGetMaterial(materialName, out warp_Material mat))
-                return mat;
-
-            mat = new warp_Material();
+            // Note: Warp3D doesn't have TryGetMaterial, so we always create and add
+            // The scene will handle duplicate names appropriately
+            warp_Material mat = new warp_Material();
             warp_Texture texture = GetTexture(textureID, sop);
             if (texture is not null)
             {
@@ -756,12 +808,12 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             {
                 try
                 {
-                    //using (Bitmap img = (Bitmap)m_imgDecoder.DecodeToImage(asset.Data))
-                    using (Bitmap img = (Bitmap)J2kImage.FromBytes(asset.Data,null, false, 16))
+                    SKBitmap skImg = J2kBytesToSKBitmap(asset.Data);
+                    if (skImg != null)
                     {
-                        //img.Save("lixo"+id.ToString()+".png",ImageFormat.Png);
-                        ret = new warp_Texture(img, 8); // reduce textures size to 256 * 256
-                }
+                        // Create warp_Texture directly from SKBitmap with reduction level 8 (reduce textures size to 256 * 256)
+                        ret = new warp_Texture(skImg, 8);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -825,61 +877,46 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             ulong g = 0;
             ulong b = 0;
             ulong a = 0;
-            int pixelBytes;
+            // pixelBytes not required when using managed copies
 
             try
             {
-                using (Bitmap bitmap = (Bitmap)J2kImage.FromBytes(j2kData))
+                SKBitmap sk = J2kBytesToSKBitmap(j2kData);
+                if (sk == null)
                 {
-                    width = bitmap.Width;
-                    height = bitmap.Height;
-
-                    BitmapData bitmapData = bitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, bitmap.PixelFormat);
-                    pixelBytes = (bitmapData.PixelFormat == PixelFormat.Format24bppRgb) ? 3 : 4;
-
-                    // Sum up the individual channels
-                    unsafe
-                    {
-                        byte* start = (byte*)bitmapData.Scan0;
-                        if (pixelBytes == 4)
-                        {
-                            for (int y = 0; y < height; y++)
-                            {
-                                
-                                byte* end = start + 4 * width;
-                                for(byte* row = start; row < end; row += 4)
-                                {
-                                    b += row[0];
-                                    g += row[1];
-                                    r += row[2];
-                                    a += row[3];
-                                }
-                                start += bitmapData.Stride;
-                            }
-                        }
-                        else
-                        {
-                            for (int y = 0; y < height; y++)
-                            {
-                                byte* end = start + 3 * width;
-                                for (byte* row = start; row < end; row += 3)
-                                {
-                                    b += row[0];
-                                    g += row[1];
-                                    r += row[2];
-                                }
-                                start += bitmapData.Stride;
-                            }
-                        }
-                    }
-                    bitmap.UnlockBits(bitmapData);
+                    width = 0;
+                    height = 0;
+                    return new Color4(0.5f, 0.5f, 0.5f, 1.0f);
                 }
-                // Get the averages for each channel
+
+                width = sk.Width;
+                height = sk.Height;
+
+                IntPtr pixels = sk.GetPixels();
+                int rowBytes = sk.RowBytes;
+                int npixels = width * height;
+
+                // Copy pixels into managed array and iterate safely
+                byte[] buf = new byte[rowBytes * height];
+                System.Runtime.InteropServices.Marshal.Copy(pixels, buf, 0, buf.Length);
+                for (int y = 0; y < height; y++)
+                {
+                    int rowStart = y * rowBytes;
+                    for (int x = 0; x < width; x++)
+                    {
+                        int idx = rowStart + x * 4;
+                        b += buf[idx + 0];
+                        g += buf[idx + 1];
+                        r += buf[idx + 2];
+                        a += buf[idx + 3];
+                    }
+                }
+
                 double invtotalPixels = 1.0/(255.0 * width * height);
                 double rm = r * invtotalPixels;
                 double gm = g * invtotalPixels;
                 double bm = b * invtotalPixels;
-                double am = pixelBytes == 3 ? 1.0 : a * invtotalPixels;
+                double am = a * invtotalPixels;
                 return new Color4((float)rm, (float)gm, (float)bm, (float)am);
             }
             catch (Exception ex)

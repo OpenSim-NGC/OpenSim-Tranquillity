@@ -29,7 +29,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using Mono.Addins;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim;
 using OpenSim.ApplicationPlugins.RegionModulesController;
@@ -42,7 +42,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 {
     public class SharedRegionModuleTests : OpenSimTestCase
     {
-//        [Test]
+//        [Fact]
         public void TestLifecycle()
         {
             TestHelpers.InMethod();
@@ -118,17 +118,17 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             List<string> co = tsr.CallOrder;
             int expectedEventCount = 6;
 
-            Assert.AreEqual(
+            Assert.Equal(
                 expectedEventCount,
                 co.Count,
                 "Expected {0} events but only got {1} ({2})",
                 expectedEventCount, co.Count, string.Join(",", co));
-            Assert.AreEqual("Initialise",       co[0]);
-            Assert.AreEqual("PostInitialise",   co[1]);
-            Assert.AreEqual("AddRegion",        co[2]);
-            Assert.AreEqual("RegionLoaded",     co[3]);
-            Assert.AreEqual("RemoveRegion",     co[4]);
-            Assert.AreEqual("Close",            co[5]);
+            Assert.Equal("Initialise",       co[0]);
+            Assert.Equal("PostInitialise",   co[1]);
+            Assert.Equal("AddRegion",        co[2]);
+            Assert.Equal("RegionLoaded",     co[3]);
+            Assert.Equal("RemoveRegion",     co[4]);
+            Assert.Equal("Close",            co[5]);
         }
     }
 

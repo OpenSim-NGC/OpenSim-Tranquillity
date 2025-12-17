@@ -27,7 +27,7 @@
 
 using System.Collections.Generic;
 using System.Text;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -36,7 +36,6 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
-    [TestFixture]
     public class UuidGathererTests : OpenSimTestCase
     {
         protected IAssetService m_assetService;
@@ -44,7 +43,6 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
         protected static string noteBase = @"Linden text version 2\n{\nLLEmbeddedItems version 1\n
 {\ncount 0\n}\nText length xxx\n"; // len does not matter on this test
-        [SetUp]
         public void Init()
         {
             // FIXME: We don't need a full scene here - it would be enough to set up the asset service.
@@ -53,7 +51,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_uuidGatherer = new UuidGatherer(m_assetService);
         }
 
-        [Test]
+        [Fact]
         public void TestCorruptAsset()
         {
             TestHelpers.InMethod();
@@ -67,13 +65,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_uuidGatherer.GatherAll();
 
             // We count the uuid as gathered even if the asset itself is corrupt.
-            Assert.That(m_uuidGatherer.GatheredUuids.Count, Is.EqualTo(1));
+            Assert.Equal(,);
         }
 
         /// <summary>
         /// Test requests made for non-existent assets while we're gathering
         /// </summary>
-        [Test]
+        [Fact]
         public void TestMissingAsset()
         {
             TestHelpers.InMethod();
@@ -83,10 +81,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_uuidGatherer.AddForInspection(missingAssetUuid);
             m_uuidGatherer.GatherAll();
 
-            Assert.That(m_uuidGatherer.GatheredUuids.Count, Is.EqualTo(0));
+            Assert.Equal(,);
         }
 
-        [Test]
+        [Fact]
         public void TestNotecardAsset()
         {
             TestHelpers.InMethod();
@@ -117,13 +115,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             // foreach (UUID key in m_uuidGatherer.GatheredUuids.Keys)
             // System.Console.WriteLine("key : {0}", key);
 
-            Assert.That(m_uuidGatherer.GatheredUuids.Count, Is.EqualTo(3));
+            Assert.Equal(,);
             Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(ncAssetId));
             Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(embeddedId));
             Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(secondLevelEmbeddedId));
         }
 
-        [Test]
+        [Fact]
         public void TestTaskItems()
         {
             TestHelpers.InMethod();
@@ -150,7 +148,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 //                            System.Console.WriteLine("key : {0}", key);
 
             // We expect to see the default prim texture and the assets of the contained task items
-            Assert.That(m_uuidGatherer.GatheredUuids.Count, Is.EqualTo(4));
+            Assert.Equal(,);
             Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(new UUID(Constants.DefaultTexture)));
             Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(TestHelpers.ParseTail(0x41)));
             Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(TestHelpers.ParseTail(0x42)));

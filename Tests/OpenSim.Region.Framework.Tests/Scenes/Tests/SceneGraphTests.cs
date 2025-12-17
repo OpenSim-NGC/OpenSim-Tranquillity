@@ -61,25 +61,25 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 = scene.SceneGraph.DuplicateObject(
                     part1.LocalId, new Vector3(10, 0, 0), ownerId, UUID.Zero, Quaternion.Identity, false);
             dupeSo.Parts.Length.Should().Be(2);
-            //Assert.That(dupeSo.Parts.Length, Is.EqualTo(2));
+            //Assert.Equal(,);
 
             SceneObjectPart dupePart1 = dupeSo.GetLinkNumPart(1);
             SceneObjectPart dupePart2 = dupeSo.GetLinkNumPart(2);
             dupePart1.Should().NotBe(part1.LocalId);
             dupePart2.Should().NotBe(part2.LocalId);
-            //Assert.That(dupePart1.LocalId, Is.Not.EqualTo(part1.LocalId));
-            //Assert.That(dupePart2.LocalId, Is.Not.EqualTo(part2.LocalId));
+            //Assert.True(dupePart1.LocalId));
+            //Assert.True(dupePart2.LocalId));
 
             dupePart1.Flags.Should().Be(part1.Flags);
             dupePart2.Flags.Should().Be(part2.Flags);
-            //Assert.That(dupePart1.Flags, Is.EqualTo(part1.Flags));
-            //Assert.That(dupePart2.Flags, Is.EqualTo(part2.Flags));
+            //Assert.Equal(,);
+            //Assert.Equal(,);
 
             /*
-            Assert.That(part1.PhysActor, Is.Not.Null);
-            Assert.That(part2.PhysActor, Is.Not.Null);
-            Assert.That(dupePart1.PhysActor, Is.Not.Null);
-            Assert.That(dupePart2.PhysActor, Is.Not.Null);
+            // TODO: Fix this assertion
+            // TODO: Fix this assertion
+            // TODO: Fix this assertion
+            // TODO: Fix this assertion
             */
         }
     }

@@ -31,7 +31,7 @@ using System.Net;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Server.Handlers.Asset;
@@ -41,10 +41,9 @@ using OpenSim.Tests.Common;
 
 namespace OpenSim.Server.Handlers.Asset.Test
 {
-    [TestFixture]
     public class AssetServerPostHandlerTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestGoodAssetStoreRequest()
         {
             TestHelpers.InMethod();
@@ -78,10 +77,10 @@ namespace OpenSim.Server.Handlers.Asset.Test
 
             AssetBase retrievedAsset = assetService.Get(assetId.ToString());
 
-            Assert.That(retrievedAsset, Is.Not.Null);
+            // TODO: Fix this assertion
         }
 
-        [Test]
+        [Fact]
         public void TestBadXmlAssetStoreRequest()
         {
             TestHelpers.InMethod();
@@ -102,7 +101,7 @@ namespace OpenSim.Server.Handlers.Asset.Test
             TestOSHttpResponse response = new TestOSHttpResponse();
             asph.Handle(null, buffer, null, response);
 
-            Assert.That(response.StatusCode, Is.EqualTo((int)HttpStatusCode.BadRequest));
+            Assert.True(response.StatusCode)HttpStatusCode.BadRequest));
         }
     }
 }

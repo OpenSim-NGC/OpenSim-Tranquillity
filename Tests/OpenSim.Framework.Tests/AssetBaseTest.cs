@@ -40,7 +40,7 @@ namespace OpenSim.Framework.Tests
             // throw new NotImplementedException();
         }
 
-        [Test]
+        [Fact]
         public void TestContainsReferences()
         {
             CheckContainsReferences(AssetType.Bodypart, true);

@@ -25,17 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Drawing;
-using System.Drawing.Imaging;
+using SkiaSharp;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.Imaging;
-using OpenSim.Region.CoreModules.Scripting.DynamicTexture;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using log4net;
@@ -56,7 +51,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
 
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private static object thisLock = new object();
-        private static Graphics m_graph = null; // just to get chars sizes
+        private static SKTypeface m_typeface = null; // SkiaSharp typeface for measurements
 
         private Scene m_scene;
         private IDynamicTextureManager m_textureManager;
@@ -123,14 +118,41 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
         {
             lock (thisLock)
             {
-                using (Font myFont = new Font(fontName, fontSize))
+                var typeface = SKTypeface.FromFamilyName(fontName, SKFontStyle.Normal);
+                using (var font = new SKFont(typeface, fontSize))
                 {
-                    SizeF stringSize = new SizeF();
-
-                    stringSize = m_graph.MeasureString(text, myFont);
-                    xSize = stringSize.Width;
-                    ySize = stringSize.Height;
+                    xSize = (int)font.MeasureText(text);
+                    // For height, use the font metrics
+                    ySize = (int)(font.Metrics.Descent - font.Metrics.Ascent);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Parse color from hex or name
+        /// </summary>
+        private static SKColor ParseColor(string value, SKColor defaultColor)
+        {
+            int hex = 0;
+            if (int.TryParse(value, System.Globalization.NumberStyles.HexNumber, 
+                System.Globalization.CultureInfo.InvariantCulture, out hex))
+            {
+                return new SKColor((uint)hex);
+            }
+            
+            // Try to parse named colors
+            switch (value.ToLower())
+            {
+                case "white": return SKColors.White;
+                case "black": return SKColors.Black;
+                case "red": return SKColors.Red;
+                case "green": return SKColors.Green;
+                case "blue": return SKColors.Blue;
+                case "yellow": return SKColors.Yellow;
+                case "cyan": return SKColors.Cyan;
+                case "magenta": return SKColors.Magenta;
+                case "gray": return SKColors.Gray;
+                default: return defaultColor;
             }
         }
 
@@ -151,10 +173,9 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
             // is shut down.
             lock(thisLock)
             {
-                if(m_graph == null)
+                if(m_typeface == null)
                 {
-                    Bitmap bitmap = new Bitmap(32, 32, PixelFormat.Format32bppArgb);
-                    m_graph = Graphics.FromImage(bitmap);
+                    m_typeface = SKTypeface.FromFamilyName(m_fontName, SKFontStyle.Normal);
                 }
             }
         }
@@ -210,7 +231,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
             int width = 256;
             int height = 256;
             int alpha = 255; // 0 is transparent
-            Color bgColor = Color.White;  // Default background color
+            SKColor bgColor = SKColors.White;  // Default background color
             char altDataDelim = ';';
 
             char[] paramDelimiter = { ',' };
@@ -221,7 +242,6 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
 
             string[] nvps = extraParams.Split(paramDelimiter);
 
-            bool lossless = false;
             int temp = -1;
             foreach (string pair in nvps)
             {
@@ -304,19 +324,15 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                           int hex = 0;
                          if (Int32.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out hex))
                          {
-                             bgColor = Color.FromArgb(hex);
+                             bgColor = new SKColor((uint)hex);
                          }
                          else
                          {
-                             bgColor = Color.FromName(value);
+                             bgColor = ParseColor(value, SKColors.White);
                          }
                          break;
                     case "altdatadelim":
                         altDataDelim = value.ToCharArray()[0];
-                        break;
-                    case "lossless":
-                        if (value.ToLower() == "true")
-                            lossless = true;
                         break;
                     case "":
                          // blank string has been passed do nothing just use defaults
@@ -349,37 +365,30 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                 }
             }
 
-            Bitmap bitmap = null;
-            Graphics graph = null;
+            SKBitmap bitmap = null;
+            SKCanvas canvas = null;
             bool reuseable = false;
 
             try
             {
-                // XXX: In testing, it appears that if multiple threads dispose of separate GDI+ objects simultaneously,
-                // the native malloc heap can become corrupted, possibly due to a double free().  This may be due to
-                // bugs in the underlying libcairo used by mono's libgdiplus.dll on Linux/OSX.  These problems were
-                // seen with both libcario 1.10.2-6.1ubuntu3 and 1.8.10-2ubuntu1.  They go away if disposal is perfomed
-                // under lock.
                 lock (this)
                 {
+                    if (alpha == 256 && bgColor.Alpha != 255)
+                        alpha = bgColor.Alpha;
 
-                    if (alpha == 256 && bgColor.A != 255)
-                        alpha = bgColor.A;
-
+                    bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+                    canvas = new SKCanvas(bitmap);
+                    
                     if (alpha == 256)
                     {
-                        bitmap = new Bitmap(width, height, PixelFormat.Format32bppRgb);
-                        graph = Graphics.FromImage(bitmap);
-                        graph.Clear(bgColor);
+                        canvas.Clear(bgColor);
                     }
                     else
                     {
-                        Color newbg = Color.FromArgb(alpha, bgColor);
-                        bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-                        graph = Graphics.FromImage(bitmap);
-                        graph.Clear(newbg);
+                        SKColor newbg = new SKColor(bgColor.Red, bgColor.Green, bgColor.Blue, (byte)alpha);
+                        canvas.Clear(newbg);
                     }
-                    GDIDraw(data, graph, altDataDelim, out reuseable);
+                    GDIDraw(data, canvas, altDataDelim, out reuseable);
                 }
 
                 byte[] imageJ2000 = Array.Empty<byte>();
@@ -394,24 +403,30 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
 
                 try
                 {
-                    imageJ2000 = OpenJPEG.EncodeFromImage(bitmap, lossless);
+                    // Convert SKBitmap to SKImage and encode as JPEG
+                    // TODO: Replace with CoreJ2K encoding when encoder becomes available
+                    using (var image = SKImage.FromBitmap(bitmap))
+                    {
+                        var data_encoded = image.Encode(SKEncodedImageFormat.Jpeg, 100);
+                        imageJ2000 = data_encoded.ToArray();
+                    }
                 }
                 catch (Exception e)
                 {
                     m_log.ErrorFormat(
-                        "[VECTORRENDERMODULE]: OpenJpeg Encode Failed.  Exception {0}{1}",
+                        "[VECTORRENDERMODULE]: Image Encoding Failed.  Exception {0}{1}",
                         e.Message, e.StackTrace);
                 }
 
                 return new OpenSim.Region.CoreModules.Scripting.DynamicTexture.DynamicTexture(
-                    data, extraParams, imageJ2000, new Size(width, height), reuseable);
+                    data, extraParams, imageJ2000, (width, height), reuseable);
             }
             finally
             {
                 lock (thisLock)
                 {
-                    if (graph != null)
-                        graph.Dispose();
+                    if (canvas != null)
+                        canvas.Dispose();
 
                     if (bitmap != null)
                         bitmap.Dispose();
@@ -486,22 +501,33 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
             return data.Split(lineDelimiter);
         }
 
-        private void GDIDraw(string data, Graphics graph, char dataDelim, out bool reuseable)
+        private void GDIDraw(string data, SKCanvas canvas, char dataDelim, out bool reuseable)
         {
             reuseable = true;
-            Point startPoint = new Point(0, 0);
-            Point endPoint = new Point(0, 0);
-            Pen drawPen = null;
-            Font myFont = null;
-            SolidBrush myBrush = null;
+            SKPoint startPoint = new SKPoint(0, 0);
+            SKPoint endPoint = new SKPoint(0, 0);
+            SKPaint drawPaint = null;
+            SKTypeface myTypeface = null;
+            SKFont myFont = null;
+            SKColor drawColor = SKColors.Black;
 
             try
             {
-                drawPen = new Pen(Color.Black, 7);
+                drawPaint = new SKPaint
+                {
+                    Color = SKColors.Black,
+                    StrokeWidth = 7,
+                    IsStroke = true,
+                    Style = SKPaintStyle.Stroke,
+                    StrokeCap = SKStrokeCap.Butt,
+                    StrokeJoin = SKStrokeJoin.Miter,
+                    IsAntialias = true
+                };
+
                 string fontName = m_fontName;
                 float fontSize = 14;
-                myFont = new Font(fontName, fontSize);
-                myBrush = new SolidBrush(Color.Black);
+                myTypeface = SKTypeface.FromFamilyName(fontName, SKFontStyle.Normal);
+                myFont = new SKFont(myTypeface, fontSize);
 
                 char[] partsDelimiter = {','};
 
@@ -519,7 +545,13 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                         if (start < nextLine.Length)
                         {
                             nextLine = nextLine.Substring(start);
-                            graph.DrawString(nextLine, myFont, myBrush, startPoint);
+                            var textPaint = new SKPaint
+                            {
+                                Color = drawColor,
+                                IsAntialias = true
+                            };
+                            canvas.DrawText(nextLine, startPoint.X, startPoint.Y, SKTextAlign.Left, myFont, textPaint);
+                            textPaint.Dispose();
                         }
                         continue;
                     }
@@ -527,27 +559,27 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                     nextLine = nextLine.TrimEnd();
                     if (nextLine.StartsWith("ResetTransf"))
                     {
-                        graph.ResetTransform();
+                        canvas.ResetMatrix();
                     }
                     else if (nextLine.StartsWith("TransTransf"))
                     {
                         float x = 0;
                         float y = 0;
                         GetParams(partsDelimiter, ref nextLine, 11, ref x, ref y);
-                        graph.TranslateTransform(x, y);
+                        canvas.Translate(x, y);
                     }
                     else if (nextLine.StartsWith("ScaleTransf"))
                     {
                         float x = 0;
                         float y = 0;
                         GetParams(partsDelimiter, ref nextLine, 11, ref x, ref y);
-                        graph.ScaleTransform(x, y);
+                        canvas.Scale(x, y);
                     }
                     else if (nextLine.StartsWith("RotTransf"))
                     {
                         float x = 0;
                         GetParams(partsDelimiter, ref nextLine, 9, ref x);
-                        graph.RotateTransform(x);
+                        canvas.RotateDegrees(x);
                     }
                     //replace with switch, or even better, do some proper parsing
                     else if (nextLine.StartsWith("MoveTo"))
@@ -555,19 +587,16 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                         float x = 0;
                         float y = 0;
                         GetParams(partsDelimiter, ref nextLine, 6, ref x, ref y);
-                        startPoint.X = (int) x;
-                        startPoint.Y = (int) y;
+                        startPoint = new SKPoint(x, y);
                     }
                     else if (nextLine.StartsWith("LineTo"))
                     {
                         float x = 0;
                         float y = 0;
                         GetParams(partsDelimiter, ref nextLine, 6, ref x, ref y);
-                        endPoint.X = (int) x;
-                        endPoint.Y = (int) y;
-                        graph.DrawLine(drawPen, startPoint, endPoint);
-                        startPoint.X = endPoint.X;
-                        startPoint.Y = endPoint.Y;
+                        endPoint = new SKPoint(x, y);
+                        canvas.DrawLine(startPoint, endPoint, drawPaint);
+                        startPoint = endPoint;
                     }
                     else if (nextLine.StartsWith("Image"))
                     {
@@ -578,87 +607,121 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                         float x = 0;
                         float y = 0;
                         GetParams(partsDelimiter, ref nextLine, 5, ref x, ref y);
-                        endPoint.X = (int) x;
-                        endPoint.Y = (int) y;
+                        endPoint = new SKPoint(x, y);
 
-                        using (Image image = ImageHttpRequest(nextLine))
+                        var image = ImageHttpRequest(nextLine);
+                        if (image != null)
                         {
-                            if (image != null)
+                            var srcRect = SKRect.Create(0, 0, image.Width, image.Height);
+                            var dstRect = SKRect.Create(startPoint.X, startPoint.Y, x, y);
+                            canvas.DrawImage(image, srcRect, dstRect);
+                            image.Dispose();
+                        }
+                        else
+                        {
+                            var errorFont = new SKFont(SKTypeface.FromFamilyName(m_fontName, SKFontStyle.Normal), 6);
+                            var errorPaint = new SKPaint
                             {
-                                graph.DrawImage(image, (float)startPoint.X, (float)startPoint.Y, x, y);
-                            }
-                            else
-                            {
-                                using (Font errorFont = new Font(m_fontName,6))
-                                {
-                                    graph.DrawString("URL couldn't be resolved or is", errorFont,
-                                                     myBrush, startPoint);
-                                    graph.DrawString("not an image. Please check URL.", errorFont,
-                                                     myBrush, new Point(startPoint.X, 12 + startPoint.Y));
-                                }
+                                Color = drawColor,
+                                IsAntialias = true
+                            };
+                            canvas.DrawText("URL couldn't be resolved or is", startPoint.X, startPoint.Y, SKTextAlign.Left, errorFont, errorPaint);
+                            canvas.DrawText("not an image. Please check URL.", startPoint.X, startPoint.Y + 12, SKTextAlign.Left, errorFont, errorPaint);
+                            errorPaint.Dispose();
+                            errorFont.Dispose();
 
-                                graph.DrawRectangle(drawPen, startPoint.X, startPoint.Y, endPoint.X, endPoint.Y);
-                            }
+                            // Draw rectangle to show error area
+                            var rectPaint = new SKPaint
+                            {
+                                Color = drawColor,
+                                StrokeWidth = drawPaint.StrokeWidth,
+                                Style = SKPaintStyle.Stroke,
+                                IsAntialias = true
+                            };
+                            var rect = SKRect.Create(startPoint.X, startPoint.Y, endPoint.X, endPoint.Y);
+                            canvas.DrawRect(rect, rectPaint);
+                            rectPaint.Dispose();
                         }
 
-                        startPoint.X += endPoint.X;
-                        startPoint.Y += endPoint.Y;
+                        startPoint = new SKPoint(startPoint.X + endPoint.X, startPoint.Y + endPoint.Y);
                     }
                     else if (nextLine.StartsWith("Rectangle"))
                     {
                         float x = 0;
                         float y = 0;
                         GetParams(partsDelimiter, ref nextLine, 9, ref x, ref y);
-                        endPoint.X = (int) x;
-                        endPoint.Y = (int) y;
-                        graph.DrawRectangle(drawPen, startPoint.X, startPoint.Y, endPoint.X, endPoint.Y);
-                        startPoint.X += endPoint.X;
-                        startPoint.Y += endPoint.Y;
+                        endPoint = new SKPoint(x, y);
+                        var rect = SKRect.Create(startPoint.X, startPoint.Y, endPoint.X, endPoint.Y);
+                        canvas.DrawRect(rect, drawPaint);
+                        startPoint = new SKPoint(startPoint.X + endPoint.X, startPoint.Y + endPoint.Y);
                     }
                     else if (nextLine.StartsWith("FillRectangle"))
                     {
                         float x = 0;
                         float y = 0;
                         GetParams(partsDelimiter, ref nextLine, 13, ref x, ref y);
-                        endPoint.X = (int) x;
-                        endPoint.Y = (int) y;
-                        graph.FillRectangle(myBrush, startPoint.X, startPoint.Y, endPoint.X, endPoint.Y);
-                        startPoint.X += endPoint.X;
-                        startPoint.Y += endPoint.Y;
+                        endPoint = new SKPoint(x, y);
+                        var fillPaint = new SKPaint { Color = drawColor, Style = SKPaintStyle.Fill };
+                        var rect = SKRect.Create(startPoint.X, startPoint.Y, endPoint.X, endPoint.Y);
+                        canvas.DrawRect(rect, fillPaint);
+                        fillPaint.Dispose();
+                        startPoint = new SKPoint(startPoint.X + endPoint.X, startPoint.Y + endPoint.Y);
                     }
                     else if (nextLine.StartsWith("FillPolygon"))
                     {
-                        PointF[] points = null;
+                        SKPoint[] points = null;
                         GetParams(partsDelimiter, ref nextLine, 11, ref points);
-                        graph.FillPolygon(myBrush, points);
+                        var fillPaint = new SKPaint { Color = drawColor, Style = SKPaintStyle.Fill };
+                        using (var path = new SKPath())
+                        {
+                            if (points != null && points.Length > 0)
+                            {
+                                path.MoveTo(points[0]);
+                                for (int i = 1; i < points.Length; i++)
+                                    path.LineTo(points[i]);
+                                path.Close();
+                                canvas.DrawPath(path, fillPaint);
+                            }
+                        }
+                        fillPaint.Dispose();
                     }
                     else if (nextLine.StartsWith("Polygon"))
                     {
-                        PointF[] points = null;
+                        SKPoint[] points = null;
                         GetParams(partsDelimiter, ref nextLine, 7, ref points);
-                        graph.DrawPolygon(drawPen, points);
+                        using (var path = new SKPath())
+                        {
+                            if (points != null && points.Length > 0)
+                            {
+                                path.MoveTo(points[0]);
+                                for (int i = 1; i < points.Length; i++)
+                                    path.LineTo(points[i]);
+                                path.Close();
+                                canvas.DrawPath(path, drawPaint);
+                            }
+                        }
                     }
                     else if (nextLine.StartsWith("Ellipse"))
                     {
                         float x = 0;
                         float y = 0;
                         GetParams(partsDelimiter, ref nextLine, 7, ref x, ref y);
-                        endPoint.X = (int)x;
-                        endPoint.Y = (int)y;
-                        graph.DrawEllipse(drawPen, startPoint.X, startPoint.Y, endPoint.X, endPoint.Y);
-                        startPoint.X += endPoint.X;
-                        startPoint.Y += endPoint.Y;
+                        endPoint = new SKPoint(x, y);
+                        var rect = SKRect.Create(startPoint.X, startPoint.Y, endPoint.X, endPoint.Y);
+                        canvas.DrawOval(rect, drawPaint);
+                        startPoint = new SKPoint(startPoint.X + endPoint.X, startPoint.Y + endPoint.Y);
                     }
                     else if (nextLine.StartsWith("FillEllipse"))
                     {
                         float x = 0;
                         float y = 0;
                         GetParams(partsDelimiter, ref nextLine, 11, ref x, ref y);
-                        endPoint.X = (int)x;
-                        endPoint.Y = (int)y;
-                        graph.FillEllipse(myBrush, startPoint.X, startPoint.Y, endPoint.X, endPoint.Y);
-                        startPoint.X += endPoint.X;
-                        startPoint.Y += endPoint.Y;
+                        endPoint = new SKPoint(x, y);
+                        var fillPaint = new SKPaint { Color = drawColor, Style = SKPaintStyle.Fill };
+                        var rect = SKRect.Create(startPoint.X, startPoint.Y, endPoint.X, endPoint.Y);
+                        canvas.DrawOval(rect, fillPaint);
+                        fillPaint.Dispose();
+                        startPoint = new SKPoint(startPoint.X + endPoint.X, startPoint.Y + endPoint.Y);
                     }
                     else if (nextLine.StartsWith("FontSize"))
                     {
@@ -666,12 +729,14 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                         nextLine = nextLine.Trim();
                         fontSize = Convert.ToSingle(nextLine, CultureInfo.InvariantCulture);
 
-                        myFont.Dispose();
-                        myFont = new Font(fontName, fontSize);
+                        myFont?.Dispose();
+                        myFont = new SKFont(myTypeface, fontSize);
                     }
                     else if (nextLine.StartsWith("FontProp"))
                     {
-                        FontStyle myFontStyle = myFont.Style;
+                        SKFontStyle currentStyle = myTypeface.FontStyle;
+                        bool bold = currentStyle == SKFontStyle.Bold || currentStyle == SKFontStyle.BoldItalic;
+                        bool italic = currentStyle == SKFontStyle.Italic || currentStyle == SKFontStyle.BoldItalic;
 
                         nextLine = nextLine.Remove(0, 8);
                         nextLine = nextLine.Trim();
@@ -679,45 +744,57 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                         string[] fprops = nextLine.Split(partsDelimiter);
                         foreach (string prop in fprops)
                         {
-                            switch (prop)
+                            switch (prop.Trim())
                             {
                                 case "B":
-                                    myFontStyle |= FontStyle.Bold;
+                                    bold = true;
                                     break;
                                 case "I":
-                                    myFontStyle |= FontStyle.Italic;
+                                    italic = true;
                                     break;
                                 case "U":
-                                    myFontStyle |= FontStyle.Underline;
+                                    // SkiaSharp doesn't directly support underline, would need custom drawing
                                     break;
                                 case "S":
-                                    myFontStyle |= FontStyle.Strikeout;
+                                    // SkiaSharp doesn't directly support strikeout, would need custom drawing
                                     break;
                                 case "R":   //This special case resets all font properties
-                                    myFontStyle = FontStyle.Regular;
+                                    bold = false;
+                                    italic = false;
                                     break;
                             }
                         }
-                        if (myFontStyle != myFont.Style)
+                        SKFontStyle newStyle = SKFontStyle.Normal;
+                        if (bold && italic)
+                            newStyle = SKFontStyle.BoldItalic;
+                        else if (bold)
+                            newStyle = SKFontStyle.Bold;
+                        else if (italic)
+                            newStyle = SKFontStyle.Italic;
+
+                        if (newStyle != currentStyle)
                         {
-                            Font newFont = new Font(myFont, myFontStyle);
-                            myFont.Dispose();
-                            myFont = newFont;
+                            myTypeface?.Dispose();
+                            myTypeface = SKTypeface.FromFamilyName(myTypeface.FamilyName, newStyle);
+                            myFont?.Dispose();
+                            myFont = new SKFont(myTypeface, fontSize);
                         }
                     }
                     else if (nextLine.StartsWith("FontName"))
                     {
                         nextLine = nextLine.Remove(0, 8);
-                        fontName = nextLine.Trim();
-                        myFont.Dispose();
-                        myFont = new Font(fontName, fontSize);
+                        string newFontName = nextLine.Trim();
+                        myTypeface?.Dispose();
+                        myTypeface = SKTypeface.FromFamilyName(newFontName, SKFontStyle.Normal);
+                        myFont?.Dispose();
+                        myFont = new SKFont(myTypeface, fontSize);
                     }
                     else if (nextLine.StartsWith("PenSize"))
                     {
                         nextLine = nextLine.Remove(0, 7);
                         nextLine = nextLine.Trim();
                         float size = Convert.ToSingle(nextLine, CultureInfo.InvariantCulture);
-                        drawPen.Width = size;
+                        drawPaint.StrokeWidth = size;
                     }
                     else if (nextLine.StartsWith("PenCap"))
                     {
@@ -731,43 +808,30 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                             start = false;
                         else if (cap[0].ToLower() != "both")
                             return;
-                        string type = cap[1].ToLower();
+                        string type = cap[1].ToLower().Trim();
 
-                        if (end)
+                        SKStrokeCap skCap = SKStrokeCap.Butt;
+                        switch (type)
                         {
-                            switch (type)
-                            {
-                                case "arrow":
-                                    drawPen.EndCap = System.Drawing.Drawing2D.LineCap.ArrowAnchor;
-                                    break;
-                                case "round":
-                                    drawPen.EndCap = System.Drawing.Drawing2D.LineCap.RoundAnchor;
-                                    break;
-                                case "diamond":
-                                    drawPen.EndCap = System.Drawing.Drawing2D.LineCap.DiamondAnchor;
-                                    break;
-                                case "flat":
-                                    drawPen.EndCap = System.Drawing.Drawing2D.LineCap.Flat;
-                                    break;
-                            }
+                            case "arrow":
+                                // SkiaSharp doesn't have arrow caps, use round as fallback
+                                skCap = SKStrokeCap.Round;
+                                break;
+                            case "round":
+                                skCap = SKStrokeCap.Round;
+                                break;
+                            case "diamond":
+                                // SkiaSharp doesn't have diamond caps, use round as fallback
+                                skCap = SKStrokeCap.Round;
+                                break;
+                            case "flat":
+                                skCap = SKStrokeCap.Butt;
+                                break;
                         }
-                        if (start)
+                        
+                        if (end || start)
                         {
-                            switch (type)
-                            {
-                                case "arrow":
-                                    drawPen.StartCap = System.Drawing.Drawing2D.LineCap.ArrowAnchor;
-                                    break;
-                                case "round":
-                                    drawPen.StartCap = System.Drawing.Drawing2D.LineCap.RoundAnchor;
-                                    break;
-                                case "diamond":
-                                    drawPen.StartCap = System.Drawing.Drawing2D.LineCap.DiamondAnchor;
-                                    break;
-                                case "flat":
-                                    drawPen.StartCap = System.Drawing.Drawing2D.LineCap.Flat;
-                                    break;
-                            }
+                            drawPaint.StrokeCap = skCap;
                         }
                     }
                     else if (nextLine.StartsWith("PenColour") || nextLine.StartsWith("PenColor"))
@@ -776,32 +840,31 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                         nextLine = nextLine.Trim();
                         int hex = 0;
 
-                        Color newColor;
+                        SKColor newColor;
                         if (Int32.TryParse(nextLine, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out hex))
                         {
-                            newColor = Color.FromArgb(hex);
+                            newColor = new SKColor((uint)hex);
                         }
                         else
                         {
-                            // this doesn't fail, it just returns black if nothing is found
-                            newColor = Color.FromName(nextLine);
+                            newColor = ParseColor(nextLine, SKColors.Black);
                         }
 
-                        myBrush.Color = newColor;
-                        drawPen.Color = newColor;
+                        drawColor = newColor;
+                        drawPaint.Color = newColor;
                     }
                 }
             }
             finally
             {
-                if (drawPen != null)
-                    drawPen.Dispose();
+                if (drawPaint != null)
+                    drawPaint.Dispose();
 
                 if (myFont != null)
                     myFont.Dispose();
 
-                if (myBrush != null)
-                    myBrush.Dispose();
+                if (myTypeface != null)
+                    myTypeface.Dispose();
             }
         }
 
@@ -843,20 +906,20 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
             }
         }
 
-        private static void GetParams(char[] partsDelimiter, ref string line, int startLength, ref PointF[] points)
+        private static void GetParams(char[] partsDelimiter, ref string line, int startLength, ref SKPoint[] points)
         {
             line = line.Remove(0, startLength);
             string[] parts = line.Split(partsDelimiter);
             if (parts.Length > 1 && parts.Length % 2 == 0)
             {
-                points = new PointF[parts.Length / 2];
+                points = new SKPoint[parts.Length / 2];
                 for (int i = 0; i < parts.Length; i = i + 2)
                 {
                     string xVal = parts[i].Trim();
                     string yVal = parts[i+1].Trim();
                     float x = Convert.ToSingle(xVal, CultureInfo.InvariantCulture);
                     float y = Convert.ToSingle(yVal, CultureInfo.InvariantCulture);
-                    PointF point = new PointF(x, y);
+                    SKPoint point = new SKPoint(x, y);
                     points[i / 2] = point;
 
 //                    m_log.DebugFormat("[VECTOR RENDER MODULE]: Got point {0}", points[i / 2]);
@@ -864,20 +927,23 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
             }
         }
 
-        private Bitmap ImageHttpRequest(string url)
+        private SKImage ImageHttpRequest(string url)
         {
             try
             {
-                WebRequest request = HttpWebRequest.Create(url);
-
-                using (HttpWebResponse response = (HttpWebResponse)(request).GetResponse())
+                var handler = new HttpClientHandler();
+                using (var client = new System.Net.Http.HttpClient(handler))
                 {
-                    if (response.StatusCode == HttpStatusCode.OK)
+                    using (var response = client.GetAsync(url).Result)
                     {
-                        using (Stream s = response.GetResponseStream())
+                        if (response.IsSuccessStatusCode)
                         {
-                            Bitmap image = new Bitmap(s);
-                            return image;
+                            using (var s = response.Content.ReadAsStreamAsync().Result)
+                            {
+                                var data = new byte[s.Length];
+                                s.Read(data, 0, (int)s.Length);
+                                return SKImage.FromEncodedData(data);
+                            }
                         }
                     }
                 }

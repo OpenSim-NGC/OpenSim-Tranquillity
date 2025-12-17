@@ -1,0 +1,5 @@
+ Copyright (c) Peter Walser, Alan Simes and Dean Lunz
+ All rights reserved.
+ 
+ Licensed under the Creative Commons Attribution Share-Alike 2.5 Canada
+ license: http://creativecommons.org/licenses/by-sa/2.5/ca/

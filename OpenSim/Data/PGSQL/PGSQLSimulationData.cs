@@ -28,7 +28,6 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Threading;
@@ -1226,10 +1225,12 @@ namespace OpenSim.Data.PGSQL
             prim.Name = (string)primRow["Name"];
             // various text fields
             prim.Text = (string)primRow["Text"];
-            prim.Color = Color.FromArgb(Convert.ToInt32(primRow["ColorA"]),
-                                        Convert.ToInt32(primRow["ColorR"]),
-                                        Convert.ToInt32(primRow["ColorG"]),
-                                        Convert.ToInt32(primRow["ColorB"]));
+            // Construct uint ARGB color: 0xAARRGGBB
+            int a = Convert.ToInt32(primRow["ColorA"]);
+            int r = Convert.ToInt32(primRow["ColorR"]);
+            int g = Convert.ToInt32(primRow["ColorG"]);
+            int b = Convert.ToInt32(primRow["ColorB"]);
+            prim.Color = (uint)((a << 24) | (r << 16) | (g << 8) | b);
             prim.Description = (string)primRow["Description"];
             prim.SitName = (string)primRow["SitName"];
             prim.TouchName = (string)primRow["TouchName"];
@@ -1726,10 +1727,16 @@ namespace OpenSim.Data.PGSQL
             // the UUID of the root part for this SceneObjectGroup
             // various text fields
             parameters.Add(_Database.CreateParameter("Text", prim.Text));
-            parameters.Add(_Database.CreateParameter("ColorR", prim.Color.R));
-            parameters.Add(_Database.CreateParameter("ColorG", prim.Color.G));
-            parameters.Add(_Database.CreateParameter("ColorB", prim.Color.B));
-            parameters.Add(_Database.CreateParameter("ColorA", prim.Color.A));
+            // Extract ARGB components from uint color (0xAARRGGBB)
+            uint color = prim.Color;
+            byte a = (byte)((color >> 24) & 0xFF);
+            byte r = (byte)((color >> 16) & 0xFF);
+            byte g = (byte)((color >> 8) & 0xFF);
+            byte b = (byte)(color & 0xFF);
+            parameters.Add(_Database.CreateParameter("ColorR", (int)r));
+            parameters.Add(_Database.CreateParameter("ColorG", (int)g));
+            parameters.Add(_Database.CreateParameter("ColorB", (int)b));
+            parameters.Add(_Database.CreateParameter("ColorA", (int)a));
             parameters.Add(_Database.CreateParameter("Description", prim.Description));
             parameters.Add(_Database.CreateParameter("SitName", prim.SitName));
             parameters.Add(_Database.CreateParameter("TouchName", prim.TouchName));

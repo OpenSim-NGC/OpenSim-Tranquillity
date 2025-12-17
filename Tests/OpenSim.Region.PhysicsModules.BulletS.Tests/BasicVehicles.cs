@@ -27,7 +27,7 @@
 
 using System.Collections.Generic;
 
-using NUnit.Framework;
+using Xunit;
 
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModule.BulletS;
@@ -38,7 +38,6 @@ using OpenMetaverse;
 
 namespace OpenSim.Region.PhysicsModule.BulletS.Tests
 {
-    [TestFixture]
     public class BasicVehicles : OpenSimTestCase
     {
         // Documentation on attributes: http://www.nunit.org/index.php?p=attributes&r=2.6.1
@@ -140,13 +139,13 @@ namespace OpenSim.Region.PhysicsModule.BulletS.Tests
             /*
             float finalRoll, finalPitch, finalYaw;
             TestVehicle.Orientation.GetEulerAngles(out finalRoll, out finalPitch, out finalYaw);
-            Assert.That(finalRoll, Is.InRange(-0.01f, 0.01f));
-            Assert.That(finalPitch, Is.InRange(-0.01f, 0.01f));
-            Assert.That(finalYaw, Is.InRange(initYaw - 0.1f, initYaw + 0.1f));
+            Assert.True(finalRoll));
+            Assert.True(finalPitch));
+            Assert.True(finalYaw));
              */
 
             Vector3 upPointer = Vector3.UnitZ * TestVehicle.Orientation;
-            Assert.That(upPointer.Z, Is.GreaterThan(0.99f));
+            Assert.True(upPointer.Z));
         }
     }
 }

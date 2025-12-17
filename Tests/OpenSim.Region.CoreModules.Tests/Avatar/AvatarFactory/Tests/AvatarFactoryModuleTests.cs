@@ -28,18 +28,19 @@
 using OpenMetaverse;
 
 using OpenSim.Framework;
+using OpenSim.Region.CoreModules.Avatar.AvatarFactory;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
+using Xunit;
 
 namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
 {
-    [TestFixture]
     public class AvatarFactoryModuleTests : OpenSimTestCase
     {
         /// <summary>
         /// Only partial right now since we don't yet test that it's ended up in the avatar appearance service.
         /// </summary>
-        [Test]
+        [Fact]
         public void TestSetAppearance()
         {
             TestHelpers.InMethod();
@@ -82,12 +83,12 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
             eyesFace.TextureID = bakedTextureID;
             afm.SetAppearance(sp, bakedTextureEntry, visualParams, null);
 
-            Assert.That(rebakeRequestsReceived, Is.EqualTo(0));
+            Assert.Equal(0, rebakeRequestsReceived);
 
             AssetBase eyesBake = scene.AssetService.Get(bakedTextureID.ToString());
-            Assert.That(eyesBake, Is.Not.Null);
-            Assert.That(eyesBake.Temporary, Is.True);
-            Assert.That(eyesBake.Local, Is.True);
+            Assert.NotNull(eyesBake);
+            Assert.True(eyesBake.Temporary);
+            Assert.True(eyesBake.Local);
         }
 
         /// <summary>
@@ -97,7 +98,7 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
         /// For a mesh avatar, it appears these 'baked textures' are used.  So these should not trigger a request to
         /// rebake.
         /// </remarks>
-        [Test]
+        [Fact]
         public void TestSetAppearanceAlphaBakedTextures()
         {
             TestHelpers.InMethod();
@@ -139,10 +140,10 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
             eyesFace.TextureID = alphaTextureID;
             afm.SetAppearance(sp, bakedTextureEntry, visualParams, null);
 
-            Assert.That(rebakeRequestsReceived, Is.EqualTo(0));
+            Assert.Equal(0, rebakeRequestsReceived);
         }
 
-        [Test]
+        [Fact]
         public void TestSaveBakedTextures()
         {
             TestHelpers.InMethod();
@@ -185,9 +186,9 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
             assetCache.Clear();
 
             AssetBase eyesBake = scene.AssetService.Get(eyesTextureId.ToString());
-            Assert.That(eyesBake, Is.Not.Null);
-            Assert.That(eyesBake.Temporary, Is.False);
-            Assert.That(eyesBake.Local, Is.False);
+            Assert.NotNull(eyesBake);
+            Assert.False(eyesBake.Temporary);
+            Assert.False(eyesBake.Local);
         }
     }
 }

@@ -25,17 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Reflection;
+using System.Collections;
+using SkiaSharp;
+using CoreJ2K;
 
-using System.Threading;
 using log4net;
 using Nini.Config;
 using OpenMetaverse;
@@ -50,9 +46,10 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.CoreModules.World.Land;
-using Caps=OpenSim.Framework.Capabilities.Caps;
-using OSDArray=OpenMetaverse.StructuredData.OSDArray;
-using OSDMap=OpenMetaverse.StructuredData.OSDMap;
+
+using Caps = OpenSim.Framework.Capabilities.Caps;
+using OSDArray = OpenMetaverse.StructuredData.OSDArray;
+using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.CoreModules.World.WorldMap
@@ -233,7 +230,7 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
         // this has to be called with a lock on m_scene
         protected virtual void AddHandlers()
         {
-            myMapImageJPEG = Array.Empty<byte>();
+            myMapImageJPEG = [];
 
             string regionimage = "regionImage" + m_scene.RegionInfo.RegionID.ToString();
             regionimage = regionimage.Replace("-", "");
@@ -807,38 +804,27 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
             if (!m_threadsRunning)
                 return;
 
-            WebRequest mapitemsrequest = null;
-            try
-            {
-                mapitemsrequest = WebRequest.Create(httpserver);
-            }
-            catch (Exception e)
-            {
-                WebUtil.GlobalExpiringBadURLs.Add(serverURI, 120000);
-                m_blacklistedregions.Add(regionhandle, expireBlackListTime);
-                m_cachedRegionMapItemsResponses.Remove(regionhandle);
-                m_log.DebugFormat("[WORLD MAP]: Access to {0} failed with {1}", httpserver, e);
-                Interlocked.Decrement(ref nAsyncRequests);
-                return;
-            }
-
-            UUID requestID = UUID.Random();
-
-            mapitemsrequest.Method = "GET";
-            mapitemsrequest.ContentType = "application/xml+llsd";
-
             string response_mapItems_reply = null;
 
-            // get the response
             try
             {
-                using (WebResponse webResponse = mapitemsrequest.GetResponse())
+                using (HttpClient httpClient = new HttpClient())
                 {
-                    using (StreamReader sr = new StreamReader(webResponse.GetResponseStream()))
-                        response_mapItems_reply = sr.ReadToEnd().Trim();
+                    httpClient.DefaultRequestHeaders.Add("Accept", "application/xml+llsd");
+                    using (HttpResponseMessage response = httpClient.GetAsync(httpserver).Result)
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            response_mapItems_reply = response.Content.ReadAsStringAsync().Result.Trim();
+                        }
+                        else
+                        {
+                            throw new HttpRequestException($"HTTP Error: {response.StatusCode}");
+                        }
+                    }
                 }
             }
-            catch (WebException)
+            catch (HttpRequestException)
             {
                 WebUtil.GlobalExpiringBadURLs.Add(serverURI, 60000);
                 m_blacklistedurls.Add(httpserver, expireBlackListTime);
@@ -1181,61 +1167,49 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
 
             if (myMapImageJPEG.Length == 0)
             {
-                MemoryStream imgstream = null;
-                Bitmap mapTexture = new Bitmap(1, 1);
-                ManagedImage managedImage;
-                Image image = (Image)mapTexture;
+                SKBitmap skBitmap = null;
 
                 try
                 {
-                    // Taking our jpeg2000 data, decoding it, then saving it to a byte array with regular jpeg data
-
-                    imgstream = new MemoryStream();
-
                     // non-async because we know we have the asset immediately.
                     AssetBase mapasset = m_scene.AssetService.Get(m_scene.RegionInfo.RegionSettings.TerrainImageID.ToString());
-                    if(mapasset == null || mapasset.Data == null || mapasset.Data.Length == 0)
+                    if (mapasset == null || mapasset.Data == null || mapasset.Data.Length == 0)
                     {
                         response.StatusCode = (int)HttpStatusCode.NotFound;
                         return;
                     }
 
-                    // Decode image to System.Drawing.Image
-                    if (OpenJPEG.DecodeToImage(mapasset.Data, out managedImage, out image))
+                    // Decode JPEG2000 image using CoreJ2K
+                    try
                     {
-                        // Save to bitmap
-                        mapTexture = new Bitmap(image);
-
-                        EncoderParameters myEncoderParameters = new EncoderParameters();
-                        myEncoderParameters.Param[0] = new EncoderParameter(Encoder.Quality, 95L);
-
-                        // Save bitmap to stream
-                        mapTexture.Save(imgstream, GetEncoderInfo("image/jpeg"), myEncoderParameters);
-
-                        // Write the stream to a byte array for output
-                        jpeg = imgstream.ToArray();
-                        myMapImageJPEG = jpeg;
+                        var j2k = J2kImage.FromBytes(mapasset.Data);
+                        if (j2k != null)
+                        {
+                            SKImage skImage = j2k.As<SKImage>();
+                            if (skImage != null)
+                            {
+                                using (SKData encoded = skImage.Encode(SKEncodedImageFormat.Jpeg, 95))
+                                {
+                                    jpeg = encoded.ToArray();
+                                    myMapImageJPEG = jpeg;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        m_log.WarnFormat("[WORLD MAP]: Failed to decode terrain image with CoreJ2K: {0}", ex.Message);
                     }
                 }
                 catch (Exception e)
                 {
-                    // Dummy!
                     m_log.Warn("[WORLD MAP]: Unable to generate Map image" + e.Message);
                     response.StatusCode = (int)HttpStatusCode.NotFound;
                     return;
                 }
                 finally
                 {
-                    // Reclaim memory, these are unmanaged resources
-                    // If we encountered an exception, one or more of these will be null
-                    if (mapTexture != null)
-                        mapTexture.Dispose();
-
-                    if (image != null)
-                        image.Dispose();
-
-                    if (imgstream != null)
-                        imgstream.Dispose();
+                    skBitmap?.Dispose();
                 }
             }
             else
@@ -1255,18 +1229,7 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
             response.StatusCode = (int)HttpStatusCode.OK;
         }
 
-        // From msdn
-        private static ImageCodecInfo GetEncoderInfo(String mimeType)
-        {
-            ImageCodecInfo[] encoders;
-            encoders = ImageCodecInfo.GetImageEncoders();
-            for (int j = 0; j < encoders.Length; ++j)
-            {
-                if (encoders[j].MimeType == mimeType)
-                    return encoders[j];
-            }
-            return null;
-        }
+
 
         /// <summary>
         /// Export the world map
@@ -1314,106 +1277,115 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
             int spanX = endX - startX + 2;
             int spanY = endY - startY + 2;
 
-            Bitmap mapTexture = new Bitmap(spanX, spanY);
-            ImageAttributes gatrib = new ImageAttributes();
-            gatrib.SetWrapMode(System.Drawing.Drawing2D.WrapMode.TileFlipXY);
-
-            Graphics g = Graphics.FromImage(mapTexture);           
-            g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
-            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-            g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
-
-            SolidBrush sea = new SolidBrush(Color.DarkBlue);
-            g.FillRectangle(sea, 0, 0, spanX, spanY);
-            sea.Dispose();
-
-            Font drawFont = new Font("Arial", 32);
-            SolidBrush drawBrush = new SolidBrush(Color.White);
-
-            List<GridRegion> regions = m_scene.GridService.GetRegionRange(m_scene.RegionInfo.ScopeID,
-                    startX, startY, endX, endY);
-
-            startX--;
-            startY--;
-
-            bool doneLocal = false;
-            string filename = "MAP-" + m_scene.RegionInfo.RegionID.ToString() + ".png";
-            try
+            using (SKBitmap mapTexture = new SKBitmap(spanX, spanY))
+            using (SKCanvas canvas = new SKCanvas(mapTexture))
             {
-                using(Image localMap = Bitmap.FromFile(filename))
+                // Set high quality rendering
+                canvas.Clear(new SKColor(0, 0, 139)); // Dark blue for sea
+
+                // Create text paint for labels
+                using (SKFont textFont = new SKFont(SKTypeface.FromFamilyName("Arial"), 32))
+                using (SKPaint textPaint = new SKPaint())
                 {
-                    int x = regionX - startX;
-                    int y = regionY - startY;
-                    int sx = regionSizeX;
-                    int sy = regionSizeY;
-                    // y origin is top
-                    g.DrawImage(localMap,new Rectangle(x, spanY - y - sy, sx, sy),
-                                0, 0, localMap.Width, localMap.Height, GraphicsUnit.Pixel, gatrib);
+                    textPaint.Color = SKColors.White;
+                    textPaint.IsAntialias = true;
 
-                    if(m_exportPrintRegionName)
+                    List<GridRegion> regions = m_scene.GridService.GetRegionRange(m_scene.RegionInfo.ScopeID,
+                            startX, startY, endX, endY);
+
+                    startX--;
+                    startY--;
+
+                    bool doneLocal = false;
+                    string filename = "MAP-" + m_scene.RegionInfo.RegionID.ToString() + ".png";
+                    try
                     {
-                        SizeF stringSize = g.MeasureString(m_regionName, drawFont);
-                        g.DrawString(m_regionName, drawFont, drawBrush, x + 30, spanY - y - 30 - stringSize.Height);
-                    }
-                }
-                doneLocal = true;
-            }
-            catch {}
-
-            if(regions.Count > 0)
-            {
-                ManagedImage managedImage = null;
-                Image image = null;
-
-                foreach(GridRegion r in regions)
-                {
-                    if(r.TerrainImage.IsZero())
-                        continue;
-
-                    if(doneLocal && r.RegionHandle == m_regionHandle)
-                        continue;
-
-                    AssetBase texAsset = m_scene.AssetService.Get(r.TerrainImage.ToString());
-                    if(texAsset == null)
-                        continue;
-
-                    if(OpenJPEG.DecodeToImage(texAsset.Data, out managedImage, out image))
-                    {
-                        int x = r.RegionLocX - startX;
-                        int y = r.RegionLocY - startY;
-                        int sx = r.RegionSizeX;
-                        int sy = r.RegionSizeY;
-                        // y origin is top
-                        g.DrawImage(image,new Rectangle(x, spanY - y - sy, sx, sy),
-                                0, 0, image.Width, image.Height, GraphicsUnit.Pixel, gatrib);
-
-                        if(m_exportPrintRegionName && r.RegionHandle == m_regionHandle)
+                        using (SKBitmap localSk = SKBitmap.Decode(filename))
                         {
-                            SizeF stringSize = g.MeasureString(r.RegionName, drawFont);
-                            g.DrawString(r.RegionName, drawFont, drawBrush, x + 30, spanY - y - 30 - stringSize.Height);
+                            if (localSk != null)
+                            {
+                                int x = regionX - startX;
+                                int y = regionY - startY;
+                                int sx = regionSizeX;
+                                int sy = regionSizeY;
+                                SKRect dst = new SKRect(x, spanY - y - sy, x + sx, spanY - y);
+                                canvas.DrawBitmap(localSk, dst);
+
+                                if (m_exportPrintRegionName)
+                                {
+                                    float textWidth = textFont.MeasureText(m_regionName);
+                                    canvas.DrawText(m_regionName, x + 30, spanY - y - 30 - 32, SKTextAlign.Left, textFont, textPaint);
+                                }
+                            }
+                        }
+                        doneLocal = true;
+                    }
+                    catch {}
+
+                    if(regions.Count > 0)
+                    {
+                        foreach (GridRegion r in regions)
+                        {
+                            if(r.TerrainImage.IsZero())
+                                continue;
+
+                            if(doneLocal && r.RegionHandle == m_regionHandle)
+                                continue;
+
+                            AssetBase texAsset = m_scene.AssetService.Get(r.TerrainImage.ToString());
+                            if(texAsset == null)
+                                continue;
+
+                            try
+                            {
+                                var j2k = J2kImage.FromBytes(texAsset.Data);
+                                if (j2k != null)
+                                {
+                                    SKImage skImage = j2k.As<SKImage>();
+                                    if (skImage != null)
+                                    {
+                                        using (SKBitmap sk = SKBitmap.FromImage(skImage))
+                                        {
+                                            if (sk != null)
+                                            {
+                                                int x = r.RegionLocX - startX;
+                                                int y = r.RegionLocY - startY;
+                                                int sx = r.RegionSizeX;
+                                                int sy = r.RegionSizeY;
+                                                SKRect dst = new SKRect(x, spanY - y - sy, x + sx, spanY - y);
+                                                canvas.DrawBitmap(sk, dst);
+
+                                                if (m_exportPrintRegionName && r.RegionHandle == m_regionHandle)
+                                                {
+                                                    float textWidth = textFont.MeasureText(r.RegionName);
+                                                    canvas.DrawText(r.RegionName, x + 30, spanY - y - 30 - 32, SKTextAlign.Left, textFont, textPaint);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            catch {}
                         }
                     }
+
+                    if(m_exportPrintScale)
+                    {
+                        String scaleText = string.Format("{0}m x {1}m", spanX, spanY);
+                        canvas.DrawText(scaleText, 30, 60, SKTextAlign.Left, textFont, textPaint);
+                    }
                 }
 
-                if(image != null)
-                    image.Dispose();
-
+                // Save as JPEG
+                using (SKImage finalImage = SKImage.FromBitmap(mapTexture))
+                using (SKData encoded = finalImage.Encode(SKEncodedImageFormat.Jpeg, 95))
+                {
+                    using (FileStream fs = File.OpenWrite(exportPath))
+                    {
+                        encoded.SaveTo(fs);
+                    }
+                }
             }
-
-            if(m_exportPrintScale)
-            {
-                String drawString = string.Format("{0}m x {1}m", spanX, spanY);
-                g.DrawString(drawString, drawFont, drawBrush, 30, 30);
-            }
-
-            drawBrush.Dispose();
-            drawFont.Dispose();
-            gatrib.Dispose();
-            g.Dispose();
-
-            mapTexture.Save(exportPath, ImageFormat.Jpeg);
-            mapTexture.Dispose();
 
             m_log.InfoFormat(
                 "[WORLD MAP]: Successfully exported world map for {0} to {1}",
@@ -1553,9 +1525,12 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
                 return;
             }
             m_log.DebugFormat("[WORLD MAP]: Generating map image for {0}", m_scene.Name);
-
-            using (Bitmap mapbmp = m_mapImageGenerator.CreateMapTile())
+            // New IMapImageGenerator returns SKBitmap. Convert to Bitmap for legacy GenerateMaptile
+            using (SKBitmap mapbmp = m_mapImageGenerator.CreateMapTile())
             {
+                if (mapbmp == null)
+                    return;
+
                 GenerateMaptile(mapbmp);
 
                 if (m_mapImageServiceModule != null)
@@ -1569,24 +1544,22 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
             //    m_mapImageServiceModule.RemoveMapTiles(m_scene);
         }
 
-        private void GenerateMaptile(Bitmap mapbmp)
+        private void GenerateMaptile(SKBitmap mapbmp)
         {
             bool needRegionSave = false;
 
             // remove old assets
-            UUID lastID = m_scene.RegionInfo.RegionSettings.TerrainImageID;
-            if (!lastID.IsZero())
+            if (m_scene.RegionInfo.RegionSettings.TerrainImageID.IsNotZero())
             {
-                m_scene.AssetService.Delete(lastID.ToString());
+                m_scene.AssetService.Delete(m_scene.RegionInfo.RegionSettings.TerrainImageID.ToString());
                 m_scene.RegionInfo.RegionSettings.TerrainImageID = UUID.Zero;
-                myMapImageJPEG = Array.Empty<byte>();
+                myMapImageJPEG = [];
                 needRegionSave = true;
             }
 
-            lastID = m_scene.RegionInfo.RegionSettings.ParcelImageID;
-            if (!lastID.IsZero())
+            if (m_scene.RegionInfo.RegionSettings.ParcelImageID.IsNotZero())
             {
-                m_scene.AssetService.Delete(lastID.ToString());
+                m_scene.AssetService.Delete(m_scene.RegionInfo.RegionSettings.ParcelImageID.ToString());
                 m_scene.RegionInfo.RegionSettings.ParcelImageID = UUID.Zero;
                 needRegionSave = true;
             }
@@ -1610,14 +1583,17 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
                         if(mb > Constants.RegionSize && mb > 0)
                         {
                             float scale = (float)Constants.RegionSize/(float)mb;
-                            using(Bitmap scaledbmp = Util.ResizeImageSolid(mapbmp, (int)(bx * scale), (int)(by * scale)))
-                                data = OpenJPEG.EncodeFromImage(scaledbmp, true);
+                            // Resize using SkiaSharp
+                            using (SKBitmap scaledSk = Util.ResizeImageSolid(mapbmp, (int)(bx * scale), (int)(by * scale)))
+                            {
+                                data = EncodeSkBitmapToJpeg(scaledSk, true);
+                            }
                         }
                         else
-                            data = OpenJPEG.EncodeFromImage(mapbmp, true);
+                            data = EncodeSkBitmapToJpeg(mapbmp, true);
                     }
                     else
-                        data = OpenJPEG.EncodeFromImage(mapbmp, true);
+                        data = EncodeSkBitmapToJpeg(mapbmp, true);
 
                     if (data != null && data.Length > 0)
                     {
@@ -1752,29 +1728,29 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
 
             m_log.DebugFormat("[WORLD MAP]: Region {0} has parcels for sale, generating overlay", m_regionName);
 
-            using (Bitmap overlay = new Bitmap(regionSizeX, regionSizeY))
+            using (SKBitmap overlay = new SKBitmap(regionSizeX, regionSizeY))
             {
-                Color background = Color.FromArgb(0, 0, 0, 0);
-
-                using (Graphics g = Graphics.FromImage(overlay))
+                using (SKCanvas canvas = new SKCanvas(overlay))
                 {
-                    using (SolidBrush transparent = new SolidBrush(background))
-                        g.FillRectangle(transparent, 0, 0, regionSizeX, regionSizeY);
+                    // Clear to fully transparent
+                    canvas.Clear(SKColors.Transparent);
 
-                    // make it a bit transparent
-                    using (SolidBrush yellow = new SolidBrush(Color.FromArgb(192, 249, 223, 9)))
+                    // Create the semi-transparent yellow paint for sale parcels
+                    using (SKPaint yellowPaint = new SKPaint())
                     {
+                        yellowPaint.Color = new SKColor(249, 223, 9, 192);
+
                         for (int x = 0; x < regionLandTilesX; x++)
                         {
                             for (int y = 0; y < regionLandTilesY; y++)
                             {
                                 if (saleBitmap[x, y])
-                                    g.FillRectangle(
-                                        yellow,
+                                    canvas.DrawRect(
                                         x * landTileSize,
-                                        regionSizeX - landTileSize - (y * landTileSize),
+                                        regionSizeY - landTileSize - (y * landTileSize),
                                         landTileSize,
-                                        landTileSize);
+                                        landTileSize,
+                                        yellowPaint);
                             }
                         }
                     }
@@ -1782,7 +1758,7 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
 
                 try
                 {
-                    return OpenJPEG.EncodeFromImage(overlay, false);
+                    return EncodeSkBitmapToJpeg(overlay, false);
                 }
                 catch (Exception e)
                 {
@@ -1791,6 +1767,28 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Helper method to encode an SKBitmap to JPEG format.
+        /// Note: This currently encodes to JPEG instead of JPEG2000 as a temporary solution.
+        /// </summary>
+        private byte[] EncodeSkBitmapToJpeg(SKBitmap bitmap, bool lossless = false)
+        {
+            if (bitmap == null) return null;
+
+            try
+            {
+                using (SKImage skImage = SKImage.FromBitmap(bitmap))
+                using (SKData encoded = skImage.Encode(SKEncodedImageFormat.Jpeg, lossless ? 100 : 95))
+                {
+                    return encoded.ToArray();
+                }
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 

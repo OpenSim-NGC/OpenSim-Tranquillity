@@ -1,11 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
+﻿/* Copyright (c) 2025 Utopia Skye LLC
+
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. 
+ */
+
 using Microsoft.EntityFrameworkCore;
 
 namespace OpenSim.Data.Model.Region;
 
 public partial class OpenSimRegionContext : DbContext
 {
+    public OpenSimRegionContext()
+    {
+    }
+
     public OpenSimRegionContext(DbContextOptions<OpenSimRegionContext> options)
         : base(options)
     {
@@ -217,7 +226,7 @@ public partial class OpenSimRegionContext : DbContext
                 .HasMaxLength(36)
                 .IsFixedLength()
                 .HasColumnName("LastOwnerID");
-            entity.Property(e => e.Linksetdata)
+            entity.Property(e => e.LinksetData)
                 .HasColumnType("mediumtext")
                 .HasColumnName("linksetdata");
             entity.Property(e => e.LoopedSound)
@@ -306,6 +315,16 @@ public partial class OpenSimRegionContext : DbContext
             entity.Property(e => e.VelocityX).HasDefaultValueSql("'0'");
             entity.Property(e => e.VelocityY).HasDefaultValueSql("'0'");
             entity.Property(e => e.VelocityZ).HasDefaultValueSql("'0'");
+
+            entity.Property(e => e.AllowUnsit)
+                .HasColumnName("allowunsit");
+
+            entity.Property(e => e.ScriptedSitOnly)
+                .HasColumnName("scriptedsitonly");
+
+            entity.Property(e => e.StartStr)
+                .HasColumnName("startstr")
+                .HasColumnType("text");
         });
 
         modelBuilder.Entity<Primitem>(entity =>
@@ -547,25 +566,25 @@ public partial class OpenSimRegionContext : DbContext
                 .HasColumnName("terrain_texture_4");
             entity.Property(e => e.UseEstateSun).HasColumnName("use_estate_sun");
             entity.Property(e => e.WaterHeight).HasColumnName("water_height");            
-            entity.Property(e => e.TerrainPBR1)
+            entity.Property(e => e.TerrainPbr1)
                 .HasColumnName("TerrainPBR1")
                 .IsRequired()
                 .HasMaxLength(36)
                 .IsFixedLength()
                 .HasDefaultValueSql("'00000000-0000-0000-0000-000000000000'");
-            entity.Property(e => e.TerrainPBR2)
+            entity.Property(e => e.TerrainPbr2)
                 .HasColumnName("TerrainPBR2")
                 .IsRequired()
                 .HasMaxLength(36)
                 .IsFixedLength()
                 .HasDefaultValueSql("'00000000-0000-0000-0000-000000000000'");
-            entity.Property(e => e.TerrainPBR3)
+            entity.Property(e => e.TerrainPbr3)
                 .HasColumnName("TerrainPBR3")
                 .IsRequired()
                 .HasMaxLength(36)
                 .IsFixedLength()
                 .HasDefaultValueSql("'00000000-0000-0000-0000-000000000000'");
-            entity.Property(e => e.TerrainPBR4)
+            entity.Property(e => e.TerrainPbr4)
                 .HasColumnName("TerrainPBR4")
                 .IsRequired()
                 .HasMaxLength(36)

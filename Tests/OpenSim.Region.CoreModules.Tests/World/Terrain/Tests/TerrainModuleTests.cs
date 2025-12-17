@@ -26,7 +26,7 @@
  */
 
 using System;
-using NUnit.Framework;
+using Xunit;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.Terrain;
 using OpenSim.Region.Framework.Scenes;
@@ -36,7 +36,7 @@ namespace OpenSim.Region.CoreModules.Terrain.Tests
 {
     public class TerrainModuleTests : OpenSimTestCase
     {
-        [Test]
+        [Fact]
         public void TestTerrainFill()
         {
             TestHelpers.InMethod();
@@ -56,7 +56,7 @@ namespace OpenSim.Region.CoreModules.Terrain.Tests
 
                 float height = scene.Heightmap[128, 128];
 
-                Assert.AreEqual(fillHeight, height);
+                Assert.Equal(fillHeight, height);
             }
 
             // Max fillheight of 30
@@ -68,7 +68,7 @@ namespace OpenSim.Region.CoreModules.Terrain.Tests
 
                 float height = scene.Heightmap[128, 128];
 
-                Assert.AreEqual(fillHeight, height);
+                Assert.Equal(fillHeight, height);
             }
         }
     }
