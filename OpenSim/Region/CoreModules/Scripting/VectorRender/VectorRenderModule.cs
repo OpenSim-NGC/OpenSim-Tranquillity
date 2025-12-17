@@ -27,14 +27,14 @@
 
 using SkiaSharp;
 using System.Globalization;
-using System.Net;
 using Nini.Config;
 using OpenMetaverse;
-using OpenMetaverse.Imaging;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using log4net;
 using System.Reflection;
+using CoreJ2K;
+using CoreJ2K.Configuration;
 using Mono.Addins;
 
 //using Cairo;
@@ -52,6 +52,11 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private static object thisLock = new object();
         private static SKTypeface m_typeface = null; // SkiaSharp typeface for measurements
+
+        private readonly J2KEncoderConfiguration encoderConfig = new J2KEncoderConfiguration()
+            .WithTiles(t => t.SetSize(256, 256))
+            .WithWavelet(w => w.UseIrreversible97().WithDecompositionLevels(4))
+            .WithProgression(p => p.WithOrder(ProgressionOrder.LRCP).WithQualityLayers(0.1f, 0.5f, 1.0f));
 
         private Scene m_scene;
         private IDynamicTextureManager m_textureManager;
@@ -226,8 +231,8 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
 
         private IDynamicTexture Draw(string data, string extraParams)
         {
-            // We need to cater for old scripts that didnt use extraParams neatly, they use either an integer size which represents both width and height, or setalpha
-            // we will now support multiple comma seperated params in the form  width:256,height:512,alpha:255
+            // We need to cater for old scripts that didn't use extraParams neatly, they use either an integer size which represents both width and height, or setalpha
+            // we will now support multiple comma separated params in the form  width:256,height:512,alpha:255
             int width = 256;
             int height = 256;
             int alpha = 255; // 0 is transparent
@@ -361,7 +366,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
                                  height = temp;
                              }
                          }
-                     break;
+                         break;
                 }
             }
 
@@ -403,13 +408,7 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
 
                 try
                 {
-                    // Convert SKBitmap to SKImage and encode as JPEG
-                    // TODO: Replace with CoreJ2K encoding when encoder becomes available
-                    using (var image = SKImage.FromBitmap(bitmap))
-                    {
-                        var data_encoded = image.Encode(SKEncodedImageFormat.Jpeg, 100);
-                        imageJ2000 = data_encoded.ToArray();
-                    }
+                    imageJ2000 = J2kImage.ToBytes(bitmap, encoderConfig);
                 }
                 catch (Exception e)
                 {
@@ -425,11 +424,8 @@ namespace OpenSim.Region.CoreModules.Scripting.VectorRender
             {
                 lock (thisLock)
                 {
-                    if (canvas != null)
-                        canvas.Dispose();
-
-                    if (bitmap != null)
-                        bitmap.Dispose();
+                    canvas?.Dispose();
+                    bitmap?.Dispose();
                 }
             }
         }

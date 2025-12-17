@@ -25,15 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.IO;
 using log4net;
 using Mono.Addins;
 using Nini.Config;
+using CoreJ2K;
+using CoreJ2K.Configuration;
 using OpenMetaverse;
-using OpenMetaverse.Imaging;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -73,6 +71,12 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         private IMapTileTerrainRenderer terrainRenderer;
         private bool m_Enabled = false;
 
+        private readonly J2KEncoderConfiguration encoderConfig = new J2KEncoderConfiguration()
+            .WithQuality(0.85)
+            .WithTiles(t => t.SetSize(256, 256))
+            .WithWavelet(w => w.UseIrreversible97().WithDecompositionLevels(7))
+            .WithProgression(p => p.WithOrder(ProgressionOrder.RPCL));
+
         #region IMapImageGenerator Members
 
         public SKBitmap CreateMapTile()
@@ -94,9 +98,8 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                     float minHeight = float.MaxValue;
                     
                     // Find height range
-                    for (int i = 0; i < heightData.Length; i++)
+                    foreach (var height in heightData)
                     {
-                        float height = heightData[i];
                         maxHeight = Math.Max(maxHeight, height);
                         minHeight = Math.Min(minHeight, height);
                     }
@@ -147,13 +150,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
                 {
                     if (skBitmap != null)
                     {
-                        // Convert SKBitmap to SKImage and encode as JPEG
-                        // TODO: Replace with CoreJ2K encoding when encoder becomes available
-                        using (var image = SKImage.FromBitmap(skBitmap))
-                        {
-                            var encoded = image.Encode(SKEncodedImageFormat.Jpeg, 100);
-                            return encoded.ToArray();
-                        }
+                        return J2kImage.ToBytes(skBitmap, encoderConfig);
                     }
                 }
             }
