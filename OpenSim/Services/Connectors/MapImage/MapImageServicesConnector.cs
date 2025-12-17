@@ -231,9 +231,7 @@ namespace OpenSim.Services.Connectors
 
         public byte[] GetMapTile(string fileName, UUID scopeID, out string format)
         {
-            format = string.Empty;
-            new Exception("GetMapTile method not Implemented");
-            return null;
+            throw new Exception("GetMapTile method not Implemented");
         }
     }
 }
