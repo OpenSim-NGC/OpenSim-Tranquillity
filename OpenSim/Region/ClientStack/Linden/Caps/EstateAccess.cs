@@ -65,8 +65,13 @@ namespace OpenSim.Region.ClientStack.Linden
                 return;
 
             m_capUrl = config.GetString("Cap_EstateAccess", string.Empty);
-            if (!String.IsNullOrEmpty(m_capUrl) && m_capUrl.Equals("localhost"))
+            // enable when configured (non-empty and not explicitly false/0)
+            if (!String.IsNullOrEmpty(m_capUrl) &&
+                !m_capUrl.Equals("false", StringComparison.OrdinalIgnoreCase) &&
+                m_capUrl != "0")
+            {
                 m_Enabled = true;
+            }
         }
 
         public void AddRegion(Scene scene)
