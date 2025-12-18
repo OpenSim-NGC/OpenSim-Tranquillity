@@ -225,7 +225,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
 //                "[J2KDecoderModule]: Doing J2K decoding of {0} bytes for asset {1}", j2kData.Length, assetID);
 
             bool decodedSuccessfully = true;
-            components = 0; // Not used by CoreJ2K decode path
+            components = 0;
 
             if (!TryLoadCacheForAsset(assetID, out layers))
             {
@@ -237,7 +237,7 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
                     {
                         // Extract layer information from CoreJ2K - create default layers for now
                         layers = CreateDefaultLayers(j2kData.Length);
-                        components = 3; // Typical JPEG2000 has 3 components (RGB)
+                        components = j2k.NumberOfComponents;
                         decodedSuccessfully = true;
                         // Cache decoded layers
                         SaveFileCacheForAsset(assetID, layers);
