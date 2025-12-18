@@ -26,21 +26,14 @@
  */
 
 using log4net;
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Reflection;
 
 using Nini.Config;
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
-
-using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
-using OpenMetaverse.StructuredData;
 
 namespace OpenSim.Services.Connectors
 {
@@ -105,12 +98,12 @@ namespace OpenSim.Services.Connectors
             }
             else
             {
+                // Do not include SCOPE when it's zero
                 reqString = ServerUtils.BuildQueryString(
                     new Dictionary<string, object>()
                         {
                             {"X" , x.ToString() },
-                            {"Y" , y.ToString() },
-                            { "SCOPE" , scopeID.ToString() },
+                            {"Y" , y.ToString() }
                         }
                     );
             }
@@ -118,7 +111,7 @@ namespace OpenSim.Services.Connectors
             try
             {
                 string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI + "/map", reqString, 10, null, false);
-                if (reply.Length > 0)
+                if (!string.IsNullOrEmpty(reply))
                 {
                     Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
                     if(replyData.TryGetValue("Result", out object resultobj))
@@ -133,17 +126,17 @@ namespace OpenSim.Services.Connectors
                             return true;
                         else if (res.Equals("failure", StringComparison.InvariantCultureIgnoreCase))
                         {
-                            reason = replyData["Message"].ToString();
+                            reason = replyData.TryGetValue("Message", out var value) ? value.ToString() : "";
                             m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile failed: {0}", reason);
                             return false;
                         }
                         m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile unknown result field contents");
                         return false;
                     }
-                }
-                else
-                {
-                    m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile reply data does not contain result field");
+                    else
+                    {
+                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile reply data does not contain result field");
+                    }
                 }
             }
             catch (Exception e)
@@ -188,7 +181,7 @@ namespace OpenSim.Services.Connectors
             try
             {
                 string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI + "/map", reqString, 10, m_Auth, false);
-                if (reply.Length > 0)
+                if (!string.IsNullOrEmpty(reply))
                 {
                     Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
                     if (replyData.TryGetValue("Result", out object resultobj))
@@ -203,7 +196,7 @@ namespace OpenSim.Services.Connectors
                             return true;
                         else if (res.Equals("failure", StringComparison.InvariantCultureIgnoreCase))
                         {
-                            reason = replyData["Message"].ToString();
+                            reason = replyData.TryGetValue("Message", out var value) ? value.ToString() : "";
                             m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile failed: {0}", reason);
                             return false;
                         }
@@ -231,9 +224,7 @@ namespace OpenSim.Services.Connectors
 
         public byte[] GetMapTile(string fileName, UUID scopeID, out string format)
         {
-            format = string.Empty;
-            new Exception("GetMapTile method not Implemented");
-            return null;
+            throw new Exception("GetMapTile method not Implemented");
         }
     }
 }

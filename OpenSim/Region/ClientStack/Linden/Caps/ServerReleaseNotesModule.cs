@@ -67,8 +67,14 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return;
 
             string capURL = config.GetString("Cap_ServerReleaseNotes", string.Empty);
-            if (string.IsNullOrEmpty(capURL) || capURL != "localhost")
+            // If capability not configured or explicitly turned off, leave disabled
+            if (string.IsNullOrEmpty(capURL) ||
+                capURL.Equals("false", StringComparison.OrdinalIgnoreCase) ||
+                capURL == "0")
+            {
+                m_log.DebugFormat("[ServerReleaseNotesModule]: Cap_ServerReleaseNotes not enabled in config");
                 return;
+            }
 
             config = source.Configs["ServerReleaseNotes"];
             if (config == null)
@@ -76,16 +82,19 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             m_ServerReleaseNotesURL = config.GetString("ServerReleaseNotesURL", m_ServerReleaseNotesURL);
             if (string.IsNullOrEmpty(m_ServerReleaseNotesURL))
-                return;
-
-            Uri dummy;
-            if(!Uri.TryCreate(m_ServerReleaseNotesURL,UriKind.Absolute, out dummy))
             {
-                m_log.Error("[Cap_ServerReleaseNotes]: Invalid ServerReleaseNotesURL. Cap Disabled");
+                m_log.Error("[ServerReleaseNotesModule]: ServerReleaseNotesURL not configured. Cap disabled.");
+                return;
+            }
+
+            if (!Uri.IsWellFormedUriString(m_ServerReleaseNotesURL, UriKind.Absolute))
+            {
+                m_log.ErrorFormat("[ServerReleaseNotesModule]: Invalid ServerReleaseNotesURL '{0}'. Cap Disabled", m_ServerReleaseNotesURL);
                 return;
             }
 
             m_enabled = true;
+            m_log.InfoFormat("[ServerReleaseNotesModule]: Enabled. Redirecting ServerReleaseNotes cap to {0}", m_ServerReleaseNotesURL);
         }
 
         public void AddRegion(Scene scene)
