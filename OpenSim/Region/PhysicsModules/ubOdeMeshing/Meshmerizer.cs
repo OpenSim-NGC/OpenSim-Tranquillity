@@ -26,24 +26,22 @@
  */
 //#define SPAM
 
-using OpenSim.Framework;
-using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.PhysicsModules.SharedBase;
-using OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet;
-
+using CoreJ2K;
+using CoreJ2K.Configuration;
+using log4net;
+using Mono.Addins;
+using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-
-using SkiaSharp;
-using CoreJ2K;
-using System.IO.Compression;
+using OpenSim.Framework;
+using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Region.Framework.Scenes;
+using OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet;
+using OpenSim.Region.PhysicsModules.SharedBase;
 using PrimMesher;
-using log4net;
-using Nini.Config;
+using SkiaSharp;
+using System.IO.Compression;
 using System.Reflection;
-
-using Mono.Addins;
 
 namespace OpenSim.Region.PhysicsModule.ubODEMeshing
 {
@@ -56,7 +54,7 @@ namespace OpenSim.Region.PhysicsModule.ubODEMeshing
         // raw files can be imported by blender so a visual inspection of the results can be done
 
         const float floatPI = MathF.PI;
-        private readonly static string cacheControlFilename = "cntr";
+        private static readonly string cacheControlFilename = "cntr";
         private bool m_Enabled = false;
 
         public static object diskLock = new();
@@ -75,6 +73,9 @@ namespace OpenSim.Region.PhysicsModule.ubODEMeshing
 
         private readonly Dictionary<AMeshKey, Mesh> m_uniqueMeshes = new();
         private readonly Dictionary<AMeshKey, Mesh> m_uniqueReleasedMeshes = new();
+
+        private readonly J2KDecoderConfiguration decoderConfig = new J2KDecoderConfiguration()
+            .WithHighestResolution();
 
         #region INonSharedRegionModule
         public string Name
@@ -715,7 +716,7 @@ namespace OpenSim.Region.PhysicsModule.ubODEMeshing
                 SKBitmap skBitmap = null;
                 try
                 {
-                    var j2k = J2kImage.FromBytes(primShape.SculptData);
+                    var j2k = J2kImage.FromBytes(primShape.SculptData, decoderConfig);
                     if (j2k != null)
                         skBitmap = j2k.As<SKBitmap>();
                 }

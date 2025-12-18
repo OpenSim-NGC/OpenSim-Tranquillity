@@ -169,13 +169,13 @@ namespace OpenSim.Capabilities.Handlers
                         return true;
                     }
                 }
-           }
-           else // it was on the cache
-           {
-               //m_log.DebugFormat("[GETTEXTURE]: texture was in the cache");
-               WriteTextureData(request, response, texture, format);
-               return true;
-           }
+            }
+            else // it was on the cache
+            {
+                //m_log.DebugFormat("[GETTEXTURE]: texture was in the cache");
+                WriteTextureData(request, response, texture, format);
+                return true;
+            }
 
             //response = new Hashtable();
 
@@ -300,8 +300,7 @@ namespace OpenSim.Capabilities.Handlers
                 {
                     // Try CoreJ2K first
                     var j2k = J2kImage.FromBytes(texture.Data);
-                    if (j2k != null)
-                        skImage = j2k.As<SKImage>();
+                    skImage = j2k?.As<SKImage>();
                 }
                 catch
                 {

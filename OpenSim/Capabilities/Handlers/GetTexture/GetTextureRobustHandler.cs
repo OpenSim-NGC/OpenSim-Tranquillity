@@ -314,7 +314,7 @@ namespace OpenSim.Capabilities.Handlers
         {
             m_log.DebugFormat("[GETTEXTURE]: Converting texture {0} to {1}", texture.ID, format);
             byte[] data = Array.Empty<byte>();
-            // Try CSJ2K (CoreJ2K) first to get an SKImage
+            // Try CoreJ2K first to get an SKImage
             try
             {
                 SKImage skImage = null;
@@ -322,12 +322,11 @@ namespace OpenSim.Capabilities.Handlers
                 try
                 {
                     var j2k = J2kImage.FromBytes(texture.Data);
-                    if (j2k != null)
-                        skImage = j2k.As<SKImage>();
+                    skImage = j2k?.As<SKImage>();
                 }
                 catch (Exception)
                 {
-                    // CSJ2K not available or failed, fall back to OpenJPEG
+                    // CoreJ2K not available or failed, fall back to OpenJPEG
                     skImage = null;
                 }
 

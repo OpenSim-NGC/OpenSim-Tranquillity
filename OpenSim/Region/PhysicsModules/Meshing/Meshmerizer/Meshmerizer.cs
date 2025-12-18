@@ -25,10 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.IO;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
@@ -37,6 +34,7 @@ using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using SkiaSharp;
 using CoreJ2K;
+using CoreJ2K.Configuration;
 using System.IO.Compression;
 using PrimMesher;
 using log4net;
@@ -70,6 +68,9 @@ namespace OpenSim.Region.PhysicsModule.Meshing
 
         // Mesh cache. Static so it can be shared across instances of this class
         private static Dictionary<ulong, Mesh> m_uniqueMeshes = new Dictionary<ulong, Mesh>();
+
+        private readonly J2KDecoderConfiguration decoderConfig = new J2KDecoderConfiguration()
+            .WithHighestResolution();
 
         #region INonSharedRegionModule
         public string Name
@@ -661,9 +662,8 @@ namespace OpenSim.Region.PhysicsModule.Meshing
                     SKImage skImage = null;
                     try
                     {
-                        var j2k = J2kImage.FromBytes(primShape.SculptData);
-                        if (j2k != null)
-                            skImage = j2k.As<SKImage>();
+                        var j2k = J2kImage.FromBytes(primShape.SculptData, decoderConfig);
+                        skImage = j2k?.As<SKImage>();
                     }
                     catch
                     {
