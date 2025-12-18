@@ -699,7 +699,7 @@ namespace OpenSim.Region.PhysicsModule.ubODEMeshing
         /// <param name="coords">Coords are added to this list by the method.</param>
         /// <param name="faces">Faces are added to this list by the method.</param>
         /// <returns>true if coords and faces were successfully generated, false if not</returns>
-        private static bool GenerateCoordsAndFacesFromPrimSculptData(
+        private bool GenerateCoordsAndFacesFromPrimSculptData(
             string primName, PrimitiveBaseShape primShape, float lod, out List<Vector3> coords, out List<Face> faces)
         {
             coords = new List<Vector3>();
@@ -713,21 +713,21 @@ namespace OpenSim.Region.PhysicsModule.ubODEMeshing
             try
             {
                 // Try CoreJ2K first
-                SKBitmap skBitmap = null;
+                SKImage skImage = null;
+                
                 try
                 {
                     var j2k = J2kImage.FromBytes(primShape.SculptData, decoderConfig);
-                    if (j2k != null)
-                        skBitmap = j2k.As<SKBitmap>();
+                    skImage = j2k?.As<SKImage>();
                 }
                 catch
                 {
-                    skBitmap = null;
+                    skImage = null;
                 }
 
-                if (skBitmap != null)
+                if (skImage != null)
                 {
-                    idata = skBitmap;
+                    idata = SKBitmap.FromImage(skImage);
                 }
                 else
                 {

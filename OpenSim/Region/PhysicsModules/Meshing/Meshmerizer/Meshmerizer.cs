@@ -660,6 +660,7 @@ namespace OpenSim.Region.PhysicsModule.Meshing
                 {
                     // Try CoreJ2K first
                     SKImage skImage = null;
+                    
                     try
                     {
                         var j2k = J2kImage.FromBytes(primShape.SculptData, decoderConfig);
