@@ -202,7 +202,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
 
                 //if (!value) // Zero the remembered last velocity
                     //m_lastVelocity = Vector3.Zero;
-                AddChange(changes.Physical, value);
+                AddChange(Changes.Physical, value);
             }
         }
 
@@ -214,7 +214,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             set
             {
                 m_fakeisVolumeDetect = value;
-                AddChange(changes.VolumeDtc, value);
+                AddChange(Changes.VolumeDtc, value);
             }
         }
 
@@ -226,7 +226,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             set
             {
                 m_fakeisphantom = value;
-                AddChange(changes.Phantom, value);
+                AddChange(Changes.Phantom, value);
             }
         }
 
@@ -239,7 +239,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             {
                 //if (value)
                 //    m_building = true;
-                AddChange(changes.building, value);
+                AddChange(Changes.building, value);
             }
         }
 
@@ -330,7 +330,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             {
                 if (value)
                     m_isSelected = value; // if true set imediatly to stop moves etc
-                AddChange(changes.Selected, value);
+                AddChange(Changes.Selected, value);
             }
         }
 
@@ -403,7 +403,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             {
                 fakepos = value;
                 m_givefakepos++;
-                AddChange(changes.Position, value);
+                AddChange(Changes.Position, value);
             }
         }
 
@@ -440,7 +440,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             {
                 if (value.IsFinite())
                 {
-                    AddChange(changes.Force, value);
+                    AddChange(Changes.Force, value);
                 }
                 else
                 {
@@ -453,7 +453,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         public override void SetVolumeDetect(int param)
         {
             m_fakeisVolumeDetect = (param != 0);
-            AddChange(changes.VolumeDtc, m_fakeisVolumeDetect);
+            AddChange(Changes.VolumeDtc, m_fakeisVolumeDetect);
         }
 
         public override Vector3 GeometricCenter
@@ -558,7 +558,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
 
             if (inertia.TotalMass > m_parentScene.maximumMassObject)
                 inertia.TotalMass = m_parentScene.maximumMassObject;
-            AddChange(changes.SetInertia,(object)m_fakeInertiaOverride);
+            AddChange(Changes.SetInertia,(object)m_fakeInertiaOverride);
         }
 
         public override Vector3 CenterOfMass
@@ -612,7 +612,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                //AddChange(changes.Shape, value);
+                //AddChange(Changes.Shape, value);
                 m_parentScene.m_meshWorker.ChangeActorPhysRep(this, value, m_size, m_fakeShapetype);
             }
         }
@@ -656,7 +656,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                     if(m_outbounds)
                         _velocity = value;
                     else
-                        AddChange(changes.Velocity, value);
+                        AddChange(Changes.Velocity, value);
                 }
                 else
                 {
@@ -677,7 +677,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             {
                 if (value.IsFinite())
                 {
-                    AddChange(changes.Torque, value);
+                    AddChange(Changes.Torque, value);
                 }
                 else
                 {
@@ -717,7 +717,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                     m_givefakeori++;
 
                     value.Normalize();
-                    AddChange(changes.Orientation, value);
+                    AddChange(Changes.Orientation, value);
                 }
                 else
                     m_log.WarnFormat("[PHYSICS]: Got NaN quaternion Orientation from Scene in Object {0}", Name);
@@ -752,7 +752,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                     if(m_outbounds)
                         m_rotationalVelocity = value;
                     else
-                        AddChange(changes.AngVelocity, value);
+                        AddChange(Changes.AngVelocity, value);
                 }
                 else
                 {
@@ -768,7 +768,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                 AddChange(changes.Buoyancy,value);
+                 AddChange(Changes.Buoyancy,value);
             }
         }
 
@@ -779,7 +779,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             {
                 if (value.IsFinite())
                 {
-                    AddChange(changes.PIDTarget,value);
+                    AddChange(Changes.PIDTarget,value);
                 }
                 else
                     m_log.WarnFormat("[PHYSICS]: Got NaN PIDTarget from Scene on Object {0}", Name);
@@ -796,7 +796,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                AddChange(changes.PIDActive,value);
+                AddChange(Changes.PIDActive,value);
             }
         }
 
@@ -809,12 +809,12 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 {
                     float mint = (0.05f > m_sceneTimeStep ? 0.05f : m_sceneTimeStep);
                     if (value < mint)
-                        AddChange(changes.PIDTau, mint);
+                        AddChange(Changes.PIDTau, mint);
                     else
-                        AddChange(changes.PIDTau, value);
+                        AddChange(Changes.PIDTau, value);
                 }
                 else
-                    AddChange(changes.PIDTau, 0);
+                    AddChange(Changes.PIDTau, 0);
             }
         }
 
@@ -823,7 +823,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                AddChange(changes.PIDHoverHeight,value);
+                AddChange(Changes.PIDHoverHeight,value);
             }
         }
         public override bool PIDHoverActive
@@ -836,7 +836,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                AddChange(changes.PIDHoverActive, value);
+                AddChange(Changes.PIDHoverActive, value);
             }
         }
 
@@ -845,7 +845,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                AddChange(changes.PIDHoverType,value);
+                AddChange(Changes.PIDHoverType,value);
             }
         }
 
@@ -858,12 +858,12 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 {
                     float mint = (0.05f > m_sceneTimeStep ? 0.05f : m_sceneTimeStep);
                     if (value < mint)
-                        AddChange(changes.PIDHoverTau, mint);
+                        AddChange(Changes.PIDHoverTau, mint);
                     else
-                        AddChange(changes.PIDHoverTau, value);
+                        AddChange(Changes.PIDHoverTau, value);
                 }
                 else
-                    AddChange(changes.PIDHoverTau, 0);
+                    AddChange(Changes.PIDHoverTau, 0);
             }
         }
 
@@ -887,7 +887,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             }
             set
             {
-                AddChange(changes.VehicleType, value);
+                AddChange(Changes.VehicleType, value);
             }
         }
 
@@ -899,7 +899,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 param = param,
                 value = value
             };
-            AddChange(changes.VehicleFloatParam, fp);
+            AddChange(Changes.VehicleFloatParam, fp);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -910,7 +910,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 param = param,
                 value = value
             };
-            AddChange(changes.VehicleVectorParam, fp);
+            AddChange(Changes.VehicleVectorParam, fp);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -921,7 +921,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 param = param,
                 value = value
             };
-            AddChange(changes.VehicleRotationParam, fp);
+            AddChange(Changes.VehicleRotationParam, fp);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -932,13 +932,13 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 param = param,
                 value = value
             };
-            AddChange(changes.VehicleFlags, bp);
+            AddChange(Changes.VehicleFlags, bp);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void SetVehicle(object vdata)
         {
-            AddChange(changes.SetVehicle, vdata);
+            AddChange(Changes.SetVehicle, vdata);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetAcceleration(Vector3 accel)
@@ -955,9 +955,9 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             if (force.IsFinite())
             {
                 if(pushforce)
-                    AddChange(changes.AddForce, force);
+                    AddChange(Changes.AddForce, force);
                 else // a impulse
-                    AddChange(changes.AddForce, force * m_sceneInverseTimeStep);
+                    AddChange(Changes.AddForce, force * m_sceneInverseTimeStep);
             }
             else
             {
@@ -972,9 +972,9 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             if (force.IsFinite())
             {
                 //if(pushforce)  for now applyrotationimpulse seems more happy applied as a force
-                    AddChange(changes.AddAngForce, force);
+                    AddChange(Changes.AddAngForce, force);
                 //else // a impulse
-                    //AddChange(changes.AddAngForce, force * m_invTimeStep);
+                    //AddChange(Changes.AddAngForce, force * m_invTimeStep);
             }
             else
             {
@@ -1115,26 +1115,26 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void setPrimForRemoval()
         {
-            AddChange(changes.Remove, null);
+            AddChange(Changes.Remove, null);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void link(PhysicsActor obj)
         {
-            AddChange(changes.Link, obj);
+            AddChange(Changes.Link, obj);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void delink()
         {
-            AddChange(changes.DeLink, null);
+            AddChange(Changes.DeLink, null);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void LockAngularMotion(byte axislock)
         {
             //m_log.DebugFormat("[axislock]: <{0},{1},{2}>", axis.X, axis.Y, axis.Z);
-            AddChange(changes.AngLock, axislock);
+            AddChange(Changes.AngLock, axislock);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1342,7 +1342,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
 
             m_building = true; // control must set this to false when done
 
-            AddChange(changes.Add, null);
+            AddChange(Changes.Add, null);
 
             // get basic mass parameters
             ODEPhysRepData repData = m_parentScene.m_meshWorker.NewActorPhysRep(this, m_pbs, m_size, _shapeType);
@@ -4008,9 +4008,9 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         {
         }
 
-        public bool DoAChange(changes what, object arg)
+        public bool DoAChange(Changes what, object arg)
         {
-            if (m_prim_geom == IntPtr.Zero && what != changes.Add && what != changes.AddPhysRep && what != changes.Remove)
+            if (m_prim_geom == IntPtr.Zero && what != Changes.Add && what != Changes.AddPhysRep && what != Changes.Remove)
             {
                 return false;
             }
@@ -4018,15 +4018,15 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             // nasty switch
             switch (what)
             {
-                case changes.Add:
+                case Changes.Add:
                     changeadd();
                     break;
 
-                case changes.AddPhysRep:
+                case Changes.AddPhysRep:
                     changeAddPhysRep((ODEPhysRepData)arg);
                     break;
 
-                case changes.Remove:
+                case Changes.Remove:
                     //If its being removed, we don't want to rebuild the physical rep at all, so ignore this stuff...
                     //When we return true, it destroys all of the prims in the linkset anyway
                     if (_parent != null)
@@ -4043,168 +4043,168 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                     UnSubscribeEvents();
                     return true;
 
-                case changes.Link:
+                case Changes.Link:
                     OdePrim tmp = (OdePrim)arg;
                     changeLink(tmp);
                     break;
 
-                case changes.DeLink:
+                case Changes.DeLink:
                     changeLink(null);
                     break;
 
-                case changes.Position:
+                case Changes.Position:
                     changePosition((Vector3)arg);
                     break;
 
-                case changes.Orientation:
+                case Changes.Orientation:
                     changeOrientation((Quaternion)arg);
                     break;
 
                 /*
-                case changes.PosOffset:
+                case Changes.PosOffset:
                     donullchange();
                     break;
 
-                case changes.OriOffset:
+                case Changes.OriOffset:
                     donullchange();
                     break;
                 */
-                case changes.Velocity:
+                case Changes.Velocity:
                     changevelocity((Vector3)arg);
                     break;
 
-                //case changes.TargetVelocity:
+                //case Changes.TargetVelocity:
                 //    break;
 
-                //case changes.Acceleration:
+                //case Changes.Acceleration:
                 //    changeacceleration((Vector3)arg);
                 //    break;
 
-                case changes.AngVelocity:
+                case Changes.AngVelocity:
                     changeangvelocity((Vector3)arg);
                     break;
 
-                case changes.Force:
+                case Changes.Force:
                     changeForce((Vector3)arg);
                     break;
 
-                case changes.Torque:
+                case Changes.Torque:
                     changeSetTorque((Vector3)arg);
                     break;
 
-                case changes.AddForce:
+                case Changes.AddForce:
                     changeAddForce((Vector3)arg);
                     break;
 
-                case changes.AddAngForce:
+                case Changes.AddAngForce:
                     changeAddAngularImpulse((Vector3)arg);
                     break;
 
-                case changes.AngLock:
+                case Changes.AngLock:
                     changeAngularLock((byte)arg);
                     break;
 
-                case changes.Size:
+                case Changes.Size:
                     changeSize((Vector3)arg);
                     break;
 
-                case changes.Shape:
+                case Changes.Shape:
                     changeShape((PrimitiveBaseShape)arg);
                     break;
 
-                case changes.PhysRepData:
+                case Changes.PhysRepData:
                     changePhysRepData((ODEPhysRepData) arg);
                     break;
 
-                //case changes.CollidesWater:
+                //case Changes.CollidesWater:
                 //    changeFloatOnWater((bool)arg);
                 //    break;
 
-                case changes.VolumeDtc:
+                case Changes.VolumeDtc:
                     changeVolumedetetion((bool)arg);
                     break;
 
-                case changes.Phantom:
+                case Changes.Phantom:
                     changePhantomStatus((bool)arg);
                     break;
 
-                case changes.Physical:
+                case Changes.Physical:
                     changePhysicsStatus((bool)arg);
                     break;
 
-                case changes.Selected:
+                case Changes.Selected:
                     changeSelectedStatus((bool)arg);
                     break;
 
-                case changes.disabled:
+                case Changes.disabled:
                     changeDisable((bool)arg);
                     break;
 
-                case changes.building:
+                case Changes.building:
                     changeBuilding((bool)arg);
                     break;
 
-                case changes.VehicleType:
+                case Changes.VehicleType:
                     changeVehicleType((int)arg);
                     break;
 
-                case changes.VehicleFlags:
+                case Changes.VehicleFlags:
                     changeVehicleFlags((strVehicleBoolParam) arg);
                     break;
 
-                case changes.VehicleFloatParam:
+                case Changes.VehicleFloatParam:
                     changeVehicleFloatParam((strVehicleFloatParam) arg);
                     break;
 
-                case changes.VehicleVectorParam:
+                case Changes.VehicleVectorParam:
                     changeVehicleVectorParam((strVehicleVectorParam) arg);
                     break;
 
-                case changes.VehicleRotationParam:
+                case Changes.VehicleRotationParam:
                     changeVehicleRotationParam((strVehicleQuatParam) arg);
                     break;
 
-                case changes.SetVehicle:
+                case Changes.SetVehicle:
                     changeSetVehicle((VehicleData) arg);
                     break;
 
-                case changes.Buoyancy:
+                case Changes.Buoyancy:
                     changeBuoyancy((float)arg);
                     break;
 
-                case changes.PIDTarget:
+                case Changes.PIDTarget:
                     changePIDTarget((Vector3)arg);
                     break;
 
-                case changes.PIDTau:
+                case Changes.PIDTau:
                     changePIDTau((float)arg);
                     break;
 
-                case changes.PIDActive:
+                case Changes.PIDActive:
                     changePIDActive((bool)arg);
                     break;
 
-                case changes.PIDHoverHeight:
+                case Changes.PIDHoverHeight:
                     changePIDHoverHeight((float)arg);
                     break;
 
-                case changes.PIDHoverType:
+                case Changes.PIDHoverType:
                     changePIDHoverType((PIDHoverType)arg);
                     break;
 
-                case changes.PIDHoverTau:
+                case Changes.PIDHoverTau:
                     changePIDHoverTau((float)arg);
                     break;
 
-                case changes.PIDHoverActive:
+                case Changes.PIDHoverActive:
                     changePIDHoverActive((bool)arg);
                     break;
 
-                case changes.SetInertia:
+                case Changes.SetInertia:
                     changeInertia((PhysicsInertiaData) arg);
                     break;
 
-                case changes.Null:
+                case Changes.Null:
                     donullchange();
                     break;
 
@@ -4216,7 +4216,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddChange(changes what, object arg)
+        public void AddChange(Changes what, object arg)
         {
             m_parentScene.AddChange(this, what, arg);
         }

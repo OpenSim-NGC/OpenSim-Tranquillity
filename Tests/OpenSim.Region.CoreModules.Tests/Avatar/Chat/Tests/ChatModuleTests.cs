@@ -42,14 +42,14 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests
 {
     public class ChatModuleTests : OpenSimTestCase
     {
-        public void FixtureInit()
+        private void FixtureInit()
         {
             // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
             // We must do this here so that child agent positions are updated in a predictable manner.
             Util.FireAndForgetMethod = FireAndForgetMethod.RegressionTest;
         }
 
-        public void TearDown()
+        private void TearDown()
         {
             // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple
             // threads.  Possibly, later tests should be rewritten so none of them require async stuff (which regression

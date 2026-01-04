@@ -35,9 +35,9 @@ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * changes by opensim team;
- * changes by Aurora team http://www.aurora-sim.org/
- * changes by Ubit Umarov
+ * Changes by opensim team;
+ * Changes by Aurora team http://www.aurora-sim.org/
+ * Changes by Ubit Umarov
  */
 
 using System;

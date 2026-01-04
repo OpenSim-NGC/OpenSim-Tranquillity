@@ -120,7 +120,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                     case meshWorkerCmnds.changesize:
                         GetMesh(nextRep);
                         if (CreateActorPhysRep(nextRep) && m_scene.haveActor(nextRep.actor))
-                            m_scene.AddChange(nextRep.actor, changes.PhysRepData, nextRep);
+                            m_scene.AddChange(nextRep.actor, Changes.PhysRepData, nextRep);
                         break;
                     case meshWorkerCmnds.getmesh:
                         DoRepDataGetMesh(nextRep);
@@ -155,7 +155,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
 
             CheckMesh(repData);
             CalcVolumeData(repData);
-            m_scene.AddChange(actor, changes.PhysRepData, repData);
+            m_scene.AddChange(actor, Changes.PhysRepData, repData);
             return;
         }
 
@@ -172,7 +172,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
 
             CheckMesh(repData);
             CalcVolumeData(repData);
-            m_scene.AddChange(actor, changes.AddPhysRep, repData);
+            m_scene.AddChange(actor, Changes.AddPhysRep, repData);
             return repData;
         }
 
@@ -264,7 +264,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             if (repData.meshState != MeshState.needAsset)
             {
                 CreateActorPhysRep(repData);
-                m_scene.AddChange(repData.actor, changes.PhysRepData, repData);
+                m_scene.AddChange(repData.actor, Changes.PhysRepData, repData);
                 return;
             }
 

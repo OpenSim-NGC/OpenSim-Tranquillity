@@ -95,7 +95,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         light = 7 // compatibility with old viewers
     }
 
-    public enum changes : int
+    public enum Changes : int
     {
         Add = 0,                // arg null. finishs the prim creation. should be used internally only ( to remove later ?)
         Remove,
@@ -159,10 +159,10 @@ namespace OpenSim.Region.PhysicsModule.ubOde
     public readonly struct ODEchangeitem
     {
         public readonly PhysicsActor actor;
-        public readonly changes what;
+        public readonly Changes what;
         public readonly Object arg;
 
-        public ODEchangeitem(PhysicsActor _actor, changes _what, Object _arg)
+        public ODEchangeitem(PhysicsActor _actor, Changes _what, Object _arg)
         {
             actor = _actor;
             what = _what;
@@ -1542,14 +1542,14 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         /// Called to queue a change to a actor
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void AddChange(PhysicsActor _actor, changes _what, Object _arg)
+        internal void AddChange(PhysicsActor _actor, Changes _what, Object _arg)
         {
             if (world == IntPtr.Zero)
                 return;
             ChangesQueue.Enqueue(new ODEchangeitem(_actor, _what, _arg));
         }
 
-        // does all pending changes generated during region load process
+        // does all pending Changes generated during region load process
         public override void ProcessPreSimulation()
         {
             lock (OdeLock)
@@ -1687,7 +1687,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                         break;
                 }
 
-                // do simulation taking at most 150ms total time including changes
+                // do simulation taking at most 150ms total time including Changes
                 while (step_time > HalfOdeStep)
                 {
                     try
@@ -2225,7 +2225,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 {
                     foreach (OdePrim prm in _prims.Values)
                     {
-                        prm.DoAChange(changes.Remove, null);
+                        prm.DoAChange(Changes.Remove, null);
                         _collisionEventPrim.Remove(prm.LocalID);
                     }
                     _prims.Clear();
@@ -2239,7 +2239,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 }
 
                 foreach (OdeCharacter ch in chtorem)
-                    ch.DoAChange(changes.Remove, null);
+                    ch.DoAChange(Changes.Remove, null);
 
                 if (TerrainGeom != IntPtr.Zero)
                 {
