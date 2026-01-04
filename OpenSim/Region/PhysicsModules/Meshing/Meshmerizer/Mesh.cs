@@ -49,7 +49,7 @@ namespace OpenSim.Region.PhysicsModule.Meshing
         Vector3 _centroid;
         int _centroidDiv;
 
-        private class vertexcomp : IEqualityComparer<Vertex>
+        private class VertexComp : IEqualityComparer<Vertex>
         {
             public bool Equals(Vertex v1, Vertex v2)
             {
@@ -70,7 +70,7 @@ namespace OpenSim.Region.PhysicsModule.Meshing
 
         public Mesh()
         {
-            vertexcomp vcomp = new vertexcomp();
+            VertexComp vcomp = new VertexComp();
 
             m_vertices = new Dictionary<Vertex, int>(vcomp);
             m_triangles = new List<Triangle>();

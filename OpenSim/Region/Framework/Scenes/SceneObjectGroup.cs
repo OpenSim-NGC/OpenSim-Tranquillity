@@ -4634,7 +4634,7 @@ namespace OpenSim.Region.Framework.Scenes
             ScheduleGroupForFullUpdate();
         }
 
-        private enum updatetype :int
+        private enum UpdateType : int
         {
             none = 0,
             partterse = 1,
@@ -4655,7 +4655,7 @@ namespace OpenSim.Region.Framework.Scenes
                 SceneObjectGroup group = part.ParentGroup;
                 PhysicsActor pha = group.RootPart.PhysActor;
 
-                updatetype updateType = updatetype.none;
+                UpdateType updateType = UpdateType.none;
 
                 if (togroup)
                 {
@@ -4665,13 +4665,13 @@ namespace OpenSim.Region.Framework.Scenes
                         if ((change & ObjectChangeType.Rotation) != 0)
                         {
                             group.RootPart.UpdateRotation(data.rotation);
-                            updateType = updatetype.none;
+                            updateType = UpdateType.none;
                         }
                         if ((change & ObjectChangeType.Position) != 0)
                         {
                             if (IsAttachment || m_scene.Permissions.CanObjectEntry(group, false, data.position))
                                 UpdateGroupPosition(data.position);
-                            updateType = updatetype.groupterse;
+                            updateType = UpdateType.groupterse;
                         }
                         else
                         // ugly rotation update of all parts
@@ -4686,7 +4686,7 @@ namespace OpenSim.Region.Framework.Scenes
                             pha.Building = true;
 
                         group.GroupResize(data.scale);
-                        updateType = updatetype.none;
+                        updateType = UpdateType.none;
 
                         if (pha is not null)
                             pha.Building = false;
@@ -4715,17 +4715,17 @@ namespace OpenSim.Region.Framework.Scenes
                         if ((change & ObjectChangeType.Position) != 0)
                         {
                             part.OffsetPosition = data.position;
-                            updateType = updatetype.partterse;
+                            updateType = UpdateType.partterse;
                         }
                         if ((change & ObjectChangeType.Rotation) != 0)
                         {
                             part.UpdateRotation(data.rotation);
-                            updateType = updatetype.none;
+                            updateType = UpdateType.none;
                         }
                         if ((change & ObjectChangeType.Scale) != 0)
                         {
                             part.Resize(data.scale);
-                            updateType = updatetype.none;
+                            updateType = UpdateType.none;
                         }
                     }
 
@@ -4733,22 +4733,22 @@ namespace OpenSim.Region.Framework.Scenes
                         pha.Building = false;
                 }
 
-                if (updateType != updatetype.none)
+                if (updateType != UpdateType.none)
                 {
                     group.HasGroupChanged = true;
 
                     switch (updateType)
                     {
-                        case updatetype.partterse:
+                        case UpdateType.partterse:
                             part.ScheduleTerseUpdate();
                             break;
-                        case updatetype.partfull:
+                        case UpdateType.partfull:
                             part.ScheduleFullUpdate();
                             break;
-                        case updatetype.groupterse:
+                        case UpdateType.groupterse:
                             group.ScheduleGroupForTerseUpdate();
                             break;
-                        case updatetype.groupfull:
+                        case UpdateType.groupfull:
                             group.ScheduleGroupForFullUpdate();
                             break;
                         default:

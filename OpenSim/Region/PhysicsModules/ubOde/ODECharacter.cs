@@ -243,7 +243,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
 
             UpdateAABB2D();
 
-            AddChange(changes.Add, null);
+            AddChange(Changes.Add, null);
         }
 
         public override int PhysicsActorType
@@ -530,7 +530,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                     if (value.Z < -100f || value.Z > 9999999f)
                         value.Z = m_parent_scene.GetTerrainHeightAtXY(127, 127) + 5;
 
-                    AddChange(changes.Position, value);
+                    AddChange(Changes.Position, value);
                 }
                 else
                 {
@@ -576,7 +576,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                     if (value.Z < 0.01f)
                         value.Z = 0.01f;
 
-                    AddChange(changes.Size, value);
+                    AddChange(Changes.Size, value);
                 }
                 else
                 {
@@ -601,7 +601,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 {
                     size = size,
                 };
-                AddChange(changes.AvatarSize, st);
+                AddChange(Changes.AvatarSize, st);
             }
             else
             {
@@ -730,7 +730,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             {
                 if (value.IsFinite())
                 {
-                    AddChange(changes.Velocity, value);
+                    AddChange(Changes.Velocity, value);
                 }
                 else
                 {
@@ -751,7 +751,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             {
                 if (value.IsFinite())
                 {
-                    AddChange(changes.TargetVelocity, value);
+                    AddChange(Changes.TargetVelocity, value);
                 }
                 else
                 {
@@ -811,7 +811,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 //fakeori = value;
                 //givefakeori++;
                 value.Normalize();
-                AddChange(changes.Orientation, value);
+                AddChange(Changes.Orientation, value);
             }
         }
 
@@ -848,11 +848,11 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             {
                 if (pushforce)
                 {
-                    AddChange(changes.Force, force * m_density * m_sceneInverseTimeStep / 28f);
+                    AddChange(Changes.Force, force * m_density * m_sceneInverseTimeStep / 28f);
                 }
                 else
                 {
-                    AddChange(changes.TargetVelocity, force);
+                    AddChange(Changes.TargetVelocity, force);
                 }
             }
             else
@@ -866,7 +866,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         public override void AvatarJump(float impulseZ)
         {
             // convert back to force and remove mass effect
-            AddChange(changes.Force, new Vector3(0, 0, impulseZ * m_massInvTimeScaled));
+            AddChange(Changes.Force, new Vector3(0, 0, impulseZ * m_massInvTimeScaled));
         }
 
         public override void AddAngularForce(Vector3 force, bool pushforce)
@@ -877,7 +877,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         public override void SetMomentum(Vector3 momentum)
         {
             if (momentum.IsFinite())
-                AddChange(changes.Momentum, momentum);
+                AddChange(Changes.Momentum, momentum);
         }
 
 
@@ -1632,7 +1632,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Destroy()
         {
-            AddChange(changes.Remove, null);
+            AddChange(Changes.Remove, null);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1670,7 +1670,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                AddChange(changes.PIDHoverHeight, value);
+                AddChange(Changes.PIDHoverHeight, value);
             }
         }
         public override bool PIDHoverActive
@@ -1683,7 +1683,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                AddChange(changes.PIDHoverActive, value);
+                AddChange(Changes.PIDHoverActive, value);
             }
         }
 
@@ -1692,7 +1692,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                AddChange(changes.PIDHoverType, value);
+                AddChange(Changes.PIDHoverType, value);
             }
         }
 
@@ -1707,7 +1707,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                     float mint = m_sceneTimeStep < 0.05f ? 0.05f : m_sceneTimeStep;
                     tmp = value < mint ? mint : value;
                 }
-                AddChange(changes.PIDHoverTau, tmp);
+                AddChange(Changes.PIDHoverTau, tmp);
             }
         }
 
@@ -1862,7 +1862,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         {
             if (pSize.IsFinite())
             {
-                // for now only look to Z changes since viewers also don't change X and Y
+                // for now only look to Z Changes since viewers also don't change X and Y
                 if (pSize.Z != m_size.Z)
                 {
                     float oldsz = m_size.Z;
@@ -2118,134 +2118,134 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             _AABB2D.maxy = _position.Y + CapsuleRadius;
         }
 
-        public bool DoAChange(changes what, object arg)
+        public bool DoAChange(Changes what, object arg)
         {
-            if (collider == IntPtr.Zero && what != changes.Add && what != changes.Remove)
+            if (collider == IntPtr.Zero && what != Changes.Add && what != Changes.Remove)
             {
                 return false;
             }
 
             switch (what)
             {
-                case changes.Add:
+                case Changes.Add:
                     changeAdd();
                     break;
-                case changes.Remove:
+                case Changes.Remove:
                     changeRemove();
                     break;
 
-                case changes.Position:
+                case Changes.Position:
                     changePosition((Vector3)arg);
                     break;
 
-                case changes.Orientation:
+                case Changes.Orientation:
                     changeOrientation((Quaternion)arg);
                     break;
 
                 /*
-                case changes.PosOffset:
+                case Changes.PosOffset:
                     donullchange();
                     break;
 
-                case changes.OriOffset:
+                case Changes.OriOffset:
                     donullchange();
                     break;
                 */
-                case changes.Velocity:
+                case Changes.Velocity:
                     changeVelocity((Vector3)arg);
                     break;
 
-                case changes.TargetVelocity:
+                case Changes.TargetVelocity:
                     changeTargetVelocity((Vector3)arg);
                     break;
 
                 /*
-                case changes.Acceleration:
+                case Changes.Acceleration:
                     changeacceleration((Vector3)arg);
                     break;
 
-                case changes.AngVelocity:
+                case Changes.AngVelocity:
                     changeangvelocity((Vector3)arg);
                     break;
                 */
-                case changes.Force:
+                case Changes.Force:
                     changeForce((Vector3)arg);
                     break;
                 /*
-                case changes.Torque:
+                case Changes.Torque:
                     changeSetTorque((Vector3)arg);
                     break;
 
-                case changes.AddForce:
+                case Changes.AddForce:
                     changeAddForce((Vector3)arg);
                     break;
 
-                case changes.AddAngForce:
+                case Changes.AddAngForce:
                     changeAddAngularForce((Vector3)arg);
                     break;
 
-                case changes.AngLock:
+                case Changes.AngLock:
                     changeAngularLock((byte)arg);
                     break;
                 */
-                case changes.Size:
+                case Changes.Size:
                     changeSize((Vector3)arg);
                     break;
 
-                case changes.AvatarSize:
+                case Changes.AvatarSize:
                     changeAvatarSize((strAvatarSize)arg);
                     break;
 
-                case changes.Momentum:
+                case Changes.Momentum:
                     changeMomentum((Vector3)arg);
                     break;
 
-                case changes.PIDHoverHeight:
+                case Changes.PIDHoverHeight:
                     changePIDHoverHeight((float)arg);
                     break;
 
-                case changes.PIDHoverType:
+                case Changes.PIDHoverType:
                     changePIDHoverType((PIDHoverType)arg);
                     break;
 
-                case changes.PIDHoverTau:
+                case Changes.PIDHoverTau:
                     changePIDHoverTau((float)arg);
                     break;
 
-                case changes.PIDHoverActive:
+                case Changes.PIDHoverActive:
                     changePIDHoverActive((bool)arg);
                     break;
 
                 /*
-                case changes.Shape:
+                case Changes.Shape:
                     changeShape((PrimitiveBaseShape)arg);
                     break;
 
-                case changes.CollidesWater:
+                case Changes.CollidesWater:
                     changeFloatOnWater((bool)arg);
                     break;
 
-                case changes.VolumeDtc:
+                case Changes.VolumeDtc:
                     changeVolumedetetion((bool)arg);
                     break;
                 */
-                case changes.Physical:
+                case Changes.Physical:
                     changePhysicsStatus((bool)arg);
                     break;
                 /*
-                case changes.Selected:
+                case Changes.Selected:
                     changeSelectedStatus((bool)arg);
                     break;
 
-                case changes.disabled:
+                case Changes.disabled:
                     changeDisable((bool)arg);
                     break;
 
-                case changes.building:
+                case Changes.building:
                     changeBuilding((bool)arg);
                     break;
                 */
-                //case changes.Null:
+                //case Changes.Null:
                 default:
                     break;
             }
@@ -2253,7 +2253,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddChange(changes what, object arg)
+        public void AddChange(Changes what, object arg)
         {
             m_parent_scene.AddChange(this, what, arg);
         }
