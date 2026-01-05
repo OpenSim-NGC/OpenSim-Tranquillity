@@ -29,8 +29,8 @@
     <ProjectReference Include="..\ClientStack\Linden\UDP\OpenSim.Region.ClientStack.LindenUDP.csproj" />
     <ProjectReference Include="..\Framework\OpenSim.Region.Framework.csproj" />
     <ProjectReference Include="..\PhysicsModules\SharedBase\OpenSim.Region.PhysicsModules.SharedBase.csproj" />
-    <ProjectReference Include="..\..\Server\Base\OpenSim.Server.Base.csproj" />
-    <ProjectReference Include="..\..\Server\Handlers\OpenSim.Server.Handlers.csproj" />
+    <ProjectReference Include="..\..\..\Source\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="..\..\..\Source\OpenSim.Server.Handlers\OpenSim.Server.Handlers.csproj" />
     <ProjectReference Include="..\..\Services\Base\OpenSim.Services.Base.csproj" />
     <ProjectReference Include="..\..\Services\Connectors\OpenSim.Services.Connectors.csproj" />
     <ProjectReference Include="..\..\Services\Interfaces\OpenSim.Services.Interfaces.csproj" />

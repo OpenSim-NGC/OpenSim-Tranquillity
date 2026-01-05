@@ -14,7 +14,7 @@
     <ProjectReference Include="..\Framework\Console\OpenSim.Framework.Console.csproj" />
     <ProjectReference Include="..\Framework\Servers\OpenSim.Framework.Servers.csproj" />
     <ProjectReference Include="..\Framework\Servers\HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
-    <ProjectReference Include="..\Server\Base\OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="Properties\AssemblyInfo.cs" />

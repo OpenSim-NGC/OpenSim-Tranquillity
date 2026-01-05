@@ -71,9 +71,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.ScriptEngine.YEngine", "Source\OpenSim.Region.ScriptEngine.YEngine\OpenSim.Region.ScriptEngine.YEngine.csproj", "{798B4867-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.Base", "OpenSim\Server\Base\OpenSim.Server.Base.csproj", "{2E0569BB-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.Base", "Source\OpenSim.Server.Base\OpenSim.Server.Base.csproj", "{2E0569BB-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.Handlers", "OpenSim\Server\Handlers\OpenSim.Server.Handlers.csproj", "{ED041501-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.Handlers", "Source\OpenSim.Server.Handlers\OpenSim.Server.Handlers.csproj", "{ED041501-0000-0000-0000-000000000000}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.AssetService", "OpenSim\Services\AssetService\OpenSim.Services.AssetService.csproj", "{7FDD1B76-0000-0000-0000-000000000000}"
 EndProject
@@ -123,15 +123,15 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSimSearch.Modules", "ad
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "pCampBot", "OpenSim\Tools\pCampBot\pCampBot.csproj", "{AF52AEDC-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Robust", "OpenSim\Server\Robust.csproj", "{6E64F01D-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Robust", "Source\OpenSim.Server.Robust\OpenSim.Server.Robust.csproj", "{6E64F01D-0000-0000-0000-000000000000}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartThreadPool", "ThirdParty\SmartThreadPool\SmartThreadPool.csproj", "{8C618053-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.MySQL.MoneyData", "addon-modules\OpenSim.Data.MySQL.MoneyData\OpenSim.Data.MySQL.MoneyData\OpenSim.Data.MySQL.MoneyData.csproj", "{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.MySQL.MoneyData", "Source\OpenSim.Data.MySQL.MoneyData\OpenSim.Data.MySQL.MoneyData.csproj", "{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.OptionalModules.Currency", "addon-modules\OpenSim.Region.OptionalModules.Currency\OpenSim.Region.OptionalModules.Currency\OpenSim.Region.OptionalModules.Currency.csproj", "{2B6DD15C-0B5D-41CA-B713-71B60147114D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.OptionalModules.Currency", "Source\OpenSim.Region.OptionalModules.Currency\OpenSim.Region.OptionalModules.Currency.csproj", "{2B6DD15C-0B5D-41CA-B713-71B60147114D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.MoneyServer", "addon-modules\OpenSim.Server.MoneyServer\OpenSim.Server.MoneyServer\OpenSim.Server.MoneyServer.csproj", "{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Server.MoneyServer", "Source\OpenSim.Server.MoneyServer\OpenSim.Server.MoneyServer.csproj", "{C3AEE6AC-BE40-4003-A7A3-E8AA039E4451}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Services.ExperienceService", "OpenSim\Services\ExperienceService\OpenSim.Services.ExperienceService.csproj", "{186509B6-EF90-431A-9034-75A1221E4120}"
 EndProject
