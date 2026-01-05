@@ -117,9 +117,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.UserAccoun
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Services.UserProfilesService", "OpenSim\Services\UserProfilesService\OpenSim.Services.UserProfilesService.csproj", "{B4C57E7D-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSimMutelist.Modules", "addon-modules\OpenSimMutelist\Modules\OpenSimMutelist.Modules.csproj", "{87C4E6E3-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSimMutelist.Modules", "Addons\OpenSimMutelist\Modules\OpenSimMutelist.Modules.csproj", "{87C4E6E3-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSimSearch.Modules", "addon-modules\OpenSimSearch\Modules\OpenSimSearch.Modules.csproj", "{BE5D1132-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSimSearch.Modules", "Addons\OpenSimSearch\Modules\OpenSimSearch.Modules.csproj", "{BE5D1132-0000-0000-0000-000000000000}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "pCampBot", "OpenSim\Tools\pCampBot\pCampBot.csproj", "{AF52AEDC-0000-0000-0000-000000000000}"
 EndProject
@@ -151,15 +151,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Warp3D.Tests", "Tests\Warp3
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Addons", "Addons", "{E1748B93-FA13-C50B-BD89-C3B777E73FCB}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcJanusService", "addon-modules\os-webrtc-janus\Janus\WebRtcJanusService.csproj", "{AA629949-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcJanusService", "Addons\os-webrtc-janus\Janus\WebRtcJanusService.csproj", "{AA629949-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoice", "addon-modules\os-webrtc-janus\WebRtcVoice\WebRtcVoice.csproj", "{C76F3732-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoice", "Addons\os-webrtc-janus\WebRtcVoice\WebRtcVoice.csproj", "{C76F3732-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceServiceModule", "addon-modules\os-webrtc-janus\WebRtcVoiceServiceModule\WebRtcVoiceServiceModule.csproj", "{5B354044-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceServiceModule", "Addons\os-webrtc-janus\WebRtcVoiceServiceModule\WebRtcVoiceServiceModule.csproj", "{5B354044-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceRegionModule", "addon-modules\os-webrtc-janus\WebRtcVoiceRegionModule\WebRtcVoiceRegionModule.csproj", "{00122A60-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceRegionModule", "Addons\os-webrtc-janus\WebRtcVoiceRegionModule\WebRtcVoiceRegionModule.csproj", "{00122A60-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gloebit", "addon-modules\Gloebit\GloebitMoneyModule\Gloebit.csproj", "{4C8A6BF4-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gloebit.GloebitMoneyModule", "Addons\Gloebit.GloebitMoneyModule\Gloebit.GloebitMoneyModule.csproj", "{4C8A6BF4-0000-0000-0000-000000000000}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.Groups", "OpenSim\Addons\Groups\OpenSim.Addons.Groups.csproj", "{77DEC20C-0000-0000-0000-000000000000}"
 EndProject
