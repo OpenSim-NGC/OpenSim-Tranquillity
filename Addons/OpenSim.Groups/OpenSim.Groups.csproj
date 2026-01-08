@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyTitle>OpenSim.Groups</AssemblyTitle>
+    <Company>http://opensimulator.org</Company>
+    <Product>OpenSim.Groups</Product>
+    <Copyright>Copyright (c) OpenSimulator.org Developers</Copyright>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="Resources\OpenSim.Groups.addin.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.2.0" />
+    <PackageReference Include="Mono.Addins" Version="1.4.1" />
+    <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Nini" HintPath="..\..\Library\Nini.dll" />
+    <Reference Include="NDesk.Options" HintPath="..\..\Library\NDesk.Options.dll" />
+    <Reference Include="log4net" HintPath="..\..\Library\log4net.dll" />
+    <Reference Include="XMLRPC" HintPath="..\..\Library\XMLRPC.dll" />
+    <Reference Include="OpenMetaverse" HintPath="..\..\Library\OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\Library\OpenMetaverse.StructuredData.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\Library\OpenMetaverseTypes.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\OpenSim\Data\OpenSim.Data.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Framework\Monitoring\OpenSim.Framework.Monitoring.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Framework\Servers\OpenSim.Framework.Servers.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Framework\Servers\HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Region\Framework\OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Server.Handlers\OpenSim.Server.Handlers.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Services\Base\OpenSim.Services.Base.csproj" />
+    <ProjectReference Include="..\..\OpenSim\Services\Interfaces\OpenSim.Services.Interfaces.csproj" />
+  </ItemGroup>
+</Project>
