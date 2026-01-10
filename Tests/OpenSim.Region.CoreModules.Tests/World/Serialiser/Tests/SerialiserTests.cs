@@ -589,7 +589,7 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
         protected Scene m_scene;
         protected SerialiserModule m_serialiserModule;
 
-        public void Init()
+        private void Init()
         {
             m_serialiserModule = new SerialiserModule();
             m_scene = new SceneHelpers().SetupScene();
