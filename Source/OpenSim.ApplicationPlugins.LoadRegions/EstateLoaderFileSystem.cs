@@ -33,6 +33,7 @@ using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
+using OpenSim.Server.RegionServer;
 
 namespace OpenSim.ApplicationPlugins.LoadRegions
 {

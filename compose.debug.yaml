@@ -1,10 +1,10 @@
 
 services:
-  robust:
-    image: robust
+  opensimserverregionserver:
+    image: opensimserverregionserver
     build:
       context: .
-      dockerfile: OpenSim/Server/Dockerfile
+      dockerfile: Source/OpenSim.Server.RegionServer/Dockerfile
       args:
         - configuration=Debug
     volumes:

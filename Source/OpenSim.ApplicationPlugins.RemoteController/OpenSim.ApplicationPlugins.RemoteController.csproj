@@ -18,7 +18,7 @@
     <Reference Include="XMLRPC" HintPath="..\..\Library\XMLRPC.dll" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Source\OpenSim.Region.Application\OpenSim.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Server.RegionServer\OpenSim.Server.RegionServer.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj" />

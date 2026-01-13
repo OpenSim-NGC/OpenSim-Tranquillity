@@ -7,10 +7,6 @@
     <GenerateDependencyFile>false</GenerateDependencyFile>
     <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
   </PropertyGroup>
-  <PropertyGroup>      
-    <OutputPath>$(SolutionDir)build\$(Configuration)\$(AssemblyName)\</OutputPath>
-    <OutDir>$(OutputPath)</OutDir>
-  </PropertyGroup>
 
 <!-- <ItemGroup>
   <PackageReference Include="Nerdbank.GitVersioning" Condition="!Exists('packages.config')">

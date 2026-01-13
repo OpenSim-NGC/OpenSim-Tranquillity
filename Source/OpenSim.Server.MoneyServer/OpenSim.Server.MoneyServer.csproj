@@ -3,10 +3,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <AssemblyTitle>OpenSim.Server.MoneyServer</AssemblyTitle>
-    <Company>OpenSim</Company>
     <Product>OpenSim.Server.MoneyServer</Product>
+    <IsPublishable>true</IsPublishable>
+    <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
   </PropertyGroup>
-
+  
   <ItemGroup>
     <Reference Include="Nini" HintPath="..\..\Library\Nini.dll" />
     <Reference Include="OpenMetaverse" HintPath="..\..\Library\OpenMetaverse.dll" />
@@ -33,6 +34,12 @@
     <Folder Include="Properties\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="AppData\**">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.2.0" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
