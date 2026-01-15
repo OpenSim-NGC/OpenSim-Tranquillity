@@ -1,7 +1,0 @@
-
-services:
-  opensimserverregionserver:
-    image: opensimserverregionserver
-    build:
-      context: .
-      dockerfile: Source/OpenSim.Server.RegionServer/Dockerfile

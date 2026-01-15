@@ -40,9 +40,9 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Server
+namespace OpenSim.Server.GridServer
 {
-    public class OpenSimServer
+    public class ServerMain
     {
         private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
 
