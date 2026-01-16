@@ -20,4 +20,6 @@ RUN dotnet publish "Source/OpenSim.Server.RegionServer/OpenSim.Server.RegionServ
 FROM base AS opensim.server.regionserver
 WORKDIR /app
 COPY --from=publish /app/publish .
+RUN mkdir -p /config
+VOLUME [ "/data" ]
 ENTRYPOINT ["dotnet", "OpenSim.Server.RegionServer.dll"]

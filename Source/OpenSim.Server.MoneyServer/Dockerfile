@@ -20,4 +20,6 @@ RUN dotnet publish "Source/OpenSim.Server.MoneyServer/OpenSim.Server.MoneyServer
 FROM base AS opensim.server.moneyserver
 WORKDIR /app
 COPY --from=publish /app/publish .
+RUN mkdir -p /config
+VOLUME [ "/data" ]
 ENTRYPOINT ["dotnet", "OpenSim.Server.MoneyServer.dll"]

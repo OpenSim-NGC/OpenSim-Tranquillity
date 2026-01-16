@@ -10,19 +10,42 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="Nini" HintPath="..\..\Library\Nini.dll" />
-    <Reference Include="OpenMetaverse" HintPath="..\..\Library\OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\Library\OpenMetaverse.StructuredData.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="..\..\Library\OpenMetaverseTypes.dll" />
+    <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
+    <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverse.StructuredData" HintPath="../../Library/OpenMetaverse.StructuredData.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Server.Handlers\OpenSim.Server.Handlers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Servers/OpenSim.Framework.Servers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Servers.HttpServer/OpenSim.Framework.Servers.HttpServer.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Server.Handlers/OpenSim.Server.Handlers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AISv3/OpenSim.Services.AISv3.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AssetService/OpenSim.Services.AssetService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AuthenticationService/OpenSim.Services.AuthenticationService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AuthorizationService/OpenSim.Services.AuthorizationService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AvatarService/OpenSim.Services.AvatarService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Base/OpenSim.Services.Base.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Connectors/OpenSim.Services.Connectors.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.EstateService/OpenSim.Services.EstateService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.ExperienceService/OpenSim.Services.ExperienceService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.FSAssetService/OpenSim.Services.FSAssetService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.FreeswitchService/OpenSim.Services.FreeswitchService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Friends/OpenSim.Services.FriendsService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.GridService/OpenSim.Services.GridService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.HypergridService/OpenSim.Services.HypergridService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.InventoryService/OpenSim.Services.InventoryService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.LLLoginService/OpenSim.Services.LLLoginService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.MapImageService/OpenSim.Services.MapImageService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.MuteListService/OpenSim.Services.MuteListService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.PresenceService/OpenSim.Services.PresenceService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.SimulationService/OpenSim.Services.SimulationService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.UserAccountService/OpenSim.Services.UserAccountService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.UserProfilesService/OpenSim.Services.UserProfilesService.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,7 +60,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="AppData\**">
+    <Content Include="AppData/**">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>  

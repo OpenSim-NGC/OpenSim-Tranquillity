@@ -20,4 +20,6 @@ RUN dotnet publish "Source/OpenSim.Server.GridServer/OpenSim.Server.GridServer.c
 FROM base AS opensim.server.gridserver
 WORKDIR /app
 COPY --from=publish /app/publish .
+RUN mkdir -p /config
+VOLUME [ "/data" ]
 ENTRYPOINT ["dotnet", "OpenSim.Server.GridServer.dll"]
