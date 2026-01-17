@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyTitle>OpenSim.Region.CoreModules</AssemblyTitle>
+    <Product>OpenSim.Region.CoreModules.Properties</Product>
+    <Description>Core modules for OpenSim</Description>
+    <Copyright>Copyright ©  2012</Copyright>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="NDesk.Options" HintPath="../../Library/NDesk.Options.dll" />
+    <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
+    <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverse.StructuredData" HintPath="../../Library/OpenMetaverse.StructuredData.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
+    <Reference Include="XMLRPC" HintPath="../../Library/XMLRPC.dll" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="../../Source/Warp3D/Warp3D.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Capabilities/OpenSim.Capabilities.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.MySQL/OpenSim.Data.MySQL.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Monitoring/OpenSim.Framework.Monitoring.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Serialization/OpenSim.Framework.Serialization.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Servers/OpenSim.Framework.Servers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Servers.HttpServer/OpenSim.Framework.Servers.HttpServer.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.ClientStack.LindenUDP/OpenSim.Region.ClientStack.LindenUDP.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.Framework/OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.SharedBase/OpenSim.Region.PhysicsModules.SharedBase.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Server.Handlers/OpenSim.Server.Handlers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Base/OpenSim.Services.Base.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Connectors/OpenSim.Services.Connectors.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
+    <ProjectReference Include="../../ThirdParty/SmartThreadPool/SmartThreadPool.csproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Ionic.Zlib.Core" Version="1.0.0" />
+    <PackageReference Include="log4net" Version="3.2.0" />
+    <PackageReference Include="MailKit" Version="4.14.1" />
+    <PackageReference Include="MimeKit" Version="4.14.0" />
+    <PackageReference Include="Mono.Addins" Version="1.4.1" />
+    <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
+    <PackageReference Include="MySqlConnector" Version="2.4.0" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
+    <PackageReference Include="CoreJ2K.Skia" Version="2.1.0.101" />
+    <PackageReference Include="SkiaSharp" Version="3.119.1" />
+  </ItemGroup>
+
+</Project>

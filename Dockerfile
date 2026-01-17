@@ -1,16 +1,21 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 as build
-WORKDIR /App
+#FROM mcr.microsoft.com/dotnet/runtime:8.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+USER app
 
-# Copy everything
-COPY . ./
-# Restore as distinct layers
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG configuration=Release
+WORKDIR /src
+COPY . .
+
 RUN dotnet restore
-# Build and publish a release
-RUN dotnet publish -o out
+RUN dotnet build  -c $configuration -o /app/build
 
-# Build runtime image
-FROM mcr.microsoft.com/dotnet/sdk:8.0 
-WORKDIR /App
-COPY --from=build /App/out .
-VOLUME ["/config", "/data"]
-ENTRYPOINT ["dotnet", "OpenSim.dll"]
+FROM build AS publish
+ARG configuration=Release
+RUN dotnet publish -c $configuration -o /app/publish /p:UseAppHost=false
+
+FROM base AS tranquillity
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["/bin/bash"]

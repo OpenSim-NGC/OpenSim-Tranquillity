@@ -50,7 +50,7 @@ using OpenSim.Tests.Common;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
-namespace OpenSim.Region.ClientStack.Linden.Caps.Tests
+namespace OpenSim.Region.ClientStack.LindenCaps.Tests
 {
     /*
     public class WebFetchInvDescModuleTests : OpenSimTestCase

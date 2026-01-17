@@ -1,0 +1,2 @@
+<? llsd/notation ?>
+{'blur_multiplier':r0.04,'fresnel_offset':r0.5,'fresnel_scale':r0.4,'name':'Default','normal_map':u822ded49-9a6c-f61c-cb89-6df54f42cdf4,'normal_scale':[r2,r2,r2],'scale_above':r0.03,'scale_below':r0.2,'type':'water','underwater_fog_mod':r0.25,'water_fog_color':[r0.0156863,r0.14902,r0.25098],'water_fog_density':r16,'wave1_direction':[r1.05,r-0.42],'wave2_direction':[r1.11,r-1.16]}

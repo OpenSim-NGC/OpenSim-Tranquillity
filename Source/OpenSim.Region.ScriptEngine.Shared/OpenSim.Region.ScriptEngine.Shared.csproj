@@ -9,20 +9,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="Nini" HintPath="..\..\Library\Nini.dll" />
-    <Reference Include="OpenMetaverse" HintPath="..\..\Library\OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="..\..\Library\OpenMetaverseTypes.dll" />
-    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\Library\OpenMetaverse.StructuredData.dll" />
+    <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
+    <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
+    <Reference Include="OpenMetaverse.StructuredData" HintPath="../../Library/OpenMetaverse.StructuredData.dll" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\OpenSim\Region\Application\OpenSim.csproj" />
-    <ProjectReference Include="..\..\OpenSim\Framework\OpenSim.Framework.csproj" />
-    <ProjectReference Include="..\..\OpenSim\Framework\Console\OpenSim.Framework.Console.csproj" />
-    <ProjectReference Include="..\..\OpenSim\Region\CoreModules\OpenSim.Region.CoreModules.csproj" />
-    <ProjectReference Include="..\..\OpenSim\Region\Framework\OpenSim.Region.Framework.csproj" />
-    <ProjectReference Include="..\..\OpenSim\Services\Interfaces\OpenSim.Services.Interfaces.csproj" />
-    <ProjectReference Include="..\..\ThirdParty\SmartThreadPool\SmartThreadPool.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Server.RegionServer/OpenSim.Server.RegionServer.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.CoreModules/OpenSim.Region.CoreModules.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.Framework/OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
+    <ProjectReference Include="../../ThirdParty/SmartThreadPool/SmartThreadPool.csproj" />
   </ItemGroup>
 
   <ItemGroup>
