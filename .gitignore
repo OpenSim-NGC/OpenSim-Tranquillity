@@ -1,124 +1,262 @@
-OpenSimConsoleHistory.txt
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
 
-.project
-.settings
-.gitignore
-*.csproj.user
-*.build
-*.mdb
-*.mdp
-*.mds
+# Mono auto generated files
+mono_crash.*
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+
+# Visual Studio cache/options directory
+vs/
+
+# MSTest test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# NUNIT
+*.VisualState.xml
+TestResult.xml
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+**/Properties/launchSettings.json
+
+# VS Code
+.vscode/
+
+# Files built by Visual Studio
+*_i.c
+*_p.c
+*_i.h
+*.ilk
+*.meta
+*.obj
+*.pch
 *.pdb
-*.pidb
-*.dll.build
-*.dll
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
 *.log
-.idea
-*.bak
-*.lnk
+*.vspscc
+*.vssscc
+builds
+*.pidb
+*.svclog
+*.scc
 
-launchSettings.json
+# Chutzpah Test files
+_Chutzpah*
+
+# Visual C++ cache files
+ipch/
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
+# Visual Studio profiler
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# TFS 2012 Local Workspace
+$tf/
+
+# Guidance Automation Toolkit
+*.gpState
+
+# ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+# JustCode
+JustCode
+
+# TeamCity
+_TeamCity*
+
+# DotCover
+*.dotCover
+
+# Visual Studio code coverage results
+*.coverage
+*.coveragexml
+
+# NCrunch
+_NCrunch_*
+*crunch*.local.xml
+nCrunchTemp_*
+
+# MightyMoose
+*.mm.*
+AutoTest.Net/
+
+# Web workbench (sass)
+sass-cache/
+
+# Installshield output folder
+[Ee]xpress/
+
+# DocProject
+DocProject/buildhelp/
+DocProject/Help/*.HxT
+DocProject/Help/*.HxC
+DocProject/Help/*.hhc
+DocProject/Help/*.hhk
+DocProject/Help/*.hhp
+DocProject/Help/Html2
+DocProject/Help/html
+
+# Click-Once directory
+publish/
+
+# Publish Web Output
+*.publish.xml
+*.azurePubxml
+
+# Microsoft Azure Web App publish settings
+PublishScripts/
+
+# NuGet Packages
+*.nupkg
+**/packages/*
+!**/packages/build/
+
+# Microsoft Azure Build Output
+csx/
+*.build.csdef
+
+# Microsoft Azure Emulator
+ecf/
+rcf/
+
+# Windows Store app package directories and files
+AppPackages/
+BundleArtifacts/
+Package.StoreAssociation.xml
+_pkginfo.txt
+*.appx
+*.appxbundle
+*.appxupload
+
+# Visual Studio cache files
+*.cache
+!*.cache/
+
+# Others
+ClientBin/
+~$*
+*~
+*.dbmdl
+*.dbproj.schemaview
+*.jfm
+*.pfx
+*.publishsettings
+orleans.codegen.cs
+
+# SQL Server files
+*.mdf
+*.ldf
+*.ndf
+
+# Business Intelligence projects
+*.rdl.data
+*.bim.layout
+*.bim_*.settings
+*.rptproj.rsuser
+*-Backup*.rdl
+
+# Microsoft Fakes
+FakesAssemblies/
+
+# GhostDoc plugin setting file
+*.GhostDoc.xml
+
+# Node.js Tools for Visual Studio
+ntvs_analysis.dat
+node_modules/
+
+# Typescript v1 declaration files
+typings/
+
+# Visual Studio 6 build log
+*.plg
+
+# Visual Studio 6 workspace options file
+*.opt
+
+# Visual Studio 6 auto-generated workspace file
+*.vbw
+
+# Visual Studio LightSwitch build output
+**/*.HTMLClient/GeneratedArtifacts
+**/*.DesktopClient/GeneratedArtifacts
+**/*.DesktopClient/ModelManifest.xml
+**/*.Server/GeneratedArtifacts
+**/*.Server/ModelManifest.xml
+_Pvt_Extensions
+
+# Paket dependency manager
+paket/paket.exe
+paket-files/
+
+# FAKE - F# Make
+fake/
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# CodeRush
+cr/
+
+# Python Tools for Visual Studio (PTVS)
+__pycache__/
+*.pyc
+
+# Cake
+# tools/**
+# !tools/packages.config
+# Telerik's JustMock configuration file
+*.jmconfig
+# BizTalk build output
+*.btp.cs
+*.btm.cs
+*.odx.cs
+*.xsd.cs
+
+# OpenSim Specific
+OpenSimConsoleHistory.txt
 
 build/
 publish/
-
-*/bin/Debug/*
-*/bin/Release/*
-
 packages/
-
-Prebuild/src/bin
-
-# Ignore .user and .suo files as these are user preference specific
-# http://stackoverflow.com/questions/72298/should-i-add-the-visual-studio-suo-and-user-files-to-source-control
-*.suo
-*.user
-
-*.VisualState.xml
-obj
-.vs/
-.vscode/
-bin/Debug/*.dll
-bin/*.dll.mdb
-bin/*.db
-bin/*.db-journal
-bin/addin-db-*
-bin/*.dll
-bin/OpenSim.vshost.exe.config
-bin/OpenSim.32BitLaunch.vshost.exe.config
-bin/OpenSim.32BitLaunch.log
-UpgradeLog.XML
-_UpgradeReport_Files/
-bin/ScriptEngines/*-*-*-*-*
-bin/ScriptEngines/*.dll
-bin/ScriptEngines/*/*.dll
-bin/ScriptEngines/*/*.state
-bin/ScriptEngines/Yengine/*
-bin/*.maddin
-bin/*.exe
-bin/*.ini
-bin/j2kDecodeCache
-bin/Physics*
-bin/Terrain*
-bin/Regions/*
-bin/UserAssets
-bin/assetcache
-bin/maptiles
-bin/bakes
-bin/MeshCache
-bin/estate_settings.xml
-bin/config-include/CenomeCache.ini
-bin/config-include/FlotsamCache.ini
-bin/config-include/GridCommon.ini
-bin/config-include/StandaloneCommon.ini
-bin/config-include/osslEnable.ini
-bin/OpenSim.Grid.AssetInventoryServer.log
-bin/OpenSim.Grid.AssetServer.log
-bin/OpenSim.Grid.GridServer.log
-bin/OpenSim.Grid.InventoryServer.log
-bin/OpenSim.Grid.MessagingServer.log
-bin/OpenSim.Grid.UserServer.log
-bin/OpenSim.log
-bin/OpenSimStats.log
-bin/Robust.log
-bin/RobustStats.log
-bin/OpenSimConsoleHistory.txt
-bin/RobustConsoleHistory.txt
-bin/*.Tests.log
-bin/*.manifest
-bin/crashes/
-Examples/*.dll
-OpenSim.build
-OpenSim.userprefs
-Prebuild/Prebuild.build
-Prebuild/Prebuild.sln
-TestResult.xml
-cov/*
-OpenSim/OpenSim.userprefs
-OpenSim/OpenSim.usertasks
-TAGS
-*~
-Makefile.local
-bin/.version
-compile.bat
-OpenSim/Data/Tests/test-results/
-OpenSim/Framework/Serialization/Tests/test-results/
-OpenSim/Framework/Servers/Tests/test-results/
-OpenSim/Framework/Tests/test-results/
-OpenSim/Region/ClientStack/Linden/Caps/test-results/
-OpenSim/Region/ClientStack/Linden/UDP/Tests/test-results/
-OpenSim/Region/CoreModules/test-results/
-OpenSim/Region/Framework/test-results/
-OpenSim/Region/OptionalModules/test-results/
-OpenSim/Region/Physics/BulletDotNETPlugin/
-OpenSim/Region/Physics/Manager/test-results/
-OpenSim/Region/Physics/OdePlugin/Tests/test-results/
-OpenSim/Region/ScriptEngine/test-results/
-OpenSim/Tests/Common/test-results/
-OpenSim/Tests/test-results/
-test-results/
-doc/html
-doc/doxygen.error.log
-bin/OpenSim.ini
-
-*.patch
