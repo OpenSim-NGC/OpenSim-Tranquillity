@@ -123,9 +123,9 @@
     ;; Uncomment this if you want experience tools to work
     ; ExperienceServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:ExperienceServiceConnector"
     ;; Uncomment this if you want offline IM to work
-    ; OfflineIMServiceConnector = "${Const|PrivatePort}/OpenSim.OfflineIM.dll:OfflineIMServiceRobustConnector"
+    ; OfflineIMServiceConnector = "${Const|PrivatePort}/OpenSim.Addons.OfflineIM.dll:OfflineIMServiceRobustConnector"
     ;; Uncomment this if you want Groups V2 to work
-    ; GroupsServiceConnector = "${Const|PrivatePort}/OpenSim.Groups.dll:GroupsServiceRobustConnector"
+    ; GroupsServiceConnector = "${Const|PrivatePort}/OpenSim.Addons.Groups.dll:GroupsServiceRobustConnector"
     ;; Uncomment to provide bakes caching
     ; BakedTextureService = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:XBakesConnector"
 
@@ -613,7 +613,7 @@
 
 [Messaging]
     ; OfflineIM
-    OfflineIMService = "OpenSim.OfflineIM.dll:OfflineIMService"
+    OfflineIMService = "OpenSim.Addons.OfflineIM.dll:OfflineIMService"
     ; maximum number of offline ims per user, default 25
     ;MaxOfflineIMs = 25;
 

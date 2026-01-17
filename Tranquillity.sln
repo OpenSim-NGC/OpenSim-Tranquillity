@@ -159,9 +159,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebRtcVoiceRegionModule", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gloebit.GloebitMoneyModule", "Addons\Gloebit.GloebitMoneyModule\Gloebit.GloebitMoneyModule.csproj", "{4C8A6BF4-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Groups", "Addons\OpenSim.Groups\OpenSim.Groups.csproj", "{77DEC20C-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.Groups", "Addons\OpenSim.Addons.Groups\OpenSim.Addons.Groups.csproj", "{77DEC20C-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.OfflineIM", "Addons\OpenSim.OfflineIM\OpenSim.OfflineIM.csproj", "{E6B51395-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.OfflineIM", "Addons\OpenSim.Addons.OfflineIM\OpenSim.Addons.OfflineIM.csproj", "{E6B51395-0000-0000-0000-000000000000}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

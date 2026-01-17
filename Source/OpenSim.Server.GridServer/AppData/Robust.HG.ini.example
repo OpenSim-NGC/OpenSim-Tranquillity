@@ -131,9 +131,9 @@
     ;; Uncomment this if you want experience tools to work
     ; ExperienceServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:ExperienceServiceConnector"
     ;; Uncomment this if you want offline IM to work
-    ; OfflineIMServiceConnector = "${Const|PrivatePort}/OpenSim.OfflineIM.dll:OfflineIMServiceRobustConnector"
+    ; OfflineIMServiceConnector = "${Const|PrivatePort}/OpenSim.Addons.OfflineIM.dll:OfflineIMServiceRobustConnector"
     ;; Uncomment this if you want Groups V2 to work
-    ; GroupsServiceConnector = "${Const|PrivatePort}/OpenSim.Groups.dll:GroupsServiceRobustConnector"
+    ; GroupsServiceConnector = "${Const|PrivatePort}/OpenSim.Addons.Groups.dll:GroupsServiceRobustConnector"
     ;; Uncomment to provide bakes caching
     ; BakedTextureService = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:XBakesConnector"
 
@@ -155,7 +155,7 @@
     HGInventoryServiceConnector = "HGInventoryService@${Const|PublicPort}/OpenSim.Server.Handlers.dll:XInventoryInConnector"
     HGAssetServiceConnector = "HGAssetService@${Const|PublicPort}/OpenSim.Server.Handlers.dll:AssetServiceConnector"
     ;; Uncomment this if you want Groups V2, HG to work
-    ; HGGroupsServiceConnector = "${Const|PublicPort}/OpenSim.Groups.dll:HGGroupsServiceRobustConnector"
+    ; HGGroupsServiceConnector = "${Const|PublicPort}/OpenSim.Addons.Groups.dll:HGGroupsServiceRobustConnector"
 
 ; * This is common for all services, it's the network setup for the entire
 ; * server instance, if none is specified above
@@ -853,14 +853,14 @@
 
 [Messaging]
     ; OfflineIM
-    OfflineIMService = "OpenSim.OfflineIM.dll:OfflineIMService"
+    OfflineIMService = "OpenSim.Addons.OfflineIM.dll:OfflineIMService"
     ; maximum number of offline ims per user, default 25
     ;MaxOfflineIMs = 25;
 
 
 [Groups]
     ;; for the HG Groups service
-    OfflineIMService = "OpenSim.OfflineIM.dll:OfflineIMService"
+    OfflineIMService = "OpenSim.Addons.OfflineIM.dll:OfflineIMService"
     UserAccountService = "OpenSim.Services.UserAccountService.dll:UserAccountService"
 
     ;; What is the HomeURI of users associated with this grid?

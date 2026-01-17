@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <AssemblyTitle>OpenSim.OfflineIM</AssemblyTitle>
+    <AssemblyTitle>OpenSim.Addons.OfflineIM</AssemblyTitle>
     <Company>http://opensimulator.org</Company>
-    <Product>OpenSim.OfflineIM</Product>
+    <Product>OpenSim.Addons.OfflineIM</Product>
     <Copyright>Copyright (c) OpenSimulator.org Developers</Copyright>
   </PropertyGroup>
   <ItemGroup>
