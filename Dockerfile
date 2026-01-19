@@ -13,7 +13,7 @@ RUN dotnet build  -c $configuration -o /app/build
 
 FROM build AS publish
 ARG configuration=Release
-RUN dotnet publish -c $configuration -o /app/publish /p:UseAppHost=false
+RUN dotnet publish Tranquillity.sln -c $configuration -r linux-x64 --self-contained false -o /app/publish /p:UseAppHost=false
 
 FROM base AS tranquillity
 WORKDIR /app
