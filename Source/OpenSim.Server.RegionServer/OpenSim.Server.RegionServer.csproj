@@ -45,12 +45,15 @@
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
   </ItemGroup>
 
-  <Target Name="CopyAppData" AfterTargets="Publish">
-    <ItemGroup>
-      <Content Include="AppData/**" CopyToPublishDirectory="Always" />
-      <Content Include="Resources/OpenSim.addin.xml" CopyToOutputDirectory="Always" />
-    </ItemGroup>
-  </Target>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/OpenSim.addin.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="AppData/**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <Target Name="CopyNativeDllConfig" AfterTargets="Publish">
     <ItemGroup>
@@ -65,4 +68,5 @@
     </ItemGroup>
     <Copy SourceFiles="@(NativeLibsToCopy)" DestinationFolder="$(PublishDir)/lib64/%(RecursiveDir)" />
   </Target>
+
 </Project>
