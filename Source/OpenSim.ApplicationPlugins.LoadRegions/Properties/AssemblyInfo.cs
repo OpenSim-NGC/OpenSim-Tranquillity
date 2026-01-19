@@ -38,7 +38,7 @@ using Mono.Addins;
 [assembly : AssemblyConfiguration("")]
 [assembly : AssemblyCompany("http://opensimulator.org")]
 [assembly : AssemblyProduct("OpenSim")]
-[assembly : AssemblyCopyright("Copyright © OpenSimulator.org Developers 2007-2009")]
+[assembly : AssemblyCopyright("Copyright ï¿½ OpenSimulator.org Developers 2007-2009")]
 [assembly : AssemblyTrademark("")]
 [assembly : AssemblyCulture("")]
 
@@ -65,4 +65,4 @@ using Mono.Addins;
 [assembly : AssemblyVersion(OpenSim.VersionInfo.AssemblyVersionNumber)]
 
 [assembly: Addin("OpenSim.ApplicationPlugins.LoadRegions", OpenSim.VersionInfo.VersionNumber)]
-[assembly: AddinDependency("OpenSim", OpenSim.VersionInfo.VersionNumber)]
+[assembly: AddinDependency("OpenSim.Server.RegionServer", OpenSim.VersionInfo.VersionNumber)]

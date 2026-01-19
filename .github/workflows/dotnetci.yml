@@ -29,6 +29,8 @@ jobs:
 #    - name: Tests
 #      run: dotnet test ./Tranquillity.sln --verbosity normal
 
-#    - name: Publish
-#      run: dotnet publish ./Tranquillity.sln --configuration Release
+    - name: Publish for Linux x64
+      run: dotnet publish Tranquillity.sln -c Release -r linux-x64 --self-contained false -o ./publish
 
+    - name: Publish for Windows x64
+      run: dotnet publish Tranquillity.sln -c Release -r win-x64 --self-contained false -o ./publish

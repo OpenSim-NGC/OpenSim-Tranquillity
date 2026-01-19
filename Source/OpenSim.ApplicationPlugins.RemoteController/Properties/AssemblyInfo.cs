@@ -33,4 +33,4 @@ using Mono.Addins;
 [assembly: AssemblyVersion(OpenSim.VersionInfo.AssemblyVersionNumber)]
 
 [assembly: Addin("OpenSim.ApplicationPlugins.RemoteController", OpenSim.VersionInfo.VersionNumber)]
-[assembly: AddinDependency("OpenSim", OpenSim.VersionInfo.VersionNumber)]
+[assembly: AddinDependency("OpenSim.Server.RegionServer", OpenSim.VersionInfo.VersionNumber)]
