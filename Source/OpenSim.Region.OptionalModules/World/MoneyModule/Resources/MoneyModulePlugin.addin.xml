@@ -1,8 +1,8 @@
-<Addin id="OpenSim.Region.ReplaceableModules.MoneyModule" version="0.2">
+<Addin id="OpenSim.Region.ReplaceableModules.MoneyModule" version="0.9.3">
     <Runtime>
         <Import assembly="OpenSim.Region.ReplaceableModules.MoneyModule.dll"/>
     </Runtime>
     <Dependencies>
-        <Addin id="OpenSim" version="0.5" />
+        <Addin id="OpenSim.Server.RegionServer" version="0.9.3" />
     </Dependencies>
 </Addin>
