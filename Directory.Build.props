@@ -3,22 +3,17 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <GenerateDependencyFile>false</GenerateDependencyFile>
     <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
   </PropertyGroup>
-
   <PropertyGroup>
     <!-- Define a common output directory for all projects -->
     <OutputPath>$(SolutionDir)build\$(Configuration)\</OutputPath>
     <BaseOutputPath>$(SolutionDir)build\</BaseOutputPath>
   </PropertyGroup>
-
-<!-- <ItemGroup>
-  <PackageReference Include="Nerdbank.GitVersioning" Condition="!Exists('packages.config')">
-    <PrivateAssets>all</PrivateAssets>
-    <Version>3.6.133</Version>
-  </PackageReference>
-</ItemGroup> -->
-
+  <ItemGroup>
+    <PackageReference Include="Nerdbank.GitVersioning" Condition="!Exists('packages.config')">
+      <PrivateAssets>all</PrivateAssets>
+      <Version>3.9.50</Version>
+    </PackageReference>
+  </ItemGroup>
 </Project>
