@@ -15,7 +15,7 @@
     <Reference Include="Nini" HintPath="..\..\Library\Nini.dll" />
     <Reference Include="OpenMetaverse" HintPath="..\..\Library\OpenMetaverse.dll" />
     <Reference Include="OpenMetaverseTypes" HintPath="..\..\Library\OpenMetaverseTypes.dll" />
-    <Reference Include="XMLRPC" HintPath="..\..\Library\XMLRPC.dll" />
+    <Reference Include="xmlrpc" HintPath="..\..\Library\xmlrpc.dll" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Source\OpenSim.Data\OpenSim.Data.csproj" />
