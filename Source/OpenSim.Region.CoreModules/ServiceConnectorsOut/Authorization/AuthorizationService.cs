@@ -31,7 +31,6 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
-using System;
 using System.Reflection;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization

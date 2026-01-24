@@ -88,6 +88,8 @@
         <RegionModule id="RemoteAuthorizationServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization.RemoteAuthorizationServicesConnector" />
         <RegionModule id="LocalAvatarServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar.LocalAvatarServicesConnector" />
         <RegionModule id="RemoteAvatarServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar.RemoteAvatarServicesConnector" />
+        <RegionModule id="LocalExperienceServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience.LocalExperienceServicesConnector" />
+        <RegionModule id="RemoteExperienceServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience.RemoteExperienceServicesConnector" />
         <RegionModule id="RegionGridServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid.RegionGridServicesConnector" />
         <RegionModule id="LocalGridUserServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser.LocalGridUserServicesConnector" />
         <RegionModule id="RemoteGridUserServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser.RemoteGridUserServicesConnector" />

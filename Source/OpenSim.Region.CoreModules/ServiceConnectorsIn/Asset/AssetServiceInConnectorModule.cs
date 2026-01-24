@@ -25,13 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
-using System.Collections.Generic;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
-using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
@@ -40,7 +36,6 @@ using OpenSim.Server.Handlers.Base;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Asset
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "AssetServiceInConnectorModule")]
     public class AssetServiceInConnectorModule : ISharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

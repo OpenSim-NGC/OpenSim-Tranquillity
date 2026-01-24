@@ -46,6 +46,10 @@
     <EmbeddedResource Include="Resources\GloebitUsersPGSQL.migrations" />
     <EmbeddedResource Include="Resources\GloebitUsersSQLite.migrations" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/Gloebit.GloebitMoneyModule.addin.xml" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.2.0" />

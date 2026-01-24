@@ -25,13 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
-using log4net;
 using Nini.Config;
 
 using OpenMetaverse;

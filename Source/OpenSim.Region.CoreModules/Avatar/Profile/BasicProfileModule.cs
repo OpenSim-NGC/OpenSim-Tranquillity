@@ -24,16 +24,12 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 
 using OpenMetaverse;
 using log4net;
 using Nini.Config;
-using Mono.Addins;
 
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
@@ -42,7 +38,6 @@ using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.CoreModules.Avatar.Profile
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "BasicProfileModule")]
     public class BasicProfileModule : IProfileModule, ISharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

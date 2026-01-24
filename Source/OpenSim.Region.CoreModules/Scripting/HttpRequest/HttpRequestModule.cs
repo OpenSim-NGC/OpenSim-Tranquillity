@@ -25,24 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
-using System.IO;
 using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
-using System.Threading;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using Mono.Addins;
-using System.Net.Http;
 using System.Security.Authentication;
-using System.Net.Http.Headers;
 
 /*****************************************************
  *
@@ -56,7 +49,6 @@ using System.Net.Http.Headers;
 
 namespace OpenSim.Region.CoreModules.Scripting.HttpRequest
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "HttpRequestModule")]
     public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
     {
         private struct ThrottleData

@@ -23,7 +23,6 @@
     <ProjectReference Include="../../Source/OpenSim.Framework.Servers.HttpServer/OpenSim.Framework.Servers.HttpServer.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Server.Handlers/OpenSim.Server.Handlers.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Services.AISv3/OpenSim.Services.AISv3.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.AssetService/OpenSim.Services.AssetService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.AuthenticationService/OpenSim.Services.AuthenticationService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.AuthorizationService/OpenSim.Services.AuthorizationService.csproj" />

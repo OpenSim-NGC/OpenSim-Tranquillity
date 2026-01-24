@@ -26,7 +26,6 @@
  */
 
 using SkiaSharp;
-using System.IO;
 using OpenSim.Region.Framework.Interfaces;
 
 namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders

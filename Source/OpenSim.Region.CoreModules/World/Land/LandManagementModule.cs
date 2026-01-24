@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -37,7 +35,6 @@ using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenMetaverse.Messages.Linden;
-using Mono.Addins;
 using OpenSim.Framework;
 using OpenSim.Framework.Console;
 using OpenSim.Framework.Monitoring;
@@ -50,8 +47,6 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 
-using Extension = Mono.Addins.ExtensionAttribute;
-
 namespace OpenSim.Region.CoreModules.World.Land
 {
     // used for caching
@@ -63,7 +58,6 @@ namespace OpenSim.Region.CoreModules.World.Land
         public byte RegionAccess;
     }
 
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "LandManagementModule")]
     public class LandManagementModule : INonSharedRegionModule , ILandChannel
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

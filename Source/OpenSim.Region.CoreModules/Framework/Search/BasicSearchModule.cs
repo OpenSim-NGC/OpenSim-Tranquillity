@@ -24,33 +24,21 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
-using System.Threading;
 
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
-using OpenSim.Framework.Monitoring;
-using OpenSim.Region.ClientStack.LindenUDP;
-using OpenSim.Region.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
-using OpenSim.Services.Connectors.Hypergrid;
 
 using OpenMetaverse;
-using OpenMetaverse.Packets;
 using log4net;
 using Nini.Config;
-using Mono.Addins;
 
 using DirFindFlags = OpenMetaverse.DirectoryManager.DirFindFlags;
 
 namespace OpenSim.Region.CoreModules.Framework.Search
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "BasicSearchModule")]
     public class BasicSearchModule : ISharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

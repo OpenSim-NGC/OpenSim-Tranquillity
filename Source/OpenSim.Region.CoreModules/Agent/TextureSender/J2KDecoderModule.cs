@@ -25,17 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
 using System.Text;
-using System.Runtime.InteropServices;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
 using CoreJ2K;
 using OpenMetaverse;
-using OpenMetaverse.Assets;
-using OpenMetaverse.Imaging;
 using SkiaSharp;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
@@ -45,7 +40,6 @@ namespace OpenSim.Region.CoreModules.Agent.TextureSender
 {
     public delegate void J2KDecodeDelegate(UUID assetID);
 
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "J2KDecoderModule")]
     public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

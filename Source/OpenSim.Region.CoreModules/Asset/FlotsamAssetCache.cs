@@ -25,17 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
-using System.Threading;
 using System.Timers;
 using log4net;
 using Nini.Config;
-using Mono.Addins;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
@@ -45,10 +40,8 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using System.Runtime.InteropServices;
 
-
 namespace OpenSim.Region.CoreModules.Asset
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "FlotsamAssetCache")]
     public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
     {
         private struct WriteAssetInfo

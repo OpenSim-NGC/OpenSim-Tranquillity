@@ -25,22 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
-using System.Collections.Generic;
 using Nini.Config;
 using log4net;
-using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using Mono.Addins;
 using OpenMetaverse;
-using System.Linq;
 using System.Linq.Expressions;
 
 namespace OpenSim.Region.CoreModules.Scripting.ScriptModuleComms
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "ScriptModuleCommsModule")]
     public class ScriptModuleCommsModule : INonSharedRegionModule, IScriptModuleComms
     {
         private static readonly ILog m_log =

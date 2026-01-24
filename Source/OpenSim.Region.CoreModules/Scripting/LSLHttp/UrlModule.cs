@@ -25,17 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Net;
-using System.Net.Sockets;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -80,7 +75,6 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLHttp
     /// <summary>
     /// This module provides external URLs for in-world scripts.
     /// </summary>
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "UrlModule")]
     public class UrlModule : ISharedRegionModule, IUrlModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

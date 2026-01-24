@@ -59,7 +59,7 @@ using System.Text;
 
 [assembly: Addin("DTLNSLMoneyModule", "1.0.4")]
 [assembly: AddinDescription("OpenSim Addin for DTL Money Module")]
-[assembly: AddinDependency("OpenSim.Region.Framework", OpenSim.VersionInfo.VersionNumber)]
+[assembly: AddinDependency("OpenSim.Region.Framework", "0.9")]
 
 namespace OpenSim.Region.OptionalModules.Currency
 {

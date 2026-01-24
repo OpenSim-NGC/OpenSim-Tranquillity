@@ -28,7 +28,6 @@
 using OpenSim.Region.CoreModules.World.Terrain;
 using OpenSim.Region.CoreModules.World.Terrain.FileLoaders;
 using OpenSim.Region.Framework.Scenes;
-using System.IO;
 
 namespace OpenSim.Region.CoreModules.World.Serialiser
 {

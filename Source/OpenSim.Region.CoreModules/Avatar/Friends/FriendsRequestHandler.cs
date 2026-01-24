@@ -25,9 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Xml;
@@ -35,7 +32,6 @@ using System.Xml;
 using OpenSim.Framework;
 using OpenSim.Server.Base;
 using OpenSim.Framework.Servers.HttpServer;
-using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
