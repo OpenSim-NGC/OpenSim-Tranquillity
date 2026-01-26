@@ -11,7 +11,7 @@
     </Dependencies>
 
 	<Extension path = "/OpenSim/RegionModules">
-        <RegionModule id="OfflineIMConnectorModule" class="OpenSim.OfflineIM.OfflineIMConnectorModule" />
+        <RegionModule id="OfflineIMConnectorModule" class="OpenSim.OfflineIM.OfflineIMRegionModule" />
 	</Extension>
   
 </Addin>

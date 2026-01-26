@@ -11,7 +11,7 @@
     </Dependencies>
 
 	<Extension path = "/OpenSim/RegionModules">
-        <RegionModule id="YEngine" class="OpenSim.Region.ScriptEngine.Yengine.YEngine" />
+        <RegionModule id="YEngine" class="OpenSim.Region.ScriptEngine.Yengine.Yengine" />
 	</Extension>
   
 </Addin>

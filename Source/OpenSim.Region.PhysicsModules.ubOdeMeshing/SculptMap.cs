@@ -1,8 +1,6 @@
 ﻿/*
  * SkiaSharp-based SculptMap
  */
-using System;
-using System.Collections.Generic;
 using SkiaSharp;
 using OpenMetaverse;
 

@@ -29,7 +29,6 @@
 using CoreJ2K;
 using CoreJ2K.Configuration;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -45,7 +44,6 @@ using System.Reflection;
 
 namespace OpenSim.Region.PhysicsModule.ubODEMeshing
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "ubODEMeshmerizer")]
     public class ubMeshmerizer : IMesher, INonSharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

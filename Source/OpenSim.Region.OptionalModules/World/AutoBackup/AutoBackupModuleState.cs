@@ -25,10 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-
-
 namespace OpenSim.Region.OptionalModules.World.AutoBackup
 {
     /// <summary>AutoBackupModuleState: Auto-Backup state for one region (scene).

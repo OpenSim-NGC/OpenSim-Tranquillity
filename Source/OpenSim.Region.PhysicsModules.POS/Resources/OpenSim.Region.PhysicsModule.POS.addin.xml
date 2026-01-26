@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Addin id="OpenSim.Groups" version="0.9">
+    
+    <Runtime>
+        <Import assembly="OpenSim.Region.Framework.dll" />
+    </Runtime>
+
+    <Dependencies>
+        <Addin id="OpenSim.Server.RegionServer" version="0.9" />
+    </Dependencies>
+
+	<Extension path = "/OpenSim/RegionModules">
+        <RegionModule id="POSPhysicsScene" class="OpenSim.Region.PhysicsModule.POS.POSScene" />
+	</Extension>
+  
+</Addin>

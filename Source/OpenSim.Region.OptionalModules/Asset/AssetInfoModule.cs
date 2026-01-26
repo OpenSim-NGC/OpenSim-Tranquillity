@@ -25,12 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Text;
-using log4net;
 using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
@@ -44,7 +38,6 @@ namespace OpenSim.Region.OptionalModules.Asset
     /// <summary>
     /// A module that just holds commands for inspecting assets.
     /// </summary>
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "AssetInfoModule")]
     public class AssetInfoModule : ISharedRegionModule
     {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

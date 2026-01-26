@@ -25,15 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Runtime.InteropServices;
 using OpenSim.Region.PhysicsModules.SharedBase;
-using PrimMesher;
 using OpenMetaverse;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 
 namespace OpenSim.Region.PhysicsModule.ubODEMeshing
 {
