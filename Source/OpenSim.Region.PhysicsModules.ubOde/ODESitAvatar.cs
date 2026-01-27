@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 // Ubit Umarov 2012
-using System;
-using System.Collections.Generic;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenMetaverse;
 

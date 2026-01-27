@@ -25,14 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Timers;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.IO;
 using System.Net;
-using System.Threading;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -55,7 +51,7 @@ using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 using Timer = System.Threading.Timer;
 
-namespace OpenSim.Region.ClientStack.Linden
+namespace OpenSim.Region.ClientStack.LindenCaps
 {
     public delegate void UpLoadedAsset(
         string assetName, string description, UUID assetID, UUID inventoryItem, UUID parentFolder,

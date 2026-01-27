@@ -9,12 +9,7 @@
         <Addin id="OpenSim.Server.RegionServer" version="0.9" />
     </Dependencies>
     
-    <ExtensionPoint path = "/OpenSim/RegionModules">
-        <ExtensionNode name="RegionModule" objectType="OpenSim.Region.Framework.Interfaces.IRegionModuleBase" />
-    </ExtensionPoint>
-
 	<Extension path = "/OpenSim/RegionModules">
-    
         <RegionModule id="AssetTransactionModule" class="OpenSim.Region.CoreModules.Agent.AssetTransaction.AssetTransactionModule" />
         <RegionModule id="IPBanModule" class="OpenSim.Region.CoreModules.Agent.IPBan.IPBanModule" />
         <RegionModule id="J2KDecoderModule" class="OpenSim.Region.CoreModules.Agent.TextureSender.J2KDecoderModule" />
@@ -136,7 +131,11 @@
         <RegionModule id="HGWorldMapModule" class="OpenSim.Region.CoreModules.World.Land.HGWorldMapModule" />
         <RegionModule id="MapSearchModule" class="OpenSim.Region.CoreModules.World.WorldMap.MapSearchModule" />
         <RegionModule id="WorldMapModule" class="OpenSim.Region.CoreModules.World.WorldMap.WorldMapModule" />
-        
 	</Extension>
-  
+    
+	<Extension path = "/OpenSim/WindModule">    
+        <WindModel id="ConfigurableWind" class="OpenSim.Region.CoreModules.World.Wind.Plugins.ConfigurableWind" />  
+        <WindModel id="SimpleRandomWind" class="OpenSim.Region.CoreModules.World.Wind.Plugins.SimpleRandomWind" />
+    </Extension>
+
 </Addin>

@@ -40,7 +40,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * Changes by Ubit Umarov
  */
 
-using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security;

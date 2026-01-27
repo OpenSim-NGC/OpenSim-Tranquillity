@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections;
-
-using System.IO;
+﻿using System.Collections;
 using System.Net;
-using System.Text;
-using System.Threading;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -15,7 +10,7 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Servers.HttpServer;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
-namespace OpenSim.Region.ClientStack.Linden
+namespace OpenSim.Region.ClientStack.LindenCaps
 {
     public delegate UUID UpdateItem(UUID itemID, UUID objectID, byte[] data);
     public delegate UUID ItemUpdatedCallback(UUID userID, UUID itemID, UUID objectID, byte[] data);

@@ -16,11 +16,11 @@
         <RegionModule id="J2KDecoderCommandModule" class="OpenSim.Region.OptionalModules.Agent.TextureSender.J2KDecoderCommandModule" />
         <RegionModule id="LindenUDPInfoModule" class="OpenSim.Region.OptionalModules.UDP.Linden.LindenUDPInfoModule" />
         <RegionModule id="AssetInfoModule" class="OpenSim.Region.OptionalModules.Asset.AssetInfoModule" />
-        <RegionModule id="AnimationsCommandModule" class="OOpenSim.Region.OptionalModules.Avatar.Animations.AnimationsCommandModule" />
+        <RegionModule id="AnimationsCommandModule" class="OpenSim.Region.OptionalModules.Avatar.Animations.AnimationsCommandModule" />
         <RegionModule id="AppearanceInfoModule" class="OpenSim.Region.OptionalModules.Avatar.Appearance.AppearanceInfoModule" />
         <RegionModule id="IRCBridgeModule" class="OpenSim.Region.OptionalModules.Avatar.Chat.IRCBridgeModule" />
         <RegionModule id="ConciergeModule" class="OpenSim.Region.OptionalModules.Avatar.Concierge.ConciergeModule" />
-        <RegionModule id="FriendsCommandModule" class="OpenSim.Region.OptionalModules.Avatar.Friends.FriendsCommandModule" />
+        <RegionModule id="FriendsCommandModule" class="OpenSim.Region.OptionalModules.Avatar.Friends.FriendsCommandsModule" />
         <RegionModule id="AnimationsCommandModule" class="OpenSim.Region.OptionalModules.Avatar.SitStand.SitStandCommandModule" />
         <RegionModule id="FreeSwitchVoiceModule" class="OpenSim.Region.OptionalModules.Avatar.Voice.FreeSwitchVoice.FreeSwitchVoiceModule" />
         <RegionModule id="VivoxVoiceModule" class="OpenSim.Region.OptionalModules.Avatar.Voice.VivoxVoice.VivoxVoiceModule" />
@@ -38,8 +38,8 @@
         <RegionModule id="JsonStoreScriptModule" class="OpenSim.Region.OptionalModules.Scripting.JsonStore.JsonStoreScriptModule" />
         <RegionModule id="RegionReadyModule" class="OpenSim.Region.OptionalModules.Scripting.RegionReady.RegionReadyModule" />
         <RegionModule id="XmlRpcGridRouter" class="OpenSim.Region.OptionalModules.Scripting.XmlRpcGridRouterModule.XmlRpcGridRouter" />
-        <RegionModule id="XmlRpcRouter" class="OpenSim.Region.OptionalModules.Scripting.XmlRpcGridRouterModule.XmlRpcRouter" />
-        <RegionModule id="WebStatsModule" class="OOpenSim.Region.UserStatistics.WebStatsModule" />
+        <RegionModule id="XmlRpcRouter" class="OpenSim.Region.OptionalModules.Scripting.XmlRpcRouterModule.XmlRpcRouter" />
+        <RegionModule id="WebStatsModule" class="OpenSim.Region.UserStatistics.WebStatsModule" />
         <RegionModule id="CameraOnlyMode" class="OpenSim.Region.OptionalModules.ViewerSupport.CameraOnlyModeModule" />
         <RegionModule id="DynamicFloater" class="OpenSim.Region.OptionalModules.ViewerSupport.DynamicFloaterModule" />
         <RegionModule id="DynamicMenu" class="OpenSim.Region.OptionalModules.ViewerSupport.DynamicMenuModule" />
@@ -50,7 +50,7 @@
         <RegionModule id="NPCModule" class="OpenSim.Region.OptionalModules.World.NPC.NPCModule" />
         <RegionModule id="SceneCommandsModule" class="OpenSim.Region.OptionalModules.Avatar.Attachments.SceneCommandsModule" />
         <RegionModule id="TreePopulatorModule" class="OpenSim.Region.OptionalModules.World.TreePopulator.TreePopulatorModule" />        
-        <RegionModule id="WorldViewModule" class="OOpenSim.Region.OptionalModules.World.WorldView.WorldViewModule" />        
+        <RegionModule id="WorldViewModule" class="OpenSim.Region.OptionalModules.World.WorldView.WorldViewModule" />        
     </Extension>
   
 </Addin>

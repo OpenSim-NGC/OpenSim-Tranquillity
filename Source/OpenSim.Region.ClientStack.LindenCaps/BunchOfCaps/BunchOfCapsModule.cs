@@ -25,22 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
-using Mono.Addins;
-
-using OpenSim.Framework;
-using OpenSim.Region.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
-[assembly: Addin("LindenCaps", OpenSim.VersionInfo.AssemblyVersionNumber)]
-[assembly: AddinDependency("OpenSim.Region.Framework", OpenSim.VersionInfo.AssemblyVersionNumber)]
-namespace OpenSim.Region.ClientStack.Linden
+namespace OpenSim.Region.ClientStack.LindenCaps
 {
     public class BunchOfCapsConfigOptions
     {
@@ -64,7 +55,6 @@ namespace OpenSim.Region.ClientStack.Linden
         public UUID testAssetsCreatorID = UUID.Zero;
     }
 
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "BunchOfCapsModule")]
     public class BunchOfCapsModule : INonSharedRegionModule
     {
         //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

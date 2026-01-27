@@ -25,26 +25,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Text;
 using log4net;
 using Nini.Config;
-using Mono.Addins;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-// using OpenSim.Services.Interfaces;
+
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
-namespace OpenSim.Region.ClientStack.Linden
+namespace OpenSim.Region.ClientStack.LindenCaps
 {
     /// <summary>
     /// SimulatorFeatures capability.
@@ -57,7 +52,6 @@ namespace OpenSim.Region.ClientStack.Linden
     /// NOTE: Part of this code was adapted from the Aurora project, specifically
     /// the normal part of the response in the capability handler.
     /// </remarks>
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "SimulatorFeaturesModule")]
     public class SimulatorFeaturesModule : INonSharedRegionModule, ISimulatorFeaturesModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

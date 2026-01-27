@@ -35,4 +35,9 @@
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/OpenSim.Region.ClientStack.LindenUDP.addin.xml" />
+  </ItemGroup>
+  
 </Project>

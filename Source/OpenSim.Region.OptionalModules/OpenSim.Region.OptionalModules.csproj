@@ -44,4 +44,9 @@
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
     <PackageReference Include="System.Data.SQLite" Version="2.0.2" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/OpenSim.Region.OptionalModules.addin.xml" />
+  </ItemGroup>
+
 </Project>
