@@ -352,7 +352,7 @@ namespace OpenSim.Server.RegionServer
 
             msg += $"\r\nApplication is terminating: {e.IsTerminating}\r\n";
 
-            m_log.Error("[APPLICATION]: + msg");
+            m_log.Error($"[APPLICATION]: {msg}");
 
             if (m_saveCrashDumps)
             {

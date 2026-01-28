@@ -46,6 +46,7 @@
         <RegionModule id="GodNamesModule" class="OpenSim.Region.OptionalModules.ViewerSupport.GodNamesModule" />
         <RegionModule id="SpecialUI" class="OpenSim.Region.OptionalModules.ViewerSupport.SpecialUIModule" />
         <RegionModule id="AutoBackupModule" class="OpenSim.Region.OptionalModules.World.AutoBackup.AutoBackupModule" />
+        <RegionModule id="DTLNSLMoneyModule" class="OpenSim.Region.OptionalModules.World.Currency.DTLNSLMoneyModule" />
         <RegionModule id="SampleMoneyModule" class="OpenSim.Region.OptionalModules.World.MoneyModule.SampleMoneyModule" />
         <RegionModule id="NPCModule" class="OpenSim.Region.OptionalModules.World.NPC.NPCModule" />
         <RegionModule id="SceneCommandsModule" class="OpenSim.Region.OptionalModules.Avatar.Attachments.SceneCommandsModule" />

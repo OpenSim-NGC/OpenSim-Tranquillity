@@ -57,11 +57,14 @@
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="AppData/**">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>  
+  
+  <Target Name="CopyAppData" AfterTargets="Publish">
+    <ItemGroup>
+      <FilesToCopy Include="AppData/**/*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FilesToCopy)" 
+          DestinationFolder="$(PublishDir)/%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
   
 </Project>

@@ -10,7 +10,7 @@ using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using log4net;
 
-namespace NSL.Certificate.Tools
+namespace OpenSim.Region.OptionalModules.World.Currency
 {
     /// <summary>
     /// class NSL Certificate Verify

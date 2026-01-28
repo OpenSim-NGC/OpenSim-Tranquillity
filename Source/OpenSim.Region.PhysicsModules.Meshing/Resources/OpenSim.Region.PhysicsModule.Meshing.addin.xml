@@ -1,9 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 
-<Addin id="OpenSim.Groups" version="0.9">
+<Addin id="OpenSim.Region.PhysicsModule.Meshing" version="0.9">
     
     <Runtime>
         <Import assembly="OpenSim.Region.Framework.dll" />
+        <Import assembly="OpenSim.Region.PhysicsModule.Meshing.dll" />
     </Runtime>
 
     <Dependencies>
@@ -11,8 +12,8 @@
     </Dependencies>
 
 	<Extension path = "/OpenSim/RegionModules">
-        <RegionModule id="ZeroMesher" class="OpenSim.Region.PhysicsModules.Meshing.ZeroMesher" />
-        <RegionModule id="Meshmerizer" class="OpenSim.Region.PhysicsModules.Meshing.Meshmerizer" />
+        <RegionModule id="ZeroMesher" class="OpenSim.Region.PhysicsModule.Meshing.ZeroMesher" />
+        <RegionModule id="Meshmerizer" class="OpenSim.Region.PhysicsModule.Meshing.Meshmerizer" />
 	</Extension>
   
 </Addin>

@@ -15,9 +15,7 @@ using System.Security.Cryptography.X509Certificates;
 using log4net;
 using Nwc.XmlRpc;
 
-
-
-namespace NSL.Network.XmlRpc
+namespace OpenSim.Region.OptionalModules.World.Currency
 {
     public class NSLXmlRpcRequest : XmlRpcRequest
     {

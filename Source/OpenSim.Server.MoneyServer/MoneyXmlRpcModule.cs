@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Text;
 using System.Reflection;
 using System.Collections;
@@ -41,14 +39,9 @@ using Nwc.XmlRpc;
 
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Data.MySQL.MoneyData;
-using OpenSim.Region.OptionalModules.Currency;
-using OpenSim.Region.Framework.Scenes;
-
-using NSL.Network.XmlRpc;
-using NSL.Certificate.Tools;
+using OpenSim.Region.OptionalModules.World.Currency;
 
 
 namespace OpenSim.Server.MoneyServer

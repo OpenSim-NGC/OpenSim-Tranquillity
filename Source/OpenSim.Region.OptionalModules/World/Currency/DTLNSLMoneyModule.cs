@@ -35,8 +35,6 @@
 using log4net;
 using Mono.Addins;
 using Nini.Config;
-using NSL.Certificate.Tools;
-using NSL.Network.XmlRpc;
 using Nwc.XmlRpc;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -47,9 +45,7 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Security;
 using System.Reflection;
@@ -57,11 +53,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
-[assembly: Addin("DTLNSLMoneyModule", "1.0.4")]
-[assembly: AddinDescription("OpenSim Addin for DTL Money Module")]
-[assembly: AddinDependency("OpenSim.Region.Framework", "0.9")]
-
-namespace OpenSim.Region.OptionalModules.Currency
+namespace OpenSim.Region.OptionalModules.World.Currency
 {
     /// <summary>
     /// Transaction Type
@@ -184,7 +176,6 @@ namespace OpenSim.Region.OptionalModules.Currency
 		}
 	*/
 
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "DTLNSLMoneyModule")]
     public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     {
         #region Constant numbers and members.
