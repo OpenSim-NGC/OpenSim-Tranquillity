@@ -25,19 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
-using log4net;
-using Mono.Addins;
-using NDesk.Options;
 using Nini.Config;
-using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Console;
-using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
@@ -47,7 +38,6 @@ namespace OpenSim.Region.CoreModules.World.Objects.Commands
     /// <summary>
     /// A module that holds commands for manipulating objects in the scene.
     /// </summary>
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "RegionCommandsModule")]
     public class RegionCommandsModule : INonSharedRegionModule
     {
         private Scene m_scene;

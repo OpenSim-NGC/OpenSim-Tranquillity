@@ -25,19 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 
 using log4net;
 using Nini.Config;
 using OpenMetaverse;
-using Mono.Addins;
 
 using OpenSim.Framework;
-using OpenSim.Framework.Servers;
-using OpenSim.Framework.Servers.HttpServer;
-using OpenSim.Framework.Client;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
@@ -50,7 +44,6 @@ namespace OpenSim.Region.OptionalModules.Scripting.XmlRpcGridRouterModule
         public string uri;
     }
 
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "XmlRpcGridRouter")]
     public class XmlRpcGridRouter : INonSharedRegionModule, IXmlRpcRouter
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

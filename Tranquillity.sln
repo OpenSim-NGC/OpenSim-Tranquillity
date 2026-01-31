@@ -65,7 +65,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModul
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.ubOde", "Source\OpenSim.Region.PhysicsModules.ubOde\OpenSim.Region.PhysicsModule.ubOde.csproj", "{AC52DE31-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.ubOdeMeshing", "Source\OpenSim.Region.PhysicsModules.ubOdeMeshing\OpenSim.Region.PhysicsModule.ubOdeMeshing.csproj", "{E7DA5126-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.ubODEMeshing", "Source\OpenSim.Region.PhysicsModules.ubODEMeshing\OpenSim.Region.PhysicsModules.ubODEMeshing.csproj", "{E7DA5126-0000-0000-0000-000000000000}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet", "Source\OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet\OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet.csproj", "{A1CC4ADF-0000-0000-0000-000000000000}"
 EndProject
@@ -128,8 +128,6 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartThreadPool", "ThirdParty\SmartThreadPool\SmartThreadPool.csproj", "{8C618053-0000-0000-0000-000000000000}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Data.MySQL.MoneyData", "Source\OpenSim.Data.MySQL.MoneyData\OpenSim.Data.MySQL.MoneyData.csproj", "{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.OptionalModules.Currency", "Source\OpenSim.Region.OptionalModules.Currency\OpenSim.Region.OptionalModules.Currency.csproj", "{2B6DD15C-0B5D-41CA-B713-71B60147114D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Services.ExperienceService", "Source\OpenSim.Services.ExperienceService\OpenSim.Services.ExperienceService.csproj", "{186509B6-EF90-431A-9034-75A1221E4120}"
 EndProject
@@ -421,10 +419,6 @@ Global
 		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2B6DD15C-0B5D-41CA-B713-71B60147114D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2B6DD15C-0B5D-41CA-B713-71B60147114D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2B6DD15C-0B5D-41CA-B713-71B60147114D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2B6DD15C-0B5D-41CA-B713-71B60147114D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{186509B6-EF90-431A-9034-75A1221E4120}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{186509B6-EF90-431A-9034-75A1221E4120}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{186509B6-EF90-431A-9034-75A1221E4120}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -545,7 +539,6 @@ Global
 		{BE5D1132-0000-0000-0000-000000000000} = {E1748B93-FA13-C50B-BD89-C3B777E73FCB}
 		{8C618053-0000-0000-0000-000000000000} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{A9CF27A6-3E23-4A10-82DA-604CA8C577D9} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
-		{2B6DD15C-0B5D-41CA-B713-71B60147114D} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{186509B6-EF90-431A-9034-75A1221E4120} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{4B7616BC-6CCE-4B78-AE40-1F24C92442F5} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 		{B120B128-D6C6-40B6-9D83-4F1F7D921109} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}

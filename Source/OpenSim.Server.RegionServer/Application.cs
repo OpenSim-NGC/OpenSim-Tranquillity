@@ -25,15 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Net;
 using System.Reflection;
 using log4net;
 using log4net.Config;
 using Nini.Config;
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
 
 namespace OpenSim.Server.RegionServer
 {
@@ -108,8 +105,7 @@ namespace OpenSim.Server.RegionServer
             int iocpThreadsMax = 2000;
 
             System.Threading.ThreadPool.GetMinThreads(out int currentMinWorkerThreads, out int currentMinIocpThreads);
-            m_log.Info(
-                $"[OPENSIM MAIN]: Runtime gave us {currentMinWorkerThreads} min worker threads and {currentMinIocpThreads} min IOCP threads");
+            m_log.Info($"[OPENSIM MAIN]: Runtime gave us {currentMinWorkerThreads} min worker threads and {currentMinIocpThreads} min IOCP threads");
 
             System.Threading.ThreadPool.GetMaxThreads(out int workerThreads, out int iocpThreads);
             m_log.Info($"[OPENSIM MAIN]: Runtime gave us {workerThreads} max worker threads and {iocpThreads} max IOCP threads");
@@ -141,8 +137,7 @@ namespace OpenSim.Server.RegionServer
             // set the resulting worker and IO completion thread counts back to ThreadPool
             if ( System.Threading.ThreadPool.SetMaxThreads(workerThreads, iocpThreads) )
             {
-                m_log.Info(
-                    $"[OPENSIM MAIN]: Threadpool set to {workerThreads} max worker threads and {iocpThreads} max IOCP threads");
+                m_log.Info($"[OPENSIM MAIN]: Threadpool set to {workerThreads} max worker threads and {iocpThreads} max IOCP threads");
             }
             else
             {
@@ -357,7 +352,7 @@ namespace OpenSim.Server.RegionServer
 
             msg += $"\r\nApplication is terminating: {e.IsTerminating}\r\n";
 
-            m_log.Error("[APPLICATION]: + msg");
+            m_log.Error($"[APPLICATION]: {msg}");
 
             if (m_saveCrashDumps)
             {

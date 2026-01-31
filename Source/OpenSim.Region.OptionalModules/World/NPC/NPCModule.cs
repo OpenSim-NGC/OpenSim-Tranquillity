@@ -25,25 +25,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Threading;
-using Timer = System.Timers.Timer;
 
 using log4net;
 using Nini.Config;
-using Mono.Addins;
 using OpenMetaverse;
 
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework;
-using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.OptionalModules.World.NPC
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "NPCModule")]
     public class NPCModule : INPCModule, ISharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

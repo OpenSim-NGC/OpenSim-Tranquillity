@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Xml;
 using OpenMetaverse;
-using OpenSim.Framework;
 
 using OpenSim.Region.DataSnapshot.Interfaces;
 using OpenSim.Region.Framework.Scenes;

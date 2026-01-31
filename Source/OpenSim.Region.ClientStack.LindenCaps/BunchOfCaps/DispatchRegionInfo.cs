@@ -1,22 +1,10 @@
-﻿using System;
-using System.Collections;
-
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Threading;
-
-using OpenMetaverse;
-using OpenMetaverse.StructuredData;
-
-using OpenSim.Framework;
-using OpenSim.Framework.Capabilities;
+﻿using System.Net;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
-namespace OpenSim.Region.ClientStack.Linden
+namespace OpenSim.Region.ClientStack.LindenCaps
 {
  
     public partial class BunchOfCaps

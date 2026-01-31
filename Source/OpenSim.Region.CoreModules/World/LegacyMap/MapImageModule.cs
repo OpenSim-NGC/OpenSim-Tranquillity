@@ -27,7 +27,6 @@
 
 using System.Reflection;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
 using CoreJ2K;
 using CoreJ2K.Configuration;
@@ -60,7 +59,6 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         public Face[] trns;
     }
 
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "MapImageModule")]
     public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
     {
         private static readonly ILog m_log =

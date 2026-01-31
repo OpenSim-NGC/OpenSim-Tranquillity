@@ -25,12 +25,9 @@
  * this file will likely require some modification.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
 using log4net;
-// TODO: convert OSDMaps to Dictionaries and UUIDs to GUIDs and remove requirement for OpenMetaverse libraries to make this more generic.
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 

@@ -1,5 +1,3 @@
-using System;
-
 namespace OpenSim.Region.CoreModules.World.Terrain
 {
     public struct TerrainModifierData

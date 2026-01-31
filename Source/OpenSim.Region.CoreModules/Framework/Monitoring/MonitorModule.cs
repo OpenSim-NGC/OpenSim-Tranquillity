@@ -25,14 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 using log4net;
 using Nini.Config;
-using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Framework.Servers;
@@ -41,11 +37,9 @@ using OpenSim.Region.CoreModules.Framework.Monitoring.Alerts;
 using OpenSim.Region.CoreModules.Framework.Monitoring.Monitors;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using Mono.Addins;
 
 namespace OpenSim.Region.CoreModules.Framework.Monitoring
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "MonitorModule")]
     public class MonitorModule : INonSharedRegionModule
     {
         /// <summary>

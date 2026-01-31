@@ -24,13 +24,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Threading;
 using System.Runtime.InteropServices;
-using System.Collections.Generic;
 using OpenSim.Framework;
 using OpenMetaverse;
-using log4net;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using Timer = System.Threading.Timer;
 using ReaderWriterLockSlim = System.Threading.ReaderWriterLockSlim;

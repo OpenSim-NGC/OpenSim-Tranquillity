@@ -1,20 +1,14 @@
 using log4net;
-using Mono.Addins;
 using Nini.Config;
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using OpenSim.Framework;
 using OpenSim.Server.Base;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
-using OpenSim.Data;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "LocalExperienceServicesConnector")]
     public class LocalExperienceServicesConnector : ISharedRegionModule, IExperienceService
     {
         private static readonly ILog m_log =

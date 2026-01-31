@@ -25,16 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
-using OpenMetaverse;
-using OpenSim.Framework;
-using OpenSim.Framework.Console;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using netcd;
@@ -48,7 +41,6 @@ namespace OpenSim.Region.OptionalModules.Framework.Monitoring
     /// Allows to store monitoring data in etcd, a high availability
     /// name-value store.
     /// </summary>
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "EtcdMonitoringModule")]
     public class EtcdMonitoringModule : INonSharedRegionModule, IEtcdModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

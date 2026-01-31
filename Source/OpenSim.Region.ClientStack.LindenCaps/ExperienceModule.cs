@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.IO;
+﻿using System.Reflection;
 using log4net;
 using Mono.Addins;
 using Nini.Config;
@@ -12,17 +9,14 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using System.Text;
-using System.Linq;
 using System.Collections.Specialized;
 using System.Web;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
-using OpenSim.Framework.Client;
 using System.Net;
 
 namespace OpenSim.Region.ClientStack.LindenCaps
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "ExperienceModule")]
     public class ExperienceModule : IExperienceModule, ISharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

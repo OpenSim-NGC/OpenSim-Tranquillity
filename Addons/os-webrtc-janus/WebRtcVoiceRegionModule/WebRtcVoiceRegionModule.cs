@@ -10,14 +10,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System;
-using System.IO;
 using System.Net;
 using System.Text;
-using System.Collections.Generic;
 using System.Reflection;
-
-using Mono.Addins;
 
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
@@ -31,9 +26,6 @@ using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
 using log4net;
 using Nini.Config;
-
-[assembly: Addin("WebRtcVoiceRegionModule", "1.0")]
-[assembly: AddinDependency("OpenSim.Region.Framework", OpenSim.VersionInfo.VersionNumber)]
 
 namespace WebRtcVoice
 {
@@ -49,7 +41,6 @@ namespace WebRtcVoice
     /// The capabilities then pass the user request information to the IWebRtcVoiceService interface
     /// that has been registered for the reqion.
     /// </summary>
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "RegionVoiceModule")]
     public class WebRtcVoiceRegionModule : ISharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

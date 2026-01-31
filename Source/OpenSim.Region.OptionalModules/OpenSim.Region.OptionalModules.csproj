@@ -8,18 +8,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Reference Include="Mono.Security.dll" HintPath="../../Library/Mono.Security.dll" />
     <Reference Include="NDesk.Options" HintPath="../../Library/NDesk.Options.dll" />
     <Reference Include="netcd" HintPath="../../Library/netcd.dll" />
     <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
     <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
     <Reference Include="OpenMetaverse.StructuredData" HintPath="../../Library/OpenMetaverse.StructuredData.dll" />
     <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
-    <Reference Include="XMLRPC" HintPath="../../Library/XMLRPC.dll" />
+    <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../Source/OpenSim.Capabilities/OpenSim.Capabilities.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.MySQL.MoneyData/OpenSim.Data.MySQL.MoneyData.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Monitoring/OpenSim.Framework.Monitoring.csproj" />
@@ -44,4 +46,9 @@
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
     <PackageReference Include="System.Data.SQLite" Version="2.0.2" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/OpenSim.Region.OptionalModules.addin.xml" />
+  </ItemGroup>
+
 </Project>

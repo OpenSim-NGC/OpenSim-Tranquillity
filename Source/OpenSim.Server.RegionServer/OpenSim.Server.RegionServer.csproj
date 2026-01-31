@@ -16,7 +16,7 @@
     <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
     <Reference Include="OpenMetaverse.StructuredData" HintPath="../../Library/OpenMetaverse.StructuredData.dll" />
     <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
-    <Reference Include="XMLRPC" HintPath="../../Library/XMLRPC.dll" />
+    <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
   </ItemGroup>
   
   <ItemGroup>
@@ -49,24 +49,31 @@
     <EmbeddedResource Include="Resources/OpenSim.Server.RegionServer.addin.xml" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="AppData/**">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
+  <Target Name="CopyAppData" AfterTargets="Publish">
+    <ItemGroup>
+      <FilesToCopy Include="AppData/**/*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FilesToCopy)" 
+          DestinationFolder="$(PublishDir)/%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
 
   <Target Name="CopyNativeDllConfig" AfterTargets="Publish">
     <ItemGroup>
       <NativeConfigToCopy Include="$(SolutionDir)Library/*.dll.config" />
     </ItemGroup>
-    <Copy SourceFiles="@(NativeConfigToCopy)" DestinationFolder="$(PublishDir)/%(RecursiveDir)" />
+    <Copy SourceFiles="@(NativeConfigToCopy)" 
+          DestinationFolder="$(PublishDir)/%(RecursiveDir)" 
+          SkipUnchangedFiles="true" />
   </Target>
 
   <Target Name="CopyNativeLibraries" AfterTargets="Publish">
     <ItemGroup>
       <NativeLibsToCopy Include="$(SolutionDir)Library/lib64/**/*.*" />
     </ItemGroup>
-    <Copy SourceFiles="@(NativeLibsToCopy)" DestinationFolder="$(PublishDir)/lib64/%(RecursiveDir)" />
+    <Copy SourceFiles="@(NativeLibsToCopy)" 
+          DestinationFolder="$(PublishDir)/lib64/%(RecursiveDir)" 
+          SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

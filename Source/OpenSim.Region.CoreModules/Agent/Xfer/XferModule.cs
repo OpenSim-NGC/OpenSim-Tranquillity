@@ -25,23 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Threading;
 using Nini.Config;
 using log4net;
-using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-using Mono.Addins;
-
 namespace OpenSim.Region.CoreModules.Agent.Xfer
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "XferModule")]
     public class XferModule : INonSharedRegionModule, IXfer
     {
         private Scene m_scene;

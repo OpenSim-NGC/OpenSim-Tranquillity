@@ -26,10 +26,7 @@
  */
 
 using log4net;
-using Mono.Addins;
 using Nini.Config;
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using OpenSim.Framework;
 using OpenSim.Server.Base;
@@ -39,7 +36,6 @@ using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "LocalAssetServicesConnector")]
     public class LocalAssetServicesConnector : ISharedRegionModule, IAssetService
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

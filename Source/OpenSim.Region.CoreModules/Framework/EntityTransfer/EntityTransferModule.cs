@@ -25,18 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
-using System.Threading;
 using OpenSim.Framework;
-using OpenSim.Framework.Capabilities;
-using OpenSim.Framework.Client;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Services.Interfaces;
 
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
@@ -44,11 +38,9 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenMetaverse;
 using log4net;
 using Nini.Config;
-using Mono.Addins;
 
 namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "EntityTransferModule")]
     public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModule, IDisposable
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

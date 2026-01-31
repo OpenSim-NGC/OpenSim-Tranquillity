@@ -16,8 +16,6 @@
  * along with OpenSim-MoneyModule-Gloebit.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Reflection;
 using System.Text;

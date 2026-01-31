@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Addin id="OpenSim.Region.ClientStack.LindenCaps" version="0.9">
+    
+    <Runtime>
+        <Import assembly="OpenSim.Framework.dll" /> 
+        <Import assembly="OpenSim.Region.Framework.dll" />
+        <Import assembly="OpenSim.Region.ClientStack.LindenCaps.dll"/>
+    </Runtime>
+
+    <Dependencies>
+        <Addin id="OpenSim.Server.RegionServer" version="0.9" />
+    </Dependencies>
+
+    <Extension path = "/OpenSim/RegionModules">
+        <RegionModule id="AgentPreferencesModule" class="OpenSim.Region.ClientStack.LindenCaps.AgentPreferencesModule" />
+        <RegionModule id="AvatarPickerSearchModule" class="OpenSim.Region.ClientStack.LindenCaps.AvatarPickerSearchModule" />
+        <RegionModule id="BunchOfCapsModule" class="OpenSim.Region.ClientStack.LindenCaps.BunchOfCapsModule" />
+        <RegionModule id="EventQueueGetModule" class="OpenSim.Region.ClientStack.LindenCaps.EventQueueGetModule" />
+        <RegionModule id="ObjectAdd" class="OpenSim.Region.ClientStack.LindenCaps.ObjectAdd" />
+        <RegionModule id="UploadObjectAssetModule" class="OpenSim.Region.ClientStack.LindenCaps.UploadObjectAssetModule" />
+        <RegionModule id="DisplayNameModule" class="OpenSim.Region.ClientStack.LindenCaps.DisplayNameModule" />
+        <RegionModule id="EstateAccessCapModule" class="OpenSim.Region.ClientStack.LindenCaps.EstateAccessCapModule" />
+        <RegionModule id="EstateChangeInfoCapModule" class="OpenSim.Region.ClientStack.LindenCaps.EstateChangeInfoCapModule" />
+        <RegionModule id="ExperienceModule" class="OpenSim.Region.ClientStack.LindenCaps.ExperienceModule" />
+        <RegionModule id="FetchInventory2Module" class="OpenSim.Region.ClientStack.LindenCaps.FetchInventory2Module" />
+        <RegionModule id="FetchLibDescModule" class="OpenSim.Region.ClientStack.LindenCaps.FetchLibDescModule" />
+        <RegionModule id="GetAssetsModule" class="OpenSim.Region.ClientStack.LindenCaps.GetAssetsModule" />
+        <RegionModule id="MeshUploadFlagModule" class="OpenSim.Region.ClientStack.LindenCaps.MeshUploadFlagModule" />
+        <RegionModule id="RegionConsoleModule" class="OpenSim.Region.ClientStack.LindenCaps.RegionConsoleModule" />
+        <RegionModule id="ServerReleaseNotesModule" class="OpenSim.Region.ClientStack.LindenCaps.ServerReleaseNotesModule" />
+        <RegionModule id="SimulatorFeaturesModule" class="OpenSim.Region.ClientStack.LindenCaps.SimulatorFeaturesModule" />
+        <RegionModule id="UploadBakedTextureModule" class="OpenSim.Region.ClientStack.LindenCaps.UploadBakedTextureModule" />
+        <RegionModule id="WebFetchInvDescModule" class="OpenSim.Region.ClientStack.LindenCaps.WebFetchInvDescModule" />       
+    </Extension>
+  
+</Addin>

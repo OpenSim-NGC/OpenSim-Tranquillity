@@ -27,13 +27,11 @@
 
 using System.Reflection;
 using log4net;
-using Mono.Addins;
 using OpenSim.Framework;
 using OpenSim.Server.RegionServer;
 
 namespace OpenSim.ApplicationPlugins.LoadRegions
 {
-    [Extension(Path="/OpenSim/Startup", Id="LoadRegions", NodeName="Plugin")]
     public class LoadRegionsPlugin : IApplicationPlugin, IRegionCreator
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

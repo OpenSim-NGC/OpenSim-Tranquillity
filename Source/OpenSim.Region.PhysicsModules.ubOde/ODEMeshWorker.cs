@@ -2,7 +2,6 @@
  * AJLDuarte 2012
  */
 
-using System;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using log4net;

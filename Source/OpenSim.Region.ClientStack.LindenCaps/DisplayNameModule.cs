@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -13,7 +12,6 @@ using System.Net;
 
 namespace OpenSim.Region.ClientStack.LindenCaps
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "DisplayNameModule")]
     public class DisplayNameModule : IDisplayNameModule, INonSharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

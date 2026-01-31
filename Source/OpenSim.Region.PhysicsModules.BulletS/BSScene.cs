@@ -24,13 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Scenes;
@@ -39,11 +33,9 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using Nini.Config;
 using log4net;
 using OpenMetaverse;
-using Mono.Addins;
 
 namespace OpenSim.Region.PhysicsModule.BulletS
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "BulletSPhysicsScene")]
     public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegionModule
     {
         internal static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);

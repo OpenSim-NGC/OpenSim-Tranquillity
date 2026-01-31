@@ -27,15 +27,14 @@
 
 using System.Reflection;
 using log4net;
-using Nini.Config;
 using Mono.Addins;
+using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.RegionServer;
 
 namespace OpenSim.ApplicationPlugins.RegionModulesController
 {
-    [Extension(Path = "/OpenSim/Startup", Id = "LoadRegions", NodeName = "Plugin")]
     public class RegionModulesControllerPlugin : IRegionModulesController,
             IApplicationPlugin
     {
@@ -56,14 +55,11 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
         private string m_name;
 
         // Internal lists to collect information about modules present
-        private List<TypeExtensionNode> m_nonSharedModules =
-                new List<TypeExtensionNode>();
-        private List<TypeExtensionNode> m_sharedModules =
-                new List<TypeExtensionNode>();
+        private List<TypeExtensionNode> m_nonSharedModules = new List<TypeExtensionNode>();
+        private List<TypeExtensionNode> m_sharedModules = new List<TypeExtensionNode>();
 
         // List of shared module instances, for adding to Scenes
-        private List<ISharedRegionModule> m_sharedInstances =
-                new List<ISharedRegionModule>();
+        private List<ISharedRegionModule> m_sharedInstances = new List<ISharedRegionModule>();
 
 #region Debug Support
 

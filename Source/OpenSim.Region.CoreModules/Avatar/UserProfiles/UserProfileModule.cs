@@ -25,13 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Globalization;
-using System.Linq;
 using System.Reflection;
-using System.Threading;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using log4net;
@@ -40,16 +36,13 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
-using Mono.Addins;
 using OpenSim.Services.Connectors.Hypergrid;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.UserProfilesService;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
-using OpenSim.Region.CoreModules.Avatar.Friends;
 
 namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "UserProfilesModule")]
     public class UserProfileModule : IProfileModule, INonSharedRegionModule
     {
         const double PROFILECACHEEXPIRE = 300;

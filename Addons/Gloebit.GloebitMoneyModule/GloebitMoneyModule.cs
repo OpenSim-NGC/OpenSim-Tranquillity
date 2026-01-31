@@ -65,18 +65,13 @@
 
 #define NEWHTTPFLOW
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Reflection;
-using System.Threading;
 using System.Text;
 using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
-using Mono.Addins;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
@@ -86,13 +81,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse.StructuredData;     // TODO: turn transactionData into a dictionary of <string, object> and remove this.
 using OpenSim.Region.ScriptEngine.Shared.ScriptBase;    // For ScriptBaseClass permissions constants
-
-[assembly: Addin("Gloebit", "0.1")]
-[assembly: AddinDependency("OpenSim.Region.Framework", OpenSim.VersionInfo.AssemblyVersionNumber)]
-[assembly: AddinDescription("OpenSim Addin for Gloebit Money Module")]
-[assembly: AddinAuthor("Gloebit LLC gloebit@gloebit.com")]
-//[assembly: ImportAddinFile("Gloebit.ini")]
-
 
 namespace Gloebit.GloebitMoneyModule
 {
@@ -109,8 +97,6 @@ namespace Gloebit.GloebitMoneyModule
     /// This is only the Gloebit Money Module which enables monetary transactions in OpenSim
     /// via the Gloebit API and Gloebit Services.
     /// </summary>
-
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "GloebitMoneyModule")]
     public class GloebitMoneyModule : IMoneyModule, ISharedRegionModule, GloebitTransaction.IAssetCallback, GloebitAPIWrapper.IUriLoader, GloebitAPIWrapper.IPlatformAccessor, GloebitAPIWrapper.IUserAlert, GloebitAPIWrapper.ITransactionAlert, GloebitAPIWrapper.ISubscriptionAlert
     {
         
@@ -149,6 +135,7 @@ namespace Gloebit.GloebitMoneyModule
         
         // OpenSim Economic Data
         private bool m_sellEnabled = false;     // If not true, Object Buy txns won't work
+
         private float EnergyEfficiency = 0f;
         private int ObjectCount = 0;
         private int PriceEnergyUnit = 0;

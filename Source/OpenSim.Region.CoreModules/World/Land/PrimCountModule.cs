@@ -25,19 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
-using Mono.Addins;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.CoreModules.World.Land
 {
@@ -50,7 +42,6 @@ namespace OpenSim.Region.CoreModules.World.Land
         public Dictionary <UUID, int> Users = new Dictionary <UUID, int>();
     }
 
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "PrimCountModule")]
     public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
     {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -33,7 +32,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenMetaverse;
 using Nini.Config;
-using Mono.Addins;
 using log4net;
 
 /*
@@ -49,8 +47,6 @@ using log4net;
 
 namespace OpenSim.Region.PhysicsModule.Meshing
 {
-
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "ZeroMesher")]
     public class ZeroMesher : IMesher, INonSharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

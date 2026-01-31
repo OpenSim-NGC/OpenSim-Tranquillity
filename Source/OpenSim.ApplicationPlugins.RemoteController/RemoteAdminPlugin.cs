@@ -26,7 +26,6 @@
  */
 
 using log4net;
-using Mono.Addins;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;
@@ -48,7 +47,6 @@ using RegionInfo = OpenSim.Framework.RegionInfo;
 
 namespace OpenSim.ApplicationPlugins.RemoteController
 {
-    [Extension(Path = "/OpenSim/Startup", Id = "LoadRegions", NodeName = "Plugin")]
     public class RemoteAdminPlugin : IApplicationPlugin
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

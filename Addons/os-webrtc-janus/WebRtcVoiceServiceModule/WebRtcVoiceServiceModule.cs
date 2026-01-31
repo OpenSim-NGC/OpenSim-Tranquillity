@@ -10,13 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System;
-using System.Linq;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Threading.Tasks;
-
-using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Base;
@@ -24,13 +18,8 @@ using OpenSim.Server.Base;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-using Mono.Addins;
-
 using log4net;
 using Nini.Config;
-
-[assembly: Addin("WebRtcVoiceServiceModule", "1.0")]
-[assembly: AddinDependency("OpenSim.Region.Framework", OpenSim.VersionInfo.VersionNumber)]
 
 namespace WebRtcVoice
 {
@@ -43,7 +32,6 @@ namespace WebRtcVoice
     /// the grid could have a non-spatial voice service for group chat, etc.
     /// Fancier configurations are possible.
     /// </summary>
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "WebRtcVoiceServiceModule")]
     public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

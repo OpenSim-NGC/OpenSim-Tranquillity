@@ -25,18 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Text;
-using log4net;
-using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
-using OpenMetaverse.Imaging;
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
@@ -48,7 +39,6 @@ namespace OpenSim.Region.OptionalModules.Agent.TextureSender
     /// <remarks>
     /// Placed here so that they can be removed if not required and to keep the J2KDecoder module itself simple.
     /// </remarks>
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "J2KDecoderCommandModule")]
     public class J2KDecoderCommandModule : ISharedRegionModule
     {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

@@ -25,27 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Reflection;
-using System.Text;
-using System.Collections.Generic;
-using System.Threading;
 
 using OpenMetaverse;
-using OpenMetaverse.StructuredData;
-using OpenSim;
-using OpenSim.Region;
-using OpenSim.Region.Framework;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 //using OpenSim.Framework.Capabilities;
-using Nini.Config;
 using log4net;
-using OSDMap = OpenMetaverse.StructuredData.OSDMap;
-using TeleportFlags = OpenSim.Framework.Constants.TeleportFlags;
 
 namespace OpenSim.Region.OptionalModules.ViewerSupport
 {

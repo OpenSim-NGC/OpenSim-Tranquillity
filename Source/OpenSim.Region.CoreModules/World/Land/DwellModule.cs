@@ -25,34 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Reflection;
-using System.Text;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
-using OpenMetaverse.StructuredData;
-using OpenMetaverse.Messages.Linden;
-using Mono.Addins;
 using OpenSim.Framework;
-using OpenSim.Framework.Capabilities;
-using OpenSim.Framework.Console;
-using OpenSim.Framework.Servers;
-using OpenSim.Framework.Servers.HttpServer;
-using OpenSim.Region.CoreModules.Framework.InterfaceCommander;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.PhysicsModules.SharedBase;
-using OpenSim.Services.Interfaces;
-using Caps = OpenSim.Framework.Capabilities.Caps;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.CoreModules.World.Land
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "DefaultDwellModule")]
     public class DefaultDwellModule : INonSharedRegionModule, IDwellModule
     {
         private Scene m_scene;

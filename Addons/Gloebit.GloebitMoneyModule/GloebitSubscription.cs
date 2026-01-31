@@ -23,9 +23,6 @@
  * See GloebitSubscriptionData.cs for DB implementation
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
 using log4net;
 using OpenMetaverse;

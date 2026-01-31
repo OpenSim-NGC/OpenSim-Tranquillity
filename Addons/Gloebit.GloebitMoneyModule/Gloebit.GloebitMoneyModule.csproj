@@ -16,7 +16,7 @@
     <Reference Include="OpenMetaverse" HintPath="..\..\Library\OpenMetaverse.dll" />
     <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\Library\OpenMetaverse.StructuredData.dll" />
     <Reference Include="OpenMetaverseTypes" HintPath="..\..\Library\OpenMetaverseTypes.dll" />
-    <Reference Include="XMLRPC" HintPath="..\..\Library\XMLRPC.dll" />
+    <Reference Include="xmlrpc" HintPath="..\..\Library\xmlrpc.dll" />
   </ItemGroup>
 
   <ItemGroup>
@@ -45,6 +45,10 @@
     <EmbeddedResource Include="Resources\GloebitUsersMySQL.migrations" />
     <EmbeddedResource Include="Resources\GloebitUsersPGSQL.migrations" />
     <EmbeddedResource Include="Resources\GloebitUsersSQLite.migrations" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/Gloebit.GloebitMoneyModule.addin.xml" />
   </ItemGroup>
 
   <ItemGroup>

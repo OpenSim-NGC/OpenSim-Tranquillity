@@ -11,11 +11,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4 # Checkout the repository
+    - name: Checkout Repository
+      uses: actions/checkout@v4 
+      with:
+        fetch-depth: 0
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x' # Specify the desired .NET SDK version
+        dotnet-version: '8.0.x'
 
     - name: Display dotnet version
       run: dotnet --version
@@ -24,7 +28,7 @@ jobs:
       run: dotnet restore ./Tranquillity.sln
 
     - name: Build
-      run: dotnet build ./Tranquillity.sln --configuration Release
+      run: dotnet build ./Tranquillity.sln --configuration Release --no-restore
 
 #    - name: Tests
 #      run: dotnet test ./Tranquillity.sln --verbosity normal

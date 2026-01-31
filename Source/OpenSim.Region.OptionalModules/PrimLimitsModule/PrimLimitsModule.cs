@@ -25,12 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -45,7 +41,6 @@ namespace OpenSim.Region.OptionalModules
     /// <remarks>
     /// This module selectivly enables parcel prim limits.
     /// </remarks>
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "PrimLimitsModule")]
     public class PrimLimitsModule : INonSharedRegionModule
     {
         protected IDialogModule m_dialogModule;

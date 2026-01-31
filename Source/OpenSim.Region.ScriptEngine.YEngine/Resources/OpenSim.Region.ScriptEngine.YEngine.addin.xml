@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Addin id="OpenSim.Region.ScriptEngine.YEngine" version="0.9">
+    
+    <Runtime>
+        <Import assembly="OpenSim.Region.Framework.dll" />
+    </Runtime>
+
+    <Dependencies>
+        <Addin id="OpenSim.Server.RegionServer" version="0.9" />
+    </Dependencies>
+
+    <Extension path = "/OpenSim/RegionModules">
+        <RegionModule id="YEngine" class="OpenSim.Region.ScriptEngine.Yengine.Yengine" />
+    </Extension>
+  
+</Addin>

@@ -25,14 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.IO;
 using System.Net;
 using System.Reflection;
-using System.Threading;
 using log4net;
 using Nini.Config;
 using OpenMetaverse.Packets;
@@ -41,7 +37,6 @@ using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenMetaverse;
-using Mono.Addins;
 
 
 namespace OpenSim.Region.ClientStack.LindenUDP
@@ -49,7 +44,6 @@ namespace OpenSim.Region.ClientStack.LindenUDP
     /// <summary>
     /// A shim around LLUDPServer that implements the IClientNetworkServer interface
     /// </summary>
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "LLUDPServerShim")]
     public class LLUDPServerShim : INonSharedRegionModule
     {
         protected IConfigSource m_Config;

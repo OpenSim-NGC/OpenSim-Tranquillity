@@ -26,15 +26,10 @@
  */
 
 using log4net;
-using Mono.Addins;
 using Nini.Config;
-
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
-using OpenSim.Data;
 using OpenSim.Server.Base;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -43,7 +38,6 @@ using OpenMetaverse;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "LocalInventoryServicesConnector")]
     public class LocalInventoryServicesConnector : ISharedRegionModule, IInventoryService
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

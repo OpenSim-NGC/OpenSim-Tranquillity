@@ -26,11 +26,8 @@
  */
 
 
-using System;
-using System.IO;
 using System.IO.Compression;
 using System.Collections;
-using System.Collections.Generic;
 using System.Text;
 
 using OpenMetaverse;
@@ -40,14 +37,12 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Capabilities;
 
 using Nini.Config;
-using log4net;
-using System.Reflection;
 
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
 
-namespace OpenSim.Region.ClientStack.Linden
+namespace OpenSim.Region.ClientStack.LindenCaps
 {
     public class ModelCost
     {

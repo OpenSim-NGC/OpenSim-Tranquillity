@@ -14,7 +14,7 @@
     <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
     <Reference Include="OpenMetaverse.StructuredData" HintPath="../../Library/OpenMetaverse.StructuredData.dll" />
     <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
-    <Reference Include="XMLRPC" HintPath="../../Library/XMLRPC.dll" />
+    <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
   </ItemGroup>
   
   <ItemGroup>
@@ -50,6 +50,10 @@
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
     <PackageReference Include="CoreJ2K.Skia" Version="2.1.0.101" />
     <PackageReference Include="SkiaSharp" Version="3.119.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/OpenSim.Region.CoreModules.addin.xml" />
   </ItemGroup>
 
 </Project>

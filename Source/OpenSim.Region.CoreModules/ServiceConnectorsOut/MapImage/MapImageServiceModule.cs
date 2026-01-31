@@ -25,15 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Net;
-using System.IO;
 using System.Timers;
 
 using log4net;
-using Mono.Addins;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
@@ -41,18 +36,10 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 using OpenMetaverse;
-using OpenMetaverse.StructuredData;
 using SkiaSharp;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MapImage
 {
-    /// <summary>
-    /// </summary>
-    /// <remarks>
-    /// </remarks>
-
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "MapImageServiceModule")]
-
     public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
     {
         private static readonly ILog m_log =

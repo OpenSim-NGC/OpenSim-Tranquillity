@@ -26,7 +26,7 @@
  */
 
 using System.Reflection;
-using System.Threading;
+
 using log4net;
 using Nini.Config;
 

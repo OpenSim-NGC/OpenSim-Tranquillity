@@ -25,24 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using log4net;
 using Nini.Config;
-using Mono.Addins;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using Caps=OpenSim.Framework.Capabilities.Caps;
+using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.CoreModules.Framework
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "CapabilitiesModule")]
     public class CapabilitiesModule : INonSharedRegionModule, ICapabilitiesModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

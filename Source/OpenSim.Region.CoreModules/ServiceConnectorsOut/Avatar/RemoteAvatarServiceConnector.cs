@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using Mono.Addins;
 using Nini.Config;
 using log4net;
 using System.Reflection;
@@ -37,7 +35,6 @@ using OpenSim.Services.Connectors;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "RemoteAvatarServicesConnector")]
     public class RemoteAvatarServicesConnector : AvatarServicesConnector,
             ISharedRegionModule, IAvatarService
     {

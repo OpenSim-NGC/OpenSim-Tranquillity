@@ -13,7 +13,7 @@
     <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
     <Reference Include="OpenMetaverse.StructuredData" HintPath="../../Library/OpenMetaverse.StructuredData.dll" />
     <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
-    <Reference Include="XMLRPC" HintPath="../../Library/XMLRPC.dll" />
+    <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,25 +28,6 @@
     <PackageReference Include="Mono.Addins.Setup" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="VersionInfo.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>VersionInfo.cs</LastGenOutput>
-    </None>
-  </ItemGroup>
-  
-  <ItemGroup>
-    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <Compile Update="VersionInfo.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>VersionInfo.tt</DependentUpon>
-    </Compile>
   </ItemGroup>
 
 </Project>

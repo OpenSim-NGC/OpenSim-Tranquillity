@@ -25,17 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Net;
-using System.Text;
 using System.Xml;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Threading;
 using OpenMetaverse;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
 using OpenSim.Framework;
 
@@ -47,10 +41,8 @@ using OpenMetaverse.StructuredData;
 
 namespace OpenSim.Region.OptionalModules.Avatar.Voice.VivoxVoice
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "VivoxVoiceModule")]
     public class VivoxVoiceModule : ISharedRegionModule
     {
-
         // channel distance model values
         public const int CHAN_DIST_NONE     = 0; // no attenuation
         public const int CHAN_DIST_INVERSE  = 1; // inverse distance attenuation

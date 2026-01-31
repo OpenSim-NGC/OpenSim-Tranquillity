@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using OpenSim.Region.CoreModules.World.Terrain;
 using OpenSim.Region.CoreModules.World.Terrain.FloodBrushes;
 using OpenSim.Region.Framework.Interfaces;
 

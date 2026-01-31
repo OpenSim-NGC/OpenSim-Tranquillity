@@ -1,16 +1,17 @@
-<Addin id="OpenSim.ApplicationPlugins.RemoteController" version="0.9.3">
+<?xml version="1.0" encoding="utf-8"?>
 
-    <Runtime>
-        <Import assembly="OpenSim.Region.Framework.dll" />
-        <Import assembly="OpenSim.ApplicationPlugins.RemoteController.dll"/>
-    </Runtime>
+<Addin id="OpenSim.ApplicationPlugins.RemoteController" version="0.9">
 
-    <Dependencies>
-        <Addin id="OpenSim.Server.RegionServer" version="0.9.3" />
-    </Dependencies>
+  <Runtime>
+    <Import assembly="OpenSim.ApplicationPlugins.RemoteController.dll"/>
+  </Runtime>
 
-    <Extension path = "/OpenSim/Startup">
-        <Plugin id="RemoteAdminPlugin" type="OpenSim.ApplicationPlugins.RemoteController.RemoteAdminPlugin" />
-    </Extension>
+  <Dependencies>
+    <Addin id="OpenSim.Server.RegionServer" version="0.9" />
+  </Dependencies>
+
+  <Extension path = "/OpenSim/Startup">
+    <Plugin id="RemoteAdminPlugin" type="OpenSim.ApplicationPlugins.RemoteController.RemoteAdminPlugin" />
+  </Extension>
     
 </Addin>
