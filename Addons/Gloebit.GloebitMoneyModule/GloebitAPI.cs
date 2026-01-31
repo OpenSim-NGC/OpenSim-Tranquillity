@@ -22,9 +22,6 @@
  * Handles communication with Gloebit's RESTful API services 
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Text;

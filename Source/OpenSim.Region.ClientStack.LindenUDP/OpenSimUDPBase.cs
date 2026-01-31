@@ -25,15 +25,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Net;
 using System.Net.Sockets;
 using log4net;
 using OpenSim.Framework;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace OpenSim.Region.ClientStack.LindenUDP
 {

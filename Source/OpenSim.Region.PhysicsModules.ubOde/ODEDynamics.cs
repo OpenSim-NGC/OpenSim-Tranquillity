@@ -40,7 +40,6 @@
 
 // Extensive change Ubit 2012
 
-using System;
 using OpenMetaverse;
 using OpenSim.Region.PhysicsModules.SharedBase;
 

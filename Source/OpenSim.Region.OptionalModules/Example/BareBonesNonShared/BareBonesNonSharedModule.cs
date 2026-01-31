@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -49,13 +47,11 @@ namespace OpenSim.Region.OptionalModules.Example.BareBonesNonShared
     /// in the simulator has its own copy).  If anybody wants to create a more complex example in the future then
     /// please create a separate class.
     ///
-    /// This module is not active by default.  If you want to see it in action,
-    /// then just uncomment the line below starting with [Extension(Path...
-    ///
     /// When the module is enabled it will print messages when it receives certain events to the screen and the log
     /// file.
     /// </remarks>
-    //[Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "BareBonesNonSharedModule")]
+    /// To actually load this module you'll need to add it to the [Modules] section of your OpenSim.ini file
+    /// and include it in the addin.xml file for this assembly.
     public class BareBonesNonSharedModule : INonSharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

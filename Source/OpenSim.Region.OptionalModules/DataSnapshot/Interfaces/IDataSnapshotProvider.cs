@@ -26,7 +26,6 @@
 *
 */
 
-using System;
 using System.Xml;
 using OpenSim.Region.Framework.Scenes;
 

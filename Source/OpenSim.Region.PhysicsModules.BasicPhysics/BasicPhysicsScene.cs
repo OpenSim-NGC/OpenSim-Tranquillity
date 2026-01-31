@@ -25,10 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using Nini.Config;
-using Mono.Addins;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
@@ -44,7 +41,6 @@ namespace OpenSim.Region.PhysicsModule.BasicPhysics
     /// Not useful for anything at the moment apart from some regression testing in other components where some form
     /// of physics plugin is needed.
     /// </remarks>
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "BasicPhysicsScene")]
     public class BasicScene : PhysicsScene, INonSharedRegionModule
     {
         private List<BasicActor> _actors = new List<BasicActor>();

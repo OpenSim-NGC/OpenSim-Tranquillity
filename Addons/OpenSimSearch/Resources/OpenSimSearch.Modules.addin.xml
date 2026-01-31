@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Addin id="OpenSimSearch" version="0.9">
+    
+    <Runtime>
+        <Import assembly="OpenSim.Region.Framework.dll" />
+    </Runtime>
+
+    <Dependencies>
+        <Addin id="OpenSim.Server.RegionServer" version="0.9" />
+    </Dependencies>
+
+    <Extension path = "/OpenSim/RegionModules">
+        <RegionModule id="OpenSimSearch" class="OpenSimSearch.Modules.OpenSearch.OpenSearchModule" />
+    </Extension>
+  
+</Addin>

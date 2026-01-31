@@ -39,11 +39,9 @@ using System.IO.Compression;
 using PrimMesher;
 using log4net;
 using Nini.Config;
-using Mono.Addins;
 
 namespace OpenSim.Region.PhysicsModule.Meshing
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "Meshmerizer")]
     public class Meshmerizer : IMesher, INonSharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

@@ -1,4 +1,6 @@
-<Addin id="OpenSim.Region.CoreModules" version="0.9.3">
+<?xml version="1.0" encoding="utf-8"?>
+
+<Addin id="OpenSim.Region.CoreModules" version="0.9">
     
     <Runtime>
         <Import assembly="OpenSim.Region.Framework.dll" />
@@ -6,15 +8,10 @@
     </Runtime>
 
     <Dependencies>
-        <Addin id="OpenSim.Server.RegionServer" version="0.9.3" />
+        <Addin id="OpenSim.Server.RegionServer" version="0.9" />
     </Dependencies>
     
-    <ExtensionPoint path = "/OpenSim/RegionModules">
-        <ExtensionNode name="RegionModule" objectType="OpenSim.Region.Framework.Interfaces.IRegionModuleBase" />
-    </ExtensionPoint>
-
-	<Extension path = "/OpenSim/RegionModules">
-    
+    <Extension path = "/OpenSim/RegionModules">
         <RegionModule id="AssetTransactionModule" class="OpenSim.Region.CoreModules.Agent.AssetTransaction.AssetTransactionModule" />
         <RegionModule id="IPBanModule" class="OpenSim.Region.CoreModules.Agent.IPBan.IPBanModule" />
         <RegionModule id="J2KDecoderModule" class="OpenSim.Region.CoreModules.Agent.TextureSender.J2KDecoderModule" />
@@ -44,7 +41,7 @@
         <RegionModule id="HGLureModule" class="OpenSim.Region.CoreModules.Avatar.Lure.HGLureModule" />
         <RegionModule id="LureModule" class="OpenSim.Region.CoreModules.Avatar.Lure.LureModule" />
         <RegionModule id="BasicProfileModule" class="OpenSim.Region.CoreModules.Avatar.Profile.BasicProfileModule" />
-        <RegionModule id="UserProfilesModule" class="OpenSim.Region.CoreModules.Avatar.UserProfiles.UserProfilesModule" />
+        <RegionModule id="UserProfilesModule" class="OpenSim.Region.CoreModules.Avatar.UserProfiles.UserProfileModule" />
         <RegionModule id="CapabilitiesModule" class="OpenSim.Region.CoreModules.Framework.CapabilitiesModule" />
         <RegionModule id="DAExampleModule" class="OpenSim.Region.CoreModules.Framework.DynamicAttributes.DAExampleModule" />
         <RegionModule id="DOExampleModule" class="OpenSim.Region.CoreModules.Framework.DynamicAttributes.DOExampleModule" />
@@ -52,7 +49,7 @@
         <RegionModule id="HGEntityTransferModule" class="OpenSim.Region.CoreModules.Framework.EntityTransfer.HGEntityTransferModule" />
         <RegionModule id="HGInventoryAccessModule" class="OpenSim.Region.CoreModules.Framework.InventoryAccess.HGInventoryAccessModule" />
         <RegionModule id="BasicInventoryAccessModule" class="OpenSim.Region.CoreModules.Framework.InventoryAccess.BasicInventoryAccessModule" />
-        <RegionModule id="LibraryModule" class="penSim.Region.CoreModules.Framework.Library.LibraryModule" />
+        <RegionModule id="LibraryModule" class="OpenSim.Region.CoreModules.Framework.Library.LibraryModule" />
         <RegionModule id="MonitorModule" class="OpenSim.Region.CoreModules.Framework.Monitoring.MonitorModule" />
         <RegionModule id="BasicSearchModule" class="OpenSim.Region.CoreModules.Framework.Search.BasicSearchModule" />
         <RegionModule id="ServiceThrottleModule" class="OpenSim.Region.CoreModules.Framework.ServiceThrottle.ServiceThrottleModule" />
@@ -88,6 +85,8 @@
         <RegionModule id="RemoteAuthorizationServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization.RemoteAuthorizationServicesConnector" />
         <RegionModule id="LocalAvatarServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar.LocalAvatarServicesConnector" />
         <RegionModule id="RemoteAvatarServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar.RemoteAvatarServicesConnector" />
+        <RegionModule id="LocalExperienceServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience.LocalExperienceServicesConnector" />
+        <RegionModule id="RemoteExperienceServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience.RemoteExperienceServicesConnector" />
         <RegionModule id="RegionGridServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid.RegionGridServicesConnector" />
         <RegionModule id="LocalGridUserServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser.LocalGridUserServicesConnector" />
         <RegionModule id="RemoteGridUserServicesConnector" class="OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser.RemoteGridUserServicesConnector" />
@@ -123,7 +122,7 @@
 	    <RegionModule id="DefaultPermissionsModule" class="OpenSim.Region.CoreModules.World.Permissions.DefaultPermissionsModule" />  
         <RegionModule id="RegionCommandsModule" class="OpenSim.Region.CoreModules.World.Objects.Commands.RegionCommandsModule" />
         <RegionModule id="RestartModule" class="OpenSim.Region.CoreModules.World.Region.RestartModule" />
-        <RegionModule id="SerialiserModule" class="penSim.Region.CoreModules.World.Serialiser.SerialiserModule" />
+        <RegionModule id="SerialiserModule" class="OpenSim.Region.CoreModules.World.Serialiser.SerialiserModule" />
         <RegionModule id="SoundModule" class="OpenSim.Region.CoreModules.World.Sound.SoundModule" />
         <RegionModule id="TerrainModule" class="OpenSim.Region.CoreModules.World.Terrain.TerrainModule" />
         <RegionModule id="VegetationModule" class="OpenSim.Region.CoreModules.World.Vegetation.VegetationModule" />
@@ -134,7 +133,11 @@
         <RegionModule id="HGWorldMapModule" class="OpenSim.Region.CoreModules.World.Land.HGWorldMapModule" />
         <RegionModule id="MapSearchModule" class="OpenSim.Region.CoreModules.World.WorldMap.MapSearchModule" />
         <RegionModule id="WorldMapModule" class="OpenSim.Region.CoreModules.World.WorldMap.WorldMapModule" />
-        
 	</Extension>
-  
+    
+	<Extension path = "/OpenSim/WindModule">    
+        <WindModel id="ConfigurableWind" class="OpenSim.Region.CoreModules.World.Wind.Plugins.ConfigurableWind" />  
+        <WindModel id="SimpleRandomWind" class="OpenSim.Region.CoreModules.World.Wind.Plugins.SimpleRandomWind" />
+    </Extension>
+
 </Addin>

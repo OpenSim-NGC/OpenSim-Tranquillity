@@ -1,22 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
-using OpenSim.Framework;
+﻿using System.Reflection;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 
 using OpenMetaverse;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
-using OpenSim.Data;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "RemoteExperienceServicesConnector")]
     public class RemoteExperienceServicesConnector : ISharedRegionModule, IExperienceService
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);

@@ -24,12 +24,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Text;
-
 using OpenSim.Framework;
 
 using OpenMetaverse;
@@ -38,7 +32,6 @@ using BulletXNA;
 using BulletXNA.LinearMath;
 using BulletXNA.BulletCollision;
 using BulletXNA.BulletDynamics;
-using BulletXNA.BulletCollision.CollisionDispatch;
 
 namespace OpenSim.Region.PhysicsModule.BulletS
 {

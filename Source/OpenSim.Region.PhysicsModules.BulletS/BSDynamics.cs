@@ -30,12 +30,7 @@
  * (http://creativecommons.org/licenses/by-sa/3.0/).
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Runtime.InteropServices;
 using OpenMetaverse;
-using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
 
 namespace OpenSim.Region.PhysicsModule.BulletS

@@ -25,15 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
 using OpenSim.Data.MySQL.MoneyData;
-using OpenSim.Region.OptionalModules.Currency;
 using log4net;
 using System.Reflection;
 using OpenMetaverse;
 using MySqlConnector;
+using OpenSim.Region.OptionalModules.World.Currency;
 
 namespace OpenSim.Server.MoneyServer
 {
