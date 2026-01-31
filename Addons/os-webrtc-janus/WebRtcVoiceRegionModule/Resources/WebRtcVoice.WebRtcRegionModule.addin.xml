@@ -10,8 +10,8 @@
         <Addin id="OpenSim.Server.RegionServer" version="0.9" />
     </Dependencies>
 
-	<Extension path = "/OpenSim/RegionModules">
+    <Extension path = "/OpenSim/RegionModules">
         <RegionModule id="WebRtcVoiceRegionModule" class="WebRtcVoice.WebRtcVoiceRegionModule" />
-	</Extension>
+    </Extension>
   
 </Addin>

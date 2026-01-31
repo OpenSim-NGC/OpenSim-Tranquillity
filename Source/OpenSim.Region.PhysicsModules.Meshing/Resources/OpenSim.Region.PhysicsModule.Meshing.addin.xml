@@ -11,9 +11,9 @@
         <Addin id="OpenSim.Server.RegionServer" version="0.9" />
     </Dependencies>
 
-	<Extension path = "/OpenSim/RegionModules">
+    <Extension path = "/OpenSim/RegionModules">
         <RegionModule id="ZeroMesher" class="OpenSim.Region.PhysicsModule.Meshing.ZeroMesher" />
         <RegionModule id="Meshmerizer" class="OpenSim.Region.PhysicsModule.Meshing.Meshmerizer" />
-	</Extension>
+    </Extension>
   
 </Addin>

@@ -10,12 +10,12 @@
         <Addin id="OpenSim.Server.RegionServer" version="0.9" />
     </Dependencies>
 
-	<Extension path = "/OpenSim/RegionModules">
+    <Extension path = "/OpenSim/RegionModules">
         <RegionModule id="GroupsModule" class="OpenSim.Groups.GroupsModule" />
         <RegionModule id="GroupsMessagingModule" class="OpenSim.Groups.GroupsMessagingModule" />
         <RegionModule id="GroupsServiceRemoteConnectorModule" class="OpenSim.Groups.GroupsServiceRemoteConnectorModule" />
         <RegionModule id="GroupsServiceLocalConnectorModule" class="OpenSim.Groups.GroupsServiceLocalConnectorModule" />
         <RegionModule id="GroupsServiceHGConnectorModule" class="OpenSim.Groups.GroupsServiceHGConnectorModule" />
-	</Extension>
+    </Extension>
   
 </Addin>

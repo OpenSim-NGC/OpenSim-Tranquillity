@@ -11,8 +11,8 @@
         <Addin id="OpenSim.Server.RegionServer" version="0.9" />
     </Dependencies>
 
-	<Extension path = "/OpenSim/RegionModules">
+    <Extension path = "/OpenSim/RegionModules">
         <RegionModule id="POSPhysicsScene" class="OpenSim.Region.PhysicsModule.POS.POSScene" />
-	</Extension>
+    </Extension>
   
 </Addin>

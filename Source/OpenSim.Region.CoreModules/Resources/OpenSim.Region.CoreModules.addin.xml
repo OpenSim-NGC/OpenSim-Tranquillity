@@ -1,3 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+
 <Addin id="OpenSim.Region.CoreModules" version="0.9">
     
     <Runtime>
@@ -9,7 +11,7 @@
         <Addin id="OpenSim.Server.RegionServer" version="0.9" />
     </Dependencies>
     
-	<Extension path = "/OpenSim/RegionModules">
+    <Extension path = "/OpenSim/RegionModules">
         <RegionModule id="AssetTransactionModule" class="OpenSim.Region.CoreModules.Agent.AssetTransaction.AssetTransactionModule" />
         <RegionModule id="IPBanModule" class="OpenSim.Region.CoreModules.Agent.IPBan.IPBanModule" />
         <RegionModule id="J2KDecoderModule" class="OpenSim.Region.CoreModules.Agent.TextureSender.J2KDecoderModule" />

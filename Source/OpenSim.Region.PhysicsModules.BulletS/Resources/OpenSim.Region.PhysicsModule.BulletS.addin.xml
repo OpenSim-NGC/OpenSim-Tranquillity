@@ -11,9 +11,9 @@
         <Addin id="OpenSim.Server.RegionServer" version="0.9" />
     </Dependencies>
 
-	<Extension path = "/OpenSim/RegionModules">
+    <Extension path = "/OpenSim/RegionModules">
         <RegionModule id="BulletSPhysicsScene" class="OpenSim.Region.PhysicsModule.BulletS.BSScene" />
-        <RegionModule id="ExtendedPhysics" class="OpenSim.Region.PhysicsModule.BulletS.ExtendedPhysics" />                               
-	</Extension>
+        <RegionModule id="ExtendedPhysics" class="OpenSim.Region.PhysicsModule.BulletS.ExtendedPhysics" />
+    </Extension>
   
 </Addin>
