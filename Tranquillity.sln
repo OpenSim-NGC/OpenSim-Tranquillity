@@ -65,7 +65,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModul
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.ubOde", "Source\OpenSim.Region.PhysicsModules.ubOde\OpenSim.Region.PhysicsModule.ubOde.csproj", "{AC52DE31-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.ubOdeMeshing", "Source\OpenSim.Region.PhysicsModules.ubOdeMeshing\OpenSim.Region.PhysicsModule.ubOdeMeshing.csproj", "{E7DA5126-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.ubODEMeshing", "Source\OpenSim.Region.PhysicsModules.ubODEMeshing\OpenSim.Region.PhysicsModules.ubODEMeshing.csproj", "{E7DA5126-0000-0000-0000-000000000000}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet", "Source\OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet\OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet.csproj", "{A1CC4ADF-0000-0000-0000-000000000000}"
 EndProject

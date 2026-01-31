@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<Addin id="OpenSim.Region.OptionalModules" version="0.9">
+<Addin id="OpenSim.Region.ClientStack.LindenCaps" version="0.9">
     
     <Runtime>
+        <Import assembly="OpenSim.Framework.dll" /> 
         <Import assembly="OpenSim.Region.Framework.dll" />
         <Import assembly="OpenSim.Region.ClientStack.LindenCaps.dll"/>
     </Runtime>

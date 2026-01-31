@@ -42,9 +42,9 @@ using SkiaSharp;
 using System.IO.Compression;
 using System.Reflection;
 
-namespace OpenSim.Region.PhysicsModule.ubODEMeshing
+namespace OpenSim.Region.PhysicsModules.ubODEMeshing
 {
-    public class ubMeshmerizer : IMesher, INonSharedRegionModule
+    public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 

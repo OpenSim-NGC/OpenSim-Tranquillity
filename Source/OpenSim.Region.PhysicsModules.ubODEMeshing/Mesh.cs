@@ -29,7 +29,7 @@ using System.Runtime.InteropServices;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.ubODEMeshing
+namespace OpenSim.Region.PhysicsModules.ubODEMeshing
 {
     public class MeshBuildingData
     {
