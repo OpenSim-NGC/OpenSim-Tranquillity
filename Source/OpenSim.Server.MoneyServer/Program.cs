@@ -1,42 +1,139 @@
 /*
- * Copyright (c) Contributors, http://opensimulator.org/
- * See CONTRIBUTORS.TXT for a full list of copyright holders.
+ * Copyright (c) 2025, Tranquillity - OpenSimulator NGC
+ * Utopia Skye LLC
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the OpenSim Project nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE DEVELOPERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * This Source Code Form is subject to the terms of the
+ * Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-using log4net.Config;
+using System.CommandLine;
 
-namespace OpenSim.Server.MoneyServer
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
+
+using Autofac.Extensions.DependencyInjection;
+using Autofac;
+
+using OpenSim.Server.Base;
+using System.CommandLine.Parsing;
+using OpenSim.Region.Framework.Scenes;
+
+namespace OpenSim.Server.MoneyServer;
+
+class Program
 {
-    class Program
+    public static IHost MoneyHost { get; private set; }
+
+    public static async Task<int> Main(string[] args)
     {
-        public static void Main(string[] args)
+        var logconfigOption = new Option<string>("--logconfig")
+            { 
+                Description = "Instruct log4net to use this file as configuration file.",
+                DefaultValueFactory = ParseResult => "OpenSim.Server.MoneyServer.dll.config",
+            };
+        var inifileOption = new Option<List<string>>("--inifile")
+            { 
+                Description = "Specify the location of zero or more .ini file(s) to read." 
+            };
+        var inimasterOption = new Option<string>("--inimaster")
+             { 
+                Description = "The path to the master ini file. The master ini file will be read first and then overridden by any .ini files specified by --inifile or --inidirectory options.",
+                DefaultValueFactory = ParseResult => "MoneyServer.ini",
+            };
+        var inidirectoryOption = new Option<string>("--inidirectory")
+            {
+                Description = "The path to folder for config ini files. The MoneyServer will read all of *.ini files " +
+                              "in this directory and override MoneyServer.ini settings",
+                DefaultValueFactory = ParseResult => "config",
+            };
+        var consoleOption = new Option<string>("--console")
+            {
+                Description = "console type, one of basic, local or rest.",
+                DefaultValueFactory = ParseResult => "local",
+            };
+        consoleOption.AcceptOnlyFromAmong("basic", "local", "rest");
+
+        RootCommand rootCommand = new RootCommand
+            {
+                logconfigOption,
+                inifileOption,
+                inimasterOption,
+                inidirectoryOption,
+                consoleOption
+            };  
+
+        ParseResult parseResult = rootCommand.Parse(args);
+        if (parseResult.Errors.Count != 0)
         {
-            XmlConfigurator.Configure();
-            MoneyServerBase app = new MoneyServerBase();
-            app.Startup();
-            app.Work();
+            foreach (ParseError parseError in parseResult.Errors)
+            {
+                Console.Error.WriteLine(parseError.Message);
+            }
+
+            return 1;
         }
+
+
+        var logConfig = parseResult.GetValue(logconfigOption);
+        var iniFile = parseResult.GetValue(inifileOption);
+        var iniMaster = parseResult.GetValue(inimasterOption);
+        var iniDirectory = parseResult.GetValue(inidirectoryOption);
+        var console = parseResult.GetValue(consoleOption);
+
+        IHostBuilder builder = Host.CreateDefaultBuilder(args);
+
+        builder.ConfigureAppConfiguration(configuration =>
+        {
+            configuration.AddIniFile(iniMaster, optional: true, reloadOnChange: true);
+            foreach (var item in iniFile)
+            {
+                configuration.AddIniFile(item, optional: true, reloadOnChange: true);
+            }
+
+            if (string.IsNullOrEmpty(iniDirectory) is false)
+            {
+                if (Directory.Exists(iniDirectory))
+                {
+                    foreach (var item in Directory.GetFiles(iniDirectory, "*.ini"))
+                    {
+                        configuration.AddIniFile(item, optional: true, reloadOnChange: true);
+                    }
+                }
+            }
+        });
+        
+        builder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
+        
+        builder.ConfigureContainer<ContainerBuilder>(registryBuilder =>
+        {
+            // The registry we're building into
+            var registry = registryBuilder.ComponentRegistryBuilder;                
+            
+            // Search the Service Runtime directory First
+            var directoryPath = AppDomain.CurrentDomain.BaseDirectory;
+            // RegisterServices.Register(registry, directoryPath, "OpenSim.*.dll");
+                
+            // Register any plugins dropped into the addons directory also
+            directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "addon-modules");
+            // RegisterServices.Register(registry, directoryPath);                
+        })
+        .ConfigureLogging(loggingBuilder =>
+        {
+            loggingBuilder.ClearProviders();
+            loggingBuilder.AddLog4Net(log4NetConfigFile: logConfig);
+            loggingBuilder.AddConsole();
+        })
+        .ConfigureServices(services =>
+        {
+            services.AddHostedService<MoneyService>();
+            // services.AddHostedService<PidFileService>();
+        });
+
+        MoneyHost = builder.Build();
+        MoneyHost.Run();
+
+        return 0;
     }
 }
