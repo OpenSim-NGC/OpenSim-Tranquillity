@@ -75,7 +75,6 @@ class Program
             return 1;
         }
 
-
         var logConfig = parseResult.GetValue(logconfigOption);
         var iniFile = parseResult.GetValue(inifileOption);
         var iniMaster = parseResult.GetValue(inimasterOption);
