@@ -16,9 +16,14 @@ using Microsoft.Extensions.Configuration;
 using Autofac.Extensions.DependencyInjection;
 using Autofac;
 
+using OpenSim.Framework.Console;
 using OpenSim.Server.Base;
 using System.CommandLine.Parsing;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using OpenSim.Framework;
+using OpenSim.Framework.Servers;
+using log4net.Config;
 
 namespace OpenSim.Server.MoneyServer;
 
@@ -50,10 +55,10 @@ class Program
             };
         var consoleOption = new Option<string>("--console")
             {
-                Description = "console type, one of basic, local or rest.",
+                Description = "console type, one of local or rest.",
                 DefaultValueFactory = ParseResult => "local",
             };
-        consoleOption.AcceptOnlyFromAmong("basic", "local", "rest");
+        consoleOption.AcceptOnlyFromAmong("basic", "local", "rest", "mock");
 
         RootCommand rootCommand = new RootCommand
             {
@@ -79,13 +84,14 @@ class Program
         var iniFile = parseResult.GetValue(inifileOption);
         var iniMaster = parseResult.GetValue(inimasterOption);
         var iniDirectory = parseResult.GetValue(inidirectoryOption);
-        var console = parseResult.GetValue(consoleOption);
+        var consoleType = parseResult.GetValue(consoleOption);
 
         IHostBuilder builder = Host.CreateDefaultBuilder(args);
 
         builder.ConfigureAppConfiguration(configuration =>
         {
             configuration.AddIniFile(iniMaster, optional: true, reloadOnChange: true);
+            
             foreach (var item in iniFile)
             {
                 configuration.AddIniFile(item, optional: true, reloadOnChange: true);
@@ -112,11 +118,35 @@ class Program
             
             // Search the Service Runtime directory First
             var directoryPath = AppDomain.CurrentDomain.BaseDirectory;
-            // RegisterServices.Register(registry, directoryPath, "OpenSim.*.dll");
+            RegisterServices.Register(registry, directoryPath, "OpenSim.*.dll");
                 
             // Register any plugins dropped into the addons directory also
             directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "addon-modules");
-            // RegisterServices.Register(registry, directoryPath);                
+            RegisterServices.Register(registry, directoryPath);
+
+            // Deal with the old fashioned config here for now.  This will go away when we're fully
+            // converted to .NET Generic Host and can use the built in configuration system everywhere
+            XmlConfigurator.Configure();
+            var moneyConfig = new MoneyServerConfigSource(iniMaster);
+            //registryBuilder.RegisterInstance(moneyConfig).AsSelf().SingleInstance();
+
+            var prompt = "MoneyServer> ";
+            ICommandConsole console = null;
+
+            if (consoleType == "basic")
+                console = new CommandConsole(prompt);
+            else if (consoleType == "rest")
+                console = new RemoteConsole(prompt);
+            else if (consoleType == "mock")
+                console = new MockConsole();
+            else if (consoleType == "local")
+                console = new LocalConsole(prompt);
+
+            registryBuilder.RegisterInstance<IServerBase>(
+                new ServerBase { Console = console, Config = moneyConfig.m_config }).AsImplementedInterfaces().SingleInstance();
+
+            registryBuilder.RegisterType<MoneyXmlRpcModule>().AsSelf().SingleInstance();
+            registryBuilder.RegisterType<MoneyDBService>().AsSelf().SingleInstance();
         })
         .ConfigureLogging(loggingBuilder =>
         {
@@ -131,7 +161,8 @@ class Program
         });
 
         MoneyHost = builder.Build();
-        MoneyHost.Run();
+        
+        await MoneyHost.RunAsync();
 
         return 0;
     }

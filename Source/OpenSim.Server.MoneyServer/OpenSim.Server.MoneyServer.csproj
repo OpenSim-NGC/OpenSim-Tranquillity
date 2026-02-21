@@ -15,22 +15,6 @@
     <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
     <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
   </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Data.Model/OpenSim.Data.Model.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Data.MySQL/OpenSim.Data.MySQL.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Data.MySQL.MoneyData/OpenSim.Data.MySQL.MoneyData.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Framework.Servers/OpenSim.Framework.Servers.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Framework.Servers.HttpServer/OpenSim.Framework.Servers.HttpServer.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Region.Framework/OpenSim.Region.Framework.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Region.OptionalModules/OpenSim.Region.OptionalModules.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Server.Handlers/OpenSim.Server.Handlers.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
-  </ItemGroup>
   
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.2.0" />
@@ -47,7 +31,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Properties/" />
+    <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.Model/OpenSim.Data.Model.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.MySQL/OpenSim.Data.MySQL.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.MySQL.MoneyData/OpenSim.Data.MySQL.MoneyData.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Servers/OpenSim.Framework.Servers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Servers.HttpServer/OpenSim.Framework.Servers.HttpServer.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.Framework/OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.OptionalModules/OpenSim.Region.OptionalModules.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Server.Handlers/OpenSim.Server.Handlers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
   </ItemGroup>
 
   <Target Name="CopyAppData" AfterTargets="Publish">

@@ -57,6 +57,8 @@ namespace OpenSim.Framework.Console
 
         public string ReadLine(string p, bool isCommand, bool e) { return ""; }
 
+        public void WriteLine(string s) { }
+
         public IScene ConsoleScene {
             get { return null; }
             set {}

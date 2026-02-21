@@ -310,7 +310,7 @@ namespace OpenSim.Server.Base
                             // If the include path contains no wildcards, then warn the user that it wasn't found.
                             if (wildcardIndex == -1 && paths.Length == 0)
                             {
-                                Console.WriteLine("[CONFIG]: Could not find include file {0}", path);
+                                Console.WriteLine($"[CONFIG]: Could not find include file {path}");
                             }
                             else
                             {
