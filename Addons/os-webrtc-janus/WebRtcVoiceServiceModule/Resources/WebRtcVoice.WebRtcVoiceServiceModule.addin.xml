@@ -11,7 +11,7 @@
     </Dependencies>
 
     <Extension path = "/OpenSim/RegionModules">
-        <RegionModule id="WebRtcVoiceServiceModule" class="WebRtcVoice.WebRtcVoiceServiceModule" />
+        <RegionModule id="WebRtcVoiceServiceModule" class="osWebRtcVoice.WebRtcVoiceServiceModule" />
     </Extension>
   
 </Addin>

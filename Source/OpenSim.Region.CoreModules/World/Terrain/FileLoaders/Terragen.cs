@@ -41,6 +41,11 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
     {
         #region ITerrainLoader Members
 
+        public int SupportedHeight
+        {
+            get { return 4096; }
+        }
+
         public ITerrainChannel LoadFile(string filename)
         {
             FileInfo file = new FileInfo(filename);
@@ -324,6 +329,11 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
             return false;
         }
 
+        public bool SupportsExtendedTileSave()
+        {
+            return false;
+        }
+
         /// <summary>
         /// terragen SCAL floats need to be written intel ordered regardless of
         /// big or little endian system
@@ -346,5 +356,9 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
             return retVal ;
         }
 
+        public void SaveFile(ITerrainChannel map, string filename, int fileWidth, int fileHeight, int startX, int startY, int stopX, int stopY, int offsetX, int offsetY)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

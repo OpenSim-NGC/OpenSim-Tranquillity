@@ -2899,5 +2899,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         {
             return m_LSL_Functions.llWorldPosToHUD(WorldPosition);
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llSetRenderMaterial(LSL_String material, LSL_Integer face)
+        {
+            m_LSL_Functions.llSetRenderMaterial(material, face);
+        }
     }
 }

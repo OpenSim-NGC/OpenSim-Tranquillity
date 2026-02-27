@@ -28,57 +28,22 @@
 using SkiaSharp;
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
+namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders;
+
+/// <summary>
+/// GIF terrain file loader using SkiaSharp.
+/// Saves and loads terrain from GIF images.
+/// Note: SkiaSharp does not support GIF encoding, so PNG is used as the fallback format.
+/// </summary>
+internal class GIF : GenericSystemDrawing
 {
-    /// <summary>
-    /// GIF terrain file loader using SkiaSharp.
-    /// Saves and loads terrain from GIF images.
-    /// Note: SkiaSharp does not support GIF encoding, so PNG is used as the fallback format.
-    /// </summary>
-    internal class GIF : GenericSystemDrawing
+    public override int SupportedHeight
     {
-        public override void SaveFile(string filename, ITerrainChannel map)
-        {
-            using(var bitmap = CreateGrayscaleBitmapFromMap(map))
-            {
-                using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
-                {
-                    using (var file = File.Create(filename))
-                    {
-                        data.SaveTo(file);
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Exports a stream using SkiaSharp PNG encoder (GIF not supported).
-        /// </summary>
-        /// <param name="stream">The target stream</param>
-        /// <param name="map">The terrain channel being saved</param>
-        public override void SaveStream(Stream stream, ITerrainChannel map)
-        {
-            using(var bitmap = CreateGrayscaleBitmapFromMap(map))
-            {
-                using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
-                {
-                    data.SaveTo(stream);
-                }
-            }
-        }
-
-        public override string ToString()
-        {
-            return "GIF";
-        }
-
-        //Returns true if this extension is supported for terrain save-tile
-        public override bool SupportsTileSave()
-        {
-            return false;
-        }
-
-        protected override void Save(SKBitmap bitmap, string filename)
+        get { return 256; }
+    }
+    public override void SaveFile(string filename, ITerrainChannel map)
+    {
+        using(var bitmap = CreateGrayscaleBitmapFromMap(map))
         {
             using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
             {
@@ -88,5 +53,37 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Exports a stream using SkiaSharp PNG encoder (GIF not supported).
+    /// </summary>
+    /// <param name="stream">The target stream</param>
+    /// <param name="map">The terrain channel being saved</param>
+    public override void SaveStream(Stream stream, ITerrainChannel map)
+    {
+        using(var bitmap = CreateGrayscaleBitmapFromMap(map))
+        {
+            using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+            {
+                data.SaveTo(stream);
+            }
+        }
+    }
+
+    public override string ToString()
+    {
+        return "GIF";
+    }
+
+    //Returns true if this extension is supported for terrain save-tile
+    public override bool SupportsTileSave()
+    {
+        return false;
+    }
+
+    public override bool SupportsExtendedTileSave()
+    {
+        return false;
     }
 }

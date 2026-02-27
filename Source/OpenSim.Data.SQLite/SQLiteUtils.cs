@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Data;
 using System.Data.SQLite;
 
@@ -103,7 +102,7 @@ namespace OpenSim.Data.SQLite
             // much less code than it used to be
             foreach (DataColumn col in dt.Columns)
             {
-                cmd.Parameters.Add(createSqliteParameter(col.ColumnName, col.DataType));
+                cmd.Parameters.Add(createSQLiteParameter(col.ColumnName, col.DataType));
             }
             return cmd;
         }
@@ -137,7 +136,7 @@ namespace OpenSim.Data.SQLite
 
             foreach (DataColumn col in dt.Columns)
             {
-                cmd.Parameters.Add(createSqliteParameter(col.ColumnName, col.DataType));
+                cmd.Parameters.Add(createSQLiteParameter(col.ColumnName, col.DataType));
             }
             return cmd;
         }
@@ -184,7 +183,7 @@ namespace OpenSim.Data.SQLite
         ///<summary>
         /// <para>
         /// This is a convenience function that collapses 5 repetitive
-        /// lines for defining SqliteParameters to 2 parameters:
+        /// lines for defining SQLiteParameters to 2 parameters:
         /// column name and database type.
         /// </para>
         ///
@@ -198,7 +197,7 @@ namespace OpenSim.Data.SQLite
         /// <param name="name"></param>
         /// <param name="type"></param>
         ///<returns>a built sqlite parameter</returns>
-        public static SQLiteParameter createSqliteParameter(string name, Type type)
+        public static SQLiteParameter createSQLiteParameter(string name, Type type)
         {
             SQLiteParameter param = new SQLiteParameter();
             param.ParameterName = ":" + name;
