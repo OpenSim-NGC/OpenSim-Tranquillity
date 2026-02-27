@@ -31,6 +31,7 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Region.PhysicsModules.SharedBase;
+using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -2299,16 +2300,18 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void SetText(string text, Vector3 color, double alpha)
         {
-            Color = (uint)(
-                ((0xff - (int)(alpha * 0xff)) << 24) |
-                (((int)(color.X * 0xff)) << 16) |
-                (((int)(color.Y * 0xff)) << 8) |
-                ((int)(color.Z * 0xff))
-            );
-            Text = text;
+            SKColor newcolor = new SKColor((byte)(color.X * 0xff),
+                                   (byte)(color.Y * 0xff),
+                                   (byte)(color.Z * 0xff),
+                                   (byte)(0xff - (int)(alpha * 0xff)));
 
-            HasGroupChanged = true;
-            m_rootPart.ScheduleFullUpdate();
+            if(Text != text || newcolor!= Color)
+            {
+                Text = text;
+                Color = ((uint)newcolor);
+                HasGroupChanged = true;
+                m_rootPart.ScheduleFullUpdate();
+            }
         }
 
         /// <summary>
@@ -3476,6 +3479,7 @@ namespace OpenSim.Region.Framework.Scenes
                 {
                     // Single prim left
                     RootPart.LinkNum = 0;
+                    RootPart.Inventory?.ForceInventoryPersistence(); // TODO remove need for this
                 }
                 else
                 {
@@ -3484,6 +3488,7 @@ namespace OpenSim.Region.Framework.Scenes
                         SceneObjectPart part = parts[i];
                         if (part.LinkNum > linkPart.LinkNum)
                             part.LinkNum--;
+                        part.Inventory?.ForceInventoryPersistence(); // TODO remove need for this
                     }
                 }
             }
@@ -3533,7 +3538,7 @@ namespace OpenSim.Region.Framework.Scenes
             if (m_rootPart.PhysActor is not null)
                 m_rootPart.PhysActor.Building = false;
 
-            linkPart.Inventory.ForceInventoryPersistence();
+            linkPart.Inventory.ForceInventoryPersistence(); // TODO remove need for this
             
             if (sendEvents)
                 linkPart.TriggerScriptChangedEvent(Changed.LINK);
@@ -4056,6 +4061,13 @@ namespace OpenSim.Region.Framework.Scenes
 //                (OpenMetaverse.PermissionMask)RootPart.OwnerMask, Name, Scene.Name);
             InvalidateEffectivePerms();
             RootPart.ScheduleFullUpdate();
+        }
+
+        public void SetPartsInventoryChanged(bool force = true)
+        {
+            SceneObjectPart[] parts = m_parts.GetArray();
+            for (int i = 0; i < parts.Length; i++)
+                parts[i].Inventory?.ForceInventoryPersistence(force);
         }
 
         public void UpdatePermissions(UUID AgentID, byte field, uint localID,

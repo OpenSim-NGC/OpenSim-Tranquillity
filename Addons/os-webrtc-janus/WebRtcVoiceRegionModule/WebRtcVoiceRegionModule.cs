@@ -1,23 +1,38 @@
-// Copyright 2024 Robert Adams (misterblue@misterblue.com)
-//
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Copyright (c) Contributors, http://opensimulator.org/
+ * See CONTRIBUTORS.TXT for a full list of copyright holders.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of the OpenSimulator Project nor the
+ *       names of its contributors may be used to endorse or promote products
+ *       derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE DEVELOPERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 using System.Net;
-using System.Text;
 using System.Reflection;
 
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 using OpenMetaverse;
@@ -26,14 +41,13 @@ using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
 using log4net;
 using Nini.Config;
-
-namespace WebRtcVoice
+namespace osWebRtcVoice
 {
     /// <summary>
     /// This module provides the WebRTC voice interface for viewer clients..
     /// 
     /// In particular, it provides the following capabilities:
-    ///      ProvisionVoiceAccountRequest, VoiceSignalingRequest, and ParcelVoiceInfoRequest.    
+    ///      ProvisionVoiceAccountRequest, VoiceSignalingRequest and limited ChatSessionRequest
     /// which are the user interface to the voice service.
     /// 
     /// Initially, when the user connects to the region, the region feature "VoiceServiceType" is
@@ -46,13 +60,11 @@ namespace WebRtcVoice
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private static readonly string logHeader = "[REGION WEBRTC VOICE]";
 
+        private static byte[] llsdUndefAnswerBytes = Util.UTF8.GetBytes("<llsd><undef /></llsd>"); 
         private bool _MessageDetails = false;
 
         // Control info
         private static bool m_Enabled = false;
-
-        private readonly Dictionary<string, string> m_UUIDName = new Dictionary<string, string>();
-        private Dictionary<string, string> m_ParcelAddress = new Dictionary<string, string>();
 
         private IConfig m_Config;
 
@@ -80,22 +92,12 @@ namespace WebRtcVoice
         // ISharedRegionModule.AddRegion
         public void AddRegion(Scene scene)
         {
-            if (m_Enabled)
-            {
-                // Get the hook that means Capbibilities are being registered
-                scene.EventManager.OnRegisterCaps += (UUID agentID, Caps caps) =>
-                    {
-                        OnRegisterCaps(scene, agentID, caps);
-                    };
-                
-            }
+            // todo register module to get parcels changes etc
         }
 
         // ISharedRegionModule.RemoveRegion
         public void RemoveRegion(Scene scene)
         {
-            var sfm = scene.RequestModuleInterface<ISimulatorFeaturesModule>();
-            sfm.OnSimulatorFeaturesRequest -= OnSimulatorFeatureRequestHandler;
         }
 
         // ISharedRegionModule.RegionLoaded
@@ -103,10 +105,13 @@ namespace WebRtcVoice
         {
             if (m_Enabled)
             {
-                // Register for the region feature reporting so we can add 'webrtc'
-                var sfm = scene.RequestModuleInterface<ISimulatorFeaturesModule>();
-                sfm.OnSimulatorFeaturesRequest += OnSimulatorFeatureRequestHandler;
-                m_log.DebugFormat("{0}: registering OnSimulatorFeatureRequestHandler", logHeader);
+                scene.EventManager.OnRegisterCaps += delegate (UUID agentID, Caps caps)
+                {
+                    OnRegisterCaps(scene, agentID, caps);
+                };
+
+                ISimulatorFeaturesModule simFeatures = scene.RequestModuleInterface<ISimulatorFeaturesModule>();
+                simFeatures?.AddFeature("VoiceServerType", OSD.FromString("webrtc"));
             }
         }
 
@@ -127,28 +132,19 @@ namespace WebRtcVoice
             get { return null; }
         }
 
-        // Called when the simulator features are being constructed.
-        // Add the flag that says we support WebRtc voice.
-        private void OnSimulatorFeatureRequestHandler(UUID agentID, ref OSDMap features)
-        {
-            m_log.DebugFormat("{0}: setting VoiceServerType=webrtc for agent {1}", logHeader, agentID);
-            features["VoiceServerType"] = "webrtc";
-        }
-
         // <summary>
         // OnRegisterCaps is invoked via the scene.EventManager
         // everytime OpenSim hands out capabilities to a client
         // (login, region crossing). We contribute three capabilities to
         // the set of capabilities handed back to the client:
-        // ProvisionVoiceAccountRequest, VoiceSignalingRequest, and ParcelVoiceInfoRequest.
+        // ProvisionVoiceAccountRequest, VoiceSignalingRequest and limited ChatSessionRequest
         //
         // ProvisionVoiceAccountRequest allows the client to obtain
         // voice communication information the the avater.
         //
         // VoiceSignalingRequest: Used for trickling ICE candidates.
         //
-        // ParcelVoiceInfoRequest is invoked whenever the client
-        // changes from one region or parcel to another.
+        // ChatSessionRequest
         //
         // Note that OnRegisterCaps is called here via a closure
         // delegate containing the scene of the respective region (see
@@ -156,9 +152,8 @@ namespace WebRtcVoice
         // </summary>
         public void OnRegisterCaps(Scene scene, UUID agentID, Caps caps)
         {
-            m_log.DebugFormat(
-                "{0}: OnRegisterCaps() called with agentID {1} caps {2} in scene {3}",
-                logHeader, agentID, caps, scene.RegionInfo.RegionName);
+            m_log.Debug(
+                $"{logHeader}: OnRegisterCaps called with agentID {agentID} caps {caps} in scene {scene.Name}");
 
             caps.RegisterSimpleHandler("ProvisionVoiceAccountRequest",
                     new SimpleStreamHandler("/" + UUID.Random(), (IOSHttpRequest httpRequest, IOSHttpResponse httpResponse) =>
@@ -172,12 +167,11 @@ namespace WebRtcVoice
                         VoiceSignalingRequest(httpRequest, httpResponse, agentID, scene);
                     }));
 
-            caps.RegisterSimpleHandler("ParcelVoiceInfoRequest",
+            caps.RegisterSimpleHandler("ChatSessionRequest",
                     new SimpleStreamHandler("/" + UUID.Random(), (IOSHttpRequest httpRequest, IOSHttpResponse httpResponse) =>
                     {
-                        ParcelVoiceInfoRequest(httpRequest, httpResponse, agentID, scene);
+                        ChatSessionRequest(httpRequest, httpResponse, agentID, scene);
                     }));
-
         }
 
         /// <summary>
@@ -192,38 +186,28 @@ namespace WebRtcVoice
         /// <returns></returns>
         public void ProvisionVoiceAccountRequest(IOSHttpRequest request, IOSHttpResponse response, UUID agentID, Scene scene)
         {
+            // Get the voice service. If it doesn't exist, return an error.
+            IWebRtcVoiceService voiceService = scene.RequestModuleInterface<IWebRtcVoiceService>();
+            if (voiceService is null)
+            {
+                m_log.Error($"{logHeader}[ProvisionVoice]: voice service not loaded");
+                response.StatusCode = (int)HttpStatusCode.NotFound;
+                return;
+            }
+
             if(request.HttpMethod != "POST")
             {
-                m_log.DebugFormat("[{0}][ProvisionVoice]: Not a POST request. Agent={1}", logHeader, agentID.ToString());
+                m_log.DebugFormat($"[{logHeader}][ProvisionVoice]: Not a POST request. Agent={agentID}");
                 response.StatusCode = (int)HttpStatusCode.NotFound;
                 return;
             }
 
             // Deserialize the request. Convert the LLSDXml to OSD for our use
-            OSDMap map = null;
-            using (Stream inputStream = request.InputStream)
-            {
-                if (inputStream.Length > 0)
-                {
-                    OSD tmp = OSDParser.DeserializeLLSDXml(inputStream);
-                    if (_MessageDetails) m_log.DebugFormat("{0}[ProvisionVoice]: Request: {1}", logHeader, tmp.ToString());
-                    map = tmp as OSDMap;
-                }
-            }
-
+            OSDMap map = BodyToMap(request, "ProvisionVoiceAccountRequest");
             if (map is null)
             {
-                m_log.ErrorFormat("{0}[ProvisionVoice]: No request data found. Agent={1}", logHeader, agentID.ToString());
+                m_log.Error($"{logHeader}[ProvisionVoice]: No request data found. Agent={agentID}");
                 response.StatusCode = (int)HttpStatusCode.NoContent;
-                return;
-            }
-
-            // Get the voice service. If it doesn't exist, return an error.
-            IWebRtcVoiceService voiceService = scene.RequestModuleInterface<IWebRtcVoiceService>();
-            if (voiceService is null)
-            {
-                m_log.ErrorFormat("{0}[ProvisionVoice]: avatar \"{1}\": no voice service", logHeader, agentID);
-                response.StatusCode = (int)HttpStatusCode.NotFound;
                 return;
             }
 
@@ -232,54 +216,129 @@ namespace WebRtcVoice
             {
                 if (vstosd is OSDString vst && !((string)vst).Equals("webrtc", StringComparison.OrdinalIgnoreCase))
                 {
-                    m_log.WarnFormat("{0}[ProvisionVoice]: voice_server_type is not 'webrtc'. Request: {1}", logHeader, map.ToString());
-                    response.RawBuffer = Util.UTF8.GetBytes("<llsd><undef /></llsd>");
+                    m_log.Warn($"{logHeader}[ProvisionVoice]: voice_server_type is not 'webrtc'. Request: {map}");
+                    response.RawBuffer = llsdUndefAnswerBytes;
+                    response.StatusCode = (int)HttpStatusCode.OK;
                     return;
+                }
+            }
+
+            if (_MessageDetails) m_log.DebugFormat($"{logHeader}[ProvisionVoice]: request: {map}");
+
+            if (map.TryGetString("channel_type", out string channelType))
+            {
+                //do fully not trust viewers voice parcel requests
+                if (channelType == "local")
+                {
+                    if (!scene.RegionInfo.EstateSettings.AllowVoice)
+                    {
+                        m_log.Debug($"{logHeader}[ProvisionVoice]:region \"{scene.Name}\": voice not enabled in estate settings");
+                        response.RawBuffer = llsdUndefAnswerBytes;
+                        response.StatusCode = (int)HttpStatusCode.NotImplemented;
+                        return;
+                    }
+                    if (scene.LandChannel == null)
+                    {
+                        m_log.Error($"{logHeader}[ProvisionVoice] region \"{scene.Name}\" land data not yet available");
+                        response.RawBuffer = llsdUndefAnswerBytes;
+                        response.StatusCode = (int)HttpStatusCode.NotImplemented;
+                        return;
+                    }
+
+                    if(!scene.TryGetScenePresence(agentID, out ScenePresence sp))
+                    {
+                        m_log.Debug($"{logHeader}[ProvisionVoice]:avatar not found");
+                        response.RawBuffer = llsdUndefAnswerBytes;
+                        response.StatusCode = (int)HttpStatusCode.NotFound;
+                        return;
+                    }
+
+                    if(map.TryGetInt("parcel_local_id", out int parcelID))
+                    {
+                        ILandObject parcel = scene.LandChannel.GetLandObject(parcelID);
+                        if (parcel == null)
+                        {
+                            response.RawBuffer = llsdUndefAnswerBytes;
+                            response.StatusCode = (int)HttpStatusCode.NotFound;
+                            return;
+                        }
+                        
+                        LandData land = parcel.LandData;
+                        if (land == null)
+                        {
+                            response.RawBuffer = llsdUndefAnswerBytes;
+                            response.StatusCode = (int)HttpStatusCode.NotFound;
+                            return;
+                        }
+
+                        if (!scene.RegionInfo.EstateSettings.TaxFree && (land.Flags & (uint)ParcelFlags.AllowVoiceChat) == 0)
+                        {
+                            m_log.Debug($"{logHeader}[ProvisionVoice]:parcel voice not allowed");
+                            response.RawBuffer = llsdUndefAnswerBytes;
+                            response.StatusCode = (int)HttpStatusCode.Forbidden;
+                            return;
+                        }
+
+                        if ((land.Flags & (uint)ParcelFlags.UseEstateVoiceChan) != 0)
+                        {
+                            map.Remove("parcel_local_id"); // estate channel
+                        }
+                        else if(parcel.IsRestrictedFromLand(agentID) || parcel.IsBannedFromLand(agentID))
+                        {
+                            // check Z distance?
+                            m_log.Debug($"{logHeader}[ProvisionVoice]:agent not allowed on parcel");
+                            response.RawBuffer = llsdUndefAnswerBytes;
+                            response.StatusCode = (int)HttpStatusCode.Forbidden;
+                            return;
+                        }
+                    }
                 }
             }
 
             // The checks passed. Send the request to the voice service.
             OSDMap resp = voiceService.ProvisionVoiceAccountRequest(map, agentID, scene.RegionInfo.RegionID).Result;
 
-            if (_MessageDetails) m_log.DebugFormat("{0}[ProvisionVoice]: response: {1}", logHeader, resp.ToString());
+            if(resp is not null)
+            {
+                if (_MessageDetails) m_log.DebugFormat($"{logHeader}[ProvisionVoice]: response: {resp}");
 
-            // TODO: check for errors and package the response
+                // TODO: check for errors and package the response
 
-            // Convert the OSD to LLSDXml for the response
-            string xmlResp = OSDParser.SerializeLLSDXmlString(resp);
-
-            response.StatusCode = (int)HttpStatusCode.OK;
-            response.RawBuffer = Util.UTF8.GetBytes(xmlResp);
+                // Convert the OSD to LLSDXml for the response
+                string xmlResp = OSDParser.SerializeLLSDXmlString(resp);
+                response.RawBuffer = Util.UTF8.GetBytes(xmlResp);
+                response.StatusCode = (int)HttpStatusCode.OK;
+            }
+            else
+            {
+                m_log.DebugFormat($"{logHeader}[ProvisionVoice]: got null response");
+                response.StatusCode = (int)HttpStatusCode.OK;
+            }
             return;
         }
 
         public void VoiceSignalingRequest(IOSHttpRequest request, IOSHttpResponse response, UUID agentID, Scene scene)
         {
+            IWebRtcVoiceService voiceService = scene.RequestModuleInterface<IWebRtcVoiceService>();
+            if (voiceService is null)
+            {
+                m_log.ErrorFormat($"{logHeader}[VoiceSignalingRequest]: avatar \"{agentID}\": no voice service");
+                response.StatusCode = (int)HttpStatusCode.NotFound;
+                return;
+            }
+
             if(request.HttpMethod != "POST")
             {
-                m_log.ErrorFormat("[{0}][VoiceSignaling]: Not a POST request. Agent={1}", logHeader, agentID.ToString());
+                m_log.Error($"[{logHeader}][VoiceSignaling]: Not a POST request. Agent={agentID}");
                 response.StatusCode = (int)HttpStatusCode.NotFound;
                 return;
             }
 
             // Deserialize the request. Convert the LLSDXml to OSD for our use
-            OSDMap map = null;
-            using (Stream inputStream = request.InputStream)
-            {
-                if (inputStream.Length > 0)
-                {
-                    OSD tmp = OSDParser.DeserializeLLSDXml(inputStream);
-                    if (_MessageDetails) m_log.DebugFormat("{0}[VoiceSignalingRequest]: Request: {1}", logHeader, tmp.ToString());
-
-                    if (tmp is OSDMap)
-                    {
-                        map = (OSDMap)tmp;
-                    }
-                }
-            }
+            OSDMap map = BodyToMap(request, "VoiceSignalingRequest");
             if (map is null)
             {
-                m_log.ErrorFormat("{0}[VoiceSignalingRequest]: No request data found. Agent={1}", logHeader, agentID.ToString());
+                m_log.ErrorFormat($"{logHeader}[VoiceSignalingRequest]: No request data found. Agent={agentID}");
                 response.StatusCode = (int)HttpStatusCode.NoContent;
                 return;
             }
@@ -289,183 +348,145 @@ namespace WebRtcVoice
             {
                 if (vstosd is OSDString vst && !((string)vst).Equals("webrtc", StringComparison.OrdinalIgnoreCase))
                 {
-                    response.RawBuffer = Util.UTF8.GetBytes("<llsd><undef /></llsd>");
+                    response.RawBuffer = llsdUndefAnswerBytes;
+                    response.StatusCode = (int)HttpStatusCode.OK;
                     return;
                 }
             }
 
-            IWebRtcVoiceService voiceService = scene.RequestModuleInterface<IWebRtcVoiceService>();
-            if (voiceService is null)
-            {
-                m_log.ErrorFormat("{0}[VoiceSignalingRequest]: avatar \"{1}\": no voice service", logHeader, agentID);
-                response.StatusCode = (int)HttpStatusCode.NotFound;
-                return;
-            }
-
             OSDMap resp = voiceService.VoiceSignalingRequest(map, agentID, scene.RegionInfo.RegionID).Result;
-            if (_MessageDetails) m_log.DebugFormat("{0}[VoiceSignalingRequest]: Response: {1}", logHeader, resp);
+
+            if (_MessageDetails) m_log.Debug($"{logHeader}[VoiceSignalingRequest]: Response: {resp}");
 
             // TODO: check for errors and package the response
 
+            response.RawBuffer = llsdUndefAnswerBytes;
             response.StatusCode = (int)HttpStatusCode.OK;
-            response.RawBuffer = Util.UTF8.GetBytes("<llsd><undef /></llsd>");
             return;
         }
 
-        // NOTE NOTE!! This is code from the FreeSwitch module. It is not clear if this is correct for WebRtc.
         /// <summary>
-        /// Callback for a client request for ParcelVoiceInfo
+        /// Callback for a client request for ChatSessionRequest.
+        /// The viewer sends this request when the user tries to start a P2P text or voice session
+        /// with another user. We need to generate a new session ID and return it to the client.
         /// </summary>
-        /// <param name="scene">current scene object of the client</param>
         /// <param name="request"></param>
-        /// <param name="path"></param>
-        /// <param name="param"></param>
+        /// <param name="response"></param>
         /// <param name="agentID"></param>
-        /// <param name="caps"></param>
-        /// <returns></returns>
-        public void ParcelVoiceInfoRequest(IOSHttpRequest request, IOSHttpResponse response, UUID agentID, Scene scene)
+        /// <param name="scene"></param>
+        public void ChatSessionRequest(IOSHttpRequest request, IOSHttpResponse response, UUID agentID, Scene scene)
         {
+            m_log.DebugFormat("{0}: ChatSessionRequest received for agent {1} in scene {2}", logHeader, agentID, scene.RegionInfo.RegionName);
             if (request.HttpMethod != "POST")
             {
                 response.StatusCode = (int)HttpStatusCode.NotFound;
                 return;
             }
 
-            response.StatusCode = (int)HttpStatusCode.OK;
-
-            m_log.DebugFormat(
-                "{0}[PARCELVOICE]: ParcelVoiceInfoRequest() on {1} for {2}",
-                logHeader, scene.RegionInfo.RegionName, agentID);
-
-            ScenePresence avatar = scene.GetScenePresence(agentID);
-            if(avatar == null)
+            if (!scene.TryGetScenePresence(agentID, out ScenePresence sp) || sp.IsDeleted)
             {
-                response.RawBuffer = Util.UTF8.GetBytes("<llsd>undef</llsd>");
+                m_log.Warn($"{logHeader} ChatSessionRequest: scene presence not found or deleted for agent {agentID}");
+                response.StatusCode = (int)HttpStatusCode.NotFound;
                 return;
             }
 
-            string avatarName = avatar.Name;
+            OSDMap reqmap = BodyToMap(request, "[ChatSessionRequest]");
+            if (reqmap is null)
+            {
+                m_log.Warn($"{logHeader} ChatSessionRequest: message body not parsable in request for agent {agentID}");
+                response.StatusCode = (int)HttpStatusCode.NoContent;
+                return;
+            }
 
-            // - check whether we have a region channel in our cache
-            // - if not:
-            //       create it and cache it
-            // - send it to the client
-            // - send channel_uri: as "sip:regionID@m_sipDomain"
+            m_log.Debug($"{logHeader} ChatSessionRequest");
+
+            if (!reqmap.TryGetString("method", out string method))
+            {
+                m_log.Warn($"{logHeader} ChatSessionRequest: missing required 'method' field in request for agent {agentID}");
+                response.StatusCode = (int)HttpStatusCode.NotFound;
+                return;
+            }
+
+            if (!reqmap.TryGetUUID("session-id", out UUID sessionID))
+            {
+                m_log.Warn($"{logHeader} ChatSessionRequest: missing required 'session-id' field in request for agent {agentID}");
+                response.StatusCode = (int)HttpStatusCode.NotFound;
+                return;
+            }
+
+            switch (method.ToLower())
+            {
+                // Several different method requests that we don't know how to handle.
+                // Just return OK for now.
+                case "decline p2p voice":
+                case "decline invitation":
+                case "start conference":
+                case "fetch history":
+                    response.StatusCode = (int)HttpStatusCode.OK;
+                    break;
+                // Asking to start a P2P voice session. We need to generate a new session ID and return
+                //     it to the client in a ChatterBoxSessionStartReply event.
+                case "start p2p voice":
+                    UUID newSessionID;
+                    if (reqmap.TryGetUUID("params", out UUID otherID))
+                        newSessionID = new(otherID.ulonga ^ agentID.ulonga, otherID.ulongb ^ agentID.ulongb);
+                    else
+                        newSessionID = UUID.Random();
+
+                    IEventQueue queue = scene.RequestModuleInterface<IEventQueue>();
+                    if (queue is null)
+                    {
+                        m_log.ErrorFormat("{0}: no event queue for scene {1}", logHeader, scene.RegionInfo.RegionName);
+                        response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                    }
+                    else
+                    {
+                        queue.ChatterBoxSessionStartReply(
+                                newSessionID,
+                                sp.Name,
+                                2,
+                                false,
+                                true,
+                                sessionID,
+                                true,
+                                string.Empty,
+                                agentID);
+
+                        response.StatusCode = (int)HttpStatusCode.OK;
+                    }
+                    break;
+                default:
+                    response.StatusCode = (int)HttpStatusCode.BadRequest;
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Convert the LLSDXml body of the request to an OSDMap for easier handling.
+        /// Also logs the request if message details is enabled.
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="pCaller"></param>
+        /// <returns>'null' if the request body is empty or cannot be deserialized</returns>
+        private OSDMap BodyToMap(IOSHttpRequest request, string pCaller)
+        {
             try
             {
-                string channelUri;
-
-                if (null == scene.LandChannel)
+                using Stream inputStream = request.InputStream;
+                if (inputStream.Length > 0)
                 {
-                    m_log.ErrorFormat("region \"{0}\": avatar \"{1}\": land data not yet available",
-                                                      scene.RegionInfo.RegionName, avatarName);
-                    response.RawBuffer = Util.UTF8.GetBytes("<llsd>undef</llsd>");
-                    return;
+                    OSD tmp = OSDParser.DeserializeLLSDXml(inputStream);
+                    if (_MessageDetails)
+                        m_log.Debug($"{pCaller} BodyToMap: Request: {tmp}");
+                    if(tmp is OSDMap map)
+                        return map;
                 }
-
-                // get channel_uri: check first whether estate
-                // settings allow voice, then whether parcel allows
-                // voice, if all do retrieve or obtain the parcel
-                // voice channel
-                LandData land = scene.GetLandData(avatar.AbsolutePosition);
-
-                // TODO: EstateSettings don't seem to get propagated...
-                 if (!scene.RegionInfo.EstateSettings.AllowVoice)
-                 {
-                     m_log.DebugFormat("{0}[PARCELVOICE]: region \"{1}\": voice not enabled in estate settings",
-                                       logHeader, scene.RegionInfo.RegionName);
-                    channelUri = String.Empty;
-                }
-                else
-
-                if (!scene.RegionInfo.EstateSettings.TaxFree && (land.Flags & (uint)ParcelFlags.AllowVoiceChat) == 0)
-                {
-                    channelUri = String.Empty;
-                }
-                else
-                {
-                    channelUri = ChannelUri(scene, land);
-                }
-
-                // fast foward encode
-                osUTF8 lsl = LLSDxmlEncode2.Start(512);
-                LLSDxmlEncode2.AddMap(lsl);
-                LLSDxmlEncode2.AddElem("parcel_local_id", land.LocalID, lsl);
-                LLSDxmlEncode2.AddElem("region_name", scene.Name, lsl);
-                LLSDxmlEncode2.AddMap("voice_credentials", lsl);
-                LLSDxmlEncode2.AddElem("channel_uri", channelUri, lsl);
-                //LLSDxmlEncode2.AddElem("channel_credentials", channel_credentials, lsl);
-                LLSDxmlEncode2.AddEndMap(lsl);
-                LLSDxmlEncode2.AddEndMap(lsl);
-
-                response.RawBuffer= LLSDxmlEncode2.EndToBytes(lsl);
             }
-            catch (Exception e)
+            catch
             {
-                m_log.ErrorFormat("{0}[PARCELVOICE]: region \"{1}\": avatar \"{2}\": {3}, retry later",
-                                  logHeader, scene.RegionInfo.RegionName, avatarName, e.Message);
-                m_log.DebugFormat("{0}[PARCELVOICE]: region \"{1}\": avatar \"{2}\": {3} failed",
-                                  logHeader, scene.RegionInfo.RegionName, avatarName, e.ToString());
-
-                response.RawBuffer = Util.UTF8.GetBytes("<llsd>undef</llsd>");
+                m_log.Debug($"{pCaller} BodyToMap: Fail to decode LLSDXml request");
             }
+            return null;
         }
-
-        // NOTE NOTE!! This is code from the FreeSwitch module. It is not clear if this is correct for WebRtc.
-        // Not sure what this Uri is for. Is this FreeSwitch specific?
-        // TODO: is this useful for WebRtc?
-        private string ChannelUri(Scene scene, LandData land)
-        {
-            string channelUri = null;
-
-            string landUUID;
-            string landName;
-
-            // Create parcel voice channel. If no parcel exists, then the voice channel ID is the same
-            // as the directory ID. Otherwise, it reflects the parcel's ID.
-
-            lock (m_ParcelAddress)
-            {
-                if (m_ParcelAddress.ContainsKey(land.GlobalID.ToString()))
-                {
-                    m_log.DebugFormat("{0}: parcel id {1}: using sip address {2}",
-                                      logHeader, land.GlobalID, m_ParcelAddress[land.GlobalID.ToString()]);
-                    return m_ParcelAddress[land.GlobalID.ToString()];
-                }
-            }
-
-            if (land.LocalID != 1 && (land.Flags & (uint)ParcelFlags.UseEstateVoiceChan) == 0)
-            {
-                landName = String.Format("{0}:{1}", scene.RegionInfo.RegionName, land.Name);
-                landUUID = land.GlobalID.ToString();
-                m_log.DebugFormat("{0}: Region:Parcel \"{1}\": parcel id {2}: using channel name {3}",
-                                  logHeader, landName, land.LocalID, landUUID);
-            }
-            else
-            {
-                landName = String.Format("{0}:{1}", scene.RegionInfo.RegionName, scene.RegionInfo.RegionName);
-                landUUID = scene.RegionInfo.RegionID.ToString();
-                m_log.DebugFormat("{0}: Region:Parcel \"{1}\": parcel id {2}: using channel name {3}",
-                                  logHeader, landName, land.LocalID, landUUID);
-            }
-
-            // slvoice handles the sip address differently if it begins with confctl, hiding it from the user in
-            // the friends list. however it also disables the personal speech indicators as well unless some
-            // siren14-3d codec magic happens. we dont have siren143d so we'll settle for the personal speech indicator.
-            channelUri = String.Format("sip:conf-{0}@{1}",
-                     "x" + Convert.ToBase64String(Encoding.ASCII.GetBytes(landUUID)),
-                     /*m_freeSwitchRealm*/ "webRTC");
-
-            lock (m_ParcelAddress)
-            {
-                if (!m_ParcelAddress.ContainsKey(land.GlobalID.ToString()))
-                {
-                    m_ParcelAddress.Add(land.GlobalID.ToString(),channelUri);
-                }
-            }
-
-            return channelUri;
-        }
-
     }
 }

@@ -1,14 +1,29 @@
-// Copyright 2024 Robert Adams (misterblue@misterblue.com)
-//
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Copyright (c) Contributors, http://opensimulator.org/
+ * See CONTRIBUTORS.TXT for a full list of copyright holders.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of the OpenSimulator Project nor the
+ *       names of its contributors may be used to endorse or promote products
+ *       derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE DEVELOPERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 using System;
 using System.Reflection;
@@ -18,7 +33,7 @@ using OpenMetaverse;
 
 using log4net;
 
-namespace WebRtcVoice
+namespace osWebRtcVoice
 {
 
     /// <summary>
@@ -54,15 +69,15 @@ namespace WebRtcVoice
         public OSDMap RawBody => m_message;
 
         public string TransactionId { 
-            get { return m_message.ContainsKey("transaction") ? m_message["transaction"] : null; }
+            get { return m_message.TryGetString("transaction", out string tid) ? tid : null;  }
             set { m_message["transaction"] = value; }
         }
         public string Sender { 
-            get { return m_message.ContainsKey("sender") ? m_message["sender"] : null; }
+            get { return m_message.TryGetString("sender", out string tid) ? tid : null;  }
             set { m_message["sender"] = value; }
         }
         public OSDMap Jsep { 
-            get { return m_message.ContainsKey("jsep") ? (m_message["jsep"] as OSDMap) : null; }
+            get { return m_message.TryGetOSDMap("jsep", out OSDMap jsep) ? jsep : null; }
             set { m_message["jsep"] = value; }
         }
         public void SetJsep(string pOffer, string pSdp)
@@ -80,7 +95,7 @@ namespace WebRtcVoice
         }
         // Note that the session_id is a long number in the JSON so we convert the string.
         public string sessionId { 
-            get { return m_message.ContainsKey("session_id") ? OSDToLong(m_message["session_id"]).ToString() : String.Empty; }
+            get { return m_message.TryGetValue("session_id", out OSD tmposd) ? OSDToLong(tmposd).ToString() : string.Empty; }
             set { m_message["session_id"] = long.Parse(value); }
         }
         public bool hasSessionId { get { return m_message.ContainsKey("session_id"); } }
@@ -97,8 +112,9 @@ namespace WebRtcVoice
         {
             m_message["handle_id"] = long.Parse(pToken);
         }
-        public string sender {
-            get { return m_message.ContainsKey("sender") ? m_message["sender"] : String.Empty; }
+        public string sender
+        {
+            get { return m_message.TryGetString("sender", out string str) ? str : string.Empty; }
         }
 
         public virtual string ToJson()
@@ -118,7 +134,7 @@ namespace WebRtcVoice
         //    and one fetches it with .AsInteger(), it will return the first 4 bytes as an integer
         //    and not the long value. So this function looks at the type of the OSD object and
         //    extracts the number appropriately.
-        public long OSDToLong(OSD pIn)
+        public static long OSDToLong(OSD pIn)
         {
             long ret = 0;
             switch (pIn.Type)
@@ -194,7 +210,7 @@ namespace WebRtcVoice
         }
 
         // Return the "data" portion of the response as an OSDMap or null if there is none
-        public OSDMap dataSection { get { return m_message.ContainsKey("data") ? (m_message["data"] as OSDMap) : null; } }
+        public OSDMap dataSection { get { return m_message.TryGetOSDMap("data", out OSDMap osdm) ? osdm : null; } }
 
         // Check if a successful response code is in the response
         public virtual bool isSuccess { get { return CheckReturnCode("success"); } }

@@ -1717,10 +1717,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             else
                 scale.Clamp(World.m_minNonphys, World.m_maxNonphys);
 
-            Vector3 tmp = part.Scale;
-            part.Scale = scale;
-            if(scale.NotEqual(tmp))
+            if(scale.NotEqual(part.Scale))
             {
+                part.Scale = scale;
                 part.ParentGroup.HasGroupChanged = true;
                 part.SendFullUpdateToAllClients();
             }
@@ -3257,11 +3256,15 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         // this is actually wrong. according to SL wiki, this function should not support negative indexes.
         public LSL_String llInsertString(string dest, int index, string src)
         {
+            if(string.IsNullOrEmpty(src))
+                return dest;
+
             // Normalize indices (if negative).
             // After normalization they may still be
             // negative, but that is now relative to
             // the start, rather than the end, of the
             // sequence.
+
             char c;
             if (index < 0)
             {
@@ -3269,7 +3272,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
                 // Negative now means it is less than the lower
                 // bound of the string.
-                if(index > 0)
+                if(index >= 0 && index < dest.Length)
                 {
                     c = dest[index];
                     if (c >= 0xDC00 && c <= 0xDFFF)
@@ -3282,7 +3285,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 }
 
             }
-            else
+            else if(index < dest.Length)
             {
                 c = dest[index];
                 if (c >= 0xDC00 && c <= 0xDFFF)
@@ -13023,25 +13026,24 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         private static LSL_List ParseString2List(string src, LSL_List separators, LSL_List spacers, bool keepNulls)
         {
-            int          srclen    = src.Length;
-            int          seplen    = separators.Length;
+            if(string.IsNullOrEmpty(src) || separators == null || spacers == null)
+                return new LSL_List();
+
             object[]     separray  = separators.Data;
-            int          spclen    = spacers.Length;
             object[]     spcarray  = spacers.Data;
-            int          dellen    = 0;
-            string[]     delarray  = new string[seplen+spclen];
+            string[]     delarray  = new string[separators.Length + spacers.Length];
 
-            int          outlen    = 0;
-            string[]     outarray  = new string[srclen*2+1];
+            string[]     outarray  = new string[2 * src.Length + 1];
 
-            int          i, j;
             string       d;
 
             /*
              * Convert separator and spacer lists to C# strings.
              * Also filter out null strings so we don't hang.
              */
-            for (i = 0; i < seplen; i ++)
+            int dellen = 0;
+            int outlen = 0;
+            for (int i = 0; i < separators.Length; i ++)
             {
                 d = separray[i].ToString();
                 if (d.Length > 0)
@@ -13049,9 +13051,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     delarray[dellen++] = d;
                 }
             }
-            seplen = dellen;
+            int seplen = dellen;
 
-            for (i = 0; i < spclen; i ++)
+            for (int i = 0; i < spacers.Length; i ++)
             {
                 d = spcarray[i].ToString();
                 if (d.Length > 0)
@@ -13063,16 +13065,15 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             /*
              * Scan through source string from beginning to end.
              */
-            for (i = 0;;)
+            for (int i = 0;;)
             {
-
                 /*
                  * Find earliest delimeter in src starting at i (if any).
                  */
                 int    earliestDel = -1;
-                int    earliestSrc = srclen;
+                int    earliestSrc = src.Length;
                 string earliestStr = null;
-                for (j = 0; j < dellen; j ++)
+                for (int j = 0; j < dellen; j++)
                 {
                     d = delarray[j];
                     if (d != null)
@@ -13123,7 +13124,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
              * Make up an exact-sized output array suitable for an LSL_List object.
              */
             object[] outlist = new object[outlen];
-            for (i = 0; i < outlen; i ++)
+            for (int i = 0; i < outlen; i ++)
             {
                 outlist[i] = new LSL_String(outarray[i]);
             }
@@ -21323,6 +21324,123 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     return re.id.IsZero() ? 0 : 1;
             }
             return 0;
+        }
+
+        public void llSetRenderMaterial(LSL_String materialstr, LSL_Integer lsl_face)
+        {
+            if(m_materialsModule is null)
+                return;
+
+            if(string.IsNullOrEmpty(materialstr.m_string))
+            { 
+                Error("llSetRenderMaterial", "material \"\" not found");
+                return;
+            }
+
+            int face = lsl_face.value;
+            bool changed;
+
+            if(UUID.ZeroString.Equals(materialstr.m_string, StringComparison.OrdinalIgnoreCase))
+            {
+                if(m_host.Shape.RenderMaterials is null || m_host.Shape.RenderMaterials.entries is null || m_host.Shape.RenderMaterials.entries.Length == 0)
+                    return;
+
+                changed = m_materialsModule.CleanMaterialOverrides(ref m_host.Shape.RenderMaterials.overrides, face);
+                if(face == ScriptBaseClass.ALL_SIDES)
+                {
+                    m_host.Shape.RenderMaterials.entries = null;
+                    changed = true;
+                }
+                else
+                    changed |= m_materialsModule.RemoveMaterialEntry(ref m_host.Shape.RenderMaterials.entries, face);
+
+                if(changed)
+                { 
+                    m_host.ParentGroup.HasGroupChanged = true;
+                    m_host.ScheduleUpdate(PrimUpdateFlags.MaterialOvr | PrimUpdateFlags.FullUpdate);
+                    m_host.TriggerScriptChangedEvent(Changed.MATERIAL);
+                }
+                return;
+            }
+
+            UUID matID = ScriptUtils.GetAssetIdFromItemName(m_host, materialstr.m_string, (int)AssetType.Material);
+            if (matID.IsZero())
+            {
+                if (!UUID.TryParse(materialstr.m_string, out matID) || matID.IsZero())
+                { 
+                    Error("llSetRenderMaterial", $"material \"{materialstr.m_string}\" not found");
+                    return;
+                }
+            }
+
+            int nsides = GetNumberOfSides(m_host);
+            if(face >= nsides)
+                return;
+
+            m_host.Shape.RenderMaterials ??= new();
+            m_host.Shape.RenderMaterials.entries ??= new Primitive.RenderMaterials.RenderMaterialEntry[1];
+
+            changed = m_materialsModule.CleanMaterialOverrides(ref m_host.Shape.RenderMaterials.overrides, face);
+            if(face == ScriptBaseClass.ALL_SIDES)
+            {
+                if(m_host.Shape.RenderMaterials.entries is null || m_host.Shape.RenderMaterials.entries.Length != nsides)
+                {
+                    m_host.Shape.RenderMaterials.entries = new Primitive.RenderMaterials.RenderMaterialEntry[nsides];
+                    for (int i = 0; i < m_host.Shape.RenderMaterials.entries.Length; i++)
+                    {
+                        m_host.Shape.RenderMaterials.entries[i] = new()
+                        {
+                            te_index = (byte)i,
+                            id = matID
+                        };
+                    }
+                    changed = true;
+                }
+                else
+                {
+                    for (int i = 0; i < m_host.Shape.RenderMaterials.entries.Length; i++)
+                    {
+                        if(matID.NotEqual(m_host.Shape.RenderMaterials.entries[i].id))
+                        { 
+                            changed = true;
+                            m_host.Shape.RenderMaterials.entries[i].id = matID;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                int indx = 0;
+                for( ; indx < m_host.Shape.RenderMaterials.entries.Length; indx++)
+                {
+                    if (m_host.Shape.RenderMaterials.entries[indx].te_index == face)
+                    {
+                        if(matID.NotEqual(m_host.Shape.RenderMaterials.entries[indx].id))
+                        { 
+                            changed = true;
+                            m_host.Shape.RenderMaterials.entries[indx].id = matID;
+                        }
+                        break;
+                    }
+                }
+                if(indx == m_host.Shape.RenderMaterials.entries.Length)
+                {
+                    Array.Resize(ref m_host.Shape.RenderMaterials.entries, m_host.Shape.RenderMaterials.entries.Length + 1);
+
+                    m_host.Shape.RenderMaterials.entries[indx] = new()
+                    {
+                        te_index = (byte)face,
+                        id = matID
+                    };
+                    changed = true;
+                }
+            }
+            if(changed)
+            { 
+                m_host.ParentGroup.HasGroupChanged = true;
+                m_host.ScheduleUpdate(PrimUpdateFlags.MaterialOvr | PrimUpdateFlags.FullUpdate);
+                m_host.TriggerScriptChangedEvent(Changed.MATERIAL);
+            }
         }
 
         public LSL_Vector llWorldPosToHUD(LSL_Vector wp)

@@ -341,7 +341,7 @@ namespace OpenSim.Framework
                     output = output[..MaxRequestDiagLength] + "...";
             }
 
-            m_log.DebugFormat($"[LOGHTTP]: {context}{Util.BinaryToASCII(output)}");
+            m_log.Debug($"[LOGHTTP]: {context} {Util.BinaryToASCII(output)}");
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

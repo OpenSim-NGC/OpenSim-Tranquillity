@@ -124,7 +124,7 @@ namespace OpenSim.Data.SQLite
 
                 SQLiteCommand shapeSelectCmd = new SQLiteCommand(shapeSelect, m_conn);
                 shapeDa = new SQLiteDataAdapter(shapeSelectCmd);
-                // SqliteCommandBuilder shapeCb = new SqliteCommandBuilder(shapeDa);
+                // SQLiteCommandBuilder shapeCb = new SQLiteCommandBuilder(shapeDa);
 
                 SQLiteCommand itemsSelectCmd = new SQLiteCommand(itemsSelect, m_conn);
                 itemsDa = new SQLiteDataAdapter(itemsSelectCmd);
@@ -2618,7 +2618,7 @@ namespace OpenSim.Data.SQLite
             // much less code than it used to be
             foreach (DataColumn col in dt.Columns)
             {
-                cmd.Parameters.Add(createSqliteParameter(col.ColumnName, col.DataType));
+                cmd.Parameters.Add(createSQLiteParameter(col.ColumnName, col.DataType));
             }
             return cmd;
         }
@@ -2653,7 +2653,7 @@ namespace OpenSim.Data.SQLite
 
             foreach (DataColumn col in dt.Columns)
             {
-                cmd.Parameters.Add(createSqliteParameter(col.ColumnName, col.DataType));
+                cmd.Parameters.Add(createSQLiteParameter(col.ColumnName, col.DataType));
             }
             return cmd;
         }
@@ -2687,7 +2687,7 @@ namespace OpenSim.Data.SQLite
 
             foreach (DataColumn col in dt.Columns)
             {
-                cmd.Parameters.Add(createSqliteParameter(col.ColumnName, col.DataType));
+                cmd.Parameters.Add(createSQLiteParameter(col.ColumnName, col.DataType));
             }
             return cmd;
         }
@@ -2730,7 +2730,7 @@ namespace OpenSim.Data.SQLite
 
         ///<summary>
         /// This is a convenience function that collapses 5 repetitive
-        /// lines for defining SqliteParameters to 2 parameters:
+        /// lines for defining SQLiteParameters to 2 parameters:
         /// column name and database type.
         ///
         /// It assumes certain conventions like :param as the param
@@ -2739,7 +2739,7 @@ namespace OpenSim.Data.SQLite
         /// for us.
         ///</summary>
         ///<returns>a built sqlite parameter</returns>
-        private static SQLiteParameter createSqliteParameter(string name, Type type)
+        private static SQLiteParameter createSQLiteParameter(string name, Type type)
         {
             SQLiteParameter param = new SQLiteParameter();
             param.ParameterName = ":" + name;
@@ -2763,7 +2763,7 @@ namespace OpenSim.Data.SQLite
             da.UpdateCommand.Connection = conn;
 
             SQLiteCommand delete = new SQLiteCommand("delete from prims where UUID = :UUID");
-            delete.Parameters.Add(createSqliteParameter("UUID", typeof(String)));
+            delete.Parameters.Add(createSQLiteParameter("UUID", typeof(String)));
             delete.Connection = conn;
             da.DeleteCommand = delete;
         }
@@ -2782,7 +2782,7 @@ namespace OpenSim.Data.SQLite
             da.UpdateCommand.Connection = conn;
 
             SQLiteCommand delete = new SQLiteCommand("delete from primitems where itemID = :itemID");
-            delete.Parameters.Add(createSqliteParameter("itemID", typeof(String)));
+            delete.Parameters.Add(createSQLiteParameter("itemID", typeof(String)));
             delete.Connection = conn;
             da.DeleteCommand = delete;
         }
@@ -2812,7 +2812,7 @@ namespace OpenSim.Data.SQLite
             da.UpdateCommand.Connection = conn;
 
             SQLiteCommand delete = new SQLiteCommand("delete from land where UUID=:UUID");
-            delete.Parameters.Add(createSqliteParameter("UUID", typeof(String)));
+            delete.Parameters.Add(createSQLiteParameter("UUID", typeof(String)));
             da.DeleteCommand = delete;
             da.DeleteCommand.Connection = conn;
         }
@@ -2831,8 +2831,8 @@ namespace OpenSim.Data.SQLite
             da.UpdateCommand.Connection = conn;
 
             SQLiteCommand delete = new SQLiteCommand("delete from landaccesslist where LandUUID= :LandUUID and AccessUUID= :AccessUUID");
-            delete.Parameters.Add(createSqliteParameter("LandUUID", typeof(String)));
-            delete.Parameters.Add(createSqliteParameter("AccessUUID", typeof(String)));
+            delete.Parameters.Add(createSQLiteParameter("LandUUID", typeof(String)));
+            delete.Parameters.Add(createSQLiteParameter("AccessUUID", typeof(String)));
             da.DeleteCommand = delete;
             da.DeleteCommand.Connection = conn;
         }
@@ -2866,7 +2866,7 @@ namespace OpenSim.Data.SQLite
             da.UpdateCommand.Connection = conn;
 
             SQLiteCommand delete = new SQLiteCommand("delete from regionenvironment where region_id= :region_id");
-            delete.Parameters.Add(createSqliteParameter("region_id", typeof(String)));
+            delete.Parameters.Add(createSQLiteParameter("region_id", typeof(String)));
             da.DeleteCommand = delete;
             da.DeleteCommand.Connection = conn;
         }
@@ -2893,7 +2893,7 @@ namespace OpenSim.Data.SQLite
             da.UpdateCommand.Connection = conn;
 
             SQLiteCommand delete = new SQLiteCommand("delete from primshapes where UUID = :UUID");
-            delete.Parameters.Add(createSqliteParameter("UUID", typeof(String)));
+            delete.Parameters.Add(createSQLiteParameter("UUID", typeof(String)));
             delete.Connection = conn;
             da.DeleteCommand = delete;
         }

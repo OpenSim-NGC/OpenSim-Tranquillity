@@ -33,7 +33,6 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using System.Data.SQLite;
 
-
 namespace OpenSim.Data.SQLite
 {
     public class SQLiteAgentPreferencesData : SQLiteGenericTableHandler<AgentPreferencesData>, IAgentPreferencesData

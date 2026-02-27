@@ -36,6 +36,11 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
     /// </summary>
     internal class PNG : GenericSystemDrawing
     {
+        public override int SupportedHeight
+        {
+            get { return 256; }
+        }
+
         public override void SaveFile(string filename, ITerrainChannel map)
         {
             using(var bitmap = CreateGrayscaleBitmapFromMap(map))
@@ -75,6 +80,11 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
         public override bool SupportsTileSave()
         {
             return true;
+        }
+
+        public override bool SupportsExtendedTileSave()
+        {
+            return false;
         }
     }
 }

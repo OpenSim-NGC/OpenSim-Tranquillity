@@ -253,6 +253,11 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
         {
             get { return ".raw"; }
         }
+        public int SupportedHeight
+        {
+            get { return 4096; }
+        }
+
 
         public virtual void SaveFile(ITerrainChannel m_channel, string filename,
                              int offsetX, int offsetY,
@@ -273,6 +278,16 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
         public bool SupportsTileSave()
         {
             return false;
+        }
+
+        public bool SupportsExtendedTileSave()
+        {
+            return false;
+        }
+
+        public void SaveFile(ITerrainChannel map, string filename, int fileWidth, int fileHeight, int startX, int startY, int stopX, int stopY, int offsetX, int offsetY)
+        {
+            throw new NotImplementedException();
         }
     }
 }

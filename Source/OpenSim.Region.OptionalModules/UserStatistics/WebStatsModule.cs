@@ -92,7 +92,7 @@ namespace OpenSim.Region.UserStatistics
 
             //IConfig startupConfig = config.Configs["Startup"];
 
-            dbConn = new SQLiteConnection("URI=file:LocalUserStatistics.db,version=3");
+            dbConn = new SQLiteConnection("URI=file:LocalUserStatistics.db");
             dbConn.Open();
             CreateTables(dbConn);
 
@@ -680,7 +680,7 @@ namespace OpenSim.Region.UserStatistics
                     updatecmd.Parameters.Add(new SQLiteParameter(":f_send_packet", uid.session_data.f_send_packet));
 
 //                        StringBuilder parameters = new StringBuilder();
-//                        SqliteParameterCollection spc = updatecmd.Parameters;
+//                        SQLiteParameterCollection spc = updatecmd.Parameters;
 //                        foreach (SQLiteParameter sp in spc)
 //                            parameters.AppendFormat("{0}={1},", sp.ParameterName, sp.Value);
 //

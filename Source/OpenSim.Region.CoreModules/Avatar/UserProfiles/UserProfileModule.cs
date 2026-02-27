@@ -57,7 +57,9 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
         readonly Dictionary<UUID, UUID> m_classifiedCache = new();
         readonly Dictionary<UUID, int> m_classifiedInterest = new();
         readonly ExpiringCacheOS<UUID, UserProfileCacheEntry> m_profilesCache = new(60000);
+
         IGroupsModule m_groupsModule = null;
+        IUserManagement m_userManagementModule = null;
 
         private readonly JsonRpcRequestManager rpc = new();
         private bool m_allowUserProfileWebURLs = true;
@@ -224,16 +226,6 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             set;
         }
 
-        IProfileModule ProfileModule
-        {
-            get; set;
-        }
-
-        IUserManagement UserManagementModule
-        {
-            get; set;
-        }
-
         /// <summary>
         /// Gets or sets a value indicating whether this
         /// <see cref="OpenSim.Region.Coremodules.UserProfiles.UserProfileModule"/> is enabled.
@@ -311,10 +303,6 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             Scene = scene;
             m_thisGridInfo ??= scene.SceneGridInfo;
             Scene.RegisterModuleInterface<IProfileModule>(this);
-            Scene.EventManager.OnNewClient += OnNewClient;
-            Scene.EventManager.OnClientClosed += OnClientClosed;
-
-            UserManagementModule = Scene.RequestModuleInterface<IUserManagement>();
         }
 
         /// <summary>
@@ -346,7 +334,19 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
         {
             if(!Enabled)
                 return;
+
             m_groupsModule = Scene.RequestModuleInterface<IGroupsModule>();
+
+            m_userManagementModule = Scene.RequestModuleInterface<IUserManagement>();
+            if(m_userManagementModule is null)
+            {
+                 m_log.Error("[UserProfileModule]: UserManagementModule not loaded. Profiles Disabled");
+                Enabled = false;
+                return;
+            }
+
+            Scene.EventManager.OnNewClient += OnNewClient;
+            Scene.EventManager.OnClientClosed += OnClientClosed;
         }
 
         /// <summary>
@@ -422,7 +422,9 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
 
         void OnClientClosed(UUID AgentId, Scene scene)
         {
-            ScenePresence sp = scene.GetScenePresence(AgentId);
+            if(!scene.TryGetScenePresence(AgentId, out ScenePresence sp))
+                return;
+
             IClientAPI client = sp.ControllingClient;
             if (client is null)
                 return;
@@ -1212,9 +1214,9 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
 
             UserProfilePick pick = null;
             Dictionary<UUID, string> curpicks = GetPicks(creatorID);
-            if(!curpicks.ContainsKey(pickID))
+            if(curpicks is not null && !curpicks.ContainsKey(pickID))
             { 
-                if(curpicks is not null && curpicks.Count >= Constants.MaxProfilePicks)
+                if(curpicks.Count >= Constants.MaxProfilePicks)
                 {
                     remoteClient.SendAvatarPicksReply(remoteClient.AgentId, curpicks);
                     return;
@@ -1641,12 +1643,18 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
 
             if (Monitor.TryEnter(m_asyncRequestsLock))
             {
+                try
+                {
                 if (!m_asyncRequestsRunning)
                 {
                     m_asyncRequestsRunning = true;
                     Util.FireAndForget(x => ProcessRequests());
                 }
+                }
+                finally
+                {
                 Monitor.Exit(m_asyncRequestsLock);
+            }
             }
 
             /*
@@ -1870,7 +1878,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
         bool GetUserAccountData(UUID userID, out UserAccount account)
         {
             account = null;
-            if (UserManagementModule.IsLocalGridUser(userID))
+            if (m_userManagementModule.IsLocalGridUser(userID))
             {
                 // Is local
                 IUserAccountService uas = Scene.UserAccountService;
@@ -1880,7 +1888,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             else
             {
                 // Is Foreign
-                string home_url = UserManagementModule.GetUserServerURL(userID, "HomeURI", out bool recentFailedWeb);
+                string home_url = m_userManagementModule.GetUserServerURL(userID, "HomeURI", out bool recentFailedWeb);
                 if (recentFailedWeb || string.IsNullOrEmpty(home_url))
                     return false;
 
@@ -1894,7 +1902,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
                 catch (Exception e)
                 {
                     m_log.Debug("[PROFILES]: GetUserInfo call failed ", e);
-                    UserManagementModule.UserWebFailed(userID);
+                    m_userManagementModule.UserWebFailed(userID);
                     return false;
                 }
 
@@ -1927,9 +1935,9 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
         /// </param>
         bool GetUserProfileServerURI(UUID userID, out string serverURI)
         {
-            if (!UserManagementModule.IsLocalGridUser(userID))
+            if (!m_userManagementModule.IsLocalGridUser(userID))
             {
-                serverURI = UserManagementModule.GetUserServerURL(userID, "ProfileServerURI", out bool failed);
+                serverURI = m_userManagementModule.GetUserServerURL(userID, "ProfileServerURI", out bool failed);
                 if(failed)
                     serverURI = string.Empty;
                 // Is Foreign
@@ -1948,7 +1956,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             if(imageID.IsZero())
                 return;
 
-            string assetServerURI = UserManagementModule.GetUserServerURL(agent, "AssetServerURI");
+            string assetServerURI = m_userManagementModule.GetUserServerURL(agent, "AssetServerURI");
             if(string.IsNullOrWhiteSpace(assetServerURI))
                 return;
 
@@ -1986,7 +1994,7 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
 
             if(client.SceneAgent is ScenePresence sp && sp.IsViewerUIGod)
             {
-                Services.Interfaces.PresenceInfo[] pi = Scene.PresenceService?.GetAgents(new string[] { agent.ToString() });
+                Services.Interfaces.PresenceInfo[] pi = Scene.PresenceService?.GetAgents([agent.ToString()]);
                 return pi is not null && pi.Length > 0;
             }
 
