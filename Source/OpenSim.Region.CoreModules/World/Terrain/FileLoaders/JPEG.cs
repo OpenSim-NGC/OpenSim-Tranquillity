@@ -30,7 +30,7 @@ using OpenSim.Region.Framework.Interfaces;
 
 namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
 {
-    public class JPEG : ITerrainLoader
+    public class JPEG : GenericSystemDrawing, ITerrainLoader
     {
         #region ITerrainLoader Members
 

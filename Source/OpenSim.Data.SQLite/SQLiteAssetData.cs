@@ -81,7 +81,7 @@ namespace OpenSim.Data.SQLite
 
             if (dbconnect.Length == 0)
             {
-                dbconnect = "URI=file:Asset.db,version=3";
+                dbconnect = "URI=file:Asset.db";
             }
             m_conn = new SQLiteConnection(dbconnect);
             m_conn.Open();
@@ -355,7 +355,7 @@ namespace OpenSim.Data.SQLite
         /// </summary>
         override public void Initialise()
         {
-            Initialise("URI=file:Asset.db,version=3");
+            Initialise("URI=file:Asset.db");
         }
 
         /// <summary>
