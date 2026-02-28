@@ -9,6 +9,7 @@
   </PropertyGroup>
   
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
     <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
     <Reference Include="OpenMetaverse.StructuredData" HintPath="../../Library/OpenMetaverse.StructuredData.dll" />

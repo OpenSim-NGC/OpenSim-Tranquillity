@@ -38,6 +38,8 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Net.Security;
 using System.Net;
+using OpenSim.Server.MoneyServer.Controllers;
+using OpenSim.Server.MoneyServer.Models;
 
 /// <summary>
 /// OpenSim Server MoneyServer
@@ -63,16 +65,12 @@ public class MoneyService : IMoneyServiceCore, IHostedService
     protected BaseHttpServer m_httpServer;
     public BaseHttpServer HttpServer => m_httpServer;
 
-    private readonly Dictionary<string, string> m_sessionDic = new Dictionary<string, string>();
-    public Dictionary<string, string> SessionDic => m_sessionDic;
-    
-    private readonly Dictionary<string, string> m_secureSessionDic = new Dictionary<string, string>();
-    public Dictionary<string, string> SecureSessionDic => m_secureSessionDic;       
+    private readonly MoneySessionStore m_sessionStore;
+    public Dictionary<string, string> SessionDic => m_sessionStore.SessionDic;
+    public Dictionary<string, string> SecureSessionDic => m_sessionStore.SecureSessionDic;
+    public Dictionary<string, string> WebSessionDic => m_sessionStore.WebSessionDic;
 
-    private readonly Dictionary<string, string> m_webSessionDic = new Dictionary<string, string>();
-    public Dictionary<string, string> WebSessionDic => m_webSessionDic;
-
-    private readonly MoneyXmlRpcModule m_moneyXmlRpcModule;
+    private readonly MoneyXmlRpcController m_moneyXmlRpcController;
     private readonly MoneyDBService m_moneyDBService;
 
     private readonly IServiceProvider _serviceProvider;
@@ -84,13 +82,15 @@ public class MoneyService : IMoneyServiceCore, IHostedService
         IServiceProvider serviceProvider,
         IConfiguration configuration,
         ILogger<MoneyService> logger,
-        IServerBase serverBase
+        IServerBase serverBase,
+        MoneySessionStore sessionStore
         )
     {
         _serviceProvider = serviceProvider;
         _configuration = configuration;
         _logger = logger;
         _serverBase = serverBase;
+        m_sessionStore = sessionStore ?? throw new ArgumentNullException(nameof(sessionStore));
 
         // Deal with the old fashioned config here for now.  This will go away when we're fully converted.
         MainConsole.Instance = serverBase.Console;
@@ -141,9 +141,8 @@ public class MoneyService : IMoneyServiceCore, IHostedService
         m_moneyDBService = _serviceProvider.GetRequiredService<MoneyDBService>();
         m_moneyDBService.Initialise();
 
-        m_moneyXmlRpcModule = _serviceProvider.GetRequiredService<MoneyXmlRpcModule>();
-        m_moneyXmlRpcModule.Initialise(m_moneyDBService, this);
-        m_moneyXmlRpcModule.PostInitialise();
+        m_moneyXmlRpcController = _serviceProvider.GetRequiredService<MoneyXmlRpcController>();
+        m_moneyXmlRpcController.RegisterLegacyHandlers(m_httpServer);
     }
 
     public Task StartAsync(CancellationToken stoppingToken)

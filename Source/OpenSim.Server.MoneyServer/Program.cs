@@ -24,6 +24,9 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using log4net.Config;
+using Microsoft.AspNetCore.Hosting;
+using OpenSim.Server.MoneyServer.Models;
+using Microsoft.AspNetCore.Builder;
 
 namespace OpenSim.Server.MoneyServer;
 
@@ -145,8 +148,7 @@ class Program
             registryBuilder.RegisterInstance<IServerBase>(
                 new ServerBase { Console = console, Config = moneyConfig.m_config }).AsImplementedInterfaces().SingleInstance();
 
-            registryBuilder.RegisterType<MoneyXmlRpcModule>().AsSelf().SingleInstance();
-            registryBuilder.RegisterType<MoneyDBService>().AsSelf().SingleInstance();
+            registryBuilder.RegisterType<MoneyDBService>().As<IMoneyDBService>().AsSelf().SingleInstance();
         })
         .ConfigureLogging(loggingBuilder =>
         {
@@ -156,8 +158,36 @@ class Program
         })
         .ConfigureServices(services =>
         {
-            services.AddHostedService<MoneyService>();
+            services.AddControllers().AddControllersAsServices();
+            services.AddSingleton<MoneySessionStore>();
+
+            services.AddSingleton<MoneyService>();
+            services.AddSingleton<IMoneyServiceCore>(sp => sp.GetRequiredService<MoneyService>());
+            services.AddHostedService(sp => sp.GetRequiredService<MoneyService>());
             // services.AddHostedService<PidFileService>();
+        });
+
+        builder.ConfigureWebHostDefaults(webBuilder =>
+        {
+            webBuilder.ConfigureServices((context, services) =>
+            {
+                string urls = context.Configuration.GetValue<string>("MoneyServer:AspNetUrls", string.Empty);
+                if (!string.IsNullOrWhiteSpace(urls))
+                {
+                    webBuilder.UseSetting(WebHostDefaults.ServerUrlsKey, urls);
+                }
+                else
+                {
+                    int port = context.Configuration.GetValue<int>("MoneyServer:AspNetPort", 8009);
+                    webBuilder.UseUrls($"http://*:{port}");
+                }
+            });
+
+            webBuilder.Configure(app =>
+            {
+                app.UseRouting();
+                app.UseEndpoints(endpoints => endpoints.MapControllers());
+            });
         });
 
         MoneyHost = builder.Build();
