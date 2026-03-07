@@ -296,7 +296,7 @@ namespace osWebRtcVoice
             }
 
             // The checks passed. Send the request to the voice service.
-            OSDMap resp = voiceService.ProvisionVoiceAccountRequest(map, agentID, scene.RegionInfo.RegionID).Result;
+            OSDMap resp = voiceService.ProvisionVoiceAccountRequest(map, agentID, scene.RegionInfo.RegionID);
 
             if(resp is not null)
             {
@@ -354,7 +354,7 @@ namespace osWebRtcVoice
                 }
             }
 
-            OSDMap resp = voiceService.VoiceSignalingRequest(map, agentID, scene.RegionInfo.RegionID).Result;
+            OSDMap resp = voiceService.VoiceSignalingRequest(map, agentID, scene.RegionInfo.RegionID);
 
             if (_MessageDetails) m_log.Debug($"{logHeader}[VoiceSignalingRequest]: Response: {resp}");
 
