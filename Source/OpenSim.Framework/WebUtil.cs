@@ -37,6 +37,7 @@ using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Web;
 using System.Xml;
 using System.Xml.Serialization;
@@ -426,7 +427,8 @@ namespace OpenSim.Framework
                 responseMessage = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
                 responseMessage.EnsureSuccessStatusCode();
 
-                Stream resStream = responseMessage.Content.ReadAsStream();
+                using CancellationTokenSource cts = new(30000);
+                Stream resStream = responseMessage.Content.ReadAsStream(cts.Token);
                 if (resStream is not null)
                 {
                     using StreamReader reader = new(resStream);
@@ -591,7 +593,8 @@ namespace OpenSim.Framework
                 responseMessage = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
                 responseMessage.EnsureSuccessStatusCode();
 
-                using StreamReader reader = new(responseMessage.Content.ReadAsStream());
+                using CancellationTokenSource cts = new(30000);
+                using StreamReader reader = new(responseMessage.Content.ReadAsStream(cts.Token));
                 string responseStr = reader.ReadToEnd();
                 rcvlen = responseStr.Length;
                 if (DebugLevel >= 5)
@@ -1161,7 +1164,7 @@ namespace OpenSim.Framework
                 auth?.AddAuthorization(request.Headers);
 
                 request.Headers.ExpectContinue = false;
-                request.Headers.TransferEncodingChunked = false; if (timeoutsecs > 0)
+                request.Headers.TransferEncodingChunked = false;
 
                 if (keepalive)
                 {
@@ -1192,7 +1195,8 @@ namespace OpenSim.Framework
 
                 if ((responseMessage.Content.Headers.ContentLength is long contentLength) && contentLength != 0)
                 {
-                    using StreamReader reader = new(responseMessage.Content.ReadAsStream());
+                    using CancellationTokenSource cts = new(30000);
+                    using StreamReader reader = new(responseMessage.Content.ReadAsStream(cts.Token));
                     respstring = reader.ReadToEnd();
                     rcvlen = respstring.Length;
                 }
@@ -1277,7 +1281,8 @@ namespace OpenSim.Framework
 
                 if ((responseMessage.Content.Headers.ContentLength is long contentLength) && contentLength != 0)
                 {
-                    using StreamReader reader = new(responseMessage.Content.ReadAsStream());
+                    using CancellationTokenSource cts = new(30000);
+                    using StreamReader reader = new(responseMessage.Content.ReadAsStream(cts.Token));
                     respstring = reader.ReadToEnd();
                 }
             }
@@ -1420,7 +1425,7 @@ namespace OpenSim.Framework
                     request.Content.Headers.TryAddWithoutValidation("Content-Length", sendlen.ToString());
                 }
 
-                responseMessage = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
+                responseMessage = client.Send(request, HttpCompletionOption.ResponseContentRead);
                 responseMessage.EnsureSuccessStatusCode();
 
                 int rcvlen = 0;
@@ -1514,7 +1519,7 @@ namespace OpenSim.Framework
                 //else
                 //    request.Headers.TryAddWithoutValidation("Connection", "close");
 
-                responseMessage = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
+                responseMessage = client.Send(request, HttpCompletionOption.ResponseContentRead);
                 responseMessage.EnsureSuccessStatusCode();
 
                 int rcvlen = 0;
