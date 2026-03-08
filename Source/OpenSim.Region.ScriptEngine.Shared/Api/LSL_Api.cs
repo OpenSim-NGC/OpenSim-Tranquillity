@@ -18557,7 +18557,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                                             new DetectParams[0]));
                     return;
                 }
-                else if (experiencePermission == ExperiencePermission.Allowed)
+                else if (experiencePermission == ExperiencePermission.Blocked)
                 {
                     m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
                             "experience_permissions_denied", new Object[] {
