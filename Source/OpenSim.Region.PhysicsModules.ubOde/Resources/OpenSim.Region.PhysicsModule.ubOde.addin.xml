@@ -5,6 +5,7 @@
     <Runtime>
         <Import assembly="OpenSim.Region.Framework.dll" />
         <Import assembly="OpenSim.Region.PhysicsModule.ubOde.dll" />
+        <Import assembly="OpenSim.Region.PhysicsModules.ubODEMeshing.dll" />
     </Runtime>
 
     <Dependencies>
@@ -12,7 +13,7 @@
     </Dependencies>
 
     <Extension path = "/OpenSim/RegionModules">
-        <RegionModule id="ubODEPhysicsScene" class="OpenSim.Region.PhysicsModule.ubOde.ubOdeModule" />                             
+        <RegionModule id="ubODEPhysicsScene" class="OpenSim.Region.PhysicsModule.ubOde.ubOdeModule" /> 
     </Extension>
   
 </Addin>
