@@ -1037,6 +1037,14 @@
     ;# {Enabled} {} {Enable the YEngine scripting engine?} {true false} true
     ; Enabled = true
 
+    ; Emit state-load failure metrics (Phase 1.5 telemetry).
+    ; When enabled, YEngine tracks restore/reset failure reasons in counters.
+    ; StateLoadMetricsEnabled = true
+
+    ; Emit state-load failure metric snapshots during maintenance cycles.
+    ; This logs only when totals change.
+    ; StateLoadMetricsPeriodic = true
+
     ;; llSetTimerEvent minimum value. Default 0.5s, 0.05s whould be more resonable
     ; MinTimerInterval = 0.5
 

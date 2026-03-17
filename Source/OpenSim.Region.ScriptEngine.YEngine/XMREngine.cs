@@ -90,6 +90,9 @@ namespace OpenSim.Region.ScriptEngine.Yengine
 
         private int m_MaintenanceInterval = 10;
         private System.Timers.Timer m_MaintenanceTimer;
+        private bool m_StateLoadMetricsEnabled = true;
+        private bool m_StateLoadMetricsPeriodic = true;
+        private long m_LastReportedStateLoadFailureTotal;
         public int numThreadScriptWorkers;
 
         private object m_FrameUpdateLock = new();
@@ -207,9 +210,14 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             m_ScriptDebug = m_Config.GetBoolean("ScriptDebug", false);
             m_ScriptDebugSaveSource = m_Config.GetBoolean("ScriptDebugSaveSource", false);
             m_ScriptDebugSaveIL = m_Config.GetBoolean("ScriptDebugSaveIL", false);
+            m_StateLoadMetricsEnabled = m_Config.GetBoolean("StateLoadMetricsEnabled", true);
+            m_StateLoadMetricsPeriodic = m_Config.GetBoolean("StateLoadMetricsPeriodic", true);
 
             m_StackSize = m_Config.GetInt("ScriptStackSize", 2048) << 10;
             m_HeapSize = m_Config.GetInt("ScriptHeapSize", 1024) << 10;
+
+            m_log.InfoFormat("[YEngine]: state load metrics enabled={0}, periodic={1}",
+                m_StateLoadMetricsEnabled, m_StateLoadMetricsPeriodic);
 
             // Verify that our ScriptEventCode's match OpenSim's scriptEvent's.
             bool err = false;
@@ -796,6 +804,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
                     m_log.Info("[YEngine]: yeng cvv - show compiler version value");
                     //m_log.Info("[YEngine]: yeng mvv [<newvalue>] - show migration version value");
                     m_log.Info("[YEngine]: yeng mvv - show migration version value");
+                    m_log.Info("[YEngine]: yeng stateload [show|reset] - show/reset state-load failure metrics");
                     m_log.Info("[YEngine]: yeng tracecalls [yes | no]");
                     m_log.Info("[YEngine]: yeng verbose [yes | no]");
                     //m_log.Info("[YEngine]: yeng pev [-help ...] - post event");
@@ -808,6 +817,14 @@ namespace OpenSim.Region.ScriptEngine.Yengine
                 case "mvv":
                     m_log.InfoFormat("[YEngine]: migration version value = {0}", XMRInstance.migrationVersion);
                     break;
+
+                case "stateload":
+                {
+                    bool resetAfterRead = (args.Length > firstPerRegionarg) &&
+                        args[firstPerRegionarg].Equals("reset", StringComparison.InvariantCultureIgnoreCase);
+                    ReportStateLoadMetrics(resetAfterRead);
+                    break;
+                }
 
                 //case "pev":
                 //    XmrTestPev(args, 2);
@@ -1909,6 +1926,31 @@ namespace OpenSim.Region.ScriptEngine.Yengine
                     continue;
                 ins.GetExecutionState(new XmlDocument());
             }
+
+            if(m_StateLoadMetricsEnabled && m_StateLoadMetricsPeriodic)
+            {
+                long total = XMRInstance.GetStateLoadFailureTotalCount();
+                if(total != m_LastReportedStateLoadFailureTotal)
+                {
+                    m_LastReportedStateLoadFailureTotal = total;
+                    ReportStateLoadMetrics(false);
+                }
+            }
+        }
+
+        private void ReportStateLoadMetrics(bool resetAfterRead)
+        {
+            if(!m_StateLoadMetricsEnabled)
+            {
+                m_log.Info("[YEngine]: state load metrics disabled by config");
+                return;
+            }
+
+            string report = XMRInstance.GetStateLoadFailureMetricsReport(resetAfterRead);
+            m_log.InfoFormat("[YEngine]: state-load-failure-metrics {0}", report);
+
+            if(resetAfterRead)
+                m_LastReportedStateLoadFailureTotal = XMRInstance.GetStateLoadFailureTotalCount();
         }
 
         /**

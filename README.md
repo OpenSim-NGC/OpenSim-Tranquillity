@@ -15,7 +15,12 @@ and runtime to execute compiled binaries.
 
 # Compiling Tranquillity
 
-Please see BUILDING.md
+For build instructions, see Docs/BUILDING.md.
+
+# Testing
+
+For testing workflows (including YEngine state-load telemetry configuration and commands),
+see Docs/TESTING.txt.
 
 # Running Tranquillity on Windows
 
