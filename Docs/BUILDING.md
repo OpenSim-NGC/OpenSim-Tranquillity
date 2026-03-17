@@ -25,6 +25,9 @@ The output from the publish will be in build/<Configuration>/net8.0/<platform>/
 
 Where Configuration is either Debug or Release and Platform is either linux-x64 or win-x64 as shown above.
 
+For testing workflows (including YEngine state-load telemetry configuration and commands),
+see Docs/TESTING.txt.
+
 Either configuration will do a NuGet restore (dotnet restore) to restore any required NuGet package references prior to
 kicking off a build using a current version of msbuild.  The Csproj and SLN files are all designed to use the new
 format for Msbuild which is simplified and really directly replaces what prebuild provided.

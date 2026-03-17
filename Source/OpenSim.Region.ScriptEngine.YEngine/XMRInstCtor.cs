@@ -383,18 +383,19 @@ namespace OpenSim.Region.ScriptEngine.Yengine
                     doc.LoadXml(xml);
                     LoadScriptState(doc);
                 }
-                catch
+                catch(ScriptStateLoadException ssle)
                 {
-                    File.Delete(m_StateFileName);
-
-                    eventCode = ScriptEventCode.None;  // not processing any event
-
-                    // default state_entry() must initialize global variables
-                    glblVars.AllocVarArrays(m_ObjCode.glblSizes); // reset globals
-                    doGblInit = true;
-                    stateCode = 0;
-
-                    PostEvent(EventParams.StateEntryParams);
+                    RecordStateLoadFailure(ssle.Reason);
+                    m_log.WarnFormat("[YEngine]: unable to restore state for {0} ({1}) from {2}: {3}",
+                        m_ItemID, ssle.Reason, m_StateFileName, ssle.Message);
+                    ResetToDefaultStateAfterLoadFailure();
+                }
+                catch(Exception e)
+                {
+                    RecordStateLoadFailure(ScriptStateLoadFailureReason.Unknown);
+                    m_log.WarnFormat("[YEngine]: unable to restore state for {0} ({1}) from {2}: {3}",
+                        m_ItemID, ScriptStateLoadFailureReason.Unknown, m_StateFileName, e.Message);
+                    ResetToDefaultStateAfterLoadFailure();
                 }
             }
 
@@ -431,10 +432,108 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             }
         }
 
+        private void ResetToDefaultStateAfterLoadFailure()
+        {
+            try
+            {
+                File.Delete(m_StateFileName);
+            }
+            catch(Exception e)
+            {
+                m_log.WarnFormat("[YEngine]: unable to delete bad state file {0}: {1}", m_StateFileName, e.Message);
+            }
+
+            eventCode = ScriptEventCode.None;  // not processing any event
+
+            // default state_entry() must initialize global variables
+            glblVars.AllocVarArrays(m_ObjCode.glblSizes); // reset globals
+            doGblInit = true;
+            stateCode = 0;
+
+            PostEvent(EventParams.StateEntryParams);
+        }
+
         private static EventParams changedEvent_CR = new EventParams("changed", new object[] { CHANGED_REGION }, zeroDetectParams);
         private static EventParams changedEvent_CT = new EventParams("changed", new object[] { CHANGED_TELEPORT }, zeroDetectParams);
         private static EventParams changedEvent_CRT = new EventParams("changed", new object[] { CHANGED_REGION | CHANGED_TELEPORT }, zeroDetectParams);
         private static EventParams changedEvent_CRS = new EventParams("changed", new object[] { CHANGED_REGION_START }, zeroDetectParams);
+
+        private enum ScriptStateLoadFailureReason
+        {
+            Unknown,
+            MissingScriptStateTag,
+            MissingEngineAttribute,
+            AssetMismatch,
+            SourceHashMismatch,
+            MigrationVersionMismatch,
+            MissingPluginsNode,
+            MissingSnapshotNode,
+            MissingPermissionsNode,
+            ParseError
+        }
+
+        private sealed class ScriptStateLoadException : Exception
+        {
+            public ScriptStateLoadFailureReason Reason { get; private set; }
+
+            public ScriptStateLoadException(ScriptStateLoadFailureReason reason, string message)
+                : base(message)
+            {
+                Reason = reason;
+            }
+
+            public ScriptStateLoadException(ScriptStateLoadFailureReason reason, string message, Exception innerException)
+                : base(message, innerException)
+            {
+                Reason = reason;
+            }
+        }
+
+        private static readonly object s_StateLoadFailureMetricsLock = new object();
+        private static readonly Dictionary<ScriptStateLoadFailureReason, long> s_StateLoadFailureCounts =
+            new Dictionary<ScriptStateLoadFailureReason, long>();
+        private static long s_StateLoadFailureTotal;
+
+        private static void RecordStateLoadFailure(ScriptStateLoadFailureReason reason)
+        {
+            lock(s_StateLoadFailureMetricsLock)
+            {
+                s_StateLoadFailureTotal++;
+                if(!s_StateLoadFailureCounts.TryGetValue(reason, out long count))
+                    count = 0;
+                s_StateLoadFailureCounts[reason] = count + 1;
+            }
+        }
+
+        internal static long GetStateLoadFailureTotalCount()
+        {
+            lock(s_StateLoadFailureMetricsLock)
+                return s_StateLoadFailureTotal;
+        }
+
+        internal static string GetStateLoadFailureMetricsReport(bool resetAfterRead)
+        {
+            StringBuilder sb = new StringBuilder(256);
+            lock(s_StateLoadFailureMetricsLock)
+            {
+                sb.Append("total=").Append(s_StateLoadFailureTotal);
+
+                foreach(ScriptStateLoadFailureReason reason in Enum.GetValues(typeof(ScriptStateLoadFailureReason)))
+                {
+                    if(!s_StateLoadFailureCounts.TryGetValue(reason, out long count) || count <= 0)
+                        continue;
+
+                    sb.Append(' ').Append(reason).Append('=').Append(count);
+                }
+
+                if(resetAfterRead)
+                {
+                    s_StateLoadFailureTotal = 0;
+                    s_StateLoadFailureCounts.Clear();
+                }
+            }
+            return sb.ToString();
+        }
 
         /**
          * @brief Save compilation error messages for later retrieval
@@ -473,11 +572,14 @@ namespace OpenSim.Region.ScriptEngine.Yengine
          */
         private void LoadScriptState(XmlDocument doc)
         {
+            try
+            {
 
             // Everything we know is enclosed in <ScriptState>...</ScriptState>
             XmlElement scriptStateN = (XmlElement)doc.SelectSingleNode("ScriptState");
             if(scriptStateN == null)
-                throw new Exception("no <ScriptState> tag");
+                throw new ScriptStateLoadException(ScriptStateLoadFailureReason.MissingScriptStateTag,
+                    "no <ScriptState> tag");
 
             XmlElement XvariablesN = null;
             string sen = scriptStateN.GetAttribute("Engine");
@@ -485,22 +587,27 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             {
                 XvariablesN = (XmlElement)scriptStateN.SelectSingleNode("Variables");
                 if(XvariablesN == null)
-                    throw new Exception("<ScriptState> missing Engine=\"YEngine\" attribute");
+                    throw new ScriptStateLoadException(ScriptStateLoadFailureReason.MissingEngineAttribute,
+                        "<ScriptState> missing Engine=\"YEngine\" attribute");
                 processXstate(doc);
                 return;
             }
+
+            ValidateStateMetadata(scriptStateN);
 
             // AssetID is unique for the script source text so make sure the
             // state file was written for that source file
             string assetID = scriptStateN.GetAttribute("Asset");
             if(assetID != m_Item.AssetID.ToString())
-                throw new Exception("<ScriptState> assetID mismatch");
+                throw new ScriptStateLoadException(ScriptStateLoadFailureReason.AssetMismatch,
+                    "<ScriptState> assetID mismatch");
 
             // Also match the sourceHash in case script was
             // loaded via 'xmroption fetchsource' and has changed
             string sourceHash = scriptStateN.GetAttribute("SourceHash");
             if((sourceHash == null) || (sourceHash != m_ObjCode.sourceHash))
-                throw new Exception("<ScriptState> SourceHash mismatch");
+                throw new ScriptStateLoadException(ScriptStateLoadFailureReason.SourceHashMismatch,
+                    "<ScriptState> SourceHash mismatch");
 
             // Get various attributes
             XmlElement runningN = (XmlElement)scriptStateN.SelectSingleNode("Running");
@@ -531,10 +638,20 @@ namespace OpenSim.Region.ScriptEngine.Yengine
 
             // Restore timers and listeners
             XmlElement pluginN = (XmlElement)scriptStateN.SelectSingleNode("Plugins");
+            if(pluginN == null)
+            {
+                throw new ScriptStateLoadException(ScriptStateLoadFailureReason.MissingPluginsNode,
+                    "<ScriptState> missing <Plugins> node");
+            }
             Object[] pluginData = ExtractXMLObjectArray(pluginN, "plugin");
 
             // Script's global variables and stack contents
             XmlElement snapshotN = (XmlElement)scriptStateN.SelectSingleNode("Snapshot");
+            if(snapshotN == null)
+            {
+                throw new ScriptStateLoadException(ScriptStateLoadFailureReason.MissingSnapshotNode,
+                    "<ScriptState> missing <Snapshot> node");
+            }
 
             Byte[] data = Convert.FromBase64String(snapshotN.InnerText);
             using(MemoryStream ms = new MemoryStream())
@@ -556,6 +673,11 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             //    m_StackLeft = int.Parse(stkN.InnerText);
 
             XmlElement permissionsN = (XmlElement)scriptStateN.SelectSingleNode("Permissions");
+            if(permissionsN == null)
+            {
+                throw new ScriptStateLoadException(ScriptStateLoadFailureReason.MissingPermissionsNode,
+                    "<ScriptState> missing <Permissions> node");
+            }
             m_Item.PermsGranter = new UUID(permissionsN.GetAttribute("granter"));
             m_Item.PermsMask = Convert.ToInt32(permissionsN.GetAttribute("mask"));
             m_Part.Inventory.UpdateInventoryItem(m_Item, false, false);
@@ -584,6 +706,62 @@ namespace OpenSim.Region.ScriptEngine.Yengine
                     pluginData);
 
             MinEventDelay = minEventDelay;
+            }
+            catch(ScriptStateLoadException)
+            {
+                throw;
+            }
+            catch(Exception e)
+            {
+                throw new ScriptStateLoadException(ScriptStateLoadFailureReason.ParseError,
+                    "state parse/restore failed", e);
+            }
+        }
+
+        private void ValidateStateMetadata(XmlElement scriptStateN)
+        {
+            string schemaVersion = scriptStateN.GetAttribute("StateSchemaVersion");
+            if(!string.IsNullOrEmpty(schemaVersion))
+            {
+                if(int.TryParse(schemaVersion, out int stateSchema) && stateSchema != stateSchemaVersion)
+                {
+                    m_log.WarnFormat("[YEngine]: state schema version mismatch for {0}: saved={1}, current={2}",
+                        m_ItemID, stateSchema, stateSchemaVersion);
+                }
+                else if(!int.TryParse(schemaVersion, out _))
+                {
+                    m_log.WarnFormat("[YEngine]: state schema version malformed for {0}: {1}",
+                        m_ItemID, schemaVersion);
+                }
+            }
+
+            string migration = scriptStateN.GetAttribute("MigrationVersion");
+            if(!string.IsNullOrEmpty(migration) && int.TryParse(migration, out int stateMigration) && stateMigration != migrationVersion)
+            {
+                m_log.WarnFormat("[YEngine]: state migration version mismatch for {0}: saved={1}, current={2}",
+                    m_ItemID, stateMigration, migrationVersion);
+            }
+
+            string globalsSig = scriptStateN.GetAttribute("GlobalsSignature");
+            if(!string.IsNullOrEmpty(globalsSig))
+            {
+                string currentGlobalsSig = BuildGlobalsSignature();
+                if(globalsSig != currentGlobalsSig)
+                {
+                    m_log.WarnFormat("[YEngine]: globals signature mismatch for {0}", m_ItemID);
+                }
+            }
+
+            string apiFingerprint = scriptStateN.GetAttribute("ApiFingerprint");
+            if(!string.IsNullOrEmpty(apiFingerprint))
+            {
+                string currentApiFingerprint = BuildApiFingerprint();
+                if(apiFingerprint != currentApiFingerprint)
+                {
+                    m_log.WarnFormat("[YEngine]: API fingerprint mismatch for {0}: saved={1}, current={2}",
+                        m_ItemID, apiFingerprint, currentApiFingerprint);
+                }
+            }
         }
 
         private void processXstate(XmlDocument doc)
@@ -1144,7 +1322,8 @@ namespace OpenSim.Region.ScriptEngine.Yengine
         {
             int mv = stream.ReadByte();
             if(mv != migrationVersion)
-                throw new Exception("incoming migration version " + mv + " but accept only " + migrationVersion);
+                throw new ScriptStateLoadException(ScriptStateLoadFailureReason.MigrationVersionMismatch,
+                    "incoming migration version " + mv + " but accept only " + migrationVersion);
 
             stream.ReadByte();  // ignored
 
