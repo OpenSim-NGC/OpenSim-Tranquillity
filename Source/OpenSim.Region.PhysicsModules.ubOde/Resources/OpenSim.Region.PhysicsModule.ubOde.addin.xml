@@ -3,6 +3,7 @@
 <Addin id="OpenSim.Region.PhysicsModule.ubOde" version="0.9">
     
     <Runtime>
+        <Import assembly="OpenSim.Framework.dll" />
         <Import assembly="OpenSim.Region.Framework.dll" />
         <Import assembly="OpenSim.Region.PhysicsModule.ubOde.dll" />
         <Import assembly="OpenSim.Region.PhysicsModules.ubODEMeshing.dll" />
