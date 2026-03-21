@@ -254,11 +254,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         {
             AssetBase asset = m_scene.AssetService.Get(id.ToString());
 
-            if (asset != null)
-            {
-                m_log.DebugFormat("[MAPTILE]: Static map image texture {0} found for {1}", id, m_scene.Name);
-            }
-            else
+            if (asset == null || asset.Data == null || asset.Data.Length == 0)
             {
                 m_log.WarnFormat("[MAPTILE]: Static map image texture {0} not found for {1}", id, m_scene.Name);
                 return null;
