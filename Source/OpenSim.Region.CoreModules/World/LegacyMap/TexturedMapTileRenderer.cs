@@ -196,10 +196,13 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         private SKBitmap fetchTexture(UUID id)
         {
             AssetBase asset = m_scene.AssetService.Get(id.ToString());
-
             m_log.DebugFormat("{0} Fetched texture {1}, found: {2}", LogHeader, id, asset != null);
 
-            if (asset == null) return null;
+            if (asset != null && (asset.Data == null || asset.Data.Length == 0))
+            {
+                m_log.WarnFormat("{0} Asset data is empty for texture {1}", LogHeader, id);
+                return null;
+            }   
 
             try
             {

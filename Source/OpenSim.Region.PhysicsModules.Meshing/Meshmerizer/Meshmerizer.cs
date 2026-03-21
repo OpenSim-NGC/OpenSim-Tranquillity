@@ -626,7 +626,7 @@ namespace OpenSim.Region.PhysicsModule.Meshing
         {
             coords = new List<Coord>();
             faces = new List<Face>();
-            PrimMesher.SculptMesh sculptMesh;
+            SculptMesh sculptMesh;
             SKBitmap idata = null;
             string decodedSculptFileName = "";
 
