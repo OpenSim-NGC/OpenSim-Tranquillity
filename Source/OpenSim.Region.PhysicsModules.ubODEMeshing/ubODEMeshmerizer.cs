@@ -72,8 +72,8 @@ namespace OpenSim.Region.PhysicsModules.ubODEMeshing
         private readonly Dictionary<AMeshKey, Mesh> m_uniqueMeshes = new();
         private readonly Dictionary<AMeshKey, Mesh> m_uniqueReleasedMeshes = new();
 
-        private readonly J2KDecoderConfiguration decoderConfig = new J2KDecoderConfiguration()
-            .WithHighestResolution();
+        private readonly J2KDecoderConfiguration decoderConfig = 
+            new J2KDecoderConfiguration().WithHighestResolution();
 
         #region INonSharedRegionModule
         public string Name
@@ -702,7 +702,7 @@ namespace OpenSim.Region.PhysicsModules.ubODEMeshing
         {
             coords = new List<Vector3>();
             faces = new List<Face>();
-            PrimMesher.SculptMesh sculptMesh;
+            SculptMesh sculptMesh;
             SKBitmap idata = null;
 
             if (primShape.SculptData == null || primShape.SculptData.Length == 0)
@@ -727,44 +727,13 @@ namespace OpenSim.Region.PhysicsModules.ubODEMeshing
                 {
                     idata = SKBitmap.FromImage(skImage);
                 }
-                else
-                {
-                    // Fallback to OpenJPEG for ManagedImage conversion
-                    OpenMetaverse.Imaging.ManagedImage managedImage;
-                    OpenMetaverse.Imaging.OpenJPEG.DecodeToImage(primShape.SculptData, out managedImage);
-
-                    if (managedImage == null)
-                    {
-                        m_log.WarnFormat("[PHYSICS]: OpenJPEG decoded sculpt data for {0} to a null bitmap.  Ignoring.", primName);
-                        return false;
-                    }
-
-                    if ((managedImage.Channels & OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha) != 0)
-                        managedImage.ConvertChannels(managedImage.Channels & ~OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha);
-
-                    using (var tgaStream = new MemoryStream(managedImage.ExportTGA()))
-                    {
-                        idata = SKBitmap.Decode(tgaStream);
-                    }
-
-                    managedImage = null;
-                }
-            }
-            catch (DllNotFoundException e)
-            {
-                m_log.Error($"[PHYSICS]: OpenJpeg problem: {e.Message}");
-                return false;
-            }
-            catch (IndexOutOfRangeException)
-            {
-                m_log.Error("[PHYSICS]: OpenJpeg was unable to decode this. Physics Proxy generation failed");
-                return false;
             }
             catch (Exception ex)
             {
                 m_log.Error("[PHYSICS]: Unable to generate a Sculpty physics proxy. Sculpty texture decode failed: " + ex.Message);
                 return false;
             }
+
             // remove mirror and invert bits
             OpenMetaverse.SculptType pbsSculptType = ((OpenMetaverse.SculptType)(primShape.SculptType & 0x3f));
             var sculptType = pbsSculptType switch
@@ -775,6 +744,7 @@ namespace OpenSim.Region.PhysicsModules.ubODEMeshing
                 OpenMetaverse.SculptType.Sphere => PrimMesher.SculptMesh.SculptType.sphere,
                 _ => PrimMesher.SculptMesh.SculptType.plane,
             };
+            
             bool mirror = ((primShape.SculptType & 128) != 0);
             bool invert = ((primShape.SculptType & 64) != 0);
 

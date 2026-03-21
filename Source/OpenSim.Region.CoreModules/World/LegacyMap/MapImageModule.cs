@@ -266,25 +266,16 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
 
             try
             {
-                // Use OpenJpegDotNet to decode JPEG2000 directly to SKBitmap
                 using var stream = new System.IO.MemoryStream(asset.Data);
-                return SKBitmap.Decode(stream);
-            }
-            catch (DllNotFoundException)
-            {
-                m_log.ErrorFormat("[MAPTILE]: OpenJpeg is not installed correctly on this system.   Asset Data is empty for {0}", id);
-
-            }
-            catch (IndexOutOfRangeException)
-            {
-                m_log.ErrorFormat("[MAPTILE]: OpenJpeg was unable to decode this.   Asset Data is empty for {0}", id);
-
+                var decodedImage = J2kImage.FromStream(stream);
+                return decodedImage.As<SKBitmap>();
             }
             catch (Exception)
             {
-                m_log.ErrorFormat("[MAPTILE]: OpenJpeg was unable to decode this.   Asset Data is empty for {0}", id);
+                m_log.ErrorFormat("[MAPTILE]: CoreJ2k was unable to decode this.   Asset Data is empty for {0}", id);
 
             }
+            
             return null;
 
         }

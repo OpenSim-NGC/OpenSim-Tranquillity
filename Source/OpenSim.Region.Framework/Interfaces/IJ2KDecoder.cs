@@ -26,7 +26,6 @@
  */
 
 using OpenMetaverse;
-using OpenMetaverse.Imaging;
 using SkiaSharp;
 
 namespace OpenSim.Region.Framework.Interfaces
