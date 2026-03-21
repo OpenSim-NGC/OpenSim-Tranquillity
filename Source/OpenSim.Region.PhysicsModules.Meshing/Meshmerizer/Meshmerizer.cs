@@ -673,32 +673,6 @@ namespace OpenSim.Region.PhysicsModule.Meshing
                     {
                         idata = SKBitmap.FromImage(skImage);
                     }
-                    else
-                    {
-                        // Fallback to OpenJPEG for ManagedImage conversion
-                        OpenMetaverse.Imaging.ManagedImage managedImage;
-
-                        OpenMetaverse.Imaging.OpenJPEG.DecodeToImage(primShape.SculptData, out managedImage);
-
-                        if (managedImage == null)
-                        {
-                            // In some cases it seems that the decode can return a null bitmap without throwing
-                            // an exception
-                            m_log.WarnFormat("[PHYSICS]: OpenJPEG decoded sculpt data for {0} to a null bitmap.  Ignoring.", primName);
-
-                            return false;
-                        }
-
-                        if ((managedImage.Channels & OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha) != 0)
-                            managedImage.ConvertChannels(managedImage.Channels & ~OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha);
-
-                        // Try to decode the exported TGA stream directly with SkiaSharp
-                        using (var tgaStream = new MemoryStream(managedImage.ExportTGA()))
-                        {
-                            idata = SKBitmap.Decode(tgaStream);
-                        }
-                        managedImage = null;
-                    }
 
                     if (cacheSculptMaps && idata != null)
                     {
@@ -711,16 +685,6 @@ namespace OpenSim.Region.PhysicsModule.Meshing
                         }
                         catch (Exception e) { m_log.Error("[SCULPT]: unable to cache sculpt map " + decodedSculptFileName + " " + e.Message); }
                     }
-                }
-                catch (DllNotFoundException)
-                {
-                    m_log.Error("[PHYSICS]: OpenJpeg is not installed correctly on this system. Physics Proxy generation failed.  Often times this is because of an old version of GLIBC.  You must have version 2.4 or above!");
-                    return false;
-                }
-                catch (IndexOutOfRangeException)
-                {
-                    m_log.Error("[PHYSICS]: OpenJpeg was unable to decode this. Physics Proxy generation failed");
-                    return false;
                 }
                 catch (Exception ex)
                 {
