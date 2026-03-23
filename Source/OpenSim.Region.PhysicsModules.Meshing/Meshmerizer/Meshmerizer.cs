@@ -626,8 +626,10 @@ namespace OpenSim.Region.PhysicsModule.Meshing
         {
             coords = new List<Coord>();
             faces = new List<Face>();
+
             SculptMesh sculptMesh;
             SKBitmap idata = null;
+            
             string decodedSculptFileName = "";
 
             if (cacheSculptMaps && !primShape.SculptTexture.IsZero())
@@ -645,35 +647,26 @@ namespace OpenSim.Region.PhysicsModule.Meshing
                     m_log.Error("[SCULPT]: unable to load cached sculpt map " + decodedSculptFileName + " " + e.Message);
 
                 }
-                //if (idata != null)
-                //    m_log.Debug("[SCULPT]: loaded cached map asset for map ID: " + primShape.SculptTexture.ToString());
             }
 
             if (idata == null)
             {
                 if (primShape.SculptData == null || primShape.SculptData.Length == 0)
+                {
+                    m_log.Warn("[PHYSICS]: Unable to generate a Sculpty physics proxy. SculptData is null/zero length");
                     return false;
+                }
 
                 try
                 {
-                    // Try CoreJ2K first
-                    SKImage skImage = null;
+                    var j2k = J2kImage.FromBytes(primShape.SculptData, decoderConfig);
+                    idata = j2k?.As<SKBitmap>();
+
+                    if (idata == null)
+                    {
+                         return false;
+                    }
                     
-                    try
-                    {
-                        var j2k = J2kImage.FromBytes(primShape.SculptData, decoderConfig);
-                        skImage = j2k?.As<SKImage>();
-                    }
-                    catch
-                    {
-                        skImage = null;
-                    }
-
-                    if (skImage != null)
-                    {
-                        idata = SKBitmap.FromImage(skImage);
-                    }
-
                     if (cacheSculptMaps && idata != null)
                     {
                         try
@@ -683,7 +676,10 @@ namespace OpenSim.Region.PhysicsModule.Meshing
                             using var fs = File.OpenWrite(decodedSculptFileName);
                             dataEncoded.SaveTo(fs);
                         }
-                        catch (Exception e) { m_log.Error("[SCULPT]: unable to cache sculpt map " + decodedSculptFileName + " " + e.Message); }
+                        catch (Exception e) 
+                        { 
+                            m_log.Error("[SCULPT]: unable to cache sculpt map " + decodedSculptFileName + " " + e.Message); 
+                        }
                     }
                 }
                 catch (Exception ex)

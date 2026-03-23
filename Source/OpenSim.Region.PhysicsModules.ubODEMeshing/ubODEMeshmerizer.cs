@@ -709,23 +709,13 @@ namespace OpenSim.Region.PhysicsModules.ubODEMeshing
                 return false;
 
             try
-            {
-                // Try CoreJ2K first
-                SKImage skImage = null;
-                
-                try
-                {
-                    var j2k = J2kImage.FromBytes(primShape.SculptData, decoderConfig);
-                    skImage = j2k?.As<SKImage>();
-                }
-                catch
-                {
-                    skImage = null;
-                }
+            {               
+                var j2k = J2kImage.FromBytes(primShape.SculptData, decoderConfig);
+                idata = j2k?.As<SKBitmap>();
 
-                if (skImage != null)
+                if (idata == null)
                 {
-                    idata = SKBitmap.FromImage(skImage);
+                    return false;
                 }
             }
             catch (Exception ex)
