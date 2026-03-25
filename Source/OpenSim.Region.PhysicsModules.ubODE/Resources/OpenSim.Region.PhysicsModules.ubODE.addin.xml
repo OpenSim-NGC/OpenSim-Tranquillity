@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<Addin id="OpenSim.Region.PhysicsModule.ubOde" version="0.9">
+<Addin id="OpenSim.Region.PhysicsModules.ubODE" version="0.9">
     
     <Runtime>
         <Import assembly="OpenSim.Framework.dll" />
         <Import assembly="OpenSim.Region.Framework.dll" />
-        <Import assembly="OpenSim.Region.PhysicsModule.ubOde.dll" />
+        <Import assembly="OpenSim.Region.PhysicsModules.SharedBase.dll" />
+        <Import assembly="OpenSim.Region.PhysicsModules.ubODE.dll" />
         <Import assembly="OpenSim.Region.PhysicsModules.ubODEMeshing.dll" />
     </Runtime>
 
@@ -14,7 +15,7 @@
     </Dependencies>
 
     <Extension path = "/OpenSim/RegionModules">
-        <RegionModule id="ubODEPhysicsScene" class="OpenSim.Region.PhysicsModule.ubOde.ubOdeModule" /> 
+        <RegionModule id="ubODEPhysicsScene" class="OpenSim.Region.PhysicsModules.ubODE.ubODEModule" /> 
     </Extension>
   
 </Addin>

@@ -28,7 +28,7 @@
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.ubOde
+namespace OpenSim.Region.PhysicsModules.ubODE
 {
     /// <summary>
     /// </summary>

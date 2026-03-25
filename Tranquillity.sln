@@ -55,15 +55,15 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.Framework", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.OptionalModules", "Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj", "{BAF8E8F2-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.BasicPhysics", "Source\OpenSim.Region.PhysicsModules.BasicPhysics\OpenSim.Region.PhysicsModule.BasicPhysics.csproj", "{BAC989A5-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.BasicPhysics", "Source\OpenSim.Region.PhysicsModules.BasicPhysics\OpenSim.Region.PhysicsModules.BasicPhysics.csproj", "{BAC989A5-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.BulletS", "Source\OpenSim.Region.PhysicsModules.BulletS\OpenSim.Region.PhysicsModule.BulletS.csproj", "{223BC46D-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.BulletS", "Source\OpenSim.Region.PhysicsModules.BulletS\OpenSim.Region.PhysicsModules.BulletS.csproj", "{223BC46D-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.Meshing", "Source\OpenSim.Region.PhysicsModules.Meshing\OpenSim.Region.PhysicsModule.Meshing.csproj", "{5ECE503F-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.Meshing", "Source\OpenSim.Region.PhysicsModules.Meshing\OpenSim.Region.PhysicsModules.Meshing.csproj", "{5ECE503F-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.POS", "Source\OpenSim.Region.PhysicsModules.POS\OpenSim.Region.PhysicsModule.POS.csproj", "{2400666E-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.POS", "Source\OpenSim.Region.PhysicsModules.POS\OpenSim.Region.PhysicsModules.POS.csproj", "{2400666E-0000-0000-0000-000000000000}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModule.ubOde", "Source\OpenSim.Region.PhysicsModules.ubOde\OpenSim.Region.PhysicsModule.ubOde.csproj", "{AC52DE31-0000-0000-0000-000000000000}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.ubODE", "Source\OpenSim.Region.PhysicsModules.ubODE\OpenSim.Region.PhysicsModules.ubODE.csproj", "{AC52DE31-0000-0000-0000-000000000000}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Region.PhysicsModules.ubODEMeshing", "Source\OpenSim.Region.PhysicsModules.ubODEMeshing\OpenSim.Region.PhysicsModules.ubODEMeshing.csproj", "{E7DA5126-0000-0000-0000-000000000000}"
 EndProject

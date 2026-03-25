@@ -33,7 +33,7 @@
 using OpenMetaverse;
 using OpenSim.Region.PhysicsModules.SharedBase;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public sealed class BSDynamics : BSActor
     {

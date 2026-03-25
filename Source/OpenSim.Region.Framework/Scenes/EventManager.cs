@@ -599,8 +599,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// Triggered by <see cref="TriggerScriptCollidingStart"/>
         /// in <see cref="SceneObjectPart.SendCollisionEvent"/>
         /// via <see cref="SceneObjectPart.PhysicsCollision"/>
-        /// via <see cref="OpenSim.Region.PhysicsModule.SharedBase.PhysicsActor.OnCollisionUpdate"/>
-        /// via <see cref="OpenSim.Region.PhysicsModule.SharedBase.PhysicsActor.SendCollisionUpdate"/>
+        /// via <see cref="OpenSim.Region.PhysicsModules.SharedBase.PhysicsActor.OnCollisionUpdate"/>
+        /// via <see cref="OpenSim.Region.PhysicsModules.SharedBase.PhysicsActor.SendCollisionUpdate"/>
         /// </remarks>
         public event ScriptColliding OnScriptColliderStart;
 
@@ -613,8 +613,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// Triggered by <see cref="TriggerScriptColliding"/>
         /// in <see cref="SceneObjectPart.SendCollisionEvent"/>
         /// via <see cref="SceneObjectPart.PhysicsCollision"/>
-        /// via <see cref="OpenSim.Region.PhysicsModule.SharedBase.PhysicsActor.OnCollisionUpdate"/>
-        /// via <see cref="OpenSim.Region.PhysicsModule.SharedBase.PhysicsActor.SendCollisionUpdate"/>
+        /// via <see cref="OpenSim.Region.PhysicsModules.SharedBase.PhysicsActor.OnCollisionUpdate"/>
+        /// via <see cref="OpenSim.Region.PhysicsModules.SharedBase.PhysicsActor.SendCollisionUpdate"/>
         /// </remarks>
         public event ScriptColliding OnScriptColliding;
 
@@ -626,8 +626,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// Triggered by <see cref="TriggerScriptCollidingEnd"/>
         /// in <see cref="SceneObjectPart.SendCollisionEvent"/>
         /// via <see cref="SceneObjectPart.PhysicsCollision"/>
-        /// via <see cref="OpenSim.Region.PhysicsModule.SharedBase.PhysicsActor.OnCollisionUpdate"/>
-        /// via <see cref="OpenSim.Region.PhysicsModule.SharedBase.PhysicsActor.SendCollisionUpdate"/>
+        /// via <see cref="OpenSim.Region.PhysicsModules.SharedBase.PhysicsActor.OnCollisionUpdate"/>
+        /// via <see cref="OpenSim.Region.PhysicsModules.SharedBase.PhysicsActor.SendCollisionUpdate"/>
         /// </remarks>
         public event ScriptColliding OnScriptCollidingEnd;
 
@@ -639,8 +639,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// Triggered by <see cref="TriggerScriptLandCollidingStart"/>
         /// in <see cref="SceneObjectPart.SendLandCollisionEvent"/>
         /// via <see cref="SceneObjectPart.PhysicsCollision"/>
-        /// via <see cref="OpenSim.Region.PhysicsModule.SharedBase.PhysicsActor.OnCollisionUpdate"/>
-        /// via <see cref="OpenSim.Region.PhysicsModule.SharedBase.PhysicsActor.SendCollisionUpdate"/>
+        /// via <see cref="OpenSim.Region.PhysicsModules.SharedBase.PhysicsActor.OnCollisionUpdate"/>
+        /// via <see cref="OpenSim.Region.PhysicsModules.SharedBase.PhysicsActor.SendCollisionUpdate"/>
         /// </remarks>
         public event ScriptColliding OnScriptLandColliderStart;
 
@@ -652,8 +652,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// Triggered by <see cref="TriggerScriptLandColliding"/>
         /// in <see cref="SceneObjectPart.SendLandCollisionEvent"/>
         /// via <see cref="SceneObjectPart.PhysicsCollision"/>
-        /// via <see cref="OpenSim.Region.PhysicsModule.SharedBase.PhysicsActor.OnCollisionUpdate"/>
-        /// via <see cref="OpenSim.Region.PhysicsModule.SharedBase.PhysicsActor.SendCollisionUpdate"/>
+        /// via <see cref="OpenSim.Region.PhysicsModules.SharedBase.PhysicsActor.OnCollisionUpdate"/>
+        /// via <see cref="OpenSim.Region.PhysicsModules.SharedBase.PhysicsActor.SendCollisionUpdate"/>
         /// </remarks>
         public event ScriptColliding OnScriptLandColliding;
 
@@ -665,8 +665,8 @@ namespace OpenSim.Region.Framework.Scenes
         /// Triggered by <see cref="TriggerScriptLandCollidingEnd"/>
         /// in <see cref="SceneObjectPart.SendLandCollisionEvent"/>
         /// via <see cref="SceneObjectPart.PhysicsCollision"/>
-        /// via <see cref="OpenSim.Region.PhysicsModule.SharedBase.PhysicsActor.OnCollisionUpdate"/>
-        /// via <see cref="OpenSim.Region.PhysicsModule.SharedBase.PhysicsActor.SendCollisionUpdate"/>
+        /// via <see cref="OpenSim.Region.PhysicsModules.SharedBase.PhysicsActor.OnCollisionUpdate"/>
+        /// via <see cref="OpenSim.Region.PhysicsModules.SharedBase.PhysicsActor.SendCollisionUpdate"/>
         /// </remarks>
         public event ScriptColliding OnScriptLandColliderEnd;
 

@@ -39,7 +39,7 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.ubOde
+namespace OpenSim.Region.PhysicsModules.ubODE
 {
      // colision flags of things others can colide with
     // rays, sensors, probes removed since can't  be colided with
@@ -329,7 +329,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             mesher = m_frameWorkScene.RequestModuleInterface<IMesher>();
             if (mesher == null)
             {
-                m_log.ErrorFormat("[ubOde] No mesher. module disabled");
+                m_log.ErrorFormat("[ubODE] No mesher. module disabled");
                 return;
             }
 
@@ -1556,7 +1556,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 int donechanges = 0;
                 if (!ChangesQueue.IsEmpty)
                 {
-                    m_log.InfoFormat("[ubOde] start processing pending actor operations");
+                    m_log.InfoFormat("[ubODE] start processing pending actor operations");
                     int tstart = Util.EnvironmentTickCount();
 
                     UBOdeNative.AllocateODEDataForThread(~0U);
@@ -1590,9 +1590,9 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                         donechanges++;
                     }
                     int time = Util.EnvironmentTickCountSubtract(tstart);
-                    m_log.InfoFormat("[ubOde] finished {0} operations in {1}ms", donechanges, time);
+                    m_log.InfoFormat("[ubODE] finished {0} operations in {1}ms", donechanges, time);
                 }
-                m_log.InfoFormat("[ubOde] {0} prim actors loaded",_prims.Count);
+                m_log.InfoFormat("[ubODE] {0} prim actors loaded",_prims.Count);
             }
             m_lastframe = Util.GetTimeStamp() + 0.5;
             step_time = -0.5f;

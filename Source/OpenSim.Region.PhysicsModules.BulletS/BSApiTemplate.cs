@@ -28,7 +28,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     // Constraint type values as defined by Bullet
     public enum ConstraintType : int

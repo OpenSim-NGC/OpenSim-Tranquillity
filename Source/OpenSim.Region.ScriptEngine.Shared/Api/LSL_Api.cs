@@ -2645,7 +2645,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             // keep using physactor ideia of isphysical
             // it should be SOP ideia of that
-            // not much of a issue with ubOde
+            // not much of a issue with ubODE
             if (pa != null && pa.IsPhysical)
                 isphys = true;
             else

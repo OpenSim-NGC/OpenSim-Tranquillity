@@ -30,13 +30,13 @@ using System.Collections.Generic;
 using Xunit;
 
 using OpenSim.Framework;
-using OpenSim.Region.PhysicsModule.BulletS;
-using OpenSim.Region.PhysicsModule.SharedBase;
+using OpenSim.Region.PhysicsModules.BulletS;
+using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Tests.Common;
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.BulletS.Tests
+namespace OpenSim.Region.PhysicsModules.BulletS.Tests
 {
     public class BasicVehicles : OpenSimTestCase
     {

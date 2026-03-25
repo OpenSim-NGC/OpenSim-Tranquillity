@@ -5,9 +5,9 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.ubOde
+namespace OpenSim.Region.PhysicsModules.ubODE
 {
-    class ubOdeModule : INonSharedRegionModule
+    class ubODEModule : INonSharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -51,7 +51,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                         //throw new Exception("Invalid physics meshing option");
                     }
 
-                    DllmapConfigHelper.RegisterAssembly(typeof(ubOdeModule).Assembly);
+                    DllmapConfigHelper.RegisterAssembly(typeof(ubODEModule).Assembly);
 
                     UBOdeNative.InitODE();
 

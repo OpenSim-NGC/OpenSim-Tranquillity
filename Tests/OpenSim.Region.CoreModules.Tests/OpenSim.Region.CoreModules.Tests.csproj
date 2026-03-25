@@ -33,7 +33,7 @@
     <ProjectReference Include="..\..\Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.SharedBase\OpenSim.Region.PhysicsModules.SharedBase.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.BasicPhysics\OpenSim.Region.PhysicsModule.BasicPhysics.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.BasicPhysics\OpenSim.Region.PhysicsModules.BasicPhysics.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Data.Null\OpenSim.Data.Null.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />

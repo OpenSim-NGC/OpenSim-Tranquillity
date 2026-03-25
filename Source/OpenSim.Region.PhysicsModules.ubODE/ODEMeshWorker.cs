@@ -8,7 +8,7 @@ using log4net;
 using Nini.Config;
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.ubOde
+namespace OpenSim.Region.PhysicsModules.ubODE
 {
     public enum MeshState : byte
     {

@@ -32,7 +32,7 @@ using Nini.Config;
 using log4net;
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public class ExtendedPhysics : INonSharedRegionModule
     {

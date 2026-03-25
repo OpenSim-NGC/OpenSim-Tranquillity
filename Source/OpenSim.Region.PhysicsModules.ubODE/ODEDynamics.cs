@@ -43,7 +43,7 @@
 using OpenMetaverse;
 using OpenSim.Region.PhysicsModules.SharedBase;
 
-namespace OpenSim.Region.PhysicsModule.ubOde
+namespace OpenSim.Region.PhysicsModules.ubODE
 {
     public class ODEDynamics
     {
