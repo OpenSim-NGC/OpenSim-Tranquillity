@@ -27,7 +27,7 @@
 using OMV = OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public sealed class BSShapeCollection : IDisposable
     {

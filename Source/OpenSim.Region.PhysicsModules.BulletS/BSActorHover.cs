@@ -29,7 +29,7 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 
 using OMV = OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public class BSActorHover : BSActor
     {

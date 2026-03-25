@@ -377,7 +377,7 @@ namespace OpenSim.Region.PhysicsModules.ubODEMeshing
             //            m_log.DebugFormat("[MESH]: experimental mesh proxy generation for {0}", primName);
 
 
-            // for ubOde we have a diferent mesh use priority
+            // for ubODE we have a diferent mesh use priority
             // priority is to use full mesh then decomposition
             // SL does the oposite
             bool usemesh = false;
@@ -387,7 +387,7 @@ namespace OpenSim.Region.PhysicsModules.ubODEMeshing
 
             if (primShape.SculptData == null || primShape.SculptData.Length <= 0)
             {
-                m_log.InfoFormat("[MESH]: asset data for {0} is zero length", primName);
+                // m_log.InfoFormat("[MESH]: asset data for {0} is zero length", primName);
                 return false;
             }
 

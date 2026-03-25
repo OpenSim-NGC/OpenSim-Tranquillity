@@ -30,7 +30,7 @@ using OMV = OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public sealed class BSCharacter : BSPhysObject
     {
@@ -855,7 +855,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             // and subsequently trigger an update in ScenePresence.SendTerseUpdateToAllClients().  The cause of this cycle (feedback?)
             // has not yet been identified.
             //
-            // If there is a threshold below 0.4 or no threshold check at all (as in ODE), then RawVelocity stays constant and extra
+            // If there is a threshold below 0.4 or no threshold check at all (as in Ode), then RawVelocity stays constant and extra
             // updates are not triggered in ScenePresence.SendTerseUpdateToAllClients().
     //        if (!entprop.Velocity.ApproxEquals(RawVelocity, 0.1f))
                 RawVelocity = entprop.Velocity;

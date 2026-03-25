@@ -34,7 +34,7 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using log4net;
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.ubOde
+namespace OpenSim.Region.PhysicsModules.ubODE
 {
     /// <summary>
     /// Processes raycast requests as ODE is in a state to be able to do them.

@@ -19,9 +19,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModule.BulletS\OpenSim.Region.PhysicsModule.BulletS.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModule.Meshing\OpenSim.Region.PhysicsModule.Meshing.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModule.SharedBase\OpenSim.Region.PhysicsModule.SharedBase.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.BulletS\OpenSim.Region.PhysicsModules.BulletS.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.Meshing\OpenSim.Region.PhysicsModules.Meshing.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.SharedBase\OpenSim.Region.PhysicsModules.SharedBase.csproj" />
     <ProjectReference Include="..\..\Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj" />
   </ItemGroup>
   <ItemGroup>

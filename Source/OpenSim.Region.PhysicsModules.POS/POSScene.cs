@@ -32,7 +32,7 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.PhysicsModule.POS
+namespace OpenSim.Region.PhysicsModules.POS
 {
     public class POSScene : PhysicsScene, INonSharedRegionModule
     {

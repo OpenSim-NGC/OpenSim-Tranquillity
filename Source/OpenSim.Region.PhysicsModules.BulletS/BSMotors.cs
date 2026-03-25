@@ -28,7 +28,7 @@
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public abstract class BSMotor
     {

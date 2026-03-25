@@ -26,7 +26,7 @@
  */
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public class BSConstraint6Dof : BSConstraint
     {

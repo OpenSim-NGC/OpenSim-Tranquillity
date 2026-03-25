@@ -33,7 +33,7 @@ using BulletXNA.LinearMath;
 using BulletXNA.BulletCollision;
 using BulletXNA.BulletDynamics;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public sealed class BSAPIXNA : BSAPITemplate
     {

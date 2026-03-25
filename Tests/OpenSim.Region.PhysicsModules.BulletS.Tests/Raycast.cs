@@ -30,7 +30,7 @@ using OpenSim.Tests.Common;
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.BulletS.Tests
+namespace OpenSim.Region.PhysicsModules.BulletS.Tests
 {
     public class BulletSimRaycast : OpenSimTestCase
     {

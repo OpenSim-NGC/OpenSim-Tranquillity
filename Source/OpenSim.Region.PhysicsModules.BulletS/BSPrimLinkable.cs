@@ -28,7 +28,7 @@ using OpenSim.Framework;
 
 using OMV = OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public class BSPrimLinkable : BSPrimDisplaced
     {

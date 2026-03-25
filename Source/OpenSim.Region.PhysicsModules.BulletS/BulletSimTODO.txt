@@ -5,7 +5,7 @@ Vehicle buoyancy. Computed correctly? Possibly creating very large effective mas
     Negative buoyancy computed correctly
 Center-of-gravity
 Computation of mesh mass. How done? How should it be done?
-Enable vehicle border crossings (at least as poorly as ODE)
+Enable vehicle border crossings (at least as poorly as Ode)
 	Terrain skirts
 	Avatar created in previous region and not new region when crossing border
 	Vehicle recreated in new sim at small Z value (offset from root value?) (DONE)
@@ -316,7 +316,7 @@ When is force introduced by SetForce removed? The prestep action could go foreve
 	(Resolution: setForce registers a prestep action which keeps applying the force)
 Child movement in linkset (don't rebuild linkset) (DONE 20130122))
 Avatar standing on a moving object should start to move with the object. (DONE 20130125)
-Angular motion around Z moves the vehicle in world Z and not vehicle Z in ODE.
+Angular motion around Z moves the vehicle in world Z and not vehicle Z in Ode.
 	Verify that angular motion specified around Z moves in the vehicle coordinates.
 	DONE 20130120: BulletSim properly applies force in vehicle relative coordinates.
 Nebadon vehicles turning funny in arena (DONE)
@@ -362,7 +362,7 @@ BSPrim.Force should set a continious force on the prim. The force should be
 	applied each tick.  Some limits?
 	(DONE: added physical actors. Implemented SetForce, SetTorque, ...)
 Implement LSL physics controls. Like STATUS_ROTATE_X. (DONE)
-Add osGetPhysicsEngineName() so scripters can tell whether BulletSim or ODE
+Add osGetPhysicsEngineName() so scripters can tell whether BulletSim or Ode
 Avatar rotation (check out changes to ScenePresence for physical rotation) (DONE)
 Avatar running (what does phys engine need to do?) (DONE: multiplies run factor by walking force)
 setForce should set a constant force. Different than AddImpulse. (DONE)

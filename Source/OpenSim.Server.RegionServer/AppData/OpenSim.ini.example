@@ -250,7 +250,7 @@
     ;; Default is ubODEMeshmerizer
     ; meshing = Meshmerizer
     ; meshing = ZeroMesher
-    ;; With ubOde physics engine you must select ubODEMeshmerizer
+    ;; With ubODE physics engine you must select ubODEMeshmerizer
     ; meshing = ubODEMeshmerizer
 
     ;; Choose one of the physics engines below

@@ -32,14 +32,14 @@ using System.Text;
 
 using OpenSim.Framework;
 using OpenSim.Region;
-using OpenSim.Region.PhysicsModule.SharedBase;
-using OpenSim.Region.PhysicsModule.Meshing;
+using OpenSim.Region.PhysicsModules.SharedBase;
+using OpenSim.Region.PhysicsModules.Meshing;
 using OpenSim.Region.Framework.Interfaces;
 
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.PhysicsModule.BulletS.Tests
+namespace OpenSim.Region.PhysicsModules.BulletS.Tests
 {
     // Utility functions for building up and tearing down the sample physics environments
     public static class BulletSimTestsUtil

@@ -31,7 +31,7 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenMetaverse;
 using Nini.Config;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public static class BSParam
     {

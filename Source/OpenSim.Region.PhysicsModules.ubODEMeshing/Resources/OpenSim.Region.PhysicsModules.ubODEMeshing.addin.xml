@@ -4,7 +4,7 @@
     
     <Runtime>
         <Import assembly="OpenSim.Region.Framework.dll" />
-        <Import assembly="OpenSim.Region.PhysicsModule.ubOde.dll" />
+        <Import assembly="OpenSim.Region.PhysicsModules.ubODE.dll" />
         <Import assembly="OpenSim.Region.PhysicsModules.ubODEMeshing.dll" />
     </Runtime>
 

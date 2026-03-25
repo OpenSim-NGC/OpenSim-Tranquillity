@@ -2,7 +2,7 @@
 using OpenSim.Region.PhysicsModules.SharedBase;
 using System.Runtime.CompilerServices;
 
-namespace OpenSim.Region.PhysicsModule.ubOde
+namespace OpenSim.Region.PhysicsModules.ubODE
 {
     public partial class ODEScene
     {

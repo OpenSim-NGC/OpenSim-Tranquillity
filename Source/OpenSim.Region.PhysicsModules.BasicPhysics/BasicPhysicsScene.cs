@@ -32,7 +32,7 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.PhysicsModule.BasicPhysics
+namespace OpenSim.Region.PhysicsModules.BasicPhysics
 {
     /// <summary>
     /// This is an incomplete extremely basic physics implementation
