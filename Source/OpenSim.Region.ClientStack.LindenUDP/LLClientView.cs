@@ -8981,11 +8981,13 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                 return;
 
             ImprovedInstantMessagePacket msgpack = (ImprovedInstantMessagePacket)Pack;
-            string IMfromName = Util.FieldToString(msgpack.MessageBlock.FromAgentName);
+            // Never trust sender identity fields from viewer packet for agent IM.
+            // Use authenticated client identity to avoid stale/spoofed names.
+            string IMfromName = c.Name;
             string IMmessage = Utils.BytesToString(msgpack.MessageBlock.Message);
 
             GridInstantMessage im = new(c.Scene,
-                    msgpack.AgentData.AgentID,
+                    c.AgentId,
                     IMfromName,
                     msgpack.MessageBlock.ToAgentID,
                     msgpack.MessageBlock.Dialog,

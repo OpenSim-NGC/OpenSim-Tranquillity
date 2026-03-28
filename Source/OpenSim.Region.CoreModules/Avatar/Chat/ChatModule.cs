@@ -224,7 +224,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat
                     if(avatar == null)
                         return;
                     fromPos = avatar.AbsolutePosition;
-                    fromName = avatar.Name;
+                    fromName = ResolveAvatarChatName(scene, avatar);
                     fromID = c.Sender.AgentId;
                     if (avatar.IsViewerUIGod)
                     { // let gods speak to outside or things may get confusing
@@ -341,7 +341,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat
             {
                 ScenePresence avatar = (c.Scene as Scene).GetScenePresence(c.Sender.AgentId);
                 fromID = c.Sender.AgentId;
-                fromName = avatar.Name;
+                fromName = ResolveAvatarChatName(c.Scene as Scene, avatar);
                 ownerID = UUID.Zero;
                 sourceType = ChatSourceType.Agent;
             }
@@ -442,6 +442,40 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat
                 fromAgentID, ownerID, (byte)src, (byte)ChatAudibleLevel.Fully);
 
             return true;
+        }
+
+        protected virtual string ResolveAvatarChatName(Scene scene, ScenePresence avatar)
+        {
+            if (avatar == null)
+                return string.Empty;
+
+            string fallback = avatar.Name;
+            if (scene?.UserManagementModule == null)
+                return fallback;
+
+            UserData ud = scene.UserManagementModule.GetUserData(avatar.UUID);
+            if (ud == null)
+                return fallback;
+
+            string first = ud.FirstName?.Trim() ?? string.Empty;
+            string last = ud.LastName?.Trim() ?? string.Empty;
+            string legacy = string.Empty;
+
+            if (!string.IsNullOrEmpty(first))
+            {
+                if (string.IsNullOrEmpty(last) || last.Equals("Resident", StringComparison.OrdinalIgnoreCase))
+                    legacy = first;
+                else
+                    legacy = first + " " + last;
+            }
+
+            string display = ud.DisplayName?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(display))
+                return display;
+            if (!string.IsNullOrEmpty(legacy))
+                return legacy;
+
+            return fallback;
         }
 
         Dictionary<UUID, System.Threading.Timer> Timers = new Dictionary<UUID, System.Threading.Timer>();
