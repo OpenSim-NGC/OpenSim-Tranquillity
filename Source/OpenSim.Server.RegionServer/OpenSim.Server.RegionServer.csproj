@@ -35,6 +35,7 @@
     <ProjectReference Include="../../Source/OpenSim.Services.Base/OpenSim.Services.Base.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.UserAccountService/OpenSim.Services.UserAccountService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.InventoryService/OpenSim.Services.InventoryService.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -49,12 +50,7 @@
     <EmbeddedResource Include="Resources/OpenSim.Server.RegionServer.addin.xml" />
   </ItemGroup>
 
-  <Target Name="CopyAppData" AfterTargets="Publish">
-    <ItemGroup>
-      <FilesToCopy Include="AppData/**/*.*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(PublishDir)/%(RecursiveDir)" SkipUnchangedFiles="true" />
-  </Target>
+
 
   <Target Name="CopyNativeDllConfig" AfterTargets="Publish">
     <ItemGroup>
@@ -68,6 +64,13 @@
       <NativeLibsToCopy Include="$(SolutionDir)Library/lib64/**/*.*" />
     </ItemGroup>
     <Copy SourceFiles="@(NativeLibsToCopy)" DestinationFolder="$(PublishDir)/lib64/%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+  
+  <Target Name="CopyAppData" AfterTargets="Publish">
+    <ItemGroup>
+      <FilesToCopy Include="AppData/**/*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(PublishDir)/%(RecursiveDir)" SkipUnchangedFiles="true" />
   </Target>
 
 </Project>
