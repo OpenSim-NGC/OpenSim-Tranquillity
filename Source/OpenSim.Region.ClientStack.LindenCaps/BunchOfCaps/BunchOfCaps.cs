@@ -2215,10 +2215,32 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             // Full content request
             NameValueCollection query = httpRequest.QueryString;
-            string[] ids = query.GetValues("ids");
+            string[] rawIds = query?.GetValues("ids") ?? Array.Empty<string>();
+
+            // Firestorm/SL viewers usually send repeated ids params (?ids=a&ids=b),
+            // but proxies can collapse to comma separated values (?ids=a,b).
+            // Normalize and de-duplicate to improve resiliency.
+            List<string> ids = new(rawIds.Length);
+            HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+            foreach (string raw in rawIds)
+            {
+                if (string.IsNullOrWhiteSpace(raw))
+                    continue;
+
+                string[] parts = raw.Split(',');
+                foreach (string part in parts)
+                {
+                    if (!UUID.TryParse(part.Trim(), out UUID parsed) || parsed.IsZero())
+                        continue;
+
+                    string key = parsed.ToString();
+                    if (seen.Add(key))
+                        ids.Add(key);
+                }
+            }
 
             osUTF8 lsl;
-            if(ids.Length == 0)
+            if(ids.Count == 0)
             {
                 lsl = LLSDxmlEncode2.Start();
                 LLSDxmlEncode2.AddMap(lsl);
@@ -2226,33 +2248,73 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             }
             else
             {
-                List<UserData> names = m_UserManager.GetKnownUsers(ids, m_scopeID);
-                lsl = LLSDxmlEncode2.Start(names.Count * 256 + 256);
-
-                LLSDxmlEncode2.AddMap(lsl);
-                if (names.Count == 0)
-                    LLSDxmlEncode2.AddEmptyArray("agents", lsl);
-                else
+                List<UserData> names = m_UserManager.GetKnownUsers(ids.ToArray(), m_scopeID);
+                Dictionary<UUID, UserData> namesById = new(names.Count);
+                foreach (UserData ud in names)
                 {
-                    LLSDxmlEncode2.AddArray("agents", lsl);
+                    if (ud is not null && !ud.Id.IsZero())
+                        namesById[ud.Id] = ud;
+                }
 
-                    foreach (UserData ud in names)
+                List<UUID> badIds = new();
+                lsl = LLSDxmlEncode2.Start(ids.Count * 256 + 512);
+                LLSDxmlEncode2.AddMap(lsl);
+                LLSDxmlEncode2.AddArray("agents", lsl);
+
+                foreach (string id in ids)
+                {
+                    if (!UUID.TryParse(id, out UUID agentId) || agentId.IsZero())
+                        continue;
+
+                    if (!namesById.TryGetValue(agentId, out UserData ud) || ud is null)
                     {
-                        // dont tell about unknown users, we can't send them back on Bad either
-                        if (string.IsNullOrEmpty(ud.FirstName) || ud.FirstName.Equals("Unkown"))
-                            continue;
-
-                        LLSDxmlEncode2.AddMap(lsl);
-                        LLSDxmlEncode2.AddElem("username", ud.LowerUsername, lsl);
-                        LLSDxmlEncode2.AddElem("display_name", ud.ViewerDisplayName, lsl);
-                        LLSDxmlEncode2.AddElem("display_name_next_update", ud.NameChanged.AddDays(7), lsl);
-                        LLSDxmlEncode2.AddElem("display_name_expires", DateTime.UtcNow.AddDays(1), lsl);
-                        LLSDxmlEncode2.AddElem("legacy_first_name", ud.FirstName, lsl);
-                        LLSDxmlEncode2.AddElem("legacy_last_name", ud.LastName, lsl);
-                        LLSDxmlEncode2.AddElem("id", ud.Id, lsl);
-                        LLSDxmlEncode2.AddElem("is_display_name_default", ud.IsNameDefault, lsl);
-                        LLSDxmlEncode2.AddEndMap(lsl);
+                        badIds.Add(agentId);
+                        continue;
                     }
+
+                    string firstName = ud.FirstName?.Trim() ?? string.Empty;
+                    string lastName = ud.LastName?.Trim() ?? string.Empty;
+
+                    if (firstName.Length == 0
+                        || firstName.Equals("Unknown", StringComparison.OrdinalIgnoreCase)
+                        || firstName.Equals("Unkown", StringComparison.OrdinalIgnoreCase))
+                    {
+                        badIds.Add(agentId);
+                        continue;
+                    }
+
+                    bool resident = lastName.Equals("Resident", StringComparison.OrdinalIgnoreCase);
+                    string username;
+                    if (resident || lastName.Length == 0)
+                        username = firstName;
+                    else if (lastName.StartsWith("@", StringComparison.Ordinal))
+                        username = firstName + lastName;
+                    else
+                        username = firstName + "." + lastName;
+
+                    string legacyName = resident || lastName.Length == 0 ? firstName : firstName + " " + lastName;
+                    string displayName = string.IsNullOrWhiteSpace(ud.DisplayName) ? legacyName : ud.DisplayName;
+                    bool isDisplayNameDefault = string.IsNullOrWhiteSpace(ud.DisplayName);
+                    DateTime nextUpdate = ud.NameChanged == default ? DateTime.UtcNow.AddDays(7) : ud.NameChanged.AddDays(7);
+
+                    LLSDxmlEncode2.AddMap(lsl);
+                    LLSDxmlEncode2.AddElem("username", username.ToLowerInvariant(), lsl);
+                    LLSDxmlEncode2.AddElem("display_name", displayName, lsl);
+                    LLSDxmlEncode2.AddElem("display_name_next_update", nextUpdate, lsl);
+                    LLSDxmlEncode2.AddElem("display_name_expires", DateTime.UtcNow.AddDays(1), lsl);
+                    LLSDxmlEncode2.AddElem("legacy_first_name", firstName, lsl);
+                    LLSDxmlEncode2.AddElem("legacy_last_name", lastName, lsl);
+                    LLSDxmlEncode2.AddElem("id", agentId, lsl);
+                    LLSDxmlEncode2.AddElem("is_display_name_default", isDisplayNameDefault, lsl);
+                    LLSDxmlEncode2.AddEndMap(lsl);
+                }
+
+                LLSDxmlEncode2.AddEndArray(lsl);
+                if (badIds.Count > 0)
+                {
+                    LLSDxmlEncode2.AddArray("bad_ids", lsl);
+                    foreach (UUID badId in badIds)
+                        LLSDxmlEncode2.AddElem(badId, lsl);
                     LLSDxmlEncode2.AddEndArray(lsl);
                 }
             }
