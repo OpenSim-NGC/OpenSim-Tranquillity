@@ -40,14 +40,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Properties/" />
+    <!-- 
+      Include all files within the 'AppData' folder and its subfolders.
+      The 'Link' metadata flattens the output by omitting the top-level 'AppData' folder 
+      while preserving subdirectories.
+    -->
+    <Content Include="AppData\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <!-- 
+        This line is the key to stripping the top-level folder on build/publish.
+        It ensures files are placed directly in the output directory or in subfolders 
+        relative to the output root, not nested under "AppData" in the output.
+      -->
+      <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
   </ItemGroup>
-
-  <Target Name="CopyAppData" AfterTargets="Publish">
-    <ItemGroup>
-      <FilesToCopy Include="AppData/**/*.*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(PublishDir)/%(RecursiveDir)" SkipUnchangedFiles="true" />
-  </Target>
 
 </Project>
