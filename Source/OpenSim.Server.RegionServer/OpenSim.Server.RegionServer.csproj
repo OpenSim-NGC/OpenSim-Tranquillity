@@ -51,6 +51,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.2" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.2" />
     <PackageReference Include="log4net" Version="3.3.0" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.Setup" Version="1.4.1" />
@@ -62,22 +65,6 @@
     <EmbeddedResource Include="Resources/OpenSim.Server.RegionServer.addin.xml" />
   </ItemGroup>
 
-
-
-  <Target Name="CopyNativeDllConfig" AfterTargets="Publish">
-    <ItemGroup>
-      <NativeConfigToCopy Include="$(SolutionDir)Library/*.dll.config" />
-    </ItemGroup>
-    <Copy SourceFiles="@(NativeConfigToCopy)" DestinationFolder="$(PublishDir)/%(RecursiveDir)" SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="CopyNativeLibraries" AfterTargets="Publish">
-    <ItemGroup>
-      <NativeLibsToCopy Include="$(SolutionDir)Library/lib64/**/*.*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(NativeLibsToCopy)" DestinationFolder="$(PublishDir)/lib64/%(RecursiveDir)" SkipUnchangedFiles="true" />
-  </Target>
-  
   <ItemGroup>
     <!-- 
       Include all files within the 'AppData' folder and its subfolders.

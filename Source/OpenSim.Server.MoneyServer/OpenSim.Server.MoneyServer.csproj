@@ -18,7 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Data.Model/OpenSim.Data.Model.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Data.MySQL/OpenSim.Data.MySQL.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Data.MySQL.MoneyData/OpenSim.Data.MySQL.MoneyData.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />

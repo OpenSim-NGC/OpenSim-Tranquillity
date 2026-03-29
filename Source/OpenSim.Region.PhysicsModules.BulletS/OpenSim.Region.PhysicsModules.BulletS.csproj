@@ -8,7 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="BulletXNA.dll" HintPath="../../Library/BulletXNA.dll" />
     <Reference Include="Nini.dll" HintPath="../../Library/Nini.dll" />
     <Reference Include="OpenMetaverse.dll" HintPath="../../Library/OpenMetaverse.dll" />
     <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
@@ -34,5 +33,16 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources/OpenSim.Region.PhysicsModules.BulletS.addin.xml" />
   </ItemGroup>
-  
+
+  <ItemGroup>
+    <!-- Reference the managed DLL -->
+    <Reference Include="BulletXNA.dll" HintPath="../../Library/BulletXNA.dll" />
+
+    <!-- Include the native DLL/SO and copy to output -->
+    <None Include="runtimes\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory> 
+    </None>
+</ItemGroup>
+
 </Project>

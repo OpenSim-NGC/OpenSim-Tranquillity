@@ -32,4 +32,12 @@
     <EmbeddedResource Include="Resources/OpenSim.Region.PhysicsModules.ubODE.addin.xml" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Include the native DLL/SO and copy to output -->
+    <None Include="runtimes\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory> 
+    </None>
+  </ItemGroup>
+
 </Project>
