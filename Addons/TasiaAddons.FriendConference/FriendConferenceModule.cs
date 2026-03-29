@@ -157,6 +157,7 @@ public class FriendConferenceModule : ISharedRegionModule
 
     private void OnNewClient(IClientAPI client)
     {
+        client.OnInstantMessage -= OnViewerInstantMessage;
         client.OnInstantMessage += OnViewerInstantMessage;
     }
 
@@ -516,8 +517,6 @@ public class FriendConferenceModule : ISharedRegionModule
 
         UUID to = new(im.toAgentID);
         IClientAPI client = GetActiveClient(to);
-        if (client != null)
-            client.SendInstantMessage(im);
 
         if (client != null && dialog == InstantMessageDialog.SessionAdd)
         {
