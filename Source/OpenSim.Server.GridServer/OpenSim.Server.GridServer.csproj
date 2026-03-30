@@ -17,8 +17,20 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../Addons/OpenSim.Addons.Groups/OpenSim.Addons.Groups.csproj" />
+    <ProjectReference Include="../../Addons/OpenSim.Addons.OfflineIM/OpenSim.Addons.OfflineIM.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Capabilities.Handlers/OpenSim.Capabilities.Handlers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Capabilities/OpenSim.Capabilities.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.MySQL/OpenSim.Data.MySQL.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.Null/OpenSim.Data.Null.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.PGSQL/OpenSim.Data.PGSQL.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.SQLite/OpenSim.Data.SQLite.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.AssetLoader.Filesystem/OpenSim.Framework.AssetLoader.Filesystem.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Monitoring/OpenSim.Framework.Monitoring.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Serialization/OpenSim.Framework.Serialization.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Servers/OpenSim.Framework.Servers.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Servers.HttpServer/OpenSim.Framework.Servers.HttpServer.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj" />
@@ -45,6 +57,7 @@
     <ProjectReference Include="../../Source/OpenSim.Services.SimulationService/OpenSim.Services.SimulationService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.UserAccountService/OpenSim.Services.UserAccountService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.UserProfilesService/OpenSim.Services.UserProfilesService.csproj" />
+
   </ItemGroup>
 
   <ItemGroup>
