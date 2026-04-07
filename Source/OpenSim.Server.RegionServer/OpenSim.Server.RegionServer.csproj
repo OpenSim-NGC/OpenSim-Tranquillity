@@ -24,7 +24,12 @@
     <ProjectReference Include="../../Source/OpenSim.ApplicationPlugins.RegionModulesController/OpenSim.ApplicationPlugins.RegionModulesController.csproj" />
     <ProjectReference Include="../../Source/OpenSim.ApplicationPlugins.RemoteController/OpenSim.ApplicationPlugins.RemoteController.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.MySQL/OpenSim.Data.MySQL.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.Null/OpenSim.Data.Null.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.PGSQL/OpenSim.Data.PGSQL.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.SQLite/OpenSim.Data.SQLite.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.AssetLoader.Filesystem/OpenSim.Framework.AssetLoader.Filesystem.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Monitoring/OpenSim.Framework.Monitoring.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Servers/OpenSim.Framework.Servers.csproj" />
@@ -33,11 +38,36 @@
     <ProjectReference Include="../../Source/OpenSim.Region.OptionalModules/OpenSim.Region.OptionalModules.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.Framework/OpenSim.Region.Framework.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AssetService/OpenSim.Services.AssetService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AuthenticationService/OpenSim.Services.AuthenticationService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AuthorizationService/OpenSim.Services.AuthorizationService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AvatarService/OpenSim.Services.AvatarService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.Base/OpenSim.Services.Base.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Connectors/OpenSim.Services.Connectors.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.EstateService/OpenSim.Services.EstateService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.ExperienceService/OpenSim.Services.ExperienceService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.FSAssetService/OpenSim.Services.FSAssetService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.FreeswitchService/OpenSim.Services.FreeswitchService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Friends/OpenSim.Services.FriendsService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.GridService/OpenSim.Services.GridService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.HypergridService/OpenSim.Services.HypergridService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.InventoryService/OpenSim.Services.InventoryService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.LLLoginService/OpenSim.Services.LLLoginService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.MapImageService/OpenSim.Services.MapImageService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.MuteListService/OpenSim.Services.MuteListService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.PresenceService/OpenSim.Services.PresenceService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.SimulationService/OpenSim.Services.SimulationService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.UserAccountService/OpenSim.Services.UserAccountService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.UserProfilesService/OpenSim.Services.UserProfilesService.csproj" />
+
+
+
+    <ProjectReference Include="../../Source/OpenSim.Services.GridService/OpenSim.Services.GridService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.HypergridService/OpenSim.Services.HypergridService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.InventoryService/OpenSim.Services.InventoryService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.SimulationService/OpenSim.Services.SimulationService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.UserAccountService/OpenSim.Services.UserAccountService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.ClientStack.LindenCaps/OpenSim.Region.ClientStack.LindenCaps.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.ClientStack.LindenUDP/OpenSim.Region.ClientStack.LindenUDP.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.SharedBase/OpenSim.Region.PhysicsModules.SharedBase.csproj" />
@@ -51,6 +81,7 @@
     <ProjectReference Include="../../Source/OpenSim.Region.ScriptEngine.Shared/OpenSim.Region.ScriptEngine.Shared.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.ScriptEngine.YEngine/OpenSim.Region.ScriptEngine.YEngine.csproj" />
     <ProjectReference Include="../../Addons/os-webrtc-janus/WebRtcVoiceRegionModule/WebRtcVoiceRegionModule.csproj" />
+
   </ItemGroup>
 
   <ItemGroup>
@@ -82,7 +113,7 @@
         It ensures files are placed directly in the output directory or in subfolders 
         relative to the output root, not nested under "AppData" in the output.
       -->
-      <Copy>%(RecursiveDir)%(Filename)%(Extension)</Copy>
+      <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Content>
   </ItemGroup>
   
