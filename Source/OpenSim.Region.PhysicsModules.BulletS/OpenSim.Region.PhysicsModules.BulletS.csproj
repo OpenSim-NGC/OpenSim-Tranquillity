@@ -35,20 +35,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- <Content Include="app.config">
+      <Link>$(TargetName).dll.config</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content> -->
+
     <!-- Reference the managed DLL -->
     <Reference Include="BulletXNA.dll" HintPath="../../Library/BulletXNA.dll" />
     
-    <!-- Include the DLL config file and copy to output -->
-    <None Include="OpenSim.Region.PhysicsModules.BulletS.dll.config" >
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </None>
-    
     <!-- Include the native DLL/SO and copy to output -->
-    <None Include="runtimes\**\*.*">
+    <Content Include="runtimes\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory> 
-    </None>
-</ItemGroup>
+    </Content>
+  </ItemGroup>
 
 </Project>

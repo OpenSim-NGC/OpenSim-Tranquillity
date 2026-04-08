@@ -33,17 +33,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Include the DLL config file and copy to output -->
-    <None Include="OpenSim.Region.PhysicsModules.ubODE.dll.config" >
+    <!-- <Content Include="app.config">
+      <Link>$(TargetName).dll.config</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </None>
+    </Content> -->
 
     <!-- Include the native DLL/SO and copy to output -->
-    <None Include="runtimes\**\*.*">
+    <Content Include="runtimes\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory> 
-    </None>
+    </Content>
   </ItemGroup>
 
 </Project>
