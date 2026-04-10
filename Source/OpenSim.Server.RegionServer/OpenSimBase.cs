@@ -43,10 +43,11 @@ using OpenSim.Services.UserAccountService;
 
 namespace OpenSim.Server.RegionServer
 {
+
     /// <summary>
     /// Common OpenSimulator simulator code
     /// </summary>
-    public class OpenSimBase : RegionApplicationBase
+    public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -109,7 +110,7 @@ namespace OpenSim.Server.RegionServer
         /// <value>
         /// The config information passed into the OpenSimulator region server.
         /// </value>
-        public OpenSimConfigSource ConfigSource { get; private set; }
+        public IConfigSource ConfigSource { get; private set; }
 
         protected EnvConfigSource m_EnvConfigSource = new EnvConfigSource();
 
@@ -145,7 +146,7 @@ namespace OpenSim.Server.RegionServer
         {
             m_configLoader = new ConfigurationLoader();
             ConfigSource = m_configLoader.LoadConfigSettings(configSource, envConfigSource, out m_configSettings, out m_networkServersInfo);
-            Config = ConfigSource.Source;
+            Config = ConfigSource;
             ReadExtraConfigSettings();
         }
 
@@ -211,7 +212,7 @@ namespace OpenSim.Server.RegionServer
             if (startupConfig != null)
             {
                 // refuse to run MegaRegions
-                if(startupConfig.GetBoolean("CombineContiguousRegions", false))
+                if (startupConfig.GetBoolean("CombineContiguousRegions", false))
                 {
                     m_log.Fatal("CombineContiguousRegions (MegaRegions) option is no longer suported. Use a older version to save region contents as OAR, then import into a fresh install of this new version");
                     throw new Exception("CombineContiguousRegions not suported");
@@ -228,7 +229,7 @@ namespace OpenSim.Server.RegionServer
                 string permissionModules = Util.GetConfigVarFromSections<string>(Config, "permissionmodules",
                     new string[] { "Startup", "Permissions" }, "DefaultPermissionsModule");
 
-                m_permsModules =  new List<string>(permissionModules.Split(',').Select(m => m.Trim()));
+                m_permsModules = new List<string>(permissionModules.Split(',').Select(m => m.Trim()));
 
                 managedStatsURI = startupConfig.GetString("ManagedStatsRemoteFetchURI", String.Empty);
                 managedStatsPassword = startupConfig.GetString("ManagedStatsRemoteFetchPassword", String.Empty);
@@ -251,7 +252,7 @@ namespace OpenSim.Server.RegionServer
                         module));
 
             // Load the estate data service
-            module = Util.GetConfigVarFromSections<string>(Config, "LocalServiceModule", new string[]{"EstateDataStore", "EstateService"}, String.Empty);
+            module = Util.GetConfigVarFromSections<string>(Config, "LocalServiceModule", new string[] { "EstateDataStore", "EstateService" }, String.Empty);
             if (String.IsNullOrEmpty(module))
                 throw new Exception("Configuration file is missing the LocalServiceModule parameter in the [EstateDataStore] or [EstateService] section");
 
@@ -343,33 +344,33 @@ namespace OpenSim.Server.RegionServer
             IConfig startupConfig = Config.Configs["Startup"];
             if (startupConfig == null || startupConfig.GetBoolean("JobEngineEnabled", true))
                 WorkManager.JobEngine.Start();
-            
+
             // Sure is not the right place for this but do the job...
             // Must always be called before (all) / the HTTP servers starting for the Certs creation or renewals.
-                if (startupConfig.GetBoolean("EnableSelfsignedCertSupport", false))
-                {
-                    if(!File.Exists("SSL\\ssl\\"+ startupConfig.GetString("CertFileName") +".p12") || startupConfig.GetBoolean("CertRenewOnStartup"))
-                    {               
-                        Util.CreateOrUpdateSelfsignedCert(
-                            string.IsNullOrEmpty(startupConfig.GetString("CertFileName")) ? "OpenSim" : startupConfig.GetString("CertFileName"),
-                            string.IsNullOrEmpty(startupConfig.GetString("CertHostName")) ? "localhost" : startupConfig.GetString("CertHostName"),
-                            string.IsNullOrEmpty(startupConfig.GetString("CertHostIp")) ? "127.0.0.1" : startupConfig.GetString("CertHostIp"),
-                            string.IsNullOrEmpty(startupConfig.GetString("CertPassword")) ? string.Empty : startupConfig.GetString("CertPassword")
-                        );
-                    }
-                }
-
-            if(startupConfig.GetBoolean("EnableCertConverter", false))
+            if (startupConfig.GetBoolean("EnableSelfsignedCertSupport", false))
             {
-                 Util.ConvertPemToPKCS12(
-                    string.IsNullOrEmpty(startupConfig.GetString("outputCertName")) ? "letsencrypt" : startupConfig.GetString("outputCertName"),
-                    string.IsNullOrEmpty(startupConfig.GetString("PemCertPublicKey")) ? string.Empty : startupConfig.GetString("PemCertPublicKey"),
-                    string.IsNullOrEmpty(startupConfig.GetString("PemCertPrivateKey")) ? string.Empty : startupConfig.GetString("PemCertPrivateKey"),
-                    string.IsNullOrEmpty(startupConfig.GetString("outputCertPassword")) ? string.Empty : startupConfig.GetString("outputCertPassword")
-                );
+                if (!File.Exists("SSL\\ssl\\" + startupConfig.GetString("CertFileName") + ".p12") || startupConfig.GetBoolean("CertRenewOnStartup"))
+                {
+                    Util.CreateOrUpdateSelfsignedCert(
+                        string.IsNullOrEmpty(startupConfig.GetString("CertFileName")) ? "OpenSim" : startupConfig.GetString("CertFileName"),
+                        string.IsNullOrEmpty(startupConfig.GetString("CertHostName")) ? "localhost" : startupConfig.GetString("CertHostName"),
+                        string.IsNullOrEmpty(startupConfig.GetString("CertHostIp")) ? "127.0.0.1" : startupConfig.GetString("CertHostIp"),
+                        string.IsNullOrEmpty(startupConfig.GetString("CertPassword")) ? string.Empty : startupConfig.GetString("CertPassword")
+                    );
+                }
             }
-            
-            if(m_networkServersInfo.HttpUsesSSL)
+
+            if (startupConfig.GetBoolean("EnableCertConverter", false))
+            {
+                Util.ConvertPemToPKCS12(
+                   string.IsNullOrEmpty(startupConfig.GetString("outputCertName")) ? "letsencrypt" : startupConfig.GetString("outputCertName"),
+                   string.IsNullOrEmpty(startupConfig.GetString("PemCertPublicKey")) ? string.Empty : startupConfig.GetString("PemCertPublicKey"),
+                   string.IsNullOrEmpty(startupConfig.GetString("PemCertPrivateKey")) ? string.Empty : startupConfig.GetString("PemCertPrivateKey"),
+                   string.IsNullOrEmpty(startupConfig.GetString("outputCertPassword")) ? string.Empty : startupConfig.GetString("outputCertPassword")
+               );
+            }
+
+            if (m_networkServersInfo.HttpUsesSSL)
             {
                 m_httpServerSSL = true;
                 m_httpServerPort = m_networkServersInfo.httpSSLPort;
@@ -439,9 +440,9 @@ namespace OpenSim.Server.RegionServer
 
             // set initial ServerURI
             regionInfo.HttpPort = m_httpServerPort;
-            if(m_httpServerSSL)
+            if (m_httpServerSSL)
             {
-                if(!m_httpServer.CheckSSLCertHost(regionInfo.ExternalHostName))
+                if (!m_httpServer.CheckSSLCertHost(regionInfo.ExternalHostName))
                     throw new Exception("main http cert CN doesn't match region External IP");
 
                 regionInfo.ServerURI = "https://" + regionInfo.ExternalHostName +
@@ -483,10 +484,10 @@ namespace OpenSim.Server.RegionServer
             }
 
             scene.SetModuleInterfaces();
-// First Step of bootreport sequence
+            // First Step of bootreport sequence
             if (scene.SnmpService != null)
             {
-                scene.SnmpService.ColdStart(1,scene);
+                scene.SnmpService.ColdStart(1, scene);
                 scene.SnmpService.LinkDown(scene);
             }
 
@@ -558,7 +559,7 @@ namespace OpenSim.Server.RegionServer
             {
                 scene.SnmpService.BootInfo("Initializing region modules", scene);
             }
-            scene.EventManager.OnShutdown += delegate() { ShutdownRegion(scene); };
+            scene.EventManager.OnShutdown += delegate () { ShutdownRegion(scene); };
 
             mscene = scene;
 
@@ -608,7 +609,7 @@ namespace OpenSim.Server.RegionServer
             }
 
             MainConsole.Instance.Output("Estate {0} has no owner set.", regionInfo.EstateSettings.EstateName);
-            List<char> excluded = new List<char>(new char[1]{' '});
+            List<char> excluded = new List<char>(new char[1] { ' ' });
 
 
             if (estateOwnerFirstName == null || estateOwnerLastName == null)
@@ -625,17 +626,17 @@ namespace OpenSim.Server.RegionServer
 
                 // XXX: The LocalUserAccountServicesConnector is currently registering its inner service rather than
                 // itself!
-//                    if (scene.UserAccountService is LocalUserAccountServicesConnector)
-//                    {
-//                        IUserAccountService innerUas
-//                            = ((LocalUserAccountServicesConnector)scene.UserAccountService).UserAccountService;
-//
-//                        m_log.DebugFormat("B {0}", innerUas.GetType());
-//
-//                        if (innerUas is UserAccountService)
-//                        {
+                //                    if (scene.UserAccountService is LocalUserAccountServicesConnector)
+                //                    {
+                //                        IUserAccountService innerUas
+                //                            = ((LocalUserAccountServicesConnector)scene.UserAccountService).UserAccountService;
+                //
+                //                        m_log.DebugFormat("B {0}", innerUas.GetType());
+                //
+                //                        if (innerUas is UserAccountService)
+                //                        {
 
-                if (scene.UserAccountService is UserAccountService)
+                if (scene.UserAccountService is IUserAccountService)
                 {
                     if (estateOwnerPassword == null)
                         estateOwnerPassword = MainConsole.Instance.Prompt("Password", null, null, false);
@@ -845,7 +846,7 @@ namespace OpenSim.Server.RegionServer
         /// </remarks>
         public class SimStatusHandler : SimpleStreamHandler
         {
-            public SimStatusHandler() : base("/simstatus", "SimStatus") {}
+            public SimStatusHandler() : base("/simstatus", "SimStatus") { }
 
             protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
             {
@@ -1180,10 +1181,5 @@ namespace OpenSim.Server.RegionServer
 
             return true;    // need to update the database
         }
-    }
-
-    public class OpenSimConfigSource
-    {
-        public IConfigSource Source;
     }
 }

@@ -8,7 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="BulletXNA.dll" HintPath="../../Library/BulletXNA.dll" />
     <Reference Include="Nini.dll" HintPath="../../Library/Nini.dll" />
     <Reference Include="OpenMetaverse.dll" HintPath="../../Library/OpenMetaverse.dll" />
     <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
@@ -28,11 +27,26 @@
     <PackageReference Include="log4net" Version="3.3.0" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Resources/OpenSim.Region.PhysicsModules.BulletS.addin.xml" />
   </ItemGroup>
-  
+
+  <ItemGroup>
+    <!-- <Content Include="app.config">
+      <Link>$(TargetName).dll.config</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content> -->
+
+    <!-- Reference the managed DLL -->
+    <Reference Include="BulletXNA.dll" HintPath="../../Library/BulletXNA.dll" />
+    
+    <!-- Include the native DLL/SO and copy to output -->
+    <Content Include="runtimes\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

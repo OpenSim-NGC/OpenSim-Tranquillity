@@ -18,7 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Data.Model/OpenSim.Data.Model.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Data.MySQL/OpenSim.Data.MySQL.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Data.MySQL.MoneyData/OpenSim.Data.MySQL.MoneyData.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
@@ -36,18 +35,25 @@
     <PackageReference Include="log4net" Version="3.3.0" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Properties/" />
+    <!-- 
+      Include all files within the 'AppData' folder and its subfolders.
+      The 'Link' metadata flattens the output by omitting the top-level 'AppData' folder 
+      while preserving subdirectories.
+    -->
+    <Content Include="AppData\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <!-- 
+        This line is the key to stripping the top-level folder on build/publish.
+        It ensures files are placed directly in the output directory or in subfolders 
+        relative to the output root, not nested under "AppData" in the output.
+      -->
+      <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
   </ItemGroup>
-
-  <Target Name="CopyAppData" AfterTargets="Publish">
-    <ItemGroup>
-      <FilesToCopy Include="AppData/**/*.*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(PublishDir)/%(RecursiveDir)" SkipUnchangedFiles="true" />
-  </Target>
 
 </Project>

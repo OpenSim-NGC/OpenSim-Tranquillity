@@ -31,6 +31,7 @@ using log4net;
 using log4net.Config;
 using Nini.Config;
 using OpenSim.Framework;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Server.RegionServer
 {

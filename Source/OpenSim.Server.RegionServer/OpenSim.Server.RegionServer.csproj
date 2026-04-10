@@ -20,9 +20,16 @@
   </ItemGroup>
   
   <ItemGroup>
-
+    <ProjectReference Include="../../Source/OpenSim.ApplicationPlugins.LoadRegions/OpenSim.ApplicationPlugins.LoadRegions.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.ApplicationPlugins.RegionModulesController/OpenSim.ApplicationPlugins.RegionModulesController.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.ApplicationPlugins.RemoteController/OpenSim.ApplicationPlugins.RemoteController.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.MySQL/OpenSim.Data.MySQL.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.Null/OpenSim.Data.Null.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.PGSQL/OpenSim.Data.PGSQL.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.SQLite/OpenSim.Data.SQLite.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.AssetLoader.Filesystem/OpenSim.Framework.AssetLoader.Filesystem.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Monitoring/OpenSim.Framework.Monitoring.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Servers/OpenSim.Framework.Servers.csproj" />
@@ -30,44 +37,84 @@
     <ProjectReference Include="../../Source/OpenSim.Region.CoreModules/OpenSim.Region.CoreModules.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.OptionalModules/OpenSim.Region.OptionalModules.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.Framework/OpenSim.Region.Framework.csproj" />
-    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.SharedBase/OpenSim.Region.PhysicsModules.SharedBase.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AssetService/OpenSim.Services.AssetService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AuthenticationService/OpenSim.Services.AuthenticationService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AuthorizationService/OpenSim.Services.AuthorizationService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.AvatarService/OpenSim.Services.AvatarService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.Base/OpenSim.Services.Base.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Connectors/OpenSim.Services.Connectors.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.EstateService/OpenSim.Services.EstateService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.ExperienceService/OpenSim.Services.ExperienceService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.FSAssetService/OpenSim.Services.FSAssetService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.FreeswitchService/OpenSim.Services.FreeswitchService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Friends/OpenSim.Services.FriendsService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.GridService/OpenSim.Services.GridService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.HypergridService/OpenSim.Services.HypergridService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.InventoryService/OpenSim.Services.InventoryService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.LLLoginService/OpenSim.Services.LLLoginService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.MapImageService/OpenSim.Services.MapImageService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.MuteListService/OpenSim.Services.MuteListService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.PresenceService/OpenSim.Services.PresenceService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.SimulationService/OpenSim.Services.SimulationService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.UserAccountService/OpenSim.Services.UserAccountService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.UserProfilesService/OpenSim.Services.UserProfilesService.csproj" />
+
+
+
+    <ProjectReference Include="../../Source/OpenSim.Services.GridService/OpenSim.Services.GridService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.HypergridService/OpenSim.Services.HypergridService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.InventoryService/OpenSim.Services.InventoryService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.SimulationService/OpenSim.Services.SimulationService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.UserAccountService/OpenSim.Services.UserAccountService.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.ClientStack.LindenCaps/OpenSim.Region.ClientStack.LindenCaps.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.ClientStack.LindenUDP/OpenSim.Region.ClientStack.LindenUDP.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.SharedBase/OpenSim.Region.PhysicsModules.SharedBase.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet/OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.BasicPhysics/OpenSim.Region.PhysicsModules.BasicPhysics.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.BulletS/OpenSim.Region.PhysicsModules.BulletS.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.Meshing/OpenSim.Region.PhysicsModules.Meshing.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.POS/OpenSim.Region.PhysicsModules.POS.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.ubODE/OpenSim.Region.PhysicsModules.ubODE.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.ubODEMeshing/OpenSim.Region.PhysicsModules.ubODEMeshing.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.ScriptEngine.Shared/OpenSim.Region.ScriptEngine.Shared.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.ScriptEngine.YEngine/OpenSim.Region.ScriptEngine.YEngine.csproj" />
+    <ProjectReference Include="../../Addons/os-webrtc-janus/WebRtcVoiceRegionModule/WebRtcVoiceRegionModule.csproj" />
+
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.2" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.2" />
     <PackageReference Include="log4net" Version="3.3.0" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.Setup" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Resources/OpenSim.Server.RegionServer.addin.xml" />
   </ItemGroup>
 
-  <Target Name="CopyAppData" AfterTargets="Publish">
-    <ItemGroup>
-      <FilesToCopy Include="AppData/**/*.*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(PublishDir)/%(RecursiveDir)" SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="CopyNativeDllConfig" AfterTargets="Publish">
-    <ItemGroup>
-      <NativeConfigToCopy Include="$(SolutionDir)Library/*.dll.config" />
-    </ItemGroup>
-    <Copy SourceFiles="@(NativeConfigToCopy)" DestinationFolder="$(PublishDir)/%(RecursiveDir)" SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="CopyNativeLibraries" AfterTargets="Publish">
-    <ItemGroup>
-      <NativeLibsToCopy Include="$(SolutionDir)Library/lib64/**/*.*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(NativeLibsToCopy)" DestinationFolder="$(PublishDir)/lib64/%(RecursiveDir)" SkipUnchangedFiles="true" />
-  </Target>
-
+  <ItemGroup>
+    <!-- 
+      Include all files within the 'AppData' folder and its subfolders.
+      The 'Link' metadata flattens the output by omitting the top-level 'AppData' folder 
+      while preserving subdirectories.
+    -->
+    <Content Include="AppData\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <!-- 
+        This line is the key to stripping the top-level folder on build/publish.
+        It ensures files are placed directly in the output directory or in subfolders 
+        relative to the output root, not nested under "AppData" in the output.
+      -->
+      <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+  
 </Project>

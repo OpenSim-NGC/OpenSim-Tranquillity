@@ -31,12 +31,10 @@ using Mono.Addins;
 using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Server.RegionServer;
 
 namespace OpenSim.ApplicationPlugins.RegionModulesController
 {
-    public class RegionModulesControllerPlugin : IRegionModulesController,
-            IApplicationPlugin
+    public class RegionModulesControllerPlugin : IRegionModulesController, IApplicationPlugin
     {
         // Logger
         private static readonly ILog m_log =
@@ -45,11 +43,11 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
         /// <summary>
         /// Controls whether we load modules from Mono.Addins.
         /// </summary>
-        /// <remarks>For debug purposes.  Defaults to true.</remarks>
+            /// <remarks>For debug purposes.  Defaults to true.</remarks>
         public bool LoadModulesFromAddins { get; set; }
 
         // Config access
-        private OpenSimBase m_openSim;
+        private IOpenSimBase m_openSim;
 
         // Our name
         private string m_name;
@@ -88,7 +86,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
 
 #region IApplicationPlugin implementation
 
-        public void Initialise (OpenSimBase openSim)
+        public void Initialise (IOpenSimBase openSim)
         {
             if (!LoadModulesFromAddins)
                 return;
@@ -101,9 +99,9 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
             m_log.DebugFormat("[REGIONMODULES]: Initializing...");
 
             // The [Modules] section in the ini file
-            IConfig modulesConfig = m_openSim.ConfigSource.Source.Configs["Modules"];
+            IConfig modulesConfig = m_openSim.ConfigSource.Configs["Modules"];
             if (modulesConfig == null)
-                modulesConfig = m_openSim.ConfigSource.Source.AddConfig("Modules");
+                modulesConfig = m_openSim.ConfigSource.AddConfig("Modules");
 
             // Who we are
             string id = AddinManager.CurrentAddin.Id;
@@ -183,7 +181,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
 
                 // OK, we're up and running
                 m_sharedInstances.Add(module);
-                module.Initialise(m_openSim.ConfigSource.Source);
+                module.Initialise(m_openSim.ConfigSource);
             }
         }
 
@@ -345,7 +343,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
             }
 
             IConfig modulesConfig =
-                    m_openSim.ConfigSource.Source.Configs["Modules"];
+                    m_openSim.ConfigSource.Configs["Modules"];
 
             // Scan for, and load, nonshared modules
             List<INonSharedRegionModule> list = new List<INonSharedRegionModule>();
@@ -402,7 +400,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
                                   scene.RegionInfo.RegionName, module.Name);
 
                 // Initialise the module
-                module.Initialise(m_openSim.ConfigSource.Source);
+                module.Initialise(m_openSim.ConfigSource);
 
                 list.Add(module);
             }
@@ -464,7 +462,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
                 m_log.DebugFormat("[REGIONMODULE]: Adding scene {0} to non-shared module {1} (deferred)",
                                   scene.RegionInfo.RegionName, module.Name);
 
-                module.Initialise(m_openSim.ConfigSource.Source);
+                module.Initialise(m_openSim.ConfigSource);
 
                 list.Add(module);
                 deferredlist.Add(module);
