@@ -71,7 +71,7 @@ namespace OpenSim.Server.RegionServer
                 m_log.Error("[REGION SERVER]: HTTP Server config failed.   HTTP Server and HTTPS server must be on different ports");
             }
 
-            if(m_networkServersInfo.HttpUsesSSL)
+            if (m_networkServersInfo.HttpUsesSSL)
             {
                 m_httpServer = new BaseHttpServer(
                         mainSSLport, m_networkServersInfo.HttpUsesSSL,
@@ -83,7 +83,7 @@ namespace OpenSim.Server.RegionServer
 
             // unsecure main server
             BaseHttpServer server = new BaseHttpServer(mainport);
-            if(!m_networkServersInfo.HttpUsesSSL)
+            if (!m_networkServersInfo.HttpUsesSSL)
             {
                 m_httpServer = server;
                 server.Start();

@@ -5,11 +5,6 @@
     <Nullable>disable</Nullable>
     <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
   </PropertyGroup>
-  <PropertyGroup>
-    <!-- Define a common output directory for all projects -->
-    <OutputPath>$(SolutionDir)build\$(Configuration)\</OutputPath>
-    <BaseOutputPath>$(SolutionDir)build\</BaseOutputPath>
-  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Nerdbank.GitVersioning" Condition="!Exists('packages.config')">
       <PrivateAssets>all</PrivateAssets>

@@ -17,8 +17,20 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../Addons/OpenSim.Addons.Groups/OpenSim.Addons.Groups.csproj" />
+    <ProjectReference Include="../../Addons/OpenSim.Addons.OfflineIM/OpenSim.Addons.OfflineIM.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Capabilities.Handlers/OpenSim.Capabilities.Handlers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Capabilities/OpenSim.Capabilities.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.MySQL/OpenSim.Data.MySQL.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.Null/OpenSim.Data.Null.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.PGSQL/OpenSim.Data.PGSQL.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.SQLite/OpenSim.Data.SQLite.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.AssetLoader.Filesystem/OpenSim.Framework.AssetLoader.Filesystem.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Monitoring/OpenSim.Framework.Monitoring.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Serialization/OpenSim.Framework.Serialization.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Servers/OpenSim.Framework.Servers.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Servers.HttpServer/OpenSim.Framework.Servers.HttpServer.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj" />
@@ -45,24 +57,36 @@
     <ProjectReference Include="../../Source/OpenSim.Services.SimulationService/OpenSim.Services.SimulationService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.UserAccountService/OpenSim.Services.UserAccountService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.UserProfilesService/OpenSim.Services.UserProfilesService.csproj" />
+
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="SkiaSharp" Version="3.119.1" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.1" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.1" />
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.2" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.2" />
     <PackageReference Include="log4net" Version="3.3.0" />
     <PackageReference Include="Mono.Addins" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.Setup" Version="1.4.1" />
     <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
   </ItemGroup>
   
-  <Target Name="CopyAppData" AfterTargets="Publish">
-    <ItemGroup>
-      <FilesToCopy Include="AppData/**/*.*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(PublishDir)/%(RecursiveDir)" SkipUnchangedFiles="true" />
-  </Target>
+  <ItemGroup>
+    <!-- 
+      Include all files within the 'AppData' folder and its subfolders.
+      The 'Link' metadata flattens the output by omitting the top-level 'AppData' folder 
+      while preserving subdirectories.
+    -->
+    <Content Include="AppData\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <!-- 
+        This line is the key to stripping the top-level folder on build/publish.
+        It ensures files are placed directly in the output directory or in subfolders 
+        relative to the output root, not nested under "AppData" in the output.
+      -->
+      <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
   
 </Project>

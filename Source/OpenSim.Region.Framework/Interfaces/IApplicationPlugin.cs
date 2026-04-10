@@ -26,9 +26,29 @@
  */
 
 using OpenSim.Framework;
+using Nini.Config;
+using OpenSim.Region.Framework.Scenes;
+using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Server.RegionServer
+namespace OpenSim.Region.Framework.Interfaces
 {
+    public interface IOpenSimBase
+    {
+        IConfigSource ConfigSource { get; }
+        IRegistryCore ApplicationRegistry { get; }
+        IEstateDataService EstateDataService { get; }
+        SceneManager SceneManager { get; }
+
+        string GetVersionText();
+        void Shutdown();
+
+        void CreateRegion(RegionInfo regionInfo, bool portadd_flag, out IScene scene);
+        void CreateRegion(RegionInfo regionInfo, out IScene scene);
+        void RemoveRegion(Scene scene, bool cleanup);
+        void CloseRegion(Scene scene);
+        bool PopulateRegionEstateInfo(RegionInfo regInfo);
+    }
+
     /// <summary>
     /// OpenSimulator Application Plugin framework interface
     /// </summary>
@@ -38,7 +58,7 @@ namespace OpenSim.Server.RegionServer
         /// Initialize the Plugin
         /// </summary>
         /// <param name="openSim">The Application instance</param>
-        void Initialise(OpenSimBase openSim);
+        void Initialise(IOpenSimBase openSim);
 
         /// <summary>
         /// Called when the application loading is completed
@@ -49,9 +69,9 @@ namespace OpenSim.Server.RegionServer
 
     public class ApplicationPluginInitialiser : PluginInitialiserBase
     {
-        private OpenSimBase server;
+        private IOpenSimBase server;
 
-        public ApplicationPluginInitialiser(OpenSimBase s)
+        public ApplicationPluginInitialiser(IOpenSimBase s)
         {
             server = s;
         }

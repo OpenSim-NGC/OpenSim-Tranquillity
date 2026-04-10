@@ -43,6 +43,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Base;
 
 namespace OpenSim.Server.RegionServer
 {
@@ -750,18 +751,18 @@ namespace OpenSim.Server.RegionServer
 
             if (!Path.IsPathRooted(regionFile))
             {
-                string regionsDir = ConfigSource.Source.Configs["Startup"].GetString("regionload_regionsdir", "Regions").Trim();
+                string regionsDir = ConfigSource.Configs["Startup"].GetString("regionload_regionsdir", "Regions").Trim();
                 regionFile = Path.Combine(regionsDir, regionFile);
             }
 
             RegionInfo regInfo;
             if (isXml)
             {
-                regInfo = new RegionInfo(regionName, regionFile, false, ConfigSource.Source);
+                regInfo = new RegionInfo(regionName, regionFile, false, ConfigSource);
             }
             else
             {
-                regInfo = new RegionInfo(regionName, regionFile, false, ConfigSource.Source, regionName);
+                regInfo = new RegionInfo(regionName, regionFile, false, ConfigSource, regionName);
             }
 
             if (SceneManager.TryGetScene(regInfo.RegionID, out Scene existingScene))

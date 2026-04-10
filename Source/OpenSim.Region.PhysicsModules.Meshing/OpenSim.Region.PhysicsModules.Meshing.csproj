@@ -9,9 +9,9 @@
 
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.3.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
-    <PackageReference Include="CoreJ2K.Skia" Version="2.1.0.101" />
-    <PackageReference Include="SkiaSharp" Version="3.119.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
+    <PackageReference Include="CoreJ2K.Skia" Version="2.1.2.38" />
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
   </ItemGroup>
   
   <ItemGroup>
