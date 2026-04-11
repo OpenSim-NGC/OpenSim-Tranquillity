@@ -5,7 +5,6 @@
     <Import assembly="OpenSim.Server.RegionServer.dll"/>
     <Import assembly="OpenSim.Framework.dll"/>
     <Import assembly="OpenSim.Region.Framework.dll"/>
-    <Import assembly="Mono.Addins.dll"/>
   </Runtime>
 
   <ExtensionPoint path="/OpenSim/Startup">

@@ -25,27 +25,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Reflection;
 using System.Xml;
 using System.Xml.Serialization;
 using System.Text;
-using System.Collections.Generic;
 using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenMetaverse;
-using Mono.Addins;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.Servers;
-
-using OpenMetaverse.StructuredData; // LitJson is hidden on this
-
-[assembly:AddinRoot("Robust", OpenSim.VersionInfo.AssemblyVersionNumber)]
 namespace OpenSim.Server.Base
 {
-    [TypeExtensionPoint(Path="/Robust/Connector", Name="RobustConnector")]
     public interface IRobustConnector
     {
         string ConfigName

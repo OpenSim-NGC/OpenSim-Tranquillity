@@ -25,81 +25,70 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Net;
-using Mono.Addins;
-using Xunit;
-using OpenMetaverse;
-using OpenSim;
-using OpenSim.ApplicationPlugins.RegionModulesController;
-using OpenSim.Framework;
-using OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.Framework.Scenes.Tests
+namespace OpenSim.Region.Framework.Scenes.Tests;
+
+public class SharedRegionModuleTests : OpenSimTestCase
 {
-    public class SharedRegionModuleTests : OpenSimTestCase
-    {
 //        [Fact]
-        public void TestLifecycle()
-        {
-            TestHelpers.InMethod();
-            TestHelpers.EnableLogging();
+    public void TestLifecycle()
+    {
+        TestHelpers.InMethod();
+        TestHelpers.EnableLogging();
 
-            UUID estateOwnerId = TestHelpers.ParseTail(0x1);
-            UUID regionId = TestHelpers.ParseTail(0x10);
+        UUID estateOwnerId = TestHelpers.ParseTail(0x1);
+        UUID regionId = TestHelpers.ParseTail(0x10);
 
-            IConfigSource configSource = new IniConfigSource();
-            configSource.AddConfig("Startup");
-            configSource.AddConfig("Modules");
+        IConfigSource configSource = new IniConfigSource();
+        configSource.AddConfig("Startup");
+        configSource.AddConfig("Modules");
 
 //            // We use this to skip estate questions
-            // Turns out not to be needed is estate owner id is pre-set in region information.
+        // Turns out not to be needed is estate owner id is pre-set in region information.
 //            IConfig estateConfig = configSource.AddConfig(OpenSimBase.ESTATE_SECTION_NAME);
 //            estateConfig.Set("DefaultEstateOwnerName", "Zaphod Beeblebrox");
 //            estateConfig.Set("DefaultEstateOwnerUUID", estateOwnerId);
 //            estateConfig.Set("DefaultEstateOwnerEMail", "zaphod@galaxy.com");
 //            estateConfig.Set("DefaultEstateOwnerPassword", "two heads");
 
-            // For grid servic
-            configSource.AddConfig("GridService");
-            configSource.Configs["Modules"].Set("GridServices", "RegionGridServicesConnector");
-            configSource.Configs["GridService"].Set("StorageProvider", "OpenSim.Data.Null.dll:NullRegionData");
-            configSource.Configs["GridService"].Set("LocalServiceModule", "OpenSim.Services.GridService.dll:GridService");
-            configSource.Configs["GridService"].Set("ConnectionString", "!static");
+        // For grid servic
+        configSource.AddConfig("GridService");
+        configSource.Configs["Modules"].Set("GridServices", "RegionGridServicesConnector");
+        configSource.Configs["GridService"].Set("StorageProvider", "OpenSim.Data.Null.dll:NullRegionData");
+        configSource.Configs["GridService"].Set("LocalServiceModule", "OpenSim.Services.GridService.dll:GridService");
+        configSource.Configs["GridService"].Set("ConnectionString", "!static");
 
-            RegionGridServicesConnector gridService = new RegionGridServicesConnector();
+        RegionGridServicesConnector gridService = new RegionGridServicesConnector();
 //
-            OpenSim sim = new OpenSim(configSource);
+        OpenSim sim = new OpenSim(configSource);
 
-            sim.SuppressExit = true;
-            sim.EnableInitialPluginLoad = false;
-            sim.LoadEstateDataService = false;
-            sim.NetServersInfo.HttpListenerPort = 0;
+        sim.SuppressExit = true;
+        sim.EnableInitialPluginLoad = false;
+        sim.LoadEstateDataService = false;
+        sim.NetServersInfo.HttpListenerPort = 0;
 
-            IRegistryCore reg = sim.ApplicationRegistry;
+        IRegistryCore reg = sim.ApplicationRegistry;
 
-            RegionInfo ri = new RegionInfo();
-            ri.RegionID = regionId;
-            ri.EstateSettings.EstateOwner = estateOwnerId;
-            ri.InternalEndPoint = new IPEndPoint(0, 0);
+        RegionInfo ri = new RegionInfo();
+        ri.RegionID = regionId;
+        ri.EstateSettings.EstateOwner = estateOwnerId;
+        ri.InternalEndPoint = new IPEndPoint(0, 0);
 
-            MockRegionModulesControllerPlugin rmcp = new MockRegionModulesControllerPlugin();
-            sim.m_plugins = new List<IApplicationPlugin>() { rmcp };
-            reg.RegisterInterface<IRegionModulesController>(rmcp);
+        MockRegionModulesControllerPlugin rmcp = new MockRegionModulesControllerPlugin();
+        sim.m_plugins = new List<IApplicationPlugin>() { rmcp };
+        reg.RegisterInterface<IRegionModulesController>(rmcp);
 
-            // XXX: Have to initialize directly for now
-            rmcp.Initialise(sim);
+        // XXX: Have to initialize directly for now
+        rmcp.Initialise(sim);
 
-            rmcp.AddNode(gridService);
+        rmcp.AddNode(gridService);
 
-            TestSharedRegion tsr = new TestSharedRegion();
-            rmcp.AddNode(tsr);
+        TestSharedRegion tsr = new TestSharedRegion();
+        rmcp.AddNode(tsr);
 
-            // FIXME: Want to use the real one eventually but this is currently directly tied into Mono.Addins
-            // which has been written in such a way that makes it impossible to use for regression tests.
+        // FIXME: Want to use the real one eventually but this is currently directly tied into Mono.Addins
+        // which has been written in such a way that makes it impossible to use for regression tests.
 //            RegionModulesControllerPlugin rmcp = new RegionModulesControllerPlugin();
 //            rmcp.LoadModulesFromAddins = false;
 ////            reg.RegisterInterface<IRegionModulesController>(rmcp);
@@ -109,140 +98,139 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 //            node.
 //            rmcp.AddNode(node, configSource.Configs["Modules"], new Dictionary<RuntimeAddin, IList<int>>());
 
-            sim.Startup();
-            IScene scene;
-            sim.CreateRegion(ri, out scene);
+        sim.Startup();
+        IScene scene;
+        sim.CreateRegion(ri, out scene);
 
-            sim.Shutdown();
+        sim.Shutdown();
 
-            List<string> co = tsr.CallOrder;
-            int expectedEventCount = 6;
+        List<string> co = tsr.CallOrder;
+        int expectedEventCount = 6;
 
-            Assert.Equal(
-                expectedEventCount,
-                co.Count,
-                "Expected {0} events but only got {1} ({2})",
-                expectedEventCount, co.Count, string.Join(",", co));
-            Assert.Equal("Initialise",       co[0]);
-            Assert.Equal("PostInitialise",   co[1]);
-            Assert.Equal("AddRegion",        co[2]);
-            Assert.Equal("RegionLoaded",     co[3]);
-            Assert.Equal("RemoveRegion",     co[4]);
-            Assert.Equal("Close",            co[5]);
+        Assert.Equal(
+            expectedEventCount,
+            co.Count,
+            "Expected {0} events but only got {1} ({2})",
+            expectedEventCount, co.Count, string.Join(",", co));
+        Assert.Equal("Initialise",       co[0]);
+        Assert.Equal("PostInitialise",   co[1]);
+        Assert.Equal("AddRegion",        co[2]);
+        Assert.Equal("RegionLoaded",     co[3]);
+        Assert.Equal("RemoveRegion",     co[4]);
+        Assert.Equal("Close",            co[5]);
+    }
+}
+
+class TestSharedRegion : ISharedRegionModule
+{
+    // FIXME: Should really use MethodInfo
+    public List<string> CallOrder = new List<string>();
+
+    public string Name { get { return "TestSharedRegion"; } }
+
+    public Type ReplaceableInterface { get { return null; } }
+
+    public void PostInitialise()
+    {
+        CallOrder.Add("PostInitialise");
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        CallOrder.Add("Initialise");
+    }
+
+    public void Close()
+    {
+        CallOrder.Add("Close");
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        CallOrder.Add("AddRegion");
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        CallOrder.Add("RemoveRegion");
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        CallOrder.Add("RegionLoaded");
+    }
+}
+
+class MockRegionModulesControllerPlugin : IRegionModulesController, IApplicationPlugin
+{
+    // List of shared module instances, for adding to Scenes
+    private List<ISharedRegionModule> m_sharedInstances = new List<ISharedRegionModule>();
+
+    // Config access
+    private OpenSimBase m_openSim;
+
+    public string Version { get { return "0"; } }
+    public string Name { get { return "MockRegionModulesControllerPlugin"; } }
+
+    public void Initialise() {}
+
+    public void Initialise(OpenSimBase sim)
+    {
+        m_openSim = sim;
+    }
+
+    /// <summary>
+    /// Called when the application loading is completed
+    /// </summary>
+    public void PostInitialise()
+    {
+        foreach (ISharedRegionModule module in m_sharedInstances)
+            module.PostInitialise();
+    }
+
+    public void AddRegionToModules(Scene scene)
+    {
+        List<ISharedRegionModule> sharedlist = new List<ISharedRegionModule>();
+
+        foreach (ISharedRegionModule module in m_sharedInstances)
+        {
+            module.AddRegion(scene);
+            scene.AddRegionModule(module.Name, module);
+
+            sharedlist.Add(module);
+        }
+
+        foreach (ISharedRegionModule module in sharedlist)
+        {
+            module.RegionLoaded(scene);
         }
     }
 
-    class TestSharedRegion : ISharedRegionModule
+    public void RemoveRegionFromModules(Scene scene)
     {
-        // FIXME: Should really use MethodInfo
-        public List<string> CallOrder = new List<string>();
-
-        public string Name { get { return "TestSharedRegion"; } }
-
-        public Type ReplaceableInterface { get { return null; } }
-
-        public void PostInitialise()
+        foreach (IRegionModuleBase module in scene.RegionModules.Values)
         {
-            CallOrder.Add("PostInitialise");
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            CallOrder.Add("Initialise");
-        }
-
-        public void Close()
-        {
-            CallOrder.Add("Close");
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            CallOrder.Add("AddRegion");
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            CallOrder.Add("RemoveRegion");
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            CallOrder.Add("RegionLoaded");
-        }
-    }
-
-    class MockRegionModulesControllerPlugin : IRegionModulesController, IApplicationPlugin
-    {
-        // List of shared module instances, for adding to Scenes
-        private List<ISharedRegionModule> m_sharedInstances = new List<ISharedRegionModule>();
-
-        // Config access
-        private OpenSimBase m_openSim;
-
-        public string Version { get { return "0"; } }
-        public string Name { get { return "MockRegionModulesControllerPlugin"; } }
-
-        public void Initialise() {}
-
-        public void Initialise(OpenSimBase sim)
-        {
-            m_openSim = sim;
-        }
-
-        /// <summary>
-        /// Called when the application loading is completed
-        /// </summary>
-        public void PostInitialise()
-        {
-            foreach (ISharedRegionModule module in m_sharedInstances)
-                module.PostInitialise();
-        }
-
-        public void AddRegionToModules(Scene scene)
-        {
-            List<ISharedRegionModule> sharedlist = new List<ISharedRegionModule>();
-
-            foreach (ISharedRegionModule module in m_sharedInstances)
-            {
-                module.AddRegion(scene);
-                scene.AddRegionModule(module.Name, module);
-
-                sharedlist.Add(module);
-            }
-
-            foreach (ISharedRegionModule module in sharedlist)
-            {
-                module.RegionLoaded(scene);
-            }
-        }
-
-        public void RemoveRegionFromModules(Scene scene)
-        {
-            foreach (IRegionModuleBase module in scene.RegionModules.Values)
-            {
 //                m_log.DebugFormat("[REGIONMODULE]: Removing scene {0} from module {1}",
 //                                  scene.RegionInfo.RegionName, module.Name);
-                module.RemoveRegion(scene);
-            }
-
-            scene.RegionModules.Clear();
+            module.RemoveRegion(scene);
         }
 
-        public void AddNode(ISharedRegionModule module)
-        {
-            m_sharedInstances.Add(module);
-            module.Initialise(m_openSim.ConfigSource.Source);
-        }
+        scene.RegionModules.Clear();
+    }
 
-        public void Dispose()
+    public void AddNode(ISharedRegionModule module)
+    {
+        m_sharedInstances.Add(module);
+        module.Initialise(m_openSim.ConfigSource.Source);
+    }
+
+    public void Dispose()
+    {
+        // We expect that all regions have been removed already
+        while (m_sharedInstances.Count > 0)
         {
-            // We expect that all regions have been removed already
-            while (m_sharedInstances.Count > 0)
-            {
-                m_sharedInstances[0].Close();
-                m_sharedInstances.RemoveAt(0);
-            }
+            m_sharedInstances[0].Close();
+            m_sharedInstances.RemoveAt(0);
         }
     }
 }
