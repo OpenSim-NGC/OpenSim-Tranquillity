@@ -26,11 +26,11 @@
  */
 
 using SkiaSharp;
+using CoreJ2K;
 using System.Reflection;
 using log4net;
 using Nini.Config;
 using OpenMetaverse;
-using OpenMetaverse.Imaging;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -197,40 +197,26 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         {
             AssetBase asset = m_scene.AssetService.Get(id.ToString());
             m_log.DebugFormat("{0} Fetched texture {1}, found: {2}", LogHeader, id, asset != null);
-            if (asset == null) return null;
+
+            if (asset != null && (asset.Data == null || asset.Data.Length == 0))
+            {
+                m_log.WarnFormat("{0} Asset data is empty for texture {1}", LogHeader, id);
+                return null;
+            }   
 
             try
             {
-                // Decode JPEG2000 to managed image data
-                ManagedImage managedImage;
-                if (OpenJPEG.DecodeToImage(asset.Data, out managedImage))
-                {
-                    // Create SKBitmap from managed image width/height
-                    // ManagedImage stores raw RGBA data
-                    SKBitmap bitmap = new SKBitmap(managedImage.Width, managedImage.Height, SKColorType.Rgba8888, SKAlphaType.Opaque);
-                    
-                    // Note: For now, return a placeholder as ManagedImage data access may vary
-                    // In practice, you'd need to properly extract the pixel data from ManagedImage
-                    // and copy it to the SKBitmap
-                    return bitmap;
-                }
-                else
-                    return null;
-            }
-            catch (DllNotFoundException)
-            {
-                m_log.ErrorFormat("{0} OpenJpeg is not installed correctly on this system.   Asset Data is empty for {1}", LogHeader, id);
-            }
-            catch (IndexOutOfRangeException)
-            {
-                m_log.ErrorFormat("{0} OpenJpeg was unable to encode this.   Asset Data is empty for {1}", LogHeader, id);
+                using var stream = new MemoryStream(asset.Data);
+                var decodedImage = J2kImage.FromStream(stream);
+                return decodedImage.As<SKBitmap>();
             }
             catch (Exception)
             {
-                m_log.ErrorFormat("{0} OpenJpeg was unable to encode this.   Asset Data is empty for {1}", LogHeader, id);
-            }
-            return null;
+                m_log.ErrorFormat("[MAPTILE]: CoreJ2k was unable to decode this.   Asset Data is empty for {0}", id);
 
+            }
+
+            return null;
         }
 
         // Compute the average color of a texture.

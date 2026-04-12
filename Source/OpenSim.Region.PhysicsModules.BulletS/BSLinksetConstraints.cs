@@ -26,7 +26,7 @@
  */
 using OMV = OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public sealed class BSLinksetConstraints : BSLinkset
     {

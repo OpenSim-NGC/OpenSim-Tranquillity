@@ -29,7 +29,7 @@ using System.Runtime.InteropServices;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.Meshing
+namespace OpenSim.Region.PhysicsModules.Meshing
 {
     public class Mesh : IMesh
     {

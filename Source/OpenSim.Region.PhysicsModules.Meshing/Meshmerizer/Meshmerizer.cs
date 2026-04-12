@@ -40,7 +40,7 @@ using PrimMesher;
 using log4net;
 using Nini.Config;
 
-namespace OpenSim.Region.PhysicsModule.Meshing
+namespace OpenSim.Region.PhysicsModules.Meshing
 {
     public class Meshmerizer : IMesher, INonSharedRegionModule
     {
@@ -365,7 +365,7 @@ namespace OpenSim.Region.PhysicsModule.Meshing
 
             if (primShape.SculptData.Length <= 0)
             {
-                // XXX: At the moment we can not log here since ODEPrim, for instance, ends up triggering this
+                // XXX: At the moment we can not log here since OdePrim, for instance, ends up triggering this
                 // method twice - once before it has loaded sculpt data from the asset service and once afterwards.
                 // The first time will always call with unloaded SculptData if this needs to be uploaded.
 //                m_log.ErrorFormat("[MESH]: asset data for {0} is zero length", primName);
@@ -626,8 +626,10 @@ namespace OpenSim.Region.PhysicsModule.Meshing
         {
             coords = new List<Coord>();
             faces = new List<Face>();
-            PrimMesher.SculptMesh sculptMesh;
+
+            SculptMesh sculptMesh;
             SKBitmap idata = null;
+            
             string decodedSculptFileName = "";
 
             if (cacheSculptMaps && !primShape.SculptTexture.IsZero())
@@ -645,61 +647,26 @@ namespace OpenSim.Region.PhysicsModule.Meshing
                     m_log.Error("[SCULPT]: unable to load cached sculpt map " + decodedSculptFileName + " " + e.Message);
 
                 }
-                //if (idata != null)
-                //    m_log.Debug("[SCULPT]: loaded cached map asset for map ID: " + primShape.SculptTexture.ToString());
             }
 
             if (idata == null)
             {
                 if (primShape.SculptData == null || primShape.SculptData.Length == 0)
+                {
+                    m_log.Warn("[PHYSICS]: Unable to generate a Sculpty physics proxy. SculptData is null/zero length");
                     return false;
+                }
 
                 try
                 {
-                    // Try CoreJ2K first
-                    SKImage skImage = null;
+                    var j2k = J2kImage.FromBytes(primShape.SculptData, decoderConfig);
+                    idata = j2k?.As<SKBitmap>();
+
+                    if (idata == null)
+                    {
+                         return false;
+                    }
                     
-                    try
-                    {
-                        var j2k = J2kImage.FromBytes(primShape.SculptData, decoderConfig);
-                        skImage = j2k?.As<SKImage>();
-                    }
-                    catch
-                    {
-                        skImage = null;
-                    }
-
-                    if (skImage != null)
-                    {
-                        idata = SKBitmap.FromImage(skImage);
-                    }
-                    else
-                    {
-                        // Fallback to OpenJPEG for ManagedImage conversion
-                        OpenMetaverse.Imaging.ManagedImage managedImage;
-
-                        OpenMetaverse.Imaging.OpenJPEG.DecodeToImage(primShape.SculptData, out managedImage);
-
-                        if (managedImage == null)
-                        {
-                            // In some cases it seems that the decode can return a null bitmap without throwing
-                            // an exception
-                            m_log.WarnFormat("[PHYSICS]: OpenJPEG decoded sculpt data for {0} to a null bitmap.  Ignoring.", primName);
-
-                            return false;
-                        }
-
-                        if ((managedImage.Channels & OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha) != 0)
-                            managedImage.ConvertChannels(managedImage.Channels & ~OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha);
-
-                        // Try to decode the exported TGA stream directly with SkiaSharp
-                        using (var tgaStream = new MemoryStream(managedImage.ExportTGA()))
-                        {
-                            idata = SKBitmap.Decode(tgaStream);
-                        }
-                        managedImage = null;
-                    }
-
                     if (cacheSculptMaps && idata != null)
                     {
                         try
@@ -709,18 +676,11 @@ namespace OpenSim.Region.PhysicsModule.Meshing
                             using var fs = File.OpenWrite(decodedSculptFileName);
                             dataEncoded.SaveTo(fs);
                         }
-                        catch (Exception e) { m_log.Error("[SCULPT]: unable to cache sculpt map " + decodedSculptFileName + " " + e.Message); }
+                        catch (Exception e) 
+                        { 
+                            m_log.Error("[SCULPT]: unable to cache sculpt map " + decodedSculptFileName + " " + e.Message); 
+                        }
                     }
-                }
-                catch (DllNotFoundException)
-                {
-                    m_log.Error("[PHYSICS]: OpenJpeg is not installed correctly on this system. Physics Proxy generation failed.  Often times this is because of an old version of GLIBC.  You must have version 2.4 or above!");
-                    return false;
-                }
-                catch (IndexOutOfRangeException)
-                {
-                    m_log.Error("[PHYSICS]: OpenJpeg was unable to decode this. Physics Proxy generation failed");
-                    return false;
                 }
                 catch (Exception ex)
                 {

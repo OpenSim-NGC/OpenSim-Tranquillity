@@ -2645,7 +2645,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             // keep using physactor ideia of isphysical
             // it should be SOP ideia of that
-            // not much of a issue with ubOde
+            // not much of a issue with ubODE
             if (pa != null && pa.IsPhysical)
                 isphys = true;
             else
@@ -18557,7 +18557,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                                             new DetectParams[0]));
                     return;
                 }
-                else if (experiencePermission == ExperiencePermission.Allowed)
+                else if (experiencePermission == ExperiencePermission.Blocked)
                 {
                     m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
                             "experience_permissions_denied", new Object[] {

@@ -25,7 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System;
+using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
@@ -200,7 +203,7 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
     // IWebRtcVoiceService
 
     // IWebRtcVoiceService.ProvisionVoiceAccountRequest
-    public async Task<OSDMap> ProvisionVoiceAccountRequest(OSDMap pRequest, UUID pUserID, UUID pSceneID)
+        public OSDMap ProvisionVoiceAccountRequest(OSDMap pRequest, UUID pUserID, UUID pSceneID)
     {
         OSDMap response = null;
         IVoiceViewerSession vSession = null;
@@ -237,13 +240,13 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
         }
         if (vSession is not null)
         {
-            response = await vSession.VoiceService.ProvisionVoiceAccountRequest(vSession, pRequest, pUserID, pSceneID);
+                response = vSession.VoiceService.ProvisionVoiceAccountRequest(vSession, pRequest, pUserID, pSceneID);
         }
         return response;
     }
 
     // IWebRtcVoiceService.VoiceSignalingRequest
-    public async Task<OSDMap> VoiceSignalingRequest(OSDMap pRequest, UUID pUserID, UUID pSceneID)
+        public OSDMap VoiceSignalingRequest(OSDMap pRequest, UUID pUserID, UUID pSceneID)
     {
         OSDMap response = null;
         IVoiceViewerSession vSession = null;
@@ -252,7 +255,7 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
             // request has a viewer session. Use that to find the voice service
             if (VoiceViewerSession.TryGetViewerSession(viewerSessionId, out vSession))
             {
-                response = await vSession.VoiceService.VoiceSignalingRequest(vSession, pRequest, pUserID, pSceneID);
+                    response = vSession.VoiceService.VoiceSignalingRequest(vSession, pRequest, pUserID, pSceneID);
             }
             else
             {
@@ -267,13 +270,13 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
     }
 
     // This module should never be called with this signature
-    public Task<OSDMap> ProvisionVoiceAccountRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pSceneID)
+        public OSDMap ProvisionVoiceAccountRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pSceneID)
     {
         throw new NotImplementedException();
     }
 
     // This module should never be called with this signature
-    public Task<OSDMap> VoiceSignalingRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pSceneID)
+        public OSDMap VoiceSignalingRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pSceneID)
     {
         throw new NotImplementedException();
     }

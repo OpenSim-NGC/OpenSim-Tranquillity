@@ -30,9 +30,11 @@ using System.Threading;
 using System.Reflection;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.ScriptEngine.Interfaces;
+using OpenSim.Region.ScriptEngine.Shared.Api;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.Framework.Scenes;
 using log4net;
@@ -166,6 +168,9 @@ namespace OpenSim.Region.ScriptEngine.Yengine
          */
         public static byte migrationVersion = 12;
 
+        // Version for XML ScriptState metadata compatibility checks.
+        public const int stateSchemaVersion = 1;
+
         // Incremented each time script gets reset.
         public int m_ResetCount = 0;
 
@@ -246,5 +251,77 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             {"experience_permissions", ScriptEventCode.experience_permissions},
             {"experience_permissions_denied", ScriptEventCode.experience_permissions_denied},
         };
+
+        private string BuildGlobalsSignature()
+        {
+            if(m_ObjCode == null)
+                return string.Empty;
+
+            XMRInstArSizes gs = m_ObjCode.glblSizes;
+            StringBuilder sb = new StringBuilder(256);
+            sb.Append("sz=")
+              .Append(gs.iasArrays).Append(',')
+              .Append(gs.iasChars).Append(',')
+              .Append(gs.iasFloats).Append(',')
+              .Append(gs.iasIntegers).Append(',')
+              .Append(gs.iasLists).Append(',')
+              .Append(gs.iasObjects).Append(',')
+              .Append(gs.iasRotations).Append(',')
+              .Append(gs.iasStrings).Append(',')
+              .Append(gs.iasVectors).Append(',')
+              .Append(gs.iasSDTClObjs).Append(',')
+              .Append(gs.iasSDTIntfObjs);
+
+            if(m_ObjCode.globalVarNames != null && m_ObjCode.globalVarNames.Count > 0)
+            {
+                List<string> typeNames = new List<string>(m_ObjCode.globalVarNames.Keys);
+                typeNames.Sort(StringComparer.Ordinal);
+
+                foreach(string typeName in typeNames)
+                {
+                    sb.Append(';').Append(typeName).Append(':');
+                    Dictionary<int, string> slots = m_ObjCode.globalVarNames[typeName];
+                    if(slots == null || slots.Count == 0)
+                        continue;
+
+                    List<int> indexes = new List<int>(slots.Keys);
+                    indexes.Sort();
+
+                    bool first = true;
+                    foreach(int idx in indexes)
+                    {
+                        if(!first)
+                            sb.Append(',');
+                        first = false;
+
+                        sb.Append(idx).Append('=').Append(slots[idx]);
+                    }
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        private string BuildApiFingerprint()
+        {
+            try
+            {
+                ApiManager am = new ApiManager();
+                List<string> apis = new List<string>();
+                foreach(string api in am.GetApis())
+                {
+                    if(!string.IsNullOrEmpty(api))
+                        apis.Add(api);
+                }
+
+                apis.Sort(StringComparer.Ordinal);
+                return string.Join(",", apis);
+            }
+            catch(Exception e)
+            {
+                m_log.Warn("[YEngine]: unable to build API fingerprint", e);
+                return string.Empty;
+            }
+        }
     }
 }

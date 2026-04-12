@@ -34,7 +34,6 @@ using log4net;
 using SkiaSharp;
 using CoreJ2K;
 using OpenMetaverse;
-using OpenMetaverse.Imaging;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 
@@ -284,18 +283,22 @@ namespace OpenSim.Capabilities.Handlers
 
         private byte[] ConvertTextureData(AssetBase texture, string format)
         {
+            if (texture == null || texture.Data == null || texture.Data.Length == 0)
+            {
+                m_log.WarnFormat("[GETTEXTURE]: No data to convert for texture {0}", texture?.ID);
+                return Array.Empty<byte>();
+            }
+            
             m_log.DebugFormat("[GETTEXTURE]: Converting texture {0} to {1}", texture.ID, format);
             byte[] data = Array.Empty<byte>();
-
-            MemoryStream imgstream = new MemoryStream();
             SKBitmap mTexture = null;
-            ManagedImage managedImage = null;
 
             try
             {
                 // Taking our jpeg2000 data, decoding it, then saving it to a byte array with regular data
                 // Decode image to SKBitmap
                 SKImage skImage = null;
+
                 try
                 {
                     // Try CoreJ2K first
@@ -310,11 +313,6 @@ namespace OpenSim.Capabilities.Handlers
                 if (skImage != null)
                 {
                     mTexture = SKBitmap.FromImage(skImage);
-                }
-                else if (OpenJPEG.DecodeToImage(texture.Data, out managedImage))
-                {
-                    // Fallback: Create SKBitmap from decoded managed image
-                    mTexture = new SKBitmap(managedImage.Width, managedImage.Height, SKColorType.Rgba8888, SKAlphaType.Opaque);
                 }
 
                 if (mTexture != null)
@@ -356,11 +354,6 @@ namespace OpenSim.Capabilities.Handlers
                 // If we encountered an exception, one or more of these will be null
                 if (mTexture != null)
                     mTexture.Dispose();
-
-                if (managedImage != null)
-                    managedImage.Clear();
-                if (imgstream != null)
-                    imgstream.Dispose();
             }
 
             return data;

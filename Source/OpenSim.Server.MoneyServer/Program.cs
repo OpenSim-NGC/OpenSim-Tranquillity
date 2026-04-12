@@ -9,18 +9,12 @@
 
 using System.CommandLine;
 
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Configuration;
-
 using Autofac.Extensions.DependencyInjection;
 using Autofac;
 
 using OpenSim.Framework.Console;
 using OpenSim.Server.Base;
 using System.CommandLine.Parsing;
-using OpenSim.Region.Framework.Scenes;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using log4net.Config;

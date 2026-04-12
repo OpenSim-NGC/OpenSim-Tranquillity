@@ -77,6 +77,10 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             scriptStateN.SetAttribute("Engine", m_Engine.ScriptEngineName);
             scriptStateN.SetAttribute("Asset", m_Item.AssetID.ToString());
             scriptStateN.SetAttribute("SourceHash", m_ObjCode.sourceHash);
+            scriptStateN.SetAttribute("StateSchemaVersion", stateSchemaVersion.ToString());
+            scriptStateN.SetAttribute("MigrationVersion", migrationVersion.ToString());
+            scriptStateN.SetAttribute("GlobalsSignature", BuildGlobalsSignature());
+            scriptStateN.SetAttribute("ApiFingerprint", BuildApiFingerprint());
 
             // Make sure we aren't executing part of the script so it stays 
             // stable.  Setting suspendOnCheckRun tells CheckRun() to suspend

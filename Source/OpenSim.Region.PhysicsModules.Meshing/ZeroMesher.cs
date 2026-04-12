@@ -45,7 +45,7 @@ using log4net;
  * it's always availabe and thus the default in case of configuration errors
 */
 
-namespace OpenSim.Region.PhysicsModule.Meshing
+namespace OpenSim.Region.PhysicsModules.Meshing
 {
     public class ZeroMesher : IMesher, INonSharedRegionModule
     {

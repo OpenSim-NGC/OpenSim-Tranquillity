@@ -24,12 +24,6 @@ jobs:
     - name: Display dotnet version
       run: dotnet --version
 
-    - name: Cache NuGet Packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }} restore-keys: | ${{ runner.os }}-nuget-
-
     - name: Restore dependencies
       run: dotnet restore ./Tranquillity.sln
 
@@ -39,20 +33,40 @@ jobs:
 #    - name: Tests
 #      run: dotnet test ./Tranquillity.sln --verbosity normal
 
+    # Publish GridServer for Linux x64
     - name: Publish GridServer for Linux x64
-      run: dotnet publish Source/OpenSim.Server.GridServer/OpenSim.Server.GridServer.csproj -c Release -r linux-x64 --self-contained false -o ./publish/linux-x64/gridserver
+      run: dotnet publish ./Source/OpenSim.Server.GridServer/OpenSim.Server.GridServer.csproj -c Release -r linux-x64 -o ./publish/linux-x64/OpenSim.Server.GridServer
 
+    # Publish RegionServer for Linux x64
     - name: Publish RegionServer for Linux x64
-      run: dotnet publish Source/OpenSim.Server.RegionServer/OpenSim.Server.RegionServer.csproj -c Release -r linux-x64 --self-contained false -o ./publish/linux-x64/regionserver
-
+      run: dotnet publish ./Source/OpenSim.Server.RegionServer/OpenSim.Server.RegionServer.csproj -c Release -r linux-x64 -o ./publish/linux-x64/OpenSim.Server.RegionServer
+    
+    # Publish MoneyServer for Linux x64
     - name: Publish MoneyServer for Linux x64
-      run: dotnet publish Source/OpenSim.Server.MoneyServer/OpenSim.Server.MoneyServer.csproj -c Release -r linux-x64 --self-contained false -o ./publish/linux-x64/moneyserver
+      run: dotnet publish ./Source/OpenSim.Server.MoneyServer/OpenSim.Server.MoneyServer.csproj -c Release -r linux-x64 -o ./publish/linux-x64/OpenSim.Server.MoneyServer
 
+    # Upload Project Linux Artifacts
+    - name: Upload Linux Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-x64-artifacts
+        path: ./publish/linux-x64
+
+    # Publish GridServer for Windows x64
     - name: Publish GridServer for Windows x64
-      run: dotnet publish Source/OpenSim.Server.GridServer/OpenSim.Server.GridServer.csproj -c Release -r win-x64 --self-contained false -o ./publish/win-x64/gridserver
-
+      run: dotnet publish ./Source/OpenSim.Server.GridServer/OpenSim.Server.GridServer.csproj -c Release -r win-x64 -o ./publish/win-x64/OpenSim.Server.GridServer
+  
+    # Publish RegionServer for Windows x64
     - name: Publish RegionServer for Windows x64
-      run: dotnet publish Source/OpenSim.Server.RegionServer/OpenSim.Server.RegionServer.csproj -c Release -r win-x64 --self-contained false -o ./publish/win-x64/regionserver
-
+      run: dotnet publish ./Source/OpenSim.Server.RegionServer/OpenSim.Server.RegionServer.csproj -c Release -r win-x64 -o ./publish/win-x64/OpenSim.Server.RegionServer
+  
+    # Publish MoneyServer for Windows x64
     - name: Publish MoneyServer for Windows x64
-      run: dotnet publish Source/OpenSim.Server.MoneyServer/OpenSim.Server.MoneyServer.csproj -c Release -r win-x64 --self-contained false -o ./publish/win-x64/moneyserver
+      run: dotnet publish ./Source/OpenSim.Server.MoneyServer/OpenSim.Server.MoneyServer.csproj -c Release -r win-x64 -o ./publish/win-x64/OpenSim.Server.MoneyServer
+
+    # Upload Windows Build Artifacts
+    - name: Upload Windows Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: win-x64-artifacts
+        path: ./publish/win-x64

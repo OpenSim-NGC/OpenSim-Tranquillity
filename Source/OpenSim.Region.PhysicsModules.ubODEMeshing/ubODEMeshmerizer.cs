@@ -72,8 +72,8 @@ namespace OpenSim.Region.PhysicsModules.ubODEMeshing
         private readonly Dictionary<AMeshKey, Mesh> m_uniqueMeshes = new();
         private readonly Dictionary<AMeshKey, Mesh> m_uniqueReleasedMeshes = new();
 
-        private readonly J2KDecoderConfiguration decoderConfig = new J2KDecoderConfiguration()
-            .WithHighestResolution();
+        private readonly J2KDecoderConfiguration decoderConfig = 
+            new J2KDecoderConfiguration().WithHighestResolution();
 
         #region INonSharedRegionModule
         public string Name
@@ -377,7 +377,7 @@ namespace OpenSim.Region.PhysicsModules.ubODEMeshing
             //            m_log.DebugFormat("[MESH]: experimental mesh proxy generation for {0}", primName);
 
 
-            // for ubOde we have a diferent mesh use priority
+            // for ubODE we have a diferent mesh use priority
             // priority is to use full mesh then decomposition
             // SL does the oposite
             bool usemesh = false;
@@ -387,7 +387,7 @@ namespace OpenSim.Region.PhysicsModules.ubODEMeshing
 
             if (primShape.SculptData == null || primShape.SculptData.Length <= 0)
             {
-                m_log.InfoFormat("[MESH]: asset data for {0} is zero length", primName);
+                // m_log.InfoFormat("[MESH]: asset data for {0} is zero length", primName);
                 return false;
             }
 
@@ -702,69 +702,28 @@ namespace OpenSim.Region.PhysicsModules.ubODEMeshing
         {
             coords = new List<Vector3>();
             faces = new List<Face>();
-            PrimMesher.SculptMesh sculptMesh;
+            SculptMesh sculptMesh;
             SKBitmap idata = null;
 
             if (primShape.SculptData == null || primShape.SculptData.Length == 0)
                 return false;
 
             try
-            {
-                // Try CoreJ2K first
-                SKImage skImage = null;
-                
-                try
+            {               
+                var j2k = J2kImage.FromBytes(primShape.SculptData, decoderConfig);
+                idata = j2k?.As<SKBitmap>();
+
+                if (idata == null)
                 {
-                    var j2k = J2kImage.FromBytes(primShape.SculptData, decoderConfig);
-                    skImage = j2k?.As<SKImage>();
+                    return false;
                 }
-                catch
-                {
-                    skImage = null;
-                }
-
-                if (skImage != null)
-                {
-                    idata = SKBitmap.FromImage(skImage);
-                }
-                else
-                {
-                    // Fallback to OpenJPEG for ManagedImage conversion
-                    OpenMetaverse.Imaging.ManagedImage managedImage;
-                    OpenMetaverse.Imaging.OpenJPEG.DecodeToImage(primShape.SculptData, out managedImage);
-
-                    if (managedImage == null)
-                    {
-                        m_log.WarnFormat("[PHYSICS]: OpenJPEG decoded sculpt data for {0} to a null bitmap.  Ignoring.", primName);
-                        return false;
-                    }
-
-                    if ((managedImage.Channels & OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha) != 0)
-                        managedImage.ConvertChannels(managedImage.Channels & ~OpenMetaverse.Imaging.ManagedImage.ImageChannels.Alpha);
-
-                    using (var tgaStream = new MemoryStream(managedImage.ExportTGA()))
-                    {
-                        idata = SKBitmap.Decode(tgaStream);
-                    }
-
-                    managedImage = null;
-                }
-            }
-            catch (DllNotFoundException e)
-            {
-                m_log.Error($"[PHYSICS]: OpenJpeg problem: {e.Message}");
-                return false;
-            }
-            catch (IndexOutOfRangeException)
-            {
-                m_log.Error("[PHYSICS]: OpenJpeg was unable to decode this. Physics Proxy generation failed");
-                return false;
             }
             catch (Exception ex)
             {
                 m_log.Error("[PHYSICS]: Unable to generate a Sculpty physics proxy. Sculpty texture decode failed: " + ex.Message);
                 return false;
             }
+
             // remove mirror and invert bits
             OpenMetaverse.SculptType pbsSculptType = ((OpenMetaverse.SculptType)(primShape.SculptType & 0x3f));
             var sculptType = pbsSculptType switch
@@ -775,6 +734,7 @@ namespace OpenSim.Region.PhysicsModules.ubODEMeshing
                 OpenMetaverse.SculptType.Sphere => PrimMesher.SculptMesh.SculptType.sphere,
                 _ => PrimMesher.SculptMesh.SculptType.plane,
             };
+            
             bool mirror = ((primShape.SculptType & 128) != 0);
             bool invert = ((primShape.SculptType & 64) != 0);
 

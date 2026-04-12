@@ -27,7 +27,7 @@
 using System.Reflection;
 using Nini.Config;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public struct MaterialAttributes
     {

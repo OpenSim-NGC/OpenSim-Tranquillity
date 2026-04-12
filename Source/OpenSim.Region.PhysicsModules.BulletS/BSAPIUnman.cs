@@ -29,7 +29,7 @@ using System.Security;
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     public sealed class BSAPIUnman : BSAPITemplate
     {

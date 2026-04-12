@@ -254,11 +254,7 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
         {
             AssetBase asset = m_scene.AssetService.Get(id.ToString());
 
-            if (asset != null)
-            {
-                m_log.DebugFormat("[MAPTILE]: Static map image texture {0} found for {1}", id, m_scene.Name);
-            }
-            else
+            if (asset == null || asset.Data == null || asset.Data.Length == 0)
             {
                 m_log.WarnFormat("[MAPTILE]: Static map image texture {0} not found for {1}", id, m_scene.Name);
                 return null;
@@ -266,25 +262,16 @@ namespace OpenSim.Region.CoreModules.World.LegacyMap
 
             try
             {
-                // Use OpenJpegDotNet to decode JPEG2000 directly to SKBitmap
                 using var stream = new System.IO.MemoryStream(asset.Data);
-                return SKBitmap.Decode(stream);
-            }
-            catch (DllNotFoundException)
-            {
-                m_log.ErrorFormat("[MAPTILE]: OpenJpeg is not installed correctly on this system.   Asset Data is empty for {0}", id);
-
-            }
-            catch (IndexOutOfRangeException)
-            {
-                m_log.ErrorFormat("[MAPTILE]: OpenJpeg was unable to decode this.   Asset Data is empty for {0}", id);
-
+                var decodedImage = J2kImage.FromStream(stream);
+                return decodedImage.As<SKBitmap>();
             }
             catch (Exception)
             {
-                m_log.ErrorFormat("[MAPTILE]: OpenJpeg was unable to decode this.   Asset Data is empty for {0}", id);
+                m_log.ErrorFormat("[MAPTILE]: CoreJ2k was unable to decode this.   Asset Data is empty for {0}", id);
 
             }
+            
             return null;
 
         }

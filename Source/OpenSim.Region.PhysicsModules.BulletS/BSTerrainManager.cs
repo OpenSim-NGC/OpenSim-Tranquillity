@@ -29,7 +29,7 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModule.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS
 {
     // The physical implementation of the terrain is wrapped in this class.
     public abstract class BSTerrainPhys : IDisposable
@@ -562,7 +562,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
         // Unhook all the combining that I know about.
         public void UnCombine(PhysicsScene pScene)
         {
-            // Just like ODE, we don't do anything yet.
+            // Just like Ode, we don't do anything yet.
             DetailLog("{0},BSTerrainManager.UnCombine", BSScene.DetailLogZero);
         }
 

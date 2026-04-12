@@ -29,7 +29,7 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
 
-namespace OpenSim.Region.PhysicsModule.POS
+namespace OpenSim.Region.PhysicsModules.POS
 {
     public class POSCharacter : PhysicsActor
     {
