@@ -28,6 +28,35 @@ Where Configuration is either Debug or Release and Platform is either linux-x64 
 For testing workflows (including YEngine state-load telemetry configuration and commands),
 see Docs/TESTING.txt.
 
+## Plugin discovery migration testing
+
+Step-1 plugin migration work supports selecting a plugin discovery backend at runtime.
+
+Configuration in `[Startup]`:
+
+```ini
+PluginDiscovery = monoaddins
+EnablePluginManagementCommands = true
+```
+
+- `PluginDiscovery` values:
+  - `monoaddins` (default)
+  - `reflection` (transitional backend for migration validation)
+- `EnablePluginManagementCommands` controls registration of plugin/repository management console commands.
+  Connector discovery/loading still runs when this is set to `false`.
+
+Environment override (takes precedence over config):
+
+```bash
+export OPENSIM_PLUGIN_DISCOVERY=reflection
+```
+
+Sample startup files containing these settings include:
+- `Source/OpenSim.Server.RegionServer/AppData/OpenSim.ini.example`
+- `Source/OpenSim.Server.GridServer/AppData/Robust.ini.example`
+- `Source/OpenSim.Server.GridServer/AppData/Robust.HG.ini.example`
+- `Source/OpenSim.Server.MoneyServer/AppData/MoneyServer.ini.example`
+
 Either configuration will do a NuGet restore (dotnet restore) to restore any required NuGet package references prior to
 kicking off a build using a current version of msbuild.  The Csproj and SLN files are all designed to use the new
 format for Msbuild which is simplified and really directly replaces what prebuild provided.

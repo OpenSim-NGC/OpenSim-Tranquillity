@@ -22,6 +22,80 @@ DotNetCorePlugins offers a simpler, .NET Core-native alternative that uses folde
 
 ---
 
+## Implementation Status (Current Branch)
+
+### Completed in Step 1
+
+- Introduced `IPluginDiscovery` abstraction and wired `PluginLoader<T>` to use it.
+- Added a backend factory with runtime selection:
+    - `monoaddins` (default)
+    - `reflection` (transitional non-Mono backend)
+- Added type-hinted discovery API calls so non-XML backends can discover by interface type.
+- Added startup discovery summary counters at migrated extension points for backend parity checks:
+        - `/OpenSim/Startup` (generic loader)
+        - `/OpenSim/RegionModules`
+        - `/OpenSim/WindModule`
+        - `/Robust/Connector`
+- Added explicit discovery capability metadata to the abstraction (`PluginDiscoveryCapabilities`) so
+    call sites can branch on backend features rather than backend-name strings.
+- Migrated key extension paths off direct `AddinManager` calls:
+    - `/OpenSim/RegionModules`
+    - `/OpenSim/WindModule`
+    - `/Robust/Connector`
+- Reduced runtime Mono.Addins coupling in robust connector loading:
+        - `ServerUtils.PluginLoader` now checks discovery capabilities and only initializes
+            `AddinRegistry`/`CommandManager` when registry metadata is supported by the active backend.
+        - `AddinRegistry` and plugin/repository management command wiring are now best-effort;
+            startup continues and connector loading falls back cleanly if management command setup fails.
+        - Added startup switch `EnablePluginManagementCommands` (default `true`) so plugin/repository
+            management command registration can be disabled without impacting connector loading.
+        - Connector `PluginPath` resolution now falls back to plugin assembly location when
+            addin metadata is unavailable.
+- Removed direct `Mono.Addins.TypeExtensionNode` inheritance from wind plugins.
+- Removed several stale `using Mono.Addins;` directives in source modules.
+
+### Backend Selection Configuration
+
+You can choose the discovery backend using either config or environment:
+
+```ini
+[Startup]
+; monoaddins | reflection
+PluginDiscovery = monoaddins
+
+; Optional: disable plugin/repository management command registration
+; while keeping connector discovery/loading behavior.
+EnablePluginManagementCommands = true
+
+[Modules]
+; Optional override for region module discovery
+PluginDiscovery = monoaddins
+
+[Wind]
+; Optional override for wind discovery
+PluginDiscovery = monoaddins
+```
+
+Environment override (highest precedence where supported):
+
+```bash
+export OPENSIM_PLUGIN_DISCOVERY=reflection
+```
+
+Implementation note:
+- `OPENSIM_PLUGIN_DISCOVERY` now strictly overrides configured backend values when both are present,
+    and startup logs an explicit override message when the values differ.
+
+### Transitional Scope Note
+
+- The `reflection` backend is for incremental migration testing and does not yet replace
+    all Mono.Addins features (for example, repository/registry management and XML metadata semantics).
+- Default behavior remains `monoaddins` until full migration is complete.
+- Runtime startup parity capture is environment-dependent in current dev setup; compile-time
+    parity validation with backend overrides is currently used as the stable smoke check.
+
+---
+
 ## Current Architecture Analysis
 
 ### 1. Plugin Discovery & Loading Model
@@ -489,6 +563,24 @@ Remove Mono.Addins attributes:
 RegionModulesPath = "./bin/plugins/regionmodules"
 WindModelsPath = "./bin/plugins/windmodels"
 AssetCachePath = "./bin/plugins/assetcache"
+```
+
+### Smoke Test Commands (Current Transitional Backend)
+
+Use these commands from repo root to verify both backends compile and load paths are reachable:
+
+```bash
+# Default backend (monoaddins)
+dotnet build Source/OpenSim.Framework/OpenSim.Framework.csproj -c Debug
+dotnet build Source/OpenSim.ApplicationPlugins.RegionModulesController/OpenSim.ApplicationPlugins.RegionModulesController.csproj -c Debug
+dotnet build Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj -c Debug
+dotnet build Source/OpenSim.Region.CoreModules/OpenSim.Region.CoreModules.csproj -c Debug
+
+# Reflection backend override
+OPENSIM_PLUGIN_DISCOVERY=reflection dotnet build Source/OpenSim.Framework/OpenSim.Framework.csproj -c Debug
+OPENSIM_PLUGIN_DISCOVERY=reflection dotnet build Source/OpenSim.ApplicationPlugins.RegionModulesController/OpenSim.ApplicationPlugins.RegionModulesController.csproj -c Debug
+OPENSIM_PLUGIN_DISCOVERY=reflection dotnet build Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj -c Debug
+OPENSIM_PLUGIN_DISCOVERY=reflection dotnet build Source/OpenSim.Region.CoreModules/OpenSim.Region.CoreModules.csproj -c Debug
 ```
 
 ---

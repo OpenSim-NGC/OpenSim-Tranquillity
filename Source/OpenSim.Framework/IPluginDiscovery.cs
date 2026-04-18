@@ -1,0 +1,302 @@
+/*
+ * Copyright (c) Contributors, http://opensimulator.org/
+ * See CONTRIBUTORS.TXT for a full list of copyright holders.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of the OpenSimulator Project nor the
+ *       names of its contributors may be used to endorse or promote products
+ *       derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE DEVELOPERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using Mono.Addins;
+using log4net;
+
+namespace OpenSim.Framework
+{
+    public sealed class PluginDiscoveryCapabilities
+    {
+        public bool SupportsAddinRegistryMetadata { get; }
+
+        public PluginDiscoveryCapabilities(bool supportsAddinRegistryMetadata)
+        {
+            SupportsAddinRegistryMetadata = supportsAddinRegistryMetadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstraction for plugin discovery backends.
+    /// </summary>
+    public interface IPluginDiscovery : IDisposable
+    {
+        PluginDiscoveryCapabilities Capabilities { get; }
+        void Initialize(string pluginDirectory);
+        IReadOnlyList<PluginExtensionNode> GetExtensionNodes(string extensionPoint, Type requiredTypeHint = null);
+        int GetExtensionNodeCount(string extensionPoint, Type requiredTypeHint = null);
+    }
+
+    public static class PluginDiscoveryFactory
+    {
+        private const string BackendOverrideVariableName = "OPENSIM_PLUGIN_DISCOVERY";
+
+        public static IPluginDiscovery Create(ILog log, string configuredBackend = null)
+        {
+            string backend = configuredBackend;
+            string envBackend = Environment.GetEnvironmentVariable(BackendOverrideVariableName);
+
+            if (!string.IsNullOrWhiteSpace(envBackend))
+            {
+                if (!string.IsNullOrWhiteSpace(configuredBackend) &&
+                    !string.Equals(configuredBackend.Trim(), envBackend.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    log.InfoFormat(
+                        "[PLUGINS]: Environment override {0}={1} supersedes configured backend '{2}'",
+                        BackendOverrideVariableName,
+                        envBackend,
+                        configuredBackend);
+                }
+
+                backend = envBackend;
+            }
+
+            if (string.IsNullOrWhiteSpace(backend))
+                backend = "monoaddins";
+
+            switch (backend.Trim().ToLowerInvariant())
+            {
+                case "dotnet":
+                case "dotnetcore":
+                case "reflection":
+                    log.InfoFormat("[PLUGINS]: Using reflection discovery backend ({0})", backend);
+                    return new ReflectionPluginDiscovery(log);
+
+                default:
+                    log.InfoFormat("[PLUGINS]: Using Mono.Addins discovery backend ({0})", backend);
+                    return new MonoAddinsPluginDiscovery(log);
+            }
+        }
+    }
+
+    public sealed class ReflectionPluginDiscovery : IPluginDiscovery
+    {
+        private readonly ILog m_log;
+        private string m_pluginDirectory = ".";
+        private List<Assembly> m_assemblies = new List<Assembly>();
+
+        public PluginDiscoveryCapabilities Capabilities { get; } =
+            new PluginDiscoveryCapabilities(supportsAddinRegistryMetadata: false);
+
+        public ReflectionPluginDiscovery(ILog log)
+        {
+            m_log = log;
+        }
+
+        public void Initialize(string pluginDirectory)
+        {
+            m_pluginDirectory = string.IsNullOrWhiteSpace(pluginDirectory) ? "." : pluginDirectory;
+            m_assemblies = new List<Assembly>();
+        }
+
+        public IReadOnlyList<PluginExtensionNode> GetExtensionNodes(string extensionPoint, Type requiredTypeHint = null)
+        {
+            List<PluginExtensionNode> nodes = new List<PluginExtensionNode>();
+
+            if (requiredTypeHint == null)
+            {
+                m_log.WarnFormat("[PLUGINS]: Reflection discovery for {0} requires a plugin type hint.", extensionPoint);
+                return nodes;
+            }
+
+            foreach (Assembly assembly in GetAssemblies())
+            {
+                foreach (Type type in GetLoadableTypes(assembly))
+                {
+                    if (type.IsAbstract || type.IsInterface)
+                        continue;
+
+                    if (!requiredTypeHint.IsAssignableFrom(type))
+                        continue;
+
+                    string provider = assembly.GetName().Name ?? string.Empty;
+                    string path = string.IsNullOrEmpty(assembly.Location)
+                        ? provider
+                        : string.Format("{0}:{1}", assembly.Location, type.FullName);
+
+                    nodes.Add(new PluginExtensionNode(
+                        type.Name,
+                        provider,
+                        path,
+                        type,
+                        () => Activator.CreateInstance(type, true)));
+                }
+            }
+
+            return nodes;
+        }
+
+        public int GetExtensionNodeCount(string extensionPoint, Type requiredTypeHint = null)
+        {
+            return GetExtensionNodes(extensionPoint, requiredTypeHint).Count;
+        }
+
+        public void Dispose()
+        {
+            m_assemblies.Clear();
+        }
+
+        private IReadOnlyList<Assembly> GetAssemblies()
+        {
+            if (m_assemblies.Count > 0)
+                return m_assemblies;
+
+            if (!Directory.Exists(m_pluginDirectory))
+            {
+                m_log.WarnFormat("[PLUGINS]: Plugin discovery directory does not exist: {0}", m_pluginDirectory);
+                return m_assemblies;
+            }
+
+            foreach (string dllPath in Directory.GetFiles(m_pluginDirectory, "*.dll", SearchOption.TopDirectoryOnly))
+            {
+                try
+                {
+                    m_assemblies.Add(Assembly.LoadFrom(dllPath));
+                }
+                catch (BadImageFormatException)
+                {
+                    // Ignore native or incompatible binaries.
+                }
+                catch (Exception e)
+                {
+                    m_log.WarnFormat("[PLUGINS]: Unable to load assembly {0}: {1}", dllPath, e.Message);
+                }
+            }
+
+            return m_assemblies;
+        }
+
+        private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+        {
+            try
+            {
+                return assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException rtle)
+            {
+                return rtle.Types.Where(t => t != null);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Current discovery backend implemented with Mono.Addins.
+    /// </summary>
+    public sealed class MonoAddinsPluginDiscovery : IPluginDiscovery
+    {
+        private readonly ILog m_log;
+        private bool m_eventsAttached;
+
+        public PluginDiscoveryCapabilities Capabilities { get; } =
+            new PluginDiscoveryCapabilities(supportsAddinRegistryMetadata: true);
+
+        public MonoAddinsPluginDiscovery(ILog log)
+        {
+            m_log = log;
+        }
+
+        public void Initialize(string pluginDirectory)
+        {
+            if (!AddinManager.IsInitialized)
+            {
+                AddinManager.Initialize(pluginDirectory);
+                AddinManager.Registry.Update(null);
+            }
+
+            AttachEvents();
+        }
+
+        public IReadOnlyList<PluginExtensionNode> GetExtensionNodes(string extensionPoint, Type requiredTypeHint = null)
+        {
+            List<PluginExtensionNode> nodes = new List<PluginExtensionNode>();
+
+            foreach (TypeExtensionNode node in AddinManager.GetExtensionNodes(extensionPoint))
+            {
+                nodes.Add(new PluginExtensionNode(node.Id, node.Addin.Id, node.Path, node.Type, () => node.CreateInstance()));
+            }
+
+            return nodes;
+        }
+
+        public int GetExtensionNodeCount(string extensionPoint, Type requiredTypeHint = null)
+        {
+            return AddinManager.GetExtensionNodes(extensionPoint).Count;
+        }
+
+        public void Dispose()
+        {
+            if (!m_eventsAttached)
+                return;
+
+            AddinManager.ExtensionChanged -= OnExtensionChanged;
+            AddinManager.AddinUnloaded -= OnUnload;
+            AddinManager.AddinLoadError -= OnLoaderError;
+            AddinManager.AddinLoaded -= OnLoad;
+            m_eventsAttached = false;
+        }
+
+        private void AttachEvents()
+        {
+            if (m_eventsAttached)
+                return;
+
+            AddinManager.AddinLoadError += OnLoaderError;
+            AddinManager.AddinLoaded += OnLoad;
+            AddinManager.AddinUnloaded += OnUnload;
+            AddinManager.ExtensionChanged += OnExtensionChanged;
+            m_eventsAttached = true;
+        }
+
+        private void OnLoad(object sender, AddinEventArgs args)
+        {
+            m_log.Info("[PLUGINS]: Plugin Loaded: " + args.AddinId);
+        }
+
+        private void OnUnload(object sender, AddinEventArgs args)
+        {
+            m_log.Info("[PLUGINS]: Plugin Unloaded: " + args.AddinId);
+        }
+
+        private void OnLoaderError(object sender, AddinErrorEventArgs args)
+        {
+            if (args.Exception == null)
+                m_log.Error("[PLUGINS]: Plugin Error: " + args.Message);
+            else
+                m_log.Error("[PLUGINS]: Plugin Error: " + args.Exception.Message + "\n" + args.Exception.StackTrace);
+        }
+
+        private void OnExtensionChanged(object sender, ExtensionEventArgs args)
+        {
+            m_log.Info("[PLUGINS]: Extension Changed: " + args.Path);
+        }
+    }
+}

@@ -3,6 +3,10 @@
 ; Place to create a PID file
 ; PIDFile = "/tmp/money.pid"
 
+; Set false to disable plugin/repository management console command registration
+; while keeping connector discovery/loading behavior.
+EnablePluginManagementCommands = true
+
 
 [MySql]
 ;

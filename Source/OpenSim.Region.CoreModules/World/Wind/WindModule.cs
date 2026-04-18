@@ -27,7 +27,6 @@
 
 using System.Reflection;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -39,6 +38,7 @@ namespace OpenSim.Region.CoreModules.World.Wind
     public class WindModule : IWindModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private IPluginDiscovery m_pluginDiscovery;
 
         private uint m_frame = 0;
         private int m_dataVersion = 0;
@@ -62,10 +62,19 @@ namespace OpenSim.Region.CoreModules.World.Wind
         public void Initialise(IConfigSource config)
         {
             m_windConfig = config.Configs["Wind"];
+
+            string pluginDiscovery = string.Empty;
+            IConfig startupConfig = config.Configs["Startup"];
+            if (startupConfig != null)
+                pluginDiscovery = startupConfig.GetString("PluginDiscovery", string.Empty);
+
 //            string desiredWindPlugin = m_dWindPluginName;
 
             if (m_windConfig != null)
             {
+                if (m_windConfig.Contains("PluginDiscovery"))
+                    pluginDiscovery = m_windConfig.GetString("PluginDiscovery", pluginDiscovery);
+
                 m_enabled = m_windConfig.GetBoolean("enabled", true);
 
                 m_frameUpdateRate = m_windConfig.GetInt("wind_update_rate", 150);
@@ -80,6 +89,7 @@ namespace OpenSim.Region.CoreModules.World.Wind
             if (m_enabled)
             {
                 m_log.InfoFormat("[WIND] Enabled with an update rate of {0} frames.", m_frameUpdateRate);
+                m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log, pluginDiscovery);
 
             }
 
@@ -92,12 +102,31 @@ namespace OpenSim.Region.CoreModules.World.Wind
 
             m_scene = scene;
             m_frame = 0;
+
+            if (m_pluginDiscovery == null)
+                m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log);
+
+            m_pluginDiscovery.Initialize(".");
+
+            IReadOnlyList<PluginExtensionNode> discoveredNodes =
+                m_pluginDiscovery.GetExtensionNodes("/OpenSim/WindModule", typeof(IWindModelPlugin));
+
             // Register all the Wind Model Plug-ins
-            foreach (IWindModelPlugin windPlugin in AddinManager.GetExtensionObjects("/OpenSim/WindModule", false))
+            foreach (PluginExtensionNode node in discoveredNodes)
             {
+                IWindModelPlugin windPlugin = node.CreateInstance() as IWindModelPlugin;
+                if (windPlugin == null)
+                    continue;
+
                 m_log.InfoFormat("[WIND] Found Plugin: {0}", windPlugin.Name);
                 m_availableWindPlugins.Add(windPlugin.Name, windPlugin);
             }
+
+            m_log.InfoFormat(
+                "[WIND] Discovery summary path=/OpenSim/WindModule backend={0} discovered={1} loaded={2}",
+                m_pluginDiscovery.GetType().Name,
+                discoveredNodes.Count,
+                m_availableWindPlugins.Count);
 
             // Check for desired plugin
             if (m_availableWindPlugins.ContainsKey(m_dWindPluginName))
@@ -173,6 +202,9 @@ namespace OpenSim.Region.CoreModules.World.Wind
             {
                 windPlugin.Dispose();
             }
+
+            m_pluginDiscovery?.Dispose();
+            m_pluginDiscovery = null;
 
             m_availableWindPlugins.Clear();
 

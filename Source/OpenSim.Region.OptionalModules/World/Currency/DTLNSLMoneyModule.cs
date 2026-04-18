@@ -33,7 +33,6 @@
 //  2022/09/29  Send the helper URI to the viewer only when the EconomyHelper setting in OpenSim.ini
 
 using log4net;
-using Mono.Addins;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;

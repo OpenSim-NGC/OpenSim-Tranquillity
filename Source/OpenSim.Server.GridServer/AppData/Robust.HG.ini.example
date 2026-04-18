@@ -61,6 +61,10 @@
     ; The Robust.exe process must have R/W access to the location
     RegistryLocation = "."
 
+    ; Set false to disable plugin/repository management console command registration
+    ; while keeping connector discovery/loading behavior.
+    EnablePluginManagementCommands = true
+
     ; Modular configurations
     ; Set path to directory for modular ini files...
     ; The Robust.exe process must have R/W access to the location

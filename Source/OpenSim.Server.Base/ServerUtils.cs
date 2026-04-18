@@ -72,6 +72,7 @@ namespace OpenSim.Server.Base
     public class PluginLoader
     {
         static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private readonly IPluginDiscovery m_pluginDiscovery;
 
         public AddinRegistry Registry
         {
@@ -88,14 +89,61 @@ namespace OpenSim.Server.Base
         public PluginLoader(IConfigSource config, string registryPath)
         {
             Config = config;
+            string pluginDiscovery = string.Empty;
+            bool enablePluginManagementCommands = true;
+            IConfig startupConfig = Config.Configs["Startup"];
+            if (startupConfig != null)
+            {
+                pluginDiscovery = startupConfig.GetString("PluginDiscovery", string.Empty);
+                enablePluginManagementCommands = startupConfig.GetBoolean("EnablePluginManagementCommands", true);
+            }
 
-            Registry = new AddinRegistry(registryPath, ".");
+            m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log, pluginDiscovery);
+
+            if (m_pluginDiscovery.Capabilities.SupportsAddinRegistryMetadata)
+            {
+                TryInitializeRegistryAndCommands(registryPath, enablePluginManagementCommands);
+            }
+
             //suppress_console_output_(true);
-            AddinManager.Initialize(registryPath);
+            m_pluginDiscovery.Initialize(registryPath);
             //suppress_console_output_(false);
-            AddinManager.Registry.Update();
-            CommandManager commandmanager = new CommandManager(Registry);
-            AddinManager.AddExtensionNodeHandler("/Robust/Connector", OnExtensionChanged);
+
+            LoadConfiguredConnectors();
+        }
+
+        private void TryInitializeRegistryAndCommands(string registryPath, bool enablePluginManagementCommands)
+        {
+            try
+            {
+                Registry = new AddinRegistry(registryPath, ".");
+            }
+            catch (Exception e)
+            {
+                m_log.WarnFormat(
+                    "[SERVER UTILS]: Unable to initialize addin registry at {0}: {1}",
+                    registryPath,
+                    e.Message);
+                Registry = null;
+                return;
+            }
+
+            if (!enablePluginManagementCommands)
+            {
+                m_log.Info("[SERVER UTILS]: Plugin/repository management commands disabled by Startup setting EnablePluginManagementCommands=false");
+                return;
+            }
+
+            try
+            {
+                _ = new CommandManager(Registry);
+            }
+            catch (Exception e)
+            {
+                m_log.WarnFormat(
+                    "[SERVER UTILS]: Plugin/repository management commands unavailable: {0}",
+                    e.Message);
+            }
         }
 
         private static TextWriter prev_console_;
@@ -123,36 +171,72 @@ namespace OpenSim.Server.Base
             }
         }
 
-        private void OnExtensionChanged(object s, ExtensionNodeEventArgs args)
+        private void LoadConfiguredConnectors()
         {
-            IRobustConnector connector = (IRobustConnector)args.ExtensionObject;
-            Addin a = Registry.GetAddin(args.ExtensionNode.Addin.Id);
+            IReadOnlyList<PluginExtensionNode> discoveredNodes =
+                m_pluginDiscovery.GetExtensionNodes("/Robust/Connector", typeof(IRobustConnector));
+            int loadedConnectorCount = 0;
 
-            if(a == null)
+            foreach (PluginExtensionNode node in discoveredNodes)
+            {
+                IRobustConnector connector = node.CreateInstance() as IRobustConnector;
+                if (connector == null)
+                    continue;
+
+                connector.PluginPath = ResolvePluginPath(node);
+                LoadPlugin(connector);
+                loadedConnectorCount++;
+            }
+
+            m_log.InfoFormat(
+                "[SERVER UTILS]: Discovery summary path=/Robust/Connector backend={0} discovered={1} loaded={2}",
+                m_pluginDiscovery.GetType().Name,
+                discoveredNodes.Count,
+                loadedConnectorCount);
+        }
+
+        private string ResolvePluginPath(PluginExtensionNode node)
+        {
+            // Non-Mono discovery backends do not provide AddinRegistry metadata.
+            // Use the plugin assembly location as the connector path in that case.
+            if (Registry == null)
+            {
+                if (node.Type?.Assembly != null)
+                {
+                    string assemblyLocation = node.Type.Assembly.Location;
+                    if (!string.IsNullOrEmpty(assemblyLocation))
+                        return assemblyLocation;
+                }
+
+                m_log.WarnFormat(
+                    "[SERVER UTILS]: Unable to resolve plugin path for connector {0} using backend {1}",
+                    node.ID,
+                    m_pluginDiscovery.GetType().Name);
+                return string.Empty;
+            }
+
+            Addin a = Registry.GetAddin(node.Provider);
+
+            if (a == null)
             {
                 Registry.Rebuild(null);
-                a = Registry.GetAddin(args.ExtensionNode.Addin.Id);
+                a = Registry.GetAddin(node.Provider);
             }
 
-            switch(args.Change)
+            if (a == null)
             {
-                case ExtensionChange.Add:
-                    if (a.AddinFile.Contains(Registry.DefaultAddinsFolder))
-                    {
-                        m_log.InfoFormat("[SERVER UTILS]: Adding {0} from registry", a.Name);
-                        connector.PluginPath = System.IO.Path.Combine(Registry.DefaultAddinsFolder,a.Name.Replace(',', '.'));                    }
-                    else
-                    {
-                        m_log.InfoFormat("[SERVER UTILS]: Adding {0} from ./bin", a.Name);
-                        connector.PluginPath = a.AddinFile;
-                    }
-                    LoadPlugin(connector);
-                    break;
-                case ExtensionChange.Remove:
-                    m_log.InfoFormat("[SERVER UTILS]: Removing {0}", a.Name);
-                    UnloadPlugin(connector);
-                    break;
+                m_log.WarnFormat("[SERVER UTILS]: Unable to resolve addin metadata for connector {0}", node.ID);
+                return string.Empty;
             }
+
+            if (a.AddinFile.Contains(Registry.DefaultAddinsFolder))
+            {
+                m_log.InfoFormat("[SERVER UTILS]: Adding {0} from registry", a.Name);
+                return Path.Combine(Registry.DefaultAddinsFolder, a.Name.Replace(',', '.'));
+            }
+
+            m_log.InfoFormat("[SERVER UTILS]: Adding {0} from ./bin", a.Name);
+            return a.AddinFile;
         }
 
         private void LoadPlugin(IRobustConnector connector)
