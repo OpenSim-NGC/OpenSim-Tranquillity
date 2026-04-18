@@ -30,6 +30,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Loader;
 using Mono.Addins;
 using log4net;
 
@@ -104,7 +105,42 @@ namespace OpenSim.Framework
         private string m_pluginDirectory = ".";
         private Type m_cachedRequiredType;
         private List<Assembly> m_assemblies = new List<Assembly>();
+        private int m_lastScannedAssemblyCount;
+        private int m_lastSkippedAssemblyCount;
+        private int m_lastLoadFailureCount;
+        private bool m_resolutionHookAttached;
         private readonly List<McMaster.NETCore.Plugins.PluginLoader> m_pluginLoaders = new List<McMaster.NETCore.Plugins.PluginLoader>();
+
+        private static readonly string[] s_skippedAssemblyPrefixes =
+        {
+            "System.",
+            "Microsoft.",
+            "Mono.",
+            "Autofac",
+            "BouncyCastle",
+            "BulletXNA",
+            "C5",
+            "CoreJ2K",
+            "DotNetOpenId",
+            "ICSharpCode",
+            "Ionic.Zlib",
+            "log4net",
+            "LukeSkywalker",
+            "MailKit",
+            "McMaster.NETCore.Plugins",
+            "MimeKit",
+            "MySqlConnector",
+            "NDesk.Options",
+            "netcd",
+            "Nini",
+            "Npgsql",
+            "OpenMetaverse",
+            "RestSharp",
+            "SkiaSharp",
+            "SmartThreadPool",
+            "Warp3D",
+            "xmlrpc"
+        };
 
         public PluginDiscoveryCapabilities Capabilities { get; } =
             new PluginDiscoveryCapabilities(supportsAddinRegistryMetadata: false);
@@ -120,6 +156,8 @@ namespace OpenSim.Framework
             m_cachedRequiredType = null;
             m_assemblies = new List<Assembly>();
             DisposePluginLoaders();
+            AttachLegacyAssemblyResolver();
+            EnsureLegacyAssemblyAliases();
         }
 
         public IReadOnlyList<PluginExtensionNode> GetExtensionNodes(string extensionPoint, Type requiredTypeHint = null)
@@ -156,6 +194,15 @@ namespace OpenSim.Framework
                 }
             }
 
+            m_log.InfoFormat(
+                "[PLUGINS]: Discovery summary [{0}] scanned={1}, skipped={2}, loadFailures={3}, candidates={4} using {5}",
+                extensionPoint,
+                m_lastScannedAssemblyCount,
+                m_lastSkippedAssemblyCount,
+                m_lastLoadFailureCount,
+                nodes.Count,
+                nameof(DotNetCorePluginsDiscovery));
+
             return nodes;
         }
 
@@ -169,6 +216,7 @@ namespace OpenSim.Framework
             m_cachedRequiredType = null;
             m_assemblies.Clear();
             DisposePluginLoaders();
+            DetachLegacyAssemblyResolver();
         }
 
         private IReadOnlyList<Assembly> GetAssemblies(Type requiredTypeHint)
@@ -178,6 +226,9 @@ namespace OpenSim.Framework
 
             m_cachedRequiredType = requiredTypeHint;
             m_assemblies.Clear();
+            m_lastScannedAssemblyCount = 0;
+            m_lastSkippedAssemblyCount = 0;
+            m_lastLoadFailureCount = 0;
             DisposePluginLoaders();
 
             if (!Directory.Exists(m_pluginDirectory))
@@ -188,11 +239,23 @@ namespace OpenSim.Framework
 
             foreach (string dllPath in Directory.GetFiles(m_pluginDirectory, "*.dll", SearchOption.TopDirectoryOnly))
             {
+                m_lastScannedAssemblyCount++;
+
+                if (!ShouldProbeAssembly(dllPath, requiredTypeHint))
+                {
+                    m_lastSkippedAssemblyCount++;
+                    continue;
+                }
+
                 try
                 {
+                    string assemblyPath = Path.IsPathRooted(dllPath)
+                        ? dllPath
+                        : Path.GetFullPath(dllPath);
+
                     McMaster.NETCore.Plugins.PluginLoader loader =
                         McMaster.NETCore.Plugins.PluginLoader.CreateFromAssemblyFile(
-                            dllPath,
+                            assemblyPath,
                             sharedTypes: new[] { requiredTypeHint });
 
                     m_pluginLoaders.Add(loader);
@@ -204,11 +267,58 @@ namespace OpenSim.Framework
                 }
                 catch (Exception e)
                 {
+                    m_lastLoadFailureCount++;
                     m_log.WarnFormat("[PLUGINS]: Unable to load assembly {0}: {1}", dllPath, e.Message);
                 }
             }
 
             return m_assemblies;
+        }
+
+        private static bool ShouldProbeAssembly(string dllPath, Type requiredTypeHint)
+        {
+            string assemblySimpleName = Path.GetFileNameWithoutExtension(dllPath) ?? string.Empty;
+
+            if (requiredTypeHint != null)
+            {
+                if (requiredTypeHint.Name.Equals("IApplicationPlugin", StringComparison.Ordinal))
+                {
+                    if (assemblySimpleName.StartsWith("OpenSim.ApplicationPlugins.", StringComparison.OrdinalIgnoreCase) ||
+                        assemblySimpleName.Contains(".ApplicationPlugins.", StringComparison.OrdinalIgnoreCase) ||
+                        assemblySimpleName.EndsWith("ApplicationPlugin", StringComparison.OrdinalIgnoreCase) ||
+                        assemblySimpleName.EndsWith("ApplicationPlugins", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+
+                    return false;
+                }
+            }
+
+            if (assemblySimpleName.StartsWith("OpenSim.", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (assemblySimpleName.StartsWith("WebRtcVoice", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (assemblySimpleName.EndsWith("Plugin", StringComparison.OrdinalIgnoreCase) ||
+                assemblySimpleName.EndsWith("Plugins", StringComparison.OrdinalIgnoreCase) ||
+                assemblySimpleName.EndsWith("Module", StringComparison.OrdinalIgnoreCase) ||
+                assemblySimpleName.EndsWith("Modules", StringComparison.OrdinalIgnoreCase) ||
+                assemblySimpleName.Contains(".Plugin.", StringComparison.OrdinalIgnoreCase) ||
+                assemblySimpleName.Contains(".Module.", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            foreach (string prefix in s_skippedAssemblyPrefixes)
+            {
+                if (assemblySimpleName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            // Keep probing unknown assemblies so external plugin names still work by default.
+            return true;
         }
 
         private void DisposePluginLoaders()
@@ -219,6 +329,77 @@ namespace OpenSim.Framework
             }
 
             m_pluginLoaders.Clear();
+        }
+
+        private void AttachLegacyAssemblyResolver()
+        {
+            if (m_resolutionHookAttached)
+                return;
+
+            AssemblyLoadContext.Default.Resolving += ResolveLegacyAssembly;
+            m_resolutionHookAttached = true;
+        }
+
+        private void DetachLegacyAssemblyResolver()
+        {
+            if (!m_resolutionHookAttached)
+                return;
+
+            AssemblyLoadContext.Default.Resolving -= ResolveLegacyAssembly;
+            m_resolutionHookAttached = false;
+        }
+
+        private Assembly ResolveLegacyAssembly(AssemblyLoadContext context, AssemblyName assemblyName)
+        {
+            if (!"zlib.net".Equals(assemblyName?.Name, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            string preferredPath = Path.Combine(m_pluginDirectory, "zlib.net.dll");
+            if (File.Exists(preferredPath))
+            {
+                try
+                {
+                    return context.LoadFromAssemblyPath(Path.GetFullPath(preferredPath));
+                }
+                catch
+                {
+                    // Fall through to secondary path.
+                }
+            }
+
+            string fallbackPath = Path.Combine(m_pluginDirectory, "Ionic.Zlib.Core.dll");
+            if (File.Exists(fallbackPath))
+            {
+                try
+                {
+                    return context.LoadFromAssemblyPath(Path.GetFullPath(fallbackPath));
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            return null;
+        }
+
+        private void EnsureLegacyAssemblyAliases()
+        {
+            try
+            {
+                string sourcePath = Path.Combine(m_pluginDirectory, "Ionic.Zlib.Core.dll");
+                string targetPath = Path.Combine(m_pluginDirectory, "zlib.net.dll");
+
+                if (!File.Exists(sourcePath) || File.Exists(targetPath))
+                    return;
+
+                File.Copy(sourcePath, targetPath);
+                m_log.InfoFormat("[PLUGINS]: Created legacy assembly alias {0} from {1}", targetPath, sourcePath);
+            }
+            catch (Exception e)
+            {
+                m_log.WarnFormat("[PLUGINS]: Unable to prepare legacy assembly aliases in {0}: {1}", m_pluginDirectory, e.Message);
+            }
         }
 
         private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
