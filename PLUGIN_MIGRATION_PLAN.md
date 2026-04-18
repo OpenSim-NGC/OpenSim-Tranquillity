@@ -29,7 +29,9 @@ DotNetCorePlugins offers a simpler, .NET Core-native alternative that uses folde
 - Introduced `IPluginDiscovery` abstraction and wired `PluginLoader<T>` to use it.
 - Added a backend factory with runtime selection:
     - `monoaddins` (default)
-    - `reflection` (transitional non-Mono backend)
+    - `reflection`/`dotnet`/`dotnetcore` mapped to DotNetCorePlugins discovery backend
+- Implemented the non-Mono backend using `McMaster.NETCore.Plugins`
+    (shared-type loading keyed by plugin interface hints).
 - Added type-hinted discovery API calls so non-XML backends can discover by interface type.
 - Added startup discovery summary counters at migrated extension points for backend parity checks:
         - `/OpenSim/Startup` (generic loader)
@@ -88,8 +90,9 @@ Implementation note:
 
 ### Transitional Scope Note
 
-- The `reflection` backend is for incremental migration testing and does not yet replace
-    all Mono.Addins features (for example, repository/registry management and XML metadata semantics).
+- The `reflection` selector now routes to the DotNetCorePlugins implementation and remains
+    an incremental migration path that does not yet replace all Mono.Addins features
+    (for example, repository/registry management and XML metadata semantics).
 - Default behavior remains `monoaddins` until full migration is complete.
 - Runtime startup parity capture is environment-dependent in current dev setup; compile-time
     parity validation with backend overrides is currently used as the stable smoke check.

@@ -88,8 +88,8 @@ namespace OpenSim.Framework
                 case "dotnet":
                 case "dotnetcore":
                 case "reflection":
-                    log.InfoFormat("[PLUGINS]: Using reflection discovery backend ({0})", backend);
-                    return new ReflectionPluginDiscovery(log);
+                    log.InfoFormat("[PLUGINS]: Using DotNetCorePlugins discovery backend ({0})", backend);
+                    return new DotNetCorePluginsDiscovery(log);
 
                 default:
                     log.InfoFormat("[PLUGINS]: Using Mono.Addins discovery backend ({0})", backend);
@@ -98,16 +98,18 @@ namespace OpenSim.Framework
         }
     }
 
-    public sealed class ReflectionPluginDiscovery : IPluginDiscovery
+    public class DotNetCorePluginsDiscovery : IPluginDiscovery
     {
         private readonly ILog m_log;
         private string m_pluginDirectory = ".";
+        private Type m_cachedRequiredType;
         private List<Assembly> m_assemblies = new List<Assembly>();
+        private readonly List<McMaster.NETCore.Plugins.PluginLoader> m_pluginLoaders = new List<McMaster.NETCore.Plugins.PluginLoader>();
 
         public PluginDiscoveryCapabilities Capabilities { get; } =
             new PluginDiscoveryCapabilities(supportsAddinRegistryMetadata: false);
 
-        public ReflectionPluginDiscovery(ILog log)
+        public DotNetCorePluginsDiscovery(ILog log)
         {
             m_log = log;
         }
@@ -115,7 +117,9 @@ namespace OpenSim.Framework
         public void Initialize(string pluginDirectory)
         {
             m_pluginDirectory = string.IsNullOrWhiteSpace(pluginDirectory) ? "." : pluginDirectory;
+            m_cachedRequiredType = null;
             m_assemblies = new List<Assembly>();
+            DisposePluginLoaders();
         }
 
         public IReadOnlyList<PluginExtensionNode> GetExtensionNodes(string extensionPoint, Type requiredTypeHint = null)
@@ -124,11 +128,11 @@ namespace OpenSim.Framework
 
             if (requiredTypeHint == null)
             {
-                m_log.WarnFormat("[PLUGINS]: Reflection discovery for {0} requires a plugin type hint.", extensionPoint);
+                m_log.WarnFormat("[PLUGINS]: DotNetCorePlugins discovery for {0} requires a plugin type hint.", extensionPoint);
                 return nodes;
             }
 
-            foreach (Assembly assembly in GetAssemblies())
+            foreach (Assembly assembly in GetAssemblies(requiredTypeHint))
             {
                 foreach (Type type in GetLoadableTypes(assembly))
                 {
@@ -162,13 +166,19 @@ namespace OpenSim.Framework
 
         public void Dispose()
         {
+            m_cachedRequiredType = null;
             m_assemblies.Clear();
+            DisposePluginLoaders();
         }
 
-        private IReadOnlyList<Assembly> GetAssemblies()
+        private IReadOnlyList<Assembly> GetAssemblies(Type requiredTypeHint)
         {
-            if (m_assemblies.Count > 0)
+            if (m_cachedRequiredType == requiredTypeHint && m_assemblies.Count > 0)
                 return m_assemblies;
+
+            m_cachedRequiredType = requiredTypeHint;
+            m_assemblies.Clear();
+            DisposePluginLoaders();
 
             if (!Directory.Exists(m_pluginDirectory))
             {
@@ -180,7 +190,13 @@ namespace OpenSim.Framework
             {
                 try
                 {
-                    m_assemblies.Add(Assembly.LoadFrom(dllPath));
+                    McMaster.NETCore.Plugins.PluginLoader loader =
+                        McMaster.NETCore.Plugins.PluginLoader.CreateFromAssemblyFile(
+                            dllPath,
+                            sharedTypes: new[] { requiredTypeHint });
+
+                    m_pluginLoaders.Add(loader);
+                    m_assemblies.Add(loader.LoadDefaultAssembly());
                 }
                 catch (BadImageFormatException)
                 {
@@ -195,6 +211,16 @@ namespace OpenSim.Framework
             return m_assemblies;
         }
 
+        private void DisposePluginLoaders()
+        {
+            foreach (McMaster.NETCore.Plugins.PluginLoader loader in m_pluginLoaders)
+            {
+                loader.Dispose();
+            }
+
+            m_pluginLoaders.Clear();
+        }
+
         private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
         {
             try
@@ -205,6 +231,15 @@ namespace OpenSim.Framework
             {
                 return rtle.Types.Where(t => t != null);
             }
+        }
+    }
+
+    // Compatibility alias for existing backend name references in docs/config.
+    public sealed class ReflectionPluginDiscovery : DotNetCorePluginsDiscovery
+    {
+        public ReflectionPluginDiscovery(ILog log)
+            : base(log)
+        {
         }
     }
 
