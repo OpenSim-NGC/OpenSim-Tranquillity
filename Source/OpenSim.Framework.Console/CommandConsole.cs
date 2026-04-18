@@ -788,7 +788,7 @@ namespace OpenSim.Framework.Console
                 }
             }
             return cmdinput;
-        }
+        } 
 
         public virtual void ReadConfig(IConfigSource configSource)
         {

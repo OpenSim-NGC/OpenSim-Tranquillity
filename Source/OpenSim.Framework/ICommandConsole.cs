@@ -105,6 +105,8 @@ namespace OpenSim.Framework
 
         string ReadLine(string p, bool isCommand, bool e);
 
+        void WriteLine(string s);
+
         void ReadConfig(IConfigSource configSource);
         void SetCntrCHandler(OnCntrCCelegate handler);
     }
