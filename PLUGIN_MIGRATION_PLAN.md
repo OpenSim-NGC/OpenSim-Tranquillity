@@ -56,6 +56,28 @@ DotNetCorePlugins offers a simpler, .NET Core-native alternative that uses folde
 - Removed direct `Mono.Addins.TypeExtensionNode` inheritance from wind plugins.
 - Removed several stale `using Mono.Addins;` directives in source modules.
 
+### Completed in Step 1.1: Eliminated Zlib.net Binding Dependency
+
+**Problem**: The reflection-based plugin loader triggered `zlib.net 1.0.4.0` binding errors when ApplicationPlugins loaded,
+even though zlib was not directly used by plugins. Root cause was transitive dependency from Region.CoreModules
+(via Ionic.Zlib.Core) trying to satisfy expectations of compiled zlib.net bindings.
+
+**Solution**: Replaced external Ionic.Zlib.Core dependency with .NET's built-in System.IO.Compression:
+- Updated `InventoryArchiveWriteRequest.cs`: GZipStream now uses System.IO.Compression
+- Updated `ArchiveWriteRequest.cs`: GZipStream now uses System.IO.Compression
+- Updated `MaterialsModule.cs`: ZlibStream replaced with System.IO.Compression.DeflateStream
+- Removed `Ionic.Zlib.Core` NuGet package references from:
+  - `OpenSim.Region.CoreModules.csproj`
+  - `OpenSim.Region.OptionalModules.csproj`
+- Removed legacy zlib assembly resolver from `DotNetCorePluginsDiscovery`:
+  - Removed `ResolveLegacyAssembly()` method that attempted zlib.net -> Ionic.Zlib.Core fallback
+  - Removed `EnsureLegacyAssemblyAliases()` method that created zlib.net.dll aliases
+  - Removed `AttachLegacyAssemblyResolver()` / `DetachLegacyAssemblyResolver()` methods
+  - Removed `Ionic.Zlib` from skipped assembly prefix list
+
+**Result**: Plugin discovery no longer requires legacy assembly binding resolution, eliminating a source of
+reflection-backend discovery failures. All compression now uses .NET Framework built-ins (no external dependency).
+
 ### Backend Selection Configuration
 
 You can choose the discovery backend using either config or environment:
