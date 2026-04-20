@@ -78,6 +78,43 @@ even though zlib was not directly used by plugins. Root cause was transitive dep
 **Result**: Plugin discovery no longer requires legacy assembly binding resolution, eliminating a source of
 reflection-backend discovery failures. All compression now uses .NET Framework built-ins (no external dependency).
 
+### Completed in Step 2: Config-Based Registry and Plugin Loader Infrastructure
+
+**Phase 2.1: PluginRegistry.cs**
+- Created `PluginRegistry` class for programmatic plugin management without XML manifests
+- Features:
+  * `PluginDescriptor` class encapsulates plugin metadata (id, type, name, version, enabled, priority)
+  * `Register()` / `RegisterAll()` for programmatic registration
+  * `FromIniConfig()` loads registrations from INI configuration
+  * `FromJsonFile()` loads registrations from JSON configuration
+  * Query methods: `GetPlugins()`, `GetPluginTypes()`, `HasPlugins()`, `GetPluginCount()`
+  * Registry merging for composable configurations
+  * Full logging for debugging
+
+**Phase 2.2: DotNetCorePluginLoader<T>**
+- Created `DotNetCorePluginLoader<T>` class to replace Mono.Addins loader
+- Features:
+  * Generic loader constrained to `where T : class, IPlugin`
+  * `Load(extensionPoint, typeHint)` uses discovery backend to find plugins
+  * `LoadFromRegistry(registry, extensionPoint, typeHint)` loads from explicit registry
+  * Two-phase initialization: instantiation then initialization
+  * Comprehensive error handling and diagnostics
+  * `DotNetCorePluginLoaderFactory` for easy instantiation with backend selection
+  * Both `reflection` (new DotNetCorePlugins) and `monoaddins` (legacy) backends supported
+
+**Phase 2.3: PluginLoaderHelper.cs and Integration**
+- Created helper methods for migration:
+  * `LoadPluginsUsingRegistry()`: Pure registry-based approach
+  * `LoadPluginsUsingDiscovery()`: Pure discovery-based approach
+  * `LoadPluginsHybrid()`: Try registry first, fall back to discovery (recommended)
+  * `DebugPluginLoader<T>`: Verbose logging for diagnostics
+- Design allows coexistence with existing Mono.Addins code during transition
+- No breaking changes to existing plugin infrastructure
+
+**Result**: Core infrastructure for Phase 2 complete. Both backends can operate in parallel.
+RegionModulesController and other loaders can now optionally use the new infrastructure via
+helper methods, or continue using existing discovery backend until full migration.
+
 ### Backend Selection Configuration
 
 You can choose the discovery backend using either config or environment:
