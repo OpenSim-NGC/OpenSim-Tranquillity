@@ -40,7 +40,6 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="Ionic.Zlib.Core" Version="1.0.0" />
     <PackageReference Include="log4net" Version="3.3.0" />
     <PackageReference Include="MailKit" Version="4.15.1" />
     <PackageReference Include="MimeKit" Version="4.15.1" />

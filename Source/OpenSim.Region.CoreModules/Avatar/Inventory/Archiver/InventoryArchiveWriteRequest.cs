@@ -35,9 +35,7 @@ using OpenSim.Framework.Serialization.External;
 using OpenSim.Region.CoreModules.World.Archiver;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
-using GZipStream = Ionic.Zlib.GZipStream;
-using CompressionMode = Ionic.Zlib.CompressionMode;
-using CompressionLevel = Ionic.Zlib.CompressionLevel;
+using System.IO.Compression;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
@@ -114,7 +112,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
                 scene,
                 userInfo,
                 invPath,
-                new GZipStream(new FileStream(savePath, FileMode.Create), CompressionMode.Compress, CompressionLevel.BestCompression))
+                new GZipStream(new FileStream(savePath, FileMode.Create), System.IO.Compression.CompressionMode.Compress))
         {
         }
 

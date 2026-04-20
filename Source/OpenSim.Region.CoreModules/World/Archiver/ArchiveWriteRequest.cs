@@ -34,9 +34,7 @@ using OpenSim.Framework;
 using OpenSim.Framework.Serialization;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using GZipStream = Ionic.Zlib.GZipStream;
-using CompressionMode = Ionic.Zlib.CompressionMode;
-using CompressionLevel = Ionic.Zlib.CompressionLevel;
+using System.IO.Compression;
 using OpenSim.Framework.Serialization.External;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
@@ -94,7 +92,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
         {
             try
             {
-                m_saveStream = new GZipStream(new FileStream(savePath, FileMode.Create), CompressionMode.Compress, CompressionLevel.BestCompression);
+                m_saveStream = new GZipStream(new FileStream(savePath, FileMode.Create), System.IO.Compression.CompressionMode.Compress);
             }
             catch (EntryPointNotFoundException e)
             {

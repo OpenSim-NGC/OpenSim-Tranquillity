@@ -108,7 +108,6 @@ namespace OpenSim.Framework
         private int m_lastScannedAssemblyCount;
         private int m_lastSkippedAssemblyCount;
         private int m_lastLoadFailureCount;
-        private bool m_resolutionHookAttached;
         private readonly List<McMaster.NETCore.Plugins.PluginLoader> m_pluginLoaders = new List<McMaster.NETCore.Plugins.PluginLoader>();
 
         private static readonly string[] s_skippedAssemblyPrefixes =
@@ -123,7 +122,6 @@ namespace OpenSim.Framework
             "CoreJ2K",
             "DotNetOpenId",
             "ICSharpCode",
-            "Ionic.Zlib",
             "log4net",
             "LukeSkywalker",
             "MailKit",
@@ -156,8 +154,6 @@ namespace OpenSim.Framework
             m_cachedRequiredType = null;
             m_assemblies = new List<Assembly>();
             DisposePluginLoaders();
-            AttachLegacyAssemblyResolver();
-            EnsureLegacyAssemblyAliases();
         }
 
         public IReadOnlyList<PluginExtensionNode> GetExtensionNodes(string extensionPoint, Type requiredTypeHint = null)
@@ -216,7 +212,6 @@ namespace OpenSim.Framework
             m_cachedRequiredType = null;
             m_assemblies.Clear();
             DisposePluginLoaders();
-            DetachLegacyAssemblyResolver();
         }
 
         private IReadOnlyList<Assembly> GetAssemblies(Type requiredTypeHint)
@@ -329,77 +324,6 @@ namespace OpenSim.Framework
             }
 
             m_pluginLoaders.Clear();
-        }
-
-        private void AttachLegacyAssemblyResolver()
-        {
-            if (m_resolutionHookAttached)
-                return;
-
-            AssemblyLoadContext.Default.Resolving += ResolveLegacyAssembly;
-            m_resolutionHookAttached = true;
-        }
-
-        private void DetachLegacyAssemblyResolver()
-        {
-            if (!m_resolutionHookAttached)
-                return;
-
-            AssemblyLoadContext.Default.Resolving -= ResolveLegacyAssembly;
-            m_resolutionHookAttached = false;
-        }
-
-        private Assembly ResolveLegacyAssembly(AssemblyLoadContext context, AssemblyName assemblyName)
-        {
-            if (!"zlib.net".Equals(assemblyName?.Name, StringComparison.OrdinalIgnoreCase))
-                return null;
-
-            string preferredPath = Path.Combine(m_pluginDirectory, "zlib.net.dll");
-            if (File.Exists(preferredPath))
-            {
-                try
-                {
-                    return context.LoadFromAssemblyPath(Path.GetFullPath(preferredPath));
-                }
-                catch
-                {
-                    // Fall through to secondary path.
-                }
-            }
-
-            string fallbackPath = Path.Combine(m_pluginDirectory, "Ionic.Zlib.Core.dll");
-            if (File.Exists(fallbackPath))
-            {
-                try
-                {
-                    return context.LoadFromAssemblyPath(Path.GetFullPath(fallbackPath));
-                }
-                catch
-                {
-                    return null;
-                }
-            }
-
-            return null;
-        }
-
-        private void EnsureLegacyAssemblyAliases()
-        {
-            try
-            {
-                string sourcePath = Path.Combine(m_pluginDirectory, "Ionic.Zlib.Core.dll");
-                string targetPath = Path.Combine(m_pluginDirectory, "zlib.net.dll");
-
-                if (!File.Exists(sourcePath) || File.Exists(targetPath))
-                    return;
-
-                File.Copy(sourcePath, targetPath);
-                m_log.InfoFormat("[PLUGINS]: Created legacy assembly alias {0} from {1}", targetPath, sourcePath);
-            }
-            catch (Exception e)
-            {
-                m_log.WarnFormat("[PLUGINS]: Unable to prepare legacy assembly aliases in {0}: {1}", m_pluginDirectory, e.Message);
-            }
         }
 
         private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
