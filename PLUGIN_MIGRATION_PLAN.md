@@ -115,6 +115,115 @@ reflection-backend discovery failures. All compression now uses .NET Framework b
 RegionModulesController and other loaders can now optionally use the new infrastructure via
 helper methods, or continue using existing discovery backend until full migration.
 
+### Completed in Step 3 (Pilot): Code-Based Registrations for Startup Plugins
+
+- Added `IPluginRegistryProvider` and `PluginRegistry.FromProviders(...)` to support
+    in-assembly code registrations as a replacement for `.addin.xml` extension entries.
+- Updated `DotNetCorePluginsDiscovery` to prefer explicit code registrations for a requested
+    extension path, with reflection discovery as fallback when no code registrations exist.
+- Added pilot registration providers in startup plugin assemblies:
+    - `OpenSim.ApplicationPlugins.LoadRegions`
+    - `OpenSim.ApplicationPlugins.RegionModulesController`
+    - `OpenSim.ApplicationPlugins.RemoteController`
+- Added unit test coverage in `OpenSim.Framework.PluginMigration.Tests` for provider-based
+    registry loading.
+
+**Pilot result**: Reflection backend can now resolve `/OpenSim/Startup` plugins through explicit,
+code-defined registrations without requiring XML manifest metadata for these assemblies.
+Existing XML manifests are still retained in this pilot for transition compatibility.
+
+### Completed in Step 3 (Batch 2): RegionModules Pilot and Parity-Safe Discovery
+
+- Updated `DotNetCorePluginsDiscovery` to make code registrations **additive** with reflection
+    discovery (with type de-duplication), rather than replacing reflection results.
+    This preserves plugin parity while extension points are only partially converted.
+- Added code registration providers for additional pilot assemblies:
+    - `OpenSim.Region.ClientStack.LindenCaps` (`/OpenSim/RegionModules` entries)
+    - `OpenSim.Region.ClientStack.LindenUDP` (`/OpenSim/RegionModules` entry)
+
+**Batch 2 result**: Phase 3 conversion can proceed incrementally by assembly without losing
+non-converted plugins at shared extension paths.
+
+### Completed in Step 3 (Batch 3): CoreModules Registration Conversion (RegionModules + Wind)
+
+- Added `OpenSim.Region.CoreModules/PluginRegistration.cs` with code-based registrations generated
+    from `OpenSim.Region.CoreModules.addin.xml` for:
+    - `/OpenSim/RegionModules`
+    - `/OpenSim/WindModule`
+- Registration uses assembly-local type-name resolution (`Assembly.GetType`) to preserve resilience
+    if individual module type names diverge across build variants.
+
+**Batch 3 result**: The largest remaining manifest-backed assembly now provides explicit
+code registrations while preserving compatibility with XML-backed discovery during transition.
+
+### Completed in Step 3 (Batch 4): OptionalModules Registration Conversion (RegionModules)
+
+- Added `OpenSim.Region.OptionalModules/PluginRegistration.cs` with code-based registrations
+    generated from `OpenSim.Region.OptionalModules.addin.xml` for:
+    - `/OpenSim/RegionModules`
+- Registration uses assembly-local type-name resolution (`Assembly.GetType`) to preserve
+    transition safety where optional feature classes may vary by build/runtime environment.
+
+**Batch 4 result**: Optional region-module registrations are now available through provider-based
+code metadata while additive discovery still preserves any remaining reflection-only plugins.
+
+### Completed in Step 3 (Batch 5): Physics Module Registration Conversion (RegionModules)
+
+- Added provider-based code registrations for physics assemblies:
+    - `OpenSim.Region.PhysicsModules.BasicPhysics`
+    - `OpenSim.Region.PhysicsModules.BulletS`
+    - `OpenSim.Region.PhysicsModules.Meshing`
+    - `OpenSim.Region.PhysicsModules.POS`
+    - `OpenSim.Region.PhysicsModules.ubODE`
+    - `OpenSim.Region.PhysicsModules.ubODEMeshing`
+- Each provider mirrors its `.addin.xml` `/OpenSim/RegionModules` entries using
+    assembly-local type-name resolution (`Assembly.GetType`) for transition safety.
+
+**Batch 5 result**: All current Source-tree physics module manifests now have corresponding
+code-based registrations for region module discovery.
+
+### Completed in Step 3 (Batch 6): Script Engine Registration Conversion (YEngine)
+
+- Added `OpenSim.Region.ScriptEngine.YEngine/PluginRegistration.cs` with code-based
+    registration generated from `OpenSim.Region.ScriptEngine.YEngine.addin.xml` for:
+    - `/OpenSim/RegionModules` (`YEngine`)
+- Registration uses assembly-local type-name resolution (`Assembly.GetType`) for transition safety.
+
+**Batch 6 result**: YEngine module registration is now represented in provider-based code metadata.
+
+### Completed in Step 3 (Batch 7): Addons Registration Conversion (RegionModules)
+
+- Added provider-based code registrations for addon assemblies:
+    - `Addons/Gloebit.GloebitMoneyModule`
+    - `Addons/OpenSim.Addons.Groups`
+    - `Addons/OpenSim.Addons.OfflineIM`
+    - `Addons/OpenSimMutelist`
+    - `Addons/OpenSimSearch`
+    - `Addons/os-webrtc-janus/WebRtcVoiceRegionModule`
+    - `Addons/os-webrtc-janus/WebRtcVoiceServiceModule`
+- Each provider mirrors `.addin.xml` `/OpenSim/RegionModules` entries using assembly-local
+    type-name resolution (`Assembly.GetType`) and preserves declared manifest version strings.
+
+**Batch 7 result**: Addon region-module manifests now have corresponding code registrations
+for provider-based discovery.
+
+### Step 3 Scope Clarification: RegionServer Manifest
+
+- `OpenSim.Server.RegionServer.addin.xml` currently defines extension points only
+    (`/OpenSim/Startup`, `/OpenSim/AssetCache`, `/OpenSim/AssetClient`, `/OpenSim/WindModule`,
+    `/OpenSim/RegionModules`) and does not contain extension entries to convert into
+    `PluginDescriptor` registrations.
+
+### Step 3 Coverage Snapshot
+
+- All current `Source/` and `Addons/` manifests containing `<Extension path=...>` plugin entries
+    now have corresponding provider-based `PluginRegistration.cs` mappings.
+- Remaining manifest-only files without provider mappings are extension-point-only roots:
+    - `Source/OpenSim.Server.RegionServer/Resources/OpenSim.Server.RegionServer.addin.xml`
+    - `Source/OpenSim.Data/Resources/OpenSim.Data.addin.xml`
+- These extension-point-only manifests are part of later cleanup work and do not block
+    provider-based plugin registration migration for extension entries.
+
 ### Backend Selection Configuration
 
 You can choose the discovery backend using either config or environment:

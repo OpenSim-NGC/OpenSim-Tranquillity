@@ -37,6 +37,15 @@ using log4net;
 namespace OpenSim.Framework
 {
     /// <summary>
+    /// Implemented by assemblies that provide explicit plugin registrations
+    /// without relying on Mono.Addins XML manifests.
+    /// </summary>
+    public interface IPluginRegistryProvider
+    {
+        void RegisterPlugins(PluginRegistry registry);
+    }
+
+    /// <summary>
     /// Descriptor for a plugin that can be registered for an extension point.
     /// Replaces Mono.Addins XML manifest functionality.
     /// </summary>
@@ -311,6 +320,47 @@ namespace OpenSim.Framework
         }
 
         /// <summary>
+        /// Build a registry from in-assembly code providers.
+        /// </summary>
+        public static PluginRegistry FromProviders(IEnumerable<Assembly> assemblies, ILog log = null)
+        {
+            var registry = new PluginRegistry();
+            var logger = log ?? m_log;
+
+            if (assemblies == null)
+                return registry;
+
+            foreach (Assembly assembly in assemblies.Where(a => a != null).Distinct())
+            {
+                foreach (Type type in GetLoadableTypes(assembly))
+                {
+                    if (type == null || type.IsAbstract || type.IsInterface)
+                        continue;
+
+                    if (!typeof(IPluginRegistryProvider).IsAssignableFrom(type))
+                        continue;
+
+                    try
+                    {
+                        var provider = (IPluginRegistryProvider)Activator.CreateInstance(type, true);
+                        provider.RegisterPlugins(registry);
+                        logger.DebugFormat("[PLUGIN-REGISTRY]: Loaded provider {0} from {1}",
+                            type.FullName, assembly.GetName().Name);
+                    }
+                    catch (Exception e)
+                    {
+                        logger.WarnFormat("[PLUGIN-REGISTRY]: Failed to run provider {0} from {1}: {2}",
+                            type.FullName,
+                            assembly.GetName().Name,
+                            e.Message);
+                    }
+                }
+            }
+
+            return registry;
+        }
+
+        /// <summary>
         /// Merge another registry into this one
         /// </summary>
         public void MergeWith(PluginRegistry other)
@@ -364,6 +414,18 @@ namespace OpenSim.Framework
             public string Description { get; set; }
             public bool? Enabled { get; set; }
             public int? Priority { get; set; }
+        }
+
+        private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+        {
+            try
+            {
+                return assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException rtle)
+            {
+                return rtle.Types.Where(t => t != null);
+            }
         }
     }
 }

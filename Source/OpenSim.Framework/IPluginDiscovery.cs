@@ -105,6 +105,7 @@ namespace OpenSim.Framework
         private string m_pluginDirectory = ".";
         private Type m_cachedRequiredType;
         private List<Assembly> m_assemblies = new List<Assembly>();
+        private PluginRegistry m_registeredPlugins = new PluginRegistry();
         private int m_lastScannedAssemblyCount;
         private int m_lastSkippedAssemblyCount;
         private int m_lastLoadFailureCount;
@@ -153,17 +154,55 @@ namespace OpenSim.Framework
             m_pluginDirectory = string.IsNullOrWhiteSpace(pluginDirectory) ? "." : pluginDirectory;
             m_cachedRequiredType = null;
             m_assemblies = new List<Assembly>();
+            m_registeredPlugins = new PluginRegistry();
             DisposePluginLoaders();
         }
 
         public IReadOnlyList<PluginExtensionNode> GetExtensionNodes(string extensionPoint, Type requiredTypeHint = null)
         {
             List<PluginExtensionNode> nodes = new List<PluginExtensionNode>();
+            HashSet<string> seenTypes = new HashSet<string>(StringComparer.Ordinal);
 
             if (requiredTypeHint == null)
             {
                 m_log.WarnFormat("[PLUGINS]: DotNetCorePlugins discovery for {0} requires a plugin type hint.", extensionPoint);
                 return nodes;
+            }
+
+            IReadOnlyList<PluginDescriptor> explicitRegistrations =
+                m_registeredPlugins.GetPlugins(extensionPoint);
+
+            int explicitCount = 0;
+            int reflectionCount = 0;
+
+            if (explicitRegistrations.Count > 0)
+            {
+                foreach (PluginDescriptor descriptor in explicitRegistrations)
+                {
+                    Type type = descriptor.PluginType;
+
+                    if (type == null || type.IsAbstract || type.IsInterface)
+                        continue;
+
+                    if (!requiredTypeHint.IsAssignableFrom(type))
+                        continue;
+
+                    Assembly assembly = type.Assembly;
+                    string provider = assembly.GetName().Name ?? string.Empty;
+                    string path = string.IsNullOrEmpty(assembly.Location)
+                        ? provider
+                        : string.Format("{0}:{1}", assembly.Location, type.FullName);
+
+                    nodes.Add(new PluginExtensionNode(
+                        descriptor.Id ?? type.Name,
+                        provider,
+                        path,
+                        type,
+                        () => Activator.CreateInstance(type, true)));
+
+                    seenTypes.Add(type.AssemblyQualifiedName ?? type.FullName ?? type.Name);
+                    explicitCount++;
+                }
             }
 
             foreach (Assembly assembly in GetAssemblies(requiredTypeHint))
@@ -174,6 +213,10 @@ namespace OpenSim.Framework
                         continue;
 
                     if (!requiredTypeHint.IsAssignableFrom(type))
+                        continue;
+
+                    string typeKey = type.AssemblyQualifiedName ?? type.FullName ?? type.Name;
+                    if (seenTypes.Contains(typeKey))
                         continue;
 
                     string provider = assembly.GetName().Name ?? string.Empty;
@@ -187,15 +230,20 @@ namespace OpenSim.Framework
                         path,
                         type,
                         () => Activator.CreateInstance(type, true)));
+
+                    seenTypes.Add(typeKey);
+                    reflectionCount++;
                 }
             }
 
             m_log.InfoFormat(
-                "[PLUGINS]: Discovery summary [{0}] scanned={1}, skipped={2}, loadFailures={3}, candidates={4} using {5}",
+                "[PLUGINS]: Discovery summary [{0}] scanned={1}, skipped={2}, loadFailures={3}, code={4}, reflected={5}, candidates={6} using {7}",
                 extensionPoint,
                 m_lastScannedAssemblyCount,
                 m_lastSkippedAssemblyCount,
                 m_lastLoadFailureCount,
+                explicitCount,
+                reflectionCount,
                 nodes.Count,
                 nameof(DotNetCorePluginsDiscovery));
 
@@ -221,6 +269,7 @@ namespace OpenSim.Framework
 
             m_cachedRequiredType = requiredTypeHint;
             m_assemblies.Clear();
+            m_registeredPlugins.Clear();
             m_lastScannedAssemblyCount = 0;
             m_lastSkippedAssemblyCount = 0;
             m_lastLoadFailureCount = 0;
@@ -266,6 +315,8 @@ namespace OpenSim.Framework
                     m_log.WarnFormat("[PLUGINS]: Unable to load assembly {0}: {1}", dllPath, e.Message);
                 }
             }
+
+            m_registeredPlugins = PluginRegistry.FromProviders(m_assemblies, m_log);
 
             return m_assemblies;
         }

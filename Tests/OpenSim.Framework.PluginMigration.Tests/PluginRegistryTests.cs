@@ -27,6 +27,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using OpenSim.Framework;
 using Xunit;
 
@@ -261,6 +262,20 @@ namespace OpenSim.Framework.PluginMigration.Tests
             var plugins = m_registry.GetPlugins("/OpenSim/Test");
             Assert.Equal("This is a test plugin", plugins[0].Description);
         }
+
+        /// <summary>
+        /// Test loading registry entries from code providers.
+        /// </summary>
+        [Fact]
+        public void TestRegistryFromProviders()
+        {
+            var registry = PluginRegistry.FromProviders(new[] { Assembly.GetExecutingAssembly() });
+
+            var plugins = registry.GetPlugins("/OpenSim/ProviderTest");
+            Assert.Single(plugins);
+            Assert.Equal("provider-test", plugins[0].Id);
+            Assert.Equal(typeof(MockPlugin), plugins[0].PluginType);
+        }
     }
 
     /// <summary>
@@ -462,6 +477,16 @@ namespace OpenSim.Framework.PluginMigration.Tests
         public void AddNode(PluginExtensionNode node)
         {
             m_nodes.Add(node);
+        }
+    }
+
+    public class TestProviderRegistration : IPluginRegistryProvider
+    {
+        public void RegisterPlugins(PluginRegistry registry)
+        {
+            registry.Register(
+                "/OpenSim/ProviderTest",
+                new PluginDescriptor("provider-test", typeof(MockPlugin), "Provider Test", "1.0"));
         }
     }
 }
