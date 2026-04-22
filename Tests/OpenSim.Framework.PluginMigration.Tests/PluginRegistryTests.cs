@@ -27,7 +27,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Xml.Linq;
 using OpenSim.Framework;
 using Xunit;
 
@@ -275,6 +278,59 @@ namespace OpenSim.Framework.PluginMigration.Tests
             Assert.Single(plugins);
             Assert.Equal("provider-test", plugins[0].Id);
             Assert.Equal(typeof(MockPlugin), plugins[0].PluginType);
+        }
+
+        /// <summary>
+        /// Guard rail for migration progress: any manifest with plugin extension entries
+        /// must have a corresponding provider registration file in the project root.
+        /// </summary>
+        [Fact]
+        public void TestManifestsWithExtensionsHaveProviderRegistrationFiles()
+        {
+            string repoRoot = FindRepoRoot();
+            var manifestFiles = new List<string>();
+            manifestFiles.AddRange(Directory.GetFiles(Path.Combine(repoRoot, "Source"), "*.addin.xml", SearchOption.AllDirectories));
+            manifestFiles.AddRange(Directory.GetFiles(Path.Combine(repoRoot, "Addons"), "*.addin.xml", SearchOption.AllDirectories));
+
+            var missingProviders = new List<string>();
+
+            foreach (string manifest in manifestFiles)
+            {
+                XDocument doc = XDocument.Load(manifest);
+                bool hasExtensions = doc.Root != null && doc.Root.Elements().Any(e => e.Name.LocalName == "Extension");
+                if (!hasExtensions)
+                    continue;
+
+                string resourceDir = Path.GetDirectoryName(manifest);
+                if (resourceDir == null)
+                    continue;
+
+                DirectoryInfo projectDir = Directory.GetParent(resourceDir);
+                if (projectDir == null)
+                    continue;
+
+                string providerPath = Path.Combine(projectDir.FullName, "PluginRegistration.cs");
+                if (!File.Exists(providerPath))
+                    missingProviders.Add(Path.GetRelativePath(repoRoot, providerPath));
+            }
+
+            Assert.True(
+                missingProviders.Count == 0,
+                "Missing provider registration files: " + string.Join(", ", missingProviders));
+        }
+
+        private static string FindRepoRoot()
+        {
+            DirectoryInfo dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null)
+            {
+                if (File.Exists(Path.Combine(dir.FullName, "Tranquillity.sln")))
+                    return dir.FullName;
+
+                dir = dir.Parent;
+            }
+
+            throw new InvalidOperationException("Could not locate repository root from test base directory.");
         }
     }
 
