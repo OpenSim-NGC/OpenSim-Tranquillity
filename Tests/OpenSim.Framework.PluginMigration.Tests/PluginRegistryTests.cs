@@ -32,6 +32,9 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using log4net;
+using log4net.Appender;
+using log4net.Config;
 using OpenSim.Framework;
 using Xunit;
 
@@ -44,6 +47,7 @@ namespace OpenSim.Framework.PluginMigration.Tests
     public class PluginRegistryTests
     {
         private readonly PluginRegistry m_registry;
+        private static readonly object s_pluginDiscoveryOverrideLock = new object();
 
         // Use entries in the form "relative/provider/path|/Extension/Path|Id|Full.Type.Name"
         // for intentional provider-only registrations that should not fail parity checks.
@@ -543,7 +547,6 @@ namespace OpenSim.Framework.PluginMigration.Tests
 
             var allowedAttributes = new HashSet<string>(StringComparer.Ordinal)
             {
-                "Source/OpenSim.Server.Base/ServerUtils.cs|AddinRoot"
             };
 
             var foundAttributes = new HashSet<string>(StringComparer.Ordinal);
@@ -581,10 +584,6 @@ namespace OpenSim.Framework.PluginMigration.Tests
 
             var allowedUsingFiles = new HashSet<string>(StringComparer.Ordinal)
             {
-                "Source/OpenSim.Framework/IPluginDiscovery.cs",
-                "Source/OpenSim.Framework/PluginManager.cs",
-                "Source/OpenSim.Server.Base/CommandManager.cs",
-                "Source/OpenSim.Server.Base/ServerUtils.cs"
             };
 
             var filesWithUsing = new HashSet<string>(StringComparer.Ordinal);
@@ -788,6 +787,7 @@ namespace OpenSim.Framework.PluginMigration.Tests
     /// </summary>
     public class DotNetCorePluginLoaderTests
     {
+        private static readonly object s_pluginDiscoveryOverrideLock = new object();
         private readonly MockPluginDiscovery m_discovery;
         private readonly DotNetCorePluginLoader<MockPlugin> m_loader;
 
@@ -909,6 +909,91 @@ namespace OpenSim.Framework.PluginMigration.Tests
         }
 
         /// <summary>
+        /// Test plugin discovery factory defaults to the dotnetcore backend.
+        /// </summary>
+        [Fact]
+        public void TestPluginDiscoveryFactoryDefaultsToDotNetCoreBackend()
+        {
+            (ILog log, MemoryAppender appender) = CreateMemoryLogger();
+
+            using IPluginDiscovery discovery = PluginDiscoveryFactory.Create(log);
+
+            Assert.IsType<DotNetCorePluginsDiscovery>(discovery);
+            Assert.Contains(
+                appender.GetEvents().Select(e => e.RenderedMessage),
+                message => message.Contains("Using DotNetCorePlugins discovery backend (dotnetcore)", StringComparison.Ordinal));
+        }
+
+        /// <summary>
+        /// Test plugin discovery factory maps configured backend aliases to the dotnetcore backend.
+        /// </summary>
+        [Theory]
+        [InlineData("dotnet")]
+        [InlineData("dotnetcore")]
+        [InlineData("reflection")]
+        [InlineData("monoaddins")]
+        public void TestPluginDiscoveryFactoryMapsConfiguredAliasesToDotNetCoreBackend(string configuredBackend)
+        {
+            (ILog log, MemoryAppender appender) = CreateMemoryLogger();
+
+            using IPluginDiscovery discovery = PluginDiscoveryFactory.Create(log, configuredBackend);
+
+            Assert.IsType<DotNetCorePluginsDiscovery>(discovery);
+
+            string[] messages = appender.GetEvents().Select(e => e.RenderedMessage).ToArray();
+            if (string.Equals(configuredBackend, "monoaddins", StringComparison.Ordinal))
+            {
+                Assert.Contains(
+                    messages,
+                    message => message.Contains("Mono.Addins backend has been removed", StringComparison.Ordinal));
+            }
+            else
+            {
+                Assert.Contains(
+                    messages,
+                    message => message.Contains($"Using DotNetCorePlugins discovery backend ({configuredBackend})", StringComparison.Ordinal));
+            }
+        }
+
+        /// <summary>
+        /// Test environment variable override takes precedence over configured backend selection.
+        /// </summary>
+        [Fact]
+        public void TestPluginDiscoveryFactoryEnvironmentOverrideTakesPrecedence()
+        {
+            lock (s_pluginDiscoveryOverrideLock)
+            {
+                const string overrideVariableName = "OPENSIM_PLUGIN_DISCOVERY";
+                string previousValue = Environment.GetEnvironmentVariable(overrideVariableName);
+
+                try
+                {
+                    Environment.SetEnvironmentVariable(overrideVariableName, "reflection");
+                    (ILog log, MemoryAppender appender) = CreateMemoryLogger();
+
+                    using IPluginDiscovery discovery = PluginDiscoveryFactory.Create(log, "monoaddins");
+
+                    Assert.IsType<DotNetCorePluginsDiscovery>(discovery);
+
+                    string[] messages = appender.GetEvents().Select(e => e.RenderedMessage).ToArray();
+                    Assert.Contains(
+                        messages,
+                        message => message.Contains("supersedes configured backend 'monoaddins'", StringComparison.Ordinal));
+                    Assert.Contains(
+                        messages,
+                        message => message.Contains("Using DotNetCorePlugins discovery backend (reflection)", StringComparison.Ordinal));
+                    Assert.DoesNotContain(
+                        messages,
+                        message => message.Contains("Mono.Addins backend has been removed", StringComparison.Ordinal));
+                }
+                finally
+                {
+                    Environment.SetEnvironmentVariable(overrideVariableName, previousValue);
+                }
+            }
+        }
+
+        /// <summary>
         /// Test loading multiple plugins
         /// </summary>
         [Fact]
@@ -921,6 +1006,16 @@ namespace OpenSim.Framework.PluginMigration.Tests
             m_loader.LoadFromRegistry(registry, "/OpenSim/Test", typeof(MockPlugin));
 
             Assert.Equal(2, m_loader.LoadedPlugins.Count);
+        }
+
+        private static (ILog Log, MemoryAppender Appender) CreateMemoryLogger()
+        {
+            string repositoryName = $"PluginMigrationTests-{Guid.NewGuid():N}";
+            MemoryAppender appender = new MemoryAppender();
+
+            BasicConfigurator.Configure(LogManager.CreateRepository(repositoryName), appender);
+            ILog log = LogManager.GetLogger(repositoryName, repositoryName);
+            return (log, appender);
         }
     }
 

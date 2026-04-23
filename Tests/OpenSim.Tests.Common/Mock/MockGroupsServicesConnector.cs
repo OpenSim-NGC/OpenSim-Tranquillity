@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
 
@@ -38,7 +37,6 @@ using OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups;
 
 namespace OpenSim.Tests.Common
 {
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule")]
     public class MockGroupsServicesConnector : ISharedRegionModule, IGroupsServicesConnector
     {
         IXGroupData m_data = new NullXGroupData(null, null);

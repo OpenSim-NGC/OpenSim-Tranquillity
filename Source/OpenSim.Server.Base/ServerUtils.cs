@@ -36,14 +36,11 @@ using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenMetaverse;
-using Mono.Addins;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.Servers;
 
 using OpenMetaverse.StructuredData; // LitJson is hidden on this
 
-// Retained for transitional monoaddins compatibility in robust command/registry flows.
-[assembly:AddinRoot("Robust", OpenSim.VersionInfo.AssemblyVersionNumber)]
 namespace OpenSim.Server.Base
 {
     public interface IRobustConnector
@@ -74,12 +71,6 @@ namespace OpenSim.Server.Base
         static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private readonly IPluginDiscovery m_pluginDiscovery;
 
-        public AddinRegistry Registry
-        {
-            get;
-            private set;
-        }
-
         public IConfigSource Config
         {
             get;
@@ -90,85 +81,16 @@ namespace OpenSim.Server.Base
         {
             Config = config;
             string pluginDiscovery = string.Empty;
-            bool enablePluginManagementCommands = true;
             IConfig startupConfig = Config.Configs["Startup"];
             if (startupConfig != null)
             {
                 pluginDiscovery = startupConfig.GetString("PluginDiscovery", string.Empty);
-                enablePluginManagementCommands = startupConfig.GetBoolean("EnablePluginManagementCommands", true);
             }
 
             m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log, pluginDiscovery);
-
-            if (m_pluginDiscovery.Capabilities.SupportsAddinRegistryMetadata)
-            {
-                TryInitializeRegistryAndCommands(registryPath, enablePluginManagementCommands);
-            }
-
-            //suppress_console_output_(true);
             m_pluginDiscovery.Initialize(registryPath);
-            //suppress_console_output_(false);
 
             LoadConfiguredConnectors();
-        }
-
-        private void TryInitializeRegistryAndCommands(string registryPath, bool enablePluginManagementCommands)
-        {
-            try
-            {
-                Registry = new AddinRegistry(registryPath, ".");
-            }
-            catch (Exception e)
-            {
-                m_log.WarnFormat(
-                    "[SERVER UTILS]: Unable to initialize addin registry at {0}: {1}",
-                    registryPath,
-                    e.Message);
-                Registry = null;
-                return;
-            }
-
-            if (!enablePluginManagementCommands)
-            {
-                m_log.Info("[SERVER UTILS]: Plugin/repository management commands disabled by Startup setting EnablePluginManagementCommands=false");
-                return;
-            }
-
-            try
-            {
-                _ = new CommandManager(Registry);
-            }
-            catch (Exception e)
-            {
-                m_log.WarnFormat(
-                    "[SERVER UTILS]: Plugin/repository management commands unavailable: {0}",
-                    e.Message);
-            }
-        }
-
-        private static TextWriter prev_console_;
-        // Temporarily masking the errors reported on start
-        // This is caused by a non-managed dll in the ./bin dir
-        // when the registry is initialized. The dll belongs to
-        // libomv, which has a hard-coded path to "." for pinvoke
-        // to load the openjpeg dll
-        //
-        // Will look for a way to fix, but for now this keeps the
-        // confusion to a minimum. this was copied from our region
-        // plugin loader, we have been doing this in there for a long time.
-        //
-        public void suppress_console_output_(bool save)
-        {
-            if (save)
-            {
-                prev_console_ = System.Console.Out;
-                System.Console.SetOut(new StreamWriter(Stream.Null));
-            }
-            else
-            {
-                if (prev_console_ != null)
-                    System.Console.SetOut(prev_console_);
-            }
         }
 
         private void LoadConfiguredConnectors()
@@ -197,46 +119,17 @@ namespace OpenSim.Server.Base
 
         private string ResolvePluginPath(PluginExtensionNode node)
         {
-            // Non-Mono discovery backends do not provide AddinRegistry metadata.
-            // Use the plugin assembly location as the connector path in that case.
-            if (Registry == null)
+            if (node.Type?.Assembly != null)
             {
-                if (node.Type?.Assembly != null)
-                {
-                    string assemblyLocation = node.Type.Assembly.Location;
-                    if (!string.IsNullOrEmpty(assemblyLocation))
-                        return assemblyLocation;
-                }
-
-                m_log.WarnFormat(
-                    "[SERVER UTILS]: Unable to resolve plugin path for connector {0} using backend {1}",
-                    node.ID,
-                    m_pluginDiscovery.GetType().Name);
-                return string.Empty;
+                string assemblyLocation = node.Type.Assembly.Location;
+                if (!string.IsNullOrEmpty(assemblyLocation))
+                    return assemblyLocation;
             }
 
-            Addin a = Registry.GetAddin(node.Provider);
-
-            if (a == null)
-            {
-                Registry.Rebuild(null);
-                a = Registry.GetAddin(node.Provider);
-            }
-
-            if (a == null)
-            {
-                m_log.WarnFormat("[SERVER UTILS]: Unable to resolve addin metadata for connector {0}", node.ID);
-                return string.Empty;
-            }
-
-            if (a.AddinFile.Contains(Registry.DefaultAddinsFolder))
-            {
-                m_log.InfoFormat("[SERVER UTILS]: Adding {0} from registry", a.Name);
-                return Path.Combine(Registry.DefaultAddinsFolder, a.Name.Replace(',', '.'));
-            }
-
-            m_log.InfoFormat("[SERVER UTILS]: Adding {0} from ./bin", a.Name);
-            return a.AddinFile;
+            m_log.WarnFormat(
+                "[SERVER UTILS]: Unable to resolve plugin path for connector {0}",
+                node.ID);
+            return string.Empty;
         }
 
         private void LoadPlugin(IRobustConnector connector)

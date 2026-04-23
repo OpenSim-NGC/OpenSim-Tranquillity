@@ -28,7 +28,7 @@ DotNetCorePlugins offers a simpler, .NET Core-native alternative that uses folde
 
 - Introduced `IPluginDiscovery` abstraction and wired `PluginLoader<T>` to use it.
 - Added a backend factory with runtime selection:
-    - `monoaddins` (default)
+    - `monoaddins` (legacy compatibility selector, now routed to DotNetCorePlugins with a warning)
     - `reflection`/`dotnet`/`dotnetcore` mapped to DotNetCorePlugins discovery backend
 - Implemented the non-Mono backend using `McMaster.NETCore.Plugins`
     (shared-type loading keyed by plugin interface hints).
@@ -49,8 +49,8 @@ DotNetCorePlugins offers a simpler, .NET Core-native alternative that uses folde
             `AddinRegistry`/`CommandManager` when registry metadata is supported by the active backend.
         - `AddinRegistry` and plugin/repository management command wiring are now best-effort;
             startup continues and connector loading falls back cleanly if management command setup fails.
-        - Added startup switch `EnablePluginManagementCommands` (default `true`) so plugin/repository
-            management command registration can be disabled without impacting connector loading.
+        - A temporary startup switch for plugin-management commands was added during transition
+            and later removed in Step 5.2 when Mono.Addins command management was retired.
         - Connector `PluginPath` resolution now falls back to plugin assembly location when
             addin metadata is unavailable.
 - Removed direct `Mono.Addins.TypeExtensionNode` inheritance from wind plugins.
@@ -344,6 +344,122 @@ code-based registrations for region module discovery.
 
 **Batch 6 result**: YEngine module registration is now represented in provider-based code metadata.
 
+### Completed in Step 5.1 (Partial): Mono.Addins Package Reference Removal
+
+Removed `Mono.Addins`, `Mono.Addins.Setup` (where present), and `Mono.Addins.CecilReflector`
+package references from all 15 projects that had no direct source code usage of the library:
+
+**Source projects cleaned** (8):
+- `OpenSim.Server.GridServer` (Mono.Addins + Setup + CecilReflector)
+- `OpenSim.Server.RegionServer` (Mono.Addins + Setup + CecilReflector)
+- `OpenSim.Region.Framework` (Mono.Addins + CecilReflector)
+- `OpenSim.Region.OptionalModules` (Mono.Addins + CecilReflector)
+- `OpenSim.Region.ClientStack.LindenCaps` (Mono.Addins + CecilReflector)
+- `OpenSim.Data.MySQL` (Mono.Addins + CecilReflector)
+- `OpenSim.Data.MySQL.MoneyData` (Mono.Addins + CecilReflector)
+- `OpenSim.Services.Connectors` (Mono.Addins + CecilReflector)
+
+**Addon projects cleaned** (7):
+- `Addons/OpenSimSearch` (Mono.Addins + CecilReflector)
+- `Addons/OpenSimMutelist` (Mono.Addins + CecilReflector)
+- `Addons/OpenSim.Addons.Groups` (Mono.Addins + CecilReflector)
+- `Addons/os-webrtc-janus/WebRtcVoiceServiceModule` (Mono.Addins + CecilReflector)
+- `Addons/os-webrtc-janus/WebRtcVoiceRegionModule` (Mono.Addins + CecilReflector)
+- `Addons/OpenSim.Addons.OfflineIM` (Mono.Addins + CecilReflector)
+- `Addons/Gloebit.GloebitMoneyModule` (Mono.Addins + CecilReflector)
+
+**Remaining projects with Mono.Addins references** (source usage still present):
+- `OpenSim.Framework` — retains `MonoAddinsPluginDiscovery` class and `PluginManager.cs`
+- `OpenSim.Server.Base` — retains `CommandManager.cs` and `ServerUtils.cs` Mono.Addins paths
+
+**Validation gates passed**:
+- Full solution Debug build (0 errors)
+- Plugin migration test suite (34/34 passing)
+
+---
+
+### Completed in Step 5.2: Mono.Addins Full Elimination
+
+Removed all remaining Mono.Addins source-code usage and package references:
+
+**`Source/OpenSim.Framework/IPluginDiscovery.cs`**:
+- Removed `MonoAddinsPluginDiscovery` class (~60 lines)
+- Removed `using Mono.Addins;`
+- Changed `PluginDiscoveryFactory` default backend from `"monoaddins"` to `"dotnetcore"`
+- `monoaddins` case now logs a deprecation warning and redirects to `DotNetCorePluginsDiscovery`
+
+**`Source/OpenSim.Framework/PluginManager.cs`**:
+- Replaced ~580 lines of Mono.Addins-backed `SetupService` subclass with a minimal no-op stub
+- All public methods retained with same signatures but returning empty/false results
+- Removed `using Mono.Addins`, `using Mono.Addins.Setup`, `using Mono.Addins.Description`
+
+**`Source/OpenSim.Server.Base/CommandManager.cs`**:
+- Replaced ~320 lines of Mono.Addins console command wiring with an empty stub class
+- Removed `using Mono.Addins`, `using Mono.Addins.Setup`
+
+**`Source/OpenSim.Server.Base/ServerUtils.cs`**:
+- Removed `using Mono.Addins;`
+- Removed `[assembly:AddinRoot("Robust", ...)]` attribute
+- Removed `AddinRegistry Registry` property from `PluginLoader`
+- Removed `TryInitializeRegistryAndCommands()` method
+- Simplified `ResolvePluginPath()` to use only assembly location (no `Addin`/`Registry` branches)
+- Removed `suppress_console_output_()` helper (was only used with now-removed Mono.Addins init)
+
+**Package references removed** (last two projects):
+- `Source/OpenSim.Framework/OpenSim.Framework.csproj`: removed Mono.Addins 1.4.1, Mono.Addins.Setup 1.4.1, Mono.Addins.CecilReflector 1.4.1
+- `Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj`: removed Mono.Addins 1.4.1, Mono.Addins.Setup 1.4.1, Mono.Addins.CecilReflector 1.4.1
+
+**Migration test allowlists updated** (`Tests/OpenSim.Framework.PluginMigration.Tests/PluginRegistryTests.cs`):
+- `allowedAttributes` set: cleared (was `ServerUtils.cs|AddinRoot`)
+- `allowedUsingFiles` set: cleared (was 4 files: IPluginDiscovery.cs, PluginManager.cs, CommandManager.cs, ServerUtils.cs)
+
+**Validation gates passed**:
+- Full solution Debug build (0 errors)
+- Plugin migration test suite (34/34 passing)
+
+**Mono.Addins is now fully removed from the production source tree.** Historical references remain
+in this migration plan only.
+
+### Completed in Step 5.3: Residual Test and Project Footprint Cleanup
+
+Removed the final Mono.Addins residue that remained outside the core runtime migration:
+
+**Test source cleanup**:
+- Removed an unused `using Mono.Addins;` from `Tests/OpenSim.Region.Framework.Tests/Scenes/Tests/SharedRegionModuleTests.cs`
+- Removed test-only `[Extension(...)]` attributes and `using Mono.Addins;` from:
+    - `Tests/OpenSim.Region.OptionalModules.Tests/Example/WebSocketEchoTest/WebSocketEchoModule.cs`
+    - `Tests/OpenSim.Tests.Common/Mock/MockGroupsServicesConnector.cs`
+
+**Additional project reference cleanup**:
+- Removed stale Mono.Addins package references from:
+    - `Source/OpenSim.ApplicationPlugins.RegionModulesController`
+    - `Source/OpenSim.Data`
+    - `Source/OpenSim.Data.PGSQL`
+    - `Source/OpenSim.Data.SQLite`
+    - `Source/OpenSim.Region.ClientStack.LindenUDP`
+    - `Source/OpenSim.Region.CoreModules`
+    - `Source/OpenSim.Region.PhysicsModules.BasicPhysics`
+    - `Source/OpenSim.Region.PhysicsModules.BulletS`
+    - `Source/OpenSim.Region.PhysicsModules.POS`
+    - `Source/OpenSim.Region.ScriptEngine.YEngine`
+    - `Source/OpenSim.Server.Handlers`
+    - `Tests/OpenSim.Tests.Common`
+
+**Backend-selection regression coverage added** (`Tests/OpenSim.Framework.PluginMigration.Tests/PluginRegistryTests.cs`):
+- Default backend selection now tested (`dotnetcore`)
+- Compatibility aliases now tested (`dotnet`, `dotnetcore`, `reflection`, `monoaddins`)
+- Environment override precedence now tested (`OPENSIM_PLUGIN_DISCOVERY`)
+
+**Validation gates passed**:
+- Full solution Debug build (0 errors)
+- Plugin migration test suite (40/40 passing)
+
+**Mono.Addins is now fully removed from source and test project files.**
+
+---
+
+---
+
 ### Completed in Step 3 (Batch 7): Addons Registration Conversion (RegionModules)
 
 - Added provider-based code registrations for addon assemblies:
@@ -399,38 +515,35 @@ You can choose the discovery backend using either config or environment:
 
 ```ini
 [Startup]
-; monoaddins | reflection
-PluginDiscovery = monoaddins
-
-; Optional: disable plugin/repository management command registration
-; while keeping connector discovery/loading behavior.
-EnablePluginManagementCommands = true
+; dotnetcore | reflection | monoaddins (deprecated alias)
+PluginDiscovery = dotnetcore
 
 [Modules]
 ; Optional override for region module discovery
-PluginDiscovery = monoaddins
+PluginDiscovery = dotnetcore
 
 [Wind]
 ; Optional override for wind discovery
-PluginDiscovery = monoaddins
+PluginDiscovery = dotnetcore
 ```
 
 Environment override (highest precedence where supported):
 
 ```bash
-export OPENSIM_PLUGIN_DISCOVERY=reflection
+export OPENSIM_PLUGIN_DISCOVERY=dotnetcore
 ```
 
 Implementation note:
 - `OPENSIM_PLUGIN_DISCOVERY` now strictly overrides configured backend values when both are present,
     and startup logs an explicit override message when the values differ.
 
-### Transitional Scope Note
+### Current Scope Note
 
 - The `reflection` selector now routes to the DotNetCorePlugins implementation and remains
-    an incremental migration path that does not yet replace all Mono.Addins features
-    (for example, repository/registry management and XML metadata semantics).
-- Default behavior remains `monoaddins` until full migration is complete.
+    a compatibility alias for migration validation.
+- The `monoaddins` selector is retained only as a deprecated compatibility alias and now logs
+    a warning before routing to DotNetCorePlugins.
+- Default behavior is now `dotnetcore`.
 - Runtime startup parity capture is environment-dependent in current dev setup; compile-time
     parity validation with backend overrides is currently used as the stable smoke check.
 
@@ -905,18 +1018,24 @@ WindModelsPath = "./bin/plugins/windmodels"
 AssetCachePath = "./bin/plugins/assetcache"
 ```
 
-### Smoke Test Commands (Current Transitional Backend)
+### Smoke Test Commands (Current Backend)
 
-Use these commands from repo root to verify both backends compile and load paths are reachable:
+Use these commands from repo root to verify the default backend and explicit compatibility aliases:
 
 ```bash
-# Default backend (monoaddins)
+# Default backend (dotnetcore)
 dotnet build Source/OpenSim.Framework/OpenSim.Framework.csproj -c Debug
 dotnet build Source/OpenSim.ApplicationPlugins.RegionModulesController/OpenSim.ApplicationPlugins.RegionModulesController.csproj -c Debug
 dotnet build Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj -c Debug
 dotnet build Source/OpenSim.Region.CoreModules/OpenSim.Region.CoreModules.csproj -c Debug
 
-# Reflection backend override
+# Explicit dotnetcore override
+OPENSIM_PLUGIN_DISCOVERY=dotnetcore dotnet build Source/OpenSim.Framework/OpenSim.Framework.csproj -c Debug
+OPENSIM_PLUGIN_DISCOVERY=dotnetcore dotnet build Source/OpenSim.ApplicationPlugins.RegionModulesController/OpenSim.ApplicationPlugins.RegionModulesController.csproj -c Debug
+OPENSIM_PLUGIN_DISCOVERY=dotnetcore dotnet build Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj -c Debug
+OPENSIM_PLUGIN_DISCOVERY=dotnetcore dotnet build Source/OpenSim.Region.CoreModules/OpenSim.Region.CoreModules.csproj -c Debug
+
+# Compatibility alias override
 OPENSIM_PLUGIN_DISCOVERY=reflection dotnet build Source/OpenSim.Framework/OpenSim.Framework.csproj -c Debug
 OPENSIM_PLUGIN_DISCOVERY=reflection dotnet build Source/OpenSim.ApplicationPlugins.RegionModulesController/OpenSim.ApplicationPlugins.RegionModulesController.csproj -c Debug
 OPENSIM_PLUGIN_DISCOVERY=reflection dotnet build Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj -c Debug

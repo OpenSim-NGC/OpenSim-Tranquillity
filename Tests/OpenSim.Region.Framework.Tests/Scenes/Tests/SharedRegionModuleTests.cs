@@ -28,7 +28,6 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using Mono.Addins;
 using Xunit;
 using OpenMetaverse;
 using OpenSim;

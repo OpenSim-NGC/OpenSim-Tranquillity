@@ -35,20 +35,18 @@ Step-1 plugin migration work supports selecting a plugin discovery backend at ru
 Configuration in `[Startup]`:
 
 ```ini
-PluginDiscovery = monoaddins
-EnablePluginManagementCommands = true
+PluginDiscovery = dotnetcore
 ```
 
 - `PluginDiscovery` values:
-  - `monoaddins` (default)
-  - `reflection` (transitional backend for migration validation)
-- `EnablePluginManagementCommands` controls registration of plugin/repository management console commands.
-  Connector discovery/loading still runs when this is set to `false`.
+  - `dotnetcore` (default)
+  - `reflection` (compatibility alias for the DotNetCorePlugins backend)
+  - `monoaddins` (deprecated compatibility alias that logs a warning and uses DotNetCorePlugins)
 
 Environment override (takes precedence over config):
 
 ```bash
-export OPENSIM_PLUGIN_DISCOVERY=reflection
+export OPENSIM_PLUGIN_DISCOVERY=dotnetcore
 ```
 
 Sample startup files containing these settings include:

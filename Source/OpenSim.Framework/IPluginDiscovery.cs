@@ -31,7 +31,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
-using Mono.Addins;
 using log4net;
 
 namespace OpenSim.Framework
@@ -82,19 +81,21 @@ namespace OpenSim.Framework
             }
 
             if (string.IsNullOrWhiteSpace(backend))
-                backend = "monoaddins";
+                backend = "dotnetcore";
 
             switch (backend.Trim().ToLowerInvariant())
             {
+                case "monoaddins":
+                    log.WarnFormat(
+                        "[PLUGINS]: Mono.Addins backend has been removed. Using DotNetCorePlugins discovery backend instead.");
+                    return new DotNetCorePluginsDiscovery(log);
+
                 case "dotnet":
                 case "dotnetcore":
                 case "reflection":
+                default:
                     log.InfoFormat("[PLUGINS]: Using DotNetCorePlugins discovery backend ({0})", backend);
                     return new DotNetCorePluginsDiscovery(log);
-
-                default:
-                    log.InfoFormat("[PLUGINS]: Using Mono.Addins discovery backend ({0})", backend);
-                    return new MonoAddinsPluginDiscovery(log);
             }
         }
     }
@@ -396,98 +397,6 @@ namespace OpenSim.Framework
         public ReflectionPluginDiscovery(ILog log)
             : base(log)
         {
-        }
-    }
-
-    /// <summary>
-    /// Current discovery backend implemented with Mono.Addins.
-    /// </summary>
-    public sealed class MonoAddinsPluginDiscovery : IPluginDiscovery
-    {
-        private readonly ILog m_log;
-        private bool m_eventsAttached;
-
-        public PluginDiscoveryCapabilities Capabilities { get; } =
-            new PluginDiscoveryCapabilities(supportsAddinRegistryMetadata: true);
-
-        public MonoAddinsPluginDiscovery(ILog log)
-        {
-            m_log = log;
-        }
-
-        public void Initialize(string pluginDirectory)
-        {
-            if (!AddinManager.IsInitialized)
-            {
-                AddinManager.Initialize(pluginDirectory);
-                AddinManager.Registry.Update(null);
-            }
-
-            AttachEvents();
-        }
-
-        public IReadOnlyList<PluginExtensionNode> GetExtensionNodes(string extensionPoint, Type requiredTypeHint = null)
-        {
-            List<PluginExtensionNode> nodes = new List<PluginExtensionNode>();
-
-            foreach (TypeExtensionNode node in AddinManager.GetExtensionNodes(extensionPoint))
-            {
-                nodes.Add(new PluginExtensionNode(node.Id, node.Addin.Id, node.Path, node.Type, () => node.CreateInstance()));
-            }
-
-            return nodes;
-        }
-
-        public int GetExtensionNodeCount(string extensionPoint, Type requiredTypeHint = null)
-        {
-            return AddinManager.GetExtensionNodes(extensionPoint).Count;
-        }
-
-        public void Dispose()
-        {
-            if (!m_eventsAttached)
-                return;
-
-            AddinManager.ExtensionChanged -= OnExtensionChanged;
-            AddinManager.AddinUnloaded -= OnUnload;
-            AddinManager.AddinLoadError -= OnLoaderError;
-            AddinManager.AddinLoaded -= OnLoad;
-            m_eventsAttached = false;
-        }
-
-        private void AttachEvents()
-        {
-            if (m_eventsAttached)
-                return;
-
-            AddinManager.AddinLoadError += OnLoaderError;
-            AddinManager.AddinLoaded += OnLoad;
-            AddinManager.AddinUnloaded += OnUnload;
-            AddinManager.ExtensionChanged += OnExtensionChanged;
-            m_eventsAttached = true;
-        }
-
-        private void OnLoad(object sender, AddinEventArgs args)
-        {
-            m_log.Info("[PLUGINS]: Plugin Loaded: " + args.AddinId);
-        }
-
-        private void OnUnload(object sender, AddinEventArgs args)
-        {
-            m_log.Info("[PLUGINS]: Plugin Unloaded: " + args.AddinId);
-        }
-
-        private void OnLoaderError(object sender, AddinErrorEventArgs args)
-        {
-            if (args.Exception == null)
-                m_log.Error("[PLUGINS]: Plugin Error: " + args.Message);
-            else
-                m_log.Error("[PLUGINS]: Plugin Error: " + args.Exception.Message + "\n" + args.Exception.StackTrace);
-        }
-
-        private void OnExtensionChanged(object sender, ExtensionEventArgs args)
-        {
-            m_log.Info("[PLUGINS]: Extension Changed: " + args.Path);
         }
     }
 }
