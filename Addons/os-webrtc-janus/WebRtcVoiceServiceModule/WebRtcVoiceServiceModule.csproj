@@ -29,8 +29,4 @@
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="Resources/WebRtcVoice.WebRtcVoiceServiceModule.addin.xml" />
-  </ItemGroup>
-
 </Project>

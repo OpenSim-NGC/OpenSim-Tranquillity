@@ -28,8 +28,4 @@
     <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.SharedBase/OpenSim.Region.PhysicsModules.SharedBase.csproj" />
   </ItemGroup>
   
-  <ItemGroup>
-    <EmbeddedResource Include="Resources/OpenSim.Region.PhysicsModules.Meshing.addin.xml" />
-  </ItemGroup>
-
 </Project>

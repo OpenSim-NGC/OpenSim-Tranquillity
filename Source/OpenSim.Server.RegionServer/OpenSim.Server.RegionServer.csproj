@@ -93,10 +93,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Resources/OpenSim.Server.RegionServer.addin.xml" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- 
       Include all files within the 'AppData' folder and its subfolders.
       The 'Link' metadata flattens the output by omitting the top-level 'AppData' folder 

@@ -31,10 +31,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Resources/OpenSim.Region.PhysicsModules.BulletS.addin.xml" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- <Content Include="app.config">
       <Link>$(TargetName).dll.config</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

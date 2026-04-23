@@ -50,9 +50,4 @@
     <PackageReference Include="CoreJ2K.Skia" Version="2.1.2.38" />
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
   </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="Resources/OpenSim.Region.CoreModules.addin.xml" />
-  </ItemGroup>
-
 </Project>

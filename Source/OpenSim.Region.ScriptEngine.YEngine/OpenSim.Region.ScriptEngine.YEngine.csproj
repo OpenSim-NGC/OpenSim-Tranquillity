@@ -32,8 +32,4 @@
     <ProjectReference Include="../../Source/OpenSim.Region.ScriptEngine.Shared/OpenSim.Region.ScriptEngine.Shared.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="Resources/OpenSim.Region.ScriptEngine.YEngine.addin.xml" />
-  </ItemGroup>
-
 </Project>

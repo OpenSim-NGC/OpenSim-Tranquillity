@@ -24,8 +24,4 @@
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
   </ItemGroup>
   
-  <ItemGroup>
-    <EmbeddedResource Include="Resources/OpenSimMuteList.Modules.addin.xml" />
-  </ItemGroup>
-
 </Project>

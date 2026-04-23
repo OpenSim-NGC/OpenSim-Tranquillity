@@ -55,6 +55,159 @@ DotNetCorePlugins offers a simpler, .NET Core-native alternative that uses folde
             addin metadata is unavailable.
 - Removed direct `Mono.Addins.TypeExtensionNode` inheritance from wind plugins.
 - Removed several stale `using Mono.Addins;` directives in source modules.
+- Removed `Mono.Addins` extension-point attributes from core plugin interfaces now driven by
+    manifest/provider discovery metadata:
+        - `IRegionModuleBase` (`/OpenSim/RegionModules`)
+        - `IWindModelPlugin` (`/OpenSim/WindModule`)
+- Removed `Mono.Addins` extension-point attribute from `IRobustConnector` in
+    `OpenSim.Server.Base` while preserving existing addin-registry command support and
+    connector loading via discovery backends.
+- Completed low-risk Mono.Addins attribute/using cleanup sweep in migrated extension-point
+    interfaces. Remaining references are currently intentional in transitional management/
+    registry code paths (`PluginManager`, `CommandManager`, mono backend in `IPluginDiscovery`,
+    and robust addin-root compatibility metadata in `ServerUtils`).
+- Additional low-risk cleanup pass removed unused imports in transitional command wiring
+    (`CommandManager`), while preserving required `Mono.Addins.Description` usage in
+    `PluginManager` (`DependencyCollection`) to keep framework/server builds green.
+- Completed first controlled `.addin.xml` EmbeddedResource removal pilot:
+        - Removed `Resources/OpenSim.ApplicationPlugins.LoadRegions.addin.xml` from
+            `OpenSim.ApplicationPlugins.LoadRegions.csproj` embedded resources.
+        - Added explicit allowlist entry in migration guard tests for this manifest path.
+        - Validation gates passed:
+                - normal Debug build of `OpenSim.ApplicationPlugins.LoadRegions`
+                - reflection-smoke Debug build (`OPENSIM_PLUGIN_DISCOVERY=reflection`)
+                - plugin migration test suite (`34/34` passing)
+- Completed second controlled `.addin.xml` EmbeddedResource removal pilot:
+        - Removed `Resources/OpenSim.ApplicationPlugins.RegionModulesController.addin.xml` from
+            `OpenSim.ApplicationPlugins.RegionModulesController.csproj` embedded resources.
+        - Added explicit allowlist entry in migration guard tests for this manifest path.
+        - Validation gates passed:
+                - normal Debug build of `OpenSim.ApplicationPlugins.RegionModulesController`
+                - reflection-smoke Debug build (`OPENSIM_PLUGIN_DISCOVERY=reflection`)
+                - plugin migration test suite (`34/34` passing)
+- Completed third controlled `.addin.xml` EmbeddedResource removal pilot:
+        - Removed `Resources/OpenSim.ApplicationPlugins.RemoteController.addin.xml` from
+            `OpenSim.ApplicationPlugins.RemoteController.csproj` embedded resources.
+        - Added explicit allowlist entry in migration guard tests for this manifest path.
+        - Validation gates passed:
+                - normal Debug build of `OpenSim.ApplicationPlugins.RemoteController`
+                - reflection-smoke Debug build (`OPENSIM_PLUGIN_DISCOVERY=reflection`)
+                - plugin migration test suite (`34/34` passing)
+- Completed fourth controlled `.addin.xml` EmbeddedResource removal pilot:
+        - Removed `Resources/OpenSim.Region.ClientStack.LindenUDP.addin.xml` from
+            `OpenSim.Region.ClientStack.LindenUDP.csproj` embedded resources.
+        - Added explicit allowlist entry in migration guard tests for this manifest path.
+        - Validation gates passed:
+                - normal Debug build of `OpenSim.Region.ClientStack.LindenUDP`
+                - reflection-smoke Debug build (`OPENSIM_PLUGIN_DISCOVERY=reflection`)
+                - plugin migration test suite (`34/34` passing)
+- Completed fifth controlled `.addin.xml` EmbeddedResource removal pilot:
+        - Removed `Resources/OpenSim.Region.ClientStack.LindenCaps.addin.xml` from
+            `OpenSim.Region.ClientStack.LindenCaps.csproj` embedded resources.
+        - Added explicit allowlist entry in migration guard tests for this manifest path.
+        - Validation gates passed:
+                - normal Debug build of `OpenSim.Region.ClientStack.LindenCaps`
+                - reflection-smoke Debug build (`OPENSIM_PLUGIN_DISCOVERY=reflection`)
+                - plugin migration test suite (`34/34` passing)
+- Completed sixth controlled `.addin.xml` EmbeddedResource removal pilot:
+        - Removed `Resources/OpenSim.Region.OptionalModules.addin.xml` from
+            `OpenSim.Region.OptionalModules.csproj` embedded resources.
+        - Added explicit allowlist entry in migration guard tests for this manifest path.
+        - Validation gates passed:
+                - normal Debug build of `OpenSim.Region.OptionalModules`
+                - reflection-smoke Debug build (`OPENSIM_PLUGIN_DISCOVERY=reflection`)
+                - plugin migration test suite (`34/34` passing)
+- Completed seventh controlled `.addin.xml` EmbeddedResource removal pilot:
+        - Removed `Resources/OpenSim.Region.CoreModules.addin.xml` from
+            `OpenSim.Region.CoreModules.csproj` embedded resources.
+        - Added explicit allowlist entry in migration guard tests for this manifest path.
+        - Validation gates passed:
+                - normal Debug build of `OpenSim.Region.CoreModules`
+                - reflection-smoke Debug build (`OPENSIM_PLUGIN_DISCOVERY=reflection`)
+                - plugin migration test suite (`34/34` passing)
+- Completed eighth controlled `.addin.xml` EmbeddedResource removal pilot (small physics batch):
+        - Removed `Resources/OpenSim.Region.PhysicsModules.BasicPhysics.addin.xml` from
+            `OpenSim.Region.PhysicsModules.BasicPhysics.csproj` embedded resources.
+        - Removed `Resources/OpenSim.Region.PhysicsModules.BulletS.addin.xml` from
+            `OpenSim.Region.PhysicsModules.BulletS.csproj` embedded resources.
+        - Removed `Resources/OpenSim.Region.PhysicsModules.Meshing.addin.xml` from
+            `OpenSim.Region.PhysicsModules.Meshing.csproj` embedded resources.
+        - Added explicit allowlist entries in migration guard tests for these manifest paths.
+        - Validation gates passed:
+                - normal Debug builds of `OpenSim.Region.PhysicsModules.BasicPhysics`,
+                  `OpenSim.Region.PhysicsModules.BulletS`, and
+                  `OpenSim.Region.PhysicsModules.Meshing`
+                - reflection-smoke Debug builds (`OPENSIM_PLUGIN_DISCOVERY=reflection`) for all three
+                - plugin migration test suite (`34/34` passing)
+- Completed ninth controlled `.addin.xml` EmbeddedResource removal pilot (remaining physics batch):
+        - Removed `Resources/OpenSim.Region.PhysicsModules.ubODE.addin.xml` from
+            `OpenSim.Region.PhysicsModules.ubODE.csproj` embedded resources.
+        - Removed `Resources/OpenSim.Region.PhysicsModules.ubODEMeshing.addin.xml` from
+            `OpenSim.Region.PhysicsModules.ubODEMeshing.csproj` embedded resources.
+        - Removed `Resources/OpenSim.Region.PhysicsModules.POS.addin.xml` from
+            `OpenSim.Region.PhysicsModules.POS.csproj` embedded resources.
+        - Added explicit allowlist entries in migration guard tests for these manifest paths.
+        - Validation gates passed:
+                - normal Debug builds of `OpenSim.Region.PhysicsModules.ubODE`,
+                  `OpenSim.Region.PhysicsModules.ubODEMeshing`, and
+                  `OpenSim.Region.PhysicsModules.POS`
+                - reflection-smoke Debug builds (`OPENSIM_PLUGIN_DISCOVERY=reflection`) for all three
+                - plugin migration test suite (`34/34` passing)
+- Completed tenth controlled `.addin.xml` EmbeddedResource removal pilot (addons small batch):
+        - Removed `Resources/OpenSimSearch.Modules.addin.xml` from
+            `OpenSimSearch.Modules.csproj` embedded resources.
+        - Removed `Resources/OpenSimMuteList.Modules.addin.xml` from
+            `OpenSimMutelist.Modules.csproj` embedded resources.
+        - Removed `Resources/OpenSim.OfflineIM.addin.xml` from
+            `OpenSim.Addons.OfflineIM.csproj` embedded resources.
+        - Added explicit allowlist entries in migration guard tests for these manifest paths.
+        - Validation gates passed:
+                - normal Debug builds of `OpenSimSearch.Modules`,
+                  `OpenSimMutelist.Modules`, and
+                  `OpenSim.Addons.OfflineIM`
+                - reflection-smoke Debug builds (`OPENSIM_PLUGIN_DISCOVERY=reflection`) for all three
+                - plugin migration test suite (`34/34` passing)
+- Completed eleventh controlled `.addin.xml` EmbeddedResource removal pilot (addons provider batch):
+        - Removed `Resources/OpenSim.Groups.addin.xml` from
+            `OpenSim.Addons.Groups.csproj` embedded resources.
+        - Removed `Resources/Gloebit.GloebitMoneyModule.addin.xml` from
+            `Gloebit.GloebitMoneyModule.csproj` embedded resources.
+        - Removed `Resources/WebRtcVoice.WebRtcRegionModule.addin.xml` from
+            `WebRtcVoiceRegionModule.csproj` embedded resources.
+        - Added explicit allowlist entries in migration guard tests for these manifest paths.
+        - Validation gates passed:
+                - normal Debug builds of `OpenSim.Addons.Groups`,
+                  `Gloebit.GloebitMoneyModule`, and
+                  `WebRtcVoiceRegionModule`
+                - reflection-smoke Debug builds (`OPENSIM_PLUGIN_DISCOVERY=reflection`) for all three
+                - plugin migration test suite (`34/34` passing)
+- Completed twelfth controlled `.addin.xml` EmbeddedResource removal pilot (provider pair batch):
+        - Removed `Resources/WebRtcVoice.WebRtcVoiceServiceModule.addin.xml` from
+            `WebRtcVoiceServiceModule.csproj` embedded resources.
+        - Removed `Resources/OpenSim.Region.ScriptEngine.YEngine.addin.xml` from
+            `OpenSim.Region.ScriptEngine.YEngine.csproj` embedded resources.
+        - Added explicit allowlist entries in migration guard tests for these manifest paths.
+        - Validation gates passed:
+                - normal Debug builds of `WebRtcVoiceServiceModule` and
+                  `OpenSim.Region.ScriptEngine.YEngine`
+                - reflection-smoke Debug builds (`OPENSIM_PLUGIN_DISCOVERY=reflection`) for both
+                - plugin migration test suite (`34/34` passing)
+- Completed thirteenth controlled `.addin.xml` EmbeddedResource removal pilot (higher-risk single):
+        - Removed `Resources/OpenSim.Data.addin.xml` from
+            `OpenSim.Data.csproj` embedded resources.
+        - Added explicit allowlist entry in migration guard tests for this manifest path.
+        - Validation gates passed:
+                - normal Debug build of `OpenSim.Data`
+                - reflection-smoke Debug build (`OPENSIM_PLUGIN_DISCOVERY=reflection`)
+                - plugin migration test suite (`34/34` passing)
+- Completed fourteenth controlled `.addin.xml` EmbeddedResource removal pilot (final remaining manifest):
+        - Removed `Resources/OpenSim.Server.RegionServer.addin.xml` from
+            `OpenSim.Server.RegionServer.csproj` embedded resources.
+        - Added explicit allowlist entry in migration guard tests for this manifest path.
+        - Validation gates passed:
+                - normal Debug build of `OpenSim.Server.RegionServer`
+                - reflection-smoke Debug build (`OPENSIM_PLUGIN_DISCOVERY=reflection`)
+                - plugin migration test suite (`34/34` passing)
 
 ### Completed in Step 1.1: Eliminated Zlib.net Binding Dependency
 
@@ -218,6 +371,22 @@ for provider-based discovery.
 
 - All current `Source/` and `Addons/` manifests containing `<Extension path=...>` plugin entries
     now have corresponding provider-based `PluginRegistration.cs` mappings.
+- Added migration guard-rail tests in `OpenSim.Framework.PluginMigration.Tests` to assert:
+    - manifests with extension entries have a corresponding `PluginRegistration.cs`, and
+        - each manifest extension entry `id`/`class` pair is represented in the provider source
+            across both provider styles (`RegisterByName(..., "full.class.Name", ...)` and
+            `new PluginDescriptor(..., typeof(TypeName), ...)`).
+        - provider registrations are parity-checked bidirectionally against manifest
+            `(path, id, class)` triplets (missing and unexpected entries).
+        - reverse-parity checks now support an explicit keyed allowlist for intentional
+            provider-only triplets (`relative/provider/path|path|id|type`) while keeping strict
+            failure behavior by default.
+        - manifest parsing accepts both `<... class="..." />` and `<... type="..." />`
+            extension entry attributes to support startup-plugin manifests.
+        - remaining `Mono.Addins` usage is constrained by tests to known intentional
+            transitional locations (attribute and using-directive footprint guards).
+        - provider-backed manifests remain embedded as csproj `EmbeddedResource` entries
+            unless explicitly allowlisted for controlled removal pilots.
 - Remaining manifest-only files without provider mappings are extension-point-only roots:
     - `Source/OpenSim.Server.RegionServer/Resources/OpenSim.Server.RegionServer.addin.xml`
     - `Source/OpenSim.Data/Resources/OpenSim.Data.addin.xml`

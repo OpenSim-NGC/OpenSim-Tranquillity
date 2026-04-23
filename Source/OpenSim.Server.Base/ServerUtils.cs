@@ -42,10 +42,10 @@ using OpenSim.Framework.Servers;
 
 using OpenMetaverse.StructuredData; // LitJson is hidden on this
 
+// Retained for transitional monoaddins compatibility in robust command/registry flows.
 [assembly:AddinRoot("Robust", OpenSim.VersionInfo.AssemblyVersionNumber)]
 namespace OpenSim.Server.Base
 {
-    [TypeExtensionPoint(Path="/Robust/Connector", Name="RobustConnector")]
     public interface IRobustConnector
     {
         string ConfigName

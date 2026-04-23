@@ -26,8 +26,4 @@
     <ProjectReference Include="..\..\Source\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
   </ItemGroup>
     
-  <ItemGroup>
-    <EmbeddedResource Include="Resources/OpenSimSearch.Modules.addin.xml" />
-  </ItemGroup>
-
 </Project>
