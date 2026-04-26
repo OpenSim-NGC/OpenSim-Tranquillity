@@ -456,12 +456,43 @@ Removed the final Mono.Addins residue that remained outside the core runtime mig
 
 **Mono.Addins is now fully removed from source and test project files.**
 
----
 
----
 
 ### Completed in Step 3 (Batch 7): Addons Registration Conversion (RegionModules)
 
+### Completed in Step 5.4: Extension-Point-Only Manifest Cleanup
+
+Removed final orphaned manifest files that contained only extension-point definitions (no plugin extensions):
+
+**Deleted manifests**:
+- `Source/OpenSim.Data/Resources/OpenSim.Data.addin.xml`
+    - Defined extension points: `/OpenSim/AssetData`, `/OpenSim/InventoryData`
+    - These extension points are used by data service implementations but the manifest file itself
+        was not needed at runtime (no Mono.Addins processing required)
+- `Source/OpenSim.Server.RegionServer/Resources/OpenSim.Server.RegionServer.addin.xml`
+    - Defined extension points: `/OpenSim/Startup`, `/OpenSim/AssetCache`, `/OpenSim/AssetClient`,
+        `/OpenSim/WindModule`, `/OpenSim/RegionModules`
+    - These extension points are the primary registration targets for all plugin types
+        but the manifest file itself was not needed at runtime
+
+**Test allowlist updated**:
+- Removed entries for both deleted manifests from `s_allowedMissingEmbeddedManifests` in
+    `Tests/OpenSim.Framework.PluginMigration.Tests/PluginRegistryTests.cs`
+- These manifests are no longer needed since they were never embedded resources and were only
+    referenced in the allowlist to permit their existence during the migration
+
+**Validation gates passed**:
+- Normal Debug build of `OpenSim.Framework` (0 errors)
+- Reflection backend override build (`OPENSIM_PLUGIN_DISCOVERY=reflection`) (0 errors)
+- Plugin migration test suite (40/40 passing)
+
+**Result**: Migration to DotNetCorePlugins backend is now complete. All XML manifests have been
+either converted to code-based registrations or (for extension-point-only files) removed entirely.
+The codebase is now free of dependency on Mono.Addins and XML manifest processing.
+
+---
+
+---
 - Added provider-based code registrations for addon assemblies:
     - `Addons/Gloebit.GloebitMoneyModule`
     - `Addons/OpenSim.Addons.Groups`

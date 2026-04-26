@@ -80,8 +80,6 @@ namespace OpenSim.Framework.PluginMigration.Tests
             "Addons/os-webrtc-janus/WebRtcVoiceRegionModule/Resources/WebRtcVoice.WebRtcRegionModule.addin.xml",
             "Addons/os-webrtc-janus/WebRtcVoiceServiceModule/Resources/WebRtcVoice.WebRtcVoiceServiceModule.addin.xml",
             "Source/OpenSim.Region.ScriptEngine.YEngine/Resources/OpenSim.Region.ScriptEngine.YEngine.addin.xml",
-            "Source/OpenSim.Data/Resources/OpenSim.Data.addin.xml",
-            "Source/OpenSim.Server.RegionServer/Resources/OpenSim.Server.RegionServer.addin.xml"
         };
 
         public PluginRegistryTests()
