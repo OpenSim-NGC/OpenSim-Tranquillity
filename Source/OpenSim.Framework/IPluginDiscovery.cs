@@ -111,7 +111,6 @@ namespace OpenSim.Framework
         private int m_lastSkippedAssemblyCount;
         private int m_lastLoadFailureCount;
         private readonly List<McMaster.NETCore.Plugins.PluginLoader> m_pluginLoaders = new List<McMaster.NETCore.Plugins.PluginLoader>();
-
         private static readonly string[] s_skippedAssemblyPrefixes =
         {
             "System.",

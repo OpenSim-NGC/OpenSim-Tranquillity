@@ -26,6 +26,7 @@
     <PackageReference Include="log4net" Version="3.3.0" />
     <PackageReference Include="McMaster.NETCore.Plugins" Version="2.0.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
+    <PackageReference Include="zlib.net-mutliplatform" Version="1.0.6" />
   </ItemGroup>
 
 </Project>
