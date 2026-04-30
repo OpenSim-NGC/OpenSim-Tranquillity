@@ -55,7 +55,6 @@ using Amib.Threading;
 using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
-using SkiaSharp;
 
 namespace OpenSim.Framework
 {
@@ -4666,23 +4665,6 @@ namespace OpenSim.Framework
             }
 
             m_log.Error($"{message} Failed XML ({length} bytes) = {xml}");
-        }
-
-        public static SKBitmap ResizeImageSolid(SKBitmap image, int width, int height)
-        {
-            SKBitmap result = new(width, height, SKColorType.Rgb888x, SKAlphaType.Opaque);
-
-            using (SKCanvas canvas = new(result))
-            using (SKPaint paint = new())
-            {
-                paint.IsAntialias = true;
-                paint.FilterQuality = SKFilterQuality.High;
-
-                canvas.Clear(SKColors.Transparent);
-                canvas.DrawBitmap(image, new SKRect(0, 0, width, height), paint);
-            }
-
-            return result;
         }
 
         public static void SaveAssetToFile(string filename, byte[] data)

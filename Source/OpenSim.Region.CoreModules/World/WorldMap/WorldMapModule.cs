@@ -1580,7 +1580,7 @@ namespace OpenSim.Region.CoreModules.World.WorldMap
                         {
                             float scale = (float)Constants.RegionSize/(float)mb;
                             // Resize using SkiaSharp
-                            using (SKBitmap scaledSk = Util.ResizeImageSolid(mapbmp, (int)(bx * scale), (int)(by * scale)))
+                            using (SKBitmap scaledSk = SkiaImageUtils.ResizeImageSolid(mapbmp, (int)(bx * scale), (int)(by * scale)))
                             {
                                 data = EncodeSkBitmapToJpeg(scaledSk, true);
                             }
