@@ -1,0 +1,15 @@
+version: 0.9.7.{build}
+branches:
+  only:
+  - develop
+image: Visual Studio 2022
+install:
+- git submodule update --init --recursive
+- dotnet restore
+build:
+  project: Tranquillity.sln
+  verbosity: minimal
+test: off
+artifacts:
+- path: build\Debug\net8.0
+  name: NGC-Tranquillity
