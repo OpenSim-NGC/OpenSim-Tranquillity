@@ -490,6 +490,47 @@ Removed final orphaned manifest files that contained only extension-point defini
 either converted to code-based registrations or (for extension-point-only files) removed entirely.
 The codebase is now free of dependency on Mono.Addins and XML manifest processing.
 
+## Post-Migration Optional Checklist
+
+These items are optional hardening and cleanup tasks now that the migration is complete.
+
+### Runtime parity and operations
+
+- [ ] Run startup parity checks in your real deployment profiles (Standalone/Grid, representative regions, addon mix).
+- [ ] Capture and compare plugin discovery summaries between baseline and current builds for `/OpenSim/Startup`, `/OpenSim/RegionModules`, `/OpenSim/WindModule`, and `/Robust/Connector`.
+- [ ] Verify plugin path behavior from packaged distribution paths (not just repo-root execution) and document any path assumptions.
+- [ ] Reconfirm no port/conflict side effects in operational smoke runs (single active RegionServer instance per test cycle).
+
+### Backend policy tightening
+
+- [ ] Decide a deprecation date for compatibility aliases (`reflection`, `monoaddins`) and announce it in release notes.
+- [ ] After the deprecation window, remove alias routing and require explicit `dotnetcore` when configured.
+- [ ] Keep one regression test that enforces environment override precedence for `OPENSIM_PLUGIN_DISCOVERY`.
+
+### Test and CI hardening
+
+- [ ] Add a CI matrix leg that builds key projects with `OPENSIM_PLUGIN_DISCOVERY=dotnetcore` and `OPENSIM_PLUGIN_DISCOVERY=reflection` (alias validation until retired).
+- [ ] Add at least one integration smoke test that boots a minimal server profile and asserts non-zero plugin discovery on each migrated extension point.
+- [ ] Preserve plugin registration parity tests as a release gate for future addon/provider changes.
+
+### Documentation and contributor guidance
+
+- [ ] Add a short "Plugin registration after migration" section to contributor docs with one Source example and one Addons example.
+- [ ] Document backend selection precedence (env var vs config) in operator-facing docs.
+- [ ] Document that Mono.Addins manifests are historical and new plugins should use provider-based registrations.
+
+### Technical debt follow-up (as needed)
+
+- [ ] Periodically review and reduce allowlists in migration guard tests where no longer needed.
+- [ ] Evaluate whether any migration-only compatibility code/logging can be simplified after one stable release cycle.
+- [ ] Track and revisit external binary dependency constraints discovered during migration (for example, transitive drawing/compression concerns).
+
+### Suggested completion criteria for closeout
+
+- [ ] Two consecutive release-candidate cycles pass build + plugin migration tests + runtime smoke checks with no migration-related regressions.
+- [ ] Backend alias deprecation plan is either completed or explicitly scheduled.
+- [ ] Documentation reflects provider-based registration as the only supported authoring model.
+
 ---
 
 ---
