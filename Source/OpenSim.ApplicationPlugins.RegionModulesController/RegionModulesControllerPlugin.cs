@@ -86,15 +86,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
             if (modulesConfig == null)
                 modulesConfig = m_openSim.ConfigSource.AddConfig("Modules");
 
-            string pluginDiscovery = modulesConfig.GetString("PluginDiscovery", string.Empty);
-            if (string.IsNullOrWhiteSpace(pluginDiscovery))
-            {
-                IConfig startupConfig = m_openSim.ConfigSource.Configs["Startup"];
-                if (startupConfig != null)
-                    pluginDiscovery = startupConfig.GetString("PluginDiscovery", string.Empty);
-            }
-
-            m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log, pluginDiscovery);
+            m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log);
             m_pluginDiscovery.Initialize(".");
 
             m_name = GetType().Name;

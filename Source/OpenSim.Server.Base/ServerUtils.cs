@@ -80,14 +80,7 @@ namespace OpenSim.Server.Base
         public PluginLoader(IConfigSource config, string registryPath)
         {
             Config = config;
-            string pluginDiscovery = string.Empty;
-            IConfig startupConfig = Config.Configs["Startup"];
-            if (startupConfig != null)
-            {
-                pluginDiscovery = startupConfig.GetString("PluginDiscovery", string.Empty);
-            }
-
-            m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log, pluginDiscovery);
+            m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log);
             m_pluginDiscovery.Initialize(registryPath);
 
             LoadConfiguredConnectors();

@@ -123,10 +123,6 @@
     ;; Place to create a PID file
     ; PIDFile = "/tmp/OpenSim.exe.pid"
 
-    ;# {PluginDiscovery} {dotnetcore} {Plugin discovery backend} {}
-    ; Plugin discovery backend. dotnetcore is the default and recommended backend.
-    ; PluginDiscovery = dotnetcore
-
     ;# {RegistryLocation} {} {Plugin Discovery Location} {}
     ; Set path to the directory scanned for plugin assemblies if you want plugins
     ; outside of bin. The OpenSim.exe process must have R/W access to the location.

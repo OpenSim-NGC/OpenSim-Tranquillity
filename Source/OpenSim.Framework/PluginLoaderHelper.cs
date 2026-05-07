@@ -68,7 +68,6 @@ namespace OpenSim.Framework
 
                 // Step 2: Create plugin loader
                 var loader = DotNetCorePluginLoaderFactory.Create<T>(
-                    configuredBackend: null,
                     initialiser: initialiser);
 
                 // Step 3: Load plugins from registry
@@ -96,7 +95,6 @@ namespace OpenSim.Framework
         public static List<T> LoadPluginsUsingDiscovery<T>(
             string extensionPath,
             string pluginDirectory,
-            string configuredBackend = null,
             PluginInitialiserBase initialiser = null) where T : class, IPlugin
         {
             var result = new List<T>();
@@ -106,9 +104,8 @@ namespace OpenSim.Framework
                 m_log.InfoFormat("[PLUGIN-HELPER]: Loading plugins for {0} using discovery backend",
                     extensionPath);
 
-                // Create loader with specified backend (or default)
+                // Create loader with the default discovery backend.
                 var loader = DotNetCorePluginLoaderFactory.Create<T>(
-                    configuredBackend: configuredBackend,
                     initialiser: initialiser);
 
                 // Initialize discovery with plugin directory
@@ -149,7 +146,6 @@ namespace OpenSim.Framework
             string extensionPath,
             IConfigSource config,
             string pluginDirectory = ".",
-            string configuredBackend = null,
             PluginInitialiserBase initialiser = null) where T : class, IPlugin
         {
             var result = new List<T>();
@@ -163,7 +159,6 @@ namespace OpenSim.Framework
                     m_log.InfoFormat("[PLUGIN-HELPER]: Using registry for {0}", extensionPath);
                     
                     var loader = DotNetCorePluginLoaderFactory.Create<T>(
-                        configuredBackend: configuredBackend,
                         initialiser: initialiser);
                     
                     loader.LoadFromRegistry(registry, extensionPath, typeof(T));
@@ -174,7 +169,6 @@ namespace OpenSim.Framework
                     m_log.InfoFormat("[PLUGIN-HELPER]: Registry empty for {0}, using discovery", extensionPath);
                     
                     var loader = DotNetCorePluginLoaderFactory.Create<T>(
-                        configuredBackend: configuredBackend,
                         initialiser: initialiser);
                     
                     var discovery = loader.GetType()

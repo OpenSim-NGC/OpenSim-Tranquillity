@@ -234,13 +234,12 @@ namespace OpenSim.Framework
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         /// <summary>
-        /// Create a plugin loader using the configured discovery backend
+        /// Create a plugin loader using the DotNetCorePlugins discovery backend
         /// </summary>
         public static DotNetCorePluginLoader<T> Create<T>(
-            string configuredBackend = null,
             PluginInitialiserBase initialiser = null) where T : class, IPlugin
         {
-            var discovery = PluginDiscoveryFactory.Create(m_log, configuredBackend);
+            var discovery = PluginDiscoveryFactory.Create(m_log);
             return new DotNetCorePluginLoader<T>(discovery, initialiser);
         }
 

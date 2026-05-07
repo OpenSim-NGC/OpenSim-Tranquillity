@@ -10,7 +10,7 @@ The supported registration model is provider-based code registration using
 - Implement the plugin interface for your target extension point.
 - Add a `PluginRegistration` class that implements `IPluginRegistryProvider`.
 - Register your plugin with the correct extension path.
-- Build and verify discovery with `OPENSIM_PLUGIN_DISCOVERY=dotnetcore`.
+- Build and verify discovery with a normal debug build.
 
 ## 1) Choose the Extension Point
 
@@ -257,24 +257,8 @@ Notes for both options:
 
 ## 6) First-Run INI Toggles
 
-For initial validation, force the discovery backend explicitly:
-
-```ini
-[Startup]
-PluginDiscovery = dotnetcore
-
-[Modules]
-PluginDiscovery = dotnetcore
-
-[Wind]
-PluginDiscovery = dotnetcore
-```
-
-You can also set an environment override when starting a server:
-
-```bash
-export OPENSIM_PLUGIN_DISCOVERY=dotnetcore
-```
+No discovery backend toggle is required. Runtime discovery always uses
+DotNetCorePlugins.
 
 Module activation is still controlled by module-specific configuration.
 Common patterns in this repository include:
@@ -293,7 +277,6 @@ From repository root:
 
 ```bash
 dotnet build --configuration Debug
-OPENSIM_PLUGIN_DISCOVERY=dotnetcore dotnet build --configuration Debug
 ```
 
 For focused validation, build the plugin project directly and then run a server
@@ -309,8 +292,6 @@ profile that should load it.
 - Plugin discovered but not active:
   - Check module-specific configuration in INI files.
   - Check startup logs for discovery summary and module initialization errors.
-- Loader backend confusion:
-  - Set `OPENSIM_PLUGIN_DISCOVERY=dotnetcore` explicitly during validation.
 
 ## 9) Existing In-Repo Examples
 

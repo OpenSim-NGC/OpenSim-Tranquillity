@@ -785,7 +785,6 @@ namespace OpenSim.Framework.PluginMigration.Tests
     /// </summary>
     public class DotNetCorePluginLoaderTests
     {
-        private static readonly object s_pluginDiscoveryOverrideLock = new object();
         private readonly MockPluginDiscovery m_discovery;
         private readonly DotNetCorePluginLoader<MockPlugin> m_loader;
 
@@ -919,76 +918,7 @@ namespace OpenSim.Framework.PluginMigration.Tests
             Assert.IsType<DotNetCorePluginsDiscovery>(discovery);
             Assert.Contains(
                 appender.GetEvents().Select(e => e.RenderedMessage),
-                message => message.Contains("Using DotNetCorePlugins discovery backend (dotnetcore)", StringComparison.Ordinal));
-        }
-
-        /// <summary>
-        /// Test plugin discovery factory maps configured backend aliases to the dotnetcore backend.
-        /// </summary>
-        [Theory]
-        [InlineData("dotnet")]
-        [InlineData("dotnetcore")]
-        [InlineData("reflection")]
-        [InlineData("monoaddins")]
-        public void TestPluginDiscoveryFactoryMapsConfiguredAliasesToDotNetCoreBackend(string configuredBackend)
-        {
-            (ILog log, MemoryAppender appender) = CreateMemoryLogger();
-
-            using IPluginDiscovery discovery = PluginDiscoveryFactory.Create(log, configuredBackend);
-
-            Assert.IsType<DotNetCorePluginsDiscovery>(discovery);
-
-            string[] messages = appender.GetEvents().Select(e => e.RenderedMessage).ToArray();
-            if (string.Equals(configuredBackend, "monoaddins", StringComparison.Ordinal))
-            {
-                Assert.Contains(
-                    messages,
-                    message => message.Contains("Mono.Addins backend has been removed", StringComparison.Ordinal));
-            }
-            else
-            {
-                Assert.Contains(
-                    messages,
-                    message => message.Contains($"Using DotNetCorePlugins discovery backend ({configuredBackend})", StringComparison.Ordinal));
-            }
-        }
-
-        /// <summary>
-        /// Test environment variable override takes precedence over configured backend selection.
-        /// </summary>
-        [Fact]
-        public void TestPluginDiscoveryFactoryEnvironmentOverrideTakesPrecedence()
-        {
-            lock (s_pluginDiscoveryOverrideLock)
-            {
-                const string overrideVariableName = "OPENSIM_PLUGIN_DISCOVERY";
-                string previousValue = Environment.GetEnvironmentVariable(overrideVariableName);
-
-                try
-                {
-                    Environment.SetEnvironmentVariable(overrideVariableName, "reflection");
-                    (ILog log, MemoryAppender appender) = CreateMemoryLogger();
-
-                    using IPluginDiscovery discovery = PluginDiscoveryFactory.Create(log, "monoaddins");
-
-                    Assert.IsType<DotNetCorePluginsDiscovery>(discovery);
-
-                    string[] messages = appender.GetEvents().Select(e => e.RenderedMessage).ToArray();
-                    Assert.Contains(
-                        messages,
-                        message => message.Contains("supersedes configured backend 'monoaddins'", StringComparison.Ordinal));
-                    Assert.Contains(
-                        messages,
-                        message => message.Contains("Using DotNetCorePlugins discovery backend (reflection)", StringComparison.Ordinal));
-                    Assert.DoesNotContain(
-                        messages,
-                        message => message.Contains("Mono.Addins backend has been removed", StringComparison.Ordinal));
-                }
-                finally
-                {
-                    Environment.SetEnvironmentVariable(overrideVariableName, previousValue);
-                }
-            }
+                message => message.Contains("Using DotNetCorePlugins discovery backend", StringComparison.Ordinal));
         }
 
         /// <summary>

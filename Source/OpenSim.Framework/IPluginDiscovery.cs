@@ -58,45 +58,10 @@ namespace OpenSim.Framework
 
     public static class PluginDiscoveryFactory
     {
-        private const string BackendOverrideVariableName = "OPENSIM_PLUGIN_DISCOVERY";
-
-        public static IPluginDiscovery Create(ILog log, string configuredBackend = null)
+        public static IPluginDiscovery Create(ILog log)
         {
-            string backend = configuredBackend;
-            string envBackend = Environment.GetEnvironmentVariable(BackendOverrideVariableName);
-
-            if (!string.IsNullOrWhiteSpace(envBackend))
-            {
-                if (!string.IsNullOrWhiteSpace(configuredBackend) &&
-                    !string.Equals(configuredBackend.Trim(), envBackend.Trim(), StringComparison.OrdinalIgnoreCase))
-                {
-                    log.InfoFormat(
-                        "[PLUGINS]: Environment override {0}={1} supersedes configured backend '{2}'",
-                        BackendOverrideVariableName,
-                        envBackend,
-                        configuredBackend);
-                }
-
-                backend = envBackend;
-            }
-
-            if (string.IsNullOrWhiteSpace(backend))
-                backend = "dotnetcore";
-
-            switch (backend.Trim().ToLowerInvariant())
-            {
-                case "monoaddins":
-                    log.WarnFormat(
-                        "[PLUGINS]: Mono.Addins backend has been removed. Using DotNetCorePlugins discovery backend instead.");
-                    return new DotNetCorePluginsDiscovery(log);
-
-                case "dotnet":
-                case "dotnetcore":
-                case "reflection":
-                default:
-                    log.InfoFormat("[PLUGINS]: Using DotNetCorePlugins discovery backend ({0})", backend);
-                    return new DotNetCorePluginsDiscovery(log);
-            }
+            log.Info("[PLUGINS]: Using DotNetCorePlugins discovery backend");
+            return new DotNetCorePluginsDiscovery(log);
         }
     }
 
@@ -390,12 +355,4 @@ namespace OpenSim.Framework
         }
     }
 
-    // Compatibility alias for existing backend name references in docs/config.
-    public sealed class ReflectionPluginDiscovery : DotNetCorePluginsDiscovery
-    {
-        public ReflectionPluginDiscovery(ILog log)
-            : base(log)
-        {
-        }
-    }
 }

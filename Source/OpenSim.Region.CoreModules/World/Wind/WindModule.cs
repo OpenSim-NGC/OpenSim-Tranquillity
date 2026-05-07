@@ -63,18 +63,10 @@ namespace OpenSim.Region.CoreModules.World.Wind
         {
             m_windConfig = config.Configs["Wind"];
 
-            string pluginDiscovery = string.Empty;
-            IConfig startupConfig = config.Configs["Startup"];
-            if (startupConfig != null)
-                pluginDiscovery = startupConfig.GetString("PluginDiscovery", string.Empty);
-
 //            string desiredWindPlugin = m_dWindPluginName;
 
             if (m_windConfig != null)
             {
-                if (m_windConfig.Contains("PluginDiscovery"))
-                    pluginDiscovery = m_windConfig.GetString("PluginDiscovery", pluginDiscovery);
-
                 m_enabled = m_windConfig.GetBoolean("enabled", true);
 
                 m_frameUpdateRate = m_windConfig.GetInt("wind_update_rate", 150);
@@ -89,7 +81,7 @@ namespace OpenSim.Region.CoreModules.World.Wind
             if (m_enabled)
             {
                 m_log.InfoFormat("[WIND] Enabled with an update rate of {0} frames.", m_frameUpdateRate);
-                m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log, pluginDiscovery);
+                m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log);
 
             }
 

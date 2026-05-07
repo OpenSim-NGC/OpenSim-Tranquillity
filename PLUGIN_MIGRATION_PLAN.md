@@ -503,20 +503,25 @@ These items are optional hardening and cleanup tasks now that the migration is c
 
 ### Backend policy tightening
 
-- [ ] Decide a deprecation date for compatibility aliases (`reflection`, `monoaddins`) and announce it in release notes.
-- [ ] After the deprecation window, remove alias routing and require explicit `dotnetcore` when configured.
-- [ ] Keep one regression test that enforces environment override precedence for `OPENSIM_PLUGIN_DISCOVERY`.
+Historical note: this section reflects the transition plan that existed before
+backend selection was removed. Runtime discovery now always uses
+DotNetCorePlugins, and the old `PluginDiscovery` config plus
+`OPENSIM_PLUGIN_DISCOVERY` override are no longer recognized.
+
+- [x] Compatibility aliases were removed by collapsing runtime discovery to DotNetCorePlugins only.
+- [x] Config-based backend selection was removed; explicit `dotnetcore` configuration is no longer required or read.
+- [x] Environment override precedence tests were removed because `OPENSIM_PLUGIN_DISCOVERY` is no longer supported.
 
 ### Test and CI hardening
 
-- [ ] Add a CI matrix leg that builds key projects with `OPENSIM_PLUGIN_DISCOVERY=dotnetcore` and `OPENSIM_PLUGIN_DISCOVERY=reflection` (alias validation until retired).
+- [ ] Replace the old backend-alias CI idea with normal plugin-migration and runtime smoke coverage under the single DotNetCorePlugins path.
 - [ ] Add at least one integration smoke test that boots a minimal server profile and asserts non-zero plugin discovery on each migrated extension point.
 - [ ] Preserve plugin registration parity tests as a release gate for future addon/provider changes.
 
 ### Documentation and contributor guidance
 
 - [ ] Add a short "Plugin registration after migration" section to contributor docs with one Source example and one Addons example.
-- [ ] Document backend selection precedence (env var vs config) in operator-facing docs.
+- [x] Operator-facing docs now state that backend selection config/env overrides were removed.
 - [ ] Document that Mono.Addins manifests are historical and new plugins should use provider-based registrations.
 
 ### Technical debt follow-up (as needed)
@@ -583,41 +588,17 @@ for provider-based discovery.
 
 ### Backend Selection Configuration
 
-You can choose the discovery backend using either config or environment:
+Historical note: backend selection is no longer configurable.
 
-```ini
-[Startup]
-; dotnetcore | reflection | monoaddins (deprecated alias)
-PluginDiscovery = dotnetcore
-
-[Modules]
-; Optional override for region module discovery
-PluginDiscovery = dotnetcore
-
-[Wind]
-; Optional override for wind discovery
-PluginDiscovery = dotnetcore
-```
-
-Environment override (highest precedence where supported):
-
-```bash
-export OPENSIM_PLUGIN_DISCOVERY=dotnetcore
-```
-
-Implementation note:
-- `OPENSIM_PLUGIN_DISCOVERY` now strictly overrides configured backend values when both are present,
-    and startup logs an explicit override message when the values differ.
+- Runtime discovery always uses DotNetCorePlugins.
+- `PluginDiscovery` entries in `[Startup]`, `[Modules]`, or `[Wind]` are obsolete and should be removed from local INI files.
+- `OPENSIM_PLUGIN_DISCOVERY` is obsolete and should be removed from local startup scripts or service definitions.
 
 ### Current Scope Note
 
-- The `reflection` selector now routes to the DotNetCorePlugins implementation and remains
-    a compatibility alias for migration validation.
-- The `monoaddins` selector is retained only as a deprecated compatibility alias and now logs
-    a warning before routing to DotNetCorePlugins.
-- Default behavior is now `dotnetcore`.
-- Runtime startup parity capture is environment-dependent in current dev setup; compile-time
-    parity validation with backend overrides is currently used as the stable smoke check.
+- Runtime discovery is fixed to DotNetCorePlugins.
+- The old `reflection` and `monoaddins` selector names are part of historical migration context only.
+- Runtime startup parity capture is still environment-dependent in current dev setup; the remaining smoke checks should target the single supported discovery path.
 
 ---
 
@@ -1092,26 +1073,16 @@ AssetCachePath = "./bin/plugins/assetcache"
 
 ### Smoke Test Commands (Current Backend)
 
-Use these commands from repo root to verify the default backend and explicit compatibility aliases:
+Historical note: this section previously validated backend overrides during the
+migration window. The only supported smoke checks now use the default runtime
+behavior, which is always DotNetCorePlugins.
 
 ```bash
-# Default backend (dotnetcore)
+# Default runtime behavior
 dotnet build Source/OpenSim.Framework/OpenSim.Framework.csproj -c Debug
 dotnet build Source/OpenSim.ApplicationPlugins.RegionModulesController/OpenSim.ApplicationPlugins.RegionModulesController.csproj -c Debug
 dotnet build Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj -c Debug
 dotnet build Source/OpenSim.Region.CoreModules/OpenSim.Region.CoreModules.csproj -c Debug
-
-# Explicit dotnetcore override
-OPENSIM_PLUGIN_DISCOVERY=dotnetcore dotnet build Source/OpenSim.Framework/OpenSim.Framework.csproj -c Debug
-OPENSIM_PLUGIN_DISCOVERY=dotnetcore dotnet build Source/OpenSim.ApplicationPlugins.RegionModulesController/OpenSim.ApplicationPlugins.RegionModulesController.csproj -c Debug
-OPENSIM_PLUGIN_DISCOVERY=dotnetcore dotnet build Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj -c Debug
-OPENSIM_PLUGIN_DISCOVERY=dotnetcore dotnet build Source/OpenSim.Region.CoreModules/OpenSim.Region.CoreModules.csproj -c Debug
-
-# Compatibility alias override
-OPENSIM_PLUGIN_DISCOVERY=reflection dotnet build Source/OpenSim.Framework/OpenSim.Framework.csproj -c Debug
-OPENSIM_PLUGIN_DISCOVERY=reflection dotnet build Source/OpenSim.ApplicationPlugins.RegionModulesController/OpenSim.ApplicationPlugins.RegionModulesController.csproj -c Debug
-OPENSIM_PLUGIN_DISCOVERY=reflection dotnet build Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj -c Debug
-OPENSIM_PLUGIN_DISCOVERY=reflection dotnet build Source/OpenSim.Region.CoreModules/OpenSim.Region.CoreModules.csproj -c Debug
 ```
 
 ---
