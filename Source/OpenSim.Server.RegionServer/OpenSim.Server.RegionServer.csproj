@@ -60,9 +60,6 @@
     <ProjectReference Include="../../Source/OpenSim.Services.SimulationService/OpenSim.Services.SimulationService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.UserAccountService/OpenSim.Services.UserAccountService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.UserProfilesService/OpenSim.Services.UserProfilesService.csproj" />
-
-
-
     <ProjectReference Include="../../Source/OpenSim.Services.GridService/OpenSim.Services.GridService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.HypergridService/OpenSim.Services.HypergridService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.InventoryService/OpenSim.Services.InventoryService.csproj" />
@@ -89,14 +86,7 @@
     <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.2" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.2" />
     <PackageReference Include="log4net" Version="3.3.0" />
-    <PackageReference Include="Mono.Addins" Version="1.4.1" />
-    <PackageReference Include="Mono.Addins.Setup" Version="1.4.1" />
-    <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="Resources/OpenSim.Server.RegionServer.addin.xml" />
   </ItemGroup>
 
   <ItemGroup>

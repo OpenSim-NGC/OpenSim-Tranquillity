@@ -39,8 +39,7 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-
-using Ionic.Zlib;
+using System.IO.Compression;
 
 namespace OpenSim.Region.OptionalModules.Materials
 {
@@ -798,8 +797,8 @@ namespace OpenSim.Region.OptionalModules.Materials
             byte[] data = OSDParser.SerializeLLSDBinary(inOsd, useHeader);
             using (MemoryStream msSinkCompressed = new())
             {
-                using (Ionic.Zlib.ZlibStream zOut = new Ionic.Zlib.ZlibStream(msSinkCompressed,
-                    Ionic.Zlib.CompressionMode.Compress, CompressionLevel.BestCompression, true))
+                using (DeflateStream zOut = new DeflateStream(msSinkCompressed,
+                    CompressionMode.Compress, true))
                 {
                     zOut.Write(data, 0, data.Length);
                 }
@@ -813,7 +812,7 @@ namespace OpenSim.Region.OptionalModules.Materials
         {
             using (MemoryStream msSinkUnCompressed = new())
             {
-                using (Ionic.Zlib.ZlibStream zOut = new(msSinkUnCompressed, CompressionMode.Decompress, true))
+                using (DeflateStream zOut = new(msSinkUnCompressed, CompressionMode.Decompress, true))
                 {
                     zOut.Write(input, 0, input.Length);
                 }

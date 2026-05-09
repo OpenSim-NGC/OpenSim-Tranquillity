@@ -217,5 +217,10 @@ namespace OpenSim.Framework.Console
 
             return cmdinput;
         }
+
+        public virtual void WriteLine(string s)
+        {
+            Output(s);
+        }
     }
 }

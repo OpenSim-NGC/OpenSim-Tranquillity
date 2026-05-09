@@ -47,11 +47,9 @@
     ; If no path if specified then a PID file is not created.
     ; PIDFile = "/tmp/Robust.exe.pid"
 
-    ; Plugin Registry Location
-    ; Set path to directory for plugin registry. Information
-    ; about the registered repositories and installed plugins
-    ; will be stored here
-    ; The Robust.exe process must have R/W access to the location
+    ; Plugin discovery location
+    ; Set path to the directory scanned for plugin assemblies.
+    ; The Robust.exe process must have R/W access to the location.
     RegistryLocation = "."
 
     ; Modular configurations

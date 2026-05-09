@@ -36,16 +36,13 @@ using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenMetaverse;
-using Mono.Addins;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.Servers;
 
 using OpenMetaverse.StructuredData; // LitJson is hidden on this
 
-[assembly:AddinRoot("Robust", OpenSim.VersionInfo.AssemblyVersionNumber)]
 namespace OpenSim.Server.Base
 {
-    [TypeExtensionPoint(Path="/Robust/Connector", Name="RobustConnector")]
     public interface IRobustConnector
     {
         string ConfigName
@@ -72,12 +69,7 @@ namespace OpenSim.Server.Base
     public class PluginLoader
     {
         static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        public AddinRegistry Registry
-        {
-            get;
-            private set;
-        }
+        private readonly IPluginDiscovery m_pluginDiscovery;
 
         public IConfigSource Config
         {
@@ -88,71 +80,49 @@ namespace OpenSim.Server.Base
         public PluginLoader(IConfigSource config, string registryPath)
         {
             Config = config;
+            m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log);
+            m_pluginDiscovery.Initialize(registryPath);
 
-            Registry = new AddinRegistry(registryPath, ".");
-            //suppress_console_output_(true);
-            AddinManager.Initialize(registryPath);
-            //suppress_console_output_(false);
-            AddinManager.Registry.Update();
-            CommandManager commandmanager = new CommandManager(Registry);
-            AddinManager.AddExtensionNodeHandler("/Robust/Connector", OnExtensionChanged);
+            LoadConfiguredConnectors();
         }
 
-        private static TextWriter prev_console_;
-        // Temporarily masking the errors reported on start
-        // This is caused by a non-managed dll in the ./bin dir
-        // when the registry is initialized. The dll belongs to
-        // libomv, which has a hard-coded path to "." for pinvoke
-        // to load the openjpeg dll
-        //
-        // Will look for a way to fix, but for now this keeps the
-        // confusion to a minimum. this was copied from our region
-        // plugin loader, we have been doing this in there for a long time.
-        //
-        public void suppress_console_output_(bool save)
+        private void LoadConfiguredConnectors()
         {
-            if (save)
+            IReadOnlyList<PluginExtensionNode> discoveredNodes =
+                m_pluginDiscovery.GetExtensionNodes("/Robust/Connector", typeof(IRobustConnector));
+            int loadedConnectorCount = 0;
+
+            foreach (PluginExtensionNode node in discoveredNodes)
             {
-                prev_console_ = System.Console.Out;
-                System.Console.SetOut(new StreamWriter(Stream.Null));
+                IRobustConnector connector = node.CreateInstance() as IRobustConnector;
+                if (connector == null)
+                    continue;
+
+                connector.PluginPath = ResolvePluginPath(node);
+                LoadPlugin(connector);
+                loadedConnectorCount++;
             }
-            else
-            {
-                if (prev_console_ != null)
-                    System.Console.SetOut(prev_console_);
-            }
+
+            m_log.InfoFormat(
+                "[SERVER UTILS]: Discovery summary path=/Robust/Connector backend={0} discovered={1} loaded={2}",
+                m_pluginDiscovery.GetType().Name,
+                discoveredNodes.Count,
+                loadedConnectorCount);
         }
 
-        private void OnExtensionChanged(object s, ExtensionNodeEventArgs args)
+        private string ResolvePluginPath(PluginExtensionNode node)
         {
-            IRobustConnector connector = (IRobustConnector)args.ExtensionObject;
-            Addin a = Registry.GetAddin(args.ExtensionNode.Addin.Id);
-
-            if(a == null)
+            if (node.Type?.Assembly != null)
             {
-                Registry.Rebuild(null);
-                a = Registry.GetAddin(args.ExtensionNode.Addin.Id);
+                string assemblyLocation = node.Type.Assembly.Location;
+                if (!string.IsNullOrEmpty(assemblyLocation))
+                    return assemblyLocation;
             }
 
-            switch(args.Change)
-            {
-                case ExtensionChange.Add:
-                    if (a.AddinFile.Contains(Registry.DefaultAddinsFolder))
-                    {
-                        m_log.InfoFormat("[SERVER UTILS]: Adding {0} from registry", a.Name);
-                        connector.PluginPath = System.IO.Path.Combine(Registry.DefaultAddinsFolder,a.Name.Replace(',', '.'));                    }
-                    else
-                    {
-                        m_log.InfoFormat("[SERVER UTILS]: Adding {0} from ./bin", a.Name);
-                        connector.PluginPath = a.AddinFile;
-                    }
-                    LoadPlugin(connector);
-                    break;
-                case ExtensionChange.Remove:
-                    m_log.InfoFormat("[SERVER UTILS]: Removing {0}", a.Name);
-                    UnloadPlugin(connector);
-                    break;
-            }
+            m_log.WarnFormat(
+                "[SERVER UTILS]: Unable to resolve plugin path for connector {0}",
+                node.ID);
+            return string.Empty;
         }
 
         private void LoadPlugin(IRobustConnector connector)

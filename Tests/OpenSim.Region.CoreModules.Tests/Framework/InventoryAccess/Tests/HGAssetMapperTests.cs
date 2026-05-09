@@ -26,6 +26,7 @@
  */
 
 using System;
+using System.Linq;
 using System.Threading;
 using System.Xml;
 using Xunit;
@@ -110,9 +111,9 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess.Tests
             // Check that saved script nodes have attributes
             XmlNodeList savedScriptStateNodes = ncAssetGetXmlDoc.GetElementsByTagName("SavedScriptState");
 
-            Assert.Equal(1, savedScriptStateNodes.Count);
-            Assert.Equal(1, savedScriptStateNodes[0].Attributes.Count);
-            XmlNode uuidAttribute = savedScriptStateNodes[0].Attributes.GetNamedItem("UUID");
+            XmlNode savedScriptStateNode = Assert.Single(savedScriptStateNodes.Cast<XmlNode>());
+            Assert.Single(savedScriptStateNode.Attributes.Cast<XmlAttribute>());
+            XmlNode uuidAttribute = savedScriptStateNode.Attributes.GetNamedItem("UUID");
             Assert.NotNull(uuidAttribute);
             // XXX: To check the actual UUID attribute we would have to do some work to retreive the UUID of the task
             // item created earlier.

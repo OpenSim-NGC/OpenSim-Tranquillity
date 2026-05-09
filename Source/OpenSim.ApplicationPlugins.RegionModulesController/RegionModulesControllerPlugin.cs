@@ -27,8 +27,8 @@
 
 using System.Reflection;
 using log4net;
-using Mono.Addins;
 using Nini.Config;
+using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
@@ -53,8 +53,10 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
         private string m_name;
 
         // Internal lists to collect information about modules present
-        private List<TypeExtensionNode> m_nonSharedModules = new List<TypeExtensionNode>();
-        private List<TypeExtensionNode> m_sharedModules = new List<TypeExtensionNode>();
+        private List<PluginExtensionNode> m_nonSharedModules = new List<PluginExtensionNode>();
+        private List<PluginExtensionNode> m_sharedModules = new List<PluginExtensionNode>();
+
+        private IPluginDiscovery m_pluginDiscovery;
 
         // List of shared module instances, for adding to Scenes
         private List<ISharedRegionModule> m_sharedInstances = new List<ISharedRegionModule>();
@@ -66,22 +68,6 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
             LoadModulesFromAddins = true;
         }
 
-        private void on_addinloaded_(object sender, AddinEventArgs args)
-        {
-            m_log.Info ("[PLUGINS]: Plugin Loaded: " + args.AddinId);
-        }
-
-        private void on_addinloaderror_(object sender, AddinErrorEventArgs args)
-        {
-            if (args.Exception == null)
-                m_log.Error ("[REGIONMODULES]: Plugin Error: "
-                        + args.Message);
-            else
-                m_log.Error ("[REGIONMODULES]: Plugin Error: "
-                        + args.Exception.Message + "\n"
-                        + args.Exception.StackTrace);
-        }
-
 #endregion
 
 #region IApplicationPlugin implementation
@@ -90,9 +76,6 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
         {
             if (!LoadModulesFromAddins)
                 return;
-
-            AddinManager.AddinLoadError += on_addinloaderror_;
-            AddinManager.AddinLoaded += on_addinloaded_;
             
             m_openSim = openSim;
             m_openSim.ApplicationRegistry.RegisterInterface<IRegionModulesController>(this);
@@ -103,41 +86,58 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
             if (modulesConfig == null)
                 modulesConfig = m_openSim.ConfigSource.AddConfig("Modules");
 
-            // Who we are
-            string id = AddinManager.CurrentAddin.Id;
+            m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log);
+            m_pluginDiscovery.Initialize(".");
 
-            // Make friendly name
-            int pos = id.LastIndexOf(".");
-            if (pos == -1)
-                m_name = id;
-            else
-                m_name = id.Substring(pos + 1);
+            m_name = GetType().Name;
+
+            IReadOnlyList<PluginExtensionNode> discoveredNodes =
+                m_pluginDiscovery.GetExtensionNodes("/OpenSim/RegionModules", typeof(IRegionModuleBase));
+            int disabledCount = 0;
+            int unknownCount = 0;
                 
             // Scan modules and load all that aren't disabled
-            foreach (TypeExtensionNode node in
-                    AddinManager.GetExtensionNodes("/OpenSim/RegionModules"))
+            foreach (PluginExtensionNode node in discoveredNodes)
             {
                 if (typeof(ISharedRegionModule).IsAssignableFrom(node.Type))
                 {
                     if (CheckModuleEnabled(node, modulesConfig))
                     {
-                        m_log.DebugFormat("[REGIONMODULES]: Found shared region module {0}, class {1}", node.Id, node.Type);
+                        m_log.DebugFormat("[REGIONMODULES]: Found shared region module {0}, class {1}", node.ID, node.Type);
                         m_sharedModules.Add(node);
+                    }
+                    else
+                    {
+                        disabledCount++;
                     }
                 }
                 else if (typeof(INonSharedRegionModule).IsAssignableFrom(node.Type))
                 {
                     if (CheckModuleEnabled(node, modulesConfig))
                     {
-                        m_log.DebugFormat("[REGIONMODULES]: Found non-shared region module {0}, class {1}", node.Id, node.Type);
+                        m_log.DebugFormat("[REGIONMODULES]: Found non-shared region module {0}, class {1}", node.ID, node.Type);
                         m_nonSharedModules.Add(node);
+                    }
+                    else
+                    {
+                        disabledCount++;
                     }
                 }
                 else
                 {
-                    m_log.DebugFormat("[REGIONMODULES]: Found unknown type of module {0}, class {1}", node.Id, node.Type);
+                    m_log.DebugFormat("[REGIONMODULES]: Found unknown type of module {0}, class {1}", node.ID, node.Type);
+                    unknownCount++;
                 }
             }
+
+            m_log.InfoFormat(
+                "[REGIONMODULES]: Discovery summary path=/OpenSim/RegionModules backend={0} discovered={1} shared={2} nonshared={3} disabled={4} unknown={5}",
+                m_pluginDiscovery.GetType().Name,
+                discoveredNodes.Count,
+                m_sharedModules.Count,
+                m_nonSharedModules.Count,
+                disabledCount,
+                unknownCount);
                
             // Load and init the module. We try a constructor with a port
             // if a port was given, fall back to one without if there is
@@ -146,13 +146,13 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
             // must provide a constructor with a port in the future.
             // For now, we do this so migration is easy.
             //
-            foreach (TypeExtensionNode node in m_sharedModules)
+            foreach (PluginExtensionNode node in m_sharedModules)
             {
                 Object[] ctorArgs = new Object[] { (uint)0 };
 
                 // Read the config again
                 string moduleString =
-                        modulesConfig.GetString("Setup_" + node.Id, String.Empty);
+                    modulesConfig.GetString("Setup_" + node.ID, String.Empty);
                         
                 if (moduleString == "disabled")
                     continue;
@@ -224,9 +224,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
 
             m_sharedModules.Clear();
             m_nonSharedModules.Clear();
-
-            AddinManager.AddinLoadError -= on_addinloaderror_;
-            AddinManager.AddinLoaded -= on_addinloaded_;
+            m_pluginDiscovery?.Dispose();
         }
 
 #endregion
@@ -235,7 +233,7 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
         {
             get
             {
-                return AddinManager.CurrentAddin.Version;
+                return GetType().Assembly.GetName().Version?.ToString() ?? string.Empty;
             }
         }
 
@@ -255,11 +253,11 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
         /// <param name="node"></param>
         /// <param name="modulesConfig">The config section</param>
         /// <returns>true if the module is enabled, false if it is disabled</returns>
-        protected bool CheckModuleEnabled(TypeExtensionNode node, IConfig modulesConfig)
+        protected bool CheckModuleEnabled(PluginExtensionNode node, IConfig modulesConfig)
         {
             // Get the config string
             string moduleString =
-                    modulesConfig.GetString("Setup_" + node.Id, String.Empty);
+                modulesConfig.GetString("Setup_" + node.ID, String.Empty);
 
             // We have a selector
             if (!String.IsNullOrEmpty(moduleString))
@@ -347,12 +345,12 @@ namespace OpenSim.ApplicationPlugins.RegionModulesController
 
             // Scan for, and load, nonshared modules
             List<INonSharedRegionModule> list = new List<INonSharedRegionModule>();
-            foreach (TypeExtensionNode node in m_nonSharedModules)
+            foreach (PluginExtensionNode node in m_nonSharedModules)
             {
                 Object[] ctorArgs = new Object[] {0};
 
                 // Read the config
-                string moduleString = modulesConfig.GetString("Setup_" + node.Id, string.Empty);
+                string moduleString = modulesConfig.GetString("Setup_" + node.ID, string.Empty);
 
                 // We may not want to load this at all
                 if (moduleString == "disabled")

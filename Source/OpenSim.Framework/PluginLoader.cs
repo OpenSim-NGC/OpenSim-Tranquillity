@@ -30,7 +30,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using log4net;
-using Mono.Addins;
 
 namespace OpenSim.Framework
 {
@@ -51,7 +50,7 @@ namespace OpenSim.Framework
     public interface IPluginConstraint
     {
         string Message { get; }
-        bool Apply(string extpoint);
+        bool Apply(string extpoint, Type pluginTypeHint, IPluginDiscovery discovery);
     }
 
     /// <summary>
@@ -73,6 +72,7 @@ namespace OpenSim.Framework
         private List<T> loaded = new List<T>();
         private List<string> extpoints = new List<string>();
         private PluginInitialiserBase initialiser;
+        private readonly IPluginDiscovery discovery;
 
         private Dictionary<string, IPluginConstraint> constraints
             = new Dictionary<string, IPluginConstraint>();
@@ -102,18 +102,28 @@ namespace OpenSim.Framework
         public PluginLoader()
         {
             Initialiser = new PluginInitialiserBase();
+            discovery = PluginDiscoveryFactory.Create(log);
             initialise_plugin_dir(".");
         }
 
         public PluginLoader(PluginInitialiserBase init)
         {
             Initialiser = init;
+            discovery = PluginDiscoveryFactory.Create(log);
             initialise_plugin_dir(".");
         }
 
         public PluginLoader(PluginInitialiserBase init, string dir)
         {
             Initialiser = init;
+            discovery = PluginDiscoveryFactory.Create(log);
+            initialise_plugin_dir(dir);
+        }
+
+        public PluginLoader(PluginInitialiserBase init, string dir, IPluginDiscovery pluginDiscovery)
+        {
+            Initialiser = init;
+            discovery = pluginDiscovery ?? throw new ArgumentNullException(nameof(pluginDiscovery));
             initialise_plugin_dir(dir);
         }
 
@@ -159,16 +169,23 @@ namespace OpenSim.Framework
             {
                 log.Info("[PLUGINS]: Loading extension point " + ext);
 
+                IReadOnlyList<PluginExtensionNode> discoveredNodes = discovery.GetExtensionNodes(ext, typeof(T));
+                log.InfoFormat(
+                    "[PLUGINS]: Extension point {0} discovered {1} candidate plugin(s) using {2}",
+                    ext,
+                    discoveredNodes.Count,
+                    discovery.GetType().Name);
+
                 if (constraints.TryGetValue(ext , out IPluginConstraint cons))
                 {
-                    if (cons.Apply(ext))
+                    if (cons.Apply(ext, typeof(T), discovery))
                         log.Error("[PLUGINS]: " + ext + " failed constraint: " + cons.Message);
                 }
 
                 filters.TryGetValue(ext, out IPluginFilter filter);
 
                 List<T> loadedPlugins = new List<T>();
-                foreach (PluginExtensionNode node in AddinManager.GetExtensionNodes(ext))
+                foreach (PluginExtensionNode node in discoveredNodes)
                 {
                     log.Info("[PLUGINS]: Trying plugin " + node.Path);
 
@@ -197,90 +214,43 @@ namespace OpenSim.Framework
         /// </summary>
         public void Dispose()
         {
-            AddinManager.ExtensionChanged -= OnExtensionChanged;
-            AddinManager.AddinUnloaded -= OnUnload;
-            AddinManager.AddinLoadError -= OnLoaderError;
-            AddinManager.AddinLoaded -= OnLoad;
+            discovery.Dispose();
         }
 
         private void initialise_plugin_dir(string dir)
         {
-            if (AddinManager.IsInitialized == true)
-                return;
-
             log.Info("[PLUGINS]: Initializing addin manager");
-
-            AddinManager.Initialize(dir);
-
-            AddinManager.AddinLoadError += OnLoaderError;
-            AddinManager.AddinLoaded += OnLoad;
-            AddinManager.AddinUnloaded += OnUnload;
-            AddinManager.ExtensionChanged += OnExtensionChanged;
-
-            AddinManager.Registry.Update(null);
-        }
-
-        private void OnLoad(object sender, AddinEventArgs args)
-        {
-            log.Info("[PLUGINS]: Plugin Loaded: " + args.AddinId);
-        }
-
-        private void OnUnload(object sender, AddinEventArgs args)
-        {
-            log.Info ("[PLUGINS]: Plugin Unloaded: " + args.AddinId);
-        }
-
-        private void OnLoaderError(object sender, AddinErrorEventArgs args)
-        {
-            if (args.Exception == null)
-                log.Error("[PLUGINS]: Plugin Error: "
-                        + args.Message);
-            else
-                log.Error("[PLUGINS]: Plugin Error: "
-                        + args.Exception.Message + "\n"
-                        + args.Exception.StackTrace);
-        }
-        
-        private void OnExtensionChanged(object sender, ExtensionEventArgs args)
-        {
-            log.Info ("[PLUGINS]: Extension Changed: " + args.Path);
+            discovery.Initialize(dir);
         }
     }
 
-    public class PluginExtensionNode : ExtensionNode
+    public class PluginExtensionNode
     {
-        [NodeAttribute]
-        string id = "";
+        private readonly Func<object> m_factory;
 
-        [NodeAttribute]
-        string provider = "";
+        public string ID { get; }
+        public string Provider { get; }
+        public string Path { get; }
+        public Type TypeObject { get; }
+        public string TypeName => TypeObject?.FullName ?? string.Empty;
 
-        [NodeAttribute]
-        string type = "";
+        public Type Type => TypeObject;
 
-        Type typeobj;
-
-        public string ID { get { return id; } }
-        public string Provider { get { return provider; } }
-        public string TypeName { get { return type; } }
-
-        public Type TypeObject
+        public PluginExtensionNode(string id, string provider, string path, Type typeObject, Func<object> factory)
         {
-            get
-            {
-                if (typeobj != null)
-                    return typeobj;
-
-                if (type.Length == 0)
-                    throw new InvalidOperationException("Type name not specified.");
-
-                return typeobj = Addin.GetType(type, true);
-            }
+            ID = id ?? string.Empty;
+            Provider = provider ?? string.Empty;
+            Path = path ?? string.Empty;
+            TypeObject = typeObject;
+            m_factory = factory ?? throw new ArgumentNullException(nameof(factory));
         }
 
         public object CreateInstance()
         {
-            return Activator.CreateInstance(TypeObject);
+            if (TypeObject == null)
+                throw new InvalidOperationException("Type object not specified.");
+
+            return m_factory();
         }
     }
 
@@ -313,9 +283,9 @@ namespace OpenSim.Framework
             }
         }
 
-        public bool Apply(string extpoint)
+        public bool Apply(string extpoint, Type pluginTypeHint, IPluginDiscovery discovery)
         {
-            int count = AddinManager.GetExtensionNodes(extpoint).Count;
+            int count = discovery.GetExtensionNodeCount(extpoint, pluginTypeHint);
 
             if ((count < min) || (count > max))
                 throw new PluginConstraintViolatedException(Message);

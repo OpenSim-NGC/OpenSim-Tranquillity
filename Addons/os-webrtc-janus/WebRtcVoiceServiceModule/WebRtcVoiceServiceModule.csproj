@@ -21,16 +21,12 @@
     <ProjectReference Include="../../../Source/OpenSim.Services.Base/OpenSim.Services.Base.csproj" />
     <ProjectReference Include="../../../Source/OpenSim.Services.Connectors/OpenSim.Services.Connectors.csproj" />
     <ProjectReference Include="../../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
-    <ProjectReference Include="../WebRtcVoice/WebRtcVoice.csproj" />
+    <ProjectReference Include="../../../Addons/os-webrtc-janus/WebRtcVoice/WebRtcVoice.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.3.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="Resources/WebRtcVoice.WebRtcVoiceServiceModule.addin.xml" />
   </ItemGroup>
 
 </Project>

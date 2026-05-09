@@ -67,7 +67,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
             // TODO: Add cache and check that this does receive a copy of the asset
         }
 
-        public void TestAddTemporaryAsset()
+        private void TestAddTemporaryAsset()
         {
             TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();

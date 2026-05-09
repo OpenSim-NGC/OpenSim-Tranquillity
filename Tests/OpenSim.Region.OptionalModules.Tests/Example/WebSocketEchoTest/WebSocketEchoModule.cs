@@ -29,7 +29,6 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using OpenSim.Framework.Servers;
-using Mono.Addins;
 using log4net;
 using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
@@ -40,8 +39,6 @@ using OpenSim.Framework.Servers.HttpServer;
 
 namespace OpenSim.Region.OptionalModules.WebSocketEchoModule
 {
-
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "WebSocketEchoModule")]
     public class WebSocketEchoModule : ISharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
