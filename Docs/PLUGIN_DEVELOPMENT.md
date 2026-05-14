@@ -197,7 +197,7 @@ Minimal `csproj` pattern:
   <ItemGroup>
     <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
     <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverse.Types.dll" />
   </ItemGroup>
 
   <ItemGroup>
@@ -238,7 +238,7 @@ Minimal `csproj` pattern:
   <ItemGroup>
     <Reference Include="Nini" HintPath="..\..\Library\Nini.dll" />
     <Reference Include="OpenMetaverse" HintPath="..\..\Library\OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="..\..\Library\OpenMetaverseTypes.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\Library\OpenMetaverse.Types.dll" />
   </ItemGroup>
 
   <ItemGroup>

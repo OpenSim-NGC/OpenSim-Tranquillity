@@ -15,7 +15,7 @@
       <HintPath>..\..\Library\OpenMetaverse.StructuredData.dll</HintPath>
     </Reference>
     <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\Library\OpenMetaverseTypes.dll</HintPath>
+      <HintPath>..\..\Library\OpenMetaverse.Types.dll</HintPath>
     </Reference>
     <Reference Include="XMLRPC">
       <HintPath>..\..\Library\XMLRPC.dll</HintPath>

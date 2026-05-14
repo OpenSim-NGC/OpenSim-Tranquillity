@@ -12,7 +12,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
+      <HintPath>..\..\bin\OpenMetaverse.Types.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>

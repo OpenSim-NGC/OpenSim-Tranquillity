@@ -9,7 +9,7 @@
   <ItemGroup>
     <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
     <Reference Include="OpenMetaverse.StructuredData" HintPath="../../Library/OpenMetaverse.StructuredData.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverse.Types.dll" />
     <Reference Include="XMLRPC" HintPath="../../Library/XMLRPC.dll" />
   </ItemGroup>
   <ItemGroup>
