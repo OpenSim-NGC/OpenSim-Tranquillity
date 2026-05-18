@@ -6,16 +6,7 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="OpenMetaverse">
-      <HintPath>..\..\bin\OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\bin\OpenMetaverse.Types.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-  </ItemGroup>
+  
   <ItemGroup>
     <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
@@ -42,4 +33,8 @@
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
+  </ItemGroup>
 </Project>

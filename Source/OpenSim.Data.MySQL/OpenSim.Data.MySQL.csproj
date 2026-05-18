@@ -8,12 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverse.StructuredData" HintPath="../../Library/OpenMetaverse.StructuredData.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverse.Types.dll" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
@@ -46,9 +40,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
+    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.8-beta" />
+    <PackageReference Include="log4net" Version="3.3.1" />
     <PackageReference Include="MySqlConnector" Version="2.5.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
   </ItemGroup>
 
 </Project>

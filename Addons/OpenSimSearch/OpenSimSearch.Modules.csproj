@@ -6,13 +6,13 @@
     <Product>OpenSim</Product>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
+    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Nini" HintPath="..\..\Library\Nini.dll" />
-    <Reference Include="OpenMetaverse" HintPath="..\..\Library\OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverse.Types" HintPath="..\..\Library\OpenMetaverse.Types.dll" />
     <Reference Include="xmlrpc" HintPath="..\..\Library\xmlrpc.dll" />
   </ItemGroup>
   <ItemGroup>

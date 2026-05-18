@@ -7,9 +7,7 @@
     <Copyright>Copyright (c) OpenSimulator.org Developers 2007-2009</Copyright>
   </PropertyGroup>
 
-  <ItemGroup>
-    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverse.Types.dll" />
-  </ItemGroup>
+  
 
   <ItemGroup>
     <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
@@ -23,8 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
+  </ItemGroup>
 </Project>

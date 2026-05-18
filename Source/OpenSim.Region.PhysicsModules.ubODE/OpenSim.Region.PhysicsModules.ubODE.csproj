@@ -8,16 +8,9 @@
     <Copyright>Copyright (c) OpenSimulator.org Developers 2007-2009</Copyright>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
-  </ItemGroup>
   
   <ItemGroup>
     <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
-    <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverse.Types.dll" />
   </ItemGroup>
   
   <ItemGroup>
@@ -29,15 +22,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- <Content Include="app.config">
-      <Link>$(TargetName).dll.config</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content> -->
-
     <!-- Include the native DLL/SO and copy to output -->
     <Content Include="runtimes\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
+  </ItemGroup>
 </Project>

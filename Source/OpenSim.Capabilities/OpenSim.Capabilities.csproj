@@ -9,9 +9,6 @@
 
   <ItemGroup>
     <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
-    <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverse.StructuredData" HintPath="../../Library/OpenMetaverse.StructuredData.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverse.Types.dll" />
   </ItemGroup>
   
   <ItemGroup>
@@ -23,28 +20,10 @@
   </ItemGroup>
   
   <ItemGroup>
-    <Compile Remove="Properties/AssemblyInfo.cs" />
-    <Compile Remove="Handlers/FetchInventory/FetchInvDescHandler.cs" />
-    <Compile Remove="Handlers/FetchInventory/FetchInvDescServerConnector.cs" />
-    <Compile Remove="Handlers/FetchInventory/FetchInventory2Handler.cs" />
-    <Compile Remove="Handlers/FetchInventory/FetchInventory2ServerConnector.cs" />
-	  <Compile Remove="Handlers/FetchInventory/FetchLib2Handler.cs" />
-	  <Compile Remove="Handlers/FetchInventory/FetchLibDescHandler.cs" />
-    <Compile Remove="Handlers/GetAssets/GetAssetsHandler.cs" />
-    <Compile Remove="Handlers/GetMesh/GetMeshHandler.cs" />
-    <Compile Remove="Handlers/GetMesh/GetMeshServerConnector.cs" />
-    <Compile Remove="Handlers/GetTexture/GetTextureHandler.cs" />
-    <Compile Remove="Handlers/GetTexture/GetTextureRobustHandler.cs" />
-    <Compile Remove="Handlers/GetTexture/GetTextureServerConnector.cs" />
-    <Compile Remove="Handlers/Properties/AssemblyInfo.cs" />
-    <Compile Remove="Handlers/FetchInventory/Tests/FetchInventory2HandlerTests.cs" />
-    <Compile Remove="Handlers/FetchInventory/Tests/FetchInventoryDescendents2HandlerTests.cs" />
-    <Compile Remove="Handlers/GetTexture/Tests/GetTextureHandlerTests.cs" />
-    <Compile Remove="Handlers/obj/Debug/.NETFramework,Version=v4.8.AssemblyAttributes.cs" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
+    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.8-beta" />
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
   </ItemGroup>
 </Project>
