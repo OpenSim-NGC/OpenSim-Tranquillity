@@ -596,6 +596,28 @@
     ; password help: optional: page providing password assistance for users of your grid
     ;password = ${Const|BaseURL}/password
 
+	; map: alternative to the built in map url for v2/3 viewers
+	;map = 
+
+	; webprofile: alternative to the built in webprofile url for v2/3 viewers
+	;webprofile = 
+
+	; search: url to a search service for the grid
+	;search = 
+
+	; destination: url to a page that shows destinations on the grid
+	;destination = 
+
+	; marketplace: url to a marketplace service for the grid [Not being used at the moment]
+	;marketplace = 
+	
+	; Sets the tutorial URL for new users which will be displayed on first login.
+	; This is a website that appears in the client telling the user how to move, fly, etc.
+	; NOTE: the URL you provide will NOT be the URL the client goes to! The client automatically 
+	;  appends it's language specification to the end of this URL. Ex. http://localhost/tutorial/ 
+	;  becomes http://localhost/tutorial/en for English language.
+	;tutorial =
+
     ; a http page for grid status
     ;GridStatus = ${Const|BaseURL}:${Const|PublicPort}/GridStatus
     ; a RSS page for grid status

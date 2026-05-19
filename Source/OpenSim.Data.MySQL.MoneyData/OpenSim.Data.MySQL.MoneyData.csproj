@@ -7,14 +7,14 @@
     <Product>OpenSim.Data.MySQL.MoneyData</Product>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
+    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
+    <PackageReference Include="log4net" Version="3.3.1" />
     <PackageReference Include="MySqlConnector" Version="2.5.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
-    <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
     <Reference Include="XMLRPC" HintPath="../../Library/XMLRPC.dll" />
   </ItemGroup>
   <ItemGroup>

@@ -169,7 +169,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                                    detailTexture[i].Width != 16 || detailTexture[i].Height != 16)
                                 {
                                     using(SKBitmap origBitmap = detailTexture[i])
-                                        detailTexture[i] = Util.ResizeImageSolid(origBitmap, 16, 16);
+                                        detailTexture[i] = SkiaImageUtils.ResizeImageSolid(origBitmap, 16, 16);
                                 }
 
                                 // Save the decoded and resized texture to the cache
@@ -263,7 +263,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                             if(detailTexture[i].Width != 16 || detailTexture[i].Height != 16)
                             {
                                 using(SKBitmap origBitmap = detailTexture[i])
-                                    detailTexture[i] = Util.ResizeImageSolid(origBitmap, 16, 16);
+                                    detailTexture[i] = SkiaImageUtils.ResizeImageSolid(origBitmap, 16, 16);
                             }
                         }
                     }

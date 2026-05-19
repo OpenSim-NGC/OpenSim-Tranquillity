@@ -6,16 +6,8 @@
     <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
   </PropertyGroup>
 
-  <!-- <Target Name="CopyFiles">
-    <Copy SourceFiles="@(FilesToCopy_0000)" DestinationFolder="../../../bin/" />
-  </Target> -->
-
   <ItemGroup>
     <Reference Include="Nini" HintPath="..\..\Library\Nini.dll" />
-    <Reference Include="log4net" HintPath="..\..\Library\log4net.dll" />
-    <Reference Include="OpenMetaverse" HintPath="..\..\Library\OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\Library\OpenMetaverse.StructuredData.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="..\..\Library\OpenMetaverseTypes.dll" />
     <Reference Include="xmlrpc" HintPath="..\..\Library\xmlrpc.dll" />
   </ItemGroup>
 
@@ -48,10 +40,13 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
+    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.8-beta" />
+    <PackageReference Include="log4net" Version="3.3.1" />
     <PackageReference Include="MySqlConnector" Version="2.5.0" />
     <PackageReference Include="Npgsql" Version="10.0.2" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
   </ItemGroup>
 
 </Project>

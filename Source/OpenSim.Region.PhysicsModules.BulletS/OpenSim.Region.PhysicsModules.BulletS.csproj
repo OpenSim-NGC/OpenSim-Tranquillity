@@ -9,8 +9,6 @@
 
   <ItemGroup>
     <Reference Include="Nini.dll" HintPath="../../Library/Nini.dll" />
-    <Reference Include="OpenMetaverse.dll" HintPath="../../Library/OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverseTypes.dll" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,16 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- <Content Include="app.config">
-      <Link>$(TargetName).dll.config</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content> -->
-
     <!-- Reference the managed DLL -->
     <Reference Include="BulletXNA.dll" HintPath="../../Library/BulletXNA.dll" />
     
@@ -43,4 +31,10 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
+  </ItemGroup>
 </Project>
