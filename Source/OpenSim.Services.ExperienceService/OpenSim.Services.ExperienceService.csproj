@@ -21,8 +21,8 @@
 
   <ItemGroup>
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
-    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse" Version="1.2.13" />
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />
   </ItemGroup>
   
 </Project>

@@ -13,9 +13,9 @@
     <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
-    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse" Version="1.2.13" />
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />
+    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.13" />
     <PackageReference Include="log4net" Version="3.3.1" />
     <PackageReference Include="MySqlConnector" Version="2.5.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />

@@ -26,8 +26,8 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
-    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.8-beta" />
+    <PackageReference Include="OpenMetaverse" Version="1.2.13" />
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />
+    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.13" />
   </ItemGroup>
 </Project>
