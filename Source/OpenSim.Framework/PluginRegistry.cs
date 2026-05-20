@@ -25,407 +25,402 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using Nini.Config;
 using log4net;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+/// <summary>
+/// Implemented by assemblies that provide explicit plugin registrations
+/// without relying on Mono.Addins XML manifests.
+/// </summary>
+public interface IPluginRegistryProvider
+{
+    void RegisterPlugins(PluginRegistry registry);
+}
+
+/// <summary>
+/// Descriptor for a plugin that can be registered for an extension point.
+/// Replaces Mono.Addins XML manifest functionality.
+/// </summary>
+public class PluginDescriptor
 {
     /// <summary>
-    /// Implemented by assemblies that provide explicit plugin registrations
-    /// without relying on Mono.Addins XML manifests.
+    /// Unique identifier for this plugin
     /// </summary>
-    public interface IPluginRegistryProvider
+    public string Id { get; set; }
+
+    /// <summary>
+    /// Type implementing the plugin interface
+    /// </summary>
+    public Type PluginType { get; set; }
+
+    /// <summary>
+    /// Display name for the plugin
+    /// </summary>
+    public string Name { get; set; }
+
+    /// <summary>
+    /// Optional version identifier
+    /// </summary>
+    public string Version { get; set; }
+
+    /// <summary>
+    /// Optional description
+    /// </summary>
+    public string Description { get; set; }
+
+    /// <summary>
+    /// Optional enabled flag (default: true)
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Optional priority (higher loads first; default: 0)
+    /// </summary>
+    public int Priority { get; set; } = 0;
+
+    public PluginDescriptor() { }
+
+    public PluginDescriptor(string id, Type pluginType, string name = null, string version = null)
     {
-        void RegisterPlugins(PluginRegistry registry);
+        Id = id;
+        PluginType = pluginType;
+        Name = name ?? pluginType.Name;
+        Version = version ?? "1.0";
+    }
+}
+
+/// <summary>
+/// Registry mapping extension points to plugin descriptors.
+/// Replaces .addin.xml file-based registration.
+/// </summary>
+public class PluginRegistry
+{
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private readonly Dictionary<string, List<PluginDescriptor>> m_registry = 
+        new Dictionary<string, List<PluginDescriptor>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Register a plugin for an extension point
+    /// </summary>
+    public void Register(string extensionPath, PluginDescriptor descriptor)
+    {
+        if (descriptor?.PluginType == null)
+            throw new ArgumentNullException(nameof(descriptor));
+
+        if (!m_registry.ContainsKey(extensionPath))
+            m_registry[extensionPath] = new List<PluginDescriptor>();
+
+        m_registry[extensionPath].Add(descriptor);
+        m_log.DebugFormat("[PLUGIN-REGISTRY]: Registered {0} for {1}", descriptor.Id, extensionPath);
     }
 
     /// <summary>
-    /// Descriptor for a plugin that can be registered for an extension point.
-    /// Replaces Mono.Addins XML manifest functionality.
+    /// Register multiple plugins for an extension point
     /// </summary>
-    public class PluginDescriptor
+    public void RegisterAll(string extensionPath, params PluginDescriptor[] descriptors)
     {
-        /// <summary>
-        /// Unique identifier for this plugin
-        /// </summary>
-        public string Id { get; set; }
-
-        /// <summary>
-        /// Type implementing the plugin interface
-        /// </summary>
-        public Type PluginType { get; set; }
-
-        /// <summary>
-        /// Display name for the plugin
-        /// </summary>
-        public string Name { get; set; }
-
-        /// <summary>
-        /// Optional version identifier
-        /// </summary>
-        public string Version { get; set; }
-
-        /// <summary>
-        /// Optional description
-        /// </summary>
-        public string Description { get; set; }
-
-        /// <summary>
-        /// Optional enabled flag (default: true)
-        /// </summary>
-        public bool Enabled { get; set; } = true;
-
-        /// <summary>
-        /// Optional priority (higher loads first; default: 0)
-        /// </summary>
-        public int Priority { get; set; } = 0;
-
-        public PluginDescriptor() { }
-
-        public PluginDescriptor(string id, Type pluginType, string name = null, string version = null)
+        foreach (var descriptor in descriptors)
         {
-            Id = id;
-            PluginType = pluginType;
-            Name = name ?? pluginType.Name;
-            Version = version ?? "1.0";
+            Register(extensionPath, descriptor);
         }
     }
 
     /// <summary>
-    /// Registry mapping extension points to plugin descriptors.
-    /// Replaces .addin.xml file-based registration.
+    /// Get all registered plugins for an extension point
     /// </summary>
-    public class PluginRegistry
+    public IReadOnlyList<PluginDescriptor> GetPlugins(string extensionPath)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        if (!m_registry.TryGetValue(extensionPath, out var plugins))
+            return new List<PluginDescriptor>();
 
-        private readonly Dictionary<string, List<PluginDescriptor>> m_registry = 
-            new Dictionary<string, List<PluginDescriptor>>(StringComparer.OrdinalIgnoreCase);
+        return plugins
+            .Where(p => p.Enabled)
+            .OrderByDescending(p => p.Priority)
+            .ToList();
+    }
 
-        /// <summary>
-        /// Register a plugin for an extension point
-        /// </summary>
-        public void Register(string extensionPath, PluginDescriptor descriptor)
+    /// <summary>
+    /// Get plugin types for an extension point
+    /// </summary>
+    public IReadOnlyList<Type> GetPluginTypes(string extensionPath)
+    {
+        return GetPlugins(extensionPath)
+            .Select(p => p.PluginType)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Check if an extension point has registered plugins
+    /// </summary>
+    public bool HasPlugins(string extensionPath)
+    {
+        return GetPlugins(extensionPath).Count > 0;
+    }
+
+    /// <summary>
+    /// Get count of registered plugins for an extension point
+    /// </summary>
+    public int GetPluginCount(string extensionPath)
+    {
+        return GetPlugins(extensionPath).Count;
+    }
+
+    /// <summary>
+    /// Load plugin registrations from INI configuration
+    /// </summary>
+    public static PluginRegistry FromIniConfig(IConfigSource config, ILog log = null)
+    {
+        var registry = new PluginRegistry();
+        var logger = log ?? m_log;
+
+        var pluginConfig = config.Configs["PluginRegistry"];
+        if (pluginConfig == null)
         {
-            if (descriptor?.PluginType == null)
-                throw new ArgumentNullException(nameof(descriptor));
-
-            if (!m_registry.ContainsKey(extensionPath))
-                m_registry[extensionPath] = new List<PluginDescriptor>();
-
-            m_registry[extensionPath].Add(descriptor);
-            m_log.DebugFormat("[PLUGIN-REGISTRY]: Registered {0} for {1}", descriptor.Id, extensionPath);
+            logger.Warn("[PLUGIN-REGISTRY]: No [PluginRegistry] section in config");
+            return registry;
         }
 
-        /// <summary>
-        /// Register multiple plugins for an extension point
-        /// </summary>
-        public void RegisterAll(string extensionPath, params PluginDescriptor[] descriptors)
+        // Read extension point registrations from config
+        // Format example:
+        // [PluginRegistry]
+        // /OpenSim/RegionModules = OpenSim.Region.CoreModules.dll, OpenSim.Addons.Groups.dll
+        // /OpenSim/WindModule = OpenSim.Region.CoreModules.dll
+
+        foreach (var key in pluginConfig.GetKeys())
         {
-            foreach (var descriptor in descriptors)
+            if (!key.StartsWith("/"))
+                continue; // Skip non-extension-point keys
+
+            string extensionPath = key;
+            string assemblyList = pluginConfig.GetString(key, string.Empty);
+
+            if (string.IsNullOrWhiteSpace(assemblyList))
             {
-                Register(extensionPath, descriptor);
+                logger.WarnFormat("[PLUGIN-REGISTRY]: Empty assembly list for {0}", extensionPath);
+                continue;
+            }
+
+            var assemblies = assemblyList.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim());
+
+            foreach (var assemblyName in assemblies)
+            {
+                try
+                {
+                    // This will be handled by plugin loader discovery
+                    logger.DebugFormat("[PLUGIN-REGISTRY]: Noted assembly {0} for {1}", assemblyName, extensionPath);
+                }
+                catch (Exception e)
+                {
+                    logger.WarnFormat("[PLUGIN-REGISTRY]: Failed to process assembly {0} for {1}: {2}",
+                        assemblyName, extensionPath, e.Message);
+                }
             }
         }
 
-        /// <summary>
-        /// Get all registered plugins for an extension point
-        /// </summary>
-        public IReadOnlyList<PluginDescriptor> GetPlugins(string extensionPath)
-        {
-            if (!m_registry.TryGetValue(extensionPath, out var plugins))
-                return new List<PluginDescriptor>();
+        return registry;
+    }
 
-            return plugins
-                .Where(p => p.Enabled)
-                .OrderByDescending(p => p.Priority)
-                .ToList();
+    /// <summary>
+    /// Load plugin registrations from JSON file
+    /// Format:
+    /// {
+    ///   "extensionPoints": [
+    ///     {
+    ///       "path": "/OpenSim/RegionModules",
+    ///       "plugins": [
+    ///         { "id": "CoreModules", "type": "OpenSim.Region.CoreModules.Scripting.ScriptEngine" },
+    ///         { "id": "GroupsModule", "type": "OpenSim.Groups.GroupsModule" }
+    ///       ]
+    ///     }
+    ///   ]
+    /// }
+    /// </summary>
+    public static PluginRegistry FromJsonFile(string jsonPath, ILog log = null)
+    {
+        var registry = new PluginRegistry();
+        var logger = log ?? m_log;
+
+        if (!File.Exists(jsonPath))
+        {
+            logger.WarnFormat("[PLUGIN-REGISTRY]: JSON config file not found: {0}", jsonPath);
+            return registry;
         }
 
-        /// <summary>
-        /// Get plugin types for an extension point
-        /// </summary>
-        public IReadOnlyList<Type> GetPluginTypes(string extensionPath)
+        try
         {
-            return GetPlugins(extensionPath)
-                .Select(p => p.PluginType)
-                .ToList();
-        }
+            string json = File.ReadAllText(jsonPath);
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var config = JsonSerializer.Deserialize<PluginRegistryConfig>(json, options);
 
-        /// <summary>
-        /// Check if an extension point has registered plugins
-        /// </summary>
-        public bool HasPlugins(string extensionPath)
-        {
-            return GetPlugins(extensionPath).Count > 0;
-        }
-
-        /// <summary>
-        /// Get count of registered plugins for an extension point
-        /// </summary>
-        public int GetPluginCount(string extensionPath)
-        {
-            return GetPlugins(extensionPath).Count;
-        }
-
-        /// <summary>
-        /// Load plugin registrations from INI configuration
-        /// </summary>
-        public static PluginRegistry FromIniConfig(IConfigSource config, ILog log = null)
-        {
-            var registry = new PluginRegistry();
-            var logger = log ?? m_log;
-
-            var pluginConfig = config.Configs["PluginRegistry"];
-            if (pluginConfig == null)
+            if (config?.ExtensionPoints == null)
             {
-                logger.Warn("[PLUGIN-REGISTRY]: No [PluginRegistry] section in config");
+                logger.Warn("[PLUGIN-REGISTRY]: Invalid JSON structure in " + jsonPath);
                 return registry;
             }
 
-            // Read extension point registrations from config
-            // Format example:
-            // [PluginRegistry]
-            // /OpenSim/RegionModules = OpenSim.Region.CoreModules.dll, OpenSim.Addons.Groups.dll
-            // /OpenSim/WindModule = OpenSim.Region.CoreModules.dll
-
-            foreach (var key in pluginConfig.GetKeys())
+            foreach (var extPoint in config.ExtensionPoints)
             {
-                if (!key.StartsWith("/"))
-                    continue; // Skip non-extension-point keys
-
-                string extensionPath = key;
-                string assemblyList = pluginConfig.GetString(key, string.Empty);
-
-                if (string.IsNullOrWhiteSpace(assemblyList))
-                {
-                    logger.WarnFormat("[PLUGIN-REGISTRY]: Empty assembly list for {0}", extensionPath);
+                if (string.IsNullOrEmpty(extPoint.Path))
                     continue;
-                }
 
-                var assemblies = assemblyList.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                    .Select(s => s.Trim());
-
-                foreach (var assemblyName in assemblies)
+                foreach (var plugin in extPoint.Plugins ?? new List<PluginRegistryEntry>())
                 {
-                    try
-                    {
-                        // This will be handled by plugin loader discovery
-                        logger.DebugFormat("[PLUGIN-REGISTRY]: Noted assembly {0} for {1}", assemblyName, extensionPath);
-                    }
-                    catch (Exception e)
-                    {
-                        logger.WarnFormat("[PLUGIN-REGISTRY]: Failed to process assembly {0} for {1}: {2}",
-                            assemblyName, extensionPath, e.Message);
-                    }
-                }
-            }
-
-            return registry;
-        }
-
-        /// <summary>
-        /// Load plugin registrations from JSON file
-        /// Format:
-        /// {
-        ///   "extensionPoints": [
-        ///     {
-        ///       "path": "/OpenSim/RegionModules",
-        ///       "plugins": [
-        ///         { "id": "CoreModules", "type": "OpenSim.Region.CoreModules.Scripting.ScriptEngine" },
-        ///         { "id": "GroupsModule", "type": "OpenSim.Groups.GroupsModule" }
-        ///       ]
-        ///     }
-        ///   ]
-        /// }
-        /// </summary>
-        public static PluginRegistry FromJsonFile(string jsonPath, ILog log = null)
-        {
-            var registry = new PluginRegistry();
-            var logger = log ?? m_log;
-
-            if (!File.Exists(jsonPath))
-            {
-                logger.WarnFormat("[PLUGIN-REGISTRY]: JSON config file not found: {0}", jsonPath);
-                return registry;
-            }
-
-            try
-            {
-                string json = File.ReadAllText(jsonPath);
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                var config = JsonSerializer.Deserialize<PluginRegistryConfig>(json, options);
-
-                if (config?.ExtensionPoints == null)
-                {
-                    logger.Warn("[PLUGIN-REGISTRY]: Invalid JSON structure in " + jsonPath);
-                    return registry;
-                }
-
-                foreach (var extPoint in config.ExtensionPoints)
-                {
-                    if (string.IsNullOrEmpty(extPoint.Path))
-                        continue;
-
-                    foreach (var plugin in extPoint.Plugins ?? new List<PluginRegistryEntry>())
-                    {
-                        if (string.IsNullOrEmpty(plugin.Type))
-                            continue;
-
-                        try
-                        {
-                            var type = Type.GetType(plugin.Type, false);
-                            if (type != null)
-                            {
-                                var descriptor = new PluginDescriptor
-                                {
-                                    Id = plugin.Id ?? plugin.Type.Split('.').Last(),
-                                    PluginType = type,
-                                    Name = plugin.Name ?? type.Name,
-                                    Version = plugin.Version ?? "1.0",
-                                    Description = plugin.Description,
-                                    Enabled = plugin.Enabled ?? true,
-                                    Priority = plugin.Priority ?? 0
-                                };
-                                registry.Register(extPoint.Path, descriptor);
-                            }
-                            else
-                            {
-                                logger.WarnFormat("[PLUGIN-REGISTRY]: Type not found: {0}", plugin.Type);
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            logger.WarnFormat("[PLUGIN-REGISTRY]: Failed to register {0}: {1}",
-                                plugin.Type, e.Message);
-                        }
-                    }
-                }
-
-                logger.InfoFormat("[PLUGIN-REGISTRY]: Loaded {0} extension points from {1}",
-                    config.ExtensionPoints.Count, jsonPath);
-            }
-            catch (Exception e)
-            {
-                logger.ErrorFormat("[PLUGIN-REGISTRY]: Error loading JSON from {0}: {1}", jsonPath, e.Message);
-            }
-
-            return registry;
-        }
-
-        /// <summary>
-        /// Build a registry from in-assembly code providers.
-        /// </summary>
-        public static PluginRegistry FromProviders(IEnumerable<Assembly> assemblies, ILog log = null)
-        {
-            var registry = new PluginRegistry();
-            var logger = log ?? m_log;
-
-            if (assemblies == null)
-                return registry;
-
-            foreach (Assembly assembly in assemblies.Where(a => a != null).Distinct())
-            {
-                foreach (Type type in GetLoadableTypes(assembly))
-                {
-                    if (type == null || type.IsAbstract || type.IsInterface)
-                        continue;
-
-                    if (!typeof(IPluginRegistryProvider).IsAssignableFrom(type))
+                    if (string.IsNullOrEmpty(plugin.Type))
                         continue;
 
                     try
                     {
-                        var provider = (IPluginRegistryProvider)Activator.CreateInstance(type, true);
-                        provider.RegisterPlugins(registry);
-                        logger.DebugFormat("[PLUGIN-REGISTRY]: Loaded provider {0} from {1}",
-                            type.FullName, assembly.GetName().Name);
+                        var type = Type.GetType(plugin.Type, false);
+                        if (type != null)
+                        {
+                            var descriptor = new PluginDescriptor
+                            {
+                                Id = plugin.Id ?? plugin.Type.Split('.').Last(),
+                                PluginType = type,
+                                Name = plugin.Name ?? type.Name,
+                                Version = plugin.Version ?? "1.0",
+                                Description = plugin.Description,
+                                Enabled = plugin.Enabled ?? true,
+                                Priority = plugin.Priority ?? 0
+                            };
+                            registry.Register(extPoint.Path, descriptor);
+                        }
+                        else
+                        {
+                            logger.WarnFormat("[PLUGIN-REGISTRY]: Type not found: {0}", plugin.Type);
+                        }
                     }
                     catch (Exception e)
                     {
-                        logger.WarnFormat("[PLUGIN-REGISTRY]: Failed to run provider {0} from {1}: {2}",
-                            type.FullName,
-                            assembly.GetName().Name,
-                            e.Message);
+                        logger.WarnFormat("[PLUGIN-REGISTRY]: Failed to register {0}: {1}",
+                            plugin.Type, e.Message);
                     }
                 }
             }
 
+            logger.InfoFormat("[PLUGIN-REGISTRY]: Loaded {0} extension points from {1}",
+                config.ExtensionPoints.Count, jsonPath);
+        }
+        catch (Exception e)
+        {
+            logger.ErrorFormat("[PLUGIN-REGISTRY]: Error loading JSON from {0}: {1}", jsonPath, e.Message);
+        }
+
+        return registry;
+    }
+
+    /// <summary>
+    /// Build a registry from in-assembly code providers.
+    /// </summary>
+    public static PluginRegistry FromProviders(IEnumerable<Assembly> assemblies, ILog log = null)
+    {
+        var registry = new PluginRegistry();
+        var logger = log ?? m_log;
+
+        if (assemblies == null)
             return registry;
-        }
 
-        /// <summary>
-        /// Merge another registry into this one
-        /// </summary>
-        public void MergeWith(PluginRegistry other)
+        foreach (Assembly assembly in assemblies.Where(a => a != null).Distinct())
         {
-            if (other == null)
-                return;
-
-            foreach (var kvp in other.m_registry)
+            foreach (Type type in GetLoadableTypes(assembly))
             {
-                if (!m_registry.ContainsKey(kvp.Key))
-                    m_registry[kvp.Key] = new List<PluginDescriptor>();
+                if (type == null || type.IsAbstract || type.IsInterface)
+                    continue;
 
-                m_registry[kvp.Key].AddRange(kvp.Value);
+                if (!typeof(IPluginRegistryProvider).IsAssignableFrom(type))
+                    continue;
+
+                try
+                {
+                    var provider = (IPluginRegistryProvider)Activator.CreateInstance(type, true);
+                    provider.RegisterPlugins(registry);
+                    logger.DebugFormat("[PLUGIN-REGISTRY]: Loaded provider {0} from {1}",
+                        type.FullName, assembly.GetName().Name);
+                }
+                catch (Exception e)
+                {
+                    logger.WarnFormat("[PLUGIN-REGISTRY]: Failed to run provider {0} from {1}: {2}",
+                        type.FullName,
+                        assembly.GetName().Name,
+                        e.Message);
+                }
             }
         }
 
-        /// <summary>
-        /// Get all registered extension points
-        /// </summary>
-        public IReadOnlyList<string> GetExtensionPoints()
-        {
-            return m_registry.Keys.ToList();
-        }
+        return registry;
+    }
 
-        /// <summary>
-        /// Clear all registrations
-        /// </summary>
-        public void Clear()
-        {
-            m_registry.Clear();
-        }
+    /// <summary>
+    /// Merge another registry into this one
+    /// </summary>
+    public void MergeWith(PluginRegistry other)
+    {
+        if (other == null)
+            return;
 
-        // JSON deserialization helper classes
-        private class PluginRegistryConfig
+        foreach (var kvp in other.m_registry)
         {
-            public List<PluginExtensionPointConfig> ExtensionPoints { get; set; } = new List<PluginExtensionPointConfig>();
-        }
+            if (!m_registry.ContainsKey(kvp.Key))
+                m_registry[kvp.Key] = new List<PluginDescriptor>();
 
-        private class PluginExtensionPointConfig
-        {
-            public string Path { get; set; }
-            public List<PluginRegistryEntry> Plugins { get; set; } = new List<PluginRegistryEntry>();
+            m_registry[kvp.Key].AddRange(kvp.Value);
         }
+    }
 
-        private class PluginRegistryEntry
+    /// <summary>
+    /// Get all registered extension points
+    /// </summary>
+    public IReadOnlyList<string> GetExtensionPoints()
+    {
+        return m_registry.Keys.ToList();
+    }
+
+    /// <summary>
+    /// Clear all registrations
+    /// </summary>
+    public void Clear()
+    {
+        m_registry.Clear();
+    }
+
+    // JSON deserialization helper classes
+    private class PluginRegistryConfig
+    {
+        public List<PluginExtensionPointConfig> ExtensionPoints { get; set; } = new List<PluginExtensionPointConfig>();
+    }
+
+    private class PluginExtensionPointConfig
+    {
+        public string Path { get; set; }
+        public List<PluginRegistryEntry> Plugins { get; set; } = new List<PluginRegistryEntry>();
+    }
+
+    private class PluginRegistryEntry
+    {
+        public string Id { get; set; }
+        public string Type { get; set; }
+        public string Name { get; set; }
+        public string Version { get; set; }
+        public string Description { get; set; }
+        public bool? Enabled { get; set; }
+        public int? Priority { get; set; }
+    }
+
+    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    {
+        try
         {
-            public string Id { get; set; }
-            public string Type { get; set; }
-            public string Name { get; set; }
-            public string Version { get; set; }
-            public string Description { get; set; }
-            public bool? Enabled { get; set; }
-            public int? Priority { get; set; }
+            return assembly.GetTypes();
         }
-
-        private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+        catch (ReflectionTypeLoadException rtle)
         {
-            try
-            {
-                return assembly.GetTypes();
-            }
-            catch (ReflectionTypeLoadException rtle)
-            {
-                return rtle.Types.Where(t => t != null);
-            }
+            return rtle.Types.Where(t => t != null);
         }
     }
 }

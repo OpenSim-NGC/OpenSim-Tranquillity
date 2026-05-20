@@ -25,34 +25,30 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+// This MUST be a ref type!
+public class PresenceData
 {
-    // This MUST be a ref type!
-    public class PresenceData
-    {
-        public string UserID;
-        public UUID RegionID;
-        public UUID SessionID;
-        public Dictionary<string, string> Data;
-    }
+    public string UserID;
+    public UUID RegionID;
+    public UUID SessionID;
+    public Dictionary<string, string> Data;
+}
 
-    /// <summary>
-    /// An interface for connecting to the presence datastore
-    /// </summary>
-    public interface IPresenceData
-    {
-        bool Store(PresenceData data);
+/// <summary>
+/// An interface for connecting to the presence datastore
+/// </summary>
+public interface IPresenceData
+{
+    bool Store(PresenceData data);
 
-        PresenceData Get(UUID sessionID);
-        void LogoutRegionAgents(UUID regionID);
-        bool ReportAgent(UUID sessionID, UUID regionID);
-        PresenceData[] Get(string field, string data);
-        bool Delete(string field, string val);
-        bool VerifyAgent(UUID agentId, UUID secureSessionID);
-    }
+    PresenceData Get(UUID sessionID);
+    void LogoutRegionAgents(UUID regionID);
+    bool ReportAgent(UUID sessionID, UUID regionID);
+    PresenceData[] Get(string field, string data);
+    bool Delete(string field, string val);
+    bool VerifyAgent(UUID agentId, UUID secureSessionID);
 }

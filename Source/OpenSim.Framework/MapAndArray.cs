@@ -25,167 +25,164 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+/// <summary>
+/// Stores two synchronized collections: a mutable dictionary and an
+/// immutable array. Slower inserts/removes than a normal dictionary,
+/// but provides safe iteration while maintaining fast hash lookups
+/// </summary>
+/// <typeparam name="TKey">Key type to use for hash lookups</typeparam>
+/// <typeparam name="TValue">Value type to store</typeparam>
+public sealed class MapAndArray<TKey, TValue>
 {
+    private Dictionary<TKey, TValue> m_dict;
+    private TValue[] m_array;
+
+    /// <summary>Number of values currently stored in the collection</summary>
+    public int Count { get { return m_dict.Count; } }
+    /// <summary>NOTE: This collection is thread safe. You do not need to
+    /// acquire a lock to add, remove, or enumerate entries. This
+    /// synchronization object should only be locked for larger
+    /// transactions</summary>
+    private object m_syncRoot = new object();
+    public object SyncRoot { get { return m_syncRoot; } }
+
     /// <summary>
-    /// Stores two synchronized collections: a mutable dictionary and an
-    /// immutable array. Slower inserts/removes than a normal dictionary,
-    /// but provides safe iteration while maintaining fast hash lookups
+    /// Constructor
     /// </summary>
-    /// <typeparam name="TKey">Key type to use for hash lookups</typeparam>
-    /// <typeparam name="TValue">Value type to store</typeparam>
-    public sealed class MapAndArray<TKey, TValue>
+    public MapAndArray()
     {
-        private Dictionary<TKey, TValue> m_dict;
-        private TValue[] m_array;
+        m_dict = new Dictionary<TKey, TValue>();
+        m_array = null;
+    }
 
-        /// <summary>Number of values currently stored in the collection</summary>
-        public int Count { get { return m_dict.Count; } }
-        /// <summary>NOTE: This collection is thread safe. You do not need to
-        /// acquire a lock to add, remove, or enumerate entries. This
-        /// synchronization object should only be locked for larger
-        /// transactions</summary>
-        private object m_syncRoot = new object();
-        public object SyncRoot { get { return m_syncRoot; } }
+    /// <summary>
+    /// Constructor
+    /// </summary>
+    /// <param name="capacity">Initial capacity of the dictionary</param>
+    public MapAndArray(int capacity)
+    {
+        m_dict = new Dictionary<TKey, TValue>(capacity);
+        m_array = null;
+    }
 
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        public MapAndArray()
+    /// <summary>
+    /// Adds a key/value pair to the collection, or updates an existing key
+    /// with a new value
+    /// </summary>
+    /// <param name="key">Key to add or update</param>
+    /// <param name="value">Value to add</param>
+    /// <returns>True if a new key was added, false if an existing key was
+    /// updated</returns>
+    public bool AddOrReplace(TKey key, TValue value)
+    {
+        lock (m_syncRoot)
         {
-            m_dict = new Dictionary<TKey, TValue>();
+            ref TValue curvalue = ref CollectionsMarshal.GetValueRefOrAddDefault(m_dict, key, out bool existed);
+            curvalue = value;
+            m_array = null;
+            return existed;
+        }
+    }
+
+    /// <summary>
+    /// Adds a key/value pair to the collection. This will throw an
+    /// exception if the key is already present in the collection
+    /// </summary>
+    /// <param name="key">Key to add or update</param>
+    /// <param name="value">Value to add</param>
+    /// <returns>Index of the inserted item</returns>
+    public int Add(TKey key, TValue value)
+    {
+        lock (m_syncRoot)
+        {
+            m_dict.Add(key, value);
+            m_array = null;
+            return m_dict.Count;
+        }
+    }
+
+    /// <summary>
+    /// Removes a key/value pair from the collection
+    /// </summary>
+    /// <param name="key">Key to remove</param>
+    /// <returns>True if the key was found and removed, otherwise false</returns>
+    public bool Remove(TKey key)
+    {
+        lock (m_syncRoot)
+        {
+            m_array = null;
+            return m_dict.Remove(key);
+        }
+    }
+
+    /// <summary>
+    /// Determines whether the collections contains a specified key
+    /// </summary>
+    /// <param name="key">Key to search for</param>
+    /// <returns>True if the key was found, otherwise false</returns>
+    public bool ContainsKey(TKey key)
+    {
+        lock (m_syncRoot)
+            return m_dict.ContainsKey(key);
+    }
+
+    /// <summary>
+    /// Gets the value associated with the specified key
+    /// </summary>
+    /// <param name="key">Key of the value to get</param>
+    /// <param name="value">Will contain the value associated with the
+    /// given key if the key is found. If the key is not found it will
+    /// contain the default value for the type of the value parameter</param>
+    /// <returns>True if the key was found and a value was retrieved,
+    /// otherwise false</returns>
+    public bool TryGetValue(TKey key, out TValue value)
+    {
+        lock (m_syncRoot)
+            return m_dict.TryGetValue(key, out value);
+    }
+
+    /// <summary>
+    /// Clears all key/value pairs from the collection
+    /// </summary>
+    public void Clear()
+    {
+        lock (m_syncRoot)
+        {
+            if(m_dict.Count > 0)
+                m_dict = new Dictionary<TKey, TValue>();
             m_array = null;
         }
+    }
 
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="capacity">Initial capacity of the dictionary</param>
-        public MapAndArray(int capacity)
+    /// <summary>
+    /// Gets a reference to the immutable array of values stored in this
+    /// collection. This array is thread safe for iteration
+    /// </summary>
+    /// <returns>A thread safe reference ton an array of all of the stored
+    /// values</returns>
+    public TValue[] GetArray()
+    {
+        lock (m_syncRoot)
         {
-            m_dict = new Dictionary<TKey, TValue>(capacity);
-            m_array = null;
-        }
-
-        /// <summary>
-        /// Adds a key/value pair to the collection, or updates an existing key
-        /// with a new value
-        /// </summary>
-        /// <param name="key">Key to add or update</param>
-        /// <param name="value">Value to add</param>
-        /// <returns>True if a new key was added, false if an existing key was
-        /// updated</returns>
-        public bool AddOrReplace(TKey key, TValue value)
-        {
-            lock (m_syncRoot)
+            if (m_array is null)
             {
-                ref TValue curvalue = ref CollectionsMarshal.GetValueRefOrAddDefault(m_dict, key, out bool existed);
-                curvalue = value;
-                m_array = null;
-                return existed;
+                if(m_dict.Count == 0)
+                    return Array.Empty<TValue>();
+                m_array = new TValue[m_dict.Count];
+                m_dict.Values.CopyTo(m_array, 0);
             }
+            return m_array;
         }
+    }
 
-        /// <summary>
-        /// Adds a key/value pair to the collection. This will throw an
-        /// exception if the key is already present in the collection
-        /// </summary>
-        /// <param name="key">Key to add or update</param>
-        /// <param name="value">Value to add</param>
-        /// <returns>Index of the inserted item</returns>
-        public int Add(TKey key, TValue value)
-        {
-            lock (m_syncRoot)
-            {
-                m_dict.Add(key, value);
-                m_array = null;
-                return m_dict.Count;
-            }
-        }
-
-        /// <summary>
-        /// Removes a key/value pair from the collection
-        /// </summary>
-        /// <param name="key">Key to remove</param>
-        /// <returns>True if the key was found and removed, otherwise false</returns>
-        public bool Remove(TKey key)
-        {
-            lock (m_syncRoot)
-            {
-                m_array = null;
-                return m_dict.Remove(key);
-            }
-        }
-
-        /// <summary>
-        /// Determines whether the collections contains a specified key
-        /// </summary>
-        /// <param name="key">Key to search for</param>
-        /// <returns>True if the key was found, otherwise false</returns>
-        public bool ContainsKey(TKey key)
-        {
-            lock (m_syncRoot)
-                return m_dict.ContainsKey(key);
-        }
-
-        /// <summary>
-        /// Gets the value associated with the specified key
-        /// </summary>
-        /// <param name="key">Key of the value to get</param>
-        /// <param name="value">Will contain the value associated with the
-        /// given key if the key is found. If the key is not found it will
-        /// contain the default value for the type of the value parameter</param>
-        /// <returns>True if the key was found and a value was retrieved,
-        /// otherwise false</returns>
-        public bool TryGetValue(TKey key, out TValue value)
-        {
-            lock (m_syncRoot)
-                return m_dict.TryGetValue(key, out value);
-        }
-
-        /// <summary>
-        /// Clears all key/value pairs from the collection
-        /// </summary>
-        public void Clear()
-        {
-            lock (m_syncRoot)
-            {
-                if(m_dict.Count > 0)
-                    m_dict = new Dictionary<TKey, TValue>();
-                m_array = null;
-            }
-        }
-
-        /// <summary>
-        /// Gets a reference to the immutable array of values stored in this
-        /// collection. This array is thread safe for iteration
-        /// </summary>
-        /// <returns>A thread safe reference ton an array of all of the stored
-        /// values</returns>
-        public TValue[] GetArray()
-        {
-            lock (m_syncRoot)
-            {
-                if (m_array is null)
-                {
-                    if(m_dict.Count == 0)
-                        return Array.Empty<TValue>();
-                    m_array = new TValue[m_dict.Count];
-                    m_dict.Values.CopyTo(m_array, 0);
-                }
-                return m_array;
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Span<TValue> GetSpan()
-        {
-            return new Span<TValue>(GetArray());
-        }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Span<TValue> GetSpan()
+    {
+        return new Span<TValue>(GetArray());
     }
 }

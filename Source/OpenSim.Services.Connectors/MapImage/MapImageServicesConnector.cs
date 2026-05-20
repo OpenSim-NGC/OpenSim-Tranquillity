@@ -26,7 +26,6 @@
  */
 
 using log4net;
-using System.Net;
 using System.Reflection;
 
 using Nini.Config;
@@ -35,196 +34,195 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
-namespace OpenSim.Services.Connectors
+namespace OpenSim.Services.Connectors;
+
+public class MapImageServicesConnector : BaseServiceConnector, IMapImageService
 {
-    public class MapImageServicesConnector : BaseServiceConnector, IMapImageService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private string m_ServerURI = String.Empty;
+
+    public MapImageServicesConnector()
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        private string m_ServerURI = String.Empty;
+    public MapImageServicesConnector(string serverURI)
+    {
+        m_ServerURI = serverURI.TrimEnd('/');
+    }
 
-        public MapImageServicesConnector()
+    public MapImageServicesConnector(IConfigSource source)
+    {
+        Initialise(source);
+    }
+
+    public virtual void Initialise(IConfigSource source)
+    {
+        IConfig config = source.Configs["MapImageService"];
+        if (config == null)
         {
+            m_log.Error("[MAP IMAGE CONNECTOR]: MapImageService missing");
+            throw new Exception("MapImage connector init error");
         }
 
-        public MapImageServicesConnector(string serverURI)
+        string serviceURI = config.GetString("MapImageServerURI",
+                String.Empty);
+
+        if (serviceURI.Length == 0)
         {
-            m_ServerURI = serverURI.TrimEnd('/');
+            m_log.Error("[MAP IMAGE CONNECTOR]: No Server URI named in section MapImageService");
+            throw new Exception("MapImage connector init error");
         }
+        m_ServerURI = serviceURI;
+        m_ServerURI = serviceURI.TrimEnd('/');
+        base.Initialise(source, "MapImageService");
+    }
 
-        public MapImageServicesConnector(IConfigSource source)
+    public bool RemoveMapTile(int x, int y, UUID scopeID, out string reason)
+    {
+        reason = string.Empty;
+        string reqString;
+        if (scopeID.IsNotZero())
         {
-            Initialise(source);
-        }
-
-        public virtual void Initialise(IConfigSource source)
-        {
-            IConfig config = source.Configs["MapImageService"];
-            if (config == null)
-            {
-                m_log.Error("[MAP IMAGE CONNECTOR]: MapImageService missing");
-                throw new Exception("MapImage connector init error");
-            }
-
-            string serviceURI = config.GetString("MapImageServerURI",
-                    String.Empty);
-
-            if (serviceURI.Length == 0)
-            {
-                m_log.Error("[MAP IMAGE CONNECTOR]: No Server URI named in section MapImageService");
-                throw new Exception("MapImage connector init error");
-            }
-            m_ServerURI = serviceURI;
-            m_ServerURI = serviceURI.TrimEnd('/');
-            base.Initialise(source, "MapImageService");
-        }
-
-        public bool RemoveMapTile(int x, int y, UUID scopeID, out string reason)
-        {
-            reason = string.Empty;
-            string reqString;
-            if (scopeID.IsNotZero())
-            {
-                reqString = ServerUtils.BuildQueryString(
-                    new Dictionary<string, object>()
-                        {
-                            {"X" , x.ToString() },
-                            {"Y" , y.ToString() },
-                            { "SCOPE" , scopeID.ToString() },
-                        }
-                    );
-            }
-            else
-            {
-                // Do not include SCOPE when it's zero
-                reqString = ServerUtils.BuildQueryString(
-                    new Dictionary<string, object>()
-                        {
-                            {"X" , x.ToString() },
-                            {"Y" , y.ToString() }
-                        }
-                    );
-            }
-
-            try
-            {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI + "/map", reqString, 10, null, false);
-                if (!string.IsNullOrEmpty(reply))
-                {
-                    Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-                    if(replyData.TryGetValue("Result", out object resultobj))
+            reqString = ServerUtils.BuildQueryString(
+                new Dictionary<string, object>()
                     {
-                        string res = resultobj as string;
-                        if(string.IsNullOrEmpty(res))
-                        {
-                            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: unknown result field");
-                            return false;
-                        }
-                        else if (res.Equals("success", StringComparison.InvariantCultureIgnoreCase))
-                            return true;
-                        else if (res.Equals("failure", StringComparison.InvariantCultureIgnoreCase))
-                        {
-                            reason = replyData.TryGetValue("Message", out var value) ? value.ToString() : "";
-                            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile failed: {0}", reason);
-                            return false;
-                        }
-                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile unknown result field contents");
+                        {"X" , x.ToString() },
+                        {"Y" , y.ToString() },
+                        { "SCOPE" , scopeID.ToString() },
+                    }
+                );
+        }
+        else
+        {
+            // Do not include SCOPE when it's zero
+            reqString = ServerUtils.BuildQueryString(
+                new Dictionary<string, object>()
+                    {
+                        {"X" , x.ToString() },
+                        {"Y" , y.ToString() }
+                    }
+                );
+        }
+
+        try
+        {
+            string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI + "/map", reqString, 10, null, false);
+            if (!string.IsNullOrEmpty(reply))
+            {
+                Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+                if(replyData.TryGetValue("Result", out object resultobj))
+                {
+                    string res = resultobj as string;
+                    if(string.IsNullOrEmpty(res))
+                    {
+                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: unknown result field");
                         return false;
                     }
-                    else
+                    else if (res.Equals("success", StringComparison.InvariantCultureIgnoreCase))
+                        return true;
+                    else if (res.Equals("failure", StringComparison.InvariantCultureIgnoreCase))
                     {
-                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile reply data does not contain result field");
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile Exception at {0}/map: {1}", m_ServerURI, e.Message);
-            }
-            return false;
-        }
-
-        public bool AddMapTile(int x, int y, byte[] jpgData, UUID scopeID, out string reason)
-        {
-            reason = string.Empty;
-            int tickstart = Util.EnvironmentTickCount();
-
-            string reqString;
-            if (scopeID.IsNotZero())
-            {
-                reqString = ServerUtils.BuildQueryString(
-                    new Dictionary<string, object>()
-                        {
-                            {"X" , x.ToString() },
-                            {"Y" , y.ToString() },
-                            { "SCOPE" , scopeID.ToString() },
-                            { "TYPE" , "image/jpeg" },
-                            { "DATA" , Convert.ToBase64String(jpgData) }
-                        }
-                    );
-            }
-            else
-            {
-                reqString = ServerUtils.BuildQueryString(
-                    new Dictionary<string, object>()
-                        {
-                            {"X" , x.ToString() },
-                            {"Y" , y.ToString() },
-                            { "TYPE" , "image/jpeg" },
-                            { "DATA" , Convert.ToBase64String(jpgData) }
-                        }
-                    );
-            }
-
-            try
-            {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI + "/map", reqString, 10, m_Auth, false);
-                if (!string.IsNullOrEmpty(reply))
-                {
-                    Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-                    if (replyData.TryGetValue("Result", out object resultobj))
-                    {
-                        string res = resultobj as string;
-                        if (string.IsNullOrEmpty(res))
-                        {
-                            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile unknown result field");
-                            return false;
-                        }
-                        else if (res.Equals("success", StringComparison.InvariantCultureIgnoreCase))
-                            return true;
-                        else if (res.Equals("failure", StringComparison.InvariantCultureIgnoreCase))
-                        {
-                            reason = replyData.TryGetValue("Message", out var value) ? value.ToString() : "";
-                            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile failed: {0}", reason);
-                            return false;
-                        }
-                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile unknown result field contents");
+                        reason = replyData.TryGetValue("Message", out var value) ? value.ToString() : "";
+                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile failed: {0}", reason);
                         return false;
                     }
+                    m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile unknown result field contents");
+                    return false;
                 }
                 else
                 {
-                    m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile reply data does not contain result field");
+                    m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile reply data does not contain result field");
                 }
             }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile Exception at {0}/map: {1}", m_ServerURI, e.Message);
-            }
-            finally
-            {
-                // This just dumps a warning for any operation that takes more than 100 ms
-                int tickdiff = Util.EnvironmentTickCountSubtract(tickstart);
-                m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile {1} Bytes in {0}ms", tickdiff, jpgData.Length);
-            }
-            return false;
+        }
+        catch (Exception e)
+        {
+            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile Exception at {0}/map: {1}", m_ServerURI, e.Message);
+        }
+        return false;
+    }
+
+    public bool AddMapTile(int x, int y, byte[] jpgData, UUID scopeID, out string reason)
+    {
+        reason = string.Empty;
+        int tickstart = Util.EnvironmentTickCount();
+
+        string reqString;
+        if (scopeID.IsNotZero())
+        {
+            reqString = ServerUtils.BuildQueryString(
+                new Dictionary<string, object>()
+                    {
+                        {"X" , x.ToString() },
+                        {"Y" , y.ToString() },
+                        { "SCOPE" , scopeID.ToString() },
+                        { "TYPE" , "image/jpeg" },
+                        { "DATA" , Convert.ToBase64String(jpgData) }
+                    }
+                );
+        }
+        else
+        {
+            reqString = ServerUtils.BuildQueryString(
+                new Dictionary<string, object>()
+                    {
+                        {"X" , x.ToString() },
+                        {"Y" , y.ToString() },
+                        { "TYPE" , "image/jpeg" },
+                        { "DATA" , Convert.ToBase64String(jpgData) }
+                    }
+                );
         }
 
-        public byte[] GetMapTile(string fileName, UUID scopeID, out string format)
+        try
         {
-            throw new Exception("GetMapTile method not Implemented");
+            string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI + "/map", reqString, 10, m_Auth, false);
+            if (!string.IsNullOrEmpty(reply))
+            {
+                Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+                if (replyData.TryGetValue("Result", out object resultobj))
+                {
+                    string res = resultobj as string;
+                    if (string.IsNullOrEmpty(res))
+                    {
+                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile unknown result field");
+                        return false;
+                    }
+                    else if (res.Equals("success", StringComparison.InvariantCultureIgnoreCase))
+                        return true;
+                    else if (res.Equals("failure", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        reason = replyData.TryGetValue("Message", out var value) ? value.ToString() : "";
+                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile failed: {0}", reason);
+                        return false;
+                    }
+                    m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile unknown result field contents");
+                    return false;
+                }
+            }
+            else
+            {
+                m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile reply data does not contain result field");
+            }
         }
+        catch (Exception e)
+        {
+            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile Exception at {0}/map: {1}", m_ServerURI, e.Message);
+        }
+        finally
+        {
+            // This just dumps a warning for any operation that takes more than 100 ms
+            int tickdiff = Util.EnvironmentTickCountSubtract(tickstart);
+            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile {1} Bytes in {0}ms", tickdiff, jpgData.Length);
+        }
+        return false;
+    }
+
+    public byte[] GetMapTile(string fileName, UUID scopeID, out string format)
+    {
+        throw new Exception("GetMapTile method not Implemented");
     }
 }

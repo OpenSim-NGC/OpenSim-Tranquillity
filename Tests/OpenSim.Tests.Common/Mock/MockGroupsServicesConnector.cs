@@ -35,362 +35,361 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+public class MockGroupsServicesConnector : ISharedRegionModule, IGroupsServicesConnector
 {
-    public class MockGroupsServicesConnector : ISharedRegionModule, IGroupsServicesConnector
+    IXGroupData m_data = new NullXGroupData(null, null);
+
+    public string Name
     {
-        IXGroupData m_data = new NullXGroupData(null, null);
+        get { return "MockGroupsServicesConnector"; }
+    }
 
-        public string Name
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void Initialise(IConfigSource config)
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        scene.RegisterModuleInterface<IGroupsServicesConnector>(this);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public void PostInitialise()
+    {
+    }
+
+    public UUID CreateGroup(UUID requestingAgentID, string name, string charter, bool showInList, UUID insigniaID,
+                            int membershipFee, bool openEnrollment, bool allowPublish,
+                            bool maturePublish, UUID founderID)
+    {
+        XGroup group = new XGroup()
         {
-            get { return "MockGroupsServicesConnector"; }
+            groupID = UUID.Random(),
+            ownerRoleID = UUID.Random(),
+            name = name,
+            charter = charter,
+            showInList = showInList,
+            insigniaID = insigniaID,
+            membershipFee = membershipFee,
+            openEnrollment = openEnrollment,
+            allowPublish = allowPublish,
+            maturePublish = maturePublish,
+            founderID = founderID,
+            everyonePowers = (ulong)XmlRpcGroupsServicesConnectorModule.DefaultEveryonePowers,
+            ownersPowers = (ulong)XmlRpcGroupsServicesConnectorModule.DefaultOwnerPowers
+        };
+
+        if (m_data.StoreGroup(group))
+        {
+            return group.groupID;
         }
-
-        public Type ReplaceableInterface
+        else
         {
-            get { return null; }
+            return UUID.Zero;
         }
+    }
 
-        public void Initialise(IConfigSource config)
-        {
-        }
+    public void UpdateGroup(UUID requestingAgentID, UUID groupID, string charter, bool showInList,
+                            UUID insigniaID, int membershipFee, bool openEnrollment,
+                            bool allowPublish, bool maturePublish)
+    {
+    }
 
-        public void Close()
-        {
-        }
+    public void AddGroupRole(UUID requestingAgentID, UUID groupID, UUID roleID, string name, string description,
+                             string title, ulong powers)
+    {
+    }
 
-        public void AddRegion(Scene scene)
-        {
-            scene.RegisterModuleInterface<IGroupsServicesConnector>(this);
-        }
+    public void RemoveGroupRole(UUID requestingAgentID, UUID groupID, UUID roleID)
+    {
+    }
 
-        public void RemoveRegion(Scene scene)
-        {
-        }
+    public void UpdateGroupRole(UUID requestingAgentID, UUID groupID, UUID roleID, string name, string description,
+                                string title, ulong powers)
+    {
+    }
 
-        public void RegionLoaded(Scene scene)
-        {
-        }
+    private XGroup GetXGroup(UUID groupID, string name)
+    {
+        XGroup group = m_data.GetGroup(groupID);
+        return group;
+    }
 
-        public void PostInitialise()
-        {
-        }
+    public GroupRecord GetGroupRecord(UUID requestingAgentID, UUID groupID, string groupName)
+    {
+        XGroup xg = GetXGroup(groupID, groupName);
 
-        public UUID CreateGroup(UUID requestingAgentID, string name, string charter, bool showInList, UUID insigniaID,
-                                int membershipFee, bool openEnrollment, bool allowPublish,
-                                bool maturePublish, UUID founderID)
-        {
-            XGroup group = new XGroup()
-            {
-                groupID = UUID.Random(),
-                ownerRoleID = UUID.Random(),
-                name = name,
-                charter = charter,
-                showInList = showInList,
-                insigniaID = insigniaID,
-                membershipFee = membershipFee,
-                openEnrollment = openEnrollment,
-                allowPublish = allowPublish,
-                maturePublish = maturePublish,
-                founderID = founderID,
-                everyonePowers = (ulong)XmlRpcGroupsServicesConnectorModule.DefaultEveryonePowers,
-                ownersPowers = (ulong)XmlRpcGroupsServicesConnectorModule.DefaultOwnerPowers
-            };
-
-            if (m_data.StoreGroup(group))
-            {
-                return group.groupID;
-            }
-            else
-            {
-                return UUID.Zero;
-            }
-        }
-
-        public void UpdateGroup(UUID requestingAgentID, UUID groupID, string charter, bool showInList,
-                                UUID insigniaID, int membershipFee, bool openEnrollment,
-                                bool allowPublish, bool maturePublish)
-        {
-        }
-
-        public void AddGroupRole(UUID requestingAgentID, UUID groupID, UUID roleID, string name, string description,
-                                 string title, ulong powers)
-        {
-        }
-
-        public void RemoveGroupRole(UUID requestingAgentID, UUID groupID, UUID roleID)
-        {
-        }
-
-        public void UpdateGroupRole(UUID requestingAgentID, UUID groupID, UUID roleID, string name, string description,
-                                    string title, ulong powers)
-        {
-        }
-
-        private XGroup GetXGroup(UUID groupID, string name)
-        {
-            XGroup group = m_data.GetGroup(groupID);
-            return group;
-        }
-
-        public GroupRecord GetGroupRecord(UUID requestingAgentID, UUID groupID, string groupName)
-        {
-            XGroup xg = GetXGroup(groupID, groupName);
-
-            if (xg == null)
-                return null;
-
-            GroupRecord gr = new GroupRecord()
-            {
-                GroupID = xg.groupID,
-                GroupName = xg.name,
-                AllowPublish = xg.allowPublish,
-                MaturePublish = xg.maturePublish,
-                Charter = xg.charter,
-                FounderID = xg.founderID,
-                // FIXME: group picture storage location unknown
-                MembershipFee = xg.membershipFee,
-                OpenEnrollment = xg.openEnrollment,
-                OwnerRoleID = xg.ownerRoleID,
-                ShowInList = xg.showInList
-            };
-
-            return gr;
-        }
-
-        public GroupProfileData GetMemberGroupProfile(UUID requestingAgentID, UUID GroupID, UUID AgentID)
-        {
-            return default(GroupProfileData);
-        }
-
-        public void SetAgentActiveGroup(UUID requestingAgentID, UUID AgentID, UUID GroupID)
-        {
-        }
-
-        public void SetAgentActiveGroupRole(UUID requestingAgentID, UUID AgentID, UUID GroupID, UUID RoleID)
-        {
-        }
-
-        public void SetAgentGroupInfo(UUID requestingAgentID, UUID agentID, UUID groupID, bool acceptNotices, bool listInProfile)
-        {
-            XGroup group = GetXGroup(groupID, null);
-
-            if (group == null)
-                return;
-
-            XGroupMember xgm = null;
-            if (!group.members.TryGetValue(agentID, out xgm))
-                return;
-
-            xgm.acceptNotices = acceptNotices;
-            xgm.listInProfile = listInProfile;
-
-            m_data.StoreGroup(group);
-        }
-
-        public void AddAgentToGroupInvite(UUID requestingAgentID, UUID inviteID, UUID groupID, UUID roleID, UUID agentID)
-        {
-        }
-
-        public GroupInviteInfo GetAgentToGroupInvite(UUID requestingAgentID, UUID inviteID)
-        {
+        if (xg == null)
             return null;
-        }
 
-        public void RemoveAgentToGroupInvite(UUID requestingAgentID, UUID inviteID)
+        GroupRecord gr = new GroupRecord()
         {
-        }
+            GroupID = xg.groupID,
+            GroupName = xg.name,
+            AllowPublish = xg.allowPublish,
+            MaturePublish = xg.maturePublish,
+            Charter = xg.charter,
+            FounderID = xg.founderID,
+            // FIXME: group picture storage location unknown
+            MembershipFee = xg.membershipFee,
+            OpenEnrollment = xg.openEnrollment,
+            OwnerRoleID = xg.ownerRoleID,
+            ShowInList = xg.showInList
+        };
 
-        public void AddAgentToGroup(UUID requestingAgentID, UUID agentID, UUID groupID, UUID roleID)
+        return gr;
+    }
+
+    public GroupProfileData GetMemberGroupProfile(UUID requestingAgentID, UUID GroupID, UUID AgentID)
+    {
+        return default(GroupProfileData);
+    }
+
+    public void SetAgentActiveGroup(UUID requestingAgentID, UUID AgentID, UUID GroupID)
+    {
+    }
+
+    public void SetAgentActiveGroupRole(UUID requestingAgentID, UUID AgentID, UUID GroupID, UUID RoleID)
+    {
+    }
+
+    public void SetAgentGroupInfo(UUID requestingAgentID, UUID agentID, UUID groupID, bool acceptNotices, bool listInProfile)
+    {
+        XGroup group = GetXGroup(groupID, null);
+
+        if (group == null)
+            return;
+
+        XGroupMember xgm = null;
+        if (!group.members.TryGetValue(agentID, out xgm))
+            return;
+
+        xgm.acceptNotices = acceptNotices;
+        xgm.listInProfile = listInProfile;
+
+        m_data.StoreGroup(group);
+    }
+
+    public void AddAgentToGroupInvite(UUID requestingAgentID, UUID inviteID, UUID groupID, UUID roleID, UUID agentID)
+    {
+    }
+
+    public GroupInviteInfo GetAgentToGroupInvite(UUID requestingAgentID, UUID inviteID)
+    {
+        return null;
+    }
+
+    public void RemoveAgentToGroupInvite(UUID requestingAgentID, UUID inviteID)
+    {
+    }
+
+    public void AddAgentToGroup(UUID requestingAgentID, UUID agentID, UUID groupID, UUID roleID)
+    {
+        XGroup group = GetXGroup(groupID, null);
+
+        if (group == null)
+            return;
+
+        XGroupMember groupMember = new XGroupMember()
         {
-            XGroup group = GetXGroup(groupID, null);
+            agentID = agentID,
+            groupID = groupID,
+            roleID = roleID
+        };
 
-            if (group == null)
-                return;
+        group.members[agentID] = groupMember;
 
-            XGroupMember groupMember = new XGroupMember()
-            {
-                agentID = agentID,
-                groupID = groupID,
-                roleID = roleID
-            };
+        m_data.StoreGroup(group);
+    }
 
-            group.members[agentID] = groupMember;
+    public void RemoveAgentFromGroup(UUID requestingAgentID, UUID AgentID, UUID GroupID)
+    {
+    }
 
-            m_data.StoreGroup(group);
-        }
+    public void AddAgentToGroupRole(UUID requestingAgentID, UUID AgentID, UUID GroupID, UUID RoleID)
+    {
+    }
 
-        public void RemoveAgentFromGroup(UUID requestingAgentID, UUID AgentID, UUID GroupID)
-        {
-        }
+    public void RemoveAgentFromGroupRole(UUID requestingAgentID, UUID AgentID, UUID GroupID, UUID RoleID)
+    {
+    }
 
-        public void AddAgentToGroupRole(UUID requestingAgentID, UUID AgentID, UUID GroupID, UUID RoleID)
-        {
-        }
+    public List<DirGroupsReplyData> FindGroups(UUID requestingAgentID, string search)
+    {
+        return null;
+    }
 
-        public void RemoveAgentFromGroupRole(UUID requestingAgentID, UUID AgentID, UUID GroupID, UUID RoleID)
-        {
-        }
+    public GroupMembershipData GetAgentGroupMembership(UUID requestingAgentID, UUID AgentID, UUID GroupID)
+    {
+        return null;
+    }
 
-        public List<DirGroupsReplyData> FindGroups(UUID requestingAgentID, string search)
-        {
-            return null;
-        }
+    public GroupMembershipData GetAgentActiveMembership(UUID requestingAgentID, UUID AgentID)
+    {
+        return null;
+    }
 
-        public GroupMembershipData GetAgentGroupMembership(UUID requestingAgentID, UUID AgentID, UUID GroupID)
-        {
-            return null;
-        }
+    public List<GroupMembershipData> GetAgentGroupMemberships(UUID requestingAgentID, UUID AgentID)
+    {
+        return new List<GroupMembershipData>();
+    }
 
-        public GroupMembershipData GetAgentActiveMembership(UUID requestingAgentID, UUID AgentID)
-        {
-            return null;
-        }
+    public List<GroupRolesData> GetAgentGroupRoles(UUID requestingAgentID, UUID AgentID, UUID GroupID)
+    {
+        return null;
+    }
 
-        public List<GroupMembershipData> GetAgentGroupMemberships(UUID requestingAgentID, UUID AgentID)
-        {
-            return new List<GroupMembershipData>();
-        }
+    public List<GroupRolesData> GetGroupRoles(UUID requestingAgentID, UUID GroupID)
+    {
+        return null;
+    }
 
-        public List<GroupRolesData> GetAgentGroupRoles(UUID requestingAgentID, UUID AgentID, UUID GroupID)
-        {
-            return null;
-        }
+    public List<GroupMembersData> GetGroupMembers(UUID requestingAgentID, UUID groupID)
+    {
+        List<GroupMembersData> groupMembers = new List<GroupMembersData>();
 
-        public List<GroupRolesData> GetGroupRoles(UUID requestingAgentID, UUID GroupID)
-        {
-            return null;
-        }
+        XGroup group = GetXGroup(groupID, null);
 
-        public List<GroupMembersData> GetGroupMembers(UUID requestingAgentID, UUID groupID)
-        {
-            List<GroupMembersData> groupMembers = new List<GroupMembersData>();
-
-            XGroup group = GetXGroup(groupID, null);
-
-            if (group == null)
-                return groupMembers;
-
-            foreach (XGroupMember xgm in group.members.Values)
-            {
-                GroupMembersData gmd = new GroupMembersData();
-                gmd.AgentID = xgm.agentID;
-                gmd.IsOwner = group.founderID == gmd.AgentID;
-                gmd.AcceptNotices = xgm.acceptNotices;
-                gmd.ListInProfile = xgm.listInProfile;
-
-                groupMembers.Add(gmd);
-            }
-
+        if (group == null)
             return groupMembers;
+
+        foreach (XGroupMember xgm in group.members.Values)
+        {
+            GroupMembersData gmd = new GroupMembersData();
+            gmd.AgentID = xgm.agentID;
+            gmd.IsOwner = group.founderID == gmd.AgentID;
+            gmd.AcceptNotices = xgm.acceptNotices;
+            gmd.ListInProfile = xgm.listInProfile;
+
+            groupMembers.Add(gmd);
         }
 
-        public List<GroupRoleMembersData> GetGroupRoleMembers(UUID requestingAgentID, UUID GroupID)
-        {
+        return groupMembers;
+    }
+
+    public List<GroupRoleMembersData> GetGroupRoleMembers(UUID requestingAgentID, UUID GroupID)
+    {
+        return null;
+    }
+
+    public List<GroupNoticeData> GetGroupNotices(UUID requestingAgentID, UUID groupID)
+    {
+        XGroup group = GetXGroup(groupID, null);
+
+        if (group == null)
             return null;
-        }
 
-        public List<GroupNoticeData> GetGroupNotices(UUID requestingAgentID, UUID groupID)
+        List<GroupNoticeData> notices = new List<GroupNoticeData>();
+
+        foreach (XGroupNotice notice in group.notices.Values)
         {
-            XGroup group = GetXGroup(groupID, null);
-
-            if (group == null)
-                return null;
-
-            List<GroupNoticeData> notices = new List<GroupNoticeData>();
-
-            foreach (XGroupNotice notice in group.notices.Values)
+            GroupNoticeData gnd = new GroupNoticeData()
             {
-                GroupNoticeData gnd = new GroupNoticeData()
-                {
-                    NoticeID = notice.noticeID,
-                    Timestamp = notice.timestamp,
-                    FromName = notice.fromName,
-                    Subject = notice.subject,
-                    HasAttachment = notice.hasAttachment,
-                    AssetType = (byte)notice.assetType
-                };
-
-                notices.Add(gnd);
-            }
-
-            return notices;
-        }
-
-        public GroupNoticeInfo GetGroupNotice(UUID requestingAgentID, UUID noticeID)
-        {
-            // Yes, not an efficient way to do it.
-            Dictionary<UUID, XGroup> groups = m_data.GetGroups();
-
-            foreach (XGroup group in groups.Values)
-            {
-                if (group.notices.ContainsKey(noticeID))
-                {
-                    XGroupNotice n = group.notices[noticeID];
-
-                    GroupNoticeInfo gni = new GroupNoticeInfo();
-                    gni.GroupID = n.groupID;
-                    gni.Message = n.message;
-                    gni.BinaryBucket = n.binaryBucket;
-                    gni.noticeData.NoticeID = n.noticeID;
-                    gni.noticeData.Timestamp = n.timestamp;
-                    gni.noticeData.FromName = n.fromName;
-                    gni.noticeData.Subject = n.subject;
-                    gni.noticeData.HasAttachment = n.hasAttachment;
-                    gni.noticeData.AssetType = (byte)n.assetType;
-
-                    return gni;
-                }
-            }
-
-            return null;
-        }
-
-        public void AddGroupNotice(UUID requestingAgentID, UUID groupID, UUID noticeID, string fromName, string subject, string message, byte[] binaryBucket)
-        {
-            XGroup group = GetXGroup(groupID, null);
-
-            if (group == null)
-                return;
-
-            XGroupNotice groupNotice = new XGroupNotice()
-            {
-                groupID = groupID,
-                noticeID = noticeID,
-                fromName = fromName,
-                subject = subject,
-                message = message,
-                timestamp = (uint)Util.UnixTimeSinceEpoch(),
-                hasAttachment = false,
-                assetType = 0,
-                binaryBucket = binaryBucket
+                NoticeID = notice.noticeID,
+                Timestamp = notice.timestamp,
+                FromName = notice.fromName,
+                Subject = notice.subject,
+                HasAttachment = notice.hasAttachment,
+                AssetType = (byte)notice.assetType
             };
 
-            group.notices[noticeID] = groupNotice;
-
-            m_data.StoreGroup(group);
+            notices.Add(gnd);
         }
 
-        public void ResetAgentGroupChatSessions(UUID agentID)
+        return notices;
+    }
+
+    public GroupNoticeInfo GetGroupNotice(UUID requestingAgentID, UUID noticeID)
+    {
+        // Yes, not an efficient way to do it.
+        Dictionary<UUID, XGroup> groups = m_data.GetGroups();
+
+        foreach (XGroup group in groups.Values)
         {
+            if (group.notices.ContainsKey(noticeID))
+            {
+                XGroupNotice n = group.notices[noticeID];
+
+                GroupNoticeInfo gni = new GroupNoticeInfo();
+                gni.GroupID = n.groupID;
+                gni.Message = n.message;
+                gni.BinaryBucket = n.binaryBucket;
+                gni.noticeData.NoticeID = n.noticeID;
+                gni.noticeData.Timestamp = n.timestamp;
+                gni.noticeData.FromName = n.fromName;
+                gni.noticeData.Subject = n.subject;
+                gni.noticeData.HasAttachment = n.hasAttachment;
+                gni.noticeData.AssetType = (byte)n.assetType;
+
+                return gni;
+            }
         }
 
-        public bool hasAgentBeenInvitedToGroupChatSession(UUID agentID, UUID groupID)
-        {
-            return false;
-        }
+        return null;
+    }
 
-        public bool hasAgentDroppedGroupChatSession(UUID agentID, UUID groupID)
-        {
-            return false;
-        }
+    public void AddGroupNotice(UUID requestingAgentID, UUID groupID, UUID noticeID, string fromName, string subject, string message, byte[] binaryBucket)
+    {
+        XGroup group = GetXGroup(groupID, null);
 
-        public void AgentDroppedFromGroupChatSession(UUID agentID, UUID groupID)
-        {
-        }
+        if (group == null)
+            return;
 
-        public void AgentInvitedToGroupChatSession(UUID agentID, UUID groupID)
+        XGroupNotice groupNotice = new XGroupNotice()
         {
-        }
+            groupID = groupID,
+            noticeID = noticeID,
+            fromName = fromName,
+            subject = subject,
+            message = message,
+            timestamp = (uint)Util.UnixTimeSinceEpoch(),
+            hasAttachment = false,
+            assetType = 0,
+            binaryBucket = binaryBucket
+        };
+
+        group.notices[noticeID] = groupNotice;
+
+        m_data.StoreGroup(group);
+    }
+
+    public void ResetAgentGroupChatSessions(UUID agentID)
+    {
+    }
+
+    public bool hasAgentBeenInvitedToGroupChatSession(UUID agentID, UUID groupID)
+    {
+        return false;
+    }
+
+    public bool hasAgentDroppedGroupChatSession(UUID agentID, UUID groupID)
+    {
+        return false;
+    }
+
+    public void AgentDroppedFromGroupChatSession(UUID agentID, UUID groupID)
+    {
+    }
+
+    public void AgentInvitedToGroupChatSession(UUID agentID, UUID groupID)
+    {
     }
 }

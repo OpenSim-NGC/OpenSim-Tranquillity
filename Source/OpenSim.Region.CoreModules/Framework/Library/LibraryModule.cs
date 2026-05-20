@@ -39,176 +39,176 @@ using log4net;
 using Nini.Config;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
-namespace OpenSim.Region.CoreModules.Framework.Library
+namespace OpenSim.Region.CoreModules.Framework.Library;
+
+public class LibraryModule : ISharedRegionModule
 {
-    public class LibraryModule : ISharedRegionModule
-    {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private static bool m_HasRunOnce = false;
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static bool m_HasRunOnce = false;
 
-        private bool m_Enabled = false;
+    private bool m_Enabled = false;
 //        private string m_LibraryName = "OpenSim Library";
-        private Scene m_Scene;
+    private Scene m_Scene;
 
-        private ILibraryService m_Library;
+    private ILibraryService m_Library;
 
-        #region ISharedRegionModule
+    #region ISharedRegionModule
 
-        public void Initialise(IConfigSource config)
+    public void Initialise(IConfigSource config)
+    {
+        m_Enabled = config.Configs["Modules"].GetBoolean("LibraryModule", m_Enabled);
+        if (m_Enabled)
         {
-            m_Enabled = config.Configs["Modules"].GetBoolean("LibraryModule", m_Enabled);
-            if (m_Enabled)
+            IConfig libConfig = config.Configs["LibraryService"];
+            if (libConfig != null)
             {
-                IConfig libConfig = config.Configs["LibraryService"];
-                if (libConfig != null)
+                string dllName = libConfig.GetString("LocalServiceModule", string.Empty);
+                m_log.Debug("[LIBRARY MODULE]: Library service dll is " + dllName);
+                if (dllName != string.Empty)
                 {
-                    string dllName = libConfig.GetString("LocalServiceModule", string.Empty);
-                    m_log.Debug("[LIBRARY MODULE]: Library service dll is " + dllName);
-                    if (dllName != string.Empty)
-                    {
-                        Object[] args = new Object[] { config };
-                        m_Library = ServerUtils.LoadPlugin<ILibraryService>(dllName, args);
-                    }
+                    Object[] args = new Object[] { config };
+                    m_Library = ServerUtils.LoadPlugin<ILibraryService>(dllName, args);
                 }
             }
-            if (m_Library == null)
+        }
+        if (m_Library == null)
+        {
+            m_log.Warn("[LIBRARY MODULE]: No local library service. Module will be disabled.");
+            m_Enabled = false;
+        }
+    }
+
+    public bool IsSharedModule
+    {
+        get { return true; }
+    }
+
+    public string Name
+    {
+        get { return "Library Module"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        // Store only the first scene
+        if (m_Scene == null)
+        {
+            m_Scene = scene;
+        }
+        scene.RegisterModuleInterface<ILibraryService>(m_Library);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.UnregisterModuleInterface<ILibraryService>(m_Library);
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        // This will never run more than once, even if the region is restarted
+        if (!m_HasRunOnce)
+        {
+            LoadLibrariesFromArchives();
+            //DumpLibrary();
+            m_HasRunOnce = true;
+        }
+    }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+        m_Scene = null;
+    }
+
+    #endregion ISharedRegionModule
+
+    #region LoadLibraries
+    private string pathToLibraries = "Library";
+
+    protected void LoadLibrariesFromArchives()
+    {
+        InventoryFolderImpl lib = m_Library.LibraryRootFolder;
+        if (lib == null)
+        {
+            m_log.Debug("[LIBRARY MODULE]: No library. Ignoring Library Module");
+            return;
+        }
+
+        RegionInfo regInfo = new RegionInfo();
+        Scene m_MockScene = new Scene(regInfo);
+        LocalInventoryService invService = new LocalInventoryService(lib);
+        m_MockScene.RegisterModuleInterface<IInventoryService>(invService);
+        m_MockScene.RegisterModuleInterface<IAssetService>(m_Scene.AssetService);
+
+        UserAccount uinfo = new UserAccount(lib.Owner);
+        uinfo.FirstName = "OpenSim";
+        uinfo.LastName = "Library";
+        uinfo.ServiceURLs = new Dictionary<string, object>();
+
+        foreach (string iarFileName in Directory.GetFiles(pathToLibraries, "*.iar"))
+        {
+            string simpleName = Path.GetFileNameWithoutExtension(iarFileName);
+
+            m_log.InfoFormat("[LIBRARY MODULE]: Loading library archive {0} ({1})...", iarFileName, simpleName);
+            simpleName = GetInventoryPathFromName(simpleName);
+
+            InventoryArchiveReadRequest archread = new InventoryArchiveReadRequest(m_MockScene.InventoryService, m_MockScene.AssetService, m_MockScene.UserAccountService, uinfo, simpleName, iarFileName, false);
+            try
             {
-                m_log.Warn("[LIBRARY MODULE]: No local library service. Module will be disabled.");
-                m_Enabled = false;
-            }
-        }
-
-        public bool IsSharedModule
-        {
-            get { return true; }
-        }
-
-        public string Name
-        {
-            get { return "Library Module"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            // Store only the first scene
-            if (m_Scene == null)
-            {
-                m_Scene = scene;
-            }
-            scene.RegisterModuleInterface<ILibraryService>(m_Library);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.UnregisterModuleInterface<ILibraryService>(m_Library);
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            // This will never run more than once, even if the region is restarted
-            if (!m_HasRunOnce)
-            {
-                LoadLibrariesFromArchives();
-                //DumpLibrary();
-                m_HasRunOnce = true;
-            }
-        }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-            m_Scene = null;
-        }
-
-        #endregion ISharedRegionModule
-
-        #region LoadLibraries
-        private string pathToLibraries = "Library";
-
-        protected void LoadLibrariesFromArchives()
-        {
-            InventoryFolderImpl lib = m_Library.LibraryRootFolder;
-            if (lib == null)
-            {
-                m_log.Debug("[LIBRARY MODULE]: No library. Ignoring Library Module");
-                return;
-            }
-
-            RegionInfo regInfo = new RegionInfo();
-            Scene m_MockScene = new Scene(regInfo);
-            LocalInventoryService invService = new LocalInventoryService(lib);
-            m_MockScene.RegisterModuleInterface<IInventoryService>(invService);
-            m_MockScene.RegisterModuleInterface<IAssetService>(m_Scene.AssetService);
-
-            UserAccount uinfo = new UserAccount(lib.Owner);
-            uinfo.FirstName = "OpenSim";
-            uinfo.LastName = "Library";
-            uinfo.ServiceURLs = new Dictionary<string, object>();
-
-            foreach (string iarFileName in Directory.GetFiles(pathToLibraries, "*.iar"))
-            {
-                string simpleName = Path.GetFileNameWithoutExtension(iarFileName);
-
-                m_log.InfoFormat("[LIBRARY MODULE]: Loading library archive {0} ({1})...", iarFileName, simpleName);
-                simpleName = GetInventoryPathFromName(simpleName);
-
-                InventoryArchiveReadRequest archread = new InventoryArchiveReadRequest(m_MockScene.InventoryService, m_MockScene.AssetService, m_MockScene.UserAccountService, uinfo, simpleName, iarFileName, false);
-                try
+                Dictionary<UUID, InventoryNodeBase> nodes = archread.Execute();
+                if (nodes != null && nodes.Count == 0)
                 {
-                    Dictionary<UUID, InventoryNodeBase> nodes = archread.Execute();
-                    if (nodes != null && nodes.Count == 0)
-                    {
-                        // didn't find the subfolder with the given name; place it on the top
-                        m_log.InfoFormat("[LIBRARY MODULE]: Didn't find {0} in library. Placing archive on the top level", simpleName);
-                        archread.Close();
-                        archread = new InventoryArchiveReadRequest(m_MockScene.InventoryService, m_MockScene.AssetService, m_MockScene.UserAccountService, uinfo, "/", iarFileName, false);
-                        archread.Execute();
-                    }
-
-                    foreach (InventoryNodeBase node in nodes.Values)
-                        FixPerms(node);
-                }
-                catch (Exception e)
-                {
-                    m_log.DebugFormat("[LIBRARY MODULE]: Exception when processing archive {0}: {1}", iarFileName, e.StackTrace);
-                }
-                finally
-                {
+                    // didn't find the subfolder with the given name; place it on the top
+                    m_log.InfoFormat("[LIBRARY MODULE]: Didn't find {0} in library. Placing archive on the top level", simpleName);
                     archread.Close();
+                    archread = new InventoryArchiveReadRequest(m_MockScene.InventoryService, m_MockScene.AssetService, m_MockScene.UserAccountService, uinfo, "/", iarFileName, false);
+                    archread.Execute();
                 }
+
+                foreach (InventoryNodeBase node in nodes.Values)
+                    FixPerms(node);
             }
-        }
-
-        private void FixPerms(InventoryNodeBase node)
-        {
-            m_log.DebugFormat("[LIBRARY MODULE]: Fixing perms for {0} {1}", node.Name, node.ID);
-
-            if (node is InventoryItemBase)
+            catch (Exception e)
             {
-                InventoryItemBase item = (InventoryItemBase)node;
-                item.BasePermissions = (uint)PermissionMask.All;
-                item.EveryOnePermissions = (uint)PermissionMask.All - (uint)PermissionMask.Modify;
-                item.CurrentPermissions = (uint)PermissionMask.All;
-                item.NextPermissions = (uint)PermissionMask.All;
+                m_log.DebugFormat("[LIBRARY MODULE]: Exception when processing archive {0}: {1}", iarFileName, e.StackTrace);
+            }
+            finally
+            {
+                archread.Close();
             }
         }
+    }
+
+    private void FixPerms(InventoryNodeBase node)
+    {
+        m_log.DebugFormat("[LIBRARY MODULE]: Fixing perms for {0} {1}", node.Name, node.ID);
+
+        if (node is InventoryItemBase)
+        {
+            InventoryItemBase item = (InventoryItemBase)node;
+            item.BasePermissions = (uint)PermissionMask.All;
+            item.EveryOnePermissions = (uint)PermissionMask.All - (uint)PermissionMask.Modify;
+            item.CurrentPermissions = (uint)PermissionMask.All;
+            item.NextPermissions = (uint)PermissionMask.All;
+        }
+    }
 
 //        private void DumpLibrary()
 //        {
@@ -226,33 +226,32 @@ namespace OpenSim.Region.CoreModules.Framework.Library
 //            DumpFolder(lib);
 //        }
 
-        private void DumpFolder(InventoryFolderImpl folder)
+    private void DumpFolder(InventoryFolderImpl folder)
+    {
+        foreach (InventoryItemBase item in folder.Items.Values)
         {
-            foreach (InventoryItemBase item in folder.Items.Values)
-            {
-                m_log.DebugFormat("   --> item {0}", item.Name);
-            }
-            foreach (InventoryFolderImpl f in folder.RequestListOfFolderImpls())
-            {
-                m_log.DebugFormat(" - folder {0}", f.Name);
-                DumpFolder(f);
-            }
+            m_log.DebugFormat("   --> item {0}", item.Name);
         }
-
-        private string GetInventoryPathFromName(string name)
+        foreach (InventoryFolderImpl f in folder.RequestListOfFolderImpls())
         {
-            string[] parts = name.Split();
-            if (parts.Length == 3)
-            {
-                name = string.Empty;
-                // cut the last part
-                for (int i = 0; i < parts.Length - 1; i++)
-                    name = name + ' ' + parts[i];
-            }
-
-            return name;
+            m_log.DebugFormat(" - folder {0}", f.Name);
+            DumpFolder(f);
         }
-
-        #endregion LoadLibraries
     }
+
+    private string GetInventoryPathFromName(string name)
+    {
+        string[] parts = name.Split();
+        if (parts.Length == 3)
+        {
+            name = string.Empty;
+            // cut the last part
+            for (int i = 0; i < parts.Length - 1; i++)
+                name = name + ' ' + parts[i];
+        }
+
+        return name;
+    }
+
+    #endregion LoadLibraries
 }

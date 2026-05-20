@@ -3,13 +3,10 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 
-using Microsoft.Extensions.Logging;
-
 using Nwc.XmlRpc;
 
 using OpenMetaverse;
 using OpenSim.Data.MySQL.MoneyData;
-using OpenSim.Framework;
 using OpenSim.Region.OptionalModules.World.Currency;
 using OpenSim.Server.MoneyServer.Models;
 

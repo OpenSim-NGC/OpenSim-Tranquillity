@@ -25,81 +25,79 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IFriendsModule
 {
-    public interface IFriendsModule
-    {
-        /// <summary>
-        /// Are friends cached on this simulator for a particular user?
-        /// </summary>
-        /// <param name="userID"></param>
-        /// <returns></returns>
-        bool AreFriendsCached(UUID userID);
+    /// <summary>
+    /// Are friends cached on this simulator for a particular user?
+    /// </summary>
+    /// <param name="userID"></param>
+    /// <returns></returns>
+    bool AreFriendsCached(UUID userID);
 
-        /// <summary>
-        /// Get friends from local cache only
-        /// </summary>
-        /// <param name="userID"></param>
-        /// <returns>
-        /// An empty array if the user has no friends or friends have not been cached.
-        /// </returns>
-        FriendInfo[] GetFriendsFromCache(UUID userID);
+    /// <summary>
+    /// Get friends from local cache only
+    /// </summary>
+    /// <param name="userID"></param>
+    /// <returns>
+    /// An empty array if the user has no friends or friends have not been cached.
+    /// </returns>
+    FriendInfo[] GetFriendsFromCache(UUID userID);
 
-        /// <summary>
-        /// Add a friendship between two users.
-        /// </summary>
-        /// <remarks>
-        /// Ultimately, it would be more useful to take in a user account here rather than having to have a user
-        /// present in the scene.
-        /// </remarks>
-        /// <param name="client"></param>
-        /// <param name="friendID"></param>
-        void AddFriendship(IClientAPI client, UUID friendID);
+    /// <summary>
+    /// Add a friendship between two users.
+    /// </summary>
+    /// <remarks>
+    /// Ultimately, it would be more useful to take in a user account here rather than having to have a user
+    /// present in the scene.
+    /// </remarks>
+    /// <param name="client"></param>
+    /// <param name="friendID"></param>
+    void AddFriendship(IClientAPI client, UUID friendID);
 
-        /// <summary>
-        /// Remove a friendship between two users.
-        /// </summary>
-        /// <remarks>
-        /// Ultimately, it would be more useful to take in a user account here rather than having to have a user
-        /// present in the scene.
-        /// </remarks>
-        /// <param name="client"></param>
-        /// <param name="exFriendID"></param>
-        void RemoveFriendship(IClientAPI client, UUID exFriendID);
+    /// <summary>
+    /// Remove a friendship between two users.
+    /// </summary>
+    /// <remarks>
+    /// Ultimately, it would be more useful to take in a user account here rather than having to have a user
+    /// present in the scene.
+    /// </remarks>
+    /// <param name="client"></param>
+    /// <param name="exFriendID"></param>
+    void RemoveFriendship(IClientAPI client, UUID exFriendID);
 
-        /// <summary>
-        /// Get permissions granted by a friend.
-        /// </summary>
-        /// <param name="userID">The user.</param>
-        /// <param name="friendID">The friend that granted.</param>
-        /// <returns>The permissions.  These come from the FriendRights enum.</returns>
-        int GetRightsGrantedByFriend(UUID userID, UUID friendID);
+    /// <summary>
+    /// Get permissions granted by a friend.
+    /// </summary>
+    /// <param name="userID">The user.</param>
+    /// <param name="friendID">The friend that granted.</param>
+    /// <returns>The permissions.  These come from the FriendRights enum.</returns>
+    int GetRightsGrantedByFriend(UUID userID, UUID friendID);
 
-        /// <summary>
-        /// Grant permissions for a friend.
-        /// </summary>
-        /// <remarks>
-        /// This includes giving them the ability to see when the user is online and permission to edit the user's
-        /// objects.
-        /// Granting lower permissions than the friend currently has will rescind the extra permissions.
-        /// </remarks>
-        /// <param name="remoteClient">The user granting the permissions.</param>
-        /// <param name="friendID">The friend.</param>
-        /// <param name="perms">These come from the FriendRights enum.</param>
-        void GrantRights(IClientAPI remoteClient, UUID friendID, int perms);
+    /// <summary>
+    /// Grant permissions for a friend.
+    /// </summary>
+    /// <remarks>
+    /// This includes giving them the ability to see when the user is online and permission to edit the user's
+    /// objects.
+    /// Granting lower permissions than the friend currently has will rescind the extra permissions.
+    /// </remarks>
+    /// <param name="remoteClient">The user granting the permissions.</param>
+    /// <param name="friendID">The friend.</param>
+    /// <param name="perms">These come from the FriendRights enum.</param>
+    void GrantRights(IClientAPI remoteClient, UUID friendID, int perms);
 
-        void IsNowRoot(ScenePresence sp);
-        bool SendFriendsOnlineIfNeeded(IClientAPI client);
-        bool IsFriendOnline(UUID userID, UUID friendID);
-        void CacheFriendsOnline(UUID userID, List<UUID> friendsOnline, bool online);
-        void CacheFriendOnline(UUID userID, UUID friendOnline, bool online);
-        List<UUID> GetCachedFriendsOnline(UUID userID);
-        bool IsFriend(UUID userID, UUID friendID);
-    }
+    void IsNowRoot(ScenePresence sp);
+    bool SendFriendsOnlineIfNeeded(IClientAPI client);
+    bool IsFriendOnline(UUID userID, UUID friendID);
+    void CacheFriendsOnline(UUID userID, List<UUID> friendsOnline, bool online);
+    void CacheFriendOnline(UUID userID, UUID friendOnline, bool online);
+    List<UUID> GetCachedFriendsOnline(UUID userID);
+    bool IsFriend(UUID userID, UUID friendID);
 }

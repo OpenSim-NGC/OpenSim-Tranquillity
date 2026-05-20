@@ -25,11 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Region.ClientStack.LindenCaps
-{
-    public class EventQueueHelper
-    {
-        private EventQueueHelper() {} // no construction possible, it's an utility class
+namespace OpenSim.Region.ClientStack.LindenCaps;
 
-    }
+public class EventQueueHelper
+{
+    private EventQueueHelper() {} // no construction possible, it's an utility class
+
 }

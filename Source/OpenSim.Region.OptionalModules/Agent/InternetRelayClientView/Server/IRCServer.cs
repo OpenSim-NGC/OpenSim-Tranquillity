@@ -30,54 +30,53 @@ using System.Net.Sockets;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server
+namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server;
+
+public delegate void OnNewIRCUserDelegate(IRCClientView user);
+
+/// <summary>
+/// Adam's completely hacked up not-probably-compliant RFC1459 server class.
+/// </summary>
+class IRCServer
 {
-    public delegate void OnNewIRCUserDelegate(IRCClientView user);
+    public event OnNewIRCUserDelegate OnNewIRCClient;
 
-    /// <summary>
-    /// Adam's completely hacked up not-probably-compliant RFC1459 server class.
-    /// </summary>
-    class IRCServer
+    private readonly TcpListener m_listener;
+    private readonly Scene m_baseScene;
+    private bool m_running = true;
+
+    public IRCServer(IPAddress listener, int port, Scene baseScene)
     {
-        public event OnNewIRCUserDelegate OnNewIRCClient;
+        m_listener = new TcpListener(listener, port);
 
-        private readonly TcpListener m_listener;
-        private readonly Scene m_baseScene;
-        private bool m_running = true;
+        m_listener.Start(50);
 
-        public IRCServer(IPAddress listener, int port, Scene baseScene)
+        WorkManager.StartThread(ListenLoop, "IRCServer");
+        m_baseScene = baseScene;
+    }
+
+    public void Stop()
+    {
+        m_running = false;
+        m_listener.Stop();
+    }
+
+    private void ListenLoop()
+    {
+        while (m_running)
         {
-            m_listener = new TcpListener(listener, port);
-
-            m_listener.Start(50);
-
-            WorkManager.StartThread(ListenLoop, "IRCServer");
-            m_baseScene = baseScene;
+            AcceptClient(m_listener.AcceptTcpClient());
+            Watchdog.UpdateThread();
         }
 
-        public void Stop()
-        {
-            m_running = false;
-            m_listener.Stop();
-        }
+        Watchdog.RemoveThread();
+    }
 
-        private void ListenLoop()
-        {
-            while (m_running)
-            {
-                AcceptClient(m_listener.AcceptTcpClient());
-                Watchdog.UpdateThread();
-            }
+    private void AcceptClient(TcpClient client)
+    {
+        IRCClientView cv = new IRCClientView(client, m_baseScene);
 
-            Watchdog.RemoveThread();
-        }
-
-        private void AcceptClient(TcpClient client)
-        {
-            IRCClientView cv = new IRCClientView(client, m_baseScene);
-
-            if (OnNewIRCClient != null)
-                OnNewIRCClient(cv);
-        }
+        if (OnNewIRCClient != null)
+            OnNewIRCClient(cv);
     }
 }

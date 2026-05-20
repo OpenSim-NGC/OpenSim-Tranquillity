@@ -30,45 +30,44 @@ using System.Reflection;
 using log4net;
 using Nini.Config;
 
-namespace OpenSim.Server.RegionServer
+namespace OpenSim.Server.RegionServer;
+
+/// <summary>
+/// Consoleless OpenSimulator region server
+/// </summary>
+public class OpenSimBackground : OpenSim
 {
-    /// <summary>
-    /// Consoleless OpenSimulator region server
-    /// </summary>
-    public class OpenSimBackground : OpenSim
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private ManualResetEvent WorldHasComeToAnEnd = new ManualResetEvent(false);
+
+    public OpenSimBackground(IConfigSource configSource) : base(configSource)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        private ManualResetEvent WorldHasComeToAnEnd = new ManualResetEvent(false);
+    /// <summary>
+    /// Performs initialisation of the scene, such as loading configuration from disk.
+    /// </summary>
+    public override void Startup()
+    {
+        m_gui = false;
 
-        public OpenSimBackground(IConfigSource configSource) : base(configSource)
-        {
-        }
+        base.Startup();
 
-        /// <summary>
-        /// Performs initialisation of the scene, such as loading configuration from disk.
-        /// </summary>
-        public override void Startup()
-        {
-            m_gui = false;
+        m_log.InfoFormat("[OPENSIM MAIN]: Startup complete, serving {0} region{1}",
+                         SceneManager.Scenes.Count, SceneManager.Scenes.Count > 1 ? "s" : "");
 
-            base.Startup();
+        WorldHasComeToAnEnd.WaitOne();
+        WorldHasComeToAnEnd.Close();
+    }
 
-            m_log.InfoFormat("[OPENSIM MAIN]: Startup complete, serving {0} region{1}",
-                             SceneManager.Scenes.Count, SceneManager.Scenes.Count > 1 ? "s" : "");
-
-            WorldHasComeToAnEnd.WaitOne();
-            WorldHasComeToAnEnd.Close();
-        }
-
-        /// <summary>
-        /// Performs any last-minute sanity checking and shuts down the region server
-        /// </summary>
-        public override void Shutdown()
-        {
-            WorldHasComeToAnEnd.Set();
-            m_log.Info("[OPENSIM MAIN]: World has come to an end");
-            base.Shutdown();
-        }
+    /// <summary>
+    /// Performs any last-minute sanity checking and shuts down the region server
+    /// </summary>
+    public override void Shutdown()
+    {
+        WorldHasComeToAnEnd.Set();
+        m_log.Info("[OPENSIM MAIN]: World has come to an end");
+        base.Shutdown();
     }
 }

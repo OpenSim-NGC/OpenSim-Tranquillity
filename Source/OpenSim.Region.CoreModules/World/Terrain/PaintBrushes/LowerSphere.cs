@@ -27,40 +27,39 @@
 
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.PaintBrushes
+namespace OpenSim.Region.CoreModules.World.Terrain.PaintBrushes;
+
+public class LowerSphere : ITerrainPaintableEffect
 {
-    public class LowerSphere : ITerrainPaintableEffect
+    #region ITerrainPaintableEffect Members
+
+    public void PaintEffect(ITerrainChannel map, bool[,] mask, float rx, float ry, float rz,
+        float size, float strength, int startX, int endX, int startY, int endY)
     {
-        #region ITerrainPaintableEffect Members
+        size = 0.5f * (float)Math.PI / size;
 
-        public void PaintEffect(ITerrainChannel map, bool[,] mask, float rx, float ry, float rz,
-            float size, float strength, int startX, int endX, int startY, int endY)
+        float dx2;
+        for (int x = startX; x <= endX; ++x)
         {
-            size = 0.5f * (float)Math.PI / size;
-
-            float dx2;
-            for (int x = startX; x <= endX; ++x)
+            dx2 = (x - rx) * (x - rx);
+            for (int y = startY; y <= endY; ++y)
             {
-                dx2 = (x - rx) * (x - rx);
-                for (int y = startY; y <= endY; ++y)
-                {
-                    if (!mask[x, y])
-                        continue;
+                if (!mask[x, y])
+                    continue;
 
-                    // Calculate a cos-sphere and add it to the heighmap
-                    double r = Math.Sqrt(dx2 + (y - ry) * (y - ry));
-                    float distancefactor = (float)Math.Cos(r * size);
-                    if (distancefactor > 0.0)
-                    {
-                        float newz = map[x, y] - distancefactor * strength;
-                        if (newz <= 0f)
-                            map[x, y] = 0f;
-                        else
-                            map[x, y] = newz;
-                    }
+                // Calculate a cos-sphere and add it to the heighmap
+                double r = Math.Sqrt(dx2 + (y - ry) * (y - ry));
+                float distancefactor = (float)Math.Cos(r * size);
+                if (distancefactor > 0.0)
+                {
+                    float newz = map[x, y] - distancefactor * strength;
+                    if (newz <= 0f)
+                        map[x, y] = 0f;
+                    else
+                        map[x, y] = newz;
                 }
             }
         }
-        #endregion
     }
+    #endregion
 }

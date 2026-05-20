@@ -27,29 +27,28 @@
 
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.FloodBrushes
-{
-    public class LowerArea : ITerrainFloodEffect
-    {
-        #region ITerrainFloodEffect Members
+namespace OpenSim.Region.CoreModules.World.Terrain.FloodBrushes;
 
-        public void FloodEffect(ITerrainChannel map, bool[,] fillArea, float height, float strength,
-            int startX, int endX, int startY, int endY)
+public class LowerArea : ITerrainFloodEffect
+{
+    #region ITerrainFloodEffect Members
+
+    public void FloodEffect(ITerrainChannel map, bool[,] fillArea, float height, float strength,
+        int startX, int endX, int startY, int endY)
+    {
+        for (int x = startX; x <= endX; ++x)
         {
-            for (int x = startX; x <= endX; ++x)
+            for (int y = startY; y <= endY; ++y)
             {
-                for (int y = startY; y <= endY; ++y)
+                if (fillArea[x, y])
                 {
-                    if (fillArea[x, y])
-                    {
-                        map[x, y] -= strength;
-                        if (map[x, y] < 0f)
-                            map[x, y] = 0f;
-                    }
+                    map[x, y] -= strength;
+                    if (map[x, y] < 0f)
+                        map[x, y] = 0f;
                 }
             }
         }
-
-        #endregion
     }
+
+    #endregion
 }

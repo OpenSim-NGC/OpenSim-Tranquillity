@@ -1,7 +1,5 @@
-using System;
+namespace Warp3D;
 
-namespace Warp3D
-{
 	/// <summary>
 	/// Summary description for warp_CoreObject.
 	/// </summary>
@@ -23,7 +21,7 @@ namespace Warp3D
 			matrix.shift(dx,dy,dz);
 		}
 
-        public void shift( warp_Vector v )
+    public void shift( warp_Vector v )
 		{
 			matrix.shift(v.x,v.y,v.z);
 		}
@@ -64,17 +62,17 @@ namespace Warp3D
 			normalmatrix.rotate(dx,dy,dz);
 		}
 
-        public void rotate( warp_Quaternion quat, float x, float y, float z )
-        {
-            matrix.rotate( quat ,  x,  y,  z);
-            normalmatrix.rotate( quat ,  x,  y,  z);
-        }
+    public void rotate( warp_Quaternion quat, float x, float y, float z )
+    {
+        matrix.rotate( quat ,  x,  y,  z);
+        normalmatrix.rotate( quat ,  x,  y,  z);
+    }
 
-        public void rotate( warp_Matrix m )
-        {
-            matrix.rotate( m );
-            normalmatrix.rotate( m );
-        }
+    public void rotate( warp_Matrix m )
+    {
+        matrix.rotate( m );
+        normalmatrix.rotate( m );
+    }
 
 
 		public void rotateSelf(float dx, float dy, float dz)
@@ -83,19 +81,19 @@ namespace Warp3D
 			normalmatrix.rotateSelf(dx,dy,dz);
 		}
 
-        public void rotateSelf( warp_Quaternion quat )
-        {
-            matrix.rotateSelf( quat );
-            normalmatrix.rotateSelf( quat );
-        }
+    public void rotateSelf( warp_Quaternion quat )
+    {
+        matrix.rotateSelf( quat );
+        normalmatrix.rotateSelf( quat );
+    }
 
-        public void rotateSelf( warp_Matrix m )
-        {
-            matrix.rotateSelf( m );
-            normalmatrix.rotateSelf( m );
-        }
+    public void rotateSelf( warp_Matrix m )
+    {
+        matrix.rotateSelf( m );
+        normalmatrix.rotateSelf( m );
+    }
 
-        public void setPos( float x, float y, float z )
+    public void setPos( float x, float y, float z )
 		{
 			matrix.m03=x;
 			matrix.m13=y;
@@ -112,4 +110,3 @@ namespace Warp3D
 			return new warp_Vector(matrix.m03,matrix.m13,matrix.m23);
 		}
 	}
-}

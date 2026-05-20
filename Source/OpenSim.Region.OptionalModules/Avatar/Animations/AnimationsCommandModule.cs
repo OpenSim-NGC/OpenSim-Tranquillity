@@ -35,157 +35,156 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Animation;
 using AnimationSet = OpenSim.Region.Framework.Scenes.Animation.AnimationSet;
 
-namespace OpenSim.Region.OptionalModules.Avatar.Animations
+namespace OpenSim.Region.OptionalModules.Avatar.Animations;
+
+/// <summary>
+/// A module that just holds commands for inspecting avatar animations.
+/// </summary>
+public class AnimationsCommandModule : ISharedRegionModule
 {
-    /// <summary>
-    /// A module that just holds commands for inspecting avatar animations.
-    /// </summary>
-    public class AnimationsCommandModule : ISharedRegionModule
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private List<Scene> m_scenes = new List<Scene>();
+    private List<Scene> m_scenes = new List<Scene>();
 
-        public string Name { get { return "Animations Command Module"; } }
+    public string Name { get { return "Animations Command Module"; } }
 
-        public Type ReplaceableInterface { get { return null; } }
+    public Type ReplaceableInterface { get { return null; } }
 
-        public void Initialise(IConfigSource source)
-        {
+    public void Initialise(IConfigSource source)
+    {
 //            m_log.DebugFormat("[ANIMATIONS COMMAND MODULE]: INITIALIZED MODULE");
-        }
+    }
 
-        public void PostInitialise()
-        {
+    public void PostInitialise()
+    {
 //            m_log.DebugFormat("[ANIMATIONS COMMAND MODULE]: POST INITIALIZED MODULE");
-        }
+    }
 
-        public void Close()
-        {
+    public void Close()
+    {
 //            m_log.DebugFormat("[ANIMATIONS COMMAND MODULE]: CLOSED MODULE");
-        }
+    }
 
-        public void AddRegion(Scene scene)
-        {
+    public void AddRegion(Scene scene)
+    {
 //            m_log.DebugFormat("[ANIMATIONS COMMAND MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
-        }
+    }
 
-        public void RemoveRegion(Scene scene)
-        {
+    public void RemoveRegion(Scene scene)
+    {
 //            m_log.DebugFormat("[ATTACHMENTS COMMAND MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
 
-            lock (m_scenes)
-                m_scenes.Remove(scene);
-        }
+        lock (m_scenes)
+            m_scenes.Remove(scene);
+    }
 
-        public void RegionLoaded(Scene scene)
-        {
+    public void RegionLoaded(Scene scene)
+    {
 //            m_log.DebugFormat("[ANIMATIONS COMMAND MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
 
-            lock (m_scenes)
-                m_scenes.Add(scene);
+        lock (m_scenes)
+            m_scenes.Add(scene);
 
-            scene.AddCommand(
-                "Users", this, "show animations",
-                "show animations [<first-name> <last-name>]",
-                "Show animation information for avatars in this simulator.",
-                "If no name is supplied then information for all avatars is shown.\n"
-                + "Please note that for inventory animations, the animation name is the name under which the animation was originally uploaded\n"
-                + ", which is not necessarily the current inventory name.",
-                HandleShowAnimationsCommand);
+        scene.AddCommand(
+            "Users", this, "show animations",
+            "show animations [<first-name> <last-name>]",
+            "Show animation information for avatars in this simulator.",
+            "If no name is supplied then information for all avatars is shown.\n"
+            + "Please note that for inventory animations, the animation name is the name under which the animation was originally uploaded\n"
+            + ", which is not necessarily the current inventory name.",
+            HandleShowAnimationsCommand);
+    }
+
+    protected void HandleShowAnimationsCommand(string module, string[] cmd)
+    {
+        if (cmd.Length != 2 && cmd.Length < 4)
+        {
+            MainConsole.Instance.Output("Usage: show animations [<first-name> <last-name>]");
+            return;
         }
 
-        protected void HandleShowAnimationsCommand(string module, string[] cmd)
+        bool targetNameSupplied = false;
+        string optionalTargetFirstName = null;
+        string optionalTargetLastName = null;
+
+        if (cmd.Length >= 4)
         {
-            if (cmd.Length != 2 && cmd.Length < 4)
+            targetNameSupplied = true;
+            optionalTargetFirstName = cmd[2];
+            optionalTargetLastName = cmd[3];
+        }
+
+        StringBuilder sb = new StringBuilder();
+
+        lock (m_scenes)
+        {
+            foreach (Scene scene in m_scenes)
             {
-                MainConsole.Instance.Output("Usage: show animations [<first-name> <last-name>]");
-                return;
-            }
-
-            bool targetNameSupplied = false;
-            string optionalTargetFirstName = null;
-            string optionalTargetLastName = null;
-
-            if (cmd.Length >= 4)
-            {
-                targetNameSupplied = true;
-                optionalTargetFirstName = cmd[2];
-                optionalTargetLastName = cmd[3];
-            }
-
-            StringBuilder sb = new StringBuilder();
-
-            lock (m_scenes)
-            {
-                foreach (Scene scene in m_scenes)
+                if (targetNameSupplied)
                 {
-                    if (targetNameSupplied)
-                    {
-                        ScenePresence sp = scene.GetScenePresence(optionalTargetFirstName, optionalTargetLastName);
-                        if (sp != null && !sp.IsChildAgent)
-                            GetAttachmentsReport(sp, sb);
-                    }
-                    else
-                    {
-                        scene.ForEachRootScenePresence(sp => GetAttachmentsReport(sp, sb));
-                    }
+                    ScenePresence sp = scene.GetScenePresence(optionalTargetFirstName, optionalTargetLastName);
+                    if (sp != null && !sp.IsChildAgent)
+                        GetAttachmentsReport(sp, sb);
+                }
+                else
+                {
+                    scene.ForEachRootScenePresence(sp => GetAttachmentsReport(sp, sb));
                 }
             }
-
-            MainConsole.Instance.Output(sb.ToString());
         }
 
-        private void GetAttachmentsReport(ScenePresence sp, StringBuilder sb)
+        MainConsole.Instance.Output(sb.ToString());
+    }
+
+    private void GetAttachmentsReport(ScenePresence sp, StringBuilder sb)
+    {
+        sb.AppendFormat("Animations for {0}\n", sp.Name);
+
+        ConsoleDisplayList cdl = new ConsoleDisplayList() { Indent = 2 };
+        ScenePresenceAnimator spa = sp.Animator;
+        AnimationSet anims = sp.Animator.Animations;
+
+        string cma = spa.CurrentMovementAnimation;
+        cdl.AddRow(
+            "Current movement anim",
+            string.Format("{0}, {1}", DefaultAvatarAnimations.GetDefaultAnimation(cma), cma));
+
+        UUID defaultAnimId = anims.DefaultAnimation.AnimID;
+        cdl.AddRow(
+            "Default anim",
+            string.Format("{0}, {1}", defaultAnimId, sp.Animator.GetAnimName(defaultAnimId)));
+
+        UUID implicitDefaultAnimId = anims.ImplicitDefaultAnimation.AnimID;
+        cdl.AddRow(
+            "Implicit default anim",
+            string.Format("{0}, {1}",
+                implicitDefaultAnimId, sp.Animator.GetAnimName(implicitDefaultAnimId)));
+
+        cdl.AddToStringBuilder(sb);
+
+        ConsoleDisplayTable cdt = new ConsoleDisplayTable() { Indent = 2 };
+        cdt.AddColumn("Animation ID", 36);
+        cdt.AddColumn("Name", 20);
+        cdt.AddColumn("Seq", 3);
+        cdt.AddColumn("Object ID", 36);
+
+        UUID[] animIds;
+        int[] sequenceNumbers;
+        UUID[] objectIds;
+
+        sp.Animator.Animations.GetArrays(out animIds, out sequenceNumbers, out objectIds);
+
+        for (int i = 0; i < animIds.Length; i++)
         {
-            sb.AppendFormat("Animations for {0}\n", sp.Name);
+            UUID animId = animIds[i];
+            string animName = sp.Animator.GetAnimName(animId);
+            int seq = sequenceNumbers[i];
+            UUID objectId = objectIds[i];
 
-            ConsoleDisplayList cdl = new ConsoleDisplayList() { Indent = 2 };
-            ScenePresenceAnimator spa = sp.Animator;
-            AnimationSet anims = sp.Animator.Animations;
-
-            string cma = spa.CurrentMovementAnimation;
-            cdl.AddRow(
-                "Current movement anim",
-                string.Format("{0}, {1}", DefaultAvatarAnimations.GetDefaultAnimation(cma), cma));
-
-            UUID defaultAnimId = anims.DefaultAnimation.AnimID;
-            cdl.AddRow(
-                "Default anim",
-                string.Format("{0}, {1}", defaultAnimId, sp.Animator.GetAnimName(defaultAnimId)));
-
-            UUID implicitDefaultAnimId = anims.ImplicitDefaultAnimation.AnimID;
-            cdl.AddRow(
-                "Implicit default anim",
-                string.Format("{0}, {1}",
-                    implicitDefaultAnimId, sp.Animator.GetAnimName(implicitDefaultAnimId)));
-
-            cdl.AddToStringBuilder(sb);
-
-            ConsoleDisplayTable cdt = new ConsoleDisplayTable() { Indent = 2 };
-            cdt.AddColumn("Animation ID", 36);
-            cdt.AddColumn("Name", 20);
-            cdt.AddColumn("Seq", 3);
-            cdt.AddColumn("Object ID", 36);
-
-            UUID[] animIds;
-            int[] sequenceNumbers;
-            UUID[] objectIds;
-
-            sp.Animator.Animations.GetArrays(out animIds, out sequenceNumbers, out objectIds);
-
-            for (int i = 0; i < animIds.Length; i++)
-            {
-                UUID animId = animIds[i];
-                string animName = sp.Animator.GetAnimName(animId);
-                int seq = sequenceNumbers[i];
-                UUID objectId = objectIds[i];
-
-                cdt.AddRow(animId, animName, seq, objectId);
-            }
-
-            cdt.AddToStringBuilder(sb);
-            sb.Append("\n");
+            cdt.AddRow(animId, animName, seq, objectId);
         }
+
+        cdt.AddToStringBuilder(sb);
+        sb.Append("\n");
     }
 }

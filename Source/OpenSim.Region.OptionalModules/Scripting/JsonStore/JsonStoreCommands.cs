@@ -31,152 +31,151 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.OptionalModules.Scripting.JsonStore
+namespace OpenSim.Region.OptionalModules.Scripting.JsonStore;
+
+public class JsonStoreCommandsModule  : INonSharedRegionModule
 {
-    public class JsonStoreCommandsModule  : INonSharedRegionModule
-    {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILog m_log =
+        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private IConfig m_config = null;
-        private bool m_enabled = false;
+    private IConfig m_config = null;
+    private bool m_enabled = false;
 
-        private Scene m_scene = null;
-        //private IJsonStoreModule m_store;
-        private JsonStoreModule m_store;
+    private Scene m_scene = null;
+    //private IJsonStoreModule m_store;
+    private JsonStoreModule m_store;
 
 #region Region Module interface
 
-        // -----------------------------------------------------------------
-        /// <summary>
-        /// Name of this shared module is it's class name
-        /// </summary>
-        // -----------------------------------------------------------------
-        public string Name
-        {
-            get { return this.GetType().Name; }
-        }
+    // -----------------------------------------------------------------
+    /// <summary>
+    /// Name of this shared module is it's class name
+    /// </summary>
+    // -----------------------------------------------------------------
+    public string Name
+    {
+        get { return this.GetType().Name; }
+    }
 
-        // -----------------------------------------------------------------
-        /// <summary>
-        /// Initialise this shared module
-        /// </summary>
-        /// <param name="scene">this region is getting initialised</param>
-        /// <param name="source">nini config, we are not using this</param>
-        // -----------------------------------------------------------------
-        public void Initialise(IConfigSource config)
+    // -----------------------------------------------------------------
+    /// <summary>
+    /// Initialise this shared module
+    /// </summary>
+    /// <param name="scene">this region is getting initialised</param>
+    /// <param name="source">nini config, we are not using this</param>
+    // -----------------------------------------------------------------
+    public void Initialise(IConfigSource config)
+    {
+        try
         {
-            try
+            if ((m_config = config.Configs["JsonStore"]) == null)
             {
-                if ((m_config = config.Configs["JsonStore"]) == null)
-                {
-                    // There is no configuration, the module is disabled
-                    // m_log.InfoFormat("[JsonStore] no configuration info");
-                    return;
-                }
-
-                m_enabled = m_config.GetBoolean("Enabled", m_enabled);
-            }
-            catch (Exception e)
-            {
-                m_log.Error("[JsonStore]: initialization error: {0}", e);
+                // There is no configuration, the module is disabled
+                // m_log.InfoFormat("[JsonStore] no configuration info");
                 return;
             }
 
-            if (m_enabled)
-                m_log.DebugFormat("[JsonStore]: module is enabled");
+            m_enabled = m_config.GetBoolean("Enabled", m_enabled);
+        }
+        catch (Exception e)
+        {
+            m_log.Error("[JsonStore]: initialization error: {0}", e);
+            return;
         }
 
-        // -----------------------------------------------------------------
-        /// <summary>
-        /// everything is loaded, perform post load configuration
-        /// </summary>
-        // -----------------------------------------------------------------
-        public void PostInitialise()
-        {
-        }
+        if (m_enabled)
+            m_log.DebugFormat("[JsonStore]: module is enabled");
+    }
 
-        // -----------------------------------------------------------------
-        /// <summary>
-        /// Nothing to do on close
-        /// </summary>
-        // -----------------------------------------------------------------
-        public void Close()
-        {
-        }
+    // -----------------------------------------------------------------
+    /// <summary>
+    /// everything is loaded, perform post load configuration
+    /// </summary>
+    // -----------------------------------------------------------------
+    public void PostInitialise()
+    {
+    }
 
-        // -----------------------------------------------------------------
-        /// <summary>
-        /// </summary>
-        // -----------------------------------------------------------------
-        public void AddRegion(Scene scene)
+    // -----------------------------------------------------------------
+    /// <summary>
+    /// Nothing to do on close
+    /// </summary>
+    // -----------------------------------------------------------------
+    public void Close()
+    {
+    }
+
+    // -----------------------------------------------------------------
+    /// <summary>
+    /// </summary>
+    // -----------------------------------------------------------------
+    public void AddRegion(Scene scene)
+    {
+        if (m_enabled)
         {
-            if (m_enabled)
+            m_scene = scene;
+
+        }
+    }
+
+    // -----------------------------------------------------------------
+    /// <summary>
+    /// </summary>
+    // -----------------------------------------------------------------
+    public void RemoveRegion(Scene scene)
+    {
+        // need to remove all references to the scene in the subscription
+        // list to enable full garbage collection of the scene object
+    }
+
+    // -----------------------------------------------------------------
+    /// <summary>
+    /// Called when all modules have been added for a region. This is
+    /// where we hook up events
+    /// </summary>
+    // -----------------------------------------------------------------
+    public void RegionLoaded(Scene scene)
+    {
+        if (m_enabled)
+        {
+            m_scene = scene;
+
+            m_store = (JsonStoreModule) m_scene.RequestModuleInterface<IJsonStoreModule>();
+            if (m_store == null)
             {
-                m_scene = scene;
-
+                m_log.ErrorFormat("[JsonStoreCommands]: JsonModule interface not defined");
+                m_enabled = false;
+                return;
             }
+
+            scene.AddCommand("JsonStore", this, "jsonstore stats", "jsonstore stats",
+                             "Display statistics about the state of the JsonStore module", "",
+                             CmdStats);
         }
+    }
 
-        // -----------------------------------------------------------------
-        /// <summary>
-        /// </summary>
-        // -----------------------------------------------------------------
-        public void RemoveRegion(Scene scene)
-        {
-            // need to remove all references to the scene in the subscription
-            // list to enable full garbage collection of the scene object
-        }
-
-        // -----------------------------------------------------------------
-        /// <summary>
-        /// Called when all modules have been added for a region. This is
-        /// where we hook up events
-        /// </summary>
-        // -----------------------------------------------------------------
-        public void RegionLoaded(Scene scene)
-        {
-            if (m_enabled)
-            {
-                m_scene = scene;
-
-                m_store = (JsonStoreModule) m_scene.RequestModuleInterface<IJsonStoreModule>();
-                if (m_store == null)
-                {
-                    m_log.ErrorFormat("[JsonStoreCommands]: JsonModule interface not defined");
-                    m_enabled = false;
-                    return;
-                }
-
-                scene.AddCommand("JsonStore", this, "jsonstore stats", "jsonstore stats",
-                                 "Display statistics about the state of the JsonStore module", "",
-                                 CmdStats);
-            }
-        }
-
-        /// -----------------------------------------------------------------
-        /// <summary>
-        /// </summary>
-        // -----------------------------------------------------------------
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
+    /// -----------------------------------------------------------------
+    /// <summary>
+    /// </summary>
+    // -----------------------------------------------------------------
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
 
 #endregion
 
 #region Commands
 
-        private void CmdStats(string module, string[] cmd)
-        {
-            if (MainConsole.Instance.ConsoleScene != m_scene && MainConsole.Instance.ConsoleScene != null)
-                return;
+    private void CmdStats(string module, string[] cmd)
+    {
+        if (MainConsole.Instance.ConsoleScene != m_scene && MainConsole.Instance.ConsoleScene != null)
+            return;
 
-            JsonStoreStats stats = m_store.GetStoreStats();
-            MainConsole.Instance.Output("{0}\t{1}", m_scene.RegionInfo.RegionName, stats.StoreCount);
-        }
+        JsonStoreStats stats = m_store.GetStoreStats();
+        MainConsole.Instance.Output("{0}\t{1}", m_scene.RegionInfo.RegionName, stats.StoreCount);
+    }
 
 #endregion
 
-    }
 }

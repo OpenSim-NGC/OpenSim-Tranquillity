@@ -25,33 +25,30 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Net;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class ClientInfo
 {
-    public class ClientInfo
-    {
-        public readonly DateTime StartedTime = DateTime.Now;
-        public AgentCircuitData agentcircuit = null;
+    public readonly DateTime StartedTime = DateTime.Now;
+    public AgentCircuitData agentcircuit = null;
 
-        public EndPoint proxyEP;
+    public EndPoint proxyEP;
 
-        public EndPoint userEP;
+    public EndPoint userEP;
 
-        public int resendThrottle;
-        public int landThrottle;
-        public int windThrottle;
-        public int cloudThrottle;
-        public int taskThrottle;
-        public int assetThrottle;
-        public int textureThrottle;
-        public int totalThrottle;
+    public int resendThrottle;
+    public int landThrottle;
+    public int windThrottle;
+    public int cloudThrottle;
+    public int taskThrottle;
+    public int assetThrottle;
+    public int textureThrottle;
+    public int totalThrottle;
 
-        // Used by adaptive only
-        public int targetThrottle;
+    // Used by adaptive only
+    public int targetThrottle;
 
-        public int maxThrottle;
-    }
+    public int maxThrottle;
 }

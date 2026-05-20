@@ -35,115 +35,114 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences;
+
+public class LocalAgentPreferencesServicesConnector : ISharedRegionModule, IAgentPreferencesService
 {
-    public class LocalAgentPreferencesServicesConnector : ISharedRegionModule, IAgentPreferencesService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IAgentPreferencesService m_AgentPreferencesService;
+    private bool m_Enabled = false;
+
+    #region ISharedRegionModule
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        private IAgentPreferencesService m_AgentPreferencesService;
-        private bool m_Enabled = false;
+    public string Name
+    {
+        get { return "LocalAgentPreferencesServicesConnector"; }
+    }
 
-        #region ISharedRegionModule
-
-        public Type ReplaceableInterface
+    public void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "LocalAgentPreferencesServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("AgentPreferencesServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("AgentPreferencesServices", "");
-                if (name == Name)
+                IConfig userConfig = source.Configs["AgentPreferencesService"];
+                if (userConfig == null)
                 {
-                    IConfig userConfig = source.Configs["AgentPreferencesService"];
-                    if (userConfig == null)
-                    {
-                        m_log.Error("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    string serviceDll = userConfig.GetString("LocalServiceModule", String.Empty);
-
-                    if (String.IsNullOrEmpty(serviceDll))
-                    {
-                        m_log.Error("[AGENT PREFERENCES CONNECTOR]: No AgentPreferencesModule named in section AgentPreferencesService");
-                        return;
-                    }
-
-                    Object[] args = new Object[] { source };
-                    m_AgentPreferencesService = ServerUtils.LoadPlugin<IAgentPreferencesService>(serviceDll, args);
-
-                    if (m_AgentPreferencesService == null)
-                    {
-                        m_log.Error("[AGENT PREFERENCES CONNECTOR]: Can't load agent preferences service");
-                        return;
-                    }
-                    m_Enabled = true;
-                    m_log.Info("[AGENT PREFERENCES CONNECTOR]: Local agent preferences connector enabled");
+                    m_log.Error("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
+                    return;
                 }
+
+                string serviceDll = userConfig.GetString("LocalServiceModule", String.Empty);
+
+                if (String.IsNullOrEmpty(serviceDll))
+                {
+                    m_log.Error("[AGENT PREFERENCES CONNECTOR]: No AgentPreferencesModule named in section AgentPreferencesService");
+                    return;
+                }
+
+                Object[] args = new Object[] { source };
+                m_AgentPreferencesService = ServerUtils.LoadPlugin<IAgentPreferencesService>(serviceDll, args);
+
+                if (m_AgentPreferencesService == null)
+                {
+                    m_log.Error("[AGENT PREFERENCES CONNECTOR]: Can't load agent preferences service");
+                    return;
+                }
+                m_Enabled = true;
+                m_log.Info("[AGENT PREFERENCES CONNECTOR]: Local agent preferences connector enabled");
             }
         }
-
-        public void PostInitialise()
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void Close()
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.RegisterModuleInterface<IAgentPreferencesService>(this);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        #endregion ISharedRegionModule
-
-        #region IAgentPreferencesService
-
-        public AgentPrefs GetAgentPreferences(UUID principalID)
-        {
-            return m_AgentPreferencesService.GetAgentPreferences(principalID);
-        }
-
-        public bool StoreAgentPreferences(AgentPrefs data)
-        {
-            return m_AgentPreferencesService.StoreAgentPreferences(data);
-        }
-
-        public string GetLang(UUID principalID)
-        {
-            return m_AgentPreferencesService.GetLang(principalID);
-        }
-
-        #endregion IAgentPreferencesService
     }
+
+    public void PostInitialise()
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void Close()
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.RegisterModuleInterface<IAgentPreferencesService>(this);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    #endregion ISharedRegionModule
+
+    #region IAgentPreferencesService
+
+    public AgentPrefs GetAgentPreferences(UUID principalID)
+    {
+        return m_AgentPreferencesService.GetAgentPreferences(principalID);
+    }
+
+    public bool StoreAgentPreferences(AgentPrefs data)
+    {
+        return m_AgentPreferencesService.StoreAgentPreferences(data);
+    }
+
+    public string GetLang(UUID principalID)
+    {
+        return m_AgentPreferencesService.GetLang(principalID);
+    }
+
+    #endregion IAgentPreferencesService
 }

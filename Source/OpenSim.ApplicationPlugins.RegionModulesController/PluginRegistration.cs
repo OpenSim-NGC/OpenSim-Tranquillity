@@ -27,19 +27,18 @@
 
 using OpenSim.Framework;
 
-namespace OpenSim.ApplicationPlugins.RegionModulesController
+namespace OpenSim.ApplicationPlugins.RegionModulesController;
+
+public class PluginRegistration : IPluginRegistryProvider
 {
-    public class PluginRegistration : IPluginRegistryProvider
+    public void RegisterPlugins(PluginRegistry registry)
     {
-        public void RegisterPlugins(PluginRegistry registry)
-        {
-            registry.Register(
-                "/OpenSim/Startup",
-                new PluginDescriptor(
-                    "RegionModulesController",
-                    typeof(RegionModulesControllerPlugin),
-                    "RegionModulesController",
-                    "0.9"));
-        }
+        registry.Register(
+            "/OpenSim/Startup",
+            new PluginDescriptor(
+                "RegionModulesController",
+                typeof(RegionModulesControllerPlugin),
+                "RegionModulesController",
+                "0.9"));
     }
 }

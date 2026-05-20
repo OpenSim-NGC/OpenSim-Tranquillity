@@ -25,65 +25,59 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
-using log4net;
 using Nini.Config;
-using OpenSim.Framework;
 using OpenSim.Data;
-using OpenSim.Services.Interfaces;
 using OpenSim.Services.Base;
 
-namespace OpenSim.Services.Friends
+namespace OpenSim.Services.Friends;
+
+public class FriendsServiceBase : ServiceBase
 {
-    public class FriendsServiceBase : ServiceBase
+    protected IFriendsData m_Database = null;
+
+    public FriendsServiceBase(IConfigSource config) : base(config)
     {
-        protected IFriendsData m_Database = null;
+        string dllName = String.Empty;
+        string connString = String.Empty;
 
-        public FriendsServiceBase(IConfigSource config) : base(config)
+        //
+        // Try reading the [FriendsService] section first, if it exists
+        //
+        IConfig friendsConfig = config.Configs["FriendsService"];
+        if (friendsConfig != null)
         {
-            string dllName = String.Empty;
-            string connString = String.Empty;
+            dllName = friendsConfig.GetString("StorageProvider", dllName);
+            connString = friendsConfig.GetString("ConnectionString", connString);
+        }
 
-            //
-            // Try reading the [FriendsService] section first, if it exists
-            //
-            IConfig friendsConfig = config.Configs["FriendsService"];
-            if (friendsConfig != null)
-            {
-                dllName = friendsConfig.GetString("StorageProvider", dllName);
-                connString = friendsConfig.GetString("ConnectionString", connString);
-            }
+        //
+        // Try reading the [DatabaseService] section, if it exists
+        //
+        IConfig dbConfig = config.Configs["DatabaseService"];
+        if (dbConfig != null)
+        {
+            if (dllName.Length == 0)
+                dllName = dbConfig.GetString("StorageProvider", String.Empty);
+            if (connString.Length == 0)
+                connString = dbConfig.GetString("ConnectionString", String.Empty);
+        }
 
-            //
-            // Try reading the [DatabaseService] section, if it exists
-            //
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig != null)
-            {
-                if (dllName.Length == 0)
-                    dllName = dbConfig.GetString("StorageProvider", String.Empty);
-                if (connString.Length == 0)
-                    connString = dbConfig.GetString("ConnectionString", String.Empty);
-            }
+        //
+        // We tried, but this doesn't exist. We can't proceed.
+        //
+        if (String.Empty.Equals(dllName))
+            throw new Exception("No StorageProvider configured");
 
-            //
-            // We tried, but this doesn't exist. We can't proceed.
-            //
-            if (String.Empty.Equals(dllName))
-                throw new Exception("No StorageProvider configured");
+        string realm = "Friends";
+        if (friendsConfig != null)
+            realm = friendsConfig.GetString("Realm", realm);
 
-            string realm = "Friends";
-            if (friendsConfig != null)
-                realm = friendsConfig.GetString("Realm", realm);
-
-            m_Database = LoadPlugin<IFriendsData>(dllName, new Object[] { connString, realm });
-            if (m_Database == null)
-            {
-                throw new Exception(
-                    string.Format(
-                        "Could not find a storage interface {0} in the given StorageProvider {1}", "IFriendsData", dllName));
-            }
+        m_Database = LoadPlugin<IFriendsData>(dllName, new Object[] { connString, realm });
+        if (m_Database == null)
+        {
+            throw new Exception(
+                string.Format(
+                    "Could not find a storage interface {0} in the given StorageProvider {1}", "IFriendsData", dllName));
         }
     }
 }

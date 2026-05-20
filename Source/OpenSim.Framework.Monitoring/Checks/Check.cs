@@ -25,94 +25,90 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Text;
+namespace OpenSim.Framework.Monitoring;
 
-namespace OpenSim.Framework.Monitoring
+public class Check
 {
-    public class Check
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public static readonly char[] DisallowedShortNameCharacters = { '.' };
+    public static readonly char[] DisallowedShortNameCharacters = { '.' };
 
-        /// <summary>
-        /// Category of this stat (e.g. cache, scene, etc).
-        /// </summary>
-        public string Category { get; private set; }
+    /// <summary>
+    /// Category of this stat (e.g. cache, scene, etc).
+    /// </summary>
+    public string Category { get; private set; }
 
-        /// <summary>
-        /// Containing name for this stat.
-        /// FIXME: In the case of a scene, this is currently the scene name (though this leaves
-        /// us with a to-be-resolved problem of non-unique region names).
-        /// </summary>
-        /// <value>
-        /// The container.
-        /// </value>
-        public string Container { get; private set; }
+    /// <summary>
+    /// Containing name for this stat.
+    /// FIXME: In the case of a scene, this is currently the scene name (though this leaves
+    /// us with a to-be-resolved problem of non-unique region names).
+    /// </summary>
+    /// <value>
+    /// The container.
+    /// </value>
+    public string Container { get; private set; }
 
-        /// <summary>
-        /// Action used to check whether alert should go off.
-        /// </summary>
-        /// <remarks>
-        /// Should return true if check passes.  False otherwise.
-        /// </remarks>
-        public Func<Check, bool> CheckFunc { get; private set; }
+    /// <summary>
+    /// Action used to check whether alert should go off.
+    /// </summary>
+    /// <remarks>
+    /// Should return true if check passes.  False otherwise.
+    /// </remarks>
+    public Func<Check, bool> CheckFunc { get; private set; }
 
-        /// <summary>
-        /// Message from the last failure, if any.  If there is no message or no failure then will be null.
-        /// </summary>
-        /// <remarks>
-        /// Should be set by the CheckFunc when applicable.
-        /// </remarks>
-        public string LastFailureMessage { get; set; }
+    /// <summary>
+    /// Message from the last failure, if any.  If there is no message or no failure then will be null.
+    /// </summary>
+    /// <remarks>
+    /// Should be set by the CheckFunc when applicable.
+    /// </remarks>
+    public string LastFailureMessage { get; set; }
 
-        public StatVerbosity Verbosity { get; private set; }
-        public string ShortName { get; private set; }
-        public string Name { get; private set; }
-        public string Description { get; private set; }
+    public StatVerbosity Verbosity { get; private set; }
+    public string ShortName { get; private set; }
+    public string Name { get; private set; }
+    public string Description { get; private set; }
 
-        public Check(
-            string shortName,
-            string name,
-            string description,
-            string category,
-            string container,
-            Func<Check, bool> checkFunc,
-            StatVerbosity verbosity)
+    public Check(
+        string shortName,
+        string name,
+        string description,
+        string category,
+        string container,
+        Func<Check, bool> checkFunc,
+        StatVerbosity verbosity)
+    {
+        if (ChecksManager.SubCommands.Contains(category))
+            throw new Exception(
+                string.Format("Alert cannot be in category '{0}' since this is reserved for a subcommand", category));
+
+        foreach (char c in DisallowedShortNameCharacters)
         {
-            if (ChecksManager.SubCommands.Contains(category))
-                throw new Exception(
-                    string.Format("Alert cannot be in category '{0}' since this is reserved for a subcommand", category));
-
-            foreach (char c in DisallowedShortNameCharacters)
-            {
-                if (shortName.IndexOf(c) != -1)
-                    throw new Exception(string.Format("Alert name {0} cannot contain character {1}", shortName, c));
-            }
-
-            ShortName = shortName;
-            Name = name;
-            Description = description;
-            Category = category;
-            Container = container;
-            CheckFunc = checkFunc;
-            Verbosity = verbosity;
+            if (shortName.IndexOf(c) != -1)
+                throw new Exception(string.Format("Alert name {0} cannot contain character {1}", shortName, c));
         }
 
-        public bool CheckIt()
-        {
-            return CheckFunc(this);
-        }
+        ShortName = shortName;
+        Name = name;
+        Description = description;
+        Category = category;
+        Container = container;
+        CheckFunc = checkFunc;
+        Verbosity = verbosity;
+    }
 
-        public virtual string ToConsoleString()
-        {
-            return string.Format(
-                "{0}.{1}.{2} - {3}",
-                Category,
-                Container,
-                ShortName,
-                Description);
-        }
+    public bool CheckIt()
+    {
+        return CheckFunc(this);
+    }
+
+    public virtual string ToConsoleString()
+    {
+        return string.Format(
+            "{0}.{1}.{2} - {3}",
+            Category,
+            Container,
+            ShortName,
+            Description);
     }
 }

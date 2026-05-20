@@ -25,28 +25,26 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public delegate bool HandlerDelegate(IClientAPI client, FloaterData data, string[] msg);
+
+public abstract class FloaterData
 {
-    public delegate bool HandlerDelegate(IClientAPI client, FloaterData data, string[] msg);
-
-    public abstract class FloaterData
-    {
-        public abstract int Channel { get; }
-        public abstract string FloaterName { get; set; }
-        public virtual string XmlName { get; set; }
-        public virtual string XmlText { get; set; }
-        public virtual HandlerDelegate Handler { get; set; }
-    }
+    public abstract int Channel { get; }
+    public abstract string FloaterName { get; set; }
+    public virtual string XmlName { get; set; }
+    public virtual string XmlText { get; set; }
+    public virtual HandlerDelegate Handler { get; set; }
+}
 
 
-    public interface IDynamicFloaterModule
-    {
-        void DoUserFloater(UUID agentID, FloaterData dialogData, string configuration);
-        void FloaterControl(ScenePresence sp, FloaterData d, string msg);
-    }
+public interface IDynamicFloaterModule
+{
+    void DoUserFloater(UUID agentID, FloaterData dialogData, string configuration);
+    void FloaterControl(ScenePresence sp, FloaterData d, string msg);
 }

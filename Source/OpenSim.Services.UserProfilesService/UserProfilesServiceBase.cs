@@ -25,63 +25,61 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
 using Nini.Config;
 using log4net;
 using OpenSim.Services.Base;
 using OpenSim.Data;
 
-namespace OpenSim.Services.ProfilesService
+namespace OpenSim.Services.ProfilesService;
+
+public class UserProfilesServiceBase: ServiceBase
 {
-    public class UserProfilesServiceBase: ServiceBase
+    static readonly ILog m_log =
+        LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    public IProfilesData ProfilesData;
+
+    public string ConfigName
     {
-        static readonly ILog m_log =
-            LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        get; private set;
+    }
 
-        public IProfilesData ProfilesData;
-
-        public string ConfigName
+    public UserProfilesServiceBase(IConfigSource config, string configName):
+        base(config)
+    {
+        if(string.IsNullOrEmpty(configName))
         {
-            get; private set;
+            m_log.WarnFormat("[PROFILES SERVICE]: Configuration section not given!");
+            return;
         }
 
-        public UserProfilesServiceBase(IConfigSource config, string configName):
-            base(config)
+        string dllName = String.Empty;
+        string connString = null;
+        string realm = String.Empty;
+
+        IConfig dbConfig = config.Configs["DatabaseService"];
+        if (dbConfig != null)
         {
-            if(string.IsNullOrEmpty(configName))
-            {
-                m_log.WarnFormat("[PROFILES SERVICE]: Configuration section not given!");
-                return;
-            }
-
-            string dllName = String.Empty;
-            string connString = null;
-            string realm = String.Empty;
-
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig != null)
-            {
-                if (dllName.Length == 0)
-                    dllName = dbConfig.GetString("StorageProvider", String.Empty);
-                if (string.IsNullOrEmpty(connString))
-                    connString = dbConfig.GetString("ConnectionString", String.Empty);
-            }
-
-            IConfig ProfilesConfig = config.Configs[configName];
-            if (ProfilesConfig != null)
-            {
-                dllName = ProfilesConfig.GetString("StorageProvider", dllName);
-                connString = ProfilesConfig.GetString("ConnectionString", connString);
-                realm = ProfilesConfig.GetString("Realm", realm);
-            }
-
-            ProfilesData = LoadPlugin<IProfilesData>(dllName, new Object[] { connString });
-            if (ProfilesData == null)
-                throw new Exception("Could not find a storage interface in the given module");
-
+            if (dllName.Length == 0)
+                dllName = dbConfig.GetString("StorageProvider", String.Empty);
+            if (string.IsNullOrEmpty(connString))
+                connString = dbConfig.GetString("ConnectionString", String.Empty);
         }
+
+        IConfig ProfilesConfig = config.Configs[configName];
+        if (ProfilesConfig != null)
+        {
+            dllName = ProfilesConfig.GetString("StorageProvider", dllName);
+            connString = ProfilesConfig.GetString("ConnectionString", connString);
+            realm = ProfilesConfig.GetString("Realm", realm);
+        }
+
+        ProfilesData = LoadPlugin<IProfilesData>(dllName, new Object[] { connString });
+        if (ProfilesData == null)
+            throw new Exception("Could not find a storage interface in the given module");
+
     }
 }
 

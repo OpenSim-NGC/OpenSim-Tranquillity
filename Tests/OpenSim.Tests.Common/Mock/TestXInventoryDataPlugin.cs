@@ -30,148 +30,148 @@ using OpenMetaverse;
 using OpenSim.Data;
 using OpenSim.Data.Null;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+public class TestXInventoryDataPlugin : NullGenericDataHandler, IXInventoryData
 {
-    public class TestXInventoryDataPlugin : NullGenericDataHandler, IXInventoryData
+    private Dictionary<UUID, XInventoryFolder> m_allFolders = new Dictionary<UUID, XInventoryFolder>();
+    private Dictionary<UUID, XInventoryItem> m_allItems = new Dictionary<UUID, XInventoryItem>();
+
+    public TestXInventoryDataPlugin(string conn, string realm) {}
+
+    public XInventoryItem[] GetItems(string field, string val)
     {
-        private Dictionary<UUID, XInventoryFolder> m_allFolders = new Dictionary<UUID, XInventoryFolder>();
-        private Dictionary<UUID, XInventoryItem> m_allItems = new Dictionary<UUID, XInventoryItem>();
-
-        public TestXInventoryDataPlugin(string conn, string realm) {}
-
-        public XInventoryItem[] GetItems(string field, string val)
-        {
 //            Console.WriteLine(
 //                "Requesting items, fields {0}, vals {1}", string.Join(", ", fields), string.Join(", ", vals));
 
-            List<XInventoryItem> origItems = Get<XInventoryItem>(field, val, m_allItems.Values.ToList());
+        List<XInventoryItem> origItems = Get<XInventoryItem>(field, val, m_allItems.Values.ToList());
 
-            XInventoryItem[] items = origItems.Select(i => i.Clone()).ToArray();
+        XInventoryItem[] items = origItems.Select(i => i.Clone()).ToArray();
 
 //            Console.WriteLine("Found {0} items", items.Length);
 //            Array.ForEach(items, i => Console.WriteLine("Found item {0} {1}", i.inventoryName, i.inventoryID));
 
-            return items;
-        }
+        return items;
+    }
 
-        public XInventoryItem[] GetItems(string field, string[] vals)
-        {
+    public XInventoryItem[] GetItems(string field, string[] vals)
+    {
 //            Console.WriteLine(
 //                "Requesting items, fields {0}, vals {1}", string.Join(", ", fields), string.Join(", ", vals));
 
-            List<XInventoryItem> origItems = Get<XInventoryItem>(field, vals, m_allItems.Values.ToList());
+        List<XInventoryItem> origItems = Get<XInventoryItem>(field, vals, m_allItems.Values.ToList());
 
-            XInventoryItem[] items = origItems.Select(i => i.Clone()).ToArray();
+        XInventoryItem[] items = origItems.Select(i => i.Clone()).ToArray();
 
 //            Console.WriteLine("Found {0} items", items.Length);
 //            Array.ForEach(items, i => Console.WriteLine("Found item {0} {1}", i.inventoryName, i.inventoryID));
 
-            return items;
-        }
+        return items;
+    }
 
-        public XInventoryItem[] GetItems(string[] fields, string[] vals)
-        {
+    public XInventoryItem[] GetItems(string[] fields, string[] vals)
+    {
 //            Console.WriteLine(
 //                "Requesting items, fields {0}, vals {1}", string.Join(", ", fields), string.Join(", ", vals));
 
-            List<XInventoryItem> origItems = Get<XInventoryItem>(fields, vals, m_allItems.Values.ToList());
+        List<XInventoryItem> origItems = Get<XInventoryItem>(fields, vals, m_allItems.Values.ToList());
 
-            XInventoryItem[] items = origItems.Select(i => i.Clone()).ToArray();
+        XInventoryItem[] items = origItems.Select(i => i.Clone()).ToArray();
 
 //            Console.WriteLine("Found {0} items", items.Length);
 //            Array.ForEach(items, i => Console.WriteLine("Found item {0} {1}", i.inventoryName, i.inventoryID));
 
-            return items;
-        }
+        return items;
+    }
 
-        public XInventoryFolder[] GetFolders(string[] fields, string[] vals)
-        {
+    public XInventoryFolder[] GetFolders(string[] fields, string[] vals)
+    {
 //            Console.WriteLine(
 //                "Requesting folders, fields {0}, vals {1}", string.Join(", ", fields), string.Join(", ", vals));
 
-            List<XInventoryFolder> origFolders
-                = Get<XInventoryFolder>(fields, vals, m_allFolders.Values.ToList());
+        List<XInventoryFolder> origFolders
+            = Get<XInventoryFolder>(fields, vals, m_allFolders.Values.ToList());
 
-            XInventoryFolder[] folders = origFolders.Select(f => f.Clone()).ToArray();
+        XInventoryFolder[] folders = origFolders.Select(f => f.Clone()).ToArray();
 
 //            Console.WriteLine("Found {0} folders", folders.Length);
 //            Array.ForEach(folders, f => Console.WriteLine("Found folder {0} {1}", f.folderName, f.folderID));
 
-            return folders;
-        }
+        return folders;
+    }
 
-        public bool StoreFolder(XInventoryFolder folder)
-        {
-            m_allFolders[folder.folderID] = folder.Clone();
+    public bool StoreFolder(XInventoryFolder folder)
+    {
+        m_allFolders[folder.folderID] = folder.Clone();
 
 //            Console.WriteLine("Added folder {0} {1}", folder.folderName, folder.folderID);
 
-            return true;
-        }
+        return true;
+    }
 
-        public bool StoreItem(XInventoryItem item)
-        {
-            m_allItems[item.inventoryID] = item.Clone();
+    public bool StoreItem(XInventoryItem item)
+    {
+        m_allItems[item.inventoryID] = item.Clone();
 
 //            Console.WriteLine(
 //                "Added item {0} {1}, folder {2}, creator {3}, owner {4}",
 //                item.inventoryName, item.inventoryID, item.parentFolderID, item.creatorID, item.avatarID);
 
-            return true;
-        }
+        return true;
+    }
 
-        public bool DeleteFolders(string field, string val)
-        {
-            return DeleteFolders(new string[] { field }, new string[] { val });
-        }
+    public bool DeleteFolders(string field, string val)
+    {
+        return DeleteFolders(new string[] { field }, new string[] { val });
+    }
 
-        public bool DeleteFolders(string[] fields, string[] vals)
-        {
-            XInventoryFolder[] foldersToDelete = GetFolders(fields, vals);
-            Array.ForEach(foldersToDelete, f => m_allFolders.Remove(f.folderID));
+    public bool DeleteFolders(string[] fields, string[] vals)
+    {
+        XInventoryFolder[] foldersToDelete = GetFolders(fields, vals);
+        Array.ForEach(foldersToDelete, f => m_allFolders.Remove(f.folderID));
 
-            return true;
-        }
+        return true;
+    }
 
-        public bool DeleteItems(string field, string val)
-        {
-            return DeleteItems(new string[] { field }, new string[] { val });
-        }
+    public bool DeleteItems(string field, string val)
+    {
+        return DeleteItems(new string[] { field }, new string[] { val });
+    }
 
-        public bool DeleteItems(string[] fields, string[] vals)
-        {
-            XInventoryItem[] itemsToDelete = GetItems(fields, vals);
-            Array.ForEach(itemsToDelete, i => m_allItems.Remove(i.inventoryID));
+    public bool DeleteItems(string[] fields, string[] vals)
+    {
+        XInventoryItem[] itemsToDelete = GetItems(fields, vals);
+        Array.ForEach(itemsToDelete, i => m_allItems.Remove(i.inventoryID));
 
-            return true;
-        }
+        return true;
+    }
 
-        public bool MoveItem(string id, string newParent)
-        {
-            UUID uid = new UUID(id);
-            UUID upid = new UUID(newParent);
-            m_allItems[uid].parentFolderID = upid;
-            return true;
-        }
+    public bool MoveItem(string id, string newParent)
+    {
+        UUID uid = new UUID(id);
+        UUID upid = new UUID(newParent);
+        m_allItems[uid].parentFolderID = upid;
+        return true;
+    }
 
-        public bool MoveItems(string[] ids, string[] newParents)
-        {
-            if(ids.Length != newParents.Length)
-                return false;
-            for(int i =0; i< ids.Length;++i)
-                MoveItem(ids[i], newParents[i]);
-            return true;
-        }
+    public bool MoveItems(string[] ids, string[] newParents)
+    {
+        if(ids.Length != newParents.Length)
+            return false;
+        for(int i =0; i< ids.Length;++i)
+            MoveItem(ids[i], newParents[i]);
+        return true;
+    }
 
-        public bool MoveFolder(string id, string newParent)
-        {
-            // Don't use GetFolders() here - it takes a clone!
-            XInventoryFolder folder = m_allFolders[new UUID(id)];
+    public bool MoveFolder(string id, string newParent)
+    {
+        // Don't use GetFolders() here - it takes a clone!
+        XInventoryFolder folder = m_allFolders[new UUID(id)];
 
-            if (folder == null)
-                return false;
+        if (folder == null)
+            return false;
 
-            folder.parentFolderID = new UUID(newParent);
+        folder.parentFolderID = new UUID(newParent);
 
 //            XInventoryFolder[] newParentFolders
 //                = GetFolders(new string[] { "folderID" }, new string[] { folder.parentFolderID.ToString() });
@@ -180,18 +180,17 @@ namespace OpenSim.Tests.Common
 //                "Moved folder {0} {1}, to {2} {3}",
 //                folder.folderName, folder.folderID, newParentFolders[0].folderName, folder.parentFolderID);
 
-            // TODO: Really need to implement folder version incrementing, though this should be common code anyway,
-            // not reimplemented in each db plugin.
+        // TODO: Really need to implement folder version incrementing, though this should be common code anyway,
+        // not reimplemented in each db plugin.
 
-            return true;
-        }
+        return true;
+    }
 
-        public XInventoryItem[] GetActiveGestures(UUID principalID) { throw new NotImplementedException(); }
-        public int GetAssetPermissions(UUID principalID, UUID assetID) { throw new NotImplementedException(); }
+    public XInventoryItem[] GetActiveGestures(UUID principalID) { throw new NotImplementedException(); }
+    public int GetAssetPermissions(UUID principalID, UUID assetID) { throw new NotImplementedException(); }
 
-        public XInventoryFolder[] GetFolder(string field, string val)
-        {
-            throw new NotImplementedException();
-        }
+    public XInventoryFolder[] GetFolder(string field, string val)
+    {
+        throw new NotImplementedException();
     }
 }

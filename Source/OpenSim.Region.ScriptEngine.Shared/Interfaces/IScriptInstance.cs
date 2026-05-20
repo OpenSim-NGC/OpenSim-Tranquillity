@@ -25,226 +25,220 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Threading;
 using System.Diagnostics;
 using OpenMetaverse;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Interfaces;
 
-namespace OpenSim.Region.ScriptEngine.Interfaces
+namespace OpenSim.Region.ScriptEngine.Interfaces;
+
+public enum StateSource
 {
-    public enum StateSource
-    {
-        None = -1,
-        RegionStart = 0,
-        NewRez = 1,
-        PrimCrossing = 2,
-        ScriptedRez = 3,
-        AttachedRez = 4,
-        Teleporting = 5
-    }
+    None = -1,
+    RegionStart = 0,
+    NewRez = 1,
+    PrimCrossing = 2,
+    ScriptedRez = 3,
+    AttachedRez = 4,
+    Teleporting = 5
+}
 
-    public interface IScriptWorkItem
-    {
-        bool Cancel();
-        bool Abort();
-
-        /// <summary>
-        /// Wait for the work item to complete.
-        /// </summary>
-        /// <param name='t'>The number of milliseconds to wait.  Must be >= -1 (Timeout.Infinite).</param>
-        bool Wait(int t);
-    }
+public interface IScriptWorkItem
+{
+    bool Cancel();
+    bool Abort();
 
     /// <summary>
-    /// Interface for interaction with a particular script instance
+    /// Wait for the work item to complete.
     /// </summary>
-    public interface IScriptInstance
-    {
-        /// <summary>
-        /// Debug level for this script instance.
-        /// </summary>
-        /// <remarks>
-        /// Level == 0, no extra data is logged.
-        /// Level >= 1, state changes are logged.
-        /// Level >= 2, event firing is logged.
-        /// <value>
-        /// The debug level.
-        /// </value>
-        int DebugLevel { get; set; }
+    /// <param name='t'>The number of milliseconds to wait.  Must be >= -1 (Timeout.Infinite).</param>
+    bool Wait(int t);
+}
 
-        /// <summary>
-        /// Is the script currently running?
-        /// </summary>
-        bool Running { get; set; }
+/// <summary>
+/// Interface for interaction with a particular script instance
+/// </summary>
+public interface IScriptInstance
+{
+    /// <summary>
+    /// Debug level for this script instance.
+    /// </summary>
+    /// <remarks>
+    /// Level == 0, no extra data is logged.
+    /// Level >= 1, state changes are logged.
+    /// Level >= 2, event firing is logged.
+    /// <value>
+    /// The debug level.
+    /// </value>
+    int DebugLevel { get; set; }
 
-        /// <summary>
-        /// Is the script suspended?
-        /// </summary>
-        bool Suspended { get; set; }
+    /// <summary>
+    /// Is the script currently running?
+    /// </summary>
+    bool Running { get; set; }
 
-        /// <summary>
-        /// Is the script shutting down?
-        /// </summary>
-        bool ShuttingDown { get; set; }
+    /// <summary>
+    /// Is the script suspended?
+    /// </summary>
+    bool Suspended { get; set; }
 
-        /// <summary>
-        /// When stopping the script: should it remain stopped permanently (i.e., save !Running in its state)?
-        /// </summary>
-        bool StayStopped { get; set; }
+    /// <summary>
+    /// Is the script shutting down?
+    /// </summary>
+    bool ShuttingDown { get; set; }
 
-        /// <summary>
-        /// Script state
-        /// </summary>
-        string State { get; set; }
+    /// <summary>
+    /// When stopping the script: should it remain stopped permanently (i.e., save !Running in its state)?
+    /// </summary>
+    bool StayStopped { get; set; }
 
-        /// <summary>
-        /// If true then the engine is responsible for persisted state.  If false then some other component may
-        /// persist state (e.g. attachments persisting in assets).
-        /// </summary>
-        bool StatePersistedHere { get; }
+    /// <summary>
+    /// Script state
+    /// </summary>
+    string State { get; set; }
 
-        /// <summary>
-        /// Time the script was last started
-        /// </summary>
-        DateTime TimeStarted { get; }
+    /// <summary>
+    /// If true then the engine is responsible for persisted state.  If false then some other component may
+    /// persist state (e.g. attachments persisting in assets).
+    /// </summary>
+    bool StatePersistedHere { get; }
 
-        /// <summary>
-        /// Collects information about how long the script was executed.
-        /// </summary>
-        MetricsCollectorTime ExecutionTime { get; }
+    /// <summary>
+    /// Time the script was last started
+    /// </summary>
+    DateTime TimeStarted { get; }
 
-        /// <summary>
-        /// Scene part in which this script instance is contained.
-        /// </summary>
-        SceneObjectPart Part { get; }
+    /// <summary>
+    /// Collects information about how long the script was executed.
+    /// </summary>
+    MetricsCollectorTime ExecutionTime { get; }
 
-        IScriptEngine Engine { get; }
-        UUID AppDomain { get; set; }
-        string PrimName { get; }
-        string ScriptName { get; }
-        UUID ItemID { get; }
-        UUID ObjectID { get; }
+    /// <summary>
+    /// Scene part in which this script instance is contained.
+    /// </summary>
+    SceneObjectPart Part { get; }
 
-        /// <summary>
-        /// UUID of the root object for the linkset that the script is in.
-        /// </summary>
-        UUID RootObjectID { get; }
+    IScriptEngine Engine { get; }
+    UUID AppDomain { get; set; }
+    string PrimName { get; }
+    string ScriptName { get; }
+    UUID ItemID { get; }
+    UUID ObjectID { get; }
 
-        /// <summary>
-        /// Local id of the root object for the linkset that the script is in.
-        /// </summary>
-        uint RootLocalID { get; }
+    /// <summary>
+    /// UUID of the root object for the linkset that the script is in.
+    /// </summary>
+    UUID RootObjectID { get; }
 
-        uint LocalID { get; }
-        UUID AssetID { get; }
+    /// <summary>
+    /// Local id of the root object for the linkset that the script is in.
+    /// </summary>
+    uint RootLocalID { get; }
 
-        /// <summary>
-        /// Inventory item containing the script used.
-        /// </summary>
-        TaskInventoryItem ScriptTask { get; }
+    uint LocalID { get; }
+    UUID AssetID { get; }
 
-        Queue EventQueue { get; }
+    /// <summary>
+    /// Inventory item containing the script used.
+    /// </summary>
+    TaskInventoryItem ScriptTask { get; }
 
-        /// <summary>
-        /// Number of events queued for processing.
-        /// </summary>
-        long EventsQueued { get; }
+    Queue EventQueue { get; }
 
-        /// <summary>
-        /// Number of events processed by this script instance.
-        /// </summary>
-        long EventsProcessed { get; }
+    /// <summary>
+    /// Number of events queued for processing.
+    /// </summary>
+    long EventsQueued { get; }
 
-        void ClearQueue();
-        int StartParam { get; set; }
+    /// <summary>
+    /// Number of events processed by this script instance.
+    /// </summary>
+    long EventsProcessed { get; }
 
-        WaitHandle CoopWaitHandle { get; }
-        Stopwatch ExecutionTimer { get; }
+    void ClearQueue();
+    int StartParam { get; set; }
 
-        void RemoveState();
+    WaitHandle CoopWaitHandle { get; }
+    Stopwatch ExecutionTimer { get; }
 
-        void Init();
-        void Start();
+    void RemoveState();
 
-        /// <summary>
-        /// Stop the script instance.
-        /// </summary>
-        /// <remarks>
-        /// This must not be called by a thread that is in the process of handling an event for this script.  Otherwise
-        /// there is a danger that it will self-abort and not complete the reset.
-        /// </remarks>
-        /// <param name="timeout"></param>
-        /// How many milliseconds we will wait for an existing script event to finish before
-        /// forcibly aborting that event.
-        /// <param name="clearEventQueue">If true then the event queue is also cleared</param>
-        /// <returns>true if the script was successfully stopped, false otherwise</returns>
-        bool Stop(int timeout, bool clearEventQueue = false);
+    void Init();
+    void Start();
 
-        void SetState(string state);
+    /// <summary>
+    /// Stop the script instance.
+    /// </summary>
+    /// <remarks>
+    /// This must not be called by a thread that is in the process of handling an event for this script.  Otherwise
+    /// there is a danger that it will self-abort and not complete the reset.
+    /// </remarks>
+    /// <param name="timeout"></param>
+    /// How many milliseconds we will wait for an existing script event to finish before
+    /// forcibly aborting that event.
+    /// <param name="clearEventQueue">If true then the event queue is also cleared</param>
+    /// <returns>true if the script was successfully stopped, false otherwise</returns>
+    bool Stop(int timeout, bool clearEventQueue = false);
 
-        /// <summary>
-        /// Post an event to this script instance.
-        /// </summary>
-        /// <param name="data"></param>
-        void PostEvent(EventParams data);
+    void SetState(string state);
 
-        void Suspend();
-        void Resume();
+    /// <summary>
+    /// Post an event to this script instance.
+    /// </summary>
+    /// <param name="data"></param>
+    void PostEvent(EventParams data);
 
-        /// <summary>
-        /// Process the next event queued for this script instance.
-        /// </summary>
-        /// <returns></returns>
-        void EventProcessor();
+    void Suspend();
+    void Resume();
 
-        int EventTime();
+    /// <summary>
+    /// Process the next event queued for this script instance.
+    /// </summary>
+    /// <returns></returns>
+    void EventProcessor();
 
-        /// <summary>
-        /// Reset the script.
-        /// </summary>
-        /// <remarks>
-        /// This must not be called by a thread that is in the process of handling an event for this script.  Otherwise
-        /// there is a danger that it will self-abort and not complete the reset.  Such a thread must call
-        /// ApiResetScript() instead.
-        /// </remarks>
-        /// <param name='timeout'>
-        /// How many milliseconds we will wait for an existing script event to finish before
-        /// forcibly aborting that event prior to script reset.
-        /// </param>
-        void ResetScript(int timeout);
+    int EventTime();
 
-        /// <summary>
-        /// Reset the script.
-        /// </summary>
-        /// <remarks>
-        /// This must not be called by any thread other than the one executing the scripts current event.  This is
-        /// because there is no wait or abort logic if another thread is in the middle of processing a script event.
-        /// Such an external thread should use ResetScript() instead.
-        /// </remarks>
-        void ApiResetScript();
+    /// <summary>
+    /// Reset the script.
+    /// </summary>
+    /// <remarks>
+    /// This must not be called by a thread that is in the process of handling an event for this script.  Otherwise
+    /// there is a danger that it will self-abort and not complete the reset.  Such a thread must call
+    /// ApiResetScript() instead.
+    /// </remarks>
+    /// <param name='timeout'>
+    /// How many milliseconds we will wait for an existing script event to finish before
+    /// forcibly aborting that event prior to script reset.
+    /// </param>
+    void ResetScript(int timeout);
 
-        Dictionary<string, object> GetVars();
-        void SetVars(Dictionary<string, object> vars);
-        DetectParams GetDetectParams(int idx);
-        UUID GetDetectID(int idx);
-        void SaveState();
-        void DestroyScriptInstance();
+    /// <summary>
+    /// Reset the script.
+    /// </summary>
+    /// <remarks>
+    /// This must not be called by any thread other than the one executing the scripts current event.  This is
+    /// because there is no wait or abort logic if another thread is in the middle of processing a script event.
+    /// Such an external thread should use ResetScript() instead.
+    /// </remarks>
+    void ApiResetScript();
 
-        IScriptApi GetApi(string name);
+    Dictionary<string, object> GetVars();
+    void SetVars(Dictionary<string, object> vars);
+    DetectParams GetDetectParams(int idx);
+    UUID GetDetectID(int idx);
+    void SaveState();
+    void DestroyScriptInstance();
 
-        Dictionary<KeyValuePair<int, int>, KeyValuePair<int, int>> LineMap
-                { get; set; }
+    IScriptApi GetApi(string name);
 
-        string GetAssemblyName();
-        string GetXMLState();
-        double MinEventDelay { set; }
-        UUID RegionID { get; }
-    }
+    Dictionary<KeyValuePair<int, int>, KeyValuePair<int, int>> LineMap
+            { get; set; }
+
+    string GetAssemblyName();
+    string GetXMLState();
+    double MinEventDelay { set; }
+    UUID RegionID { get; }
 }

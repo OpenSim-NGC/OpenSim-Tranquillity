@@ -29,35 +29,34 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using System.Data.SQLite;
 
-namespace OpenSim.Data.SQLite
+namespace OpenSim.Data.SQLite;
+
+public class SQLiteMuteListData : SQLiteGenericTableHandler<MuteData>, IMuteListData
 {
-    public class SQLiteMuteListData : SQLiteGenericTableHandler<MuteData>, IMuteListData
+    public SQLiteMuteListData(string connectionString)
+            : base(connectionString, "MuteList", "MuteListStore")
     {
-        public SQLiteMuteListData(string connectionString)
-                : base(connectionString, "MuteList", "MuteListStore")
+    }
+
+    public MuteData[] Get(UUID agentID)
+    {
+        MuteData[] data = base.Get("AgentID", agentID.ToString());
+        return data;
+    }
+
+    public bool Delete(UUID agentID, UUID muteID, string muteName)
+    {
+        using (SQLiteCommand cmd = new SQLiteCommand())
         {
-        }
+            cmd.CommandText = "delete from MuteList where `AgentID` = :AgentID and `MuteID` = :MuteID and `MuteName` = :MuteName";
 
-        public MuteData[] Get(UUID agentID)
-        {
-            MuteData[] data = base.Get("AgentID", agentID.ToString());
-            return data;
-        }
+            cmd.Parameters.AddWithValue(":AgentID", agentID.ToString());
+            cmd.Parameters.AddWithValue(":MuteID", muteID.ToString());
+            cmd.Parameters.AddWithValue(":MuteName", muteName);
 
-        public bool Delete(UUID agentID, UUID muteID, string muteName)
-        {
-            using (SQLiteCommand cmd = new SQLiteCommand())
-            {
-                cmd.CommandText = "delete from MuteList where `AgentID` = :AgentID and `MuteID` = :MuteID and `MuteName` = :MuteName";
-
-                cmd.Parameters.AddWithValue(":AgentID", agentID.ToString());
-                cmd.Parameters.AddWithValue(":MuteID", muteID.ToString());
-                cmd.Parameters.AddWithValue(":MuteName", muteName);
-
-                if (ExecuteNonQuery(cmd, m_Connection) > 0)
-                    return true;
-                return false;
-            }
+            if (ExecuteNonQuery(cmd, m_Connection) > 0)
+                return true;
+            return false;
         }
     }
 }

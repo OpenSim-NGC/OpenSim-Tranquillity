@@ -33,81 +33,80 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar;
+
+public class RemoteAvatarServicesConnector : AvatarServicesConnector,
+        ISharedRegionModule, IAvatarService
 {
-    public class RemoteAvatarServicesConnector : AvatarServicesConnector,
-            ISharedRegionModule, IAvatarService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private bool m_Enabled = false;
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        private bool m_Enabled = false;
+    public string Name
+    {
+        get { return "RemoteAvatarServicesConnector"; }
+    }
 
-        public Type ReplaceableInterface
+    public override void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "RemoteAvatarServicesConnector"; }
-        }
-
-        public override void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("AvatarServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("AvatarServices", "");
-                if (name == Name)
+                IConfig userConfig = source.Configs["AvatarService"];
+                if (userConfig == null)
                 {
-                    IConfig userConfig = source.Configs["AvatarService"];
-                    if (userConfig == null)
-                    {
-                        m_log.Error("[AVATAR CONNECTOR]: AvatarService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    m_Enabled = true;
-
-                    base.Initialise(source);
-
-                    m_log.Info("[AVATAR CONNECTOR]: Remote avatars enabled");
+                    m_log.Error("[AVATAR CONNECTOR]: AvatarService missing from OpenSim.ini");
+                    return;
                 }
+
+                m_Enabled = true;
+
+                base.Initialise(source);
+
+                m_log.Info("[AVATAR CONNECTOR]: Remote avatars enabled");
             }
         }
+    }
 
-        public void PostInitialise()
-        {
-            if (!m_Enabled)
-                return;
-        }
+    public void PostInitialise()
+    {
+        if (!m_Enabled)
+            return;
+    }
 
-        public void Close()
-        {
-            if (!m_Enabled)
-                return;
-        }
+    public void Close()
+    {
+        if (!m_Enabled)
+            return;
+    }
 
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
 
-            scene.RegisterModuleInterface<IAvatarService>(this);
-        }
+        scene.RegisterModuleInterface<IAvatarService>(this);
+    }
 
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
 
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
     }
 }

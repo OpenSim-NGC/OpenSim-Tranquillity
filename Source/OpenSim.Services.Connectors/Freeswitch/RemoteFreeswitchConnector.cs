@@ -26,78 +26,73 @@
  */
 
 using log4net;
-using System;
-using System.IO;
 using System.Collections;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
 
 using OpenSim.Services.Interfaces;
-using OpenSim.Server.Base;
-using OpenMetaverse;
 
-namespace OpenSim.Services.Connectors
+namespace OpenSim.Services.Connectors;
+
+public class RemoteFreeswitchConnector : IFreeswitchService
 {
-    public class RemoteFreeswitchConnector : IFreeswitchService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private string m_ServerURI = String.Empty;
+
+    public RemoteFreeswitchConnector()
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        private string m_ServerURI = String.Empty;
+    public RemoteFreeswitchConnector(string serverURI)
+    {
+        m_ServerURI = serverURI.TrimEnd('/') + "/region-config";
+    }
 
-        public RemoteFreeswitchConnector()
+    public RemoteFreeswitchConnector(IConfigSource source)
+    {
+        Initialise(source);
+    }
+
+    public virtual void Initialise(IConfigSource source)
+    {
+        IConfig freeswitchConfig = source.Configs["FreeSwitchVoice"];
+        if (freeswitchConfig == null)
         {
+            m_log.Error("[FREESWITCH CONNECTOR]: FreeSwitchVoice missing from OpenSim.ini");
+            throw new Exception("Freeswitch connector init error");
         }
 
-        public RemoteFreeswitchConnector(string serverURI)
+        string serviceURI = freeswitchConfig.GetString("FreeswitchServiceURL",
+                String.Empty);
+
+        if (serviceURI.Length == 0)
         {
-            m_ServerURI = serverURI.TrimEnd('/') + "/region-config";
+            m_log.Error("[FREESWITCH CONNECTOR]: No FreeswitchServiceURL named in section FreeSwitchVoice");
+            throw new Exception("Freeswitch connector init error");
         }
+        m_ServerURI = serviceURI.TrimEnd('/') + "/region-config";
+    }
 
-        public RemoteFreeswitchConnector(IConfigSource source)
-        {
-            Initialise(source);
-        }
+    public Hashtable HandleDirectoryRequest(Hashtable requestBody)
+    {
+        // not used here
+        return new Hashtable();
+    }
 
-        public virtual void Initialise(IConfigSource source)
-        {
-            IConfig freeswitchConfig = source.Configs["FreeSwitchVoice"];
-            if (freeswitchConfig == null)
-            {
-                m_log.Error("[FREESWITCH CONNECTOR]: FreeSwitchVoice missing from OpenSim.ini");
-                throw new Exception("Freeswitch connector init error");
-            }
+    public Hashtable HandleDialplanRequest(Hashtable requestBody)
+    {
+        // not used here
+        return new Hashtable();
+    }
 
-            string serviceURI = freeswitchConfig.GetString("FreeswitchServiceURL",
-                    String.Empty);
-
-            if (serviceURI.Length == 0)
-            {
-                m_log.Error("[FREESWITCH CONNECTOR]: No FreeswitchServiceURL named in section FreeSwitchVoice");
-                throw new Exception("Freeswitch connector init error");
-            }
-            m_ServerURI = serviceURI.TrimEnd('/') + "/region-config";
-        }
-
-        public Hashtable HandleDirectoryRequest(Hashtable requestBody)
-        {
-            // not used here
-            return new Hashtable();
-        }
-
-        public Hashtable HandleDialplanRequest(Hashtable requestBody)
-        {
-            // not used here
-            return new Hashtable();
-        }
-
-        public string GetJsonConfig()
-        {
-            m_log.DebugFormat("[FREESWITCH CONNECTOR]: Requesting config from {0}", m_ServerURI);
-            return SynchronousRestFormsRequester.MakeRequest("GET",
-                    m_ServerURI, String.Empty);
-        }
+    public string GetJsonConfig()
+    {
+        m_log.DebugFormat("[FREESWITCH CONNECTOR]: Requesting config from {0}", m_ServerURI);
+        return SynchronousRestFormsRequester.MakeRequest("GET",
+                m_ServerURI, String.Empty);
     }
 }

@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 
@@ -36,69 +34,68 @@ using OpenSim.Framework.Servers.HttpServer;
 
 using log4net;
 
-namespace OpenSim.Server.Handlers.Simulation
+namespace OpenSim.Server.Handlers.Simulation;
+
+public class Utils
 {
-    public class Utils
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    public static byte[] falseStrBytes = osUTF8.GetASCIIBytes("false");
+
+    /// <summary>
+    /// Extract the param from an uri.
+    /// </summary>
+    /// <param name="uri">Something like this: /agent/uuid/ or /agent/uuid/handle/release</param>
+    /// <param name="uri">uuid on uuid field</param>
+    /// <param name="action">optional action</param>
+    public static bool GetParams(string uri, out UUID uuid, out UUID regionID, out string action)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        uuid = UUID.Zero;
+        regionID = UUID.Zero;
+        action = "";
 
-        public static byte[] falseStrBytes = osUTF8.GetASCIIBytes("false");
-
-        /// <summary>
-        /// Extract the param from an uri.
-        /// </summary>
-        /// <param name="uri">Something like this: /agent/uuid/ or /agent/uuid/handle/release</param>
-        /// <param name="uri">uuid on uuid field</param>
-        /// <param name="action">optional action</param>
-        public static bool GetParams(string uri, out UUID uuid, out UUID regionID, out string action)
+        uri = uri.Trim(new char[] { '/' });
+        string[] parts = uri.Split('/');
+        if (parts.Length <= 1)
         {
-            uuid = UUID.Zero;
-            regionID = UUID.Zero;
-            action = "";
-
-            uri = uri.Trim(new char[] { '/' });
-            string[] parts = uri.Split('/');
-            if (parts.Length <= 1)
-            {
-                return false;
-            }
-            else
-            {
-                if (!UUID.TryParse(parts[1], out uuid))
-                    return false;
-
-                if (parts.Length >= 3)
-                    UUID.TryParse(parts[2], out regionID);
-                if (parts.Length >= 4)
-                    action = parts[3];
-
-                return true;
-            }
+            return false;
         }
-
-        public static OSDMap DeserializeJSONOSMap(IOSHttpRequest httpRequest)
+        else
         {
-            Stream inputStream = httpRequest.InputStream;
-            Stream innerStream = null;
-            try
+            if (!UUID.TryParse(parts[1], out uuid))
+                return false;
+
+            if (parts.Length >= 3)
+                UUID.TryParse(parts[2], out regionID);
+            if (parts.Length >= 4)
+                action = parts[3];
+
+            return true;
+        }
+    }
+
+    public static OSDMap DeserializeJSONOSMap(IOSHttpRequest httpRequest)
+    {
+        Stream inputStream = httpRequest.InputStream;
+        Stream innerStream = null;
+        try
+        {
+            if ((httpRequest.ContentType == "application/x-gzip" || httpRequest.Headers["Content-Encoding"] == "gzip") || (httpRequest.Headers["X-Content-Encoding"] == "gzip"))
             {
-                if ((httpRequest.ContentType == "application/x-gzip" || httpRequest.Headers["Content-Encoding"] == "gzip") || (httpRequest.Headers["X-Content-Encoding"] == "gzip"))
-                {
-                    innerStream = inputStream;
-                    inputStream = new GZipStream(innerStream, CompressionMode.Decompress);
-                }
-                return (OSDMap)OSDParser.DeserializeJson(inputStream);
+                innerStream = inputStream;
+                inputStream = new GZipStream(innerStream, CompressionMode.Decompress);
             }
-            catch
-            {
-                return null;
-            }
-            finally
-            {
-                if (innerStream != null)
-                    innerStream.Dispose();
-                inputStream.Dispose();
-            }
+            return (OSDMap)OSDParser.DeserializeJson(inputStream);
+        }
+        catch
+        {
+            return null;
+        }
+        finally
+        {
+            if (innerStream != null)
+                innerStream.Dispose();
+            inputStream.Dispose();
         }
     }
 }

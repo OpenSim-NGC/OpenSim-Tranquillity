@@ -27,19 +27,18 @@
 
 using OpenSim.Framework;
 
-namespace OpenSim.Region.ClientStack.LindenUDP
+namespace OpenSim.Region.ClientStack.LindenUDP;
+
+public class PluginRegistration : IPluginRegistryProvider
 {
-    public class PluginRegistration : IPluginRegistryProvider
+    public void RegisterPlugins(PluginRegistry registry)
     {
-        public void RegisterPlugins(PluginRegistry registry)
-        {
-            registry.Register(
-                "/OpenSim/RegionModules",
-                new PluginDescriptor(
-                    "LLUDPServerShim",
-                    typeof(LLUDPServerShim),
-                    "LLUDPServerShim",
-                    "0.9"));
-        }
+        registry.Register(
+            "/OpenSim/RegionModules",
+            new PluginDescriptor(
+                "LLUDPServerShim",
+                typeof(LLUDPServerShim),
+                "LLUDPServerShim",
+                "0.9"));
     }
 }

@@ -35,9 +35,6 @@ using System.Text;
 using Timer = System.Timers.Timer;
 using OpenSim.Framework.Monitoring;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography.X509Certificates;
-using System.Net.Security;
-using System.Net;
 using OpenSim.Server.MoneyServer.Controllers;
 using OpenSim.Server.MoneyServer.Models;
 
@@ -224,7 +221,6 @@ public class MoneyService : IMoneyServiceCore, IHostedService
         MainServer.Stop();
 
         Thread.Sleep(500);
-        Util.StopThreadPool();
         WorkManager.Stop();
 
         _serverBase.Shutdown();

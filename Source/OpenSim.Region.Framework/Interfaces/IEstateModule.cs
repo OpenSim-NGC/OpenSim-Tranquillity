@@ -29,52 +29,50 @@ using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
-using System.Collections.Generic;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public delegate void ChangeDelegate(UUID regionID);
+public delegate void MessageDelegate(UUID regionID, UUID fromID, string fromName, string message);
+
+public interface IEstateModule
 {
-    public delegate void ChangeDelegate(UUID regionID);
-    public delegate void MessageDelegate(UUID regionID, UUID fromID, string fromName, string message);
+    event ChangeDelegate OnRegionInfoChange;
+    event ChangeDelegate OnEstateInfoChange;
+    event MessageDelegate OnEstateMessage;
+    event EstateTeleportOneUserHomeRequest OnEstateTeleportOneUserHomeRequest;
+    event EstateTeleportAllUsersHomeRequest OnEstateTeleportAllUsersHomeRequest;
 
-    public interface IEstateModule
-    {
-        event ChangeDelegate OnRegionInfoChange;
-        event ChangeDelegate OnEstateInfoChange;
-        event MessageDelegate OnEstateMessage;
-        event EstateTeleportOneUserHomeRequest OnEstateTeleportOneUserHomeRequest;
-        event EstateTeleportAllUsersHomeRequest OnEstateTeleportAllUsersHomeRequest;
+    uint GetRegionFlags();
+    bool IsManager(UUID avatarID);
 
-        uint GetRegionFlags();
-        bool IsManager(UUID avatarID);
+    string SetEstateOwner(int estateID, UserAccount account);
+    string SetEstateName(int estateID, string newName);
+    string SetRegionEstate(RegionInfo regionInfo, int estateID);
+    string CreateEstate(string estateName, UUID ownerID);
 
-        string SetEstateOwner(int estateID, UserAccount account);
-        string SetEstateName(int estateID, string newName);
-        string SetRegionEstate(RegionInfo regionInfo, int estateID);
-        string CreateEstate(string estateName, UUID ownerID);
+    /// <summary>
+    /// Tell all clients about the current state of the region (terrain textures, water height, etc.).
+    /// </summary>
+    void sendRegionHandshakeToAll();
+    void TriggerEstateInfoChange();
 
-        /// <summary>
-        /// Tell all clients about the current state of the region (terrain textures, water height, etc.).
-        /// </summary>
-        void sendRegionHandshakeToAll();
-        void TriggerEstateInfoChange();
+    /// <summary>
+    /// Fires the OnRegionInfoChange event.
+    /// </summary>
+    void TriggerRegionInfoChange();
 
-        /// <summary>
-        /// Fires the OnRegionInfoChange event.
-        /// </summary>
-        void TriggerRegionInfoChange();
+    void setEstateTerrainBaseTexture(int level, UUID texture);
+    void SetEstateTerrainTextures(List<UUID> textureIDs, int types);
+    void setEstateTerrainTextureHeights(int corner, float lowValue, float highValue);
 
-        void setEstateTerrainBaseTexture(int level, UUID texture);
-        void SetEstateTerrainTextures(List<UUID> textureIDs, int types);
-        void setEstateTerrainTextureHeights(int corner, float lowValue, float highValue);
-
-        /// <summary>
-        /// Returns whether the transfer ID is being used for a terrain transfer.
-        /// </summary>
-        bool IsTerrainXfer(ulong xferID);
-        bool handleEstateChangeInfoCap(string estateName, UUID invoice,
-            bool externallyVisible, bool allowDirectTeleport, bool denyAnonymous, bool denyAgeUnverified,
-            bool alloVoiceChat, bool overridePublicAccess, bool allowEnvironmentOverride);
-        void HandleRegionInfoRequest(IClientAPI remote_client);
-        bool SetRegionInfobyCap(OSDMap map);
-    }
+    /// <summary>
+    /// Returns whether the transfer ID is being used for a terrain transfer.
+    /// </summary>
+    bool IsTerrainXfer(ulong xferID);
+    bool handleEstateChangeInfoCap(string estateName, UUID invoice,
+        bool externallyVisible, bool allowDirectTeleport, bool denyAnonymous, bool denyAgeUnverified,
+        bool alloVoiceChat, bool overridePublicAccess, bool allowEnvironmentOverride);
+    void HandleRegionInfoRequest(IClientAPI remote_client);
+    bool SetRegionInfobyCap(OSDMap map);
 }

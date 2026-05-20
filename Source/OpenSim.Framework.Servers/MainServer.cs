@@ -25,404 +25,397 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Net;
 using System.Text;
-using log4net;
-using OpenSim.Framework;
-using OpenSim.Framework.Console;
 using OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Framework.Servers
+namespace OpenSim.Framework.Servers;
+
+public class MainServer
 {
-    public class MainServer
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private static BaseHttpServer instance = null;
-        private static BaseHttpServer unsecureinstance = null;
-        private static Dictionary<uint, BaseHttpServer> m_Servers = new Dictionary<uint, BaseHttpServer>();
+    private static BaseHttpServer instance = null;
+    private static BaseHttpServer unsecureinstance = null;
+    private static Dictionary<uint, BaseHttpServer> m_Servers = new Dictionary<uint, BaseHttpServer>();
 
-        /// <summary>
-        /// Control the printing of certain debug messages.
-        /// </summary>
-        /// <remarks>
-        /// If DebugLevel >= 1 then short warnings are logged when receiving bad input data.
-        /// If DebugLevel >= 2 then long warnings are logged when receiving bad input data.
-        /// If DebugLevel >= 3 then short notices about all incoming non-poll HTTP requests are logged.
-        /// If DebugLevel >= 4 then the time taken to fulfill the request is logged.
-        /// If DebugLevel >= 5 then the start of the body of incoming non-poll HTTP requests will be logged.
-        /// If DebugLevel >= 6 then the entire body of incoming non-poll HTTP requests will be logged.
-        /// </remarks>
-        public static int DebugLevel
+    /// <summary>
+    /// Control the printing of certain debug messages.
+    /// </summary>
+    /// <remarks>
+    /// If DebugLevel >= 1 then short warnings are logged when receiving bad input data.
+    /// If DebugLevel >= 2 then long warnings are logged when receiving bad input data.
+    /// If DebugLevel >= 3 then short notices about all incoming non-poll HTTP requests are logged.
+    /// If DebugLevel >= 4 then the time taken to fulfill the request is logged.
+    /// If DebugLevel >= 5 then the start of the body of incoming non-poll HTTP requests will be logged.
+    /// If DebugLevel >= 6 then the entire body of incoming non-poll HTTP requests will be logged.
+    /// </remarks>
+    public static int DebugLevel
+    {
+        get { return s_debugLevel; }
+        set
         {
-            get { return s_debugLevel; }
-            set
-            {
-                s_debugLevel = value;
+            s_debugLevel = value;
 
-                lock (m_Servers)
-                    foreach (BaseHttpServer server in m_Servers.Values)
-                        server.DebugLevel = s_debugLevel;
+            lock (m_Servers)
+                foreach (BaseHttpServer server in m_Servers.Values)
+                    server.DebugLevel = s_debugLevel;
+        }
+    }
+
+    private static int s_debugLevel;
+
+    /// <summary>
+    /// Set the main HTTP server instance.
+    /// </summary>
+    /// <remarks>
+    /// This will be used to register all handlers that listen to the default port.
+    /// </remarks>
+    /// <exception cref='Exception'>
+    /// Thrown if the HTTP server has not already been registered via AddHttpServer()
+    /// </exception>
+    public static BaseHttpServer Instance
+    {
+        get { return instance; }
+
+        set
+        {
+            lock (m_Servers)
+            {
+                if (!m_Servers.ContainsValue(value))
+                    throw new Exception("HTTP server must already have been registered to be set as the main instance");
+
+                instance = value;
             }
         }
+    }
 
-        private static int s_debugLevel;
+    public static BaseHttpServer UnSecureInstance
+    {
+        get { return unsecureinstance; }
 
-        /// <summary>
-        /// Set the main HTTP server instance.
-        /// </summary>
-        /// <remarks>
-        /// This will be used to register all handlers that listen to the default port.
-        /// </remarks>
-        /// <exception cref='Exception'>
-        /// Thrown if the HTTP server has not already been registered via AddHttpServer()
-        /// </exception>
-        public static BaseHttpServer Instance
+        set
         {
-            get { return instance; }
+            lock (m_Servers)
+                if (!m_Servers.ContainsValue(value))
+                    throw new Exception("HTTP server must already have been registered to be set as the main instance");
 
-            set
+            unsecureinstance = value;
+        }
+    }
+
+    /// <summary>
+    /// Get all the registered servers.
+    /// </summary>
+    /// <remarks>
+    /// Returns a copy of the dictionary so this can be iterated through without locking.
+    /// </remarks>
+    /// <value></value>
+    public static Dictionary<uint, BaseHttpServer> Servers
+    {
+        get { return new Dictionary<uint, BaseHttpServer>(m_Servers); }
+    }
+
+    public static void RegisterHttpConsoleCommands(ICommandConsole console)
+    {
+        console.Commands.AddCommand(
+            "Comms", false, "show http-handlers",
+            "show http-handlers",
+            "Show all registered http handlers", HandleShowHttpHandlersCommand);
+
+        console.Commands.AddCommand(
+            "Debug", false, "debug http", "debug http <in|out|all> [<level>]",
+            "Turn on http request logging.",
+            "If in or all and\n"
+                + "  level <= 0 then no extra logging is done.\n"
+                + "  level >= 1 then short warnings are logged when receiving bad input data.\n"
+                + "  level >= 2 then long warnings are logged when receiving bad input data.\n"
+                + "  level >= 3 then short notices about all incoming non-poll HTTP requests are logged.\n"
+                + "  level >= 4 then the time taken to fulfill the request is logged.\n"
+                + "  level >= 5 then a sample from the beginning of the data is logged.\n"
+                + "  level >= 6 then the entire data is logged.\n"
+                + "  no level is specified then the current level is returned.\n\n"
+                + "If out or all and\n"
+                + "  level >= 3 then short notices about all outgoing requests going through WebUtil are logged.\n"
+                + "  level >= 4 then the time taken to fulfill the request is logged.\n"
+                + "  level >= 5 then a sample from the beginning of the data is logged.\n"
+                + "  level >= 6 then the entire data is logged.\n",
+            HandleDebugHttpCommand);
+    }
+
+    /// <summary>
+    /// Turn on some debugging values for OpenSim.
+    /// </summary>
+    /// <param name="args"></param>
+    private static void HandleDebugHttpCommand(string module, string[] cmdparams)
+    {
+        if (cmdparams.Length < 3)
+        {
+            MainConsole.Instance.Output("Usage: debug http <in|out|all> 0..6");
+            return;
+        }
+
+        bool inReqs = false;
+        bool outReqs = false;
+        bool allReqs = false;
+
+        string subCommand = cmdparams[2];
+
+        if (subCommand.ToLower() == "in")
+        {
+            inReqs = true;
+        }
+        else if (subCommand.ToLower() == "out")
+        {
+            outReqs = true;
+        }
+        else if (subCommand.ToLower() == "all")
+        {
+            allReqs = true;
+        }
+        else
+        {
+            MainConsole.Instance.Output("You must specify in, out or all");
+            return;
+        }
+
+        if (cmdparams.Length >= 4)
+        {
+            string rawNewDebug = cmdparams[3];
+            int newDebug;
+
+            if (!int.TryParse(rawNewDebug, out newDebug))
             {
-                lock (m_Servers)
-                {
-                    if (!m_Servers.ContainsValue(value))
-                        throw new Exception("HTTP server must already have been registered to be set as the main instance");
-
-                    instance = value;
-                }
-            }
-        }
-
-        public static BaseHttpServer UnSecureInstance
-        {
-            get { return unsecureinstance; }
-
-            set
-            {
-                lock (m_Servers)
-                    if (!m_Servers.ContainsValue(value))
-                        throw new Exception("HTTP server must already have been registered to be set as the main instance");
-
-                unsecureinstance = value;
-            }
-        }
-
-        /// <summary>
-        /// Get all the registered servers.
-        /// </summary>
-        /// <remarks>
-        /// Returns a copy of the dictionary so this can be iterated through without locking.
-        /// </remarks>
-        /// <value></value>
-        public static Dictionary<uint, BaseHttpServer> Servers
-        {
-            get { return new Dictionary<uint, BaseHttpServer>(m_Servers); }
-        }
-
-        public static void RegisterHttpConsoleCommands(ICommandConsole console)
-        {
-            console.Commands.AddCommand(
-                "Comms", false, "show http-handlers",
-                "show http-handlers",
-                "Show all registered http handlers", HandleShowHttpHandlersCommand);
-
-            console.Commands.AddCommand(
-                "Debug", false, "debug http", "debug http <in|out|all> [<level>]",
-                "Turn on http request logging.",
-                "If in or all and\n"
-                    + "  level <= 0 then no extra logging is done.\n"
-                    + "  level >= 1 then short warnings are logged when receiving bad input data.\n"
-                    + "  level >= 2 then long warnings are logged when receiving bad input data.\n"
-                    + "  level >= 3 then short notices about all incoming non-poll HTTP requests are logged.\n"
-                    + "  level >= 4 then the time taken to fulfill the request is logged.\n"
-                    + "  level >= 5 then a sample from the beginning of the data is logged.\n"
-                    + "  level >= 6 then the entire data is logged.\n"
-                    + "  no level is specified then the current level is returned.\n\n"
-                    + "If out or all and\n"
-                    + "  level >= 3 then short notices about all outgoing requests going through WebUtil are logged.\n"
-                    + "  level >= 4 then the time taken to fulfill the request is logged.\n"
-                    + "  level >= 5 then a sample from the beginning of the data is logged.\n"
-                    + "  level >= 6 then the entire data is logged.\n",
-                HandleDebugHttpCommand);
-        }
-
-        /// <summary>
-        /// Turn on some debugging values for OpenSim.
-        /// </summary>
-        /// <param name="args"></param>
-        private static void HandleDebugHttpCommand(string module, string[] cmdparams)
-        {
-            if (cmdparams.Length < 3)
-            {
-                MainConsole.Instance.Output("Usage: debug http <in|out|all> 0..6");
+                MainConsole.Instance.Output("{0} is not a valid debug level", rawNewDebug);
                 return;
             }
 
-            bool inReqs = false;
-            bool outReqs = false;
-            bool allReqs = false;
-
-            string subCommand = cmdparams[2];
-
-            if (subCommand.ToLower() == "in")
+            if (newDebug < 0 || newDebug > 6)
             {
-                inReqs = true;
-            }
-            else if (subCommand.ToLower() == "out")
-            {
-                outReqs = true;
-            }
-            else if (subCommand.ToLower() == "all")
-            {
-                allReqs = true;
-            }
-            else
-            {
-                MainConsole.Instance.Output("You must specify in, out or all");
+                MainConsole.Instance.Output("{0} is outside the valid debug level range of 0..6", newDebug);
                 return;
             }
 
-            if (cmdparams.Length >= 4)
+            if (allReqs || inReqs)
             {
-                string rawNewDebug = cmdparams[3];
-                int newDebug;
+                MainServer.DebugLevel = newDebug;
+                MainConsole.Instance.Output("IN debug level set to {0}", newDebug);
+            }
 
-                if (!int.TryParse(rawNewDebug, out newDebug))
+            if (allReqs || outReqs)
+            {
+                WebUtil.DebugLevel = newDebug;
+                MainConsole.Instance.Output("OUT debug level set to {0}", newDebug);
+            }
+        }
+        else
+        {
+            if (allReqs || inReqs)
+                MainConsole.Instance.Output("Current IN debug level is {0}", DebugLevel);
+
+            if (allReqs || outReqs)
+                MainConsole.Instance.Output("Current OUT debug level is {0}", WebUtil.DebugLevel);
+        }
+    }
+
+    private static void HandleShowHttpHandlersCommand(string module, string[] args)
+    {
+        if (args.Length != 2)
+        {
+            MainConsole.Instance.Output("Usage: show http-handlers");
+            return;
+        }
+
+        StringBuilder handlers = new StringBuilder();
+
+        lock (m_Servers)
+        {
+            foreach (BaseHttpServer httpServer in m_Servers.Values)
+            {
+                handlers.AppendFormat(
+                    "Registered HTTP Handlers for server at {0}:{1}\n", httpServer.ListenIPAddress, httpServer.Port);
+
+                List<string> lst = httpServer.GetGLobalMethodsKeys();
+                if (lst.Count > 0)
                 {
-                    MainConsole.Instance.Output("{0} is not a valid debug level", rawNewDebug);
-                    return;
+                    handlers.AppendFormat("* Global query methods ({0}):\n", lst.Count);
+                    foreach (string s in lst)
+                        handlers.AppendFormat("\t***:{0}\n", s);
                 }
 
-                if (newDebug < 0 || newDebug > 6)
+                lst = httpServer.GetXmlRpcHandlerKeys();
+                if (lst.Count > 0)
                 {
-                    MainConsole.Instance.Output("{0} is outside the valid debug level range of 0..6", newDebug);
-                    return;
+                    handlers.AppendFormat("* XMLRPC methods ({0}):\n",lst.Count);
+                    foreach (string s in lst)
+                        handlers.AppendFormat("\t{0}\n", s);
                 }
 
-                if (allReqs || inReqs)
+                lst = httpServer.GetJsonRpcHandlerKeys();
+                if (lst.Count > 0)
                 {
-                    MainServer.DebugLevel = newDebug;
-                    MainConsole.Instance.Output("IN debug level set to {0}", newDebug);
+                    handlers.AppendFormat("* JSONRPC methods ({0}):\n", lst.Count);
+                    foreach (string s in lst)
+                        handlers.AppendFormat("\t{0}\n", s);
                 }
 
-                if (allReqs || outReqs)
+                lst = httpServer.GetIndexPHPHandlerKeys();
+                if (lst.Count > 0)
                 {
-                    WebUtil.DebugLevel = newDebug;
-                    MainConsole.Instance.Output("OUT debug level set to {0}", newDebug);
+                    handlers.AppendFormat("* index.php methods ({0}):\n", lst.Count);
+                    foreach (string s in lst)
+                        handlers.AppendFormat("\t{0}\n", s);
                 }
-            }
-            else
-            {
-                if (allReqs || inReqs)
-                    MainConsole.Instance.Output("Current IN debug level is {0}", DebugLevel);
 
-                if (allReqs || outReqs)
-                    MainConsole.Instance.Output("Current OUT debug level is {0}", WebUtil.DebugLevel);
-            }
-        }
-
-        private static void HandleShowHttpHandlersCommand(string module, string[] args)
-        {
-            if (args.Length != 2)
-            {
-                MainConsole.Instance.Output("Usage: show http-handlers");
-                return;
-            }
-
-            StringBuilder handlers = new StringBuilder();
-
-            lock (m_Servers)
-            {
-                foreach (BaseHttpServer httpServer in m_Servers.Values)
+                lst = httpServer.GetHTTPHandlerKeys();
+                if (lst.Count > 0)
                 {
-                    handlers.AppendFormat(
-                        "Registered HTTP Handlers for server at {0}:{1}\n", httpServer.ListenIPAddress, httpServer.Port);
-
-                    List<string> lst = httpServer.GetGLobalMethodsKeys();
-                    if (lst.Count > 0)
-                    {
-                        handlers.AppendFormat("* Global query methods ({0}):\n", lst.Count);
-                        foreach (string s in lst)
-                            handlers.AppendFormat("\t***:{0}\n", s);
-                    }
-
-                    lst = httpServer.GetXmlRpcHandlerKeys();
-                    if (lst.Count > 0)
-                    {
-                        handlers.AppendFormat("* XMLRPC methods ({0}):\n",lst.Count);
-                        foreach (string s in lst)
-                            handlers.AppendFormat("\t{0}\n", s);
-                    }
-
-                    lst = httpServer.GetJsonRpcHandlerKeys();
-                    if (lst.Count > 0)
-                    {
-                        handlers.AppendFormat("* JSONRPC methods ({0}):\n", lst.Count);
-                        foreach (string s in lst)
-                            handlers.AppendFormat("\t{0}\n", s);
-                    }
-
-                    lst = httpServer.GetIndexPHPHandlerKeys();
-                    if (lst.Count > 0)
-                    {
-                        handlers.AppendFormat("* index.php methods ({0}):\n", lst.Count);
-                        foreach (string s in lst)
-                            handlers.AppendFormat("\t{0}\n", s);
-                    }
-
-                    lst = httpServer.GetHTTPHandlerKeys();
-                    if (lst.Count > 0)
-                    {
-                        handlers.AppendFormat("* HTTP ({0}):\n", lst.Count);
-                        foreach (string s in lst)
-                            handlers.AppendFormat("\t{0}\n", s);
-                    }
-
-                    lst = httpServer.GetPollServiceHandlerKeys();
-                    if (lst.Count > 0)
-                    {
-                        handlers.AppendFormat("* HTTP poll ({0}):\n", lst.Count);
-                        foreach (string s in lst)
-                            handlers.AppendFormat("\t{0}\n", s);
-                    }
-
-                    lst = httpServer.GetLLSDHandlerKeys();
-                    if (lst.Count > 0)
-                    {
-                        handlers.AppendFormat("* LLSD ({0}):\n", lst.Count);
-                        foreach (string s in lst)
-                            handlers.AppendFormat("\t{0}\n", s);
-                    }
-
-                    lst = httpServer.GetStreamHandlerKeys();
-                    if (lst.Count > 0)
-                    {
-                        handlers.AppendFormat("* StreamHandlers ({0}):\n", lst.Count);
-                        foreach (string s in lst)
-                            handlers.AppendFormat("\t{0}\n", s);
-                    }
-
-                    lst = httpServer.GetSimpleStreamHandlerKeys();
-                    if (lst.Count > 0)
-                    {
-                        handlers.AppendFormat("* SimpleStreamHandlers ({0}):\n", lst.Count);
-                        foreach (string s in lst)
-                            handlers.AppendFormat("\t***:{0}\n", s);
-                    }
-
-                    handlers.Append("\n");
+                    handlers.AppendFormat("* HTTP ({0}):\n", lst.Count);
+                    foreach (string s in lst)
+                        handlers.AppendFormat("\t{0}\n", s);
                 }
-            }
 
-            MainConsole.Instance.Output(handlers.ToString());
-        }
+                lst = httpServer.GetPollServiceHandlerKeys();
+                if (lst.Count > 0)
+                {
+                    handlers.AppendFormat("* HTTP poll ({0}):\n", lst.Count);
+                    foreach (string s in lst)
+                        handlers.AppendFormat("\t{0}\n", s);
+                }
 
-        /// <summary>
-        /// Register an already started HTTP server to the collection of known servers.
-        /// </summary>
-        /// <param name='server'></param>
-        public static void AddHttpServer(BaseHttpServer server)
-        {
-            lock (m_Servers)
-            {
-                if (m_Servers.ContainsKey(server.Port))
-                    throw new Exception(string.Format("HTTP server for port {0} already exists.", server.Port));
+                lst = httpServer.GetLLSDHandlerKeys();
+                if (lst.Count > 0)
+                {
+                    handlers.AppendFormat("* LLSD ({0}):\n", lst.Count);
+                    foreach (string s in lst)
+                        handlers.AppendFormat("\t{0}\n", s);
+                }
 
-                m_Servers.Add(server.Port, server);
-            }
-        }
+                lst = httpServer.GetStreamHandlerKeys();
+                if (lst.Count > 0)
+                {
+                    handlers.AppendFormat("* StreamHandlers ({0}):\n", lst.Count);
+                    foreach (string s in lst)
+                        handlers.AppendFormat("\t{0}\n", s);
+                }
 
-        /// <summary>
-        /// Removes the http server listening on the given port.
-        /// </summary>
-        /// <remarks>
-        /// It is the responsibility of the caller to do clean up.
-        /// </remarks>
-        /// <param name='port'></param>
-        /// <returns></returns>
-        public static bool RemoveHttpServer(uint port)
-        {
-            lock (m_Servers)
-            {
-                if (instance != null && instance.Port == port)
-                    instance = null;
+                lst = httpServer.GetSimpleStreamHandlerKeys();
+                if (lst.Count > 0)
+                {
+                    handlers.AppendFormat("* SimpleStreamHandlers ({0}):\n", lst.Count);
+                    foreach (string s in lst)
+                        handlers.AppendFormat("\t***:{0}\n", s);
+                }
 
-                return m_Servers.Remove(port);
+                handlers.Append("\n");
             }
         }
 
-        /// <summary>
-        /// Does this collection of servers contain one with the given port?
-        /// </summary>
-        /// <remarks>
-        /// Unlike GetHttpServer, this will not instantiate a server if one does not exist on that port.
-        /// </remarks>
-        /// <param name='port'></param>
-        /// <returns>true if a server with the given port is registered, false otherwise.</returns>
-        public static bool ContainsHttpServer(uint port)
+        MainConsole.Instance.Output(handlers.ToString());
+    }
+
+    /// <summary>
+    /// Register an already started HTTP server to the collection of known servers.
+    /// </summary>
+    /// <param name='server'></param>
+    public static void AddHttpServer(BaseHttpServer server)
+    {
+        lock (m_Servers)
         {
-            lock (m_Servers)
-                return m_Servers.ContainsKey(port);
+            if (m_Servers.ContainsKey(server.Port))
+                throw new Exception(string.Format("HTTP server for port {0} already exists.", server.Port));
+
+            m_Servers.Add(server.Port, server);
         }
+    }
 
-        /// <summary>
-        /// Get the default http server or an http server for a specific port.
-        /// </summary>
-        /// <remarks>
-        /// If the requested HTTP server doesn't already exist then a new one is instantiated and started.
-        /// </remarks>
-        /// <returns></returns>
-        /// <param name='port'>If 0 then the default HTTP server is returned.</param>
-        public static IHttpServer GetHttpServer(uint port)
+    /// <summary>
+    /// Removes the http server listening on the given port.
+    /// </summary>
+    /// <remarks>
+    /// It is the responsibility of the caller to do clean up.
+    /// </remarks>
+    /// <param name='port'></param>
+    /// <returns></returns>
+    public static bool RemoveHttpServer(uint port)
+    {
+        lock (m_Servers)
         {
-            return GetHttpServer(port, null);
+            if (instance != null && instance.Port == port)
+                instance = null;
+
+            return m_Servers.Remove(port);
         }
+    }
 
-        /// <summary>
-        /// Get the default http server, an http server for a specific port
-        /// and/or an http server bound to a specific address
-        /// </summary>
-        /// <remarks>
-        /// If the requested HTTP server doesn't already exist then a new one is instantiated and started.
-        /// </remarks>
-        /// <returns></returns>
-        /// <param name='port'>If 0 then the default HTTP server is returned.</param>
-        /// <param name='ipaddr'>A specific IP address to bind to.  If null then the default IP address is used.</param>
-        public static IHttpServer GetHttpServer(uint port, IPAddress ipaddr)
+    /// <summary>
+    /// Does this collection of servers contain one with the given port?
+    /// </summary>
+    /// <remarks>
+    /// Unlike GetHttpServer, this will not instantiate a server if one does not exist on that port.
+    /// </remarks>
+    /// <param name='port'></param>
+    /// <returns>true if a server with the given port is registered, false otherwise.</returns>
+    public static bool ContainsHttpServer(uint port)
+    {
+        lock (m_Servers)
+            return m_Servers.ContainsKey(port);
+    }
+
+    /// <summary>
+    /// Get the default http server or an http server for a specific port.
+    /// </summary>
+    /// <remarks>
+    /// If the requested HTTP server doesn't already exist then a new one is instantiated and started.
+    /// </remarks>
+    /// <returns></returns>
+    /// <param name='port'>If 0 then the default HTTP server is returned.</param>
+    public static IHttpServer GetHttpServer(uint port)
+    {
+        return GetHttpServer(port, null);
+    }
+
+    /// <summary>
+    /// Get the default http server, an http server for a specific port
+    /// and/or an http server bound to a specific address
+    /// </summary>
+    /// <remarks>
+    /// If the requested HTTP server doesn't already exist then a new one is instantiated and started.
+    /// </remarks>
+    /// <returns></returns>
+    /// <param name='port'>If 0 then the default HTTP server is returned.</param>
+    /// <param name='ipaddr'>A specific IP address to bind to.  If null then the default IP address is used.</param>
+    public static IHttpServer GetHttpServer(uint port, IPAddress ipaddr)
+    {
+        if (port == 0)
+            return Instance;
+
+        if (instance != null && port == Instance.Port)
+            return Instance;
+
+        lock (m_Servers)
         {
-            if (port == 0)
-                return Instance;
-
-            if (instance != null && port == Instance.Port)
-                return Instance;
-
-            lock (m_Servers)
-            {
-                if (m_Servers.ContainsKey(port))
-                    return m_Servers[port];
-
-                m_Servers[port] = new BaseHttpServer(port);
-
-                if (ipaddr != null)
-                    m_Servers[port].ListenIPAddress = ipaddr;
-
-                m_Servers[port].Start();
-
+            if (m_Servers.ContainsKey(port))
                 return m_Servers[port];
-            }
-        }
 
-        public static void Stop()
+            m_Servers[port] = new BaseHttpServer(port);
+
+            if (ipaddr != null)
+                m_Servers[port].ListenIPAddress = ipaddr;
+
+            m_Servers[port].Start();
+
+            return m_Servers[port];
+        }
+    }
+
+    public static void Stop()
+    {
+        lock (m_Servers)
         {
-            lock (m_Servers)
+            foreach (BaseHttpServer httpServer in m_Servers.Values)
             {
-                foreach (BaseHttpServer httpServer in m_Servers.Values)
-                {
-                    httpServer.Stop(true);
-                }
+                httpServer.Stop(true);
             }
         }
     }

@@ -28,41 +28,40 @@
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.PaintBrushes
+namespace OpenSim.Region.CoreModules.World.Terrain.PaintBrushes;
+
+public class NoiseSphere : ITerrainPaintableEffect
 {
-    public class NoiseSphere : ITerrainPaintableEffect
+    #region ITerrainPaintableEffect Members
+
+    public void PaintEffect(ITerrainChannel map, bool[,] mask, float rx, float ry, float rz,
+        float size, float strength, int startX, int endX, int startY, int endY)
     {
-        #region ITerrainPaintableEffect Members
+        int x, y;
+        float distancefactor;
+        float dx2;
 
-        public void PaintEffect(ITerrainChannel map, bool[,] mask, float rx, float ry, float rz,
-            float size, float strength, int startX, int endX, int startY, int endY)
+        size *= size;
+
+        for (x = startX; x <= endX; x++)
         {
-            int x, y;
-            float distancefactor;
-            float dx2;
-
-            size *= size;
-
-            for (x = startX; x <= endX; x++)
+            dx2 = (x - rx) * (x - rx);
+            for (y = startY; y <= endY; y++)
             {
-                dx2 = (x - rx) * (x - rx);
-                for (y = startY; y <= endY; y++)
-                {
-                    if (!mask[x, y])
-                        continue;
+                if (!mask[x, y])
+                    continue;
 
-                    // Calculate a sphere and add it to the heighmap
-                    distancefactor = (dx2 + (y - ry) * (y - ry)) / size;
-                    if (distancefactor > 1.0f)
-                        continue;
+                // Calculate a sphere and add it to the heighmap
+                distancefactor = (dx2 + (y - ry) * (y - ry)) / size;
+                if (distancefactor > 1.0f)
+                    continue;
 
-                    distancefactor = strength * (1.0f - distancefactor);
-                    float noise = (float)TerrainUtil.PerlinNoise2D(x / (double) map.Width, y / (double) map.Height, 8, 1.0);
-                    map[x, y] += noise * distancefactor;
-                }
+                distancefactor = strength * (1.0f - distancefactor);
+                float noise = (float)TerrainUtil.PerlinNoise2D(x / (double) map.Width, y / (double) map.Height, 8, 1.0);
+                map[x, y] += noise * distancefactor;
             }
         }
-
-        #endregion
     }
+
+    #endregion
 }

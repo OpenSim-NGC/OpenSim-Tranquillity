@@ -25,343 +25,334 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Text;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-using OpenSim.Framework;
+namespace OpenSim.Region.Framework.Scenes.Animation;
 
-using Animation = OpenSim.Framework.Animation;
-
-namespace OpenSim.Region.Framework.Scenes.Animation
+[Serializable]
+public class AnimationSet
 {
-    [Serializable]
-    public class AnimationSet
+    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private OpenSim.Framework.Animation m_implicitDefaultAnimation = new OpenSim.Framework.Animation();
+    private OpenSim.Framework.Animation m_defaultAnimation = new OpenSim.Framework.Animation();
+    private readonly List<OpenSim.Framework.Animation> m_animations = new List<OpenSim.Framework.Animation>();
+
+    public OpenSim.Framework.Animation DefaultAnimation
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return m_defaultAnimation; }
+    }
 
-        private OpenSim.Framework.Animation m_implicitDefaultAnimation = new OpenSim.Framework.Animation();
-        private OpenSim.Framework.Animation m_defaultAnimation = new OpenSim.Framework.Animation();
-        private readonly List<OpenSim.Framework.Animation> m_animations = new List<OpenSim.Framework.Animation>();
+    public OpenSim.Framework.Animation ImplicitDefaultAnimation
+    {
+        get { return m_implicitDefaultAnimation; }
+    }
 
-        public OpenSim.Framework.Animation DefaultAnimation
+    public AnimationSet()
+    {
+        ResetDefaultAnimation();
+    }
+
+    public AnimationSet(OSDArray pArray)
+    {
+        ResetDefaultAnimation();
+        FromOSDArray(pArray);
+    }
+
+    public bool HasAnimation(UUID animID)
+    {
+        if (m_defaultAnimation.AnimID.Equals(animID))
+            return true;
+
+        for (int i = 0; i < m_animations.Count; ++i)
         {
-            get { return m_defaultAnimation; }
+            if (m_animations[i].AnimID.Equals(animID))
+                return true;
         }
 
-        public OpenSim.Framework.Animation ImplicitDefaultAnimation
-        {
-            get { return m_implicitDefaultAnimation; }
-        }
+        return false;
+    }
 
-        public AnimationSet()
+    public bool Add(UUID animID, int sequenceNum, UUID objectID)
+    {
+        lock (m_animations)
         {
-            ResetDefaultAnimation();
+            if (!HasAnimation(animID))
+            {
+                m_animations.Add(new OpenSim.Framework.Animation(animID, sequenceNum, objectID));
+                return true;
+            }
         }
+        return false;
+    }
 
-        public AnimationSet(OSDArray pArray)
-        {
-            ResetDefaultAnimation();
-            FromOSDArray(pArray);
-        }
-
-        public bool HasAnimation(UUID animID)
+    /// <summary>
+    /// Remove the specified animation
+    /// </summary>
+    /// <param name='animID'></param>
+    /// <param name='allowNoDefault'>
+    /// If true, then the default animation can be entirely removed.
+    /// If false, then removing the default animation will reset it to the simulator default (currently STAND).
+    /// </param>
+    public bool Remove(UUID animID, bool allowNoDefault)
+    {
+        lock (m_animations)
         {
             if (m_defaultAnimation.AnimID.Equals(animID))
-                return true;
-
-            for (int i = 0; i < m_animations.Count; ++i)
             {
-                if (m_animations[i].AnimID.Equals(animID))
-                    return true;
-            }
-
-            return false;
-        }
-
-        public bool Add(UUID animID, int sequenceNum, UUID objectID)
-        {
-            lock (m_animations)
-            {
-                if (!HasAnimation(animID))
-                {
-                    m_animations.Add(new OpenSim.Framework.Animation(animID, sequenceNum, objectID));
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// Remove the specified animation
-        /// </summary>
-        /// <param name='animID'></param>
-        /// <param name='allowNoDefault'>
-        /// If true, then the default animation can be entirely removed.
-        /// If false, then removing the default animation will reset it to the simulator default (currently STAND).
-        /// </param>
-        public bool Remove(UUID animID, bool allowNoDefault)
-        {
-            lock (m_animations)
-            {
-                if (m_defaultAnimation.AnimID.Equals(animID))
-                {
-                    if (allowNoDefault)
-                        m_defaultAnimation = new OpenSim.Framework.Animation(UUID.Zero, 1, UUID.Zero);
-                    else
-                        ResetDefaultAnimation();
-                }
+                if (allowNoDefault)
+                    m_defaultAnimation = new OpenSim.Framework.Animation(UUID.Zero, 1, UUID.Zero);
                 else
+                    ResetDefaultAnimation();
+            }
+            else
+            {
+                for (int i = 0; i < m_animations.Count; i++)
                 {
-                    for (int i = 0; i < m_animations.Count; i++)
+                    if (m_animations[i].AnimID.Equals(animID))
                     {
-                        if (m_animations[i].AnimID.Equals(animID))
-                        {
-                            m_animations.RemoveAt(i);
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-
-        public void Clear()
-        {
-            ResetDefaultAnimation();
-            m_animations.Clear();
-        }
-
-        /// <summary>
-        /// The default animation is reserved for "main" animations
-        /// that are mutually exclusive, e.g. flying and sitting.
-        /// </summary>
-        public bool SetDefaultAnimation(UUID animID, int sequenceNum, UUID objectID)
-        {
-            if (m_defaultAnimation.AnimID.NotEqual(animID))
-            {
-                m_defaultAnimation = new OpenSim.Framework.Animation(animID, sequenceNum, objectID);
-                m_implicitDefaultAnimation = m_defaultAnimation;
-                //return true;
-            }
-            //return false;
-            return true;
-        }
-
-        // Called from serialization only
-        public void SetImplicitDefaultAnimation(UUID animID, int sequenceNum, UUID objectID)
-        {
-            m_implicitDefaultAnimation = new OpenSim.Framework.Animation(animID, sequenceNum, objectID);
-        }
-
-        protected bool ResetDefaultAnimation()
-        {
-            return TrySetDefaultAnimation("STAND", 1, UUID.Zero);
-        }
-
-        /// <summary>
-        /// Set the animation as the default animation if it's known
-        /// </summary>
-        public bool TrySetDefaultAnimation(string anim, int sequenceNum, UUID objectID)
-        {
-            //m_log.DebugFormat(
-            //    "[ANIMATION SET]: Setting default animation {0}, sequence number {1}, object id {2}",
-            //    anim, sequenceNum, objectID);
-
-            if (DefaultAvatarAnimations.AnimsUUIDbyName.TryGetValue(anim, out UUID id))
-            {
-                return SetDefaultAnimation(id, sequenceNum, objectID);
-            }
-            return false;
-        }
-
-        public void GetAnimationIDsArray(out UUID[] animIDs)
-        {
-            lock (m_animations)
-            {
-                int j = m_defaultAnimation.AnimID.IsZero() ? 0 : 1;
-
-                int defaultSize = m_animations.Count + j;
-                animIDs = new UUID[defaultSize];
-
-                if (j > 0)
-                {
-                    animIDs[0] = m_defaultAnimation.AnimID;
-                }
-
-                for (int i = 0; i < m_animations.Count; ++i, ++j)
-                {
-                    animIDs[j] = m_animations[i].AnimID;
-                }
-            }
-        }
-
-        public void GetArrays(out UUID[] animIDs, out int[] sequenceNums, out UUID[] objectIDs)
-        {
-            lock (m_animations)
-            {
-                int j = m_defaultAnimation.AnimID.IsZero() ? 0 : 1;
-
-                int defaultSize = m_animations.Count + j;
-                animIDs = new UUID[defaultSize];
-                sequenceNums = new int[defaultSize];
-                objectIDs = new UUID[defaultSize];
-
-                if (j > 0)
-                {
-                    animIDs[0] = m_defaultAnimation.AnimID;
-                    sequenceNums[0] = m_defaultAnimation.SequenceNum;
-                    objectIDs[0] = m_defaultAnimation.ObjectID;
-                }
-
-                for (int i = 0; i < m_animations.Count; ++i,++j)
-                {
-                    animIDs[j] = m_animations[i].AnimID;
-                    sequenceNums[j] = m_animations[i].SequenceNum;
-                    objectIDs[j] = m_animations[i].ObjectID;
-                }
-            }
-        }
-
-        public OpenSim.Framework.Animation[] ToArray()
-        {
-            OpenSim.Framework.Animation[] theArray = null;
-            try
-            {
-                theArray = m_animations.ToArray();
-            }
-            catch
-            {
-                return new OpenSim.Framework.Animation[0];
-            }
-
-            return theArray;
-        }
-
-        public int FromArray(OpenSim.Framework.Animation[] theArray)
-        {
-            int ret = 0;
-            foreach (OpenSim.Framework.Animation anim in theArray)
-            { 
-                m_animations.Add(anim);
-                if(anim.SequenceNum > ret)
-                    ret = anim.SequenceNum;
-            }
-            return ret;
-        }
-
-        // Create representation of this AnimationSet as an OSDArray.
-        // First two entries in the array are the default and implicitDefault animations
-        //    followed by the other animations.
-        public OSDArray ToOSDArray()
-        {
-            OSDArray ret = new OSDArray();
-            ret.Add(DefaultAnimation.PackUpdateMessage());
-            ret.Add(ImplicitDefaultAnimation.PackUpdateMessage());
-
-            foreach (OpenSim.Framework.Animation anim in m_animations)
-                ret.Add(anim.PackUpdateMessage());
-
-            return ret;
-        }
-
-        public void FromOSDArray(OSDArray pArray)
-        {
-            this.Clear();
-
-            if (pArray.Count >= 1)
-            {
-                m_defaultAnimation = new OpenSim.Framework.Animation((OSDMap)pArray[0]);
-            }
-            if (pArray.Count >= 2)
-            {
-                m_implicitDefaultAnimation = new OpenSim.Framework.Animation((OSDMap)pArray[1]);
-            }
-            for (int ii = 2; ii < pArray.Count; ii++)
-            {
-                m_animations.Add(new OpenSim.Framework.Animation((OSDMap)pArray[ii]));
-            }
-        }
-
-        // Compare two AnimationSets and return 'true' if the default animations are the same
-        //     and all of the animations in the list are equal.
-        public override bool Equals(object obj)
-        {
-            AnimationSet other = obj as AnimationSet;
-            if (other != null)
-            {
-                if (this.DefaultAnimation.Equals(other.DefaultAnimation)
-                    && this.ImplicitDefaultAnimation.Equals(other.ImplicitDefaultAnimation))
-                {
-                    // The defaults are the same. Is the list of animations the same?
-                    OpenSim.Framework.Animation[] thisAnims = this.ToArray();
-                    OpenSim.Framework.Animation[] otherAnims = other.ToArray();
-                    if (thisAnims.Length == 0 && otherAnims.Length == 0)
-                        return true;    // the common case
-                    if (thisAnims.Length == otherAnims.Length)
-                    {
-                        // Do this the hard way but since the list is usually short this won't take long.
-                        foreach (OpenSim.Framework.Animation thisAnim in thisAnims)
-                        {
-                            bool found = false;
-                            foreach (OpenSim.Framework.Animation otherAnim in otherAnims)
-                            {
-                                if (thisAnim.Equals(otherAnim))
-                                {
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (!found)
-                            {
-                                // If anything is not in the other list, these are not equal
-                                return false;
-                            }
-                        }
-                        // Found everything in the other list. Since lists are equal length, they must be equal.
+                        m_animations.RemoveAt(i);
                         return true;
                     }
                 }
-                return false;
             }
-            // Don't know what was passed, but the base system will figure it out for me.
-            return base.Equals(obj);
         }
+        return false;
+    }
 
-        public override int GetHashCode()
+    public void Clear()
+    {
+        ResetDefaultAnimation();
+        m_animations.Clear();
+    }
+
+    /// <summary>
+    /// The default animation is reserved for "main" animations
+    /// that are mutually exclusive, e.g. flying and sitting.
+    /// </summary>
+    public bool SetDefaultAnimation(UUID animID, int sequenceNum, UUID objectID)
+    {
+        if (m_defaultAnimation.AnimID.NotEqual(animID))
         {
-            return base.GetHashCode();
+            m_defaultAnimation = new OpenSim.Framework.Animation(animID, sequenceNum, objectID);
+            m_implicitDefaultAnimation = m_defaultAnimation;
+            //return true;
         }
+        //return false;
+        return true;
+    }
 
-        public override string ToString()
+    // Called from serialization only
+    public void SetImplicitDefaultAnimation(UUID animID, int sequenceNum, UUID objectID)
+    {
+        m_implicitDefaultAnimation = new OpenSim.Framework.Animation(animID, sequenceNum, objectID);
+    }
+
+    protected bool ResetDefaultAnimation()
+    {
+        return TrySetDefaultAnimation("STAND", 1, UUID.Zero);
+    }
+
+    /// <summary>
+    /// Set the animation as the default animation if it's known
+    /// </summary>
+    public bool TrySetDefaultAnimation(string anim, int sequenceNum, UUID objectID)
+    {
+        //m_log.DebugFormat(
+        //    "[ANIMATION SET]: Setting default animation {0}, sequence number {1}, object id {2}",
+        //    anim, sequenceNum, objectID);
+
+        if (DefaultAvatarAnimations.AnimsUUIDbyName.TryGetValue(anim, out UUID id))
         {
-            StringBuilder buff = new StringBuilder();
-            buff.Append("dflt=");
-            buff.Append(DefaultAnimation.ToString());
-            buff.Append(",iDflt=");
-            if (DefaultAnimation.Equals(ImplicitDefaultAnimation))
-                buff.Append("same");
-            else
-                buff.Append(ImplicitDefaultAnimation.ToString());
-            if (m_animations.Count > 0)
+            return SetDefaultAnimation(id, sequenceNum, objectID);
+        }
+        return false;
+    }
+
+    public void GetAnimationIDsArray(out UUID[] animIDs)
+    {
+        lock (m_animations)
+        {
+            int j = m_defaultAnimation.AnimID.IsZero() ? 0 : 1;
+
+            int defaultSize = m_animations.Count + j;
+            animIDs = new UUID[defaultSize];
+
+            if (j > 0)
             {
-                buff.Append(",anims=");
-                bool firstTime = true;
-                foreach (OpenSim.Framework.Animation anim in m_animations)
+                animIDs[0] = m_defaultAnimation.AnimID;
+            }
+
+            for (int i = 0; i < m_animations.Count; ++i, ++j)
+            {
+                animIDs[j] = m_animations[i].AnimID;
+            }
+        }
+    }
+
+    public void GetArrays(out UUID[] animIDs, out int[] sequenceNums, out UUID[] objectIDs)
+    {
+        lock (m_animations)
+        {
+            int j = m_defaultAnimation.AnimID.IsZero() ? 0 : 1;
+
+            int defaultSize = m_animations.Count + j;
+            animIDs = new UUID[defaultSize];
+            sequenceNums = new int[defaultSize];
+            objectIDs = new UUID[defaultSize];
+
+            if (j > 0)
+            {
+                animIDs[0] = m_defaultAnimation.AnimID;
+                sequenceNums[0] = m_defaultAnimation.SequenceNum;
+                objectIDs[0] = m_defaultAnimation.ObjectID;
+            }
+
+            for (int i = 0; i < m_animations.Count; ++i,++j)
+            {
+                animIDs[j] = m_animations[i].AnimID;
+                sequenceNums[j] = m_animations[i].SequenceNum;
+                objectIDs[j] = m_animations[i].ObjectID;
+            }
+        }
+    }
+
+    public OpenSim.Framework.Animation[] ToArray()
+    {
+        OpenSim.Framework.Animation[] theArray = null;
+        try
+        {
+            theArray = m_animations.ToArray();
+        }
+        catch
+        {
+            return new OpenSim.Framework.Animation[0];
+        }
+
+        return theArray;
+    }
+
+    public int FromArray(OpenSim.Framework.Animation[] theArray)
+    {
+        int ret = 0;
+        foreach (OpenSim.Framework.Animation anim in theArray)
+        { 
+            m_animations.Add(anim);
+            if(anim.SequenceNum > ret)
+                ret = anim.SequenceNum;
+        }
+        return ret;
+    }
+
+    // Create representation of this AnimationSet as an OSDArray.
+    // First two entries in the array are the default and implicitDefault animations
+    //    followed by the other animations.
+    public OSDArray ToOSDArray()
+    {
+        OSDArray ret = new OSDArray();
+        ret.Add(DefaultAnimation.PackUpdateMessage());
+        ret.Add(ImplicitDefaultAnimation.PackUpdateMessage());
+
+        foreach (OpenSim.Framework.Animation anim in m_animations)
+            ret.Add(anim.PackUpdateMessage());
+
+        return ret;
+    }
+
+    public void FromOSDArray(OSDArray pArray)
+    {
+        this.Clear();
+
+        if (pArray.Count >= 1)
+        {
+            m_defaultAnimation = new OpenSim.Framework.Animation((OSDMap)pArray[0]);
+        }
+        if (pArray.Count >= 2)
+        {
+            m_implicitDefaultAnimation = new OpenSim.Framework.Animation((OSDMap)pArray[1]);
+        }
+        for (int ii = 2; ii < pArray.Count; ii++)
+        {
+            m_animations.Add(new OpenSim.Framework.Animation((OSDMap)pArray[ii]));
+        }
+    }
+
+    // Compare two AnimationSets and return 'true' if the default animations are the same
+    //     and all of the animations in the list are equal.
+    public override bool Equals(object obj)
+    {
+        AnimationSet other = obj as AnimationSet;
+        if (other != null)
+        {
+            if (this.DefaultAnimation.Equals(other.DefaultAnimation)
+                && this.ImplicitDefaultAnimation.Equals(other.ImplicitDefaultAnimation))
+            {
+                // The defaults are the same. Is the list of animations the same?
+                OpenSim.Framework.Animation[] thisAnims = this.ToArray();
+                OpenSim.Framework.Animation[] otherAnims = other.ToArray();
+                if (thisAnims.Length == 0 && otherAnims.Length == 0)
+                    return true;    // the common case
+                if (thisAnims.Length == otherAnims.Length)
                 {
-                    if (!firstTime)
-                        buff.Append(",");
-                    buff.Append("<");
-                    buff.Append(anim.ToString());
-                    buff.Append(">");
-                    firstTime = false;
+                    // Do this the hard way but since the list is usually short this won't take long.
+                    foreach (OpenSim.Framework.Animation thisAnim in thisAnims)
+                    {
+                        bool found = false;
+                        foreach (OpenSim.Framework.Animation otherAnim in otherAnims)
+                        {
+                            if (thisAnim.Equals(otherAnim))
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found)
+                        {
+                            // If anything is not in the other list, these are not equal
+                            return false;
+                        }
+                    }
+                    // Found everything in the other list. Since lists are equal length, they must be equal.
+                    return true;
                 }
             }
-            return buff.ToString();
+            return false;
         }
+        // Don't know what was passed, but the base system will figure it out for me.
+        return base.Equals(obj);
+    }
+
+    public override int GetHashCode()
+    {
+        return base.GetHashCode();
+    }
+
+    public override string ToString()
+    {
+        StringBuilder buff = new StringBuilder();
+        buff.Append("dflt=");
+        buff.Append(DefaultAnimation.ToString());
+        buff.Append(",iDflt=");
+        if (DefaultAnimation.Equals(ImplicitDefaultAnimation))
+            buff.Append("same");
+        else
+            buff.Append(ImplicitDefaultAnimation.ToString());
+        if (m_animations.Count > 0)
+        {
+            buff.Append(",anims=");
+            bool firstTime = true;
+            foreach (OpenSim.Framework.Animation anim in m_animations)
+            {
+                if (!firstTime)
+                    buff.Append(",");
+                buff.Append("<");
+                buff.Append(anim.ToString());
+                buff.Append(">");
+                firstTime = false;
+            }
+        }
+        return buff.ToString();
     }
 }

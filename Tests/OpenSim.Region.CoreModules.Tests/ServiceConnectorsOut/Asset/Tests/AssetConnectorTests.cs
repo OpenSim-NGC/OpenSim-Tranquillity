@@ -30,135 +30,134 @@ using Nini.Config;
 using OpenSim.Tests.Common;
 using Xunit;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset.Tests;
+
+public class AssetConnectorTests : OpenSimTestCase
 {
-    public class AssetConnectorTests : OpenSimTestCase
+    [Fact]
+    public void TestAddAsset()
     {
-        [Fact]
-        public void TestAddAsset()
-        {
-            TestHelpers.InMethod();
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            IConfigSource config = new IniConfigSource();
-            config.AddConfig("Modules");
-            config.Configs["Modules"].Set("AssetServices", "LocalAssetServicesConnector");
-            config.AddConfig("AssetService");
-            config.Configs["AssetService"].Set("LocalServiceModule", "OpenSim.Services.AssetService.dll:AssetService");
-            config.Configs["AssetService"].Set("StorageProvider", "OpenSim.Tests.Common.dll");
+        IConfigSource config = new IniConfigSource();
+        config.AddConfig("Modules");
+        config.Configs["Modules"].Set("AssetServices", "LocalAssetServicesConnector");
+        config.AddConfig("AssetService");
+        config.Configs["AssetService"].Set("LocalServiceModule", "OpenSim.Services.AssetService.dll:AssetService");
+        config.Configs["AssetService"].Set("StorageProvider", "OpenSim.Tests.Common.dll");
 
-            LocalAssetServicesConnector lasc = new LocalAssetServicesConnector();
-            lasc.Initialise(config);
+        LocalAssetServicesConnector lasc = new LocalAssetServicesConnector();
+        lasc.Initialise(config);
 
-            AssetBase a1 = AssetHelpers.CreateNotecardAsset();
-            lasc.Store(a1);
+        AssetBase a1 = AssetHelpers.CreateNotecardAsset();
+        lasc.Store(a1);
 
-            AssetBase retreivedA1 = lasc.Get(a1.ID);
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
+        AssetBase retreivedA1 = lasc.Get(a1.ID);
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
 
-            AssetMetadata retrievedA1Metadata = lasc.GetMetadata(a1.ID);
-            // TODO: Assert.Equal(,); - incomplete assertion
+        AssetMetadata retrievedA1Metadata = lasc.GetMetadata(a1.ID);
+        // TODO: Assert.Equal(,); - incomplete assertion
 
-            byte[] retrievedA1Data = lasc.GetData(a1.ID);
-            // TODO: Assert.Equal(,); - incomplete assertion
+        byte[] retrievedA1Data = lasc.GetData(a1.ID);
+        // TODO: Assert.Equal(,); - incomplete assertion
 
-            // TODO: Add cache and check that this does receive a copy of the asset
-        }
+        // TODO: Add cache and check that this does receive a copy of the asset
+    }
 
-        private void TestAddTemporaryAsset()
-        {
-            TestHelpers.InMethod();
+    private void TestAddTemporaryAsset()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            IConfigSource config = new IniConfigSource();
-            config.AddConfig("Modules");
-            config.Configs["Modules"].Set("AssetServices", "LocalAssetServicesConnector");
-            config.AddConfig("AssetService");
-            config.Configs["AssetService"].Set("LocalServiceModule", "OpenSim.Services.AssetService.dll:AssetService");
-            config.Configs["AssetService"].Set("StorageProvider", "OpenSim.Tests.Common.dll");
+        IConfigSource config = new IniConfigSource();
+        config.AddConfig("Modules");
+        config.Configs["Modules"].Set("AssetServices", "LocalAssetServicesConnector");
+        config.AddConfig("AssetService");
+        config.Configs["AssetService"].Set("LocalServiceModule", "OpenSim.Services.AssetService.dll:AssetService");
+        config.Configs["AssetService"].Set("StorageProvider", "OpenSim.Tests.Common.dll");
 
-            LocalAssetServicesConnector lasc = new LocalAssetServicesConnector();
-            lasc.Initialise(config);
+        LocalAssetServicesConnector lasc = new LocalAssetServicesConnector();
+        lasc.Initialise(config);
 
-            // If it is remote, it should be stored
-            AssetBase a2 = AssetHelpers.CreateNotecardAsset();
-            a2.Local = false;
-            a2.Temporary = true;
+        // If it is remote, it should be stored
+        AssetBase a2 = AssetHelpers.CreateNotecardAsset();
+        a2.Local = false;
+        a2.Temporary = true;
 
-            lasc.Store(a2);
+        lasc.Store(a2);
 
-            AssetBase retreivedA2 = lasc.Get(a2.ID);
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
+        AssetBase retreivedA2 = lasc.Get(a2.ID);
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
 
-            AssetMetadata retrievedA2Metadata = lasc.GetMetadata(a2.ID);
-            // TODO: Assert.Equal(,); - incomplete assertion
+        AssetMetadata retrievedA2Metadata = lasc.GetMetadata(a2.ID);
+        // TODO: Assert.Equal(,); - incomplete assertion
 
-            byte[] retrievedA2Data = lasc.GetData(a2.ID);
-            // TODO: Assert.Equal(,); - incomplete assertion
+        byte[] retrievedA2Data = lasc.GetData(a2.ID);
+        // TODO: Assert.Equal(,); - incomplete assertion
 
-            // TODO: Add cache and check that this does receive a copy of the asset
-        }
+        // TODO: Add cache and check that this does receive a copy of the asset
+    }
 
-        [Fact]
-        public void TestAddLocalAsset()
-        {
-            TestHelpers.InMethod();
+    [Fact]
+    public void TestAddLocalAsset()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            IConfigSource config = new IniConfigSource();
-            config.AddConfig("Modules");
-            config.Configs["Modules"].Set("AssetServices", "LocalAssetServicesConnector");
-            config.AddConfig("AssetService");
-            config.Configs["AssetService"].Set("LocalServiceModule", "OpenSim.Services.AssetService.dll:AssetService");
-            config.Configs["AssetService"].Set("StorageProvider", "OpenSim.Tests.Common.dll");
+        IConfigSource config = new IniConfigSource();
+        config.AddConfig("Modules");
+        config.Configs["Modules"].Set("AssetServices", "LocalAssetServicesConnector");
+        config.AddConfig("AssetService");
+        config.Configs["AssetService"].Set("LocalServiceModule", "OpenSim.Services.AssetService.dll:AssetService");
+        config.Configs["AssetService"].Set("StorageProvider", "OpenSim.Tests.Common.dll");
 
-            LocalAssetServicesConnector lasc = new LocalAssetServicesConnector();
-            lasc.Initialise(config);
+        LocalAssetServicesConnector lasc = new LocalAssetServicesConnector();
+        lasc.Initialise(config);
 
-            AssetBase a1 = AssetHelpers.CreateNotecardAsset();
-            a1.Local = true;
+        AssetBase a1 = AssetHelpers.CreateNotecardAsset();
+        a1.Local = true;
 
-            lasc.Store(a1);
+        lasc.Store(a1);
 
-            Assert.Null(lasc.Get(a1.ID));
-            Assert.Null(lasc.GetData(a1.ID));
-            Assert.Null(lasc.GetMetadata(a1.ID));
+        Assert.Null(lasc.Get(a1.ID));
+        Assert.Null(lasc.GetData(a1.ID));
+        Assert.Null(lasc.GetMetadata(a1.ID));
 
-            // TODO: Add cache and check that this does receive a copy of the asset
-        }
+        // TODO: Add cache and check that this does receive a copy of the asset
+    }
 
-        [Fact]
-        public void TestAddTemporaryLocalAsset()
-        {
-            TestHelpers.InMethod();
+    [Fact]
+    public void TestAddTemporaryLocalAsset()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            IConfigSource config = new IniConfigSource();
-            config.AddConfig("Modules");
-            config.Configs["Modules"].Set("AssetServices", "LocalAssetServicesConnector");
-            config.AddConfig("AssetService");
-            config.Configs["AssetService"].Set("LocalServiceModule", "OpenSim.Services.AssetService.dll:AssetService");
-            config.Configs["AssetService"].Set("StorageProvider", "OpenSim.Tests.Common.dll");
+        IConfigSource config = new IniConfigSource();
+        config.AddConfig("Modules");
+        config.Configs["Modules"].Set("AssetServices", "LocalAssetServicesConnector");
+        config.AddConfig("AssetService");
+        config.Configs["AssetService"].Set("LocalServiceModule", "OpenSim.Services.AssetService.dll:AssetService");
+        config.Configs["AssetService"].Set("StorageProvider", "OpenSim.Tests.Common.dll");
 
-            LocalAssetServicesConnector lasc = new LocalAssetServicesConnector();
-            lasc.Initialise(config);
+        LocalAssetServicesConnector lasc = new LocalAssetServicesConnector();
+        lasc.Initialise(config);
 
-            // If it is local, it should not be stored
-            AssetBase a1 = AssetHelpers.CreateNotecardAsset();
-            a1.Local = true;
-            a1.Temporary = true;
+        // If it is local, it should not be stored
+        AssetBase a1 = AssetHelpers.CreateNotecardAsset();
+        a1.Local = true;
+        a1.Temporary = true;
 
-            lasc.Store(a1);
+        lasc.Store(a1);
 
-            Assert.Null(lasc.Get(a1.ID));
-            Assert.Null(lasc.GetData(a1.ID));
-            Assert.Null(lasc.GetMetadata(a1.ID));
+        Assert.Null(lasc.Get(a1.ID));
+        Assert.Null(lasc.GetData(a1.ID));
+        Assert.Null(lasc.GetMetadata(a1.ID));
 
-            // TODO: Add cache and check that this does receive a copy of the asset
-        }
+        // TODO: Add cache and check that this does receive a copy of the asset
     }
 }

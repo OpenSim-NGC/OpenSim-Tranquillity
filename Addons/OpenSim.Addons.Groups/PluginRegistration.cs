@@ -25,33 +25,31 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
 using OpenSim.Framework;
 
-namespace OpenSim.Groups
+namespace OpenSim.Groups;
+
+public class PluginRegistration : IPluginRegistryProvider
 {
-    public class PluginRegistration : IPluginRegistryProvider
+    public void RegisterPlugins(PluginRegistry registry)
     {
-        public void RegisterPlugins(PluginRegistry registry)
-        {
-            RegisterByName(registry, "/OpenSim/RegionModules", "GroupsModule", "OpenSim.Groups.GroupsModule", "GroupsModule", "0.9");
-            RegisterByName(registry, "/OpenSim/RegionModules", "GroupsMessagingModule", "OpenSim.Groups.GroupsMessagingModule", "GroupsMessagingModule", "0.9");
-            RegisterByName(registry, "/OpenSim/RegionModules", "GroupsServiceRemoteConnectorModule", "OpenSim.Groups.GroupsServiceRemoteConnectorModule", "GroupsServiceRemoteConnectorModule", "0.9");
-            RegisterByName(registry, "/OpenSim/RegionModules", "GroupsServiceLocalConnectorModule", "OpenSim.Groups.GroupsServiceLocalConnectorModule", "GroupsServiceLocalConnectorModule", "0.9");
-            RegisterByName(registry, "/OpenSim/RegionModules", "GroupsServiceHGConnectorModule", "OpenSim.Groups.GroupsServiceHGConnectorModule", "GroupsServiceHGConnectorModule", "0.9");
-        }
+        RegisterByName(registry, "/OpenSim/RegionModules", "GroupsModule", "OpenSim.Groups.GroupsModule", "GroupsModule", "0.9");
+        RegisterByName(registry, "/OpenSim/RegionModules", "GroupsMessagingModule", "OpenSim.Groups.GroupsMessagingModule", "GroupsMessagingModule", "0.9");
+        RegisterByName(registry, "/OpenSim/RegionModules", "GroupsServiceRemoteConnectorModule", "OpenSim.Groups.GroupsServiceRemoteConnectorModule", "GroupsServiceRemoteConnectorModule", "0.9");
+        RegisterByName(registry, "/OpenSim/RegionModules", "GroupsServiceLocalConnectorModule", "OpenSim.Groups.GroupsServiceLocalConnectorModule", "GroupsServiceLocalConnectorModule", "0.9");
+        RegisterByName(registry, "/OpenSim/RegionModules", "GroupsServiceHGConnectorModule", "OpenSim.Groups.GroupsServiceHGConnectorModule", "GroupsServiceHGConnectorModule", "0.9");
+    }
 
-        private static void RegisterByName(PluginRegistry registry, string extensionPath, string id, string typeName, string displayName, string version)
-        {
-            Assembly assembly = typeof(PluginRegistration).Assembly;
-            Type type = assembly.GetType(typeName, false);
-            if (type == null)
-                return;
+    private static void RegisterByName(PluginRegistry registry, string extensionPath, string id, string typeName, string displayName, string version)
+    {
+        Assembly assembly = typeof(PluginRegistration).Assembly;
+        Type type = assembly.GetType(typeName, false);
+        if (type == null)
+            return;
 
-            registry.Register(
-                extensionPath,
-                new PluginDescriptor(id, type, displayName, version));
-        }
+        registry.Register(
+            extensionPath,
+            new PluginDescriptor(id, type, displayName, version));
     }
 }

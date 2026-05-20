@@ -28,47 +28,46 @@
 using OpenMetaverse;
 using SkiaSharp;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+/// <summary>
+/// Layer information for JPEG2000 decoded image
+/// </summary>
+public struct J2KLayerInfo
 {
+    public int End;
+    public int Start;
+    public int DiscardLevel;
+}
+
+public delegate void DecodedCallback(UUID AssetId, J2KLayerInfo[] layers);
+
+public interface IJ2KDecoder
+{
+    void BeginDecode(UUID assetID, byte[] j2kData, DecodedCallback callback);
+
     /// <summary>
-    /// Layer information for JPEG2000 decoded image
+    /// Provides a synchronous decode so that caller can be assured that this executes before the next line
     /// </summary>
-    public struct J2KLayerInfo
-    {
-        public int End;
-        public int Start;
-        public int DiscardLevel;
-    }
+    /// <param name="assetID"></param>
+    /// <param name="j2kData"></param>
+    /// <returns>true if decode was successful.  false otherwise.</returns>
+    bool Decode(UUID assetID, byte[] j2kData);
 
-    public delegate void DecodedCallback(UUID AssetId, J2KLayerInfo[] layers);
+    /// <summary>
+    /// Provides a synchronous decode so that caller can be assured that this executes before the next line
+    /// </summary>
+    /// <param name="assetID"></param>
+    /// <param name="j2kData"></param>
+    /// <param name="layers">layer data</param>
+    /// <param name="components">number of components</param>
+    /// <returns>true if decode was successful.  false otherwise.</returns>
+    bool Decode(UUID assetID, byte[] j2kData, out J2KLayerInfo[] layers, out int components);
 
-    public interface IJ2KDecoder
-    {
-        void BeginDecode(UUID assetID, byte[] j2kData, DecodedCallback callback);
-
-        /// <summary>
-        /// Provides a synchronous decode so that caller can be assured that this executes before the next line
-        /// </summary>
-        /// <param name="assetID"></param>
-        /// <param name="j2kData"></param>
-        /// <returns>true if decode was successful.  false otherwise.</returns>
-        bool Decode(UUID assetID, byte[] j2kData);
-
-        /// <summary>
-        /// Provides a synchronous decode so that caller can be assured that this executes before the next line
-        /// </summary>
-        /// <param name="assetID"></param>
-        /// <param name="j2kData"></param>
-        /// <param name="layers">layer data</param>
-        /// <param name="components">number of components</param>
-        /// <returns>true if decode was successful.  false otherwise.</returns>
-        bool Decode(UUID assetID, byte[] j2kData, out J2KLayerInfo[] layers, out int components);
-
-        /// <summary>
-        /// Provides a synchronous decode direct to an image object
-        /// </summary>
-        /// <param name="j2kData"></param>
-        /// <returns>decoded image or 'null' of unsuccessful</returns>
-        SKImage DecodeToImage(byte[] j2kData);
-    }
+    /// <summary>
+    /// Provides a synchronous decode direct to an image object
+    /// </summary>
+    /// <param name="j2kData"></param>
+    /// <returns>decoded image or 'null' of unsuccessful</returns>
+    SKImage DecodeToImage(byte[] j2kData);
 }

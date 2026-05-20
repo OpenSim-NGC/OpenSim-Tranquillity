@@ -33,242 +33,241 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.World.LegacyMap
+namespace OpenSim.Region.CoreModules.World.LegacyMap;
+
+public class ShadedMapTileRenderer : IMapTileTerrainRenderer
 {
-    public class ShadedMapTileRenderer : IMapTileTerrainRenderer
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly string LogHeader = "[SHADED MAPTILE RENDERER]";
+
+    private Scene m_scene;
+    private IConfigSource m_config;
+    private SKColor m_color_water;
+
+    public void Initialise(Scene scene, IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private static readonly string LogHeader = "[SHADED MAPTILE RENDERER]";
+        m_scene = scene;
+        m_config = config;
 
-        private Scene m_scene;
-        private IConfigSource m_config;
-        private SKColor m_color_water;
+        string[] configSections = new string[] { "Map", "Startup" };
+        string waterColorHtml = Util.GetConfigVarFromSections<string>(m_config, "MapColorWater", configSections, "#1D475F");
+        m_color_water = HtmlToSKColor(waterColorHtml);
+    }
 
-        public void Initialise(Scene scene, IConfigSource config)
+    /// <summary>
+    /// Convert HTML color string to SKColor
+    /// </summary>
+    private static SKColor HtmlToSKColor(string htmlColor)
+    {
+        // Handle #RRGGBB format
+        if (htmlColor.StartsWith("#") && htmlColor.Length == 7)
         {
-            m_scene = scene;
-            m_config = config;
+            byte r = byte.Parse(htmlColor.Substring(1, 2), System.Globalization.NumberStyles.HexNumber);
+            byte g = byte.Parse(htmlColor.Substring(3, 2), System.Globalization.NumberStyles.HexNumber);
+            byte b = byte.Parse(htmlColor.Substring(5, 2), System.Globalization.NumberStyles.HexNumber);
+            return new SKColor(r, g, b, 255);
+        }
+        // Default to black if parsing fails
+        return new SKColor(0, 0, 0, 255);
+    }
 
-            string[] configSections = new string[] { "Map", "Startup" };
-            string waterColorHtml = Util.GetConfigVarFromSections<string>(m_config, "MapColorWater", configSections, "#1D475F");
-            m_color_water = HtmlToSKColor(waterColorHtml);
+    public void TerrainToBitmap(SKBitmap mapbmp)
+    {
+        m_log.DebugFormat("{0} Generating Maptile Step 1: Terrain", LogHeader);
+        int tc = Environment.TickCount;
+
+        ITerrainChannel hm = m_scene.Heightmap;
+
+        if (mapbmp.Width != hm.Width || mapbmp.Height != hm.Height)
+        {
+            m_log.ErrorFormat("{0} TerrainToBitmap. Passed bitmap wrong dimensions. passed=<{1},{2}>, size=<{3},{4}>",
+                LogHeader, mapbmp.Width, mapbmp.Height, hm.Width, hm.Height);
         }
 
-        /// <summary>
-        /// Convert HTML color string to SKColor
-        /// </summary>
-        private static SKColor HtmlToSKColor(string htmlColor)
+        bool ShadowDebugContinue = true;
+
+        bool terraincorruptedwarningsaid = false;
+
+        float low = 255;
+        float high = 0;
+        for (int x = 0; x < hm.Width; x++)
         {
-            // Handle #RRGGBB format
-            if (htmlColor.StartsWith("#") && htmlColor.Length == 7)
+            for (int y = 0; y < hm.Height; y++)
             {
-                byte r = byte.Parse(htmlColor.Substring(1, 2), System.Globalization.NumberStyles.HexNumber);
-                byte g = byte.Parse(htmlColor.Substring(3, 2), System.Globalization.NumberStyles.HexNumber);
-                byte b = byte.Parse(htmlColor.Substring(5, 2), System.Globalization.NumberStyles.HexNumber);
-                return new SKColor(r, g, b, 255);
+                float hmval = (float)hm[x, y];
+                if (hmval < low)
+                    low = hmval;
+                if (hmval > high)
+                    high = hmval;
             }
-            // Default to black if parsing fails
-            return new SKColor(0, 0, 0, 255);
         }
 
-        public void TerrainToBitmap(SKBitmap mapbmp)
+        float waterHeight = (float)m_scene.RegionInfo.RegionSettings.WaterHeight;
+
+        for (int x = 0; x < hm.Width; x++)
         {
-            m_log.DebugFormat("{0} Generating Maptile Step 1: Terrain", LogHeader);
-            int tc = Environment.TickCount;
-
-            ITerrainChannel hm = m_scene.Heightmap;
-
-            if (mapbmp.Width != hm.Width || mapbmp.Height != hm.Height)
+            for (int y = 0; y < hm.Height; y++)
             {
-                m_log.ErrorFormat("{0} TerrainToBitmap. Passed bitmap wrong dimensions. passed=<{1},{2}>, size=<{3},{4}>",
-                    LogHeader, mapbmp.Width, mapbmp.Height, hm.Width, hm.Height);
-            }
+                // Y flip the cordinates for the bitmap: hf origin is lower left, bm origin is upper left
+                int yr = ((int)hm.Height - 1) - y;
 
-            bool ShadowDebugContinue = true;
+                float heightvalue = (float)hm[x, y];
 
-            bool terraincorruptedwarningsaid = false;
-
-            float low = 255;
-            float high = 0;
-            for (int x = 0; x < hm.Width; x++)
-            {
-                for (int y = 0; y < hm.Height; y++)
+                if (heightvalue > waterHeight)
                 {
-                    float hmval = (float)hm[x, y];
-                    if (hmval < low)
-                        low = hmval;
-                    if (hmval > high)
-                        high = hmval;
-                }
-            }
+                    // scale height value
+                    // No, that doesn't scale it:
+                    // heightvalue = low + mid * (heightvalue - low) / mid; => low + (heightvalue - low) * mid / mid = low + (heightvalue - low) * 1 = low + heightvalue - low = heightvalue
 
-            float waterHeight = (float)m_scene.RegionInfo.RegionSettings.WaterHeight;
+                    if (Single.IsInfinity(heightvalue) || Single.IsNaN(heightvalue))
+                        heightvalue = 0;
+                    else if (heightvalue > 255f)
+                        heightvalue = 255f;
+                    else if (heightvalue < 0f)
+                        heightvalue = 0f;
 
-            for (int x = 0; x < hm.Width; x++)
-            {
-                for (int y = 0; y < hm.Height; y++)
-                {
-                    // Y flip the cordinates for the bitmap: hf origin is lower left, bm origin is upper left
-                    int yr = ((int)hm.Height - 1) - y;
+                    SKColor color = new SKColor((byte)heightvalue, 100, (byte)heightvalue, 255);
 
-                    float heightvalue = (float)hm[x, y];
+                    mapbmp.SetPixel(x, yr, color);
 
-                    if (heightvalue > waterHeight)
+                    try
                     {
-                        // scale height value
-                        // No, that doesn't scale it:
-                        // heightvalue = low + mid * (heightvalue - low) / mid; => low + (heightvalue - low) * mid / mid = low + (heightvalue - low) * 1 = low + heightvalue - low = heightvalue
-
-                        if (Single.IsInfinity(heightvalue) || Single.IsNaN(heightvalue))
-                            heightvalue = 0;
-                        else if (heightvalue > 255f)
-                            heightvalue = 255f;
-                        else if (heightvalue < 0f)
-                            heightvalue = 0f;
-
-                        SKColor color = new SKColor((byte)heightvalue, 100, (byte)heightvalue, 255);
-
-                        mapbmp.SetPixel(x, yr, color);
-
-                        try
+                        //X
+                        // .
+                        //
+                        // Shade the terrain for shadows
+                        if (x < (hm.Width - 1) && yr < (hm.Height - 1))
                         {
-                            //X
-                            // .
-                            //
-                            // Shade the terrain for shadows
-                            if (x < (hm.Width - 1) && yr < (hm.Height - 1))
+                            float hfvalue = (float)hm[x, y];
+                            float hfvaluecompare = 0f;
+
+                            if ((x + 1 < hm.Width) && (y + 1 < hm.Height))
                             {
-                                float hfvalue = (float)hm[x, y];
-                                float hfvaluecompare = 0f;
+                                hfvaluecompare = (float)hm[x + 1, y + 1]; // light from north-east => look at land height there
+                            }
+                            if (Single.IsInfinity(hfvalue) || Single.IsNaN(hfvalue))
+                                hfvalue = 0f;
 
-                                if ((x + 1 < hm.Width) && (y + 1 < hm.Height))
+                            if (Single.IsInfinity(hfvaluecompare) || Single.IsNaN(hfvaluecompare))
+                                hfvaluecompare = 0f;
+
+                            float hfdiff = hfvalue - hfvaluecompare;  // => positive if NE is lower, negative if here is lower
+
+                            int hfdiffi = 0;
+                            int hfdiffihighlight = 0;
+                            float highlightfactor = 0.18f;
+
+                            try
+                            {
+                                // hfdiffi = Math.Abs((int)((hfdiff * 4) + (hfdiff * 0.5))) + 1;
+                                hfdiffi = Math.Abs((int)(hfdiff * 4.5f)) + 1;
+                                if (hfdiff % 1f != 0)
                                 {
-                                    hfvaluecompare = (float)hm[x + 1, y + 1]; // light from north-east => look at land height there
-                                }
-                                if (Single.IsInfinity(hfvalue) || Single.IsNaN(hfvalue))
-                                    hfvalue = 0f;
-
-                                if (Single.IsInfinity(hfvaluecompare) || Single.IsNaN(hfvaluecompare))
-                                    hfvaluecompare = 0f;
-
-                                float hfdiff = hfvalue - hfvaluecompare;  // => positive if NE is lower, negative if here is lower
-
-                                int hfdiffi = 0;
-                                int hfdiffihighlight = 0;
-                                float highlightfactor = 0.18f;
-
-                                try
-                                {
-                                    // hfdiffi = Math.Abs((int)((hfdiff * 4) + (hfdiff * 0.5))) + 1;
-                                    hfdiffi = Math.Abs((int)(hfdiff * 4.5f)) + 1;
-                                    if (hfdiff % 1f != 0)
-                                    {
-                                        // hfdiffi = hfdiffi + Math.Abs((int)(((hfdiff % 1) * 0.5f) * 10f) - 1);
-                                        hfdiffi = hfdiffi + Math.Abs((int)((hfdiff % 1f) * 5f) - 1);
-                                    }
-
-                                    hfdiffihighlight = Math.Abs((int)((hfdiff * highlightfactor) * 4.5f)) + 1;
-                                    if (hfdiff % 1f != 0)
-                                    {
-                                        // hfdiffi = hfdiffi + Math.Abs((int)(((hfdiff % 1) * 0.5f) * 10f) - 1);
-                                        hfdiffihighlight = hfdiffihighlight + Math.Abs((int)(((hfdiff * highlightfactor) % 1f) * 5f) - 1);
-                                    }
-                                }
-                                catch (OverflowException)
-                                {
-                                    m_log.Debug("[MAPTILE]: Shadow failed at value: " + hfdiff.ToString());
-                                    ShadowDebugContinue = false;
+                                    // hfdiffi = hfdiffi + Math.Abs((int)(((hfdiff % 1) * 0.5f) * 10f) - 1);
+                                    hfdiffi = hfdiffi + Math.Abs((int)((hfdiff % 1f) * 5f) - 1);
                                 }
 
-                                if (hfdiff > 0.3f)
+                                hfdiffihighlight = Math.Abs((int)((hfdiff * highlightfactor) * 4.5f)) + 1;
+                                if (hfdiff % 1f != 0)
                                 {
-                                    // NE is lower than here
-                                    // We have to desaturate and lighten the land at the same time
-                                    // we use floats, colors use bytes, so shrink are space down to
-                                    // 0-255
+                                    // hfdiffi = hfdiffi + Math.Abs((int)(((hfdiff % 1) * 0.5f) * 10f) - 1);
+                                    hfdiffihighlight = hfdiffihighlight + Math.Abs((int)(((hfdiff * highlightfactor) % 1f) * 5f) - 1);
+                                }
+                            }
+                            catch (OverflowException)
+                            {
+                                m_log.Debug("[MAPTILE]: Shadow failed at value: " + hfdiff.ToString());
+                                ShadowDebugContinue = false;
+                            }
 
-                                    if (ShadowDebugContinue)
+                            if (hfdiff > 0.3f)
+                            {
+                                // NE is lower than here
+                                // We have to desaturate and lighten the land at the same time
+                                // we use floats, colors use bytes, so shrink are space down to
+                                // 0-255
+
+                                if (ShadowDebugContinue)
+                                {
+                                    int r = color.Red;
+                                    int g = color.Green;
+                                    int b = color.Blue;
+                                    color = new SKColor((byte)((r + hfdiffihighlight < 255) ? r + hfdiffihighlight : 255),
+                                                        (byte)((g + hfdiffihighlight < 255) ? g + hfdiffihighlight : 255),
+                                                        (byte)((b + hfdiffihighlight < 255) ? b + hfdiffihighlight : 255),
+                                                        255);
+                                }
+                            }
+                            else if (hfdiff < -0.3f)
+                            {
+                                // here is lower than NE:
+                                // We have to desaturate and blacken the land at the same time
+                                // we use floats, colors use bytes, so shrink are space down to
+                                // 0-255
+
+                                if (ShadowDebugContinue)
+                                {
+                                    if ((x - 1 > 0) && (yr + 1 < hm.Height))
                                     {
+                                        color = mapbmp.GetPixel(x - 1, yr + 1);
                                         int r = color.Red;
                                         int g = color.Green;
                                         int b = color.Blue;
-                                        color = new SKColor((byte)((r + hfdiffihighlight < 255) ? r + hfdiffihighlight : 255),
-                                                            (byte)((g + hfdiffihighlight < 255) ? g + hfdiffihighlight : 255),
-                                                            (byte)((b + hfdiffihighlight < 255) ? b + hfdiffihighlight : 255),
+                                        color = new SKColor((byte)((r - hfdiffi > 0) ? r - hfdiffi : 0),
+                                                            (byte)((g - hfdiffi > 0) ? g - hfdiffi : 0),
+                                                            (byte)((b - hfdiffi > 0) ? b - hfdiffi : 0),
                                                             255);
-                                    }
-                                }
-                                else if (hfdiff < -0.3f)
-                                {
-                                    // here is lower than NE:
-                                    // We have to desaturate and blacken the land at the same time
-                                    // we use floats, colors use bytes, so shrink are space down to
-                                    // 0-255
 
-                                    if (ShadowDebugContinue)
-                                    {
-                                        if ((x - 1 > 0) && (yr + 1 < hm.Height))
-                                        {
-                                            color = mapbmp.GetPixel(x - 1, yr + 1);
-                                            int r = color.Red;
-                                            int g = color.Green;
-                                            int b = color.Blue;
-                                            color = new SKColor((byte)((r - hfdiffi > 0) ? r - hfdiffi : 0),
-                                                                (byte)((g - hfdiffi > 0) ? g - hfdiffi : 0),
-                                                                (byte)((b - hfdiffi > 0) ? b - hfdiffi : 0),
-                                                                255);
-
-                                            mapbmp.SetPixel(x-1, yr+1, color);
-                                        }
+                                        mapbmp.SetPixel(x-1, yr+1, color);
                                     }
                                 }
                             }
-                        }
-                        catch (ArgumentException)
-                        {
-                            if (!terraincorruptedwarningsaid)
-                            {
-                                m_log.WarnFormat("[SHADED MAP TILE RENDERER]: Your terrain is corrupted in region {0}, it might take a few minutes to generate the map image depending on the corruption level", m_scene.RegionInfo.RegionName);
-                                terraincorruptedwarningsaid = true;
-                            }
-                            color = SKColors.Black;
-                            mapbmp.SetPixel(x, yr, color);
                         }
                     }
-                    else
+                    catch (ArgumentException)
                     {
-                        // We're under the water level with the terrain, so paint water instead of land
-
-                        // Y flip the cordinates
-                        heightvalue = waterHeight - heightvalue;
-                        if (Single.IsInfinity(heightvalue) || Single.IsNaN(heightvalue))
-                            heightvalue = 0f;
-                        else if (heightvalue > 19f)
-                            heightvalue = 19f;
-                        else if (heightvalue < 0f)
-                            heightvalue = 0f;
-
-                        heightvalue = 100f - (heightvalue * 100f) / 19f;
-
-                        try
+                        if (!terraincorruptedwarningsaid)
                         {
-                            mapbmp.SetPixel(x, yr, m_color_water);
+                            m_log.WarnFormat("[SHADED MAP TILE RENDERER]: Your terrain is corrupted in region {0}, it might take a few minutes to generate the map image depending on the corruption level", m_scene.RegionInfo.RegionName);
+                            terraincorruptedwarningsaid = true;
                         }
-                        catch (ArgumentException)
+                        color = SKColors.Black;
+                        mapbmp.SetPixel(x, yr, color);
+                    }
+                }
+                else
+                {
+                    // We're under the water level with the terrain, so paint water instead of land
+
+                    // Y flip the cordinates
+                    heightvalue = waterHeight - heightvalue;
+                    if (Single.IsInfinity(heightvalue) || Single.IsNaN(heightvalue))
+                        heightvalue = 0f;
+                    else if (heightvalue > 19f)
+                        heightvalue = 19f;
+                    else if (heightvalue < 0f)
+                        heightvalue = 0f;
+
+                    heightvalue = 100f - (heightvalue * 100f) / 19f;
+
+                    try
+                    {
+                        mapbmp.SetPixel(x, yr, m_color_water);
+                    }
+                    catch (ArgumentException)
+                    {
+                        if (!terraincorruptedwarningsaid)
                         {
-                            if (!terraincorruptedwarningsaid)
-                            {
-                                m_log.WarnFormat("[SHADED MAP TILE RENDERER]: Your terrain is corrupted in region {0}, it might take a few minutes to generate the map image depending on the corruption level", m_scene.RegionInfo.RegionName);
-                                terraincorruptedwarningsaid = true;
-                            }
-                            SKColor black = SKColors.Black;
-                            mapbmp.SetPixel(x, (hm.Width - y) - 1, black);
+                            m_log.WarnFormat("[SHADED MAP TILE RENDERER]: Your terrain is corrupted in region {0}, it might take a few minutes to generate the map image depending on the corruption level", m_scene.RegionInfo.RegionName);
+                            terraincorruptedwarningsaid = true;
                         }
+                        SKColor black = SKColors.Black;
+                        mapbmp.SetPixel(x, (hm.Width - y) - 1, black);
                     }
                 }
             }
-
-            m_log.Debug("[SHADED MAP TILE RENDERER]: Generating Maptile Step 1: Done in " + (Environment.TickCount - tc) + " ms");
         }
+
+        m_log.Debug("[SHADED MAP TILE RENDERER]: Generating Maptile Step 1: Done in " + (Environment.TickCount - tc) + " ms");
     }
 }

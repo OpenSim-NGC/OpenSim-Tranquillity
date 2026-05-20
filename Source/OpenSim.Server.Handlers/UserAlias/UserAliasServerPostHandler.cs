@@ -27,15 +27,7 @@
 
 using Nini.Config;
 using log4net;
-using System;
 using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
@@ -43,161 +35,160 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
 using OpenMetaverse;
 
-namespace OpenSim.Server.Handlers.UserAlias
+namespace OpenSim.Server.Handlers.UserAlias;
+
+public class UserAliasServerPostHandler : BaseStreamHandler
 {
-    public class UserAliasServerPostHandler : BaseStreamHandler
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IUserAliasService m_UserAliasService;
+
+    public UserAliasServerPostHandler(IUserAliasService service)
+        : this(service, null, null) {}
+
+    public UserAliasServerPostHandler(IUserAliasService service, IConfig config, IServiceAuth auth) :
+            base("POST", "/useralias", auth)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_UserAliasService = service;
+    }
 
-        private IUserAliasService m_UserAliasService;
+    protected override byte[] ProcessRequest(string path, Stream requestData,
+            IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        string body;
+        using(StreamReader sr = new StreamReader(requestData))
+            body = sr.ReadToEnd();
+        body = body.Trim();
 
-        public UserAliasServerPostHandler(IUserAliasService service)
-            : this(service, null, null) {}
+        // We need to check the authorization header
+        //httpRequest.Headers["authorization"] ...
 
-        public UserAliasServerPostHandler(IUserAliasService service, IConfig config, IServiceAuth auth) :
-                base("POST", "/useralias", auth)
+        string method = string.Empty;
+        try
         {
-            m_UserAliasService = service;
+            Dictionary<string, object> request = ServerUtils.ParseQueryString(body);
+
+            if (!request.ContainsKey("METHOD"))
+                return FailureResult();
+
+            method = request["METHOD"].ToString();
+
+            switch (method)
+            {
+                case "getuserforalias":
+                    return GetUserForAlias(request);
+                case "getuseraliases":
+                    return GetUserAliases(request);
+            }
+
+            m_log.DebugFormat("[USER SERVICE HANDLER]: unknown method request: {0}", method);
+        }
+        catch (Exception e)
+        {
+            m_log.DebugFormat("[USER SERVICE HANDLER]: Exception in method {0}: {1}", method, e);
         }
 
-        protected override byte[] ProcessRequest(string path, Stream requestData,
-                IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        return FailureResult();
+    }
+
+    byte[] GetUserForAlias(Dictionary<string, object> request)
+    {
+        Dictionary<string, object> result = new Dictionary<string, object>();
+
+        if (request.TryGetValue("AliasID", out object otmp) && otmp != null)
         {
-            string body;
-            using(StreamReader sr = new StreamReader(requestData))
-                body = sr.ReadToEnd();
-            body = body.Trim();
-
-            // We need to check the authorization header
-            //httpRequest.Headers["authorization"] ...
-
-            string method = string.Empty;
-            try
+            if (UUID.TryParse(otmp.ToString(), out UUID aliasID))
             {
-                Dictionary<string, object> request = ServerUtils.ParseQueryString(body);
-
-                if (!request.ContainsKey("METHOD"))
-                    return FailureResult();
-
-                method = request["METHOD"].ToString();
-
-                switch (method)
+                var alias = m_UserAliasService.GetUserForAlias(aliasID);
+                if (alias != null)
                 {
-                    case "getuserforalias":
-                        return GetUserForAlias(request);
-                    case "getuseraliases":
-                        return GetUserAliases(request);
+                    result["result"] = alias.ToKeyValuePairs();
+                    return ResultToBytes(result);
                 }
-
-                m_log.DebugFormat("[USER SERVICE HANDLER]: unknown method request: {0}", method);
             }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[USER SERVICE HANDLER]: Exception in method {0}: {1}", method, e);
-            }
-
-            return FailureResult();
         }
 
-        byte[] GetUserForAlias(Dictionary<string, object> request)
-        {
-            Dictionary<string, object> result = new Dictionary<string, object>();
+        result["result"] = "null";
+        return ResultToBytes(result);
+    }
 
-            if (request.TryGetValue("AliasID", out object otmp) && otmp != null)
+    byte[] GetUserAliases(Dictionary<string, object> request)
+    {
+        Dictionary<string, object> result = new Dictionary<string, object>();
+
+        if (request.TryGetValue("UserID", out object otmp) && otmp != null)
+        {
+            if (UUID.TryParse(otmp.ToString(), out UUID userID))
             {
-                if (UUID.TryParse(otmp.ToString(), out UUID aliasID))
+                var aliases = m_UserAliasService.GetUserAliases(userID);
+                if (aliases != null)
                 {
-                    var alias = m_UserAliasService.GetUserForAlias(aliasID);
-                    if (alias != null)
+                    int i = 0;
+                    foreach (Services.Interfaces.UserAlias alias in aliases)
                     {
-                        result["result"] = alias.ToKeyValuePairs();
-                        return ResultToBytes(result);
+                        Dictionary<string, object> rinfoDict = alias.ToKeyValuePairs();
+                        result["alias" + i] = rinfoDict;
+                        i++;
                     }
+
+                    string xmlString = ServerUtils.BuildXmlResponse(result);
+                    return Util.UTF8NoBomEncoding.GetBytes(xmlString);
                 }
             }
-
-            result["result"] = "null";
-            return ResultToBytes(result);
         }
 
-        byte[] GetUserAliases(Dictionary<string, object> request)
-        {
-            Dictionary<string, object> result = new Dictionary<string, object>();
+        result["result"] = "null";
+        return ResultToBytes(result);
+    }
 
-            if (request.TryGetValue("UserID", out object otmp) && otmp != null)
-            {
-                if (UUID.TryParse(otmp.ToString(), out UUID userID))
-                {
-                    var aliases = m_UserAliasService.GetUserAliases(userID);
-                    if (aliases != null)
-                    {
-                        int i = 0;
-                        foreach (Services.Interfaces.UserAlias alias in aliases)
-                        {
-                            Dictionary<string, object> rinfoDict = alias.ToKeyValuePairs();
-                            result["alias" + i] = rinfoDict;
-                            i++;
-                        }
+    /*
+    private byte[] SuccessResult()
+    {
+        XmlDocument doc = new XmlDocument();
 
-                        string xmlString = ServerUtils.BuildXmlResponse(result);
-                        return Util.UTF8NoBomEncoding.GetBytes(xmlString);
-                    }
-                }
-            }
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
+        doc.AppendChild(xmlnode);
 
-            result["result"] = "null";
-            return ResultToBytes(result);
-        }
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
+        doc.AppendChild(rootElement);
 
+        XmlElement result = doc.CreateElement("", "result", "");
+        result.AppendChild(doc.CreateTextNode("Success"));
+
+        rootElement.AppendChild(result);
+
+        return Util.DocToBytes(doc);
+    }
+    */
+
+    private static byte[] ResultFailureBytes = osUTF8.GetASCIIBytes("<?xml version =\"1.0\"?><ServerResponse><result>Failure</result></ServerResponse>");
+
+    private byte[] FailureResult()
+    {
         /*
-        private byte[] SuccessResult()
-        {
-            XmlDocument doc = new XmlDocument();
+        XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
-            doc.AppendChild(xmlnode);
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
-            doc.AppendChild(rootElement);
+        doc.AppendChild(xmlnode);
 
-            XmlElement result = doc.CreateElement("", "result", "");
-            result.AppendChild(doc.CreateTextNode("Success"));
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
 
-            rootElement.AppendChild(result);
+        doc.AppendChild(rootElement);
 
-            return Util.DocToBytes(doc);
-        }
+        XmlElement result = doc.CreateElement("", "result", "");
+        result.AppendChild(doc.CreateTextNode("Failure"));
+
+        rootElement.AppendChild(result);
+
+        return Util.DocToBytes(doc);
         */
+        return ResultFailureBytes;
+    }
 
-        private static byte[] ResultFailureBytes = osUTF8.GetASCIIBytes("<?xml version =\"1.0\"?><ServerResponse><result>Failure</result></ServerResponse>");
-
-        private byte[] FailureResult()
-        {
-            /*
-            XmlDocument doc = new XmlDocument();
-
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration, "", "");
-
-            doc.AppendChild(xmlnode);
-
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse", "");
-
-            doc.AppendChild(rootElement);
-
-            XmlElement result = doc.CreateElement("", "result", "");
-            result.AppendChild(doc.CreateTextNode("Failure"));
-
-            rootElement.AppendChild(result);
-
-            return Util.DocToBytes(doc);
-            */
-            return ResultFailureBytes;
-        }
-
-        private byte[] ResultToBytes(Dictionary<string, object> result)
-        {
-            string xmlString = ServerUtils.BuildXmlResponse(result);
-            return Util.UTF8NoBomEncoding.GetBytes(xmlString);
-        }
+    private byte[] ResultToBytes(Dictionary<string, object> result)
+    {
+        string xmlString = ServerUtils.BuildXmlResponse(result);
+        return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 }

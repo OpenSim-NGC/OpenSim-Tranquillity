@@ -25,19 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Runtime.Serialization;
+namespace OpenSim.Region.ScriptEngine.Shared;
 
-namespace OpenSim.Region.ScriptEngine.Shared
+[Serializable]
+public class ScriptException : Exception
 {
-    [Serializable]
-    public class ScriptException : Exception
-    {
-        public ScriptException() : base() {}
+    public ScriptException() : base() {}
 
-        public ScriptException(string message) : base(message) {}
+    public ScriptException(string message) : base(message) {}
 
-        public ScriptException(string message, Exception innerException) : base(message, innerException) {}
+    public ScriptException(string message, Exception innerException) : base(message, innerException) {}
 
-    }
 }

@@ -1,15 +1,12 @@
-
-using System;
 using Xunit;
 
-namespace SimpleTests
+namespace SimpleTests;
+
+public class SimpleTest
 {
-    public class SimpleTest
+    [Fact]
+    public void TestBasic()
     {
-        [Fact]
-        public void TestBasic()
-        {
-            Assert.Equal(1, 1);
-        }
+        Assert.Equal(1, 1);
     }
 }

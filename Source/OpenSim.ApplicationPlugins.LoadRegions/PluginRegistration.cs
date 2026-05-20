@@ -27,19 +27,18 @@
 
 using OpenSim.Framework;
 
-namespace OpenSim.ApplicationPlugins.LoadRegions
+namespace OpenSim.ApplicationPlugins.LoadRegions;
+
+public class PluginRegistration : IPluginRegistryProvider
 {
-    public class PluginRegistration : IPluginRegistryProvider
+    public void RegisterPlugins(PluginRegistry registry)
     {
-        public void RegisterPlugins(PluginRegistry registry)
-        {
-            registry.Register(
-                "/OpenSim/Startup",
-                new PluginDescriptor(
-                    "LoadRegions",
-                    typeof(LoadRegionsPlugin),
-                    "LoadRegions",
-                    "0.9"));
-        }
+        registry.Register(
+            "/OpenSim/Startup",
+            new PluginDescriptor(
+                "LoadRegions",
+                typeof(LoadRegionsPlugin),
+                "LoadRegions",
+                "0.9"));
     }
 }

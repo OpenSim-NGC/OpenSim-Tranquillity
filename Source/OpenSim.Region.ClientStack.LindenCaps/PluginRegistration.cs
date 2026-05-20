@@ -27,31 +27,30 @@
 
 using OpenSim.Framework;
 
-namespace OpenSim.Region.ClientStack.LindenCaps
+namespace OpenSim.Region.ClientStack.LindenCaps;
+
+public class PluginRegistration : IPluginRegistryProvider
 {
-    public class PluginRegistration : IPluginRegistryProvider
+    public void RegisterPlugins(PluginRegistry registry)
     {
-        public void RegisterPlugins(PluginRegistry registry)
-        {
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("AgentPreferencesModule", typeof(AgentPreferencesModule), "AgentPreferencesModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("AvatarPickerSearchModule", typeof(AvatarPickerSearchModule), "AvatarPickerSearchModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("BunchOfCapsModule", typeof(BunchOfCapsModule), "BunchOfCapsModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("EventQueueGetModule", typeof(EventQueueGetModule), "EventQueueGetModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("ObjectAdd", typeof(ObjectAdd), "ObjectAdd", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("UploadObjectAssetModule", typeof(UploadObjectAssetModule), "UploadObjectAssetModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("DisplayNameModule", typeof(DisplayNameModule), "DisplayNameModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("EstateAccessCapModule", typeof(EstateAccessCapModule), "EstateAccessCapModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("EstateChangeInfoCapModule", typeof(EstateChangeInfoCapModule), "EstateChangeInfoCapModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("ExperienceModule", typeof(ExperienceModule), "ExperienceModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("FetchInventory2Module", typeof(FetchInventory2Module), "FetchInventory2Module", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("FetchLibDescModule", typeof(FetchLibDescModule), "FetchLibDescModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("GetAssetsModule", typeof(GetAssetsModule), "GetAssetsModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("MeshUploadFlagModule", typeof(MeshUploadFlagModule), "MeshUploadFlagModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("RegionConsoleModule", typeof(RegionConsoleModule), "RegionConsoleModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("ServerReleaseNotesModule", typeof(ServerReleaseNotesModule), "ServerReleaseNotesModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("SimulatorFeaturesModule", typeof(SimulatorFeaturesModule), "SimulatorFeaturesModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("UploadBakedTextureModule", typeof(UploadBakedTextureModule), "UploadBakedTextureModule", "0.9"));
-            registry.Register("/OpenSim/RegionModules", new PluginDescriptor("WebFetchInvDescModule", typeof(WebFetchInvDescModule), "WebFetchInvDescModule", "0.9"));
-        }
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("AgentPreferencesModule", typeof(AgentPreferencesModule), "AgentPreferencesModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("AvatarPickerSearchModule", typeof(AvatarPickerSearchModule), "AvatarPickerSearchModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("BunchOfCapsModule", typeof(BunchOfCapsModule), "BunchOfCapsModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("EventQueueGetModule", typeof(EventQueueGetModule), "EventQueueGetModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("ObjectAdd", typeof(ObjectAdd), "ObjectAdd", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("UploadObjectAssetModule", typeof(UploadObjectAssetModule), "UploadObjectAssetModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("DisplayNameModule", typeof(DisplayNameModule), "DisplayNameModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("EstateAccessCapModule", typeof(EstateAccessCapModule), "EstateAccessCapModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("EstateChangeInfoCapModule", typeof(EstateChangeInfoCapModule), "EstateChangeInfoCapModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("ExperienceModule", typeof(ExperienceModule), "ExperienceModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("FetchInventory2Module", typeof(FetchInventory2Module), "FetchInventory2Module", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("FetchLibDescModule", typeof(FetchLibDescModule), "FetchLibDescModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("GetAssetsModule", typeof(GetAssetsModule), "GetAssetsModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("MeshUploadFlagModule", typeof(MeshUploadFlagModule), "MeshUploadFlagModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("RegionConsoleModule", typeof(RegionConsoleModule), "RegionConsoleModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("ServerReleaseNotesModule", typeof(ServerReleaseNotesModule), "ServerReleaseNotesModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("SimulatorFeaturesModule", typeof(SimulatorFeaturesModule), "SimulatorFeaturesModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("UploadBakedTextureModule", typeof(UploadBakedTextureModule), "UploadBakedTextureModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("WebFetchInvDescModule", typeof(WebFetchInvDescModule), "WebFetchInvDescModule", "0.9"));
     }
 }

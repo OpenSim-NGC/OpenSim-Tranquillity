@@ -27,19 +27,18 @@
 
 using OpenSim.Framework;
 
-namespace OpenSim.ApplicationPlugins.RemoteController
+namespace OpenSim.ApplicationPlugins.RemoteController;
+
+public class PluginRegistration : IPluginRegistryProvider
 {
-    public class PluginRegistration : IPluginRegistryProvider
+    public void RegisterPlugins(PluginRegistry registry)
     {
-        public void RegisterPlugins(PluginRegistry registry)
-        {
-            registry.Register(
-                "/OpenSim/Startup",
-                new PluginDescriptor(
-                    "RemoteAdminPlugin",
-                    typeof(RemoteAdminPlugin),
-                    "RemoteAdminPlugin",
-                    "0.9"));
-        }
+        registry.Register(
+            "/OpenSim/Startup",
+            new PluginDescriptor(
+                "RemoteAdminPlugin",
+                typeof(RemoteAdminPlugin),
+                "RemoteAdminPlugin",
+                "0.9"));
     }
 }

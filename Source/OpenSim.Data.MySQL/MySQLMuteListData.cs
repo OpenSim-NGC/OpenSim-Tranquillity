@@ -25,43 +25,38 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Data;
 using MySqlConnector;
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Data.MySQL
+namespace OpenSim.Data.MySQL;
+
+public class MySqlMuteListData : MySQLGenericTableHandler<MuteData>, IMuteListData
 {
-    public class MySqlMuteListData : MySQLGenericTableHandler<MuteData>, IMuteListData
+    public MySqlMuteListData(string connectionString)
+            : base(connectionString, "MuteList", "MuteListStore")
     {
-        public MySqlMuteListData(string connectionString)
-                : base(connectionString, "MuteList", "MuteListStore")
+    }
+
+    public MuteData[] Get(UUID agentID)
+    {
+        MuteData[] data = base.Get("AgentID", agentID.ToString());
+        return data;
+    }
+
+    public bool Delete(UUID agentID, UUID muteID, string muteName)
+    {
+        string cmnd ="delete from MuteList where AgentID = ?AgentID and MuteID = ?MuteID and MuteName = ?MuteName";
+
+        using (MySqlCommand cmd = new MySqlCommand(cmnd))
         {
-        }
+            cmd.Parameters.AddWithValue("?AgentID", agentID.ToString());
+            cmd.Parameters.AddWithValue("?MuteID", muteID.ToString());
+            cmd.Parameters.AddWithValue("?MuteName", muteName);
 
-        public MuteData[] Get(UUID agentID)
-        {
-            MuteData[] data = base.Get("AgentID", agentID.ToString());
-            return data;
-        }
-
-        public bool Delete(UUID agentID, UUID muteID, string muteName)
-        {
-            string cmnd ="delete from MuteList where AgentID = ?AgentID and MuteID = ?MuteID and MuteName = ?MuteName";
-
-            using (MySqlCommand cmd = new MySqlCommand(cmnd))
-            {
-                cmd.Parameters.AddWithValue("?AgentID", agentID.ToString());
-                cmd.Parameters.AddWithValue("?MuteID", muteID.ToString());
-                cmd.Parameters.AddWithValue("?MuteName", muteName);
-
-                if (ExecuteNonQuery(cmd) > 0)
-                    return true;
-                return false;
-            }
+            if (ExecuteNonQuery(cmd) > 0)
+                return true;
+            return false;
         }
     }
 }

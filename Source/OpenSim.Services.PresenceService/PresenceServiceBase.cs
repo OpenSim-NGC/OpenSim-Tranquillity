@@ -25,60 +25,55 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
 using Nini.Config;
-using OpenSim.Framework;
 using OpenSim.Data;
-using OpenSim.Services.Interfaces;
 using OpenSim.Services.Base;
 
-namespace OpenSim.Services.PresenceService
+namespace OpenSim.Services.PresenceService;
+
+public class PresenceServiceBase : ServiceBase
 {
-    public class PresenceServiceBase : ServiceBase
+    protected IPresenceData m_Database = null;
+
+    public PresenceServiceBase(IConfigSource config)
+        : base(config)
     {
-        protected IPresenceData m_Database = null;
+        string dllName = String.Empty;
+        string connString = String.Empty;
+        string realm = "Presence";
 
-        public PresenceServiceBase(IConfigSource config)
-            : base(config)
+        //
+        // Try reading the [DatabaseService] section, if it exists
+        //
+        IConfig dbConfig = config.Configs["DatabaseService"];
+        if (dbConfig != null)
         {
-            string dllName = String.Empty;
-            string connString = String.Empty;
-            string realm = "Presence";
-
-            //
-            // Try reading the [DatabaseService] section, if it exists
-            //
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig != null)
-            {
-                if (dllName.Length == 0)
-                    dllName = dbConfig.GetString("StorageProvider", String.Empty);
-                if (connString.Length == 0)
-                    connString = dbConfig.GetString("ConnectionString", String.Empty);
-            }
-
-            //
-            // [PresenceService] section overrides [DatabaseService], if it exists
-            //
-            IConfig presenceConfig = config.Configs["PresenceService"];
-            if (presenceConfig != null)
-            {
-                dllName = presenceConfig.GetString("StorageProvider", dllName);
-                connString = presenceConfig.GetString("ConnectionString", connString);
-                realm = presenceConfig.GetString("Realm", realm);
-            }
-
-            //
-            // We tried, but this doesn't exist. We can't proceed.
-            //
-            if (string.IsNullOrEmpty(dllName))
-                throw new Exception("No StorageProvider configured");
-
-            m_Database = LoadPlugin<IPresenceData>(dllName, new Object[] { connString, realm });
-            if (m_Database == null)
-                throw new Exception("Could not find a storage interface in the given module " + dllName);
-
+            if (dllName.Length == 0)
+                dllName = dbConfig.GetString("StorageProvider", String.Empty);
+            if (connString.Length == 0)
+                connString = dbConfig.GetString("ConnectionString", String.Empty);
         }
+
+        //
+        // [PresenceService] section overrides [DatabaseService], if it exists
+        //
+        IConfig presenceConfig = config.Configs["PresenceService"];
+        if (presenceConfig != null)
+        {
+            dllName = presenceConfig.GetString("StorageProvider", dllName);
+            connString = presenceConfig.GetString("ConnectionString", connString);
+            realm = presenceConfig.GetString("Realm", realm);
+        }
+
+        //
+        // We tried, but this doesn't exist. We can't proceed.
+        //
+        if (string.IsNullOrEmpty(dllName))
+            throw new Exception("No StorageProvider configured");
+
+        m_Database = LoadPlugin<IPresenceData>(dllName, new Object[] { connString, realm });
+        if (m_Database == null)
+            throw new Exception("Could not find a storage interface in the given module " + dllName);
+
     }
 }

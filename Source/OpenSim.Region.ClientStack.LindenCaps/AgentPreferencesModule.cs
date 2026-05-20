@@ -37,160 +37,159 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
-namespace OpenSim.Region.ClientStack.LindenCaps
+namespace OpenSim.Region.ClientStack.LindenCaps;
+
+public class AgentPreferencesModule : ISharedRegionModule
 {
-    public class AgentPreferencesModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private List<Scene> m_scenes = new List<Scene>();
+
+    public void Initialise(IConfigSource source)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private List<Scene> m_scenes = new List<Scene>();
-
-        public void Initialise(IConfigSource source)
-        {
-
-        }
-
-        #region Region module
-
-        public void AddRegion(Scene scene)
-        {
-            lock (m_scenes)
-                m_scenes.Add(scene);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            lock (m_scenes)
-                m_scenes.Remove(scene);
-            scene.EventManager.OnRegisterCaps -= RegisterCaps;
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            scene.EventManager.OnRegisterCaps += RegisterCaps;
-
-            ISimulatorFeaturesModule simFeatures = scene.RequestModuleInterface<ISimulatorFeaturesModule>();
-            simFeatures?.AddFeature("AvatarHoverHeightEnabled",OSD.FromBoolean(true));
-
-        }
-
-        public void PostInitialise() {}
-
-        public void Close() {}
-
-        public string Name { get { return "AgentPreferencesModule"; } }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public void RegisterCaps(UUID agent, Caps caps)
-        {
-            string capPath = "/" + UUID.Random().ToString();
-            caps.RegisterSimpleHandler("AgentPreferences",
-                new SimpleStreamHandler(capPath, delegate(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-                    {
-                        UpdateAgentPreferences(httpRequest, httpResponse, agent);
-                    }));
-            caps.RegisterSimpleHandler("UpdateAgentLanguage",
-                new SimpleStreamHandler( capPath, delegate(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-                    {
-                        UpdateAgentPreferences(httpRequest, httpResponse, agent);
-                    }), false);
-            caps.RegisterSimpleHandler("UpdateAgentInformation",
-                new SimpleStreamHandler(capPath, delegate(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-                    {
-                        UpdateAgentPreferences(httpRequest, httpResponse, agent);
-                    }), false);
-        }
-
-        public void UpdateAgentPreferences(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID agent)
-        {
-            if (httpRequest.HttpMethod != "POST")
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-                return;
-            }
-
-            //m_log.DebugFormat("[AgentPrefs]: UpdateAgentPreferences for {0}", agent.ToString());
-            OSDMap req;
-            try
-            {
-                req = (OSDMap)OSDParser.DeserializeLLSDXml(httpRequest.InputStream);
-            }
-            catch
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
-                return;
-            }
-
-            IAgentPreferencesService aps = m_scenes[0].AgentPreferencesService;
-            AgentPrefs data = null;
-            if(aps != null)
-                data = aps.GetAgentPreferences(agent);
-
-            if (data == null)
-                data = new AgentPrefs(agent);
-
-            bool changed = false;
-            OSD tmp;
-            if (req.TryGetValue("access_prefs", out tmp) && tmp is OSDMap)
-            {
-                OSDMap accessPrefs = (OSDMap)tmp;  // We could check with ContainsKey...
-                data.AccessPrefs = accessPrefs["max"].AsString();
-                changed = true;
-            }
-            if (req.TryGetValue("default_object_perm_masks", out tmp) && tmp is OSDMap)
-            {
-                OSDMap permsMap = (OSDMap)tmp;
-                data.PermEveryone = permsMap["Everyone"].AsInteger();
-                data.PermGroup = permsMap["Group"].AsInteger();
-                data.PermNextOwner = permsMap["NextOwner"].AsInteger();
-                changed = true;
-            }
-            if (req.TryGetValue("hover_height", out tmp))
-            {
-                data.HoverHeight = (float)tmp.AsReal();
-                changed = true;
-            }
-            if (req.TryGetValue("language", out tmp))
-            {
-                data.Language = tmp.AsString();
-                changed = true;
-            }
-            if (req.TryGetValue("language_is_public", out tmp))
-            {
-                data.LanguageIsPublic = tmp.AsBoolean();
-                changed = true;
-            }
-
-            if(changed)
-                aps?.StoreAgentPreferences(data);
-
-            IAvatarFactoryModule afm = m_scenes[0].RequestModuleInterface<IAvatarFactoryModule>();
-            afm?.SetPreferencesHoverZ(agent, (float)data.HoverHeight);
-
-            OSDMap resp = new OSDMap();
-            OSDMap respAccessPrefs = new OSDMap();
-            respAccessPrefs["max"] = data.AccessPrefs;
-            resp["access_prefs"] = respAccessPrefs;
-
-            OSDMap respDefaultPerms = new OSDMap();
-            respDefaultPerms["Everyone"] = data.PermEveryone;
-            respDefaultPerms["Group"] = data.PermGroup;
-            respDefaultPerms["NextOwner"] = data.PermNextOwner;
-
-            resp["default_object_perm_masks"] = respDefaultPerms;
-            resp["god_level"] = 0; // *TODO: Add this
-            resp["hover_height"] = data.HoverHeight;
-            resp["language"] = data.Language;
-            resp["language_is_public"] = data.LanguageIsPublic;
-
-            httpResponse.RawBuffer = OSDParser.SerializeLLSDXmlBytes(resp);
-            httpResponse.StatusCode = (int)HttpStatusCode.OK;
-        }
-        #endregion Region module
     }
+
+    #region Region module
+
+    public void AddRegion(Scene scene)
+    {
+        lock (m_scenes)
+            m_scenes.Add(scene);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        lock (m_scenes)
+            m_scenes.Remove(scene);
+        scene.EventManager.OnRegisterCaps -= RegisterCaps;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        scene.EventManager.OnRegisterCaps += RegisterCaps;
+
+        ISimulatorFeaturesModule simFeatures = scene.RequestModuleInterface<ISimulatorFeaturesModule>();
+        simFeatures?.AddFeature("AvatarHoverHeightEnabled",OSD.FromBoolean(true));
+
+    }
+
+    public void PostInitialise() {}
+
+    public void Close() {}
+
+    public string Name { get { return "AgentPreferencesModule"; } }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void RegisterCaps(UUID agent, Caps caps)
+    {
+        string capPath = "/" + UUID.Random().ToString();
+        caps.RegisterSimpleHandler("AgentPreferences",
+            new SimpleStreamHandler(capPath, delegate(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+                {
+                    UpdateAgentPreferences(httpRequest, httpResponse, agent);
+                }));
+        caps.RegisterSimpleHandler("UpdateAgentLanguage",
+            new SimpleStreamHandler( capPath, delegate(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+                {
+                    UpdateAgentPreferences(httpRequest, httpResponse, agent);
+                }), false);
+        caps.RegisterSimpleHandler("UpdateAgentInformation",
+            new SimpleStreamHandler(capPath, delegate(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+                {
+                    UpdateAgentPreferences(httpRequest, httpResponse, agent);
+                }), false);
+    }
+
+    public void UpdateAgentPreferences(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID agent)
+    {
+        if (httpRequest.HttpMethod != "POST")
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+            return;
+        }
+
+        //m_log.DebugFormat("[AgentPrefs]: UpdateAgentPreferences for {0}", agent.ToString());
+        OSDMap req;
+        try
+        {
+            req = (OSDMap)OSDParser.DeserializeLLSDXml(httpRequest.InputStream);
+        }
+        catch
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+            return;
+        }
+
+        IAgentPreferencesService aps = m_scenes[0].AgentPreferencesService;
+        AgentPrefs data = null;
+        if(aps != null)
+            data = aps.GetAgentPreferences(agent);
+
+        if (data == null)
+            data = new AgentPrefs(agent);
+
+        bool changed = false;
+        OSD tmp;
+        if (req.TryGetValue("access_prefs", out tmp) && tmp is OSDMap)
+        {
+            OSDMap accessPrefs = (OSDMap)tmp;  // We could check with ContainsKey...
+            data.AccessPrefs = accessPrefs["max"].AsString();
+            changed = true;
+        }
+        if (req.TryGetValue("default_object_perm_masks", out tmp) && tmp is OSDMap)
+        {
+            OSDMap permsMap = (OSDMap)tmp;
+            data.PermEveryone = permsMap["Everyone"].AsInteger();
+            data.PermGroup = permsMap["Group"].AsInteger();
+            data.PermNextOwner = permsMap["NextOwner"].AsInteger();
+            changed = true;
+        }
+        if (req.TryGetValue("hover_height", out tmp))
+        {
+            data.HoverHeight = (float)tmp.AsReal();
+            changed = true;
+        }
+        if (req.TryGetValue("language", out tmp))
+        {
+            data.Language = tmp.AsString();
+            changed = true;
+        }
+        if (req.TryGetValue("language_is_public", out tmp))
+        {
+            data.LanguageIsPublic = tmp.AsBoolean();
+            changed = true;
+        }
+
+        if(changed)
+            aps?.StoreAgentPreferences(data);
+
+        IAvatarFactoryModule afm = m_scenes[0].RequestModuleInterface<IAvatarFactoryModule>();
+        afm?.SetPreferencesHoverZ(agent, (float)data.HoverHeight);
+
+        OSDMap resp = new OSDMap();
+        OSDMap respAccessPrefs = new OSDMap();
+        respAccessPrefs["max"] = data.AccessPrefs;
+        resp["access_prefs"] = respAccessPrefs;
+
+        OSDMap respDefaultPerms = new OSDMap();
+        respDefaultPerms["Everyone"] = data.PermEveryone;
+        respDefaultPerms["Group"] = data.PermGroup;
+        respDefaultPerms["NextOwner"] = data.PermNextOwner;
+
+        resp["default_object_perm_masks"] = respDefaultPerms;
+        resp["god_level"] = 0; // *TODO: Add this
+        resp["hover_height"] = data.HoverHeight;
+        resp["language"] = data.Language;
+        resp["language_is_public"] = data.LanguageIsPublic;
+
+        httpResponse.RawBuffer = OSDParser.SerializeLLSDXmlBytes(resp);
+        httpResponse.StatusCode = (int)HttpStatusCode.OK;
+    }
+    #endregion Region module
 }
 

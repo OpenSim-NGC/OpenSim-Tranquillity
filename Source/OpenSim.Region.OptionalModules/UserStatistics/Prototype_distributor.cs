@@ -28,49 +28,48 @@
 using System.Collections;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.UserStatistics
+namespace OpenSim.Region.UserStatistics;
+
+public class Prototype_distributor : IStatsController
 {
-    public class Prototype_distributor : IStatsController
+    private string jsFileName = "prototype.js";
+    private string prototypejs = string.Empty;
+
+    public Prototype_distributor()
     {
-        private string jsFileName = "prototype.js";
-        private string prototypejs = string.Empty;
-
-        public Prototype_distributor()
-        {
-            jsFileName = "prototype.js";
-        }
-
-        public Prototype_distributor(string jsName)
-        {
-            jsFileName = jsName;
-        }
-
-        public string ReportName
-        {
-            get { return ""; }
-        }
-        public Hashtable ProcessModel(Hashtable pParams)
-        {
-            Hashtable pResult = new Hashtable();
-            pResult["js"] = jsFileName;
-            return pResult;
-        }
-
-        public string RenderView(Hashtable pModelResult)
-        {
-            string fileName = (string)pModelResult["js"];
-            using (StreamReader fs = new StreamReader(new FileStream(Util.dataDir() + "/data/" + fileName, FileMode.Open)))
-            {
-                prototypejs = fs.ReadToEnd();
-                fs.Close();
-            }
-            return prototypejs;
-        }
-
-        public string RenderJson(Hashtable pModelResult)
-        {
-            return "{}";
-        }
-
+        jsFileName = "prototype.js";
     }
+
+    public Prototype_distributor(string jsName)
+    {
+        jsFileName = jsName;
+    }
+
+    public string ReportName
+    {
+        get { return ""; }
+    }
+    public Hashtable ProcessModel(Hashtable pParams)
+    {
+        Hashtable pResult = new Hashtable();
+        pResult["js"] = jsFileName;
+        return pResult;
+    }
+
+    public string RenderView(Hashtable pModelResult)
+    {
+        string fileName = (string)pModelResult["js"];
+        using (StreamReader fs = new StreamReader(new FileStream(Util.dataDir() + "/data/" + fileName, FileMode.Open)))
+        {
+            prototypejs = fs.ReadToEnd();
+            fs.Close();
+        }
+        return prototypejs;
+    }
+
+    public string RenderJson(Hashtable pModelResult)
+    {
+        return "{}";
+    }
+
 }

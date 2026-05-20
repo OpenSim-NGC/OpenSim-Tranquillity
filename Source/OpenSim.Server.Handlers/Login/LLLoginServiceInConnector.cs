@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using log4net;
 using Nini.Config;
@@ -36,83 +34,82 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Server.Handlers.Login
+namespace OpenSim.Server.Handlers.Login;
+
+public class LLLoginServiceInConnector : ServiceConnector
 {
-    public class LLLoginServiceInConnector : ServiceConnector
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private ILoginService m_LoginService;
+    private bool m_Proxy;
+    private BasicDosProtectorOptions m_DosProtectionOptions;
+
+    public LLLoginServiceInConnector(IConfigSource config, IHttpServer server, IScene scene) :
+            base(config, server, String.Empty)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_log.Debug("[LLLOGIN IN CONNECTOR]: Starting...");
+        string loginService = ReadLocalServiceFromConfig(config);
 
-        private ILoginService m_LoginService;
-        private bool m_Proxy;
-        private BasicDosProtectorOptions m_DosProtectionOptions;
+        ISimulationService simService = scene.RequestModuleInterface<ISimulationService>();
+        ILibraryService libService = scene.RequestModuleInterface<ILibraryService>();
 
-        public LLLoginServiceInConnector(IConfigSource config, IHttpServer server, IScene scene) :
-                base(config, server, String.Empty)
-        {
-            m_log.Debug("[LLLOGIN IN CONNECTOR]: Starting...");
-            string loginService = ReadLocalServiceFromConfig(config);
+        Object[] args = new Object[] { config, simService, libService };
+        m_LoginService = ServerUtils.LoadPlugin<ILoginService>(loginService, args);
 
-            ISimulationService simService = scene.RequestModuleInterface<ISimulationService>();
-            ILibraryService libService = scene.RequestModuleInterface<ILibraryService>();
+        InitializeHandlers(server);
+    }
 
-            Object[] args = new Object[] { config, simService, libService };
-            m_LoginService = ServerUtils.LoadPlugin<ILoginService>(loginService, args);
+    public LLLoginServiceInConnector(IConfigSource config, IHttpServer server, string configName) :
+        base(config, server, configName)
+    {
+        string loginService = ReadLocalServiceFromConfig(config);
 
-            InitializeHandlers(server);
-        }
+        Object[] args = new Object[] { config };
 
-        public LLLoginServiceInConnector(IConfigSource config, IHttpServer server, string configName) :
-            base(config, server, configName)
-        {
-            string loginService = ReadLocalServiceFromConfig(config);
+        m_LoginService = ServerUtils.LoadPlugin<ILoginService>(loginService, args);
 
-            Object[] args = new Object[] { config };
+        InitializeHandlers(server);
+    }
 
-            m_LoginService = ServerUtils.LoadPlugin<ILoginService>(loginService, args);
+    public LLLoginServiceInConnector(IConfigSource config, IHttpServer server) :
+        this(config, server, String.Empty)
+    {
+    }
 
-            InitializeHandlers(server);
-        }
+    private string ReadLocalServiceFromConfig(IConfigSource config)
+    {
+        IConfig serverConfig = config.Configs["LoginService"];
+        if (serverConfig == null)
+            throw new Exception(String.Format("No section LoginService in config file"));
 
-        public LLLoginServiceInConnector(IConfigSource config, IHttpServer server) :
-            this(config, server, String.Empty)
-        {
-        }
+        string loginService = serverConfig.GetString("LocalServiceModule", String.Empty);
+        if (loginService.Length == 0)
+            throw new Exception(String.Format("No LocalServiceModule for LoginService in config file"));
 
-        private string ReadLocalServiceFromConfig(IConfigSource config)
-        {
-            IConfig serverConfig = config.Configs["LoginService"];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section LoginService in config file"));
-
-            string loginService = serverConfig.GetString("LocalServiceModule", String.Empty);
-            if (loginService.Length == 0)
-                throw new Exception(String.Format("No LocalServiceModule for LoginService in config file"));
-
-            m_Proxy = serverConfig.GetBoolean("HasProxy", false);
-            m_DosProtectionOptions = new BasicDosProtectorOptions();
-            // Dos Protection Options
-            m_DosProtectionOptions.AllowXForwardedFor = serverConfig.GetBoolean("DOSAllowXForwardedForHeader", false);
-            m_DosProtectionOptions.RequestTimeSpan =
-                TimeSpan.FromMilliseconds(serverConfig.GetInt("DOSRequestTimeFrameMS", 10000));
-            m_DosProtectionOptions.MaxRequestsInTimeframe = serverConfig.GetInt("DOSMaxRequestsInTimeFrame", 5);
-            m_DosProtectionOptions.ForgetTimeSpan =
-                TimeSpan.FromMilliseconds(serverConfig.GetInt("DOSForgiveClientAfterMS", 120000));
-            m_DosProtectionOptions.ReportingName = "LOGINDOSPROTECTION";
+        m_Proxy = serverConfig.GetBoolean("HasProxy", false);
+        m_DosProtectionOptions = new BasicDosProtectorOptions();
+        // Dos Protection Options
+        m_DosProtectionOptions.AllowXForwardedFor = serverConfig.GetBoolean("DOSAllowXForwardedForHeader", false);
+        m_DosProtectionOptions.RequestTimeSpan =
+            TimeSpan.FromMilliseconds(serverConfig.GetInt("DOSRequestTimeFrameMS", 10000));
+        m_DosProtectionOptions.MaxRequestsInTimeframe = serverConfig.GetInt("DOSMaxRequestsInTimeFrame", 5);
+        m_DosProtectionOptions.ForgetTimeSpan =
+            TimeSpan.FromMilliseconds(serverConfig.GetInt("DOSForgiveClientAfterMS", 120000));
+        m_DosProtectionOptions.ReportingName = "LOGINDOSPROTECTION";
 
 
-            return loginService;
-        }
+        return loginService;
+    }
 
-        private void InitializeHandlers(IHttpServer server)
-        {
-            LLLoginHandlers loginHandlers = new LLLoginHandlers(m_LoginService, m_Proxy);
+    private void InitializeHandlers(IHttpServer server)
+    {
+        LLLoginHandlers loginHandlers = new LLLoginHandlers(m_LoginService, m_Proxy);
 //            server.AddXmlRPCHandler("login_to_simulator",
 //                new XmlRpcBasicDOSProtector(loginHandlers.HandleXMLRPCLogin, loginHandlers.HandleXMLRPCLoginBlocked,
 //                    m_DosProtectionOptions).Process, false);
-            server.AddXmlRPCHandler("login_to_simulator",loginHandlers.HandleXMLRPCLogin, false);
-            server.AddXmlRPCHandler("set_login_level", loginHandlers.HandleXMLRPCSetLoginLevel, false);
-            server.SetDefaultLLSDHandler(loginHandlers.HandleLLSDLogin);
-            //server.AddWebSocketHandler("/WebSocket/GridLogin", loginHandlers.HandleWebSocketLoginEvents);
-        }
+        server.AddXmlRPCHandler("login_to_simulator",loginHandlers.HandleXMLRPCLogin, false);
+        server.AddXmlRPCHandler("set_login_level", loginHandlers.HandleXMLRPCSetLoginLevel, false);
+        server.SetDefaultLLSDHandler(loginHandlers.HandleLLSDLogin);
+        //server.AddWebSocketHandler("/WebSocket/GridLogin", loginHandlers.HandleWebSocketLoginEvents);
     }
 }

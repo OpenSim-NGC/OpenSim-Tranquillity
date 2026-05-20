@@ -25,8 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
 using OpenMetaverse;
 using MySqlConnector;
 using OpenSim.Region.OptionalModules.World.Currency;

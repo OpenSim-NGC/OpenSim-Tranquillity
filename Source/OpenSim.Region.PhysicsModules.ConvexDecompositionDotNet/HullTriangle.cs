@@ -25,74 +25,71 @@
  * THE SOFTWARE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet
+namespace OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet;
+
+public class HullTriangle : int3
 {
-    public class HullTriangle : int3
+    public int3 n = new int3();
+    public int id;
+    public int vmax;
+    public float rise;
+    private List<HullTriangle> tris;
+
+    public HullTriangle(int a, int b, int c, List<HullTriangle> tris)
+        : base(a, b, c)
     {
-        public int3 n = new int3();
-        public int id;
-        public int vmax;
-        public float rise;
-        private List<HullTriangle> tris;
+        this.tris = tris;
 
-        public HullTriangle(int a, int b, int c, List<HullTriangle> tris)
-            : base(a, b, c)
+        n = new int3(-1, -1, -1);
+        id = tris.Count;
+        tris.Add(this);
+        vmax = -1;
+        rise = 0.0f;
+    }
+
+    public void Dispose()
+    {
+        Debug.Assert(tris[id] == this);
+        tris[id] = null;
+    }
+
+    public int neib(int a, int b)
+    {
+        int i;
+
+        for (i = 0; i < 3; i++)
         {
-            this.tris = tris;
-
-            n = new int3(-1, -1, -1);
-            id = tris.Count;
-            tris.Add(this);
-            vmax = -1;
-            rise = 0.0f;
+            int i1 = (i + 1) % 3;
+            int i2 = (i + 2) % 3;
+            if ((this)[i] == a && (this)[i1] == b)
+                return n[i2];
+            if ((this)[i] == b && (this)[i1] == a)
+                return n[i2];
         }
 
-        public void Dispose()
-        {
-            Debug.Assert(tris[id] == this);
-            tris[id] = null;
-        }
+        Debug.Assert(false);
+        return -1;
+    }
 
-        public int neib(int a, int b)
-        {
-            int i;
+    public void setneib(int a, int b, int value)
+    {
+        int i;
 
-            for (i = 0; i < 3; i++)
+        for (i = 0; i < 3; i++)
+        {
+            int i1 = (i + 1) % 3;
+            int i2 = (i + 2) % 3;
+            if ((this)[i] == a && (this)[i1] == b)
             {
-                int i1 = (i + 1) % 3;
-                int i2 = (i + 2) % 3;
-                if ((this)[i] == a && (this)[i1] == b)
-                    return n[i2];
-                if ((this)[i] == b && (this)[i1] == a)
-                    return n[i2];
+                n[i2] = value;
+                return;
             }
-
-            Debug.Assert(false);
-            return -1;
-        }
-
-        public void setneib(int a, int b, int value)
-        {
-            int i;
-
-            for (i = 0; i < 3; i++)
+            if ((this)[i] == b && (this)[i1] == a)
             {
-                int i1 = (i + 1) % 3;
-                int i2 = (i + 2) % 3;
-                if ((this)[i] == a && (this)[i1] == b)
-                {
-                    n[i2] = value;
-                    return;
-                }
-                if ((this)[i] == b && (this)[i1] == a)
-                {
-                    n[i2] = value;
-                    return;
-                }
+                n[i2] = value;
+                return;
             }
         }
     }

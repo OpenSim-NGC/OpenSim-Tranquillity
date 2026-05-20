@@ -28,13 +28,12 @@
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+/// <summary>
+/// An interface for a module that manages inter-agent inventory offers and transfers.
+/// </summary>
+public interface IInventoryTransferModule
 {
-    /// <summary>
-    /// An interface for a module that manages inter-agent inventory offers and transfers.
-    /// </summary>
-    public interface IInventoryTransferModule
-    {
-        bool NeedSceneCacheClear(UUID agentID, Scene scene);
-    }
+    bool NeedSceneCacheClear(UUID agentID, Scene scene);
 }

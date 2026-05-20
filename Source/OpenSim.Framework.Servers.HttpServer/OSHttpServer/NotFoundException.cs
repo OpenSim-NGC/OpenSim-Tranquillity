@@ -1,29 +1,27 @@
-using System;
 using System.Net;
 
-namespace OSHttpServer.Exceptions
+namespace OSHttpServer.Exceptions;
+
+/// <summary>
+/// The requested resource was not found in the web server.
+/// </summary>
+public class NotFoundException : HttpException
 {
     /// <summary>
-    /// The requested resource was not found in the web server.
+    /// Create a new exception
     /// </summary>
-    public class NotFoundException : HttpException
+    /// <param name="message">message describing the error</param>
+    /// <param name="inner">inner exception</param>
+    public NotFoundException(string message, Exception inner) : base(HttpStatusCode.NotFound, message, inner)
     {
-        /// <summary>
-        /// Create a new exception
-        /// </summary>
-        /// <param name="message">message describing the error</param>
-        /// <param name="inner">inner exception</param>
-        public NotFoundException(string message, Exception inner) : base(HttpStatusCode.NotFound, message, inner)
-        {
-        }
+    }
 
-        /// <summary>
-        /// Create a new exception
-        /// </summary>
-        /// <param name="message">message describing the error</param>
-        public NotFoundException(string message)
-            : base(HttpStatusCode.NotFound, message)
-        {
-        }
+    /// <summary>
+    /// Create a new exception
+    /// </summary>
+    /// <param name="message">message describing the error</param>
+    public NotFoundException(string message)
+        : base(HttpStatusCode.NotFound, message)
+    {
     }
 }

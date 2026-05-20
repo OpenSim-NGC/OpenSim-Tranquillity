@@ -25,96 +25,93 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.IO.Compression;
 
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Server.Handlers.Base
+namespace OpenSim.Server.Handlers.Base;
+
+public class RestHandlerUtils
 {
-    public class RestHandlerUtils
+    /// <summary>
+    /// Extract the param from an uri.
+    /// </summary>
+    /// <param name="uri">Something like this: /xxxx/uuid/ or /xxxx/uuid/handle/release</param>
+    /// <param name="uuid">uuid on uuid field</param>
+    /// <param name="regionHandle">optional regionHandle</param>
+    /// <param name="action">optional action</param>
+    public static bool GetParams(string path, out UUID uuid, out ulong regionHandle, out string action)
     {
-        /// <summary>
-        /// Extract the param from an uri.
-        /// </summary>
-        /// <param name="uri">Something like this: /xxxx/uuid/ or /xxxx/uuid/handle/release</param>
-        /// <param name="uuid">uuid on uuid field</param>
-        /// <param name="regionHandle">optional regionHandle</param>
-        /// <param name="action">optional action</param>
-        public static bool GetParams(string path, out UUID uuid, out ulong regionHandle, out string action)
+        uuid = UUID.Zero;
+        action = "";
+        regionHandle = 0;
+
+        path = path.Trim(new char[] { '/' });
+        string[] parts = path.Split('/');
+        if (parts.Length <= 1)
         {
-            uuid = UUID.Zero;
-            action = "";
-            regionHandle = 0;
-
-            path = path.Trim(new char[] { '/' });
-            string[] parts = path.Split('/');
-            if (parts.Length <= 1)
-            {
+            return false;
+        }
+        else
+        {
+            if (!UUID.TryParse(parts[1], out uuid))
                 return false;
-            }
-            else
+
+            if (parts.Length >= 3)
+                UInt64.TryParse(parts[2], out regionHandle);
+            if (parts.Length >= 4)
+                action = parts[3];
+
+            return true;
+        }
+    }
+
+    public static bool GetAuthentication(IOSHttpRequest httpRequest, out string authority, out string authKey)
+    {
+        authority = string.Empty;
+        authKey = string.Empty;
+
+        Uri authUri;
+
+        string auth = httpRequest.Headers["authentication"];
+        // Authentication keys look like this:
+        // http://orgrid.org:8002/<uuid>
+        if ((auth != null) && (!string.Empty.Equals(auth)) && auth != "None")
+        {
+            if (Uri.TryCreate(auth, UriKind.Absolute, out authUri))
             {
-                if (!UUID.TryParse(parts[1], out uuid))
-                    return false;
-
-                if (parts.Length >= 3)
-                    UInt64.TryParse(parts[2], out regionHandle);
-                if (parts.Length >= 4)
-                    action = parts[3];
-
+                authority = authUri.Authority;
+                authKey = authUri.PathAndQuery.Trim('/');
                 return true;
             }
         }
 
-        public static bool GetAuthentication(IOSHttpRequest httpRequest, out string authority, out string authKey)
+        return false;
+    }
+
+    public static OSDMap DeserializeOSMap(IOSHttpRequest httpRequest)
+    {
+        Stream inputStream = httpRequest.InputStream;
+        Stream innerStream = null;
+        try
         {
-            authority = string.Empty;
-            authKey = string.Empty;
-
-            Uri authUri;
-
-            string auth = httpRequest.Headers["authentication"];
-            // Authentication keys look like this:
-            // http://orgrid.org:8002/<uuid>
-            if ((auth != null) && (!string.Empty.Equals(auth)) && auth != "None")
+            if ((httpRequest.ContentType == "application/x-gzip" || httpRequest.Headers["Content-Encoding"] == "gzip") || (httpRequest.Headers["X-Content-Encoding"] == "gzip"))
             {
-                if (Uri.TryCreate(auth, UriKind.Absolute, out authUri))
-                {
-                    authority = authUri.Authority;
-                    authKey = authUri.PathAndQuery.Trim('/');
-                    return true;
-                }
+                innerStream = inputStream;
+                inputStream = new GZipStream(innerStream, CompressionMode.Decompress);
             }
-
-            return false;
+            return (OSDMap)OSDParser.DeserializeJson(inputStream);
         }
-
-        public static OSDMap DeserializeOSMap(IOSHttpRequest httpRequest)
+        catch
         {
-            Stream inputStream = httpRequest.InputStream;
-            Stream innerStream = null;
-            try
-            {
-                if ((httpRequest.ContentType == "application/x-gzip" || httpRequest.Headers["Content-Encoding"] == "gzip") || (httpRequest.Headers["X-Content-Encoding"] == "gzip"))
-                {
-                    innerStream = inputStream;
-                    inputStream = new GZipStream(innerStream, CompressionMode.Decompress);
-                }
-                return (OSDMap)OSDParser.DeserializeJson(inputStream);
-            }
-            catch
-            {
-                return null;
-            }
-            finally
-            {
-                if (innerStream != null)
-                    innerStream.Dispose();
-            }
+            return null;
+        }
+        finally
+        {
+            if (innerStream != null)
+                innerStream.Dispose();
         }
     }
 }

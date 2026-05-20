@@ -34,123 +34,122 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land;
+
+public class LocalLandServicesConnector : ISharedRegionModule, ILandService
 {
-    public class LocalLandServicesConnector : ISharedRegionModule, ILandService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private List<Scene> m_Scenes = new List<Scene>();
+
+    private bool m_Enabled = false;
+
+    public LocalLandServicesConnector()
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        private List<Scene> m_Scenes = new List<Scene>();
+    public LocalLandServicesConnector(List<Scene> scenes)
+    {
+        m_Scenes = scenes;
+    }
 
-        private bool m_Enabled = false;
+    #region ISharedRegionModule
 
-        public LocalLandServicesConnector()
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public string Name
+    {
+        get { return "LocalLandServicesConnector"; }
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-        }
-
-        public LocalLandServicesConnector(List<Scene> scenes)
-        {
-            m_Scenes = scenes;
-        }
-
-        #region ISharedRegionModule
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "LocalLandServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("LandServices", this.Name);
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("LandServices", this.Name);
-                if (name == Name)
-                {
-                    m_Enabled = true;
-                    m_log.Info("[LAND CONNECTOR]: Local land connector enabled");
-                }
+                m_Enabled = true;
+                m_log.Info("[LAND CONNECTOR]: Local land connector enabled");
             }
         }
+    }
 
-        public void Close()
-        {
-        }
+    public void Close()
+    {
+    }
 
-        public void AddRegion(Scene scene)
-        {
-            m_Scenes.Add(scene);
+    public void AddRegion(Scene scene)
+    {
+        m_Scenes.Add(scene);
 
-            if (!m_Enabled)
-                return;
+        if (!m_Enabled)
+            return;
 
-            scene.RegisterModuleInterface<ILandService>(this);
-        }
+        scene.RegisterModuleInterface<ILandService>(this);
+    }
 
-        public void RegionLoaded(Scene scene)
-        {
-        }
+    public void RegionLoaded(Scene scene)
+    {
+    }
 
-        public void PostInitialise()
-        {
-        }
+    public void PostInitialise()
+    {
+    }
 
-        public void RemoveRegion(Scene scene)
-        {
-            if (m_Scenes.Contains(scene))
-                m_Scenes.Remove(scene);
-        }
+    public void RemoveRegion(Scene scene)
+    {
+        if (m_Scenes.Contains(scene))
+            m_Scenes.Remove(scene);
+    }
 
-        #endregion ISharedRegionModule
+    #endregion ISharedRegionModule
 
-        #region ILandService
+    #region ILandService
 
-        public LandData GetLandData(UUID scopeID, ulong regionHandle, uint x, uint y, out byte regionAccess)
-        {
-            regionAccess = 2;
+    public LandData GetLandData(UUID scopeID, ulong regionHandle, uint x, uint y, out byte regionAccess)
+    {
+        regionAccess = 2;
 //            m_log.DebugFormat("[LAND CONNECTOR]: request for land data in {0} at {1}, {2}",
 //                  regionHandle, x, y);
 
-            uint rx = 0, ry = 0;
-            Util.RegionHandleToWorldLoc(regionHandle, out rx, out ry);
+        uint rx = 0, ry = 0;
+        Util.RegionHandleToWorldLoc(regionHandle, out rx, out ry);
 
-            foreach (Scene s in m_Scenes)
+        foreach (Scene s in m_Scenes)
+        {
+            uint t = s.RegionInfo.WorldLocX;
+            if( rx < t)
+                continue;
+            t += s.RegionInfo.RegionSizeX;
+            if( rx >= t)
+                continue;
+            t = s.RegionInfo.WorldLocY;
+            if( ry < t)
+                continue;
+            t += s.RegionInfo.RegionSizeY;
+            if( ry  < t)
             {
-                uint t = s.RegionInfo.WorldLocX;
-                if( rx < t)
-                    continue;
-                t += s.RegionInfo.RegionSizeX;
-                if( rx >= t)
-                    continue;
-                t = s.RegionInfo.WorldLocY;
-                if( ry < t)
-                    continue;
-                t += s.RegionInfo.RegionSizeY;
-                if( ry  < t)
-                {
-                    LandData land = s.GetLandData(x, y);
-                    regionAccess = s.RegionInfo.AccessLevel;
-                    IDwellModule dwellModule = s.RequestModuleInterface<IDwellModule>();
-                    if (dwellModule != null)
-                        land.Dwell = dwellModule.GetDwell(land);
+                LandData land = s.GetLandData(x, y);
+                regionAccess = s.RegionInfo.AccessLevel;
+                IDwellModule dwellModule = s.RequestModuleInterface<IDwellModule>();
+                if (dwellModule != null)
+                    land.Dwell = dwellModule.GetDwell(land);
 
-                    return land;
-                }
+                return land;
             }
-
-            //m_log.Debug("[LAND CONNECTOR]: didn't find land data locally.");
-            return null;
-
         }
 
-        #endregion ILandService
+        //m_log.Debug("[LAND CONNECTOR]: didn't find land data locally.");
+        return null;
+
     }
+
+    #endregion ILandService
 }

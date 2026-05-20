@@ -25,357 +25,353 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 using log4net;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+/// <summary>
+/// Exception thrown if an incorrect number of plugins are loaded
+/// </summary>
+public class PluginConstraintViolatedException : Exception
 {
-    /// <summary>
-    /// Exception thrown if an incorrect number of plugins are loaded
-    /// </summary>
-    public class PluginConstraintViolatedException : Exception
+    public PluginConstraintViolatedException() : base() { }
+    public PluginConstraintViolatedException(string msg) : base(msg) { }
+    public PluginConstraintViolatedException(string msg, Exception e) : base(msg, e) { }
+}
+
+/// <summary>
+/// Classes wishing to impose constraints on plugin loading must implement
+/// this class and pass it to PluginLoader AddConstraint()
+/// </summary>
+public interface IPluginConstraint
+{
+    string Message { get; }
+    bool Apply(string extpoint, Type pluginTypeHint, IPluginDiscovery discovery);
+}
+
+/// <summary>
+/// Classes wishing to select specific plugins from a range of possible options
+/// must implement this class and pass it to PluginLoader Load()
+/// </summary>
+public interface IPluginFilter
+{
+    bool Apply(PluginExtensionNode plugin);
+}
+
+/// <summary>
+/// Generic Plugin Loader
+/// </summary>
+public class PluginLoader<T> : IDisposable where T : IPlugin
+{
+    private const int max_loadable_plugins = 10000;
+
+    private List<T> loaded = new List<T>();
+    private List<string> extpoints = new List<string>();
+    private PluginInitialiserBase initialiser;
+    private readonly IPluginDiscovery discovery;
+
+    private Dictionary<string, IPluginConstraint> constraints
+        = new Dictionary<string, IPluginConstraint>();
+
+    private Dictionary<string, IPluginFilter> filters
+        = new Dictionary<string, IPluginFilter>();
+
+    private static readonly ILog log
+        = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    public PluginInitialiserBase Initialiser
     {
-        public PluginConstraintViolatedException() : base() { }
-        public PluginConstraintViolatedException(string msg) : base(msg) { }
-        public PluginConstraintViolatedException(string msg, Exception e) : base(msg, e) { }
+        set { initialiser = value; }
+        get { return initialiser; }
     }
 
-    /// <summary>
-    /// Classes wishing to impose constraints on plugin loading must implement
-    /// this class and pass it to PluginLoader AddConstraint()
-    /// </summary>
-    public interface IPluginConstraint
+    public List<T> Plugins
     {
-        string Message { get; }
-        bool Apply(string extpoint, Type pluginTypeHint, IPluginDiscovery discovery);
+        get { return loaded; }
     }
 
-    /// <summary>
-    /// Classes wishing to select specific plugins from a range of possible options
-    /// must implement this class and pass it to PluginLoader Load()
-    /// </summary>
-    public interface IPluginFilter
+    public T Plugin
     {
-        bool Apply(PluginExtensionNode plugin);
+        get { return (loaded.Count == 1) ? loaded[0] : default(T); }
     }
 
-    /// <summary>
-    /// Generic Plugin Loader
-    /// </summary>
-    public class PluginLoader<T> : IDisposable where T : IPlugin
+    public PluginLoader()
     {
-        private const int max_loadable_plugins = 10000;
+        Initialiser = new PluginInitialiserBase();
+        discovery = PluginDiscoveryFactory.Create(log);
+        initialise_plugin_dir(".");
+    }
 
-        private List<T> loaded = new List<T>();
-        private List<string> extpoints = new List<string>();
-        private PluginInitialiserBase initialiser;
-        private readonly IPluginDiscovery discovery;
+    public PluginLoader(PluginInitialiserBase init)
+    {
+        Initialiser = init;
+        discovery = PluginDiscoveryFactory.Create(log);
+        initialise_plugin_dir(".");
+    }
 
-        private Dictionary<string, IPluginConstraint> constraints
-            = new Dictionary<string, IPluginConstraint>();
+    public PluginLoader(PluginInitialiserBase init, string dir)
+    {
+        Initialiser = init;
+        discovery = PluginDiscoveryFactory.Create(log);
+        initialise_plugin_dir(dir);
+    }
 
-        private Dictionary<string, IPluginFilter> filters
-            = new Dictionary<string, IPluginFilter>();
+    public PluginLoader(PluginInitialiserBase init, string dir, IPluginDiscovery pluginDiscovery)
+    {
+        Initialiser = init;
+        discovery = pluginDiscovery ?? throw new ArgumentNullException(nameof(pluginDiscovery));
+        initialise_plugin_dir(dir);
+    }
 
-        private static readonly ILog log
-            = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    public void Add(string extpoint)
+    {
+        if (extpoints.Contains(extpoint))
+            return;
 
-        public PluginInitialiserBase Initialiser
+        extpoints.Add(extpoint);
+    }
+
+    public void Add(string extpoint, IPluginConstraint cons)
+    {
+        Add(extpoint);
+        AddConstraint(extpoint, cons);
+    }
+
+    public void Add(string extpoint, IPluginFilter filter)
+    {
+        Add(extpoint);
+        AddFilter(extpoint, filter);
+    }
+
+    public void AddConstraint(string extpoint, IPluginConstraint cons)
+    {
+        constraints.Add(extpoint, cons);
+    }
+
+    public void AddFilter(string extpoint, IPluginFilter filter)
+    {
+        filters.Add(extpoint, filter);
+    }
+
+    public void Load(string extpoint)
+    {
+        Add(extpoint);
+        Load();
+    }
+
+    public void Load()
+    {
+        foreach (string ext in extpoints)
         {
-            set { initialiser = value; }
-            get { return initialiser; }
-        }
+            log.Info("[PLUGINS]: Loading extension point " + ext);
 
-        public List<T> Plugins
-        {
-            get { return loaded; }
-        }
+            IReadOnlyList<PluginExtensionNode> discoveredNodes = discovery.GetExtensionNodes(ext, typeof(T));
+            log.InfoFormat(
+                "[PLUGINS]: Extension point {0} discovered {1} candidate plugin(s) using {2}",
+                ext,
+                discoveredNodes.Count,
+                discovery.GetType().Name);
 
-        public T Plugin
-        {
-            get { return (loaded.Count == 1) ? loaded[0] : default(T); }
-        }
-
-        public PluginLoader()
-        {
-            Initialiser = new PluginInitialiserBase();
-            discovery = PluginDiscoveryFactory.Create(log);
-            initialise_plugin_dir(".");
-        }
-
-        public PluginLoader(PluginInitialiserBase init)
-        {
-            Initialiser = init;
-            discovery = PluginDiscoveryFactory.Create(log);
-            initialise_plugin_dir(".");
-        }
-
-        public PluginLoader(PluginInitialiserBase init, string dir)
-        {
-            Initialiser = init;
-            discovery = PluginDiscoveryFactory.Create(log);
-            initialise_plugin_dir(dir);
-        }
-
-        public PluginLoader(PluginInitialiserBase init, string dir, IPluginDiscovery pluginDiscovery)
-        {
-            Initialiser = init;
-            discovery = pluginDiscovery ?? throw new ArgumentNullException(nameof(pluginDiscovery));
-            initialise_plugin_dir(dir);
-        }
-
-        public void Add(string extpoint)
-        {
-            if (extpoints.Contains(extpoint))
-                return;
-
-            extpoints.Add(extpoint);
-        }
-
-        public void Add(string extpoint, IPluginConstraint cons)
-        {
-            Add(extpoint);
-            AddConstraint(extpoint, cons);
-        }
-
-        public void Add(string extpoint, IPluginFilter filter)
-        {
-            Add(extpoint);
-            AddFilter(extpoint, filter);
-        }
-
-        public void AddConstraint(string extpoint, IPluginConstraint cons)
-        {
-            constraints.Add(extpoint, cons);
-        }
-
-        public void AddFilter(string extpoint, IPluginFilter filter)
-        {
-            filters.Add(extpoint, filter);
-        }
-
-        public void Load(string extpoint)
-        {
-            Add(extpoint);
-            Load();
-        }
-
-        public void Load()
-        {
-            foreach (string ext in extpoints)
+            if (constraints.TryGetValue(ext , out IPluginConstraint cons))
             {
-                log.Info("[PLUGINS]: Loading extension point " + ext);
+                if (cons.Apply(ext, typeof(T), discovery))
+                    log.Error("[PLUGINS]: " + ext + " failed constraint: " + cons.Message);
+            }
 
-                IReadOnlyList<PluginExtensionNode> discoveredNodes = discovery.GetExtensionNodes(ext, typeof(T));
-                log.InfoFormat(
-                    "[PLUGINS]: Extension point {0} discovered {1} candidate plugin(s) using {2}",
-                    ext,
-                    discoveredNodes.Count,
-                    discovery.GetType().Name);
+            filters.TryGetValue(ext, out IPluginFilter filter);
 
-                if (constraints.TryGetValue(ext , out IPluginConstraint cons))
-                {
-                    if (cons.Apply(ext, typeof(T), discovery))
-                        log.Error("[PLUGINS]: " + ext + " failed constraint: " + cons.Message);
-                }
+            List<T> loadedPlugins = new List<T>();
+            foreach (PluginExtensionNode node in discoveredNodes)
+            {
+                log.Info("[PLUGINS]: Trying plugin " + node.Path);
 
-                filters.TryGetValue(ext, out IPluginFilter filter);
+                if ((filter != null) && (filter.Apply(node) == false))
+                    continue;
 
-                List<T> loadedPlugins = new List<T>();
-                foreach (PluginExtensionNode node in discoveredNodes)
-                {
-                    log.Info("[PLUGINS]: Trying plugin " + node.Path);
+                T plugin = (T)node.CreateInstance();
+                loadedPlugins.Add(plugin);
+            }
 
-                    if ((filter != null) && (filter.Apply(node) == false))
-                        continue;
+            // We do Initialise() in a second loop after CreateInstance
+            // So that modules who need init before others can do it
+            // Example: Script Engine Component System needs to load its components before RegionLoader starts
+            foreach (T plugin in loadedPlugins)
+            {
+                Initialiser.Initialise(plugin);
+                Plugins.Add(plugin);
+            }
+        }
+    }
 
-                    T plugin = (T)node.CreateInstance();
-                    loadedPlugins.Add(plugin);
-                }
+    /// <summary>
+    /// Unregisters Mono.Addins event handlers, allowing temporary Mono.Addins
+    /// data to be garbage collected. Since the plugins created by this loader
+    /// are meant to outlive the loader itself, they must be disposed separately
+    /// </summary>
+    public void Dispose()
+    {
+        discovery.Dispose();
+    }
 
-                // We do Initialise() in a second loop after CreateInstance
-                // So that modules who need init before others can do it
-                // Example: Script Engine Component System needs to load its components before RegionLoader starts
-                foreach (T plugin in loadedPlugins)
-                {
-                    Initialiser.Initialise(plugin);
-                    Plugins.Add(plugin);
-                }
+    private void initialise_plugin_dir(string dir)
+    {
+        log.Info("[PLUGINS]: Initializing addin manager");
+        discovery.Initialize(dir);
+    }
+}
+
+public class PluginExtensionNode
+{
+    private readonly Func<object> m_factory;
+
+    public string ID { get; }
+    public string Provider { get; }
+    public string Path { get; }
+    public Type TypeObject { get; }
+    public string TypeName => TypeObject?.FullName ?? string.Empty;
+
+    public Type Type => TypeObject;
+
+    public PluginExtensionNode(string id, string provider, string path, Type typeObject, Func<object> factory)
+    {
+        ID = id ?? string.Empty;
+        Provider = provider ?? string.Empty;
+        Path = path ?? string.Empty;
+        TypeObject = typeObject;
+        m_factory = factory ?? throw new ArgumentNullException(nameof(factory));
+    }
+
+    public object CreateInstance()
+    {
+        if (TypeObject == null)
+            throw new InvalidOperationException("Type object not specified.");
+
+        return m_factory();
+    }
+}
+
+/// <summary>
+/// Constraint that bounds the number of plugins to be loaded.
+/// </summary>
+public class PluginCountConstraint : IPluginConstraint
+{
+    private int min;
+    private int max;
+
+    public PluginCountConstraint(int exact)
+    {
+        min = exact;
+        max = exact;
+    }
+
+    public PluginCountConstraint(int minimum, int maximum)
+    {
+        min = minimum;
+        max = maximum;
+    }
+
+    public string Message
+    {
+        get
+        {
+            return "The number of plugins is constrained to the interval ["
+                + min + ", " + max + "]";
+        }
+    }
+
+    public bool Apply(string extpoint, Type pluginTypeHint, IPluginDiscovery discovery)
+    {
+        int count = discovery.GetExtensionNodeCount(extpoint, pluginTypeHint);
+
+        if ((count < min) || (count > max))
+            throw new PluginConstraintViolatedException(Message);
+
+        return true;
+    }
+}
+
+/// <summary>
+/// Filters out which plugin to load based on the plugin name or names given.  Plugin names are contained in
+/// their addin.xml
+/// </summary>
+public class PluginProviderFilter : IPluginFilter
+{
+    private string[] m_filters;
+
+    /// <summary>
+    /// Constructor.
+    /// </summary>
+    /// <param name="p">
+    /// Plugin name or names on which to filter.  Multiple names should be separated by commas.
+    /// </param>
+    public PluginProviderFilter(string p)
+    {
+        m_filters = p.Split(',');
+
+        for (int i = 0; i < m_filters.Length; i++)
+        {
+            m_filters[i] = m_filters[i].Trim();
+        }
+    }
+
+    /// <summary>
+    /// Apply this filter to the given plugin.
+    /// </summary>
+    /// <param name="plugin"></param>
+    /// <returns>true if the plugin's name matched one of the filters, false otherwise.</returns>
+    public bool Apply(PluginExtensionNode plugin)
+    {
+        for (int i = 0; i < m_filters.Length; i++)
+        {
+            if (m_filters[i] == plugin.Provider)
+            {
+                return true;
             }
         }
 
-        /// <summary>
-        /// Unregisters Mono.Addins event handlers, allowing temporary Mono.Addins
-        /// data to be garbage collected. Since the plugins created by this loader
-        /// are meant to outlive the loader itself, they must be disposed separately
-        /// </summary>
-        public void Dispose()
-        {
-            discovery.Dispose();
-        }
-
-        private void initialise_plugin_dir(string dir)
-        {
-            log.Info("[PLUGINS]: Initializing addin manager");
-            discovery.Initialize(dir);
-        }
+        return false;
     }
+}
 
-    public class PluginExtensionNode
+/// <summary>
+/// Filters plugins according to their ID. Plugin IDs are contained in their addin.xml
+/// </summary>
+public class PluginIdFilter : IPluginFilter
+{
+    private string[] m_filters;
+
+    /// <summary>
+    /// Constructor.
+    /// </summary>
+    /// <param name="p">
+    /// Plugin ID or IDs on which to filter. Multiple names should be separated by commas.
+    /// </param>
+    public PluginIdFilter(string p)
     {
-        private readonly Func<object> m_factory;
+        m_filters = p.Split(',');
 
-        public string ID { get; }
-        public string Provider { get; }
-        public string Path { get; }
-        public Type TypeObject { get; }
-        public string TypeName => TypeObject?.FullName ?? string.Empty;
-
-        public Type Type => TypeObject;
-
-        public PluginExtensionNode(string id, string provider, string path, Type typeObject, Func<object> factory)
+        for (int i = 0; i < m_filters.Length; i++)
         {
-            ID = id ?? string.Empty;
-            Provider = provider ?? string.Empty;
-            Path = path ?? string.Empty;
-            TypeObject = typeObject;
-            m_factory = factory ?? throw new ArgumentNullException(nameof(factory));
-        }
-
-        public object CreateInstance()
-        {
-            if (TypeObject == null)
-                throw new InvalidOperationException("Type object not specified.");
-
-            return m_factory();
+            m_filters[i] = m_filters[i].Trim();
         }
     }
 
     /// <summary>
-    /// Constraint that bounds the number of plugins to be loaded.
+    /// Apply this filter to <paramref name="plugin" />.
     /// </summary>
-    public class PluginCountConstraint : IPluginConstraint
+    /// <param name="plugin">PluginExtensionNode instance to check whether it passes the filter.</param>
+    /// <returns>true if the plugin's ID matches one of the filters, false otherwise.</returns>
+    public bool Apply(PluginExtensionNode plugin)
     {
-        private int min;
-        private int max;
-
-        public PluginCountConstraint(int exact)
+        for (int i = 0; i < m_filters.Length; i++)
         {
-            min = exact;
-            max = exact;
-        }
-
-        public PluginCountConstraint(int minimum, int maximum)
-        {
-            min = minimum;
-            max = maximum;
-        }
-
-        public string Message
-        {
-            get
+            if (m_filters[i] == plugin.ID)
             {
-                return "The number of plugins is constrained to the interval ["
-                    + min + ", " + max + "]";
+                return true;
             }
         }
 
-        public bool Apply(string extpoint, Type pluginTypeHint, IPluginDiscovery discovery)
-        {
-            int count = discovery.GetExtensionNodeCount(extpoint, pluginTypeHint);
-
-            if ((count < min) || (count > max))
-                throw new PluginConstraintViolatedException(Message);
-
-            return true;
-        }
-    }
-
-    /// <summary>
-    /// Filters out which plugin to load based on the plugin name or names given.  Plugin names are contained in
-    /// their addin.xml
-    /// </summary>
-    public class PluginProviderFilter : IPluginFilter
-    {
-        private string[] m_filters;
-
-        /// <summary>
-        /// Constructor.
-        /// </summary>
-        /// <param name="p">
-        /// Plugin name or names on which to filter.  Multiple names should be separated by commas.
-        /// </param>
-        public PluginProviderFilter(string p)
-        {
-            m_filters = p.Split(',');
-
-            for (int i = 0; i < m_filters.Length; i++)
-            {
-                m_filters[i] = m_filters[i].Trim();
-            }
-        }
-
-        /// <summary>
-        /// Apply this filter to the given plugin.
-        /// </summary>
-        /// <param name="plugin"></param>
-        /// <returns>true if the plugin's name matched one of the filters, false otherwise.</returns>
-        public bool Apply(PluginExtensionNode plugin)
-        {
-            for (int i = 0; i < m_filters.Length; i++)
-            {
-                if (m_filters[i] == plugin.Provider)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Filters plugins according to their ID. Plugin IDs are contained in their addin.xml
-    /// </summary>
-    public class PluginIdFilter : IPluginFilter
-    {
-        private string[] m_filters;
-
-        /// <summary>
-        /// Constructor.
-        /// </summary>
-        /// <param name="p">
-        /// Plugin ID or IDs on which to filter. Multiple names should be separated by commas.
-        /// </param>
-        public PluginIdFilter(string p)
-        {
-            m_filters = p.Split(',');
-
-            for (int i = 0; i < m_filters.Length; i++)
-            {
-                m_filters[i] = m_filters[i].Trim();
-            }
-        }
-
-        /// <summary>
-        /// Apply this filter to <paramref name="plugin" />.
-        /// </summary>
-        /// <param name="plugin">PluginExtensionNode instance to check whether it passes the filter.</param>
-        /// <returns>true if the plugin's ID matches one of the filters, false otherwise.</returns>
-        public bool Apply(PluginExtensionNode plugin)
-        {
-            for (int i = 0; i < m_filters.Length; i++)
-            {
-                if (m_filters[i] == plugin.ID)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
+        return false;
     }
 }

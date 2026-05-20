@@ -25,51 +25,48 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenSim.Framework;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+public interface IAssetCache
 {
-    public interface IAssetCache
-    {
-        /// <summary>
-        /// Cache the specified asset.
-        /// </summary>
-        /// <param name='asset'></param>
-        void Cache(AssetBase asset, bool replace = false);
+    /// <summary>
+    /// Cache the specified asset.
+    /// </summary>
+    /// <param name='asset'></param>
+    void Cache(AssetBase asset, bool replace = false);
 
-        /// <summary>
-        /// Cache that the specified asset wasn't found.
-        /// </summary>
-        /// <param name='id'></param>
-        /// <summary>
-        void CacheNegative(string id);
+    /// <summary>
+    /// Cache that the specified asset wasn't found.
+    /// </summary>
+    /// <param name='id'></param>
+    /// <summary>
+    void CacheNegative(string id);
 
-        /// Get an asset by its id.
-        /// </summary>
-        /// <param name='id'></param>
-        /// <param name='asset'>Will be set to null if no asset was found</param>
-        /// <returns>False if the asset has been negative-cached</returns>
-        bool Get(string id, out AssetBase asset);
-        // as get without negative cache check
-        AssetBase GetCached(string id);
+    /// Get an asset by its id.
+    /// </summary>
+    /// <param name='id'></param>
+    /// <param name='asset'>Will be set to null if no asset was found</param>
+    /// <returns>False if the asset has been negative-cached</returns>
+    bool Get(string id, out AssetBase asset);
+    // as get without negative cache check
+    AssetBase GetCached(string id);
 
-        bool GetFromMemory(string id, out AssetBase asset);
+    bool GetFromMemory(string id, out AssetBase asset);
 
-        /// <summary>
-        /// Check whether an asset with the specified id exists in the cache.
-        /// </summary>
-        /// <param name='id'></param>
-        bool Check(string id);
+    /// <summary>
+    /// Check whether an asset with the specified id exists in the cache.
+    /// </summary>
+    /// <param name='id'></param>
+    bool Check(string id);
 
-        /// <summary>
-        /// Expire an asset from the cache.
-        /// </summary>
-        /// <param name='id'></param>
-        void Expire(string id);
+    /// <summary>
+    /// Expire an asset from the cache.
+    /// </summary>
+    /// <param name='id'></param>
+    void Expire(string id);
 
-        /// <summary>
-        /// Clear the cache.
-        /// </summary>
-        void Clear();
-    }
+    /// <summary>
+    /// Clear the cache.
+    /// </summary>
+    void Clear();
 }

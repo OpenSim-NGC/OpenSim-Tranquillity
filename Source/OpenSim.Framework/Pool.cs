@@ -25,67 +25,63 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+/// <summary>
+/// Naive pool implementation.
+/// </summary>
+/// <remarks>
+/// Currently assumes that objects are in a useable state when returned.
+/// </remarks>
+public class Pool<T>
 {
     /// <summary>
-    /// Naive pool implementation.
+    /// Number of objects in the pool.
     /// </summary>
-    /// <remarks>
-    /// Currently assumes that objects are in a useable state when returned.
-    /// </remarks>
-    public class Pool<T>
+    public int Count
     {
-        /// <summary>
-        /// Number of objects in the pool.
-        /// </summary>
-        public int Count
-        {
-            get
-            {
-                lock (m_pool)
-                    return m_pool.Count;
-            }
-        }
-
-        private Stack<T> m_pool;
-
-        /// <summary>
-        /// Maximum pool size.  Beyond this, any returned objects are not pooled.
-        /// </summary>
-        private int m_maxPoolSize;
-
-        private Func<T> m_createFunction;
-
-        public Pool(Func<T> createFunction, int maxSize)
-        {
-            m_maxPoolSize = maxSize;
-            m_createFunction = createFunction;
-            m_pool = new Stack<T>(m_maxPoolSize);
-        }
-
-        public T GetObject()
+        get
         {
             lock (m_pool)
-            {
-                if (m_pool.Count > 0)
-                    return m_pool.Pop();
-                else
-                    return m_createFunction();
-            }
+                return m_pool.Count;
         }
+    }
 
-        public void ReturnObject(T obj)
+    private Stack<T> m_pool;
+
+    /// <summary>
+    /// Maximum pool size.  Beyond this, any returned objects are not pooled.
+    /// </summary>
+    private int m_maxPoolSize;
+
+    private Func<T> m_createFunction;
+
+    public Pool(Func<T> createFunction, int maxSize)
+    {
+        m_maxPoolSize = maxSize;
+        m_createFunction = createFunction;
+        m_pool = new Stack<T>(m_maxPoolSize);
+    }
+
+    public T GetObject()
+    {
+        lock (m_pool)
         {
-            lock (m_pool)
-            {
-                if (m_pool.Count >= m_maxPoolSize)
-                    return;
-                else
-                    m_pool.Push(obj);
-            }
+            if (m_pool.Count > 0)
+                return m_pool.Pop();
+            else
+                return m_createFunction();
+        }
+    }
+
+    public void ReturnObject(T obj)
+    {
+        lock (m_pool)
+        {
+            if (m_pool.Count >= m_maxPoolSize)
+                return;
+            else
+                m_pool.Push(obj);
         }
     }
 }

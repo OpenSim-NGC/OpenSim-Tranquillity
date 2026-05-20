@@ -34,178 +34,177 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
-namespace OpenSim.Region.CoreModules.World.WorldMap
+namespace OpenSim.Region.CoreModules.World.WorldMap;
+
+public class MapSearchModule : ISharedRegionModule
 {
-    public class MapSearchModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    IGridService m_gridservice = null;
+    UUID m_stupidScope = UUID.Zero;
+
+    #region ISharedRegionModule Members
+    public void Initialise(IConfigSource source)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        IGridService m_gridservice = null;
-        UUID m_stupidScope = UUID.Zero;
+    public void AddRegion(Scene scene)
+    {
+        scene.EventManager.OnNewClient += OnNewClient;
+    }
 
-        #region ISharedRegionModule Members
-        public void Initialise(IConfigSource source)
+    public void RegionLoaded(Scene scene)
+    {
+        if (m_gridservice == null)
         {
+            m_gridservice = scene.GridService;
+            m_stupidScope = scene.RegionInfo.ScopeID;
         }
+    }
 
-        public void AddRegion(Scene scene)
-        {
-            scene.EventManager.OnNewClient += OnNewClient;
-        }
+    public void RemoveRegion(Scene scene)
+    {
+        scene.EventManager.OnNewClient -= OnNewClient;
+    }
 
-        public void RegionLoaded(Scene scene)
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+        m_gridservice = null;
+    }
+
+    public string Name
+    {
+        get { return "MapSearchModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    #endregion
+
+    private void OnNewClient(IClientAPI client)
+    {
+        client.OnMapNameRequest += OnMapNameRequestHandler;
+    }
+
+    private void OnMapNameRequestHandler(IClientAPI remoteClient, string mapName, uint flags)
+    {
+        if (m_gridservice == null)
+            return;
+
+        try
         {
-            if (m_gridservice == null)
+            List<MapBlockData> blocks = new List<MapBlockData>();
+            if (mapName.Length < 3 || (mapName.EndsWith("#") && mapName.Length < 4))
             {
-                m_gridservice = scene.GridService;
-                m_stupidScope = scene.RegionInfo.ScopeID;
-            }
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            scene.EventManager.OnNewClient -= OnNewClient;
-        }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-            m_gridservice = null;
-        }
-
-        public string Name
-        {
-            get { return "MapSearchModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        #endregion
-
-        private void OnNewClient(IClientAPI client)
-        {
-            client.OnMapNameRequest += OnMapNameRequestHandler;
-        }
-
-        private void OnMapNameRequestHandler(IClientAPI remoteClient, string mapName, uint flags)
-        {
-            if (m_gridservice == null)
-                return;
-
-            try
-            {
-                List<MapBlockData> blocks = new List<MapBlockData>();
-                if (mapName.Length < 3 || (mapName.EndsWith("#") && mapName.Length < 4))
-                {
-                    // final block, closing the search result
-                    AddFinalBlock(blocks, mapName);
-
-                    // flags are agent flags sent from the viewer.
-                    // they have different values depending on different viewers, apparently
-                    remoteClient.SendMapBlock(blocks, flags);
-                    remoteClient.SendAlertMessage("Use a search string with at least 3 characters");
-                    return;
-                }
-
-                //m_log.DebugFormat("MAP NAME=({0})", mapName);
-                string mapNameOrig = mapName;
-                int indx = mapName.IndexOfAny(new char[] {'.', '!','+','|',':','%'});
-                bool needOriginalName = indx >= 0;
-
-                // try to fetch from GridServer
-                List<GridRegion> regionInfos = m_gridservice.GetRegionsByName(m_stupidScope, mapName, 20);
-
-                if (!remoteClient.IsActive)
-                    return;
-
-                //m_log.DebugFormat("[MAPSEARCHMODULE]: search {0} returned {1} regions", mapName, regionInfos.Count);
-
-                MapBlockData data;
-                if (regionInfos != null && regionInfos.Count > 0)
-                {
-                    foreach (GridRegion info in regionInfos)
-                    {
-                        data = new MapBlockData();
-                        data.Agents = 0;
-                        data.Access = info.Access;
-                        MapBlockData block = new MapBlockData();
-                        MapBlockFromGridRegion(block, info, flags);
-
-                        if (needOriginalName && flags == 2 &&  regionInfos.Count == 1)
-                            block.Name = mapNameOrig;
-                        blocks.Add(block);
-                    }
-                }
-
                 // final block, closing the search result
-                AddFinalBlock(blocks, mapNameOrig);
+                AddFinalBlock(blocks, mapName);
 
                 // flags are agent flags sent from the viewer.
                 // they have different values depending on different viewers, apparently
                 remoteClient.SendMapBlock(blocks, flags);
-
-                // send extra user messages for V3
-                // because the UI is very confusing
-                // while we don't fix the hard-coded urls
-                if (flags == 2)
-                {
-                    if (regionInfos == null || regionInfos.Count == 0)
-                        remoteClient.SendAgentAlertMessage("No regions found with that name.", true);
-                }
-            }
-            catch{ }
-        }
-
-        private static void MapBlockFromGridRegion(MapBlockData block, GridRegion r, uint flag)
-        {
-            if (r == null)
-            {
-                block.Access = (byte)SimAccess.NonExistent;
-                block.MapImageId = UUID.Zero;
+                remoteClient.SendAlertMessage("Use a search string with at least 3 characters");
                 return;
             }
 
-            block.Access = r.Access;
-            switch (flag)
+            //m_log.DebugFormat("MAP NAME=({0})", mapName);
+            string mapNameOrig = mapName;
+            int indx = mapName.IndexOfAny(new char[] {'.', '!','+','|',':','%'});
+            bool needOriginalName = indx >= 0;
+
+            // try to fetch from GridServer
+            List<GridRegion> regionInfos = m_gridservice.GetRegionsByName(m_stupidScope, mapName, 20);
+
+            if (!remoteClient.IsActive)
+                return;
+
+            //m_log.DebugFormat("[MAPSEARCHMODULE]: search {0} returned {1} regions", mapName, regionInfos.Count);
+
+            MapBlockData data;
+            if (regionInfos != null && regionInfos.Count > 0)
             {
-                case 0:
-                    block.MapImageId = r.TerrainImage;
-                    break;
-                case 2:
-                    block.MapImageId = r.ParcelImage;
-                    break;
-                default:
-                    block.MapImageId = UUID.Zero;
-                    break;
+                foreach (GridRegion info in regionInfos)
+                {
+                    data = new MapBlockData();
+                    data.Agents = 0;
+                    data.Access = info.Access;
+                    MapBlockData block = new MapBlockData();
+                    MapBlockFromGridRegion(block, info, flags);
+
+                    if (needOriginalName && flags == 2 &&  regionInfos.Count == 1)
+                        block.Name = mapNameOrig;
+                    blocks.Add(block);
+                }
             }
-            block.Name = r.RegionName;
-            block.X = (ushort)(r.RegionLocX / Constants.RegionSize);
-            block.Y = (ushort)(r.RegionLocY / Constants.RegionSize);
-            block.SizeX = (ushort)r.RegionSizeX;
-            block.SizeY = (ushort)r.RegionSizeY;
+
+            // final block, closing the search result
+            AddFinalBlock(blocks, mapNameOrig);
+
+            // flags are agent flags sent from the viewer.
+            // they have different values depending on different viewers, apparently
+            remoteClient.SendMapBlock(blocks, flags);
+
+            // send extra user messages for V3
+            // because the UI is very confusing
+            // while we don't fix the hard-coded urls
+            if (flags == 2)
+            {
+                if (regionInfos == null || regionInfos.Count == 0)
+                    remoteClient.SendAgentAlertMessage("No regions found with that name.", true);
+            }
+        }
+        catch{ }
+    }
+
+    private static void MapBlockFromGridRegion(MapBlockData block, GridRegion r, uint flag)
+    {
+        if (r == null)
+        {
+            block.Access = (byte)SimAccess.NonExistent;
+            block.MapImageId = UUID.Zero;
+            return;
         }
 
-        private void AddFinalBlock(List<MapBlockData> blocks,string name)
+        block.Access = r.Access;
+        switch (flag)
         {
-                // final block, closing the search result
-                MapBlockData data = new MapBlockData()
-                {
-                    Agents = 0,
-                    Access = (byte)SimAccess.NonExistent,
-                    MapImageId = UUID.Zero,
-                    Name = name,
-                    RegionFlags = 0,
-                    WaterHeight = 0, // not used
-                    X = 0,
-                    Y = 0
-                };
-                blocks.Add(data);
+            case 0:
+                block.MapImageId = r.TerrainImage;
+                break;
+            case 2:
+                block.MapImageId = r.ParcelImage;
+                break;
+            default:
+                block.MapImageId = UUID.Zero;
+                break;
         }
+        block.Name = r.RegionName;
+        block.X = (ushort)(r.RegionLocX / Constants.RegionSize);
+        block.Y = (ushort)(r.RegionLocY / Constants.RegionSize);
+        block.SizeX = (ushort)r.RegionSizeX;
+        block.SizeY = (ushort)r.RegionSizeY;
+    }
+
+    private void AddFinalBlock(List<MapBlockData> blocks,string name)
+    {
+            // final block, closing the search result
+            MapBlockData data = new MapBlockData()
+            {
+                Agents = 0,
+                Access = (byte)SimAccess.NonExistent,
+                MapImageId = UUID.Zero,
+                Name = name,
+                RegionFlags = 0,
+                WaterHeight = 0, // not used
+                X = 0,
+                Y = 0
+            };
+            blocks.Add(data);
     }
 }

@@ -18,7 +18,6 @@
     <ProjectReference Include="../../Source/OpenSim.Region.CoreModules/OpenSim.Region.CoreModules.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.Framework/OpenSim.Region.Framework.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
-    <ProjectReference Include="../../ThirdParty/SmartThreadPool/SmartThreadPool.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -27,32 +27,31 @@
 
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Framework.Monitoring
+namespace OpenSim.Framework.Monitoring;
+
+/// <summary>
+/// Implemented by classes which collect up non-viewer statistical information
+/// </summary>
+public interface IStatsCollector
 {
     /// <summary>
-    /// Implemented by classes which collect up non-viewer statistical information
+    /// Report back collected statistical information.
     /// </summary>
-    public interface IStatsCollector
-    {
-        /// <summary>
-        /// Report back collected statistical information.
-        /// </summary>
-        /// <returns></returns>
-        string Report();
+    /// <returns></returns>
+    string Report();
 
-        /// <summary>
-        /// Report back collected statistical information in json
-        /// </summary>
-        /// <returns>
-        /// A <see cref="System.String"/>
-        /// </returns>
-        string XReport(string uptime, string version);
+    /// <summary>
+    /// Report back collected statistical information in json
+    /// </summary>
+    /// <returns>
+    /// A <see cref="System.String"/>
+    /// </returns>
+    string XReport(string uptime, string version);
 
-        /// <summary>
-        /// Report back collected statistical information as an OSDMap of key/values
-        /// </summary>
-        /// <returns>
-        /// </returns>
-        OSDMap OReport(string uptime, string version);
-    }
+    /// <summary>
+    /// Report back collected statistical information as an OSDMap of key/values
+    /// </summary>
+    /// <returns>
+    /// </returns>
+    OSDMap OReport(string uptime, string version);
 }

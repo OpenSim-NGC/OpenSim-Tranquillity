@@ -34,122 +34,121 @@ using OpenMetaverse;
 using log4net;
 using Nini.Config;
 
-namespace OpenSim.Region.CoreModules.Framework.UserManagement
+namespace OpenSim.Region.CoreModules.Framework.UserManagement;
+
+public class HGUserManagementModule : UserManagementModule, ISharedRegionModule, IUserManagement
 {
-    public class HGUserManagementModule : UserManagementModule, ISharedRegionModule, IUserManagement
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    #region ISharedRegionModule
+
+    public override void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        #region ISharedRegionModule
-
-        public override void Initialise(IConfigSource config)
+        string umanmod = config.Configs["Modules"].GetString("UserManagementModule", null);
+        if (umanmod == Name)
         {
-            string umanmod = config.Configs["Modules"].GetString("UserManagementModule", null);
-            if (umanmod == Name)
+            m_Enabled = true;
+            base.Init(config);
+            m_log.DebugFormat("[USER MANAGEMENT MODULE]: {0} is enabled", Name);
+        }
+    }
+
+    public override string Name
+    {
+        get { return "HGUserManagementModule"; }
+    }
+
+    #endregion ISharedRegionModule
+
+    protected override void AddAdditionalUsers(string query, List<UserData> users, HashSet<UUID> found)
+    {
+        if (query.Contains("@"))  // First.Last@foo.com, maybe?
+        {
+            string[] words = query.Split(new char[] { '@' });
+            if (words.Length != 2)
             {
-                m_Enabled = true;
-                base.Init(config);
-                m_log.DebugFormat("[USER MANAGEMENT MODULE]: {0} is enabled", Name);
+                m_log.DebugFormat("[USER MANAGEMENT MODULE]: Malformed address {0}", query);
+                return;
             }
-        }
 
-        public override string Name
-        {
-            get { return "HGUserManagementModule"; }
-        }
-
-        #endregion ISharedRegionModule
-
-        protected override void AddAdditionalUsers(string query, List<UserData> users, HashSet<UUID> found)
-        {
-            if (query.Contains("@"))  // First.Last@foo.com, maybe?
+            words[0] = words[0].Trim(); // it has at least 1
+            words[1] = words[1].Trim().ToLower();
+            string match1 = "@" + words[1];
+            if (String.IsNullOrWhiteSpace(words[0])) // query was @foo.com?
             {
-                string[] words = query.Split(new char[] { '@' });
-                if (words.Length != 2)
-                {
-                    m_log.DebugFormat("[USER MANAGEMENT MODULE]: Malformed address {0}", query);
-                    return;
-                }
-
-                words[0] = words[0].Trim(); // it has at least 1
-                words[1] = words[1].Trim().ToLower();
-                string match1 = "@" + words[1];
-                if (String.IsNullOrWhiteSpace(words[0])) // query was @foo.com?
-                {
-                    foreach (UserData d in m_userCacheByID.Values)
-                    {
-                        if(found.Contains(d.Id))
-                            continue;
-                        if (d.LastName.ToLower().StartsWith(match1))
-                            users.Add(d);
-                    }
-
-                    // We're done
-                    return;
-                }
-
-                string match0 = words[0].ToLower();
-                // words.Length == 2 and words[0] != string.empty
-                // first.last@foo.com ?
                 foreach (UserData d in m_userCacheByID.Values)
                 {
-                    if (found.Contains(d.Id))
+                    if(found.Contains(d.Id))
                         continue;
-                    if (d.LastName.ToLower().Equals(match1) &&
-                        d.FirstName.ToLower().Equals(match0))
-                    {
+                    if (d.LastName.ToLower().StartsWith(match1))
                         users.Add(d);
-                        // It's cached. We're done
-                        return;
-                    }
                 }
 
-                // This is it! Let's ask the other world
-                if (words[0].Contains("."))
+                // We're done
+                return;
+            }
+
+            string match0 = words[0].ToLower();
+            // words.Length == 2 and words[0] != string.empty
+            // first.last@foo.com ?
+            foreach (UserData d in m_userCacheByID.Values)
+            {
+                if (found.Contains(d.Id))
+                    continue;
+                if (d.LastName.ToLower().Equals(match1) &&
+                    d.FirstName.ToLower().Equals(match0))
                 {
-                    string[] names = words[0].Split(Util.SplitDotArray);
-                    if (names.Length >= 2)
+                    users.Add(d);
+                    // It's cached. We're done
+                    return;
+                }
+            }
+
+            // This is it! Let's ask the other world
+            if (words[0].Contains("."))
+            {
+                string[] names = words[0].Split(Util.SplitDotArray);
+                if (names.Length >= 2)
+                {
+                    string uriStr = "http://" + words[1];
+                    // Let's check that the last name is a valid address
+                    try
                     {
-                        string uriStr = "http://" + words[1];
-                        // Let's check that the last name is a valid address
+                        new Uri(uriStr);
+                    }
+                    catch (UriFormatException)
+                    {
+                        m_log.DebugFormat("[USER MANAGEMENT MODULE]: Malformed address {0}", uriStr);
+                        return;
+                    }
+
+                    UUID userID = UUID.Zero;
+                    uriStr = uriStr.ToLower();
+                    if(!WebUtil.GlobalExpiringBadURLs.ContainsKey(uriStr))
+                    {
+                        UserAgentServiceConnector uasConn = new UserAgentServiceConnector(uriStr);
                         try
                         {
-                            new Uri(uriStr);
+                            userID = uasConn.GetUUID(names[0], names[1]);
                         }
-                        catch (UriFormatException)
+                        catch (Exception e)
                         {
-                            m_log.DebugFormat("[USER MANAGEMENT MODULE]: Malformed address {0}", uriStr);
-                            return;
+                            m_log.Debug("[USER MANAGEMENT MODULE]: GetUUID call failed ", e);
                         }
-
-                        UUID userID = UUID.Zero;
-                        uriStr = uriStr.ToLower();
-                        if(!WebUtil.GlobalExpiringBadURLs.ContainsKey(uriStr))
-                        {
-                            UserAgentServiceConnector uasConn = new UserAgentServiceConnector(uriStr);
-                            try
-                            {
-                                userID = uasConn.GetUUID(names[0], names[1]);
-                            }
-                            catch (Exception e)
-                            {
-                                m_log.Debug("[USER MANAGEMENT MODULE]: GetUUID call failed ", e);
-                            }
-                        }
-
-                        if (!userID.Equals(UUID.Zero))
-                        {
-                            UserData ud = new UserData();
-                            ud.Id = userID;
-                            ud.FirstName = words[0];
-                            ud.LastName = "@" + words[1];
-                            users.Add(ud);
-                            AddUser(userID, names[0], names[1], uriStr);
-                            m_log.DebugFormat("[USER MANAGEMENT MODULE]: User {0}@{1} found", words[0], words[1]);
-                        }
-                        else
-                            m_log.DebugFormat("[USER MANAGEMENT MODULE]: User {0}@{1} not found", words[0], words[1]);
                     }
+
+                    if (!userID.Equals(UUID.Zero))
+                    {
+                        UserData ud = new UserData();
+                        ud.Id = userID;
+                        ud.FirstName = words[0];
+                        ud.LastName = "@" + words[1];
+                        users.Add(ud);
+                        AddUser(userID, names[0], names[1], uriStr);
+                        m_log.DebugFormat("[USER MANAGEMENT MODULE]: User {0}@{1} found", words[0], words[1]);
+                    }
+                    else
+                        m_log.DebugFormat("[USER MANAGEMENT MODULE]: User {0}@{1} not found", words[0], words[1]);
                 }
             }
         }

@@ -25,127 +25,121 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Text;
 using System.Timers;
 using log4net;
 
-namespace OpenSim.Framework.Monitoring
+namespace OpenSim.Framework.Monitoring;
+
+/// <summary>
+/// Provides a means to continuously log stats for debugging purposes.
+/// </summary>
+public static class StatsLogger
 {
-    /// <summary>
-    /// Provides a means to continuously log stats for debugging purposes.
-    /// </summary>
-    public static class StatsLogger
+    private static readonly ILog m_statsLog = LogManager.GetLogger("special.StatsLogger");
+
+    private static System.Timers.Timer m_loggingTimer;
+    private static int m_statsLogIntervalMs = 5000;
+
+    public static void RegisterConsoleCommands(ICommandConsole console)
     {
-        private static readonly ILog m_statsLog = LogManager.GetLogger("special.StatsLogger");
+        console.Commands.AddCommand(
+            "General",
+            false,
+            "stats record",
+            "stats record start|stop",
+            "Control whether stats are being regularly recorded to a separate file.",
+            "For debug purposes.  Experimental.",
+            HandleStatsRecordCommand);
 
-        private static System.Timers.Timer m_loggingTimer;
-        private static int m_statsLogIntervalMs = 5000;
+        console.Commands.AddCommand(
+            "General",
+            false,
+            "stats save",
+            "stats save <path>",
+            "Save stats snapshot to a file.  If the file already exists, then the report is appended.",
+            "For debug purposes.  Experimental.",
+            HandleStatsSaveCommand);
+    }
 
-        public static void RegisterConsoleCommands(ICommandConsole console)
+    public static void HandleStatsRecordCommand(string module, string[] cmd)
+    {
+        ICommandConsole con = MainConsole.Instance;
+
+        if (cmd.Length != 3)
         {
-            console.Commands.AddCommand(
-                "General",
-                false,
-                "stats record",
-                "stats record start|stop",
-                "Control whether stats are being regularly recorded to a separate file.",
-                "For debug purposes.  Experimental.",
-                HandleStatsRecordCommand);
-
-            console.Commands.AddCommand(
-                "General",
-                false,
-                "stats save",
-                "stats save <path>",
-                "Save stats snapshot to a file.  If the file already exists, then the report is appended.",
-                "For debug purposes.  Experimental.",
-                HandleStatsSaveCommand);
+            con.Output("Usage: stats record start|stop");
+            return;
         }
 
-        public static void HandleStatsRecordCommand(string module, string[] cmd)
+        if (cmd[2] == "start")
         {
-            ICommandConsole con = MainConsole.Instance;
+            Start();
+            con.Output("Now recording all stats to file every {0}ms", m_statsLogIntervalMs);
+        }
+        else if (cmd[2] == "stop")
+        {
+            Stop();
+            con.Output("Stopped recording stats to file.");
+        }
+    }
 
-            if (cmd.Length != 3)
-            {
-                con.Output("Usage: stats record start|stop");
-                return;
-            }
+    public static void HandleStatsSaveCommand(string module, string[] cmd)
+    {
+        ICommandConsole con = MainConsole.Instance;
 
-            if (cmd[2] == "start")
-            {
-                Start();
-                con.Output("Now recording all stats to file every {0}ms", m_statsLogIntervalMs);
-            }
-            else if (cmd[2] == "stop")
-            {
-                Stop();
-                con.Output("Stopped recording stats to file.");
-            }
+        if (cmd.Length != 3)
+        {
+            con.Output("Usage: stats save <path>");
+            return;
         }
 
-        public static void HandleStatsSaveCommand(string module, string[] cmd)
-        {
-            ICommandConsole con = MainConsole.Instance;
+        string path = cmd[2];
 
-            if (cmd.Length != 3)
-            {
-                con.Output("Usage: stats save <path>");
-                return;
-            }
-
-            string path = cmd[2];
-
-            using (StreamWriter sw = new StreamWriter(path, true))
-            {
-                foreach (string line in GetReport())
-                    sw.WriteLine(line);
-            }
-
-            MainConsole.Instance.Output("Stats saved to file {0}", path);
-        }
-
-        public static void Start()
-        {
-            if (m_loggingTimer != null)
-                Stop();
-
-            m_loggingTimer = new System.Timers.Timer(m_statsLogIntervalMs);
-            m_loggingTimer.AutoReset = false;
-            m_loggingTimer.Elapsed += Log;
-            m_loggingTimer.Start();
-        }
-
-        public static void Stop()
-        {
-            if (m_loggingTimer != null)
-            {
-                m_loggingTimer.Stop();
-            }
-        }
-
-        private static void Log(object sender, ElapsedEventArgs e)
+        using (StreamWriter sw = new StreamWriter(path, true))
         {
             foreach (string line in GetReport())
-                m_statsLog.Info(line);
-
-            m_loggingTimer.Start();
+                sw.WriteLine(line);
         }
 
-        private static List<string> GetReport()
+        MainConsole.Instance.Output("Stats saved to file {0}", path);
+    }
+
+    public static void Start()
+    {
+        if (m_loggingTimer != null)
+            Stop();
+
+        m_loggingTimer = new System.Timers.Timer(m_statsLogIntervalMs);
+        m_loggingTimer.AutoReset = false;
+        m_loggingTimer.Elapsed += Log;
+        m_loggingTimer.Start();
+    }
+
+    public static void Stop()
+    {
+        if (m_loggingTimer != null)
         {
-            List<string> lines = new List<string>();
-
-            lines.Add(string.Format("*** STATS REPORT AT {0} ***", DateTime.Now));
-
-            foreach (string report in StatsManager.GetAllStatsReports())
-                lines.Add(report);
-
-            return lines;
+            m_loggingTimer.Stop();
         }
+    }
+
+    private static void Log(object sender, ElapsedEventArgs e)
+    {
+        foreach (string line in GetReport())
+            m_statsLog.Info(line);
+
+        m_loggingTimer.Start();
+    }
+
+    private static List<string> GetReport()
+    {
+        List<string> lines = new List<string>();
+
+        lines.Add(string.Format("*** STATS REPORT AT {0} ***", DateTime.Now));
+
+        foreach (string report in StatsManager.GetAllStatsReports())
+            lines.Add(report);
+
+        return lines;
     }
 }

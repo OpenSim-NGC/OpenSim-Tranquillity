@@ -25,29 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.ScriptEngine.Yengine
+namespace OpenSim.Region.ScriptEngine.Yengine;
+
+public class PluginRegistration : IPluginRegistryProvider
 {
-    public class PluginRegistration : IPluginRegistryProvider
+    public void RegisterPlugins(PluginRegistry registry)
     {
-        public void RegisterPlugins(PluginRegistry registry)
-        {
-            RegisterByName(registry, "/OpenSim/RegionModules", "YEngine", "OpenSim.Region.ScriptEngine.Yengine.Yengine", "YEngine");
-        }
+        RegisterByName(registry, "/OpenSim/RegionModules", "YEngine", "OpenSim.Region.ScriptEngine.Yengine.Yengine", "YEngine");
+    }
 
-        private static void RegisterByName(PluginRegistry registry, string extensionPath, string id, string typeName, string displayName)
-        {
-            Assembly assembly = typeof(PluginRegistration).Assembly;
-            Type type = assembly.GetType(typeName, false);
-            if (type == null)
-                return;
+    private static void RegisterByName(PluginRegistry registry, string extensionPath, string id, string typeName, string displayName)
+    {
+        Assembly assembly = typeof(PluginRegistration).Assembly;
+        Type type = assembly.GetType(typeName, false);
+        if (type == null)
+            return;
 
-            registry.Register(
-                extensionPath,
-                new PluginDescriptor(id, type, displayName, "0.9"));
-        }
+        registry.Register(
+            extensionPath,
+            new PluginDescriptor(id, type, displayName, "0.9"));
     }
 }

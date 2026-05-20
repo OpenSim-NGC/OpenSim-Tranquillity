@@ -28,79 +28,78 @@
 using OpenSim.Region.CoreModules.World.Terrain.FloodBrushes;
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.Effects
+namespace OpenSim.Region.CoreModules.World.Terrain.Effects;
+
+public class ChannelDigger : ITerrainEffect
 {
-    public class ChannelDigger : ITerrainEffect
+    private readonly int num_h = 4;
+    private readonly int num_w = 4;
+
+    private readonly ITerrainFloodEffect raiseFunction = new RaiseArea();
+    private readonly ITerrainFloodEffect smoothFunction = new SmoothArea();
+
+    #region ITerrainEffect Members
+
+    public void RunEffect(ITerrainChannel map)
     {
-        private readonly int num_h = 4;
-        private readonly int num_w = 4;
+        FillMap(map, 15);
+        BuildTiles(map, 7);
+        SmoothMap(map, 3);
+    }
 
-        private readonly ITerrainFloodEffect raiseFunction = new RaiseArea();
-        private readonly ITerrainFloodEffect smoothFunction = new SmoothArea();
+    #endregion
 
-        #region ITerrainEffect Members
-
-        public void RunEffect(ITerrainChannel map)
+    private void SmoothMap(ITerrainChannel map, int rounds)
+    {
+        Boolean[,] bitmap = new bool[map.Width,map.Height];
+        for (int x = 0; x < map.Width; x++)
         {
-            FillMap(map, 15);
-            BuildTiles(map, 7);
-            SmoothMap(map, 3);
-        }
-
-        #endregion
-
-        private void SmoothMap(ITerrainChannel map, int rounds)
-        {
-            Boolean[,] bitmap = new bool[map.Width,map.Height];
-            for (int x = 0; x < map.Width; x++)
+            for (int y = 0; y < map.Height; y++)
             {
-                for (int y = 0; y < map.Height; y++)
-                {
-                    bitmap[x, y] = true;
-                }
-            }
-
-            for (int i = 0; i < rounds; i++)
-            {
-                //mantis 8725
-                //smoothFunction.FloodEffect(map, bitmap, -1f, 1.0f, 0, map.Width - 1, 0, map.Height - 1);
-                smoothFunction.FloodEffect(map, bitmap, -1f, 110.0f, 0, map.Width - 1, 0, map.Height - 1);
+                bitmap[x, y] = true;
             }
         }
 
-        private void FillMap(ITerrainChannel map, float val)
+        for (int i = 0; i < rounds; i++)
         {
-            for (int x = 0; x < map.Width; x++)
-                for (int y = 0; y < map.Height; y++)
-                    map[x, y] = val;
+            //mantis 8725
+            //smoothFunction.FloodEffect(map, bitmap, -1f, 1.0f, 0, map.Width - 1, 0, map.Height - 1);
+            smoothFunction.FloodEffect(map, bitmap, -1f, 110.0f, 0, map.Width - 1, 0, map.Height - 1);
         }
+    }
 
-        private void BuildTiles(ITerrainChannel map, float height)
+    private void FillMap(ITerrainChannel map, float val)
+    {
+        for (int x = 0; x < map.Width; x++)
+            for (int y = 0; y < map.Height; y++)
+                map[x, y] = val;
+    }
+
+    private void BuildTiles(ITerrainChannel map, float height)
+    {
+        int channelWidth = (int) Math.Floor((map.Width / num_w) * 0.8);
+        int channelHeight = (int) Math.Floor((map.Height / num_h) * 0.8);
+        int channelXOffset = (map.Width / num_w) - channelWidth;
+        int channelYOffset = (map.Height / num_h) - channelHeight;
+
+        for (int x = 0; x < num_w; x++)
         {
-            int channelWidth = (int) Math.Floor((map.Width / num_w) * 0.8);
-            int channelHeight = (int) Math.Floor((map.Height / num_h) * 0.8);
-            int channelXOffset = (map.Width / num_w) - channelWidth;
-            int channelYOffset = (map.Height / num_h) - channelHeight;
-
-            for (int x = 0; x < num_w; x++)
+            for (int y = 0; y < num_h; y++)
             {
-                for (int y = 0; y < num_h; y++)
+                int xoff = ((channelXOffset + channelWidth) * x) + (channelXOffset / 2);
+                int yoff = ((channelYOffset + channelHeight) * y) + (channelYOffset / 2);
+
+                Boolean[,] bitmap = new bool[map.Width,map.Height];
+
+                for (int dx = 0; dx < channelWidth; dx++)
                 {
-                    int xoff = ((channelXOffset + channelWidth) * x) + (channelXOffset / 2);
-                    int yoff = ((channelYOffset + channelHeight) * y) + (channelYOffset / 2);
-
-                    Boolean[,] bitmap = new bool[map.Width,map.Height];
-
-                    for (int dx = 0; dx < channelWidth; dx++)
+                    for (int dy = 0; dy < channelHeight; dy++)
                     {
-                        for (int dy = 0; dy < channelHeight; dy++)
-                        {
-                            bitmap[dx + xoff, dy + yoff] = true;
-                        }
+                        bitmap[dx + xoff, dy + yoff] = true;
                     }
-
-                    raiseFunction.FloodEffect(map, bitmap, -1f,(float)height, 0, map.Width - 1, 0, map.Height - 1);
                 }
+
+                raiseFunction.FloodEffect(map, bitmap, -1f,(float)height, 0, map.Width - 1, 0, map.Height - 1);
             }
         }
     }

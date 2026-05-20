@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
+namespace Warp3D;
 
-namespace Warp3D
+public class warp_FXLensFlare : warp_FXPlugin
 {
-    public class warp_FXLensFlare : warp_FXPlugin
-    {
 	    public warp_Object flareObject;
 	
 	    private int flares=0;
@@ -17,9 +13,9 @@ namespace Warp3D
 	    {
 	    }
 
-        public warp_FXLensFlare( String name, warp_Scene scene, bool zBufferSensitive ) : base( scene )
+    public warp_FXLensFlare( String name, warp_Scene scene, bool zBufferSensitive ) : base( scene )
 	    {
-            this.zBufferSensitive = zBufferSensitive;
+        this.zBufferSensitive = zBufferSensitive;
 
 		    flareObject=new warp_Object();
 		    flareObject.addVertex(new warp_Vertex(1f,1f,1f));
@@ -97,28 +93,28 @@ namespace Warp3D
 	    	addFlare(createRays(size, num, rad, color),0f);
 	    }
 
-        public void addSecs( int count, int averidgeSize, int sizeDelta, int averidgeColor, int colorDelta )
+    public void addSecs( int count, int averidgeSize, int sizeDelta, int averidgeColor, int colorDelta )
+    {
+        for ( int i = 0; i < count; i++ )
         {
-            for ( int i = 0; i < count; i++ )
-            {
-                addFlare( createSec( averidgeSize, sizeDelta, averidgeColor, colorDelta ), warp_Math.random( -0.5f, 3f ) );
+            addFlare( createSec( averidgeSize, sizeDelta, averidgeColor, colorDelta ), warp_Math.random( -0.5f, 3f ) );
 
-            }
         }
+    }
 					
 		override public void apply()
 		{
-            int px = flareObject.fastvertex[ 0 ].x;
-            int py = flareObject.fastvertex[ 0 ].y;
+        int px = flareObject.fastvertex[ 0 ].x;
+        int py = flareObject.fastvertex[ 0 ].y;
 
-            if ( !flareObject.fastvertex[ 0 ].visible )
-            {
-                return;
-            }
-            if ( zBufferSensitive && ( flareObject.fastvertex[ 0 ].z > scene.renderPipeline.zBuffer[ px + py * screen.width ] ) )
-            {
-                return;
-            }
+        if ( !flareObject.fastvertex[ 0 ].visible )
+        {
+            return;
+        }
+        if ( zBufferSensitive && ( flareObject.fastvertex[ 0 ].z > scene.renderPipeline.zBuffer[ px + py * screen.width ] ) )
+        {
+            return;
+        }
 
 			int cx=screen.width/2;
 			int cy=screen.height/2;
@@ -157,7 +153,7 @@ namespace Warp3D
 				flare=temp1;
 				
 				float[] temp2=new float[flares];
-                System.Array.Copy(flareDist, 0, temp2, 0, flares - 1 );
+            System.Array.Copy(flareDist, 0, temp2, 0, flares - 1 );
 				flareDist=temp2;
 			}
 			
@@ -221,7 +217,7 @@ namespace Warp3D
 		private warp_Texture createRays(int size, int rays, int rad, int color)
 		{
 			int pos;	
-            float relPos;
+        float relPos;
 			warp_Texture texture=new warp_Texture(size,size);
 			int[] radialMap=new int [1024];
 			warp_Math.clearBuffer(radialMap, 0);
@@ -273,7 +269,7 @@ namespace Warp3D
 				palette[i]=warp_Color.getCropColor(r,g,b);
 			}
 			
-            return palette;
+        return palette;
 		}
 		
 		private int[] getConstantAlpha(int alpha)
@@ -281,28 +277,28 @@ namespace Warp3D
 			int[] alphaPalette=new int[256];
 			for (int i=255;i>=0;i--) alphaPalette[i]=alpha;
 			
-            return alphaPalette;
+        return alphaPalette;
 		}
 		
 		private int[] getLinearAlpha()
 		{
 			int[] alphaPalette=new int[256];
-            for ( int i = 255; i >= 0; i-- )
-            {
-                alphaPalette[ i ] = 255 - i;
-            }
+        for ( int i = 255; i >= 0; i-- )
+        {
+            alphaPalette[ i ] = 255 - i;
+        }
 			
-            return alphaPalette;
+        return alphaPalette;
 		}
 		
 		private int[] getRingAlpha(int ringsize)
 		{
 			int[] alphaPalette=new int[256];
 			float angle;
-            for ( int i = 0; i < 256; i++ )
-            {
-                alphaPalette[ i ] = 0;
-            }
+        for ( int i = 0; i < 256; i++ )
+        {
+            alphaPalette[ i ] = 0;
+        }
 
 			for (int i=0;i<ringsize;i++)
 			{
@@ -315,12 +311,12 @@ namespace Warp3D
 		private int[] getSecAlpha()
 		{
 			int[] alphaPalette=getRingAlpha((int)warp_Math.random(0,255));
-            for ( int i = 0; i < 256; i++ )
-            {
-                alphaPalette[ i ] = ( alphaPalette[ i ] + 255 - i ) >> 2;
-            }
+        for ( int i = 0; i < 256; i++ )
+        {
+            alphaPalette[ i ] = ( alphaPalette[ i ] + 255 - i ) >> 2;
+        }
 			
-            return alphaPalette;
+        return alphaPalette;
 		}
 		
 		
@@ -328,7 +324,7 @@ namespace Warp3D
 		{
 			int[] palette=new int[256];
 
-            int r1=(color1>>16)&255;
+        int r1=(color1>>16)&255;
 			int g1=(color1>>8)&255;
 			int b1=color1&255;
 			int r2=(color2>>16)&255;
@@ -348,5 +344,4 @@ namespace Warp3D
 			}
 			return palette;
 		}
-    }
 }

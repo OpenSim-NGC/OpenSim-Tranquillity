@@ -28,28 +28,27 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class LandStatReportItem
 {
-    public class LandStatReportItem
+    public float LocationX;
+    public float LocationY;
+    public float LocationZ;
+    public string OwnerName;
+    public UUID OwnerID;
+    public float Score;
+    public UUID TaskID;
+    public uint TaskLocalID;
+    public string TaskName;
+    public int Bytes;
+    public int Urls;
+    public uint Time;
+    public string Parcel;
+
+    public LandStatReportItem()
     {
-        public float LocationX;
-        public float LocationY;
-        public float LocationZ;
-        public string OwnerName;
-        public UUID OwnerID;
-        public float Score;
-        public UUID TaskID;
-        public uint TaskLocalID;
-        public string TaskName;
-        public int Bytes;
-        public int Urls;
-        public uint Time;
-        public string Parcel;
-
-        public LandStatReportItem()
-        {
-
-        }
 
     }
+
 }

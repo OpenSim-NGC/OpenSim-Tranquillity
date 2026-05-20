@@ -25,115 +25,111 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+public class XInventoryFolder
 {
-    public class XInventoryFolder
+    public string folderName;
+    public int type;
+    public int version;
+    public UUID folderID;
+    public UUID agentID;
+    public UUID parentFolderID;
+
+    public XInventoryFolder Clone()
     {
-        public string folderName;
-        public int type;
-        public int version;
-        public UUID folderID;
-        public UUID agentID;
-        public UUID parentFolderID;
-
-        public XInventoryFolder Clone()
-        {
-            return (XInventoryFolder)MemberwiseClone();
-        }
+        return (XInventoryFolder)MemberwiseClone();
     }
+}
 
-    public class XInventoryItem
+public class XInventoryItem
+{
+    public UUID assetID;
+    public int assetType;
+    public string inventoryName;
+    public string inventoryDescription;
+    public int inventoryNextPermissions;
+    public int inventoryCurrentPermissions;
+    public int invType;
+    public string creatorID;
+    public int inventoryBasePermissions;
+    public int inventoryEveryOnePermissions;
+    public int salePrice;
+    public int saleType;
+    public int creationDate;
+    public UUID groupID;
+    public int groupOwned;
+    public int flags;
+    public UUID inventoryID;
+    public UUID avatarID;
+    public UUID parentFolderID;
+    public int inventoryGroupPermissions;
+
+    public XInventoryItem Clone()
     {
-        public UUID assetID;
-        public int assetType;
-        public string inventoryName;
-        public string inventoryDescription;
-        public int inventoryNextPermissions;
-        public int inventoryCurrentPermissions;
-        public int invType;
-        public string creatorID;
-        public int inventoryBasePermissions;
-        public int inventoryEveryOnePermissions;
-        public int salePrice;
-        public int saleType;
-        public int creationDate;
-        public UUID groupID;
-        public int groupOwned;
-        public int flags;
-        public UUID inventoryID;
-        public UUID avatarID;
-        public UUID parentFolderID;
-        public int inventoryGroupPermissions;
-
-        public XInventoryItem Clone()
-        {
-            return (XInventoryItem)MemberwiseClone();
-        }
+        return (XInventoryItem)MemberwiseClone();
     }
+}
 
-    public interface IXInventoryData
-    {
-        XInventoryFolder[] GetFolder(string field, string val);
-        XInventoryFolder[] GetFolders(string[] fields, string[] vals);
-        XInventoryItem[] GetItems(string[] fields, string[] vals);
+public interface IXInventoryData
+{
+    XInventoryFolder[] GetFolder(string field, string val);
+    XInventoryFolder[] GetFolders(string[] fields, string[] vals);
+    XInventoryItem[] GetItems(string[] fields, string[] vals);
 
-        bool StoreFolder(XInventoryFolder folder);
-        bool StoreItem(XInventoryItem item);
+    bool StoreFolder(XInventoryFolder folder);
+    bool StoreItem(XInventoryItem item);
 
-        /// <summary>
-        /// Delete folders where field == val
-        /// </summary>
-        /// <param name="field"></param>
-        /// <param name="val"></param>
-        /// <returns>true if the delete was successful, false if it was not</returns>
-        bool DeleteFolders(string field, string val);
+    /// <summary>
+    /// Delete folders where field == val
+    /// </summary>
+    /// <param name="field"></param>
+    /// <param name="val"></param>
+    /// <returns>true if the delete was successful, false if it was not</returns>
+    bool DeleteFolders(string field, string val);
 
-        /// <summary>
-        /// Delete folders where field1 == val1, field2 == val2...
-        /// </summary>
-        /// <param name="fields"></param>
-        /// <param name="vals"></param>
-        /// <returns>true if the delete was successful, false if it was not</returns>
-        bool DeleteFolders(string[] fields, string[] vals);
+    /// <summary>
+    /// Delete folders where field1 == val1, field2 == val2...
+    /// </summary>
+    /// <param name="fields"></param>
+    /// <param name="vals"></param>
+    /// <returns>true if the delete was successful, false if it was not</returns>
+    bool DeleteFolders(string[] fields, string[] vals);
 
-        /// <summary>
-        /// Delete items where field == val
-        /// </summary>
-        /// <param name="field"></param>
-        /// <param name="val"></param>
-        /// <returns>true if the delete was successful, false if it was not</returns>
-        bool DeleteItems(string field, string val);
+    /// <summary>
+    /// Delete items where field == val
+    /// </summary>
+    /// <param name="field"></param>
+    /// <param name="val"></param>
+    /// <returns>true if the delete was successful, false if it was not</returns>
+    bool DeleteItems(string field, string val);
 
-        /// <summary>
-        /// Delete items where field1 == val1, field2 == val2...
-        /// </summary>
-        /// <param name="fields"></param>
-        /// <param name="vals"></param>
-        /// <returns>true if the delete was successful, false if it was not</returns>
-        bool DeleteItems(string[] fields, string[] vals);
+    /// <summary>
+    /// Delete items where field1 == val1, field2 == val2...
+    /// </summary>
+    /// <param name="fields"></param>
+    /// <param name="vals"></param>
+    /// <returns>true if the delete was successful, false if it was not</returns>
+    bool DeleteItems(string[] fields, string[] vals);
 
-        /// <summary>
-        /// Move an item to another folder.
-        /// </summary>
-        /// <returns>/returns>
-        /// <param name='id'>UUID of the item</param>
-        /// <param name='newParent'>UUID of the new parent folder.</param>
-        bool MoveItem(string id, string newParentFolderID);
+    /// <summary>
+    /// Move an item to another folder.
+    /// </summary>
+    /// <returns>/returns>
+    /// <param name='id'>UUID of the item</param>
+    /// <param name='newParent'>UUID of the new parent folder.</param>
+    bool MoveItem(string id, string newParentFolderID);
 
-        /// <summary>
-        /// Move a folder to another folder.
-        /// </summary>
-        /// <returns>/returns>
-        /// <param name='id'>UUID of the item</param>
-        /// <param name='newParent'>UUID of the new parent folder.</param>
-        bool MoveFolder(string id, string newParentFolderID);
+    /// <summary>
+    /// Move a folder to another folder.
+    /// </summary>
+    /// <returns>/returns>
+    /// <param name='id'>UUID of the item</param>
+    /// <param name='newParent'>UUID of the new parent folder.</param>
+    bool MoveFolder(string id, string newParentFolderID);
 
-        XInventoryItem[] GetActiveGestures(UUID principalID);
-        int GetAssetPermissions(UUID principalID, UUID assetID);
-    }
+    XInventoryItem[] GetActiveGestures(UUID principalID);
+    int GetAssetPermissions(UUID principalID, UUID assetID);
 }

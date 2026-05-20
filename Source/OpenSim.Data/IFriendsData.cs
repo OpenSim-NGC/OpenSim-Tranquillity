@@ -25,29 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+public class FriendsData
 {
-    public class FriendsData
-    {
-        public string PrincipalID;
-        public string Friend;
-        public Dictionary<string, string> Data;
-    }
+    public string PrincipalID;
+    public string Friend;
+    public Dictionary<string, string> Data;
+}
 
-    /// <summary>
-    /// An interface for connecting to the friends datastore
-    /// </summary>
-    public interface IFriendsData
-    {
-        bool Store(FriendsData data);
-        bool Delete(UUID ownerID, string friend);
-        bool Delete(string ownerID, string friend);
-        FriendsData[] GetFriends(UUID principalID);
-        FriendsData[] GetFriends(string principalID);
-    }
+/// <summary>
+/// An interface for connecting to the friends datastore
+/// </summary>
+public interface IFriendsData
+{
+    bool Store(FriendsData data);
+    bool Delete(UUID ownerID, string friend);
+    bool Delete(string ownerID, string friend);
+    FriendsData[] GetFriends(UUID principalID);
+    FriendsData[] GetFriends(string principalID);
 }

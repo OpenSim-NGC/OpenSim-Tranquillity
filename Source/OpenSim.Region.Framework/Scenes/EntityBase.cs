@@ -25,146 +25,140 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
-using System.Runtime.Serialization;
-using System.Security.Permissions;
-using log4net;
 using OpenSim.Framework;
 using OpenMetaverse;
 using System.Runtime.CompilerServices;
 
-namespace OpenSim.Region.Framework.Scenes
+namespace OpenSim.Region.Framework.Scenes;
+
+public abstract class EntityBase : ISceneEntity
 {
-    public abstract class EntityBase : ISceneEntity
+    // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    /// <summary>
+    /// The scene to which this entity belongs
+    /// </summary>
+    protected Scene m_scene;
+    public Scene Scene
     {
-        // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_scene; }
+    }
 
-        /// <summary>
-        /// The scene to which this entity belongs
-        /// </summary>
-        protected Scene m_scene;
-        public Scene Scene
+    protected UUID m_uuid;
+    public virtual UUID UUID
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_uuid; }
+        set { m_uuid = value; }
+    }
+
+    /// <summary>
+    /// The name of this entity
+    /// </summary>
+    public osUTF8 osUTF8Name;
+    public virtual string Name
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return osUTF8Name == null ? string.Empty : osUTF8Name.ToString(); }
+        set { osUTF8Name = value == null? null : new osUTF8(value); }
+    }
+
+    /// <summary>
+    /// id local to scene
+    /// </summary>
+    protected uint m_localId;
+    public virtual uint LocalId
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_scene; }
+            return m_localId;
         }
-
-        protected UUID m_uuid;
-        public virtual UUID UUID
+        set
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_uuid; }
-            set { m_uuid = value; }
-        }
-
-        /// <summary>
-        /// The name of this entity
-        /// </summary>
-        public osUTF8 osUTF8Name;
-        public virtual string Name
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return osUTF8Name == null ? string.Empty : osUTF8Name.ToString(); }
-            set { osUTF8Name = value == null? null : new osUTF8(value); }
-        }
-
-        /// <summary>
-        /// id local to scene
-        /// </summary>
-        protected uint m_localId;
-        public virtual uint LocalId
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                return m_localId;
-            }
-            set
-            {
-                m_localId = value;
-                // m_log.DebugFormat("[ENTITY BASE]: Set part {0} to local id {1}", Name, m_localId);
-            }
-        }
-
-        /// <summary>
-        /// Signals whether this entity was in a scene but has since been removed from it.
-        /// </summary>
-        public bool IsDeleted { get; protected internal set; }
-
-        /// <summary>
-        /// Absolute position of this entity in a scene.
-        /// </summary>
-        protected Vector3 m_pos;
-        public virtual Vector3 AbsolutePosition
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                return m_pos;
-            }
-            set
-            {
-                m_pos = value;
-            }
-        }
-
-        /// <summary>
-        /// Current velocity of the entity.
-        /// </summary>
-        protected Vector3 m_velocity;
-        public virtual Vector3 Velocity
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_velocity; }
-            set { m_velocity = value; }
-        }
-
-        /// <summary>
-        /// Creates a new Entity (should not occur on it's own)
-        /// </summary>
-        public EntityBase()
-        {
-        }
-
-        /// <summary>
-        /// Performs any updates that need to be done at each frame, as opposed to immediately.
-        /// These included scheduled updates and updates that occur due to physics processing.
-        /// </summary>
-        public virtual void Update()
-        {
-        }
-
-        /// <summary>
-        /// Copies the entity
-        /// </summary>
-        /// <returns></returns>
-        public virtual EntityBase Copy()
-        {
-            return (EntityBase) MemberwiseClone();
+            m_localId = value;
+            // m_log.DebugFormat("[ENTITY BASE]: Set part {0} to local id {1}", Name, m_localId);
         }
     }
 
-    //Nested Classes
-    public class EntityIntersection
+    /// <summary>
+    /// Signals whether this entity was in a scene but has since been removed from it.
+    /// </summary>
+    public bool IsDeleted { get; protected internal set; }
+
+    /// <summary>
+    /// Absolute position of this entity in a scene.
+    /// </summary>
+    protected Vector3 m_pos;
+    public virtual Vector3 AbsolutePosition
     {
-        public Vector3 ipoint = new Vector3(0, 0, 0);
-        public Vector3 normal = new Vector3(0, 0, 0);
-        public Vector3 AAfaceNormal = new Vector3(0, 0, 0);
-        public int face = -1;
-        public bool HitTF = false;
-        public SceneObjectPart obj;
-        public float distance = 0;
-
-        public EntityIntersection()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get
         {
+            return m_pos;
         }
-
-        public EntityIntersection(Vector3 _ipoint, Vector3 _normal, bool _HitTF)
+        set
         {
-            ipoint = _ipoint;
-            normal = _normal;
-            HitTF = _HitTF;
+            m_pos = value;
         }
+    }
+
+    /// <summary>
+    /// Current velocity of the entity.
+    /// </summary>
+    protected Vector3 m_velocity;
+    public virtual Vector3 Velocity
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_velocity; }
+        set { m_velocity = value; }
+    }
+
+    /// <summary>
+    /// Creates a new Entity (should not occur on it's own)
+    /// </summary>
+    public EntityBase()
+    {
+    }
+
+    /// <summary>
+    /// Performs any updates that need to be done at each frame, as opposed to immediately.
+    /// These included scheduled updates and updates that occur due to physics processing.
+    /// </summary>
+    public virtual void Update()
+    {
+    }
+
+    /// <summary>
+    /// Copies the entity
+    /// </summary>
+    /// <returns></returns>
+    public virtual EntityBase Copy()
+    {
+        return (EntityBase) MemberwiseClone();
+    }
+}
+
+//Nested Classes
+public class EntityIntersection
+{
+    public Vector3 ipoint = new Vector3(0, 0, 0);
+    public Vector3 normal = new Vector3(0, 0, 0);
+    public Vector3 AAfaceNormal = new Vector3(0, 0, 0);
+    public int face = -1;
+    public bool HitTF = false;
+    public SceneObjectPart obj;
+    public float distance = 0;
+
+    public EntityIntersection()
+    {
+    }
+
+    public EntityIntersection(Vector3 _ipoint, Vector3 _normal, bool _HitTF)
+    {
+        ipoint = _ipoint;
+        normal = _normal;
+        HitTF = _HitTF;
     }
 }

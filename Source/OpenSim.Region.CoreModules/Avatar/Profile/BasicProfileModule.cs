@@ -36,139 +36,138 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Region.CoreModules.Avatar.Profile
+namespace OpenSim.Region.CoreModules.Avatar.Profile;
+
+public class BasicProfileModule : IProfileModule, ISharedRegionModule
 {
-    public class BasicProfileModule : IProfileModule, ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    //
+    // Module vars
+    //
+    private List<Scene> m_Scenes = new List<Scene>();
+    private bool m_Enabled = false;
+
+    #region ISharedRegionModule
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        if(config.Configs["UserProfiles"] != null)
+            return;
 
-        //
-        // Module vars
-        //
-        private List<Scene> m_Scenes = new List<Scene>();
-        private bool m_Enabled = false;
+        m_log.DebugFormat("[PROFILE MODULE]: Basic Profile Module enabled");
+        m_Enabled = true;
+    }
 
-        #region ISharedRegionModule
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
 
-        public void Initialise(IConfigSource config)
+        lock (m_Scenes)
         {
-            if(config.Configs["UserProfiles"] != null)
-                return;
-
-            m_log.DebugFormat("[PROFILE MODULE]: Basic Profile Module enabled");
-            m_Enabled = true;
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            lock (m_Scenes)
+            if (!m_Scenes.Contains(scene))
             {
-                if (!m_Scenes.Contains(scene))
-                {
-                    m_Scenes.Add(scene);
-                    // Hook up events
-                    scene.EventManager.OnNewClient += OnNewClient;
-                    scene.RegisterModuleInterface<IProfileModule>(this);
-                }
+                m_Scenes.Add(scene);
+                // Hook up events
+                scene.EventManager.OnNewClient += OnNewClient;
+                scene.RegisterModuleInterface<IProfileModule>(this);
             }
         }
+    }
 
-        public void RegionLoaded(Scene scene)
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        lock (m_Scenes)
         {
-            if (!m_Enabled)
-                return;
+            m_Scenes.Remove(scene);
         }
+    }
 
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
+    public void PostInitialise()
+    {
+    }
 
-            lock (m_Scenes)
-            {
-                m_Scenes.Remove(scene);
-            }
-        }
+    public void Close()
+    {
+    }
 
-        public void PostInitialise()
-        {
-        }
+    public string Name
+    {
+        get { return "BasicProfileModule"; }
+    }
 
-        public void Close()
-        {
-        }
+    public Type ReplaceableInterface
+    {
+        get { return typeof(IProfileModule); }
+    }
 
-        public string Name
-        {
-            get { return "BasicProfileModule"; }
-        }
+    #endregion
 
-        public Type ReplaceableInterface
-        {
-            get { return typeof(IProfileModule); }
-        }
+    /// New Client Event Handler
+    private void OnNewClient(IClientAPI client)
+    {
+        //Profile
+        client.OnRequestAvatarProperties += RequestAvatarProperties;
+    }
 
-        #endregion
-
-        /// New Client Event Handler
-        private void OnNewClient(IClientAPI client)
-        {
-            //Profile
-            client.OnRequestAvatarProperties += RequestAvatarProperties;
-        }
-
-        public void RequestAvatarProperties(IClientAPI remoteClient, UUID avatarID)
-        {
-            IScene s = remoteClient.Scene;
-            if (!(s is Scene))
-                return;
+    public void RequestAvatarProperties(IClientAPI remoteClient, UUID avatarID)
+    {
+        IScene s = remoteClient.Scene;
+        if (!(s is Scene))
+            return;
 
 //            Scene scene = (Scene)s;
 
-            string profileUrl = String.Empty;
-            string aboutText = String.Empty;
-            string firstLifeAboutText = String.Empty;
-            UUID image = UUID.Zero;
-            UUID firstLifeImage = UUID.Zero;
-            UUID partner = UUID.Zero;
-            uint wantMask = 0;
-            string wantText = String.Empty;
-            uint skillsMask = 0;
-            string skillsText = String.Empty;
-            string languages = String.Empty;
+        string profileUrl = String.Empty;
+        string aboutText = String.Empty;
+        string firstLifeAboutText = String.Empty;
+        UUID image = UUID.Zero;
+        UUID firstLifeImage = UUID.Zero;
+        UUID partner = UUID.Zero;
+        uint wantMask = 0;
+        string wantText = String.Empty;
+        uint skillsMask = 0;
+        string skillsText = String.Empty;
+        string languages = String.Empty;
 
-            UserAccount account = m_Scenes[0].UserAccountService.GetUserAccount(m_Scenes[0].RegionInfo.ScopeID, avatarID);
+        UserAccount account = m_Scenes[0].UserAccountService.GetUserAccount(m_Scenes[0].RegionInfo.ScopeID, avatarID);
 
-            string name = "Avatar";
-            int created = 0;
-            if (account != null)
-            {
-                name = account.FirstName + " " + account.LastName;
-                created = account.Created;
-            }
-            Byte[] membershipType = Utils.StringToBytes(name);
-
-            profileUrl = "No profile data";
-            aboutText = string.Empty;
-            firstLifeAboutText = string.Empty;
-            image = UUID.Zero;
-            firstLifeImage = UUID.Zero;
-            partner = UUID.Zero;
-
-            remoteClient.SendAvatarProperties(avatarID, aboutText,
-                        Util.ToDateTime(created).ToString(
-                                "M/d/yyyy", CultureInfo.InvariantCulture),
-                        membershipType, firstLifeAboutText,
-                        (uint)(0 & 0xff),
-                        firstLifeImage, image, profileUrl, partner);
-
-            //Viewer expects interest data when it asks for properties.
-            remoteClient.SendAvatarInterestsReply(avatarID, wantMask, wantText,
-                                                    skillsMask, skillsText, languages);
+        string name = "Avatar";
+        int created = 0;
+        if (account != null)
+        {
+            name = account.FirstName + " " + account.LastName;
+            created = account.Created;
         }
+        Byte[] membershipType = Utils.StringToBytes(name);
 
+        profileUrl = "No profile data";
+        aboutText = string.Empty;
+        firstLifeAboutText = string.Empty;
+        image = UUID.Zero;
+        firstLifeImage = UUID.Zero;
+        partner = UUID.Zero;
+
+        remoteClient.SendAvatarProperties(avatarID, aboutText,
+                    Util.ToDateTime(created).ToString(
+                            "M/d/yyyy", CultureInfo.InvariantCulture),
+                    membershipType, firstLifeAboutText,
+                    (uint)(0 & 0xff),
+                    firstLifeImage, image, profileUrl, partner);
+
+        //Viewer expects interest data when it asks for properties.
+        remoteClient.SendAvatarInterestsReply(avatarID, wantMask, wantText,
+                                                skillsMask, skillsText, languages);
     }
+
 }

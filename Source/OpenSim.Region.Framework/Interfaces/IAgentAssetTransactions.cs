@@ -29,20 +29,19 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IAgentAssetTransactions
 {
-    public interface IAgentAssetTransactions
-    {
-        void HandleItemUpdateFromTransaction(IClientAPI remoteClient, UUID transactionID,
-                                             InventoryItemBase item);
+    void HandleItemUpdateFromTransaction(IClientAPI remoteClient, UUID transactionID,
+                                         InventoryItemBase item);
 
-        bool HandleItemCreationFromTransaction(IClientAPI remoteClient, UUID transactionID, UUID folderID,
-                                               uint callbackID, string description, string name, sbyte invType,
-                                               sbyte type, byte wearableType, uint nextOwnerMask);
+    bool HandleItemCreationFromTransaction(IClientAPI remoteClient, UUID transactionID, UUID folderID,
+                                           uint callbackID, string description, string name, sbyte invType,
+                                           sbyte type, byte wearableType, uint nextOwnerMask);
 
-        void HandleTaskItemUpdateFromTransaction(
-            IClientAPI remoteClient, SceneObjectPart part, UUID transactionID, TaskInventoryItem item);
+    void HandleTaskItemUpdateFromTransaction(
+        IClientAPI remoteClient, SceneObjectPart part, UUID transactionID, TaskInventoryItem item);
 
-        void RemoveAgentAssetTransactions(UUID userID);
-    }
+    void RemoveAgentAssetTransactions(UUID userID);
 }

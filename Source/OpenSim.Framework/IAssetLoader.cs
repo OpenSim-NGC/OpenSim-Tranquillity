@@ -25,12 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+public interface IAssetLoader
 {
-    public interface IAssetLoader
-    {
-        void ForEachDefaultXmlAsset(string assetSetFilename, Action<AssetBase> action);
-    }
+    void ForEachDefaultXmlAsset(string assetSetFilename, Action<AssetBase> action);
 }

@@ -35,176 +35,175 @@ using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.OptionalModules.Avatar.Chat
+namespace OpenSim.Region.OptionalModules.Avatar.Chat;
+
+public class IRCBridgeModule : INonSharedRegionModule
 {
-    public class IRCBridgeModule : INonSharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    internal static bool Enabled = false;
+    internal static IConfig m_config = null;
+
+    internal static List<ChannelState> m_channels = new List<ChannelState>();
+    internal static List<RegionState> m_regions = new List<RegionState>();
+
+    internal static string m_password = String.Empty;
+    internal RegionState m_region = null;
+
+    #region INonSharedRegionModule Members
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        internal static bool Enabled = false;
-        internal static IConfig m_config = null;
+    public string Name
+    {
+        get { return "IRCBridgeModule"; }
+    }
 
-        internal static List<ChannelState> m_channels = new List<ChannelState>();
-        internal static List<RegionState> m_regions = new List<RegionState>();
-
-        internal static string m_password = String.Empty;
-        internal RegionState m_region = null;
-
-        #region INonSharedRegionModule Members
-
-        public Type ReplaceableInterface
+    public void Initialise(IConfigSource config)
+    {
+        m_config = config.Configs["IRC"];
+        if (m_config == null)
         {
-            get { return null; }
+            //                m_log.InfoFormat("[IRC-Bridge] module not configured");
+            return;
         }
 
-        public string Name
+        if (!m_config.GetBoolean("enabled", false))
         {
-            get { return "IRCBridgeModule"; }
+            //                m_log.InfoFormat("[IRC-Bridge] module disabled in configuration");
+            m_config = null;
+            return;
         }
 
-        public void Initialise(IConfigSource config)
+        if (config.Configs["RemoteAdmin"] != null)
         {
-            m_config = config.Configs["IRC"];
-            if (m_config == null)
-            {
-                //                m_log.InfoFormat("[IRC-Bridge] module not configured");
-                return;
-            }
-
-            if (!m_config.GetBoolean("enabled", false))
-            {
-                //                m_log.InfoFormat("[IRC-Bridge] module disabled in configuration");
-                m_config = null;
-                return;
-            }
-
-            if (config.Configs["RemoteAdmin"] != null)
-            {
-                m_password = config.Configs["RemoteAdmin"].GetString("access_password", m_password);
-            }
-
-            Enabled = true;
-
-            m_log.InfoFormat("[IRC-Bridge]: Module is enabled");
+            m_password = config.Configs["RemoteAdmin"].GetString("access_password", m_password);
         }
 
-        public void AddRegion(Scene scene)
+        Enabled = true;
+
+        m_log.InfoFormat("[IRC-Bridge]: Module is enabled");
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (Enabled)
         {
-            if (Enabled)
-            {
-                try
-                {
-                    m_log.InfoFormat("[IRC-Bridge] Connecting region {0}", scene.RegionInfo.RegionName);
-
-                    if (!String.IsNullOrEmpty(m_password))
-                        MainServer.Instance.AddXmlRPCHandler("irc_admin", XmlRpcAdminMethod, false);
-
-                    m_region = new RegionState(scene, m_config);
-                    lock (m_regions)
-                        m_regions.Add(m_region);
-                    m_region.Open();
-                }
-                catch (Exception e)
-                {
-                    m_log.WarnFormat("[IRC-Bridge] Region {0} not connected to IRC : {1}", scene.RegionInfo.RegionName, e.Message);
-                    m_log.Debug(e);
-                }
-            }
-            else
-            {
-                //m_log.DebugFormat("[IRC-Bridge] Not enabled. Connect for region {0} ignored", scene.RegionInfo.RegionName);
-            }
-        }
-
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!Enabled)
-                return;
-
-            if (m_region == null)
-                return;
-
-            if (!String.IsNullOrEmpty(m_password))
-                MainServer.Instance.RemoveXmlRPCHandler("irc_admin");
-
-            m_region.Close();
-
-            if (m_regions.Contains(m_region))
-            {
-                lock (m_regions) m_regions.Remove(m_region);
-            }
-        }
-
-        public void Close()
-        {
-        }
-        #endregion
-
-        public static XmlRpcResponse XmlRpcAdminMethod(XmlRpcRequest request, IPEndPoint remoteClient)
-        {
-            m_log.Debug("[IRC-Bridge]: XML RPC Admin Entry");
-
-            XmlRpcResponse response = new XmlRpcResponse();
-            Hashtable responseData = new Hashtable();
-
             try
             {
-                Hashtable requestData = (Hashtable)request.Params[0];
-                bool found = false;
-                string region = String.Empty;
+                m_log.InfoFormat("[IRC-Bridge] Connecting region {0}", scene.RegionInfo.RegionName);
 
-                if (m_password != String.Empty)
-                {
-                    if (!requestData.ContainsKey("password"))
-                        throw new Exception("Invalid request");
-                    if ((string)requestData["password"] != m_password)
-                        throw new Exception("Invalid request");
-                }
+                if (!String.IsNullOrEmpty(m_password))
+                    MainServer.Instance.AddXmlRPCHandler("irc_admin", XmlRpcAdminMethod, false);
 
-                if (!requestData.ContainsKey("region"))
-                    throw new Exception("No region name specified");
-                region = (string)requestData["region"];
-
-                foreach (RegionState rs in m_regions)
-                {
-                    if (rs.Region == region)
-                    {
-                        responseData["server"] = rs.cs.Server;
-                        responseData["port"] = (int)rs.cs.Port;
-                        responseData["user"] = rs.cs.User;
-                        responseData["channel"] = rs.cs.IrcChannel;
-                        responseData["enabled"] = rs.cs.irc.Enabled;
-                        responseData["connected"] = rs.cs.irc.Connected;
-                        responseData["nickname"] = rs.cs.irc.Nick;
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (!found) throw new Exception(String.Format("Region <{0}> not found", region));
-
-                responseData["success"] = true;
+                m_region = new RegionState(scene, m_config);
+                lock (m_regions)
+                    m_regions.Add(m_region);
+                m_region.Open();
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[IRC-Bridge] XML RPC Admin request failed : {0}", e.Message);
-
-                responseData["success"] = "false";
-                responseData["error"] = e.Message;
+                m_log.WarnFormat("[IRC-Bridge] Region {0} not connected to IRC : {1}", scene.RegionInfo.RegionName, e.Message);
+                m_log.Debug(e);
             }
-            finally
-            {
-                response.Value = responseData;
-            }
-
-            m_log.Debug("[IRC-Bridge]: XML RPC Admin Exit");
-
-            return response;
         }
+        else
+        {
+            //m_log.DebugFormat("[IRC-Bridge] Not enabled. Connect for region {0} ignored", scene.RegionInfo.RegionName);
+        }
+    }
+
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!Enabled)
+            return;
+
+        if (m_region == null)
+            return;
+
+        if (!String.IsNullOrEmpty(m_password))
+            MainServer.Instance.RemoveXmlRPCHandler("irc_admin");
+
+        m_region.Close();
+
+        if (m_regions.Contains(m_region))
+        {
+            lock (m_regions) m_regions.Remove(m_region);
+        }
+    }
+
+    public void Close()
+    {
+    }
+    #endregion
+
+    public static XmlRpcResponse XmlRpcAdminMethod(XmlRpcRequest request, IPEndPoint remoteClient)
+    {
+        m_log.Debug("[IRC-Bridge]: XML RPC Admin Entry");
+
+        XmlRpcResponse response = new XmlRpcResponse();
+        Hashtable responseData = new Hashtable();
+
+        try
+        {
+            Hashtable requestData = (Hashtable)request.Params[0];
+            bool found = false;
+            string region = String.Empty;
+
+            if (m_password != String.Empty)
+            {
+                if (!requestData.ContainsKey("password"))
+                    throw new Exception("Invalid request");
+                if ((string)requestData["password"] != m_password)
+                    throw new Exception("Invalid request");
+            }
+
+            if (!requestData.ContainsKey("region"))
+                throw new Exception("No region name specified");
+            region = (string)requestData["region"];
+
+            foreach (RegionState rs in m_regions)
+            {
+                if (rs.Region == region)
+                {
+                    responseData["server"] = rs.cs.Server;
+                    responseData["port"] = (int)rs.cs.Port;
+                    responseData["user"] = rs.cs.User;
+                    responseData["channel"] = rs.cs.IrcChannel;
+                    responseData["enabled"] = rs.cs.irc.Enabled;
+                    responseData["connected"] = rs.cs.irc.Connected;
+                    responseData["nickname"] = rs.cs.irc.Nick;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) throw new Exception(String.Format("Region <{0}> not found", region));
+
+            responseData["success"] = true;
+        }
+        catch (Exception e)
+        {
+            m_log.ErrorFormat("[IRC-Bridge] XML RPC Admin request failed : {0}", e.Message);
+
+            responseData["success"] = "false";
+            responseData["error"] = e.Message;
+        }
+        finally
+        {
+            response.Value = responseData;
+        }
+
+        m_log.Debug("[IRC-Bridge]: XML RPC Admin Exit");
+
+        return response;
     }
 }

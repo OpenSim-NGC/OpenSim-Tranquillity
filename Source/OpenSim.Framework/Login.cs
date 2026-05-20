@@ -25,30 +25,28 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
-{
-    public class Login
-    {
-        public UUID Agent;
-        public UUID BaseFolder;
-        public string CapsPath = String.Empty;
-        public uint CircuitCode;
-        public string First = "Test";
-        public UUID InventoryFolder;
-        public string Last = "User";
-        public UUID SecureSession = UUID.Zero;
-        public UUID Session;
-        public Vector3 StartPos;
-        public float StartFar;
-        public AvatarAppearance Appearance;
+namespace OpenSim.Framework;
 
-        public Login()
-        {
-            StartPos = new Vector3(128, 128, 70);
-            StartFar = -1;
-        }
+public class Login
+{
+    public UUID Agent;
+    public UUID BaseFolder;
+    public string CapsPath = String.Empty;
+    public uint CircuitCode;
+    public string First = "Test";
+    public UUID InventoryFolder;
+    public string Last = "User";
+    public UUID SecureSession = UUID.Zero;
+    public UUID Session;
+    public Vector3 StartPos;
+    public float StartFar;
+    public AvatarAppearance Appearance;
+
+    public Login()
+    {
+        StartPos = new Vector3(128, 128, 70);
+        StartFar = -1;
     }
 }

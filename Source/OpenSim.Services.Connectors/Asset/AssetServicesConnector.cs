@@ -26,408 +26,399 @@
  */
 
 using log4net;
-using System;
-using System.Threading;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
-using System.IO;
 using System.Reflection;
-using System.Timers;
 using Nini.Config;
 using OpenSim.Framework;
-using OpenSim.Framework.Monitoring;
-using OpenSim.Framework.ServiceAuth;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
-namespace OpenSim.Services.Connectors
+namespace OpenSim.Services.Connectors;
+
+public class AssetServicesConnector : BaseServiceConnector, IAssetService
 {
-    public class AssetServicesConnector : BaseServiceConnector, IAssetService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    public readonly object ConnectorLock = new object();
+
+    protected IAssetCache m_Cache = null;
+
+    private string m_ServerURI = string.Empty;
+
+    private delegate void AssetRetrievedEx(AssetBase asset);
+
+    // Keeps track of concurrent requests for the same asset, so that it's only loaded once.
+    // Maps: Asset ID -> Handlers which will be called when the asset has been loaded
+
+    private Dictionary<string, List<AssetRetrievedEx>> m_AssetHandlers = new Dictionary<string, List<AssetRetrievedEx>>();
+
+    public AssetServicesConnector()
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        public readonly object ConnectorLock = new object();
+    public AssetServicesConnector(string serverURI)
+    {
+        OSHHTPHost tmp = new OSHHTPHost(serverURI, true);
+        m_ServerURI = tmp.IsResolvedHost ? tmp.URI : null;
+    }
 
-        protected IAssetCache m_Cache = null;
+    public AssetServicesConnector(IConfigSource source) 
+    {
+        Initialise(source);
+    }
 
-        private string m_ServerURI = string.Empty;
+    public virtual void Initialise(IConfigSource source)
+    {
+        IConfig netconfig = source.Configs["Network"];
 
-        private delegate void AssetRetrievedEx(AssetBase asset);
-
-        // Keeps track of concurrent requests for the same asset, so that it's only loaded once.
-        // Maps: Asset ID -> Handlers which will be called when the asset has been loaded
-
-        private Dictionary<string, List<AssetRetrievedEx>> m_AssetHandlers = new Dictionary<string, List<AssetRetrievedEx>>();
-
-        public AssetServicesConnector()
+        IConfig assetConfig = source.Configs["AssetService"];
+        if (assetConfig == null)
         {
+            m_log.Error("[ASSET CONNECTOR]: AssetService missing from OpenSim.ini");
+            throw new Exception("Asset connector init error");
         }
 
-        public AssetServicesConnector(string serverURI)
+        m_ServerURI = assetConfig.GetString("AssetServerURI", string.Empty);
+        if (string.IsNullOrEmpty(m_ServerURI))
         {
-            OSHHTPHost tmp = new OSHHTPHost(serverURI, true);
-            m_ServerURI = tmp.IsResolvedHost ? tmp.URI : null;
+            if(netconfig != null)
+                m_ServerURI = netconfig.GetString("asset_server_url", string.Empty);
+        }
+        if (string.IsNullOrEmpty(m_ServerURI))
+        {
+            m_log.Error("[ASSET CONNECTOR]: AssetServerURI not defined in section AssetService");
+            throw new Exception("Asset connector init error");
         }
 
-        public AssetServicesConnector(IConfigSource source) 
+        OSHHTPHost m_GridAssetsURL = new OSHHTPHost(m_ServerURI, true);
+        if(!m_GridAssetsURL.IsResolvedHost)
         {
-            Initialise(source);
+            m_log.Error("[ASSET CONNECTOR]: Could not parse or resolve AssetServerURI");
+            throw new Exception("Asset connector init error");
         }
 
-        public virtual void Initialise(IConfigSource source)
+        m_ServerURI = m_GridAssetsURL.URI;
+        Initialise(source, "AssetService");
+    }
+
+    private int m_maxAssetRequestConcurrency = 8;
+    public int MaxAssetRequestConcurrency
+    {
+        get { return m_maxAssetRequestConcurrency; }
+        set { m_maxAssetRequestConcurrency = value; }
+    }
+
+    protected void SetCache(IAssetCache cache)
+    {
+        m_Cache = cache;
+    }
+
+    public AssetBase GetCached(string id)
+    {
+        AssetBase asset = null;
+        if (m_Cache != null)
         {
-            IConfig netconfig = source.Configs["Network"];
-
-            IConfig assetConfig = source.Configs["AssetService"];
-            if (assetConfig == null)
-            {
-                m_log.Error("[ASSET CONNECTOR]: AssetService missing from OpenSim.ini");
-                throw new Exception("Asset connector init error");
-            }
-
-            m_ServerURI = assetConfig.GetString("AssetServerURI", string.Empty);
-            if (string.IsNullOrEmpty(m_ServerURI))
-            {
-                if(netconfig != null)
-                    m_ServerURI = netconfig.GetString("asset_server_url", string.Empty);
-            }
-            if (string.IsNullOrEmpty(m_ServerURI))
-            {
-                m_log.Error("[ASSET CONNECTOR]: AssetServerURI not defined in section AssetService");
-                throw new Exception("Asset connector init error");
-            }
-
-            OSHHTPHost m_GridAssetsURL = new OSHHTPHost(m_ServerURI, true);
-            if(!m_GridAssetsURL.IsResolvedHost)
-            {
-                m_log.Error("[ASSET CONNECTOR]: Could not parse or resolve AssetServerURI");
-                throw new Exception("Asset connector init error");
-            }
-
-            m_ServerURI = m_GridAssetsURL.URI;
-            Initialise(source, "AssetService");
+            m_Cache.Get(id, out asset);
         }
 
-        private int m_maxAssetRequestConcurrency = 8;
-        public int MaxAssetRequestConcurrency
+        return asset;
+    }
+
+    public virtual AssetBase Get(string id)
+    {
+        AssetBase asset = null;
+        if (m_Cache != null)
         {
-            get { return m_maxAssetRequestConcurrency; }
-            set { m_maxAssetRequestConcurrency = value; }
+            if (!m_Cache.Get(id, out asset))
+                return null;
         }
 
-        protected void SetCache(IAssetCache cache)
+        if (asset == null && m_ServerURI != null)
         {
-            m_Cache = cache;
-        }
+            string uri = m_ServerURI + "/assets/" + id;
 
-        public AssetBase GetCached(string id)
-        {
-            AssetBase asset = null;
+            asset = SynchronousRestObjectRequester.MakeGetRequest<AssetBase>(uri, 0, m_Auth);
             if (m_Cache != null)
             {
-                m_Cache.Get(id, out asset);
+                if (asset != null)
+                    m_Cache.Cache(asset);
+                else
+                    m_Cache.CacheNegative(id);
             }
+        }
+        return asset;
+    }
 
-            return asset;
+    public AssetBase Get(string id, string ForeignAssetService, bool dummy)
+    {
+        return null;
+    }
+
+    public virtual AssetMetadata GetMetadata(string id)
+    {
+        if (m_Cache != null)
+        {
+            AssetBase fullAsset;
+            if (!m_Cache.Get(id, out fullAsset))
+                return null;
+
+            if (fullAsset != null)
+                return fullAsset.Metadata;
         }
 
-        public virtual AssetBase Get(string id)
-        {
-            AssetBase asset = null;
-            if (m_Cache != null)
-            {
-                if (!m_Cache.Get(id, out asset))
-                    return null;
-            }
-
-            if (asset == null && m_ServerURI != null)
-            {
-                string uri = m_ServerURI + "/assets/" + id;
-
-                asset = SynchronousRestObjectRequester.MakeGetRequest<AssetBase>(uri, 0, m_Auth);
-                if (m_Cache != null)
-                {
-                    if (asset != null)
-                        m_Cache.Cache(asset);
-                    else
-                        m_Cache.CacheNegative(id);
-                }
-            }
-            return asset;
-        }
-
-        public AssetBase Get(string id, string ForeignAssetService, bool dummy)
-        {
+        if (m_ServerURI == null)
             return null;
-        }
 
-        public virtual AssetMetadata GetMetadata(string id)
+        string uri = m_ServerURI + "/assets/" + id + "/metadata";
+        return SynchronousRestObjectRequester.MakeGetRequest<AssetMetadata>(uri, 0, m_Auth);
+    }
+
+
+    public virtual byte[] GetData(string id)
+    {
+        if (m_Cache != null)
         {
-            if (m_Cache != null)
-            {
-                AssetBase fullAsset;
-                if (!m_Cache.Get(id, out fullAsset))
-                    return null;
-
-                if (fullAsset != null)
-                    return fullAsset.Metadata;
-            }
-
-            if (m_ServerURI == null)
+            if (!m_Cache.Get(id, out AssetBase fullAsset))
                 return null;
 
-            string uri = m_ServerURI + "/assets/" + id + "/metadata";
-            return SynchronousRestObjectRequester.MakeGetRequest<AssetMetadata>(uri, 0, m_Auth);
+            if (fullAsset != null)
+                return fullAsset.Data;
         }
 
+        if (m_ServerURI == null)
+            return null;
 
-        public virtual byte[] GetData(string id)
+        using (RestClient rc = new RestClient(m_ServerURI))
         {
-            if (m_Cache != null)
+            rc.AddResourcePath("assets/" + id + "/data");
+            rc.RequestMethod = "GET";
+
+            using (MemoryStream s = rc.Request(m_Auth))
             {
-                if (!m_Cache.Get(id, out AssetBase fullAsset))
+                if (s == null || s.Length == 0)
                     return null;
-
-                if (fullAsset != null)
-                    return fullAsset.Data;
-            }
-
-            if (m_ServerURI == null)
-                return null;
-
-            using (RestClient rc = new RestClient(m_ServerURI))
-            {
-                rc.AddResourcePath("assets/" + id + "/data");
-                rc.RequestMethod = "GET";
-
-                using (MemoryStream s = rc.Request(m_Auth))
-                {
-                    if (s == null || s.Length == 0)
-                        return null;
-                    return s.ToArray();
-                }
+                return s.ToArray();
             }
         }
+    }
 
-        public virtual bool Get(string id, object sender, AssetRetrieved handler)
+    public virtual bool Get(string id, object sender, AssetRetrieved handler)
+    {
+        AssetBase asset = null;
+        if (m_Cache != null)
         {
-            AssetBase asset = null;
-            if (m_Cache != null)
-            {
-                if (!m_Cache.Get(id, out asset))
-                    return false;
-            }
-
-            if (asset == null && m_ServerURI != null)
-            {
-                string uri = m_ServerURI + "/assets/" + id;
-
-                lock (m_AssetHandlers)
-                {
-                    AssetRetrievedEx handlerEx = new AssetRetrievedEx(delegate (AssetBase _asset) { handler(id, sender, _asset); });
-
-                    List<AssetRetrievedEx> handlers;
-                    if (m_AssetHandlers.TryGetValue(id, out handlers))
-                    {
-                        // Someone else is already loading this asset. It will notify our handler when done.
-                        handlers.Add(handlerEx);
-                        return true;
-                    }
-
-                    handlers = new List<AssetRetrievedEx>();
-                    handlers.Add(handlerEx);
-
-                    m_AssetHandlers.Add(id, handlers);
-
-                    QueuedAssetRequest request = new QueuedAssetRequest();
-                    request.id = id;
-                    request.uri = uri;
-                    Util.FireAndForget(x =>
-                    {
-                        AssetRequestProcessor(request);
-                    });
-                }
-            }
-            else
-            {
-                if (asset != null && (asset.Data == null || asset.Data.Length == 0))
-                    asset = null;
-                handler(id, sender, asset);
-            }
-
-            return true;
+            if (!m_Cache.Get(id, out asset))
+                return false;
         }
 
-        private class QueuedAssetRequest
+        if (asset == null && m_ServerURI != null)
         {
-            public string uri;
-            public string id;
-        }
+            string uri = m_ServerURI + "/assets/" + id;
 
-        private void AssetRequestProcessor(QueuedAssetRequest r)
-        {
-            string id = r.id;
-            try
+            lock (m_AssetHandlers)
             {
-                AssetBase a = SynchronousRestObjectRequester.MakeGetRequest<AssetBase>(r.uri, 30000, m_Auth);
-
-                if (a != null && m_Cache != null)
-                    m_Cache.Cache(a);
+                AssetRetrievedEx handlerEx = new AssetRetrievedEx(delegate (AssetBase _asset) { handler(id, sender, _asset); });
 
                 List<AssetRetrievedEx> handlers;
-                lock (m_AssetHandlers)
+                if (m_AssetHandlers.TryGetValue(id, out handlers))
                 {
-                    handlers = m_AssetHandlers[id];
-                    m_AssetHandlers.Remove(id);
+                    // Someone else is already loading this asset. It will notify our handler when done.
+                    handlers.Add(handlerEx);
+                    return true;
                 }
 
-                if(handlers != null)
+                handlers = new List<AssetRetrievedEx>();
+                handlers.Add(handlerEx);
+
+                m_AssetHandlers.Add(id, handlers);
+
+                QueuedAssetRequest request = new QueuedAssetRequest();
+                request.id = id;
+                request.uri = uri;
+                Util.FireAndForget(x =>
                 {
-                    foreach (AssetRetrievedEx h in handlers)
-                    {
-                        try { h.Invoke(a); }
-                        catch { }
-                    }
-                    handlers.Clear();
-                }
+                    AssetRequestProcessor(request);
+                });
             }
-            catch { }
+        }
+        else
+        {
+            if (asset != null && (asset.Data == null || asset.Data.Length == 0))
+                asset = null;
+            handler(id, sender, asset);
         }
 
-        public virtual bool[] AssetsExist(string[] ids)
+        return true;
+    }
+
+    private class QueuedAssetRequest
+    {
+        public string uri;
+        public string id;
+    }
+
+    private void AssetRequestProcessor(QueuedAssetRequest r)
+    {
+        string id = r.id;
+        try
         {
-            if (m_ServerURI == null)
-                return null;
+            AssetBase a = SynchronousRestObjectRequester.MakeGetRequest<AssetBase>(r.uri, 30000, m_Auth);
 
-            string uri = m_ServerURI + "/get_assets_exist";
+            if (a != null && m_Cache != null)
+                m_Cache.Cache(a);
 
-            bool[] exist = null;
-            try
+            List<AssetRetrievedEx> handlers;
+            lock (m_AssetHandlers)
             {
-                exist = SynchronousRestObjectRequester.MakeRequest<string[], bool[]>("POST", uri, ids, m_Auth);
-            }
-            catch (Exception)
-            {
-                // This is most likely to happen because the server doesn't support this function,
-                // so just silently return "doesn't exist" for all the assets.
+                handlers = m_AssetHandlers[id];
+                m_AssetHandlers.Remove(id);
             }
 
-            if (exist == null)
-                exist = new bool[ids.Length];
+            if(handlers != null)
+            {
+                foreach (AssetRetrievedEx h in handlers)
+                {
+                    try { h.Invoke(a); }
+                    catch { }
+                }
+                handlers.Clear();
+            }
+        }
+        catch { }
+    }
 
-            return exist;
+    public virtual bool[] AssetsExist(string[] ids)
+    {
+        if (m_ServerURI == null)
+            return null;
+
+        string uri = m_ServerURI + "/get_assets_exist";
+
+        bool[] exist = null;
+        try
+        {
+            exist = SynchronousRestObjectRequester.MakeRequest<string[], bool[]>("POST", uri, ids, m_Auth);
+        }
+        catch (Exception)
+        {
+            // This is most likely to happen because the server doesn't support this function,
+            // so just silently return "doesn't exist" for all the assets.
         }
 
-        public virtual string Store(AssetBase asset)
+        if (exist == null)
+            exist = new bool[ids.Length];
+
+        return exist;
+    }
+
+    public virtual string Store(AssetBase asset)
+    {
+        // Have to assign the asset ID here. This isn't likely to
+        // trigger since current callers don't pass emtpy IDs
+        // We need the asset ID to route the request to the proper
+        // cluster member, so we can't have the server assign one.
+        if (asset.ID.Length == 0 || asset.ID == UUID.ZeroString)
         {
-            // Have to assign the asset ID here. This isn't likely to
-            // trigger since current callers don't pass emtpy IDs
-            // We need the asset ID to route the request to the proper
-            // cluster member, so we can't have the server assign one.
-            if (asset.ID.Length == 0 || asset.ID == UUID.ZeroString)
+            if (asset.FullID.IsZero())
             {
-                if (asset.FullID.IsZero())
-                {
-                    asset.FullID = UUID.Random();
-                    m_log.Warn($"[Assets] Zero ID: {asset.Name}");
-                }
-                asset.ID = asset.FullID.ToString();
+                asset.FullID = UUID.Random();
+                m_log.Warn($"[Assets] Zero ID: {asset.Name}");
             }
-            else if (asset.FullID.IsZero())
-            {
-                if (UUID.TryParse(asset.ID, out UUID uuid))
-                    asset.FullID = uuid;
-                else
-                {
-                    m_log.Warn($"[Assets] Invalid UUID on ID: {asset.ID}");
-                    asset.FullID = UUID.Random();
-                    asset.ID = asset.FullID.ToString();
-                }
-            }
-
-            if (asset.Temporary || asset.Local)
-            {
-                m_Cache?.Cache(asset);
-                return asset.ID;
-            }
-
-            if (m_ServerURI == null)
-                return null;
-
-            string uri = m_ServerURI + "/assets/";
-
-            string newID;
-            try
-            {
-                newID = SynchronousRestObjectRequester.MakeRequest<AssetBase, string>("POST", uri, asset, 10000, m_Auth);
-            }
-            catch
-            {
-                newID = null;
-            }
-
-            if (string.IsNullOrEmpty(newID) || newID.Equals(UUID.ZeroString))
-            {
-                return string.Empty;
-            }
+            asset.ID = asset.FullID.ToString();
+        }
+        else if (asset.FullID.IsZero())
+        {
+            if (UUID.TryParse(asset.ID, out UUID uuid))
+                asset.FullID = uuid;
             else
             {
-                if (newID != asset.ID)
-                {
-                    // Placing this here, so that this work with old asset servers that don't send any reply back
-                    // SynchronousRestObjectRequester returns somethins that is not an empty string
-                    asset.ID = newID;
-                    m_Cache?.Cache(asset);
-                }
+                m_log.Warn($"[Assets] Invalid UUID on ID: {asset.ID}");
+                asset.FullID = UUID.Random();
+                asset.ID = asset.FullID.ToString();
             }
+        }
 
+        if (asset.Temporary || asset.Local)
+        {
+            m_Cache?.Cache(asset);
             return asset.ID;
         }
 
-        public virtual bool UpdateContent(string id, byte[] data)
+        if (m_ServerURI == null)
+            return null;
+
+        string uri = m_ServerURI + "/assets/";
+
+        string newID;
+        try
         {
-            if (m_ServerURI == null)
-                return false;
+            newID = SynchronousRestObjectRequester.MakeRequest<AssetBase, string>("POST", uri, asset, 10000, m_Auth);
+        }
+        catch
+        {
+            newID = null;
+        }
 
-            AssetBase asset = null;
-
-            m_Cache?.Get(id, out asset);
-
-            if (asset == null)
+        if (string.IsNullOrEmpty(newID) || newID.Equals(UUID.ZeroString))
+        {
+            return string.Empty;
+        }
+        else
+        {
+            if (newID != asset.ID)
             {
-                AssetMetadata metadata = GetMetadata(id);
-                if (metadata == null)
-                    return false;
-
-                asset = new AssetBase(metadata.FullID, metadata.Name, metadata.Type, UUID.Zero.ToString());
-                asset.Metadata = metadata;
+                // Placing this here, so that this work with old asset servers that don't send any reply back
+                // SynchronousRestObjectRequester returns somethins that is not an empty string
+                asset.ID = newID;
+                m_Cache?.Cache(asset);
             }
-            asset.Data = data;
-
-            string uri = m_ServerURI + "/assets/" + id;
-
-            if (SynchronousRestObjectRequester.MakeRequest<AssetBase, bool>("POST", uri, asset, m_Auth))
-            {
-                m_Cache?.Cache(asset, true);
-                return true;
-            }
-            return false;
         }
 
-        public virtual bool Delete(string id)
-        {
-            m_Cache?.Expire(id);
-
-            if (m_ServerURI == null)
-                return false;
-
-            string uri = m_ServerURI + "/assets/" + id;
-            return SynchronousRestObjectRequester.MakeRequest<int, bool>("DELETE", uri, 0, m_Auth);
-        }
-        public void Get(string id, string ForeignAssetService, bool StoreOnLocalGrid, SimpleAssetRetrieved callBack)
-        {
-            return;
-        }
-
+        return asset.ID;
     }
+
+    public virtual bool UpdateContent(string id, byte[] data)
+    {
+        if (m_ServerURI == null)
+            return false;
+
+        AssetBase asset = null;
+
+        m_Cache?.Get(id, out asset);
+
+        if (asset == null)
+        {
+            AssetMetadata metadata = GetMetadata(id);
+            if (metadata == null)
+                return false;
+
+            asset = new AssetBase(metadata.FullID, metadata.Name, metadata.Type, UUID.Zero.ToString());
+            asset.Metadata = metadata;
+        }
+        asset.Data = data;
+
+        string uri = m_ServerURI + "/assets/" + id;
+
+        if (SynchronousRestObjectRequester.MakeRequest<AssetBase, bool>("POST", uri, asset, m_Auth))
+        {
+            m_Cache?.Cache(asset, true);
+            return true;
+        }
+        return false;
+    }
+
+    public virtual bool Delete(string id)
+    {
+        m_Cache?.Expire(id);
+
+        if (m_ServerURI == null)
+            return false;
+
+        string uri = m_ServerURI + "/assets/" + id;
+        return SynchronousRestObjectRequester.MakeRequest<int, bool>("DELETE", uri, 0, m_Auth);
+    }
+    public void Get(string id, string ForeignAssetService, bool StoreOnLocalGrid, SimpleAssetRetrieved callBack)
+    {
+        return;
+    }
+
 }

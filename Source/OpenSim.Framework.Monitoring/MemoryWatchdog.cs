@@ -25,110 +25,102 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Threading;
-using log4net;
+namespace OpenSim.Framework.Monitoring;
 
-namespace OpenSim.Framework.Monitoring
+/// <summary>
+/// Experimental watchdog for memory usage.
+/// </summary>
+public static class MemoryWatchdog
 {
-    /// <summary>
-    /// Experimental watchdog for memory usage.
-    /// </summary>
-    public static class MemoryWatchdog
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        /// <summary>
-        /// Is this watchdog active?
-        /// </summary>
-        public static bool Enabled
+    /// <summary>
+    /// Is this watchdog active?
+    /// </summary>
+    public static bool Enabled
+    {
+        get { return m_enabled; }
+        set
         {
-            get { return m_enabled; }
-            set
-            {
 //                m_log.DebugFormat("[MEMORY WATCHDOG]: Setting MemoryWatchdog.Enabled to {0}", value);
 
-                if (value && !m_enabled)
-                    UpdateLastRecord(GC.GetTotalMemory(false), Util.EnvironmentTickCount());
+            if (value && !m_enabled)
+                UpdateLastRecord(GC.GetTotalMemory(false), Util.EnvironmentTickCount());
 
-                m_enabled = value;
-            }
+            m_enabled = value;
         }
-        private static bool m_enabled;
+    }
+    private static bool m_enabled;
 
-        /// <summary>
-        /// Average heap allocation rate in bytes per millisecond.
-        /// </summary>
-        public static double AverageHeapAllocationRate
-        {
-            get { if (m_samples.Count > 0) return m_samples.Average(); else return 0; }
-        }
+    /// <summary>
+    /// Average heap allocation rate in bytes per millisecond.
+    /// </summary>
+    public static double AverageHeapAllocationRate
+    {
+        get { if (m_samples.Count > 0) return m_samples.Average(); else return 0; }
+    }
 
-        /// <summary>
-        /// Last heap allocation in bytes
-        /// </summary>
-        public static double LastHeapAllocationRate
-        {
-            get { if (m_samples.Count > 0) return m_samples.Last(); else return 0; }
-        }
+    /// <summary>
+    /// Last heap allocation in bytes
+    /// </summary>
+    public static double LastHeapAllocationRate
+    {
+        get { if (m_samples.Count > 0) return m_samples.Last(); else return 0; }
+    }
 
-        /// <summary>
-        /// Maximum number of statistical samples.
-        /// </summary>
-        /// <remarks>
-        /// At the moment this corresponds to 1 minute since the sampling rate is every 2.5 seconds as triggered from
-        /// the main Watchdog.
-        /// </remarks>
-        private static int m_maxSamples = 24;
+    /// <summary>
+    /// Maximum number of statistical samples.
+    /// </summary>
+    /// <remarks>
+    /// At the moment this corresponds to 1 minute since the sampling rate is every 2.5 seconds as triggered from
+    /// the main Watchdog.
+    /// </remarks>
+    private static int m_maxSamples = 24;
 
-        /// <summary>
-        /// Time when the watchdog was last updated.
-        /// </summary>
-        private static int m_lastUpdateTick;
+    /// <summary>
+    /// Time when the watchdog was last updated.
+    /// </summary>
+    private static int m_lastUpdateTick;
 
-        /// <summary>
-        /// Memory used at time of last watchdog update.
-        /// </summary>
-        private static long m_lastUpdateMemory;
+    /// <summary>
+    /// Memory used at time of last watchdog update.
+    /// </summary>
+    private static long m_lastUpdateMemory;
 
-        /// <summary>
-        /// Memory churn rate per millisecond.
-        /// </summary>
+    /// <summary>
+    /// Memory churn rate per millisecond.
+    /// </summary>
 //        private static double m_churnRatePerMillisecond;
 
-        /// <summary>
-        /// Historical samples for calculating moving average.
-        /// </summary>
-        private static Queue<double> m_samples = new Queue<double>(m_maxSamples);
+    /// <summary>
+    /// Historical samples for calculating moving average.
+    /// </summary>
+    private static Queue<double> m_samples = new Queue<double>(m_maxSamples);
 
-        public static void Update()
-        {
-            int now = Util.EnvironmentTickCount();
-            long memoryNow = GC.GetTotalMemory(false);
-            long memoryDiff = memoryNow - m_lastUpdateMemory;
+    public static void Update()
+    {
+        int now = Util.EnvironmentTickCount();
+        long memoryNow = GC.GetTotalMemory(false);
+        long memoryDiff = memoryNow - m_lastUpdateMemory;
 
-            if (m_samples.Count >= m_maxSamples)
-                    m_samples.Dequeue();
+        if (m_samples.Count >= m_maxSamples)
+                m_samples.Dequeue();
 
-            double elapsed = Util.EnvironmentTickCountSubtract(now, m_lastUpdateTick);
+        double elapsed = Util.EnvironmentTickCountSubtract(now, m_lastUpdateTick);
 
-            // This should never happen since it's not useful for updates to occur with no time elapsed, but
-            // protect ourselves from a divide-by-zero just in case.
-            if (elapsed == 0)
-                return;
+        // This should never happen since it's not useful for updates to occur with no time elapsed, but
+        // protect ourselves from a divide-by-zero just in case.
+        if (elapsed == 0)
+            return;
 
-            m_samples.Enqueue(memoryDiff / (double)elapsed);
+        m_samples.Enqueue(memoryDiff / (double)elapsed);
 
-            UpdateLastRecord(memoryNow, now);
-        }
+        UpdateLastRecord(memoryNow, now);
+    }
 
-        private static void UpdateLastRecord(long memoryNow, int timeNow)
-        {
-            m_lastUpdateMemory = memoryNow;
-            m_lastUpdateTick = timeNow;
-        }
+    private static void UpdateLastRecord(long memoryNow, int timeNow)
+    {
+        m_lastUpdateMemory = memoryNow;
+        m_lastUpdateTick = timeNow;
     }
 }

@@ -29,11 +29,10 @@ using SkiaSharp;
 using Nini.Config;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.World.LegacyMap
+namespace OpenSim.Region.CoreModules.World.LegacyMap;
+
+public interface IMapTileTerrainRenderer
 {
-    public interface IMapTileTerrainRenderer
-    {
-        void Initialise(Scene scene, IConfigSource config);
-        void TerrainToBitmap(SKBitmap mapbmp);
-    }
+    void Initialise(Scene scene, IConfigSource config);
+    void TerrainToBitmap(SKBitmap mapbmp);
 }

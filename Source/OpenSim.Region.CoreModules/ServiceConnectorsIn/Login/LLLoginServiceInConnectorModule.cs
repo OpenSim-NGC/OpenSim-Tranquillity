@@ -34,89 +34,88 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Handlers.Login;
 
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Login
+namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Login;
+
+public class LLLoginServiceInConnectorModule : ISharedRegionModule
 {
-    public class LLLoginServiceInConnectorModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static bool m_Enabled = false;
+    private static bool m_Registered = false;
+
+    private IConfigSource m_Config;
+    private List<Scene> m_Scenes = new List<Scene>();
+
+    #region Region Module interface
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private static bool m_Enabled = false;
-        private static bool m_Registered = false;
+        m_Config = config;
 
-        private IConfigSource m_Config;
-        private List<Scene> m_Scenes = new List<Scene>();
-
-        #region Region Module interface
-
-        public void Initialise(IConfigSource config)
+        IConfig moduleConfig = config.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            m_Config = config;
-
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+            m_Enabled = moduleConfig.GetBoolean("LLLoginServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("LLLoginServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_log.Info("[LLLOGIN IN CONNECTOR]: LLLoginerviceInConnector enabled");
-                }
-
+                m_log.Info("[LLLOGIN IN CONNECTOR]: LLLoginerviceInConnector enabled");
             }
 
         }
-
-        public void PostInitialise()
-        {
-            if (!m_Enabled)
-                return;
-
-            m_log.Info("[LLLOGIN IN CONNECTOR]: Starting...");
-        }
-
-        public void Close()
-        {
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "LLLoginServiceInConnectorModule"; }
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_Scenes.Add(scene);
-
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (m_Enabled && m_Scenes.Contains(scene))
-                m_Scenes.Remove(scene);
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            if (!m_Registered)
-            {
-                m_Registered = true;
-                new LLLoginServiceInConnector(m_Config, MainServer.Instance, scene);
-                //Object[] args = new Object[] { m_Config, MainServer.Instance, this, scene };
-                //ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:LLLoginServiceInConnector", args);
-            }
-
-        }
-
-        #endregion
 
     }
+
+    public void PostInitialise()
+    {
+        if (!m_Enabled)
+            return;
+
+        m_log.Info("[LLLOGIN IN CONNECTOR]: Starting...");
+    }
+
+    public void Close()
+    {
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public string Name
+    {
+        get { return "LLLoginServiceInConnectorModule"; }
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_Scenes.Add(scene);
+
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (m_Enabled && m_Scenes.Contains(scene))
+            m_Scenes.Remove(scene);
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        if (!m_Registered)
+        {
+            m_Registered = true;
+            new LLLoginServiceInConnector(m_Config, MainServer.Instance, scene);
+            //Object[] args = new Object[] { m_Config, MainServer.Instance, this, scene };
+            //ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:LLLoginServiceInConnector", args);
+        }
+
+    }
+
+    #endregion
+
 }

@@ -25,63 +25,61 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 
-namespace OpenSim.Framework.Capabilities
+namespace OpenSim.Framework.Capabilities;
+
+[OSDMap]
+public class LLSDAssetUploadError
 {
-    [OSDMap]
-    public class LLSDAssetUploadError
+    public string message = String.Empty;
+    public UUID identifier = UUID.Zero;
+}
+
+[OSDMap]
+public class LLSDAssetUploadResponsePricebrkDown
+{
+    public int mesh_streaming;
+    public int mesh_physics;
+    public int mesh_instance;
+    public int texture;
+    public int model;
+}
+
+[OSDMap]
+public class LLSDAssetUploadResponseData
+{
+    public double resource_cost;
+    public double model_streaming_cost;
+    public double simulation_cost;
+    public double physics_cost;
+    public LLSDAssetUploadResponsePricebrkDown upload_price_breakdown = new LLSDAssetUploadResponsePricebrkDown();
+}
+
+[OSDMap]
+public class LLSDAssetUploadResponse
+{
+    public string uploader = String.Empty;
+    public string state = String.Empty;
+    public int upload_price = 0;
+    public LLSDAssetUploadResponseData data = null;
+    public LLSDAssetUploadError error = null;
+    public LLSDAssetUploadResponse()
     {
-        public string message = String.Empty;
-        public UUID identifier = UUID.Zero;
     }
+}
 
-    [OSDMap]
-    public class LLSDAssetUploadResponsePricebrkDown
+
+[OSDMap]
+public class LLSDNewFileAngentInventoryVariablePriceReplyResponse
+{
+    public int resource_cost;
+    public string state;
+    public int upload_price;
+    public string rsvp;
+
+    public LLSDNewFileAngentInventoryVariablePriceReplyResponse()
     {
-        public int mesh_streaming;
-        public int mesh_physics;
-        public int mesh_instance;
-        public int texture;
-        public int model;
-    }
-
-    [OSDMap]
-    public class LLSDAssetUploadResponseData
-    {
-        public double resource_cost;
-        public double model_streaming_cost;
-        public double simulation_cost;
-        public double physics_cost;
-        public LLSDAssetUploadResponsePricebrkDown upload_price_breakdown = new LLSDAssetUploadResponsePricebrkDown();
-    }
-
-    [OSDMap]
-    public class LLSDAssetUploadResponse
-    {
-        public string uploader = String.Empty;
-        public string state = String.Empty;
-        public int upload_price = 0;
-        public LLSDAssetUploadResponseData data = null;
-        public LLSDAssetUploadError error = null;
-        public LLSDAssetUploadResponse()
-        {
-        }
-    }
-
-
-    [OSDMap]
-    public class LLSDNewFileAngentInventoryVariablePriceReplyResponse
-    {
-        public int resource_cost;
-        public string state;
-        public int upload_price;
-        public string rsvp;
-
-        public LLSDNewFileAngentInventoryVariablePriceReplyResponse()
-        {
-            state = "confirm_upload";
-        }
+        state = "confirm_upload";
     }
 }

@@ -26,84 +26,82 @@
  */
 
 using System.Reflection;
-using System.Threading.Tasks;
 
 using OMV = OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
 using log4net;
 
-namespace osWebRtcVoice
+namespace osWebRtcVoice;
+
+public class JanusViewerSession : IVoiceViewerSession
 {
-    public class JanusViewerSession : IVoiceViewerSession
+    protected static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    protected static readonly string LogHeader = "[JANUS VIEWER SESSION]";
+
+    // 'viewer_session' that is passed to and from the viewer
+    // IVoiceViewerSession.ViewerSessionID
+    public string ViewerSessionID { get; set; }
+    // IVoiceViewerSession.VoiceService
+    public IWebRtcVoiceService VoiceService { get; set; }
+    // The Janus server keeps track of the user by this ID
+    // IVoiceViewerSession.VoiceServiceSessionId
+    public string VoiceServiceSessionId { get; set; }
+    // IVoiceViewerSession.RegionId
+    public OMV.UUID RegionId { get; set; }
+    // IVoiceViewerSession.AgentId
+    public OMV.UUID AgentId { get; set; }
+
+    // Janus keeps track of the user by this ID
+    public int ParticipantId { get; set; }
+
+    // Connections to the Janus server
+    public JanusSession Session { get; set; }
+    public JanusAudioBridge AudioBridge { get; set; }
+    public JanusRoom Room { get; set; }
+
+    // This keeps copies of the offer/answer incase we need to resend
+    public string OfferOrig { get; set; }
+    public string Offer { get; set; }
+    // Contains "type" and "sdp" fields
+    public OSDMap Answer { get; set; }
+
+    public JanusViewerSession(IWebRtcVoiceService pVoiceService)
     {
-        protected static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        protected static readonly string LogHeader = "[JANUS VIEWER SESSION]";
+        ViewerSessionID = OMV.UUID.Random().ToString();
+        VoiceService = pVoiceService;
+        m_log.Debug($"{LogHeader} JanusViewerSession created {ViewerSessionID}");
+    }
+    public JanusViewerSession(string pViewerSessionID, IWebRtcVoiceService pVoiceService)
+    {
+        ViewerSessionID = pViewerSessionID;
+        VoiceService = pVoiceService;
+        m_log.Debug($"{LogHeader} JanusViewerSession created {ViewerSessionID}");
+    }
 
-        // 'viewer_session' that is passed to and from the viewer
-        // IVoiceViewerSession.ViewerSessionID
-        public string ViewerSessionID { get; set; }
-        // IVoiceViewerSession.VoiceService
-        public IWebRtcVoiceService VoiceService { get; set; }
-        // The Janus server keeps track of the user by this ID
-        // IVoiceViewerSession.VoiceServiceSessionId
-        public string VoiceServiceSessionId { get; set; }
-        // IVoiceViewerSession.RegionId
-        public OMV.UUID RegionId { get; set; }
-        // IVoiceViewerSession.AgentId
-        public OMV.UUID AgentId { get; set; }
-
-        // Janus keeps track of the user by this ID
-        public int ParticipantId { get; set; }
-
-        // Connections to the Janus server
-        public JanusSession Session { get; set; }
-        public JanusAudioBridge AudioBridge { get; set; }
-        public JanusRoom Room { get; set; }
-
-        // This keeps copies of the offer/answer incase we need to resend
-        public string OfferOrig { get; set; }
-        public string Offer { get; set; }
-        // Contains "type" and "sdp" fields
-        public OSDMap Answer { get; set; }
-
-        public JanusViewerSession(IWebRtcVoiceService pVoiceService)
+    // Send the messages to the voice service to try and get rid of the session
+    // IVoiceViewerSession.Shutdown
+    public async Task Shutdown()
+    {
+        m_log.DebugFormat($"{LogHeader} JanusViewerSession shutdown {ViewerSessionID}");
+        if (Room is not null)
         {
-            ViewerSessionID = OMV.UUID.Random().ToString();
-            VoiceService = pVoiceService;
-            m_log.Debug($"{LogHeader} JanusViewerSession created {ViewerSessionID}");
+            var rm = Room;
+            Room = null;
+            await rm.LeaveRoom(this);
         }
-        public JanusViewerSession(string pViewerSessionID, IWebRtcVoiceService pVoiceService)
+        if (AudioBridge is not null)
         {
-            ViewerSessionID = pViewerSessionID;
-            VoiceService = pVoiceService;
-            m_log.Debug($"{LogHeader} JanusViewerSession created {ViewerSessionID}");
-        }
-
-        // Send the messages to the voice service to try and get rid of the session
-        // IVoiceViewerSession.Shutdown
-        public async Task Shutdown()
+            var ab = AudioBridge;
+            AudioBridge = null;
+            await ab.Detach();
+        }   
+        if (Session is not null)
         {
-            m_log.DebugFormat($"{LogHeader} JanusViewerSession shutdown {ViewerSessionID}");
-            if (Room is not null)
-            {
-                var rm = Room;
-                Room = null;
-                await rm.LeaveRoom(this);
-            }
-            if (AudioBridge is not null)
-            {
-                var ab = AudioBridge;
-                AudioBridge = null;
-                await ab.Detach();
-            }   
-            if (Session is not null)
-            {
-                var s = Session;
-                Session = null;
-                _ = await s.DestroySession().ConfigureAwait(false);
-                s.Dispose();
-            }
+            var s = Session;
+            Session = null;
+            _ = await s.DestroySession().ConfigureAwait(false);
+            s.Dispose();
         }
     }
 }

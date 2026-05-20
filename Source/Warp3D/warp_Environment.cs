@@ -1,7 +1,5 @@
-using System;
+namespace Warp3D;
 
-namespace Warp3D
-{
 	/// <summary>
 	/// Summary description for warp_Environment.
 	/// </summary>
@@ -19,4 +17,3 @@ namespace Warp3D
 			background=t;
 		}
 	}
-}

@@ -27,7 +27,6 @@
 
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Framework.Servers.HttpServer
-{
-    public delegate OSD LLSDMethodString(OSD request, string thePath);
-}
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public delegate OSD LLSDMethodString(OSD request, string thePath);

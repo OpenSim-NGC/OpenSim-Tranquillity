@@ -25,87 +25,84 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Text;
 
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Framework.Monitoring
+namespace OpenSim.Framework.Monitoring;
+
+public class PercentageStat : Stat
 {
-    public class PercentageStat : Stat
+    public long Antecedent { get; set; }
+    public long Consequent { get; set; }
+
+    public override double Value
     {
-        public long Antecedent { get; set; }
-        public long Consequent { get; set; }
-
-        public override double Value
+        get
         {
-            get
+            // Asking for an update here means that the updater cannot access this value without infinite recursion.
+            // XXX: A slightly messy but simple solution may be to flick a flag so we can tell if this is being
+            // called by the pull action and just return the value.
+            try
             {
-                // Asking for an update here means that the updater cannot access this value without infinite recursion.
-                // XXX: A slightly messy but simple solution may be to flick a flag so we can tell if this is being
-                // called by the pull action and just return the value.
-                try
-                {
-                    if (StatType == StatType.Pull)
-                        PullAction(this);
+                if (StatType == StatType.Pull)
+                    PullAction(this);
 
-                    long c = Consequent;
+                long c = Consequent;
 
-                    // Avoid any chance of a multi-threaded divide-by-zero
-                    if (c == 0)
-                        return 0;
-
-                    return (double)Antecedent / c * 100;
-                }
-                catch
-                {
+                // Avoid any chance of a multi-threaded divide-by-zero
+                if (c == 0)
                     return 0;
-                }
-            }
 
-            set
+                return (double)Antecedent / c * 100;
+            }
+            catch
             {
-                throw new InvalidOperationException("Cannot set value on a PercentageStat");
+                return 0;
             }
         }
 
-        public PercentageStat(
-            string shortName,
-            string name,
-            string description,
-            string category,
-            string container,
-            StatType type,
-            Action<Stat> pullAction,
-            StatVerbosity verbosity)
-            : base(shortName, name, description, "%", category, container, type, pullAction, verbosity) {}
-
-        public override string ToConsoleString()
+        set
         {
-            StringBuilder sb = new StringBuilder();
-
-            sb.AppendFormat(
-                "{0}.{1}.{2} : {3:0.##}{4} ({5}/{6})",
-                Category, Container, ShortName, Value, UnitName, Antecedent, Consequent);
-
-            AppendMeasuresOfInterest(sb);
-
-            return sb.ToString();
+            throw new InvalidOperationException("Cannot set value on a PercentageStat");
         }
+    }
 
-        // PercentageStat is a basic stat plus percent calc
-        public override OSDMap ToOSDMap()
-        {
-            // Get the foundational instance
-            OSDMap map = base.ToOSDMap();
+    public PercentageStat(
+        string shortName,
+        string name,
+        string description,
+        string category,
+        string container,
+        StatType type,
+        Action<Stat> pullAction,
+        StatVerbosity verbosity)
+        : base(shortName, name, description, "%", category, container, type, pullAction, verbosity) {}
 
-            map["StatType"] = "PercentageStat";
+    public override string ToConsoleString()
+    {
+        StringBuilder sb = new StringBuilder();
 
-            map.Add("Antecedent", OSD.FromLong(Antecedent));
-            map.Add("Consequent", OSD.FromLong(Consequent));
+        sb.AppendFormat(
+            "{0}.{1}.{2} : {3:0.##}{4} ({5}/{6})",
+            Category, Container, ShortName, Value, UnitName, Antecedent, Consequent);
 
-            return map;
-        }
+        AppendMeasuresOfInterest(sb);
+
+        return sb.ToString();
+    }
+
+    // PercentageStat is a basic stat plus percent calc
+    public override OSDMap ToOSDMap()
+    {
+        // Get the foundational instance
+        OSDMap map = base.ToOSDMap();
+
+        map["StatType"] = "PercentageStat";
+
+        map.Add("Antecedent", OSD.FromLong(Antecedent));
+        map.Add("Consequent", OSD.FromLong(Consequent));
+
+        return map;
     }
 }

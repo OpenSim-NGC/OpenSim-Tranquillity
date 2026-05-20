@@ -28,39 +28,38 @@
 using System.Collections;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.UserStatistics
+namespace OpenSim.Region.UserStatistics;
+
+public class Updater_distributor : IStatsController
 {
-    public class Updater_distributor : IStatsController
+    private string updaterjs = string.Empty;
+
+    public string ReportName
     {
-        private string updaterjs = string.Empty;
-
-        public string ReportName
-        {
-            get { return ""; }
-        }
-
-        public Hashtable ProcessModel(Hashtable pParams)
-        {
-            Hashtable pResult = new Hashtable();
-            if (updaterjs.Length == 0)
-            {
-                StreamReader fs = new StreamReader(new FileStream(Util.dataDir() + "/data/updater.js", FileMode.Open));
-                updaterjs = fs.ReadToEnd();
-                fs.Close();
-                fs.Dispose();
-            }
-            pResult["js"] = updaterjs;
-            return pResult;
-        }
-
-        public string RenderView(Hashtable pModelResult)
-        {
-            return pModelResult["js"].ToString();
-        }
-
-        public string RenderJson(Hashtable pModelResult) {
-            return "{}";
-        }
-
+        get { return ""; }
     }
+
+    public Hashtable ProcessModel(Hashtable pParams)
+    {
+        Hashtable pResult = new Hashtable();
+        if (updaterjs.Length == 0)
+        {
+            StreamReader fs = new StreamReader(new FileStream(Util.dataDir() + "/data/updater.js", FileMode.Open));
+            updaterjs = fs.ReadToEnd();
+            fs.Close();
+            fs.Dispose();
+        }
+        pResult["js"] = updaterjs;
+        return pResult;
+    }
+
+    public string RenderView(Hashtable pModelResult)
+    {
+        return pModelResult["js"].ToString();
+    }
+
+    public string RenderJson(Hashtable pModelResult) {
+        return "{}";
+    }
+
 }

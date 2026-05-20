@@ -39,337 +39,336 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Capabilities.Handlers
+namespace OpenSim.Capabilities.Handlers;
+
+public class GetTextureRobustHandler : BaseStreamHandler
 {
-    public class GetTextureRobustHandler : BaseStreamHandler
+    private static readonly ILog m_log =
+        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private IAssetService m_assetService;
+
+    public const string DefaultFormat = "x-j2c";
+
+    // TODO: Change this to a config option
+    private string m_RedirectURL = null;
+
+    public GetTextureRobustHandler(string path, IAssetService assService, string name, string description, string redirectURL)
+        : base("GET", path, name, description)
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private IAssetService m_assetService;
+        m_assetService = assService;
+        m_RedirectURL = redirectURL;
+        if (m_RedirectURL != null && !m_RedirectURL.EndsWith("/"))
+            m_RedirectURL += "/";
+    }
 
-        public const string DefaultFormat = "x-j2c";
+    protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        // Try to parse the texture ID from the request URL
+        NameValueCollection query = HttpUtility.ParseQueryString(httpRequest.Url.Query);
+        string textureStr = query.GetOne("texture_id");
+        string format = query.GetOne("format");
 
-        // TODO: Change this to a config option
-        private string m_RedirectURL = null;
+        //m_log.DebugFormat("[GETTEXTURE]: called {0}", textureStr);
 
-        public GetTextureRobustHandler(string path, IAssetService assService, string name, string description, string redirectURL)
-            : base("GET", path, name, description)
+        if (m_assetService == null)
         {
-            m_assetService = assService;
-            m_RedirectURL = redirectURL;
-            if (m_RedirectURL != null && !m_RedirectURL.EndsWith("/"))
-                m_RedirectURL += "/";
+            m_log.Error("[GETTEXTURE]: Cannot fetch texture " + textureStr + " without an asset service");
+            httpResponse.StatusCode = (int)System.Net.HttpStatusCode.NotFound;
+            return null;
         }
 
-        protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        UUID textureID;
+        if (!String.IsNullOrEmpty(textureStr) && UUID.TryParse(textureStr, out textureID))
         {
-            // Try to parse the texture ID from the request URL
-            NameValueCollection query = HttpUtility.ParseQueryString(httpRequest.Url.Query);
-            string textureStr = query.GetOne("texture_id");
-            string format = query.GetOne("format");
-
-            //m_log.DebugFormat("[GETTEXTURE]: called {0}", textureStr);
-
-            if (m_assetService == null)
-            {
-                m_log.Error("[GETTEXTURE]: Cannot fetch texture " + textureStr + " without an asset service");
-                httpResponse.StatusCode = (int)System.Net.HttpStatusCode.NotFound;
-                return null;
-            }
-
-            UUID textureID;
-            if (!String.IsNullOrEmpty(textureStr) && UUID.TryParse(textureStr, out textureID))
-            {
 //                m_log.DebugFormat("[GETTEXTURE]: Received request for texture id {0}", textureID);
 
-                string[] formats;
-                if (!string.IsNullOrEmpty(format))
-                {
-                    formats = new string[1] { format.ToLower() };
-                }
-                else
-                {
-                    formats = WebUtil.GetPreferredImageTypes(httpRequest.Headers.Get("Accept"));
-                    if (formats.Length == 0)
-                        formats = new string[1] { DefaultFormat }; // default
-
-                }
-                // OK, we have an array with preferred formats, possibly with only one entry
-
-                httpResponse.StatusCode = (int)System.Net.HttpStatusCode.NotFound;
-                foreach (string f in formats)
-                {
-                    if (FetchTexture(httpRequest, httpResponse, textureID, f))
-                        break;
-                }
+            string[] formats;
+            if (!string.IsNullOrEmpty(format))
+            {
+                formats = new string[1] { format.ToLower() };
             }
             else
             {
-                m_log.Warn("[GETTEXTURE]: Failed to parse a texture_id from GetTexture request: " + httpRequest.Url);
+                formats = WebUtil.GetPreferredImageTypes(httpRequest.Headers.Get("Accept"));
+                if (formats.Length == 0)
+                    formats = new string[1] { DefaultFormat }; // default
+
             }
+            // OK, we have an array with preferred formats, possibly with only one entry
+
+            httpResponse.StatusCode = (int)System.Net.HttpStatusCode.NotFound;
+            foreach (string f in formats)
+            {
+                if (FetchTexture(httpRequest, httpResponse, textureID, f))
+                    break;
+            }
+        }
+        else
+        {
+            m_log.Warn("[GETTEXTURE]: Failed to parse a texture_id from GetTexture request: " + httpRequest.Url);
+        }
 
 //            m_log.DebugFormat(
 //                "[GETTEXTURE]: For texture {0} sending back response {1}, data length {2}",
 //                textureID, httpResponse.StatusCode, httpResponse.ContentLength);
 
-            return null;
-        }
+        return null;
+    }
 
-        /// <summary>
-        ///
-        /// </summary>
-        /// <param name="httpRequest"></param>
-        /// <param name="httpResponse"></param>
-        /// <param name="textureID"></param>
-        /// <param name="format"></param>
-        /// <returns>False for "caller try another codec"; true otherwise</returns>
-        private bool FetchTexture(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID textureID, string format)
+    /// <summary>
+    ///
+    /// </summary>
+    /// <param name="httpRequest"></param>
+    /// <param name="httpResponse"></param>
+    /// <param name="textureID"></param>
+    /// <param name="format"></param>
+    /// <returns>False for "caller try another codec"; true otherwise</returns>
+    private bool FetchTexture(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID textureID, string format)
+    {
+        // m_log.DebugFormat("[GETTEXTURE]: {0} with requested format {1}", textureID, format);
+        if(!String.IsNullOrEmpty(m_RedirectURL))
         {
-            // m_log.DebugFormat("[GETTEXTURE]: {0} with requested format {1}", textureID, format);
-            if(!String.IsNullOrEmpty(m_RedirectURL))
-            {
-                string textureUrl = m_RedirectURL + "?texture_id=" + textureID.ToString();
-                httpResponse.Redirect(textureUrl, HttpStatusCode.Moved);
-                m_log.Debug("[GETTEXTURE]: Redirecting texture request to " + textureUrl);
-                return true;
-            }
-
-            // Fetch,  Misses or invalid return a 404
-            AssetBase texture = m_assetService.Get(textureID.ToString());
-            if (texture != null)
-            {
-                if (texture.Type != (sbyte)AssetType.Texture)
-                {
-                    httpResponse.StatusCode = (int)System.Net.HttpStatusCode.NotFound;
-                    return true;
-                }
-                if (format == DefaultFormat)
-                {
-                    WriteTextureData(httpRequest, httpResponse, texture, format);
-                    return true;
-                }
-
-                // need to convert format
-                AssetBase newTexture = new AssetBase(texture.ID + "-" + format, texture.Name, (sbyte)AssetType.Texture, texture.Metadata.CreatorID);
-                newTexture.Data = ConvertTextureData(texture, format);
-                if (newTexture.Data.Length == 0)
-                    return false; // !!! Caller try another codec, please!
-
-                newTexture.Flags = AssetFlags.Collectable;
-                newTexture.Temporary = true;
-                newTexture.Local = true;
-                WriteTextureData(httpRequest, httpResponse, newTexture, format);
-                return true;
-            }
-
-            // not found
-            // m_log.Warn("[GETTEXTURE]: Texture " + textureID + " not found");
-            httpResponse.StatusCode = (int)System.Net.HttpStatusCode.NotFound;
+            string textureUrl = m_RedirectURL + "?texture_id=" + textureID.ToString();
+            httpResponse.Redirect(textureUrl, HttpStatusCode.Moved);
+            m_log.Debug("[GETTEXTURE]: Redirecting texture request to " + textureUrl);
             return true;
         }
 
-        private void WriteTextureData(IOSHttpRequest request, IOSHttpResponse response, AssetBase texture, string format)
+        // Fetch,  Misses or invalid return a 404
+        AssetBase texture = m_assetService.Get(textureID.ToString());
+        if (texture != null)
         {
-            string range = request.Headers.GetOne("Range");
-
-            if (!String.IsNullOrEmpty(range)) // JP2's only
+            if (texture.Type != (sbyte)AssetType.Texture)
             {
-                // Range request
-                int start, end;
-                if (TryParseRange(range, out start, out end))
+                httpResponse.StatusCode = (int)System.Net.HttpStatusCode.NotFound;
+                return true;
+            }
+            if (format == DefaultFormat)
+            {
+                WriteTextureData(httpRequest, httpResponse, texture, format);
+                return true;
+            }
+
+            // need to convert format
+            AssetBase newTexture = new AssetBase(texture.ID + "-" + format, texture.Name, (sbyte)AssetType.Texture, texture.Metadata.CreatorID);
+            newTexture.Data = ConvertTextureData(texture, format);
+            if (newTexture.Data.Length == 0)
+                return false; // !!! Caller try another codec, please!
+
+            newTexture.Flags = AssetFlags.Collectable;
+            newTexture.Temporary = true;
+            newTexture.Local = true;
+            WriteTextureData(httpRequest, httpResponse, newTexture, format);
+            return true;
+        }
+
+        // not found
+        // m_log.Warn("[GETTEXTURE]: Texture " + textureID + " not found");
+        httpResponse.StatusCode = (int)System.Net.HttpStatusCode.NotFound;
+        return true;
+    }
+
+    private void WriteTextureData(IOSHttpRequest request, IOSHttpResponse response, AssetBase texture, string format)
+    {
+        string range = request.Headers.GetOne("Range");
+
+        if (!String.IsNullOrEmpty(range)) // JP2's only
+        {
+            // Range request
+            int start, end;
+            if (TryParseRange(range, out start, out end))
+            {
+                // Before clamping start make sure we can satisfy it in order to avoid
+                // sending back the last byte instead of an error status
+                if (start >= texture.Data.Length)
                 {
-                    // Before clamping start make sure we can satisfy it in order to avoid
-                    // sending back the last byte instead of an error status
-                    if (start >= texture.Data.Length)
-                    {
 //                        m_log.DebugFormat(
 //                            "[GETTEXTURE]: Client requested range for texture {0} starting at {1} but texture has end of {2}",
 //                            texture.ID, start, texture.Data.Length);
 
-                        // Stricly speaking, as per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html, we should be sending back
-                        // Requested Range Not Satisfiable (416) here.  However, it appears that at least recent implementations
-                        // of the Linden Lab viewer (3.2.1 and 3.3.4 and probably earlier), a viewer that has previously
-                        // received a very small texture  may attempt to fetch bytes from the server past the
-                        // range of data that it received originally.  Whether this happens appears to depend on whether
-                        // the viewer's estimation of how large a request it needs to make for certain discard levels
-                        // (http://wiki.secondlife.com/wiki/Image_System#Discard_Level_and_Mip_Mapping), chiefly discard
-                        // level 2.  If this estimate is greater than the total texture size, returning a RequestedRangeNotSatisfiable
-                        // here will cause the viewer to treat the texture as bad and never display the full resolution
-                        // However, if we return PartialContent (or OK) instead, the viewer will display that resolution.
+                    // Stricly speaking, as per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html, we should be sending back
+                    // Requested Range Not Satisfiable (416) here.  However, it appears that at least recent implementations
+                    // of the Linden Lab viewer (3.2.1 and 3.3.4 and probably earlier), a viewer that has previously
+                    // received a very small texture  may attempt to fetch bytes from the server past the
+                    // range of data that it received originally.  Whether this happens appears to depend on whether
+                    // the viewer's estimation of how large a request it needs to make for certain discard levels
+                    // (http://wiki.secondlife.com/wiki/Image_System#Discard_Level_and_Mip_Mapping), chiefly discard
+                    // level 2.  If this estimate is greater than the total texture size, returning a RequestedRangeNotSatisfiable
+                    // here will cause the viewer to treat the texture as bad and never display the full resolution
+                    // However, if we return PartialContent (or OK) instead, the viewer will display that resolution.
 
 //                        response.StatusCode = (int)System.Net.HttpStatusCode.RequestedRangeNotSatisfiable;
 //                        response.AddHeader("Content-Range", String.Format("bytes */{0}", texture.Data.Length));
 //                        response.StatusCode = (int)System.Net.HttpStatusCode.OK;
-                        response.StatusCode = (int)System.Net.HttpStatusCode.PartialContent;
-                        response.ContentType = texture.Metadata.ContentType;
-                    }
-                    else
-                    {
-                        // Handle the case where no second range value was given.  This is equivalent to requesting
-                        // the rest of the entity.
-                        if (end == -1)
-                            end = int.MaxValue;
+                    response.StatusCode = (int)System.Net.HttpStatusCode.PartialContent;
+                    response.ContentType = texture.Metadata.ContentType;
+                }
+                else
+                {
+                    // Handle the case where no second range value was given.  This is equivalent to requesting
+                    // the rest of the entity.
+                    if (end == -1)
+                        end = int.MaxValue;
 
-                        end = Utils.Clamp(end, 0, texture.Data.Length - 1);
-                        start = Utils.Clamp(start, 0, end);
-                        int len = end - start + 1;
+                    end = Utils.Clamp(end, 0, texture.Data.Length - 1);
+                    start = Utils.Clamp(start, 0, end);
+                    int len = end - start + 1;
 
 //                        m_log.Debug("Serving " + start + " to " + end + " of " + texture.Data.Length + " bytes for texture " + texture.ID);
 
-                        // Always return PartialContent, even if the range covered the entire data length
-                        // We were accidentally sending back 404 before in this situation
-                        // https://issues.apache.org/bugzilla/show_bug.cgi?id=51878 supports sending 206 even if the
-                        // entire range is requested, and viewer 3.2.2 (and very probably earlier) seems fine with this.
-                        //
-                        // We also do not want to send back OK even if the whole range was satisfiable since this causes
-                        // HTTP textures on at least Imprudence 1.4.0-beta2 to never display the final texture quality.
+                    // Always return PartialContent, even if the range covered the entire data length
+                    // We were accidentally sending back 404 before in this situation
+                    // https://issues.apache.org/bugzilla/show_bug.cgi?id=51878 supports sending 206 even if the
+                    // entire range is requested, and viewer 3.2.2 (and very probably earlier) seems fine with this.
+                    //
+                    // We also do not want to send back OK even if the whole range was satisfiable since this causes
+                    // HTTP textures on at least Imprudence 1.4.0-beta2 to never display the final texture quality.
 //                        if (end > maxEnd)
 //                            response.StatusCode = (int)System.Net.HttpStatusCode.OK;
 //                        else
-                        response.StatusCode = (int)System.Net.HttpStatusCode.PartialContent;
+                    response.StatusCode = (int)System.Net.HttpStatusCode.PartialContent;
 
-                        response.ContentLength = len;
-                        response.ContentType = texture.Metadata.ContentType;
-                        response.AddHeader("Content-Range", String.Format("bytes {0}-{1}/{2}", start, end, texture.Data.Length));
-                        response.RawBuffer = texture.Data;
-                        response.RawBufferStart = start;
-                        response.RawBufferLen = len;
-                    }
-                }
-                else
-                {
-                    m_log.Warn("[GETTEXTURE]: Malformed Range header: " + range);
-                    response.StatusCode = (int)System.Net.HttpStatusCode.BadRequest;
-                }
-            }
-            else // JP2's or other formats
-            {
-                // Full content request
-                response.StatusCode = (int)System.Net.HttpStatusCode.OK;
-                response.ContentLength = texture.Data.Length;
-                if (format == DefaultFormat)
+                    response.ContentLength = len;
                     response.ContentType = texture.Metadata.ContentType;
-                else
-                    response.ContentType = "image/" + format;
-                response.RawBuffer = texture.Data;
-                response.RawBufferStart = 0;
-                response.RawBufferLen = texture.Data.Length;
-            }
-
-            //            if (response.StatusCode < 200 || response.StatusCode > 299)
-            //                m_log.WarnFormat(
-            //                    "[GETTEXTURE]: For texture {0} requested range {1} responded {2} with content length {3} (actual {4})",
-            //                    texture.FullID, range, response.StatusCode, response.ContentLength, texture.Data.Length);
-            //            else
-            //                m_log.DebugFormat(
-            //                    "[GETTEXTURE]: For texture {0} requested range {1} responded {2} with content length {3} (actual {4})",
-            //                    texture.FullID, range, response.StatusCode, response.ContentLength, texture.Data.Length);
-        }
-
-        /// <summary>
-        /// Parse a range header.
-        /// </summary>
-        /// <remarks>
-        /// As per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html,
-        /// this obeys range headers with two values (e.g. 533-4165) and no second value (e.g. 533-).
-        /// Where there is no value, -1 is returned.
-        /// FIXME: Need to cover the case where only a second value is specified (e.g. -4165), probably by returning -1
-        /// for start.</remarks>
-        /// <returns></returns>
-        /// <param name='header'></param>
-        /// <param name='start'>Start of the range.  Undefined if this was not a number.</param>
-        /// <param name='end'>End of the range.  Will be -1 if no end specified.  Undefined if there was a raw string but this was not a number.</param>
-        private bool TryParseRange(string header, out int start, out int end)
-        {
-            start = end = 0;
-
-            if (header.StartsWith("bytes="))
-            {
-                string[] rangeValues = header.Substring(6).Split('-');
-
-                if (rangeValues.Length == 2)
-                {
-                    if (!Int32.TryParse(rangeValues[0], out start))
-                        return false;
-
-                    string rawEnd = rangeValues[1];
-
-                    if (rawEnd.Length == 0)
-                    {
-                        end = -1;
-                        return true;
-                    }
-                    else if (Int32.TryParse(rawEnd, out end))
-                    {
-                        return true;
-                    }
+                    response.AddHeader("Content-Range", String.Format("bytes {0}-{1}/{2}", start, end, texture.Data.Length));
+                    response.RawBuffer = texture.Data;
+                    response.RawBufferStart = start;
+                    response.RawBufferLen = len;
                 }
             }
-
-            start = end = 0;
-            return false;
+            else
+            {
+                m_log.Warn("[GETTEXTURE]: Malformed Range header: " + range);
+                response.StatusCode = (int)System.Net.HttpStatusCode.BadRequest;
+            }
+        }
+        else // JP2's or other formats
+        {
+            // Full content request
+            response.StatusCode = (int)System.Net.HttpStatusCode.OK;
+            response.ContentLength = texture.Data.Length;
+            if (format == DefaultFormat)
+                response.ContentType = texture.Metadata.ContentType;
+            else
+                response.ContentType = "image/" + format;
+            response.RawBuffer = texture.Data;
+            response.RawBufferStart = 0;
+            response.RawBufferLen = texture.Data.Length;
         }
 
-        private byte[] ConvertTextureData(AssetBase texture, string format)
+        //            if (response.StatusCode < 200 || response.StatusCode > 299)
+        //                m_log.WarnFormat(
+        //                    "[GETTEXTURE]: For texture {0} requested range {1} responded {2} with content length {3} (actual {4})",
+        //                    texture.FullID, range, response.StatusCode, response.ContentLength, texture.Data.Length);
+        //            else
+        //                m_log.DebugFormat(
+        //                    "[GETTEXTURE]: For texture {0} requested range {1} responded {2} with content length {3} (actual {4})",
+        //                    texture.FullID, range, response.StatusCode, response.ContentLength, texture.Data.Length);
+    }
+
+    /// <summary>
+    /// Parse a range header.
+    /// </summary>
+    /// <remarks>
+    /// As per http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html,
+    /// this obeys range headers with two values (e.g. 533-4165) and no second value (e.g. 533-).
+    /// Where there is no value, -1 is returned.
+    /// FIXME: Need to cover the case where only a second value is specified (e.g. -4165), probably by returning -1
+    /// for start.</remarks>
+    /// <returns></returns>
+    /// <param name='header'></param>
+    /// <param name='start'>Start of the range.  Undefined if this was not a number.</param>
+    /// <param name='end'>End of the range.  Will be -1 if no end specified.  Undefined if there was a raw string but this was not a number.</param>
+    private bool TryParseRange(string header, out int start, out int end)
+    {
+        start = end = 0;
+
+        if (header.StartsWith("bytes="))
         {
-            m_log.DebugFormat("[GETTEXTURE]: Converting texture {0} to {1}", texture.ID, format);
-            byte[] data = Array.Empty<byte>();
-            // Try CoreJ2K first to get an SKImage
+            string[] rangeValues = header.Substring(6).Split('-');
+
+            if (rangeValues.Length == 2)
+            {
+                if (!Int32.TryParse(rangeValues[0], out start))
+                    return false;
+
+                string rawEnd = rangeValues[1];
+
+                if (rawEnd.Length == 0)
+                {
+                    end = -1;
+                    return true;
+                }
+                else if (Int32.TryParse(rawEnd, out end))
+                {
+                    return true;
+                }
+            }
+        }
+
+        start = end = 0;
+        return false;
+    }
+
+    private byte[] ConvertTextureData(AssetBase texture, string format)
+    {
+        m_log.DebugFormat("[GETTEXTURE]: Converting texture {0} to {1}", texture.ID, format);
+        byte[] data = Array.Empty<byte>();
+        // Try CoreJ2K first to get an SKImage
+        try
+        {
+            SKImage skImage = null;
+
             try
             {
-                SKImage skImage = null;
-
-                try
-                {
-                    var j2k = J2kImage.FromBytes(texture.Data);
-                    skImage = j2k?.As<SKImage>();
-                }
-                catch (Exception)
-                {
-                    // CoreJ2K not available or failed, fall back to OpenJPEG
-                    skImage = null;
-                }
-
-                if (skImage != null)
-                {
-                    SKEncodedImageFormat encFormat = SKEncodedImageFormat.Jpeg;
-                    int quality = 95;
-
-                    switch (format?.ToLowerInvariant())
-                    {
-                        case "png":
-                            encFormat = SKEncodedImageFormat.Png;
-                            break;
-                        case "jpg":
-                        case "jpeg":
-                            encFormat = SKEncodedImageFormat.Jpeg;
-                            break;
-                        case "webp":
-                            encFormat = SKEncodedImageFormat.Webp;
-                            break;
-                        case "gif":
-                            // SkiaSharp doesn't encode GIF; fall back to PNG
-                            encFormat = SKEncodedImageFormat.Png;
-                            break;
-                        default:
-                            // default to JPEG for unknown types
-                            encFormat = SKEncodedImageFormat.Jpeg;
-                            break;
-                    }
-
-                    using (var encoded = skImage.Encode(encFormat, quality))
-                    {
-                        if (encoded != null)
-                            data = encoded.ToArray();
-                    }
-                }
+                var j2k = J2kImage.FromBytes(texture.Data);
+                skImage = j2k?.As<SKImage>();
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                m_log.WarnFormat("[GETTEXTURE]: Unable to convert texture {0} to {1}: {2}", texture.ID, format, e.Message);
+                // CoreJ2K not available or failed, fall back to OpenJPEG
+                skImage = null;
             }
 
-            return data;
+            if (skImage != null)
+            {
+                SKEncodedImageFormat encFormat = SKEncodedImageFormat.Jpeg;
+                int quality = 95;
+
+                switch (format?.ToLowerInvariant())
+                {
+                    case "png":
+                        encFormat = SKEncodedImageFormat.Png;
+                        break;
+                    case "jpg":
+                    case "jpeg":
+                        encFormat = SKEncodedImageFormat.Jpeg;
+                        break;
+                    case "webp":
+                        encFormat = SKEncodedImageFormat.Webp;
+                        break;
+                    case "gif":
+                        // SkiaSharp doesn't encode GIF; fall back to PNG
+                        encFormat = SKEncodedImageFormat.Png;
+                        break;
+                    default:
+                        // default to JPEG for unknown types
+                        encFormat = SKEncodedImageFormat.Jpeg;
+                        break;
+                }
+
+                using (var encoded = skImage.Encode(encFormat, quality))
+                {
+                    if (encoded != null)
+                        data = encoded.ToArray();
+                }
+            }
         }
+        catch (Exception e)
+        {
+            m_log.WarnFormat("[GETTEXTURE]: Unable to convert texture {0} to {1}: {2}", texture.ID, format, e.Message);
+        }
+
+        return data;
     }
 }

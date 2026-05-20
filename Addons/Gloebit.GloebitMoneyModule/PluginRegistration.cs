@@ -25,29 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
 using OpenSim.Framework;
 
-namespace Gloebit.GloebitMoneyModule
+namespace Gloebit.GloebitMoneyModule;
+
+public class PluginRegistration : IPluginRegistryProvider
 {
-    public class PluginRegistration : IPluginRegistryProvider
+    public void RegisterPlugins(PluginRegistry registry)
     {
-        public void RegisterPlugins(PluginRegistry registry)
-        {
-            RegisterByName(registry, "/OpenSim/RegionModules", "GloebitMoneyModule", "Gloebit.GloebitMoneyModule.GloebitMoneyModule", "GloebitMoneyModule", "0.9");
-        }
+        RegisterByName(registry, "/OpenSim/RegionModules", "GloebitMoneyModule", "Gloebit.GloebitMoneyModule.GloebitMoneyModule", "GloebitMoneyModule", "0.9");
+    }
 
-        private static void RegisterByName(PluginRegistry registry, string extensionPath, string id, string typeName, string displayName, string version)
-        {
-            Assembly assembly = typeof(PluginRegistration).Assembly;
-            Type type = assembly.GetType(typeName, false);
-            if (type == null)
-                return;
+    private static void RegisterByName(PluginRegistry registry, string extensionPath, string id, string typeName, string displayName, string version)
+    {
+        Assembly assembly = typeof(PluginRegistration).Assembly;
+        Type type = assembly.GetType(typeName, false);
+        if (type == null)
+            return;
 
-            registry.Register(
-                extensionPath,
-                new PluginDescriptor(id, type, displayName, version));
-        }
+        registry.Register(
+            extensionPath,
+            new PluginDescriptor(id, type, displayName, version));
     }
 }

@@ -31,97 +31,96 @@ using System.Xml;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 
-namespace OpenSim.Region.CoreModules.World.Serialiser
+namespace OpenSim.Region.CoreModules.World.Serialiser;
+
+internal class SerialiseObjects : IFileSerialiser
 {
-    internal class SerialiseObjects : IFileSerialiser
+    #region IFileSerialiser Members
+
+    public string WriteToFile(Scene scene, string dir)
     {
-        #region IFileSerialiser Members
+        string targetFileName = Path.Combine(dir, "objects.xml");
 
-        public string WriteToFile(Scene scene, string dir)
+        SaveSerialisedToFile(targetFileName, scene);
+
+        return "objects.xml";
+    }
+
+    #endregion
+
+    public void SaveSerialisedToFile(string fileName, Scene scene)
+    {
+        string xmlstream = GetObjectXml(scene);
+
+        using (MemoryStream stream = ReformatXmlString(xmlstream))
         {
-            string targetFileName = Path.Combine(dir, "objects.xml");
+            stream.Seek(0, SeekOrigin.Begin);
+            CreateXmlFile(stream, fileName);
 
-            SaveSerialisedToFile(targetFileName, scene);
+            stream.Seek(0, SeekOrigin.Begin);
+            CreateCompressedXmlFile(stream, fileName);
+        }
+    }
 
-            return "objects.xml";
+    private static MemoryStream ReformatXmlString(string xmlstream)
+    {
+        MemoryStream stream = new MemoryStream();
+        XmlTextWriter formatter = new XmlTextWriter(stream, Encoding.UTF8);
+        XmlDocument doc = new XmlDocument();
+        doc.LoadXml(xmlstream);
+        formatter.Formatting = Formatting.Indented;
+        doc.WriteContentTo(formatter);
+        formatter.Flush();
+        return stream;
+    }
+
+    private static string GetObjectXml(Scene scene)
+    {
+        string xmlstream = "<scene>";
+
+        EntityBase[] EntityList = scene.GetEntities();
+        List<string> EntityXml = new List<string>();
+
+        foreach (EntityBase ent in EntityList)
+        {
+            if (ent is SceneObjectGroup)
+            {
+                EntityXml.Add(SceneObjectSerializer.ToXml2Format((SceneObjectGroup)ent));
+            }
+        }
+        EntityXml.Sort();
+
+        foreach (string xml in EntityXml)
+            xmlstream += xml;
+
+        xmlstream += "</scene>";
+        return xmlstream;
+    }
+
+    private static void CreateXmlFile(MemoryStream xmlStream, string fileName)
+    {
+        FileStream objectsFile = new FileStream(fileName, FileMode.Create);
+
+        xmlStream.WriteTo(objectsFile);
+        objectsFile.Flush();
+        objectsFile.Close();
+    }
+
+    private static void CreateCompressedXmlFile(MemoryStream xmlStream, string fileName)
+    {
+        #region GZip Compressed Version
+
+        using (FileStream objectsFileCompressed = new FileStream(fileName + ".gzs", FileMode.Create))
+        using (MemoryStream gzipMSStream = new MemoryStream())
+        {
+            using (GZipStream gzipStream = new GZipStream(gzipMSStream, CompressionMode.Compress, true))
+            {
+                xmlStream.WriteTo(gzipStream);
+            }
+
+            gzipMSStream.WriteTo(objectsFileCompressed);
         }
 
         #endregion
-
-        public void SaveSerialisedToFile(string fileName, Scene scene)
-        {
-            string xmlstream = GetObjectXml(scene);
-
-            using (MemoryStream stream = ReformatXmlString(xmlstream))
-            {
-                stream.Seek(0, SeekOrigin.Begin);
-                CreateXmlFile(stream, fileName);
-
-                stream.Seek(0, SeekOrigin.Begin);
-                CreateCompressedXmlFile(stream, fileName);
-            }
-        }
-
-        private static MemoryStream ReformatXmlString(string xmlstream)
-        {
-            MemoryStream stream = new MemoryStream();
-            XmlTextWriter formatter = new XmlTextWriter(stream, Encoding.UTF8);
-            XmlDocument doc = new XmlDocument();
-            doc.LoadXml(xmlstream);
-            formatter.Formatting = Formatting.Indented;
-            doc.WriteContentTo(formatter);
-            formatter.Flush();
-            return stream;
-        }
-
-        private static string GetObjectXml(Scene scene)
-        {
-            string xmlstream = "<scene>";
-
-            EntityBase[] EntityList = scene.GetEntities();
-            List<string> EntityXml = new List<string>();
-
-            foreach (EntityBase ent in EntityList)
-            {
-                if (ent is SceneObjectGroup)
-                {
-                    EntityXml.Add(SceneObjectSerializer.ToXml2Format((SceneObjectGroup)ent));
-                }
-            }
-            EntityXml.Sort();
-
-            foreach (string xml in EntityXml)
-                xmlstream += xml;
-
-            xmlstream += "</scene>";
-            return xmlstream;
-        }
-
-        private static void CreateXmlFile(MemoryStream xmlStream, string fileName)
-        {
-            FileStream objectsFile = new FileStream(fileName, FileMode.Create);
-
-            xmlStream.WriteTo(objectsFile);
-            objectsFile.Flush();
-            objectsFile.Close();
-        }
-
-        private static void CreateCompressedXmlFile(MemoryStream xmlStream, string fileName)
-        {
-            #region GZip Compressed Version
-
-            using (FileStream objectsFileCompressed = new FileStream(fileName + ".gzs", FileMode.Create))
-            using (MemoryStream gzipMSStream = new MemoryStream())
-            {
-                using (GZipStream gzipStream = new GZipStream(gzipMSStream, CompressionMode.Compress, true))
-                {
-                    xmlStream.WriteTo(gzipStream);
-                }
-
-                gzipMSStream.WriteTo(objectsFileCompressed);
-            }
-
-            #endregion
-        }
     }
 }

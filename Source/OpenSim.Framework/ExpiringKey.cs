@@ -24,227 +24,223 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Threading;
-using System.Collections.Generic;
-using Timer = System.Threading.Timer ;
+using Timer = System.Threading.Timer;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public sealed class ExpiringKey<Tkey1> : IDisposable
 {
-    public sealed class ExpiringKey<Tkey1> : IDisposable
+    private const int MINEXPIRECHECK = 500;
+
+    private Timer m_purgeTimer;
+    private ReaderWriterLockSlim m_rwLock;
+    private readonly Dictionary<Tkey1, int> m_dictionary;
+    private readonly double m_startTS;
+    private readonly int m_expire;
+
+    public ExpiringKey()
     {
-        private const int MINEXPIRECHECK = 500;
+        m_dictionary = new Dictionary<Tkey1, int>();
+        m_rwLock = new ReaderWriterLockSlim();
+        m_expire = MINEXPIRECHECK;
+        m_startTS = Util.GetTimeStampMS();
+    }
 
-        private Timer m_purgeTimer;
-        private ReaderWriterLockSlim m_rwLock;
-        private readonly Dictionary<Tkey1, int> m_dictionary;
-        private readonly double m_startTS;
-        private readonly int m_expire;
+    public ExpiringKey(int expireCheckTimeinMS)
+    {
+        m_dictionary = new Dictionary<Tkey1, int>();
+        m_rwLock = new ReaderWriterLockSlim();
+        m_startTS = Util.GetTimeStampMS();
+        m_expire = (expireCheckTimeinMS > MINEXPIRECHECK) ? m_expire = expireCheckTimeinMS : MINEXPIRECHECK;
+    }
 
-        public ExpiringKey()
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private void CheckTimer()
+    {
+        m_purgeTimer ??= new Timer(Purge, null, m_expire, Timeout.Infinite);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private void DisposeTimer()
+    {
+        if (m_purgeTimer != null)
         {
-            m_dictionary = new Dictionary<Tkey1, int>();
-            m_rwLock = new ReaderWriterLockSlim();
-            m_expire = MINEXPIRECHECK;
-            m_startTS = Util.GetTimeStampMS();
+            m_purgeTimer.Dispose();
+            m_purgeTimer = null;
         }
+    }
 
-        public ExpiringKey(int expireCheckTimeinMS)
+    ~ExpiringKey()
+    {
+        Dispose(false);
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    private void Dispose(bool disposing)
+    {
+        if (m_rwLock != null)
         {
-            m_dictionary = new Dictionary<Tkey1, int>();
-            m_rwLock = new ReaderWriterLockSlim();
-            m_startTS = Util.GetTimeStampMS();
-            m_expire = (expireCheckTimeinMS > MINEXPIRECHECK) ? m_expire = expireCheckTimeinMS : MINEXPIRECHECK;
+            DisposeTimer();
+            m_rwLock.Dispose();
+            m_rwLock = null;
         }
+    }
 
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        private void CheckTimer()
+    private void Purge(object ignored)
+    {
+        m_rwLock.EnterUpgradeableReadLock();
+        try
         {
-            m_purgeTimer ??= new Timer(Purge, null, m_expire, Timeout.Infinite);
-        }
-
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        private void DisposeTimer()
-        {
-            if (m_purgeTimer != null)
-            {
-                m_purgeTimer.Dispose();
-                m_purgeTimer = null;
-            }
-        }
-
-        ~ExpiringKey()
-        {
-            Dispose(false);
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        private void Dispose(bool disposing)
-        {
-            if (m_rwLock != null)
+            if (m_dictionary.Count == 0)
             {
                 DisposeTimer();
-                m_rwLock.Dispose();
-                m_rwLock = null;
+                return;
             }
-        }
 
-        private void Purge(object ignored)
-        {
-            m_rwLock.EnterUpgradeableReadLock();
-            try
+            int now = (int)(Util.GetTimeStampMS() - m_startTS);
+            List<Tkey1> expired = new List<Tkey1>(m_dictionary.Count);
+            foreach(KeyValuePair<Tkey1,int> kvp in m_dictionary)
             {
+                int expire = kvp.Value;
+                if (expire > 0 && expire < now)
+                    expired.Add(kvp.Key);
+            }
+
+            if (expired.Count > 0)
+            {
+                m_rwLock.EnterWriteLock();
+                try
+                {
+                    foreach (Tkey1 key in expired)
+                        m_dictionary.Remove(key);
+                }
+                finally { m_rwLock.ExitWriteLock(); }
+
                 if (m_dictionary.Count == 0)
-                {
                     DisposeTimer();
-                    return;
-                }
-
-                int now = (int)(Util.GetTimeStampMS() - m_startTS);
-                List<Tkey1> expired = new List<Tkey1>(m_dictionary.Count);
-                foreach(KeyValuePair<Tkey1,int> kvp in m_dictionary)
-                {
-                    int expire = kvp.Value;
-                    if (expire > 0 && expire < now)
-                        expired.Add(kvp.Key);
-                }
-
-                if (expired.Count > 0)
-                {
-                    m_rwLock.EnterWriteLock();
-                    try
-                    {
-                        foreach (Tkey1 key in expired)
-                            m_dictionary.Remove(key);
-                    }
-                    finally { m_rwLock.ExitWriteLock(); }
-
-                    if (m_dictionary.Count == 0)
-                        DisposeTimer();
-                    else
-                        m_purgeTimer.Change(m_expire, Timeout.Infinite);
-                }
                 else
                     m_purgeTimer.Change(m_expire, Timeout.Infinite);
             }
-            finally { m_rwLock.ExitUpgradeableReadLock(); }
-        }
-
-        public void Add(Tkey1 key)
-        {
-            int now = (int)(Util.GetTimeStampMS() - m_startTS) + m_expire;
-
-            m_rwLock.EnterWriteLock();
-            try
-            {
-                m_dictionary[key] = now;
-                CheckTimer();
-            }
-            finally { m_rwLock.ExitWriteLock(); }
-        }
-
-        public void Add(Tkey1 key, int expireMS)
-        {
-            int now;
-            if (expireMS > 0)
-            {
-                expireMS = (expireMS > m_expire) ? expireMS : m_expire;
-                now = (int)(Util.GetTimeStampMS() - m_startTS) + expireMS;
-            }
             else
-                now = int.MinValue;
-
-            m_rwLock.EnterWriteLock();
-            try
-            {
-                m_dictionary[key] = now;
-                CheckTimer();
-            }
-            finally { m_rwLock.ExitWriteLock(); }
+                m_purgeTimer.Change(m_expire, Timeout.Infinite);
         }
+        finally { m_rwLock.ExitUpgradeableReadLock(); }
+    }
 
-        public bool Remove(Tkey1 key)
+    public void Add(Tkey1 key)
+    {
+        int now = (int)(Util.GetTimeStampMS() - m_startTS) + m_expire;
+
+        m_rwLock.EnterWriteLock();
+        try
         {
-            m_rwLock.EnterWriteLock();
-            try
-            {
-                bool success = m_dictionary.Remove(key);
-                if(m_dictionary.Count == 0)
-                    DisposeTimer();
-                return success;
-            }
-            finally { m_rwLock.ExitWriteLock(); }
-
+            m_dictionary[key] = now;
+            CheckTimer();
         }
+        finally { m_rwLock.ExitWriteLock(); }
+    }
 
-        public void Clear()
+    public void Add(Tkey1 key, int expireMS)
+    {
+        int now;
+        if (expireMS > 0)
         {
-            m_rwLock.EnterWriteLock();
-            try
-            {
-                m_dictionary.Clear();
+            expireMS = (expireMS > m_expire) ? expireMS : m_expire;
+            now = (int)(Util.GetTimeStampMS() - m_startTS) + expireMS;
+        }
+        else
+            now = int.MinValue;
+
+        m_rwLock.EnterWriteLock();
+        try
+        {
+            m_dictionary[key] = now;
+            CheckTimer();
+        }
+        finally { m_rwLock.ExitWriteLock(); }
+    }
+
+    public bool Remove(Tkey1 key)
+    {
+        m_rwLock.EnterWriteLock();
+        try
+        {
+            bool success = m_dictionary.Remove(key);
+            if(m_dictionary.Count == 0)
                 DisposeTimer();
-            }
-            finally { m_rwLock.ExitWriteLock(); }
+            return success;
         }
+        finally { m_rwLock.ExitWriteLock(); }
 
-        public int Count
+    }
+
+    public void Clear()
+    {
+        m_rwLock.EnterWriteLock();
+        try
         {
-            get { return m_dictionary.Count; }
+            m_dictionary.Clear();
+            DisposeTimer();
         }
+        finally { m_rwLock.ExitWriteLock(); }
+    }
 
-        public bool ContainsKey(Tkey1 key)
+    public int Count
+    {
+        get { return m_dictionary.Count; }
+    }
+
+    public bool ContainsKey(Tkey1 key)
+    {
+        m_rwLock.EnterReadLock();
+        try
         {
-            m_rwLock.EnterReadLock();
-            try
+            return m_dictionary.ContainsKey(key);
+        }
+        finally { m_rwLock.ExitReadLock(); }
+    }
+
+    public bool ContainsKey(Tkey1 key, int expireMS)
+    {
+        m_rwLock.EnterUpgradeableReadLock();
+        try
+        {
+            if (m_dictionary.ContainsKey(key))
             {
-                return m_dictionary.ContainsKey(key);
-            }
-            finally { m_rwLock.ExitReadLock(); }
-        }
-
-        public bool ContainsKey(Tkey1 key, int expireMS)
-        {
-            m_rwLock.EnterUpgradeableReadLock();
-            try
-            {
-                if (m_dictionary.ContainsKey(key))
+                m_rwLock.EnterWriteLock();
+                try
                 {
-                    m_rwLock.EnterWriteLock();
-                    try
+                    int now;
+                    if (expireMS > 0)
                     {
-                        int now;
-                        if (expireMS > 0)
-                        {
-                            expireMS = (expireMS > m_expire) ? expireMS : m_expire;
-                            now = (int)(Util.GetTimeStampMS() - m_startTS) + expireMS;
-                        }
-                        else
-                            now = int.MinValue;
-
-                        m_dictionary[key] = now;
-                        return true;
+                        expireMS = (expireMS > m_expire) ? expireMS : m_expire;
+                        now = (int)(Util.GetTimeStampMS() - m_startTS) + expireMS;
                     }
-                    finally { m_rwLock.ExitWriteLock(); }
-                }
-                return false;
-            }
-            finally { m_rwLock.EnterUpgradeableReadLock(); }
-        }
+                    else
+                        now = int.MinValue;
 
-        public bool TryGetValue(Tkey1 key, out int value)
-        {
-            m_rwLock.EnterReadLock();
-            try
-            {
-                return m_dictionary.TryGetValue(key, out value);
+                    m_dictionary[key] = now;
+                    return true;
+                }
+                finally { m_rwLock.ExitWriteLock(); }
             }
-            finally { m_rwLock.ExitReadLock(); }
+            return false;
         }
+        finally { m_rwLock.EnterUpgradeableReadLock(); }
+    }
+
+    public bool TryGetValue(Tkey1 key, out int value)
+    {
+        m_rwLock.EnterReadLock();
+        try
+        {
+            return m_dictionary.TryGetValue(key, out value);
+        }
+        finally { m_rwLock.ExitReadLock(); }
     }
 }

@@ -27,25 +27,24 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework.Capabilities
-{
-    [OSDMap]
-    public class LLSDAvatarPicker
-    {
-        public string next_page_url;
-        // an array of LLSDPerson
-        public OSDArray agents = new OSDArray();
-    }
+namespace OpenSim.Framework.Capabilities;
 
-    [OSDMap]
-    public class LLSDPerson
-    {
-        public string username;
-        public string display_name;
-        //'display_name_next_update':d"1970-01-01T00:00:00Z"
-        public string legacy_first_name;
-        public string legacy_last_name;
-        public UUID id;
-        public bool is_display_name_default;
-    }
+[OSDMap]
+public class LLSDAvatarPicker
+{
+    public string next_page_url;
+    // an array of LLSDPerson
+    public OSDArray agents = new OSDArray();
+}
+
+[OSDMap]
+public class LLSDPerson
+{
+    public string username;
+    public string display_name;
+    //'display_name_next_update':d"1970-01-01T00:00:00Z"
+    public string legacy_first_name;
+    public string legacy_last_name;
+    public UUID id;
+    public bool is_display_name_default;
 }

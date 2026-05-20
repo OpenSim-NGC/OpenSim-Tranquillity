@@ -27,13 +27,12 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.Framework.Scenes
+namespace OpenSim.Region.Framework.Scenes;
+
+public struct ReturnInfo
 {
-    public struct ReturnInfo
-    {
-        public int count;
-        public Vector3 location;
-        public string objectName;
-        public string reason;
-    }
+    public int count;
+    public Vector3 location;
+    public string objectName;
+    public string reason;
 }

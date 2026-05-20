@@ -31,48 +31,46 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
-using System;
 
-namespace OpenSim.Capabilities.Handlers
+namespace OpenSim.Capabilities.Handlers;
+
+public class GetMeshServerConnector : ServiceConnector
 {
-    public class GetMeshServerConnector : ServiceConnector
+    private IAssetService m_AssetService;
+    private string m_ConfigName = "CapsService";
+
+    public GetMeshServerConnector(IConfigSource config, IHttpServer server, string configName) :
+            base(config, server, configName)
     {
-        private IAssetService m_AssetService;
-        private string m_ConfigName = "CapsService";
+        if (configName != String.Empty)
+            m_ConfigName = configName;
 
-        public GetMeshServerConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
-        {
-            if (configName != String.Empty)
-                m_ConfigName = configName;
+        IConfig serverConfig = config.Configs[m_ConfigName];
+        if (serverConfig == null)
+            throw new Exception(String.Format("No section '{0}' in config file", m_ConfigName));
 
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section '{0}' in config file", m_ConfigName));
+        string assetService = serverConfig.GetString("AssetService", String.Empty);
 
-            string assetService = serverConfig.GetString("AssetService", String.Empty);
+        if (assetService.Length == 0)
+            throw new Exception("No AssetService in config file");
 
-            if (assetService.Length == 0)
-                throw new Exception("No AssetService in config file");
+        Object[] args = new Object[] { config };
+        m_AssetService =
+                ServerUtils.LoadPlugin<IAssetService>(assetService, args);
 
-            Object[] args = new Object[] { config };
-            m_AssetService =
-                    ServerUtils.LoadPlugin<IAssetService>(assetService, args);
+        if (m_AssetService == null)
+            throw new Exception(String.Format("Failed to load AssetService from {0}; config is {1}", assetService, m_ConfigName));
 
-            if (m_AssetService == null)
-                throw new Exception(String.Format("Failed to load AssetService from {0}; config is {1}", assetService, m_ConfigName));
+        string rurl = serverConfig.GetString("GetMeshRedirectURL");
 
-            string rurl = serverConfig.GetString("GetMeshRedirectURL");
-
-            GetMeshHandler gmeshHandler = new GetMeshHandler(m_AssetService);
-            IRequestHandler reqHandler
-                = new RestHTTPHandler(
-                    "GET",
-                    "/" + UUID.Random(),
-                    httpMethod => gmeshHandler.ProcessGetMesh(httpMethod, UUID.Zero, null),
-                    "GetMesh",
-                    null);
-            server.AddStreamHandler(reqHandler);
-        }
+        GetMeshHandler gmeshHandler = new GetMeshHandler(m_AssetService);
+        IRequestHandler reqHandler
+            = new RestHTTPHandler(
+                "GET",
+                "/" + UUID.Random(),
+                httpMethod => gmeshHandler.ProcessGetMesh(httpMethod, UUID.Zero, null),
+                "GetMesh",
+                null);
+        server.AddStreamHandler(reqHandler);
     }
 }

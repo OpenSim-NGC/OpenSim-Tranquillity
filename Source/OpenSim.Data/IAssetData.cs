@@ -25,19 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+public interface IAssetDataPlugin : IPlugin
 {
-    public interface IAssetDataPlugin : IPlugin
-    {
-        AssetBase GetAsset(UUID uuid);
-        bool StoreAsset(AssetBase asset);
-        bool[] AssetsExist(UUID[] uuids);
-        List<AssetMetadata> FetchAssetMetadataSet(int start, int count);
-        void Initialise(string connect);
-        bool Delete(string id);
-    }
+    AssetBase GetAsset(UUID uuid);
+    bool StoreAsset(AssetBase asset);
+    bool[] AssetsExist(UUID[] uuids);
+    List<AssetMetadata> FetchAssetMetadataSet(int start, int count);
+    void Initialise(string connect);
+    bool Delete(string id);
 }

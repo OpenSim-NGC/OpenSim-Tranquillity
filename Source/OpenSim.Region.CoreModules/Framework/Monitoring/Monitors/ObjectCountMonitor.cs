@@ -27,39 +27,38 @@
 
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors
+namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors;
+
+class ObjectCountMonitor : IMonitor
 {
-    class ObjectCountMonitor : IMonitor
+    private readonly Scene m_scene;
+
+    public ObjectCountMonitor(Scene scene)
     {
-        private readonly Scene m_scene;
-
-        public ObjectCountMonitor(Scene scene)
-        {
-            m_scene = scene;
-        }
-
-        #region Implementation of IMonitor
-
-        public string GetName()
-        {
-            return "ObjectCountMonitor";
-        }
-
-        public double GetValue()
-        {
-            return m_scene.SceneGraph.GetTotalObjectsCount();
-        }
-
-        public string GetFriendlyName()
-        {
-            return "Total Objects Count";
-        }
-
-        public string GetFriendlyValue()
-        {
-            return (int)GetValue() + " Object(s)";
-        }
-
-        #endregion
+        m_scene = scene;
     }
+
+    #region Implementation of IMonitor
+
+    public string GetName()
+    {
+        return "ObjectCountMonitor";
+    }
+
+    public double GetValue()
+    {
+        return m_scene.SceneGraph.GetTotalObjectsCount();
+    }
+
+    public string GetFriendlyName()
+    {
+        return "Total Objects Count";
+    }
+
+    public string GetFriendlyValue()
+    {
+        return (int)GetValue() + " Object(s)";
+    }
+
+    #endregion
 }

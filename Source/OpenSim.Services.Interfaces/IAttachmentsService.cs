@@ -25,14 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using Nini.Config;
+namespace OpenSim.Services.Interfaces;
 
-namespace OpenSim.Services.Interfaces
+public interface IAttachmentsService
 {
-    public interface IAttachmentsService
-    {
-        string Get(string id);
-        void Store(string id, string data);
-    }
+    string Get(string id);
+    void Store(string id, string data);
 }

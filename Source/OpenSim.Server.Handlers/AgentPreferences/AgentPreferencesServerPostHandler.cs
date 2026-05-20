@@ -25,17 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
 using log4net;
-using System;
 using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
@@ -43,165 +35,164 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
-namespace OpenSim.Server.Handlers.AgentPreferences
+namespace OpenSim.Server.Handlers.AgentPreferences;
+
+public class AgentPreferencesServerPostHandler : BaseStreamHandler
 {
-    public class AgentPreferencesServerPostHandler : BaseStreamHandler
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IAgentPreferencesService m_AgentPreferencesService;
+
+    public AgentPreferencesServerPostHandler(IAgentPreferencesService service, IServiceAuth auth) :
+    base("POST", "/agentprefs", auth)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_AgentPreferencesService = service;
+    }
 
-        private IAgentPreferencesService m_AgentPreferencesService;
+    protected override byte[] ProcessRequest(string path, Stream requestData,
+        IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        StreamReader sr = new StreamReader(requestData);
+        string body = sr.ReadToEnd();
+        sr.Close();
+        body = body.Trim();
 
-        public AgentPreferencesServerPostHandler(IAgentPreferencesService service, IServiceAuth auth) :
-        base("POST", "/agentprefs", auth)
+        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+
+        try
         {
-            m_AgentPreferencesService = service;
+            Dictionary<string, object> request =
+                ServerUtils.ParseQueryString(body);
+
+            if (!request.ContainsKey("METHOD"))
+                return FailureResult();
+
+            string method = request["METHOD"].ToString();
+
+            switch (method)
+            {
+                case "getagentprefs":
+                    return GetAgentPrefs(request);
+                case "setagentprefs":
+                    return SetAgentPrefs(request);
+                case "getagentlang":
+                    return GetAgentLang(request);
+            }
+            m_log.DebugFormat("[AGENT PREFERENCES HANDLER]: unknown method request: {0}", method);
+        }
+        catch (Exception e)
+        {
+            m_log.DebugFormat("[AGENT PREFERENCES HANDLER]: Exception {0}", e);
         }
 
-        protected override byte[] ProcessRequest(string path, Stream requestData,
-            IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        return FailureResult();
+    }
+
+    byte[] GetAgentPrefs(Dictionary<string, object> request)
+    {
+        if (!request.ContainsKey("UserID"))
+            return FailureResult();
+
+        UUID userID;
+        if (!UUID.TryParse(request["UserID"].ToString(), out userID))
+            return FailureResult();
+        AgentPrefs prefs = m_AgentPreferencesService.GetAgentPreferences(userID);
+        Dictionary<string, object> result = new Dictionary<string, object>();
+        if (prefs != null)
+            result = prefs.ToKeyValuePairs();
+
+        string xmlString = ServerUtils.BuildXmlResponse(result);
+
+        return Util.UTF8NoBomEncoding.GetBytes(xmlString);
+    }
+
+    byte[] SetAgentPrefs(Dictionary<string, object> request)
+    {
+        if (!request.ContainsKey("PrincipalID") || !request.ContainsKey("AccessPrefs") || !request.ContainsKey("HoverHeight")
+            || !request.ContainsKey("Language") || !request.ContainsKey("LanguageIsPublic") || !request.ContainsKey("PermEveryone")
+            || !request.ContainsKey("PermGroup") || !request.ContainsKey("PermNextOwner"))
         {
-            StreamReader sr = new StreamReader(requestData);
-            string body = sr.ReadToEnd();
-            sr.Close();
-            body = body.Trim();
-
-            //m_log.DebugFormat("[XXX]: query String: {0}", body);
-
-            try
-            {
-                Dictionary<string, object> request =
-                    ServerUtils.ParseQueryString(body);
-
-                if (!request.ContainsKey("METHOD"))
-                    return FailureResult();
-
-                string method = request["METHOD"].ToString();
-
-                switch (method)
-                {
-                    case "getagentprefs":
-                        return GetAgentPrefs(request);
-                    case "setagentprefs":
-                        return SetAgentPrefs(request);
-                    case "getagentlang":
-                        return GetAgentLang(request);
-                }
-                m_log.DebugFormat("[AGENT PREFERENCES HANDLER]: unknown method request: {0}", method);
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[AGENT PREFERENCES HANDLER]: Exception {0}", e);
-            }
-
             return FailureResult();
         }
 
-        byte[] GetAgentPrefs(Dictionary<string, object> request)
+        UUID userID;
+        if (!UUID.TryParse(request["PrincipalID"].ToString(), out userID))
+            return FailureResult();
+
+        AgentPrefs data = new AgentPrefs(userID);
+        data.AccessPrefs = request["AccessPrefs"].ToString();
+        data.HoverHeight = float.Parse(request["HoverHeight"].ToString());
+        data.Language = request["Language"].ToString();
+        data.LanguageIsPublic = bool.Parse(request["LanguageIsPublic"].ToString());
+        data.PermEveryone = int.Parse(request["PermEveryone"].ToString());
+        data.PermGroup = int.Parse(request["PermGroup"].ToString());
+        data.PermNextOwner = int.Parse(request["PermNextOwner"].ToString());
+
+        return m_AgentPreferencesService.StoreAgentPreferences(data) ? SuccessResult() : FailureResult();
+    }
+
+    byte[] GetAgentLang(Dictionary<string, object> request)
+    {
+        if (!request.ContainsKey("UserID"))
+            return FailureResult();
+        UUID userID;
+        if (!UUID.TryParse(request["UserID"].ToString(), out userID))
+            return FailureResult();
+
+        string lang = "en-us";
+        AgentPrefs prefs = m_AgentPreferencesService.GetAgentPreferences(userID);
+        if (prefs != null)
         {
-            if (!request.ContainsKey("UserID"))
-                return FailureResult();
-
-            UUID userID;
-            if (!UUID.TryParse(request["UserID"].ToString(), out userID))
-                return FailureResult();
-            AgentPrefs prefs = m_AgentPreferencesService.GetAgentPreferences(userID);
-            Dictionary<string, object> result = new Dictionary<string, object>();
-            if (prefs != null)
-                result = prefs.ToKeyValuePairs();
-
-            string xmlString = ServerUtils.BuildXmlResponse(result);
-
-            return Util.UTF8NoBomEncoding.GetBytes(xmlString);
+            if (prefs.LanguageIsPublic)
+                lang = prefs.Language;
         }
+        Dictionary<string, object> result = new Dictionary<string, object>();
+        result["Language"] = lang;
+        string xmlString = ServerUtils.BuildXmlResponse(result);
+        return Util.UTF8NoBomEncoding.GetBytes(xmlString);
+    }
 
-        byte[] SetAgentPrefs(Dictionary<string, object> request)
-        {
-            if (!request.ContainsKey("PrincipalID") || !request.ContainsKey("AccessPrefs") || !request.ContainsKey("HoverHeight")
-                || !request.ContainsKey("Language") || !request.ContainsKey("LanguageIsPublic") || !request.ContainsKey("PermEveryone")
-                || !request.ContainsKey("PermGroup") || !request.ContainsKey("PermNextOwner"))
-            {
-                return FailureResult();
-            }
+    private byte[] SuccessResult()
+    {
+        XmlDocument doc = new XmlDocument();
 
-            UUID userID;
-            if (!UUID.TryParse(request["PrincipalID"].ToString(), out userID))
-                return FailureResult();
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
+            "", "");
 
-            AgentPrefs data = new AgentPrefs(userID);
-            data.AccessPrefs = request["AccessPrefs"].ToString();
-            data.HoverHeight = float.Parse(request["HoverHeight"].ToString());
-            data.Language = request["Language"].ToString();
-            data.LanguageIsPublic = bool.Parse(request["LanguageIsPublic"].ToString());
-            data.PermEveryone = int.Parse(request["PermEveryone"].ToString());
-            data.PermGroup = int.Parse(request["PermGroup"].ToString());
-            data.PermNextOwner = int.Parse(request["PermNextOwner"].ToString());
+        doc.AppendChild(xmlnode);
 
-            return m_AgentPreferencesService.StoreAgentPreferences(data) ? SuccessResult() : FailureResult();
-        }
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse",
+            "");
 
-        byte[] GetAgentLang(Dictionary<string, object> request)
-        {
-            if (!request.ContainsKey("UserID"))
-                return FailureResult();
-            UUID userID;
-            if (!UUID.TryParse(request["UserID"].ToString(), out userID))
-                return FailureResult();
+        doc.AppendChild(rootElement);
 
-            string lang = "en-us";
-            AgentPrefs prefs = m_AgentPreferencesService.GetAgentPreferences(userID);
-            if (prefs != null)
-            {
-                if (prefs.LanguageIsPublic)
-                    lang = prefs.Language;
-            }
-            Dictionary<string, object> result = new Dictionary<string, object>();
-            result["Language"] = lang;
-            string xmlString = ServerUtils.BuildXmlResponse(result);
-            return Util.UTF8NoBomEncoding.GetBytes(xmlString);
-        }
+        XmlElement result = doc.CreateElement("", "result", "");
+        result.AppendChild(doc.CreateTextNode("Success"));
 
-        private byte[] SuccessResult()
-        {
-            XmlDocument doc = new XmlDocument();
+        rootElement.AppendChild(result);
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                "", "");
+        return Util.DocToBytes(doc);
+    }
 
-            doc.AppendChild(xmlnode);
+    private byte[] FailureResult()
+    {
+        XmlDocument doc = new XmlDocument();
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                "");
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
+            "", "");
 
-            doc.AppendChild(rootElement);
+        doc.AppendChild(xmlnode);
 
-            XmlElement result = doc.CreateElement("", "result", "");
-            result.AppendChild(doc.CreateTextNode("Success"));
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse",
+            "");
 
-            rootElement.AppendChild(result);
+        doc.AppendChild(rootElement);
 
-            return Util.DocToBytes(doc);
-        }
+        XmlElement result = doc.CreateElement("", "result", "");
+        result.AppendChild(doc.CreateTextNode("Failure"));
 
-        private byte[] FailureResult()
-        {
-            XmlDocument doc = new XmlDocument();
+        rootElement.AppendChild(result);
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                "", "");
-
-            doc.AppendChild(xmlnode);
-
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                "");
-
-            doc.AppendChild(rootElement);
-
-            XmlElement result = doc.CreateElement("", "result", "");
-            result.AppendChild(doc.CreateTextNode("Failure"));
-
-            rootElement.AppendChild(result);
-
-            return Util.DocToBytes(doc);
-        }
+        return Util.DocToBytes(doc);
     }
 }

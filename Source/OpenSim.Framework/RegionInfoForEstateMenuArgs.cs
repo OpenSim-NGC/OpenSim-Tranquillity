@@ -25,30 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+public class RegionInfoForEstateMenuArgs : EventArgs
 {
-    public class RegionInfoForEstateMenuArgs : EventArgs
-    {
-        public float billableFactor;
-        public uint estateID;
-        public int maxAgents;
-        public float objectBonusFactor;
-        public uint parentEstateID;
-        public int pricePerMeter;
-        public int redirectGridX;
-        public int redirectGridY;
-        public uint regionFlags;
-        public byte simAccess;
-        public float sunHour;
-        public float terrainLowerLimit;
-        public float terrainRaiseLimit;
-        public bool useEstateSun;
-        public float waterHeight;
-        public string simName;
-        public string regionType;
-        public int AgentCapacity;
-        public int ObjectsCapacity;
-    }
+    public float billableFactor;
+    public uint estateID;
+    public int maxAgents;
+    public float objectBonusFactor;
+    public uint parentEstateID;
+    public int pricePerMeter;
+    public int redirectGridX;
+    public int redirectGridY;
+    public uint regionFlags;
+    public byte simAccess;
+    public float sunHour;
+    public float terrainLowerLimit;
+    public float terrainRaiseLimit;
+    public bool useEstateSun;
+    public float waterHeight;
+    public string simName;
+    public string regionType;
+    public int AgentCapacity;
+    public int ObjectsCapacity;
 }

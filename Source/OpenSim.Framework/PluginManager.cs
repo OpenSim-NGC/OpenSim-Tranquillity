@@ -29,62 +29,59 @@
 // remote plugin repository and install/enable/disable operations. It has been
 // retired as part of the Mono.Addins -> DotNetCorePlugins migration.
 
-using System.Collections.Generic;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+/// <summary>
+/// Retired stub. Plugin repository management via Mono.Addins is no longer supported.
+/// </summary>
+public class PluginManager
 {
-    /// <summary>
-    /// Retired stub. Plugin repository management via Mono.Addins is no longer supported.
-    /// </summary>
-    public class PluginManager
+    public PluginManager() { }
+
+    public bool InstallPlugin(int ndx, out Dictionary<string, object> result)
     {
-        public PluginManager() { }
-
-        public bool InstallPlugin(int ndx, out Dictionary<string, object> result)
-        {
-            result = new Dictionary<string, object>();
-            return false;
-        }
-
-        public void UnInstall(int ndx) { }
-
-        public void ListInstalledAddins(out Dictionary<string, object> result)
-        {
-            result = new Dictionary<string, object>();
-        }
-
-        public void ListAvailable(out Dictionary<string, object> result)
-        {
-            result = new Dictionary<string, object>();
-        }
-
-        public void ListUpdates() { }
-
-        public string Update() => "Plugin repository management is not available.";
-
-        public bool AddRepository(string repo) => false;
-
-        public void GetRepository() { }
-
-        public void RemoveRepository(string[] args) { }
-
-        public void EnableRepository(string[] args) { }
-
-        public void DisableRepository(string[] args) { }
-
-        public void ListRepositories(out Dictionary<string, object> result)
-        {
-            result = new Dictionary<string, object>();
-        }
-
-        public bool AddinInfo(int ndx, out Dictionary<string, object> result)
-        {
-            result = new Dictionary<string, object>();
-            return false;
-        }
-
-        public void DisablePlugin(string[] args) { }
-
-        public void EnablePlugin(string[] args) { }
+        result = new Dictionary<string, object>();
+        return false;
     }
+
+    public void UnInstall(int ndx) { }
+
+    public void ListInstalledAddins(out Dictionary<string, object> result)
+    {
+        result = new Dictionary<string, object>();
+    }
+
+    public void ListAvailable(out Dictionary<string, object> result)
+    {
+        result = new Dictionary<string, object>();
+    }
+
+    public void ListUpdates() { }
+
+    public string Update() => "Plugin repository management is not available.";
+
+    public bool AddRepository(string repo) => false;
+
+    public void GetRepository() { }
+
+    public void RemoveRepository(string[] args) { }
+
+    public void EnableRepository(string[] args) { }
+
+    public void DisableRepository(string[] args) { }
+
+    public void ListRepositories(out Dictionary<string, object> result)
+    {
+        result = new Dictionary<string, object>();
+    }
+
+    public bool AddinInfo(int ndx, out Dictionary<string, object> result)
+    {
+        result = new Dictionary<string, object>();
+        return false;
+    }
+
+    public void DisablePlugin(string[] args) { }
+
+    public void EnablePlugin(string[] args) { }
 }

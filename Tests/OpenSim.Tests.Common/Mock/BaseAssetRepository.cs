@@ -25,38 +25,35 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+public class BaseAssetRepository
 {
-    public class BaseAssetRepository
+    protected Dictionary<UUID, AssetBase> Assets = new Dictionary<UUID, AssetBase>();
+
+    public AssetBase FetchAsset(UUID uuid)
     {
-        protected Dictionary<UUID, AssetBase> Assets = new Dictionary<UUID, AssetBase>();
+        if (AssetsExist(new[] { uuid })[0])
+            return Assets[uuid];
+        else
+            return null;
+    }
 
-        public AssetBase FetchAsset(UUID uuid)
-        {
-            if (AssetsExist(new[] { uuid })[0])
-                return Assets[uuid];
-            else
-                return null;
-        }
+    public void CreateAsset(AssetBase asset)
+    {
+        Assets[asset.FullID] = asset;
+    }
 
-        public void CreateAsset(AssetBase asset)
-        {
-            Assets[asset.FullID] = asset;
-        }
+    public void UpdateAsset(AssetBase asset)
+    {
+        CreateAsset(asset);
+    }
 
-        public void UpdateAsset(AssetBase asset)
-        {
-            CreateAsset(asset);
-        }
-
-        public bool[] AssetsExist(UUID[] uuids)
-        {
-            return Array.ConvertAll(uuids, id => Assets.ContainsKey(id));
-        }
+    public bool[] AssetsExist(UUID[] uuids)
+    {
+        return Array.ConvertAll(uuids, id => Assets.ContainsKey(id));
     }
 }

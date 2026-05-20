@@ -27,47 +27,46 @@
 
 using OpenSim.Framework;
 
-namespace OpenSim.Groups
+namespace OpenSim.Groups;
+
+public class ForeignImporter
 {
-    public class ForeignImporter
+    IUserManagement m_UserManagement;
+    public ForeignImporter(IUserManagement uman)
     {
-        IUserManagement m_UserManagement;
-        public ForeignImporter(IUserManagement uman)
-        {
-            m_UserManagement = uman;
-        }
-
-        public GroupMembersData ConvertGroupMembersData(ExtendedGroupMembersData _m)
-        {
-            GroupMembersData m = new GroupMembersData();
-            m.AcceptNotices = _m.AcceptNotices;
-            m.AgentPowers = _m.AgentPowers;
-            m.Contribution = _m.Contribution;
-            m.IsOwner = _m.IsOwner;
-            m.ListInProfile = _m.ListInProfile;
-            m.OnlineStatus = _m.OnlineStatus;
-            m.Title = _m.Title;
-
-            string url = string.Empty, first = string.Empty, last = string.Empty, tmp = string.Empty;
-            Util.ParseUniversalUserIdentifier(_m.AgentID, out m.AgentID, out url, out first, out last, out tmp);
-            if (url != string.Empty)
-                m_UserManagement.AddUser(m.AgentID, first, last, url);
-
-            return m;
-        }
-
-        public GroupRoleMembersData ConvertGroupRoleMembersData(ExtendedGroupRoleMembersData _rm)
-        {
-            GroupRoleMembersData rm = new GroupRoleMembersData();
-            rm.RoleID = _rm.RoleID;
-
-            string url = string.Empty, first = string.Empty, last = string.Empty, tmp = string.Empty;
-            Util.ParseUniversalUserIdentifier(_rm.MemberID, out rm.MemberID, out url, out first, out last, out tmp);
-            if (url != string.Empty)
-                m_UserManagement.AddUser(rm.MemberID, first, last, url);
-
-            return rm;
-        }
-
+        m_UserManagement = uman;
     }
+
+    public GroupMembersData ConvertGroupMembersData(ExtendedGroupMembersData _m)
+    {
+        GroupMembersData m = new GroupMembersData();
+        m.AcceptNotices = _m.AcceptNotices;
+        m.AgentPowers = _m.AgentPowers;
+        m.Contribution = _m.Contribution;
+        m.IsOwner = _m.IsOwner;
+        m.ListInProfile = _m.ListInProfile;
+        m.OnlineStatus = _m.OnlineStatus;
+        m.Title = _m.Title;
+
+        string url = string.Empty, first = string.Empty, last = string.Empty, tmp = string.Empty;
+        Util.ParseUniversalUserIdentifier(_m.AgentID, out m.AgentID, out url, out first, out last, out tmp);
+        if (url != string.Empty)
+            m_UserManagement.AddUser(m.AgentID, first, last, url);
+
+        return m;
+    }
+
+    public GroupRoleMembersData ConvertGroupRoleMembersData(ExtendedGroupRoleMembersData _rm)
+    {
+        GroupRoleMembersData rm = new GroupRoleMembersData();
+        rm.RoleID = _rm.RoleID;
+
+        string url = string.Empty, first = string.Empty, last = string.Empty, tmp = string.Empty;
+        Util.ParseUniversalUserIdentifier(_rm.MemberID, out rm.MemberID, out url, out first, out last, out tmp);
+        if (url != string.Empty)
+            m_UserManagement.AddUser(rm.MemberID, first, last, url);
+
+        return rm;
+    }
+
 }

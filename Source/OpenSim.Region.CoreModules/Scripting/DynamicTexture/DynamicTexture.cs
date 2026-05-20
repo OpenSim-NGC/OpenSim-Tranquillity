@@ -27,33 +27,32 @@
 
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture
+namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture;
+
+public class DynamicTexture : IDynamicTexture
 {
-    public class DynamicTexture : IDynamicTexture
+    public string InputCommands { get; private set; }
+    public Uri InputUri { get; private set; }
+    public string InputParams { get; private set; }
+    public byte[] Data { get; private set; }
+    public (int Width, int Height) Size { get; private set; }
+    public bool IsReuseable { get; private set; }
+
+    public DynamicTexture(string inputCommands, string inputParams, byte[] data, (int Width, int Height) size, bool isReuseable)
     {
-        public string InputCommands { get; private set; }
-        public Uri InputUri { get; private set; }
-        public string InputParams { get; private set; }
-        public byte[] Data { get; private set; }
-        public (int Width, int Height) Size { get; private set; }
-        public bool IsReuseable { get; private set; }
+        InputCommands = inputCommands;
+        InputParams = inputParams;
+        Data = data;
+        Size = size;
+        IsReuseable = isReuseable;
+    }
 
-        public DynamicTexture(string inputCommands, string inputParams, byte[] data, (int Width, int Height) size, bool isReuseable)
-        {
-            InputCommands = inputCommands;
-            InputParams = inputParams;
-            Data = data;
-            Size = size;
-            IsReuseable = isReuseable;
-        }
-
-        public DynamicTexture(Uri inputUri, string inputParams, byte[] data, (int Width, int Height) size, bool isReuseable)
-        {
-            InputUri = inputUri;
-            InputParams = inputParams;
-            Data = data;
-            Size = size;
-            IsReuseable = isReuseable;
-        }
+    public DynamicTexture(Uri inputUri, string inputParams, byte[] data, (int Width, int Height) size, bool isReuseable)
+    {
+        InputUri = inputUri;
+        InputParams = inputParams;
+        Data = data;
+        Size = size;
+        IsReuseable = isReuseable;
     }
 }

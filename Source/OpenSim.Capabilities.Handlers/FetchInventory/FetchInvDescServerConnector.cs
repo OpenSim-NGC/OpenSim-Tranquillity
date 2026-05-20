@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using Nini.Config;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
@@ -33,53 +32,51 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 using OpenMetaverse;
-using OpenMetaverse.StructuredData;
 
 
-namespace OpenSim.Capabilities.Handlers
+namespace OpenSim.Capabilities.Handlers;
+
+public class FetchInvDescServerConnector : ServiceConnector
 {
-    public class FetchInvDescServerConnector : ServiceConnector
+    private IInventoryService m_InventoryService;
+    private ILibraryService m_LibraryService;
+    private string m_ConfigName = "CapsService";
+
+    public FetchInvDescServerConnector(IConfigSource config, IHttpServer server, string configName) :
+            base(config, server, configName)
     {
-        private IInventoryService m_InventoryService;
-        private ILibraryService m_LibraryService;
-        private string m_ConfigName = "CapsService";
+        if (configName != String.Empty)
+            m_ConfigName = configName;
 
-        public FetchInvDescServerConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
-        {
-            if (configName != String.Empty)
-                m_ConfigName = configName;
+        IConfig serverConfig = config.Configs[m_ConfigName];
+        if (serverConfig == null)
+            throw new Exception(String.Format("No section '{0}' in config file", m_ConfigName));
 
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section '{0}' in config file", m_ConfigName));
+        string invService = serverConfig.GetString("InventoryService", String.Empty);
 
-            string invService = serverConfig.GetString("InventoryService", String.Empty);
+        if (invService.Length == 0)
+            throw new Exception("No InventoryService in config file");
 
-            if (invService.Length == 0)
-                throw new Exception("No InventoryService in config file");
+        Object[] args = new Object[] { config };
+        m_InventoryService =
+                ServerUtils.LoadPlugin<IInventoryService>(invService, args);
 
-            Object[] args = new Object[] { config };
-            m_InventoryService =
-                    ServerUtils.LoadPlugin<IInventoryService>(invService, args);
+        if (m_InventoryService == null)
+            throw new Exception(String.Format("Failed to load InventoryService from {0}; config is {1}", invService, m_ConfigName));
 
-            if (m_InventoryService == null)
-                throw new Exception(String.Format("Failed to load InventoryService from {0}; config is {1}", invService, m_ConfigName));
+        string libService = serverConfig.GetString("LibraryService", String.Empty);
+        m_LibraryService =
+                ServerUtils.LoadPlugin<ILibraryService>(libService, args);
 
-            string libService = serverConfig.GetString("LibraryService", String.Empty);
-            m_LibraryService =
-                    ServerUtils.LoadPlugin<ILibraryService>(libService, args);
+        ExpiringKey<UUID> m_badRequests = new ExpiringKey<UUID>(30000);
 
-            ExpiringKey<UUID> m_badRequests = new ExpiringKey<UUID>(30000);
+        FetchInvDescHandler webFetchHandler = new FetchInvDescHandler(m_InventoryService, m_LibraryService, null);
+        ISimpleStreamHandler reqHandler
+            = new SimpleStreamHandler("/CAPS/WebFetchInvDesc/", delegate(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+            { 
+                webFetchHandler.FetchInventoryDescendentsRequest(httpRequest, httpResponse, m_badRequests);
+            });
 
-            FetchInvDescHandler webFetchHandler = new FetchInvDescHandler(m_InventoryService, m_LibraryService, null);
-            ISimpleStreamHandler reqHandler
-                = new SimpleStreamHandler("/CAPS/WebFetchInvDesc/", delegate(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-                { 
-                    webFetchHandler.FetchInventoryDescendentsRequest(httpRequest, httpResponse, m_badRequests);
-                });
-
-            server.AddSimpleStreamHandler(reqHandler);
-        }
+        server.AddSimpleStreamHandler(reqHandler);
     }
 }

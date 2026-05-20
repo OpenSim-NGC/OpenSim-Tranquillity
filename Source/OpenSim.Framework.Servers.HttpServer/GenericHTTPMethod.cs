@@ -27,7 +27,6 @@
 
 using System.Collections;
 
-namespace OpenSim.Framework.Servers.HttpServer
-{
-    public delegate Hashtable GenericHTTPMethod(Hashtable request);
-}
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public delegate Hashtable GenericHTTPMethod(Hashtable request);

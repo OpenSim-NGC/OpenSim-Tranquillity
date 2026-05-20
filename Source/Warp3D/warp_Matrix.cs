@@ -1,7 +1,5 @@
-using System;
+namespace Warp3D;
 
-namespace Warp3D
-{
 	public class warp_Matrix
 	{
 		public float m00=1, m01=0, m02=0, m03=0;
@@ -24,44 +22,44 @@ namespace Warp3D
 
 
 
-        public float this[ int column, int row ]
+    public float this[ int column, int row ]
+    {
+        get
         {
-            get
+            switch ( row )
             {
-                switch ( row )
-                {
-                    case 0:
-                        if ( column == 0 ) return m00;
-                        if ( column == 1 ) return m01;
-                        if ( column == 2 ) return m02;
-                        if ( column == 3 ) return m03;
-                        break;
-                    case 1:
-                        if ( column == 0 ) return m11;
-                        if ( column == 1 ) return m11;
-                        if ( column == 2 ) return m12;
-                        if ( column == 3 ) return m13;
-                        break;
-                    case 2:
-                        if ( column == 0 ) return m20;
-                        if ( column == 1 ) return m21;
-                        if ( column == 2 ) return m22;
-                        if ( column == 3 ) return m23;
-                        break;
-                    case 3:
-                        if ( column == 0 ) return m30;
-                        if ( column == 1 ) return m31;
-                        if ( column == 2 ) return m32;
-                        if ( column == 3 ) return m33;
-                        break;
+                case 0:
+                    if ( column == 0 ) return m00;
+                    if ( column == 1 ) return m01;
+                    if ( column == 2 ) return m02;
+                    if ( column == 3 ) return m03;
+                    break;
+                case 1:
+                    if ( column == 0 ) return m11;
+                    if ( column == 1 ) return m11;
+                    if ( column == 2 ) return m12;
+                    if ( column == 3 ) return m13;
+                    break;
+                case 2:
+                    if ( column == 0 ) return m20;
+                    if ( column == 1 ) return m21;
+                    if ( column == 2 ) return m22;
+                    if ( column == 3 ) return m23;
+                    break;
+                case 3:
+                    if ( column == 0 ) return m30;
+                    if ( column == 1 ) return m31;
+                    if ( column == 2 ) return m32;
+                    if ( column == 3 ) return m33;
+                    break;
 
-                    default:
-                        return 0;
-                }
-
-                return 0;
+                default:
+                    return 0;
             }
+
+            return 0;
         }
+    }
 
 		public warp_Matrix()
 		{
@@ -80,47 +78,47 @@ namespace Warp3D
 			return m;
 		}
 
-        public static warp_Matrix quaternionMatrix( warp_Quaternion quat )
-        {
-            warp_Matrix m = new warp_Matrix();
+    public static warp_Matrix quaternionMatrix( warp_Quaternion quat )
+    {
+        warp_Matrix m = new warp_Matrix();
 
-   
-            float xx = quat.X * quat.X;
-            float xy = quat.X * quat.Y;
-            float xz = quat.X * quat.Z;
-            float xw = quat.X * quat.W;
-            float yy = quat.Y * quat.Y;
-            float yz = quat.Y * quat.Z;
-            float yw = quat.Y * quat.W;
-            float zz = quat.Z * quat.Z;
-            float zw = quat.Z * quat.W;
 
-            m.m00 = 1 - 2 * ( yy + zz );
-            m.m01 = 2 * ( xy - zw) ;
-            m.m02 = 2*(xz + yw);
-            m.m10 = 2*(xy + zw);
-            m.m11 = 1 - 2* ( xx + zz );
-            m.m12 = 2*(yz - xw);
-            m.m20 = 2*(xz - yw);
-            m.m21 = 2*(yz + xw);
-            m.m22 = 1 - 2 * ( xx + yy );
+        float xx = quat.X * quat.X;
+        float xy = quat.X * quat.Y;
+        float xz = quat.X * quat.Z;
+        float xw = quat.X * quat.W;
+        float yy = quat.Y * quat.Y;
+        float yz = quat.Y * quat.Z;
+        float yw = quat.Y * quat.W;
+        float zz = quat.Z * quat.Z;
+        float zw = quat.Z * quat.W;
 
-            m.m03 = m.m13 = m.m23 = m.m30 = m.m31 = m.m32 = 0;
-            m.m33 = 1;
-            
-            return m;
-        }
+        m.m00 = 1 - 2 * ( yy + zz );
+        m.m01 = 2 * ( xy - zw) ;
+        m.m02 = 2*(xz + yw);
+        m.m10 = 2*(xy + zw);
+        m.m11 = 1 - 2* ( xx + zz );
+        m.m12 = 2*(yz - xw);
+        m.m20 = 2*(xz - yw);
+        m.m21 = 2*(yz + xw);
+        m.m22 = 1 - 2 * ( xx + yy );
 
-        public warp_Matrix rotateMatrix( warp_Quaternion quat )
-        {
+        m.m03 = m.m13 = m.m23 = m.m30 = m.m31 = m.m32 = 0;
+        m.m33 = 1;
+        
+        return m;
+    }
 
-            reset();
+    public warp_Matrix rotateMatrix( warp_Quaternion quat )
+    {
 
-            warp_Matrix temp = warp_Matrix.quaternionMatrix( quat );
-            warp_Matrix result = warp_Matrix.multiply( this, temp );
+        reset();
+
+        warp_Matrix temp = warp_Matrix.quaternionMatrix( quat );
+        warp_Matrix result = warp_Matrix.multiply( this, temp );
 
 			return result;
-        }
+    }
 
 		public static warp_Matrix scaleMatrix(float dx, float dy, float dz)
 		{
@@ -231,17 +229,17 @@ namespace Warp3D
 			transform(rotateMatrix(dx,dy,dz));
 		}
 
-        public void rotate( warp_Quaternion quat, float x, float y, float z )
-        {
-            transform( rotateMatrix( quat ) );
-        }
+    public void rotate( warp_Quaternion quat, float x, float y, float z )
+    {
+        transform( rotateMatrix( quat ) );
+    }
 
-        public void rotate( warp_Matrix m )
-        {
-            transform( m );
-        }
+    public void rotate( warp_Matrix m )
+    {
+        transform( m );
+    }
 
-        public void scaleSelf( float dx, float dy, float dz )
+    public void scaleSelf( float dx, float dy, float dz )
 		{
 			m00 *= dx;
 			m01 *= dy;
@@ -267,26 +265,26 @@ namespace Warp3D
 			m22 *= d;
 		}
 
-        public void shiftSelf( float dx, float dy, float dz )
-        {
+    public void shiftSelf( float dx, float dy, float dz )
+    {
 			m03 += m00 * dx + m01 * dy + m02 * dz;
 			m13 += m10 * dx + m11 * dy + m12 * dz;
 			m23 += m20 * dx + m21 * dx + m22 * dx;
-        }
+    }
 
-        public void rotateSelf( float dx, float dy, float dz )
-        {
-            preTransform( rotateMatrix( dx, dy, dz ) );
-        }
-        public void rotateSelf( warp_Matrix m  )
+    public void rotateSelf( float dx, float dy, float dz )
+    {
+        preTransform( rotateMatrix( dx, dy, dz ) );
+    }
+    public void rotateSelf( warp_Matrix m  )
 		{
 			preTransform( m );
 		}
 
-        public void rotateSelf( warp_Quaternion quat )
-        {
-           preTransform(rotateMatrix( quat) );
-        }
+    public void rotateSelf( warp_Quaternion quat )
+    {
+       preTransform(rotateMatrix( quat) );
+    }
 
 
 		public void transform(warp_Matrix n)
@@ -402,4 +400,3 @@ namespace Warp3D
 			m30=0; m31=0; m32=0; m33=1;
 		}
 	}
-}

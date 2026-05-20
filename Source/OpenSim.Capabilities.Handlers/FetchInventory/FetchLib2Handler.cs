@@ -27,7 +27,6 @@
 
 using System.Net;
 using System.Reflection;
-using System.Text;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -38,75 +37,74 @@ using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
 using log4net;
 
-namespace OpenSim.Capabilities.Handlers
+namespace OpenSim.Capabilities.Handlers;
+
+public class FetchLib2Handler
 {
-    public class FetchLib2Handler
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IInventoryService m_inventoryService;
+    private ILibraryService m_LibraryService;
+    private UUID m_agentID;
+    private UUID libOwner;
+
+    public FetchLib2Handler(IInventoryService invService, ILibraryService libraryService, UUID agentId)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_inventoryService = invService;
+        m_agentID = agentId;
+        m_LibraryService = libraryService;
+        if(libraryService != null)
+            libOwner = m_LibraryService.LibraryRootFolder.Owner;
+    }
 
-        private IInventoryService m_inventoryService;
-        private ILibraryService m_LibraryService;
-        private UUID m_agentID;
-        private UUID libOwner;
+    public void FetchLibSimpleRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap requestmap, ExpiringKey<UUID> BadRequests)
+    {
+        //m_log.DebugFormat("[FETCH LIB INVENTORY HANDLER]: Received FetchInventory capability request {0}", request);
 
-        public FetchLib2Handler(IInventoryService invService, ILibraryService libraryService, UUID agentId)
+        if (BadRequests == null)
         {
-            m_inventoryService = invService;
-            m_agentID = agentId;
-            m_LibraryService = libraryService;
-            if(libraryService != null)
-                libOwner = m_LibraryService.LibraryRootFolder.Owner;
+            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+            return;
         }
 
-        public void FetchLibSimpleRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap requestmap, ExpiringKey<UUID> BadRequests)
+        if (m_LibraryService == null || m_agentID == UUID.Zero)
         {
-            //m_log.DebugFormat("[FETCH LIB INVENTORY HANDLER]: Received FetchInventory capability request {0}", request);
-
-            if (BadRequests == null)
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-                return;
-            }
-
-            if (m_LibraryService == null || m_agentID == UUID.Zero)
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-                return;
-            }
-
-            OSDArray itemsRequested = (OSDArray)requestmap["items"];
-            UUID[] itemIDs = new UUID[itemsRequested.Count];
-            int i = 0;
-            foreach (OSDMap osdItemId in itemsRequested)
-            {
-                UUID id = osdItemId["item_id"].AsUUID();
-                if (!BadRequests.ContainsKey(id))
-                    itemIDs[i++] = id;
-            }
-
-            InventoryItemBase[] items = m_LibraryService.GetMultipleItems(itemIDs);
-
-            osUTF8 lsl = LLSDxmlEncode2.Start(4096);
-            LLSDxmlEncode2.AddMap(lsl);
-            LLSDxmlEncode2.AddElem("agent_id", m_agentID, lsl);
-            if(items is null || items.Length == 0)
-            {
-                LLSDxmlEncode2.AddEmptyArray("items", lsl);
-            }
-            else
-            {
-                LLSDxmlEncode2.AddArray("items", lsl);
-                foreach (InventoryItemBase item in items)
-                {
-                    if (item != null)
-                        item.ToLLSDxml(lsl);
-                }
-                LLSDxmlEncode2.AddEndArray(lsl);
-            }
-
-            LLSDxmlEncode2.AddEndMap(lsl);
-            httpResponse.RawBuffer = LLSDxmlEncode2.EndToBytes(lsl);
-            httpResponse.StatusCode = (int)HttpStatusCode.OK;
+            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+            return;
         }
+
+        OSDArray itemsRequested = (OSDArray)requestmap["items"];
+        UUID[] itemIDs = new UUID[itemsRequested.Count];
+        int i = 0;
+        foreach (OSDMap osdItemId in itemsRequested)
+        {
+            UUID id = osdItemId["item_id"].AsUUID();
+            if (!BadRequests.ContainsKey(id))
+                itemIDs[i++] = id;
+        }
+
+        InventoryItemBase[] items = m_LibraryService.GetMultipleItems(itemIDs);
+
+        osUTF8 lsl = LLSDxmlEncode2.Start(4096);
+        LLSDxmlEncode2.AddMap(lsl);
+        LLSDxmlEncode2.AddElem("agent_id", m_agentID, lsl);
+        if(items is null || items.Length == 0)
+        {
+            LLSDxmlEncode2.AddEmptyArray("items", lsl);
+        }
+        else
+        {
+            LLSDxmlEncode2.AddArray("items", lsl);
+            foreach (InventoryItemBase item in items)
+            {
+                if (item != null)
+                    item.ToLLSDxml(lsl);
+            }
+            LLSDxmlEncode2.AddEndArray(lsl);
+        }
+
+        LLSDxmlEncode2.AddEndMap(lsl);
+        httpResponse.RawBuffer = LLSDxmlEncode2.EndToBytes(lsl);
+        httpResponse.StatusCode = (int)HttpStatusCode.OK;
     }
 }

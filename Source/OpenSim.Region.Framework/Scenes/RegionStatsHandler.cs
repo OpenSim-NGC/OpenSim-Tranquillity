@@ -25,120 +25,106 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Net;
-using System.Reflection;
-using System.Text;
-using log4net;
-using Nini.Config;
-using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
-using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
-using OpenSim.Framework.Monitoring;
-using OpenSim.Region.Framework;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Scenes
+namespace OpenSim.Region.Framework.Scenes;
+
+public class RegionStatsSimpleHandler : SimpleStreamHandler
 {
-    public class RegionStatsSimpleHandler : SimpleStreamHandler
+    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private string osXStatsURI = String.Empty;
+    //private string osSecret = String.Empty;
+    private OpenSim.Framework.RegionInfo regionInfo;
+    public string localZone = TimeZoneInfo.Local.StandardName;
+    public TimeSpan utcOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
+
+    public RegionStatsSimpleHandler(RegionInfo region_info) : base("/" + Util.SHA1Hash(region_info.regionSecret))
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private string osXStatsURI = String.Empty;
-        //private string osSecret = String.Empty;
-        private OpenSim.Framework.RegionInfo regionInfo;
-        public string localZone = TimeZoneInfo.Local.StandardName;
-        public TimeSpan utcOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
-
-        public RegionStatsSimpleHandler(RegionInfo region_info) : base("/" + Util.SHA1Hash(region_info.regionSecret))
-        {
-            regionInfo = region_info;
-            osXStatsURI = Util.SHA1Hash(regionInfo.osSecret);
-        }
-
-        protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            if (regionInfo == null)
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.NotImplemented;
-                return;
-            }
-
-            if (httpRequest.HttpMethod != "GET")
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-                return;
-            }
-            httpResponse.RawBuffer = Util.UTF8.GetBytes(Report());
-        }
-
-        private string Report()
-        {
-            OSDMap args = new OSDMap(30);
-            //int time = Util.ToUnixTime(DateTime.Now);
-            args["OSStatsURI"] = OSD.FromString("http://" + regionInfo.ExternalHostName + ":" + regionInfo.HttpPort + "/" + osXStatsURI + "/");
-            args["TimeZoneName"] = OSD.FromString(localZone);
-            args["TimeZoneOffs"] = OSD.FromReal(utcOffset.TotalHours);
-            args["UxTime"] = OSD.FromInteger(Util.ToUnixTime(DateTime.Now));
-            args["Memory"] = OSD.FromReal(Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0));
-            args["Version"] = OSD.FromString(VersionInfo.Version);
-
-            string strBuffer = "";
-            strBuffer = OSDParser.SerializeJsonString(args);
-
-            return strBuffer;
-         }
+        regionInfo = region_info;
+        osXStatsURI = Util.SHA1Hash(regionInfo.osSecret);
     }
 
-    // legacy do not use. This will removed in future
-    public class RegionStatsHandler : BaseStreamHandler
+    protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private string osXStatsURI = String.Empty;
-        //private string osSecret = String.Empty;
-        private OpenSim.Framework.RegionInfo regionInfo;
-        public string localZone = TimeZoneInfo.Local.StandardName;
-        public TimeSpan utcOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
-
-        public RegionStatsHandler(RegionInfo region_info)
-            : base("GET", "/" + Util.SHA1Hash(region_info.regionSecret), "RegionStats", "Region Statistics")
+        if (regionInfo == null)
         {
-            regionInfo = region_info;
-            osXStatsURI = Util.SHA1Hash(regionInfo.osSecret);
+            httpResponse.StatusCode = (int)HttpStatusCode.NotImplemented;
+            return;
         }
 
-        protected override byte[] ProcessRequest(
-            string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        if (httpRequest.HttpMethod != "GET")
         {
-            return Util.UTF8.GetBytes(Report());
+            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+            return;
         }
+        httpResponse.RawBuffer = Util.UTF8.GetBytes(Report());
+    }
 
-        public override string ContentType
-        {
-            get { return "text/plain"; }
-        }
+    private string Report()
+    {
+        OSDMap args = new OSDMap(30);
+        //int time = Util.ToUnixTime(DateTime.Now);
+        args["OSStatsURI"] = OSD.FromString("http://" + regionInfo.ExternalHostName + ":" + regionInfo.HttpPort + "/" + osXStatsURI + "/");
+        args["TimeZoneName"] = OSD.FromString(localZone);
+        args["TimeZoneOffs"] = OSD.FromReal(utcOffset.TotalHours);
+        args["UxTime"] = OSD.FromInteger(Util.ToUnixTime(DateTime.Now));
+        args["Memory"] = OSD.FromReal(Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0));
+        args["Version"] = OSD.FromString(VersionInfo.Version);
 
-        private string Report()
-        {
-            OSDMap args = new OSDMap(30);
-            //int time = Util.ToUnixTime(DateTime.Now);
-            args["OSStatsURI"] = OSD.FromString("http://" + regionInfo.ExternalHostName + ":" + regionInfo.HttpPort + "/" + osXStatsURI + "/");
-            args["TimeZoneName"] = OSD.FromString(localZone);
-            args["TimeZoneOffs"] = OSD.FromReal(utcOffset.TotalHours);
-            args["UxTime"] = OSD.FromInteger(Util.ToUnixTime(DateTime.Now));
-            args["Memory"] = OSD.FromReal(Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0));
-            args["Version"] = OSD.FromString(VersionInfo.Version);
+        string strBuffer = "";
+        strBuffer = OSDParser.SerializeJsonString(args);
 
-            string strBuffer = "";
-            strBuffer = OSDParser.SerializeJsonString(args);
+        return strBuffer;
+     }
+}
 
-            return strBuffer;
-        }
+// legacy do not use. This will removed in future
+public class RegionStatsHandler : BaseStreamHandler
+{
+    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private string osXStatsURI = String.Empty;
+    //private string osSecret = String.Empty;
+    private OpenSim.Framework.RegionInfo regionInfo;
+    public string localZone = TimeZoneInfo.Local.StandardName;
+    public TimeSpan utcOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
+
+    public RegionStatsHandler(RegionInfo region_info)
+        : base("GET", "/" + Util.SHA1Hash(region_info.regionSecret), "RegionStats", "Region Statistics")
+    {
+        regionInfo = region_info;
+        osXStatsURI = Util.SHA1Hash(regionInfo.osSecret);
+    }
+
+    protected override byte[] ProcessRequest(
+        string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        return Util.UTF8.GetBytes(Report());
+    }
+
+    public override string ContentType
+    {
+        get { return "text/plain"; }
+    }
+
+    private string Report()
+    {
+        OSDMap args = new OSDMap(30);
+        //int time = Util.ToUnixTime(DateTime.Now);
+        args["OSStatsURI"] = OSD.FromString("http://" + regionInfo.ExternalHostName + ":" + regionInfo.HttpPort + "/" + osXStatsURI + "/");
+        args["TimeZoneName"] = OSD.FromString(localZone);
+        args["TimeZoneOffs"] = OSD.FromReal(utcOffset.TotalHours);
+        args["UxTime"] = OSD.FromInteger(Util.ToUnixTime(DateTime.Now));
+        args["Memory"] = OSD.FromReal(Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0));
+        args["Version"] = OSD.FromString(VersionInfo.Version);
+
+        string strBuffer = "";
+        strBuffer = OSDParser.SerializeJsonString(args);
+
+        return strBuffer;
     }
 }

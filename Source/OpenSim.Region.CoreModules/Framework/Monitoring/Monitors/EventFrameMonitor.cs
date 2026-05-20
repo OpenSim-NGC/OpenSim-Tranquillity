@@ -27,39 +27,38 @@
 
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors
+namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors;
+
+class EventFrameMonitor : IMonitor
 {
-    class EventFrameMonitor : IMonitor
+    private readonly Scene m_scene;
+
+    public EventFrameMonitor(Scene scene)
     {
-        private readonly Scene m_scene;
-
-        public EventFrameMonitor(Scene scene)
-        {
-            m_scene = scene;
-        }
-
-        #region Implementation of IMonitor
-
-        public string GetName()
-        {
-            return "EventFrameMonitor";
-        }
-
-        public double GetValue()
-        {
-            return m_scene.MonitorEventTime;
-        }
-
-        public string GetFriendlyName()
-        {
-            return "Total Event Frame Time";
-        }
-
-        public string GetFriendlyValue()
-        {
-            return (int)GetValue() + "ms";
-        }
-
-        #endregion
+        m_scene = scene;
     }
+
+    #region Implementation of IMonitor
+
+    public string GetName()
+    {
+        return "EventFrameMonitor";
+    }
+
+    public double GetValue()
+    {
+        return m_scene.MonitorEventTime;
+    }
+
+    public string GetFriendlyName()
+    {
+        return "Total Event Frame Time";
+    }
+
+    public string GetFriendlyValue()
+    {
+        return (int)GetValue() + "ms";
+    }
+
+    #endregion
 }

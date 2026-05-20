@@ -27,80 +27,79 @@
 
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.PaintBrushes
+namespace OpenSim.Region.CoreModules.World.Terrain.PaintBrushes;
+
+public class SmoothSphere : ITerrainPaintableEffect
 {
-    public class SmoothSphere : ITerrainPaintableEffect
+    #region ITerrainPaintableEffect Members
+
+    public void PaintEffect(ITerrainChannel map, bool[,] mask, float rx, float ry, float rz,
+        float size, float strength, int startX, int endX, int startY, int endY)
     {
-        #region ITerrainPaintableEffect Members
+        float distancefactor;
+        float dx2;
 
-        public void PaintEffect(ITerrainChannel map, bool[,] mask, float rx, float ry, float rz,
-            float size, float strength, int startX, int endX, int startY, int endY)
+        float[,] tweak = new float[endX - startX + 1, endY - startY + 1];
+        int ssize = (int)(size + 0.5);
+        if(ssize > 4)
+            ssize = 4;
+
+        size *= size;
+
+        if (strength > 1.0f)
+            strength = 1.0f;
+
+        // compute delta map
+        for (int x = startX,  i = 0; x <= endX; x++, i++)
         {
-            float distancefactor;
-            float dx2;
-
-            float[,] tweak = new float[endX - startX + 1, endY - startY + 1];
-            int ssize = (int)(size + 0.5);
-            if(ssize > 4)
-                ssize = 4;
-
-            size *= size;
-
-            if (strength > 1.0f)
-                strength = 1.0f;
-
-            // compute delta map
-            for (int x = startX,  i = 0; x <= endX; x++, i++)
+            dx2 = (x - rx) * (x - rx);
+            for (int y = startY, j = 0; y <= endY; y++, j++)
             {
-                dx2 = (x - rx) * (x - rx);
-                for (int y = startY, j = 0; y <= endY; y++, j++)
+                if (!mask[x, y])
+                    continue;
+
+                distancefactor = (dx2 + (y - ry) * (y - ry)) / size;
+                if (distancefactor <= 1.0f)
                 {
-                    if (!mask[x, y])
-                        continue;
+                    distancefactor = strength * (1.0f - distancefactor);
 
-                    distancefactor = (dx2 + (y - ry) * (y - ry)) / size;
-                    if (distancefactor <= 1.0f)
+                    float average = 0f;
+                    int avgsteps = 0;
+
+                    for (int n = x - ssize; n <=  x + ssize; ++n)
                     {
-                        distancefactor = strength * (1.0f - distancefactor);
-
-                        float average = 0f;
-                        int avgsteps = 0;
-
-                        for (int n = x - ssize; n <=  x + ssize; ++n)
+                        if(n >= 0 && n < map.Width)
                         {
-                            if(n >= 0 && n < map.Width)
+                            for (int l = y - ssize; l <= y + ssize; ++l)
                             {
-                                for (int l = y - ssize; l <= y + ssize; ++l)
+                                if (l >= 0 && l < map.Height)
                                 {
-                                    if (l >= 0 && l < map.Height)
-                                    {
-                                        avgsteps++;
-                                        average += map[n, l];
-                                    }
+                                    avgsteps++;
+                                    average += map[n, l];
                                 }
                             }
                         }
-                        average /= avgsteps;
-                        tweak[i, j] = distancefactor * (map[x, y] - average);
                     }
-                }
-            }
-            // blend in map
-            for (int x = startX, i = 0; x <= endX; x++, i++)
-            {
-                for (int y = startY, j = 0; y <= endY; y++, j++)
-                {
-                    float tz = tweak[i, j];
-                    if(tz != 0.0)
-                    {
-                        float newz = map[x, y] - tz;
-                        if (newz > 0.0)
-                            map[x, y] = newz;
-                    }
+                    average /= avgsteps;
+                    tweak[i, j] = distancefactor * (map[x, y] - average);
                 }
             }
         }
-
-        #endregion
+        // blend in map
+        for (int x = startX, i = 0; x <= endX; x++, i++)
+        {
+            for (int y = startY, j = 0; y <= endY; y++, j++)
+            {
+                float tz = tweak[i, j];
+                if(tz != 0.0)
+                {
+                    float newz = map[x, y] - tz;
+                    if (newz > 0.0)
+                        map[x, y] = newz;
+                }
+            }
+        }
     }
+
+    #endregion
 }

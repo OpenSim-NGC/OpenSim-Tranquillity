@@ -33,113 +33,112 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.OptionalModules.ViewerSupport
+namespace OpenSim.Region.OptionalModules.ViewerSupport;
+
+public class GodNamesModule : ISharedRegionModule
 {
-    public class GodNamesModule : ISharedRegionModule
+    // Infrastructure
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    // Configuration
+    private static bool m_enabled = false;
+    private static List<String> m_lastNames = new List<String>();
+    private static List<String> m_fullNames = new List<String>();
+
+    public void Initialise(IConfigSource config)
     {
-        // Infrastructure
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        IConfig moduleConfig = config.Configs["GodNames"];
 
-        // Configuration
-        private static bool m_enabled = false;
-        private static List<String> m_lastNames = new List<String>();
-        private static List<String> m_fullNames = new List<String>();
+        if (moduleConfig == null) {
+            return;
+        }
 
-        public void Initialise(IConfigSource config)
+        if (!moduleConfig.GetBoolean("Enabled", false)) {
+            m_log.Info("[GODNAMES]: Addon is disabled");
+            return;
+        }
+
+        m_log.Info("[GODNAMES]: Enabled");
+        m_enabled = true;
+        string conf_str = moduleConfig.GetString("FullNames", String.Empty);
+        if (conf_str != String.Empty)
         {
-            IConfig moduleConfig = config.Configs["GodNames"];
-
-            if (moduleConfig == null) {
-                return;
-            }
-
-            if (!moduleConfig.GetBoolean("Enabled", false)) {
-                m_log.Info("[GODNAMES]: Addon is disabled");
-                return;
-            }
-
-            m_log.Info("[GODNAMES]: Enabled");
-            m_enabled = true;
-            string conf_str = moduleConfig.GetString("FullNames", String.Empty);
-            if (conf_str != String.Empty)
-            {
-                foreach (string strl in conf_str.Split(',')) {
-                    string strlan = strl.Trim(" \t".ToCharArray());
-                    m_log.DebugFormat("[GODNAMES]: Adding {0} as a God name", strlan);
-                    m_fullNames.Add(strlan);
-                }
-            }
-
-            conf_str = moduleConfig.GetString("Surnames", String.Empty);
-            if (conf_str != String.Empty)
-            {
-                foreach (string strl in conf_str.Split(',')) {
-                    string strlan = strl.Trim(" \t".ToCharArray());
-                    m_log.DebugFormat("[GODNAMES]: Adding {0} as a God last name", strlan);
-                    m_lastNames.Add(strlan);
-                }
+            foreach (string strl in conf_str.Split(',')) {
+                string strlan = strl.Trim(" \t".ToCharArray());
+                m_log.DebugFormat("[GODNAMES]: Adding {0} as a God name", strlan);
+                m_fullNames.Add(strlan);
             }
         }
 
-        public void AddRegion(Scene scene) {
-            /*no op*/
-        }
-
-        public void RemoveRegion(Scene scene) {
-            /*no op*/
-        }
-
-        public void PostInitialise() {
-            /*no op*/
-        }
-
-        public void Close() {
-            /*no op*/
-        }
-
-        public Type ReplaceableInterface {
-            get { return null; }
-        }
-
-        public string Name {
-            get { return "Godnames"; }
-        }
-
-        public bool IsSharedModule {
-            get { return true; }
-        }
-
-        public virtual void RegionLoaded(Scene scene)
+        conf_str = moduleConfig.GetString("Surnames", String.Empty);
+        if (conf_str != String.Empty)
         {
-            if (!m_enabled)
-                return;
-
-            ISimulatorFeaturesModule featuresModule = scene.RequestModuleInterface<ISimulatorFeaturesModule>();
-
-            if (featuresModule != null)
-                featuresModule.OnSimulatorFeaturesRequest += OnSimulatorFeaturesRequest;
-
-        }
-
-        private void OnSimulatorFeaturesRequest(UUID agentID, ref OSDMap features)
-        {
-            OSD namesmap = new OSDMap();
-            if (features.ContainsKey("god_names"))
-                namesmap = features["god_names"];
-            else
-                features["god_names"] = namesmap;
-
-            OSDArray fnames = new OSDArray();
-            foreach (string name in m_fullNames) {
-                fnames.Add(name);
+            foreach (string strl in conf_str.Split(',')) {
+                string strlan = strl.Trim(" \t".ToCharArray());
+                m_log.DebugFormat("[GODNAMES]: Adding {0} as a God last name", strlan);
+                m_lastNames.Add(strlan);
             }
-            ((OSDMap)namesmap)["full_names"] = fnames;
-
-            OSDArray lnames = new OSDArray();
-            foreach (string name in m_lastNames) {
-                lnames.Add(name);
-            }
-            ((OSDMap)namesmap)["last_names"] = lnames;
         }
+    }
+
+    public void AddRegion(Scene scene) {
+        /*no op*/
+    }
+
+    public void RemoveRegion(Scene scene) {
+        /*no op*/
+    }
+
+    public void PostInitialise() {
+        /*no op*/
+    }
+
+    public void Close() {
+        /*no op*/
+    }
+
+    public Type ReplaceableInterface {
+        get { return null; }
+    }
+
+    public string Name {
+        get { return "Godnames"; }
+    }
+
+    public bool IsSharedModule {
+        get { return true; }
+    }
+
+    public virtual void RegionLoaded(Scene scene)
+    {
+        if (!m_enabled)
+            return;
+
+        ISimulatorFeaturesModule featuresModule = scene.RequestModuleInterface<ISimulatorFeaturesModule>();
+
+        if (featuresModule != null)
+            featuresModule.OnSimulatorFeaturesRequest += OnSimulatorFeaturesRequest;
+
+    }
+
+    private void OnSimulatorFeaturesRequest(UUID agentID, ref OSDMap features)
+    {
+        OSD namesmap = new OSDMap();
+        if (features.ContainsKey("god_names"))
+            namesmap = features["god_names"];
+        else
+            features["god_names"] = namesmap;
+
+        OSDArray fnames = new OSDArray();
+        foreach (string name in m_fullNames) {
+            fnames.Add(name);
+        }
+        ((OSDMap)namesmap)["full_names"] = fnames;
+
+        OSDArray lnames = new OSDArray();
+        foreach (string name in m_lastNames) {
+            lnames.Add(name);
+        }
+        ((OSDMap)namesmap)["last_names"] = lnames;
     }
 }

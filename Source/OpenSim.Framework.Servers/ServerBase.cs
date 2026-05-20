@@ -25,16 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Runtime;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 using log4net;
 using log4net.Appender;
 using log4net.Core;
@@ -929,22 +924,6 @@ public class ServerBase : IServerBase
         int allocatedThreads = 0;
         int inUseThreads = 0;
         int waitingCallbacks = 0;
-
-        if (Util.FireAndForgetMethod == FireAndForgetMethod.SmartThreadPool)
-        {
-            STPInfo stpi = Util.GetSmartThreadPoolInfo();
-
-            // ROBUST currently leaves this the FireAndForgetMethod but never actually initializes the threadpool.
-            if (stpi != null)
-            {
-                threadPoolUsed = "SmartThreadPool";
-                maxThreads = stpi.MaxThreads;
-                minThreads = stpi.MinThreads;
-                inUseThreads = stpi.InUseThreads;
-                allocatedThreads = stpi.ActiveThreads;
-                waitingCallbacks = stpi.WaitingCallbacks;
-            }
-        }
 
         if (threadPoolUsed != null)
         {

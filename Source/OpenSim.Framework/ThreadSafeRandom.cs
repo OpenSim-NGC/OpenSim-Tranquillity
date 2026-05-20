@@ -27,49 +27,46 @@
 
 // legacy Use Random.Shared instead
 
-using System;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+/// <summary>
+/// A thread-safe Random since the .NET version is not.
+/// See http://msdn.microsoft.com/en-us/library/system.random%28v=vs.100%29.aspx
+/// </summary>
+public class ThreadSafeRandom : Random
 {
-    /// <summary>
-    /// A thread-safe Random since the .NET version is not.
-    /// See http://msdn.microsoft.com/en-us/library/system.random%28v=vs.100%29.aspx
-    /// </summary>
-    public class ThreadSafeRandom : Random
+    private readonly object mainLock = new();
+    public ThreadSafeRandom() : base() {}
+
+    public ThreadSafeRandom(int seed): base (seed) {}
+
+    public override int Next()
     {
-        private readonly object mainLock = new();
-        public ThreadSafeRandom() : base() {}
+        lock (mainLock)
+            return base.Next();
+    }
 
-        public ThreadSafeRandom(int seed): base (seed) {}
+    public override int Next(int maxValue)
+    {
+        lock (mainLock)
+            return base.Next(maxValue);
+    }
 
-        public override int Next()
-        {
-            lock (mainLock)
-                return base.Next();
-        }
+    public override int Next(int minValue, int maxValue)
+    {
+        lock (mainLock)
+            return base.Next(minValue, maxValue);
+    }
 
-        public override int Next(int maxValue)
-        {
-            lock (mainLock)
-                return base.Next(maxValue);
-        }
+    public override void NextBytes(byte[] buffer)
+    {
+        lock (mainLock)
+            base.NextBytes(buffer);
+    }
 
-        public override int Next(int minValue, int maxValue)
-        {
-            lock (mainLock)
-                return base.Next(minValue, maxValue);
-        }
-
-        public override void NextBytes(byte[] buffer)
-        {
-            lock (mainLock)
-                base.NextBytes(buffer);
-        }
-
-        public override double NextDouble()
-        {
-            lock (mainLock)
-                return base.NextDouble();
-        }
+    public override double NextDouble()
+    {
+        lock (mainLock)
+            return base.NextDouble();
     }
 }

@@ -34,90 +34,89 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases;
+
+public class RemoteUserAliasServicesConnector : UserAliasServicesConnector,
+        ISharedRegionModule, IUserAliasService
 {
-    public class RemoteUserAliasServicesConnector : UserAliasServicesConnector,
-            ISharedRegionModule, IUserAliasService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private bool m_Enabled = false;
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        private bool m_Enabled = false;
+    public string Name
+    {
+        get { return "RemoteUserAliasServicesConnector"; }
+    }
 
-        public Type ReplaceableInterface
+    public override void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "RemoteUserAliasServicesConnector"; }
-        }
-
-        public override void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("UserAliasServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("UserAliasServices", "");
-                if (name == Name)
+                IConfig userConfig = source.Configs["UserAliasService"];
+                if (userConfig == null)
                 {
-                    IConfig userConfig = source.Configs["UserAliasService"];
-                    if (userConfig == null)
-                    {
-                        m_log.Error("[USER CONNECTOR]: UserAliasService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    m_Enabled = true;
-
-                    base.Initialise(source);
-
-                    m_log.Info("[USER CONNECTOR]: Remote user aliases enabled");
+                    m_log.Error("[USER CONNECTOR]: UserAliasService missing from OpenSim.ini");
+                    return;
                 }
+
+                m_Enabled = true;
+
+                base.Initialise(source);
+
+                m_log.Info("[USER CONNECTOR]: Remote user aliases enabled");
             }
         }
+    }
 
-        public void PostInitialise()
-        {
-            if (!m_Enabled)
-                return;
-        }
+    public void PostInitialise()
+    {
+        if (!m_Enabled)
+            return;
+    }
 
-        public void Close()
-        {
-            if (!m_Enabled)
-                return;
-        }
+    public void Close()
+    {
+        if (!m_Enabled)
+            return;
+    }
 
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
 
-            scene.RegisterModuleInterface<IUserAliasService>(this);
+        scene.RegisterModuleInterface<IUserAliasService>(this);
 
-            scene.EventManager.OnNewClient += OnNewClient;
-        }
+        scene.EventManager.OnNewClient += OnNewClient;
+    }
 
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
 
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
 
-        // When a user actually enters the sim, clear them from
-        // cache so the sim will have the current values for
-        // flags, title, etc. And country, don't forget country!
-        private void OnNewClient(IClientAPI client)
-        {
-        }
+    // When a user actually enters the sim, clear them from
+    // cache so the sim will have the current values for
+    // flags, title, etc. And country, don't forget country!
+    private void OnNewClient(IClientAPI client)
+    {
     }
 }

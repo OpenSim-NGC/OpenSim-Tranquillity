@@ -25,19 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+public interface IRegistryCore
 {
-    public interface IRegistryCore
-    {
-        T Get<T>();
-        void RegisterInterface<T>(T iface);
-        bool TryGet<T>(out T iface);
+    T Get<T>();
+    void RegisterInterface<T>(T iface);
+    bool TryGet<T>(out T iface);
 
-        void StackModuleInterface<M>(M mod);
-        T[] RequestModuleInterfaces<T>();
-    }
+    void StackModuleInterface<M>(M mod);
+    T[] RequestModuleInterfaces<T>();
 }

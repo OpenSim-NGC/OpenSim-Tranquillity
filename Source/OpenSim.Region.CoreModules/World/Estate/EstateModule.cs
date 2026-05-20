@@ -35,238 +35,237 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Region.CoreModules.World.Estate
+namespace OpenSim.Region.CoreModules.World.Estate;
+
+public class EstateModule : ISharedRegionModule
 {
-    public class EstateModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected List<Scene> m_Scenes = new List<Scene>();
+    protected bool m_InInfoUpdate = false;
+    private string token = "7db8eh2gvgg45jj";
+    protected bool m_enabled = false;
+
+    public bool InInfoUpdate
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return m_InInfoUpdate; }
+        set { m_InInfoUpdate = value; }
+    }
 
-        protected List<Scene> m_Scenes = new List<Scene>();
-        protected bool m_InInfoUpdate = false;
-        private string token = "7db8eh2gvgg45jj";
-        protected bool m_enabled = false;
+    public List<Scene> Scenes
+    {
+        get { return m_Scenes; }
+    }
 
-        public bool InInfoUpdate
+    protected EstateConnector m_EstateConnector;
+
+    public void Initialise(IConfigSource config)
+    {
+        uint port = MainServer.Instance.Port;
+
+        IConfig estateConfig = config.Configs["Estates"];
+        if (estateConfig != null)
         {
-            get { return m_InInfoUpdate; }
-            set { m_InInfoUpdate = value; }
-        }
-
-        public List<Scene> Scenes
-        {
-            get { return m_Scenes; }
-        }
-
-        protected EstateConnector m_EstateConnector;
-
-        public void Initialise(IConfigSource config)
-        {
-            uint port = MainServer.Instance.Port;
-
-            IConfig estateConfig = config.Configs["Estates"];
-            if (estateConfig != null)
-            {
-                if (estateConfig.GetString("EstateCommunicationsHandler", Name) == Name)
-                    m_enabled = true;
-                else
-                    return;
-
-                port = (uint)estateConfig.GetInt("Port", 0);
-                // this will need to came from somewhere else
-                token = estateConfig.GetString("Token", token);
-            }
-            else
-            {
+            if (estateConfig.GetString("EstateCommunicationsHandler", Name) == Name)
                 m_enabled = true;
-            }
-
-            m_EstateConnector = new EstateConnector(this, token, port);
-
-            if(port == 0)
-                 port = MainServer.Instance.Port;
-
-            // Instantiate the request handler
-            IHttpServer server = MainServer.GetHttpServer(port);
-            server.AddSimpleStreamHandler(new EstateSimpleRequestHandler(this, token));
-        }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_enabled)
+            else
                 return;
 
-            lock (m_Scenes)
-                m_Scenes.Add(scene);
+            port = (uint)estateConfig.GetInt("Port", 0);
+            // this will need to came from somewhere else
+            token = estateConfig.GetString("Token", token);
+        }
+        else
+        {
+            m_enabled = true;
         }
 
-        public void RegionLoaded(Scene scene)
+        m_EstateConnector = new EstateConnector(this, token, port);
+
+        if(port == 0)
+             port = MainServer.Instance.Port;
+
+        // Instantiate the request handler
+        IHttpServer server = MainServer.GetHttpServer(port);
+        server.AddSimpleStreamHandler(new EstateSimpleRequestHandler(this, token));
+    }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_enabled)
+            return;
+
+        lock (m_Scenes)
+            m_Scenes.Add(scene);
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_enabled)
+            return;
+
+        IEstateModule em = scene.RequestModuleInterface<IEstateModule>();
+
+        em.OnRegionInfoChange += OnRegionInfoChange;
+        em.OnEstateInfoChange += OnEstateInfoChange;
+        em.OnEstateMessage += OnEstateMessage;
+        em.OnEstateTeleportOneUserHomeRequest += OnEstateTeleportOneUserHomeRequest;
+        em.OnEstateTeleportAllUsersHomeRequest += OnEstateTeleportAllUsersHomeRequest;
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_enabled)
+            return;
+
+        lock (m_Scenes)
+            m_Scenes.Remove(scene);
+    }
+
+    public string Name
+    {
+        get { return "EstateModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    private Scene FindScene(UUID RegionID)
+    {
+        foreach (Scene s in m_Scenes)
         {
-            if (!m_enabled)
-                return;
-
-            IEstateModule em = scene.RequestModuleInterface<IEstateModule>();
-
-            em.OnRegionInfoChange += OnRegionInfoChange;
-            em.OnEstateInfoChange += OnEstateInfoChange;
-            em.OnEstateMessage += OnEstateMessage;
-            em.OnEstateTeleportOneUserHomeRequest += OnEstateTeleportOneUserHomeRequest;
-            em.OnEstateTeleportAllUsersHomeRequest += OnEstateTeleportAllUsersHomeRequest;
+            if (s.RegionInfo.RegionID.Equals(RegionID))
+                return s;
         }
 
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_enabled)
-                return;
+        return null;
+    }
 
-            lock (m_Scenes)
-                m_Scenes.Remove(scene);
-        }
+    private void OnRegionInfoChange(UUID RegionID)
+    {
+        Scene s = FindScene(RegionID);
+        if (s == null)
+            return;
 
-        public string Name
-        {
-            get { return "EstateModule"; }
-        }
+        if (!m_InInfoUpdate)
+            m_EstateConnector.SendUpdateCovenant(s.RegionInfo.EstateSettings.EstateID, s.RegionInfo.RegionSettings.Covenant);
+    }
 
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
+    private void OnEstateInfoChange(UUID RegionID)
+    {
+        Scene s = FindScene(RegionID);
+        if (s == null)
+            return;
 
-        private Scene FindScene(UUID RegionID)
+        if (!m_InInfoUpdate)
+            m_EstateConnector.SendUpdateEstate(s.RegionInfo.EstateSettings.EstateID);
+    }
+
+    private void OnEstateMessage(UUID RegionID, UUID FromID, string FromName, string Message)
+    {
+        Scene senderScenes = FindScene(RegionID);
+        if (senderScenes == null)
+            return;
+
+        uint estateID = senderScenes.RegionInfo.EstateSettings.EstateID;
+
+        foreach (Scene s in m_Scenes)
         {
-            foreach (Scene s in m_Scenes)
+            if (s.RegionInfo.EstateSettings.EstateID == estateID)
             {
-                if (s.RegionInfo.RegionID.Equals(RegionID))
-                    return s;
-            }
-
-            return null;
-        }
-
-        private void OnRegionInfoChange(UUID RegionID)
-        {
-            Scene s = FindScene(RegionID);
-            if (s == null)
-                return;
-
-            if (!m_InInfoUpdate)
-                m_EstateConnector.SendUpdateCovenant(s.RegionInfo.EstateSettings.EstateID, s.RegionInfo.RegionSettings.Covenant);
-        }
-
-        private void OnEstateInfoChange(UUID RegionID)
-        {
-            Scene s = FindScene(RegionID);
-            if (s == null)
-                return;
-
-            if (!m_InInfoUpdate)
-                m_EstateConnector.SendUpdateEstate(s.RegionInfo.EstateSettings.EstateID);
-        }
-
-        private void OnEstateMessage(UUID RegionID, UUID FromID, string FromName, string Message)
-        {
-            Scene senderScenes = FindScene(RegionID);
-            if (senderScenes == null)
-                return;
-
-            uint estateID = senderScenes.RegionInfo.EstateSettings.EstateID;
-
-            foreach (Scene s in m_Scenes)
-            {
-                if (s.RegionInfo.EstateSettings.EstateID == estateID)
+                IDialogModule dm = s.RequestModuleInterface<IDialogModule>();
+                if (dm != null)
                 {
-                    IDialogModule dm = s.RequestModuleInterface<IDialogModule>();
-                    if (dm != null)
-                    {
-                        dm.SendNotificationToUsersInRegion(FromID, FromName, Message);
-                    }
+                    dm.SendNotificationToUsersInRegion(FromID, FromName, Message);
                 }
             }
-            if (!m_InInfoUpdate)
-                m_EstateConnector.SendEstateMessage(estateID, FromID, FromName, Message);
         }
+        if (!m_InInfoUpdate)
+            m_EstateConnector.SendEstateMessage(estateID, FromID, FromName, Message);
+    }
 
-        private void OnEstateTeleportOneUserHomeRequest(IClientAPI client, UUID invoice, UUID senderID, UUID prey, bool kick)
+    private void OnEstateTeleportOneUserHomeRequest(IClientAPI client, UUID invoice, UUID senderID, UUID prey, bool kick)
+    {
+        if (prey.IsZero())
+            return;
+
+        Scene scene = client.Scene as Scene;
+        if (scene == null)
+            return;
+
+        if (!scene.Permissions.CanIssueEstateCommand(client.AgentId, false))
+            return;
+
+        uint estateID = scene.RegionInfo.EstateSettings.EstateID;
+        foreach (Scene s in m_Scenes)
         {
-            if (prey.IsZero())
-                return;
+            if (s.RegionInfo.EstateSettings.EstateID != estateID)
+                continue;
 
-            Scene scene = client.Scene as Scene;
-            if (scene == null)
-                return;
-
-            if (!scene.Permissions.CanIssueEstateCommand(client.AgentId, false))
-                return;
-
-            uint estateID = scene.RegionInfo.EstateSettings.EstateID;
-            foreach (Scene s in m_Scenes)
+            ScenePresence p = scene.GetScenePresence(prey);
+            if (p != null && !p.IsChildAgent && !p.IsDeleted && !p.IsInTransit)
             {
-                if (s.RegionInfo.EstateSettings.EstateID != estateID)
-                    continue;
-
-                ScenePresence p = scene.GetScenePresence(prey);
-                if (p != null && !p.IsChildAgent && !p.IsDeleted && !p.IsInTransit)
+                if (kick)
                 {
-                    if (kick)
+                    p.ControllingClient.Kick("You have been kicked out");
+                    s.CloseAgent(p.UUID, false);
+                }
+                else
+                {
+                    p.ControllingClient.SendTeleportStart(16);
+                    if (!s.TeleportClientHome(prey, client))
                     {
-                        p.ControllingClient.Kick("You have been kicked out");
+                        p.ControllingClient.Kick("You were teleported home by the region owner, but the TP failed");
                         s.CloseAgent(p.UUID, false);
                     }
-                    else
+                }
+                return;
+            }
+        }
+
+        m_EstateConnector.SendTeleportHomeOneUser(estateID, prey);
+    }
+
+    private void OnEstateTeleportAllUsersHomeRequest(IClientAPI client, UUID invoice, UUID senderID)
+    {
+        Scene scene = client.Scene as Scene;
+        if(scene == null)
+            return;
+
+        if (!scene.Permissions.CanIssueEstateCommand(client.AgentId, false))
+            return;
+
+        uint estateID = scene.RegionInfo.EstateSettings.EstateID;
+        foreach (Scene s in m_Scenes)
+        {
+            if (s.RegionInfo.EstateSettings.EstateID != estateID)
+                continue;
+
+            scene.ForEachScenePresence(delegate(ScenePresence p)
+                {
+                    if (p != null && !p.IsChildAgent && !p.IsDeleted && !p.IsInTransit)
                     {
                         p.ControllingClient.SendTeleportStart(16);
-                        if (!s.TeleportClientHome(prey, client))
+                        scene.TeleportClientHome(p.ControllingClient.AgentId, client);
+                        if (!s.TeleportClientHome(p.ControllingClient.AgentId, client))
                         {
-                            p.ControllingClient.Kick("You were teleported home by the region owner, but the TP failed");
+                            p.ControllingClient.Kick("You were teleported home by the region owner, but the TP failed - you have been logged out.");
                             s.CloseAgent(p.UUID, false);
                         }
                     }
-                    return;
-                }
-            }
-
-            m_EstateConnector.SendTeleportHomeOneUser(estateID, prey);
+                });
         }
 
-        private void OnEstateTeleportAllUsersHomeRequest(IClientAPI client, UUID invoice, UUID senderID)
-        {
-            Scene scene = client.Scene as Scene;
-            if(scene == null)
-                return;
-
-            if (!scene.Permissions.CanIssueEstateCommand(client.AgentId, false))
-                return;
-
-            uint estateID = scene.RegionInfo.EstateSettings.EstateID;
-            foreach (Scene s in m_Scenes)
-            {
-                if (s.RegionInfo.EstateSettings.EstateID != estateID)
-                    continue;
-
-                scene.ForEachScenePresence(delegate(ScenePresence p)
-                    {
-                        if (p != null && !p.IsChildAgent && !p.IsDeleted && !p.IsInTransit)
-                        {
-                            p.ControllingClient.SendTeleportStart(16);
-                            scene.TeleportClientHome(p.ControllingClient.AgentId, client);
-                            if (!s.TeleportClientHome(p.ControllingClient.AgentId, client))
-                            {
-                                p.ControllingClient.Kick("You were teleported home by the region owner, but the TP failed - you have been logged out.");
-                                s.CloseAgent(p.UUID, false);
-                            }
-                        }
-                    });
-            }
-
-            m_EstateConnector.SendTeleportHomeAllUsers(estateID);
-        }
+        m_EstateConnector.SendTeleportHomeAllUsers(estateID);
     }
 }

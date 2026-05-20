@@ -26,420 +26,414 @@
  */
 
 using log4net;
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
-
-using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
-namespace OpenSim.Services.Connectors
+namespace OpenSim.Services.Connectors;
+
+public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountService
 {
-    public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private string m_ServerURI = String.Empty;
+
+    public UserAccountServicesConnector()
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        private string m_ServerURI = String.Empty;
+    public UserAccountServicesConnector(string serverURI)
+    {
+        m_ServerURI = serverURI.TrimEnd('/');
+    }
 
-        public UserAccountServicesConnector()
+    public UserAccountServicesConnector(IConfigSource source)
+    {
+        Initialise(source);
+    }
+
+    public virtual void Initialise(IConfigSource source)
+    {
+        IConfig assetConfig = source.Configs["UserAccountService"];
+        if (assetConfig == null)
         {
+            m_log.Error("[ACCOUNT CONNECTOR]: UserAccountService missing from OpenSim.ini");
+            throw new Exception("User account connector init error");
         }
 
-        public UserAccountServicesConnector(string serverURI)
+        string serviceURI = assetConfig.GetString("UserAccountServerURI", string.Empty);
+
+        if (string.IsNullOrWhiteSpace(serviceURI))
         {
-            m_ServerURI = serverURI.TrimEnd('/');
+            m_log.Error("[ACCOUNT CONNECTOR]: UserAccountServerURI not found in section UserAccountService");
+            throw new Exception("User account connector init error");
         }
 
-        public UserAccountServicesConnector(IConfigSource source)
+        OSHHTPHost tmp = new OSHHTPHost(serviceURI, true);
+        if (!tmp.IsResolvedHost)
         {
-            Initialise(source);
+            m_log.ErrorFormat("[ACCOUNT CONNECTOR]: {0}", tmp.IsValidHost ? "Could not resolve UserAccountServerURI" : "UserAccountServerURI is a invalid host");
+            throw new Exception("User account connector init error");
         }
 
-        public virtual void Initialise(IConfigSource source)
+        m_ServerURI = tmp.URI;
+
+        base.Initialise(source, "UserAccountService");
+    }
+
+    public virtual UserAccount GetUserAccount(UUID scopeID, string firstName, string lastName)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        //sendData["SCOPEID"] = scopeID.ToString();
+        sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
+        sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
+        sendData["METHOD"] = "getaccount";
+
+        sendData["ScopeID"] = scopeID;
+        sendData["FirstName"] = firstName.ToString();
+        sendData["LastName"] = lastName.ToString();
+
+        return SendAndGetReply(sendData);
+    }
+
+    public virtual UserAccount GetUserAccount(UUID scopeID, string email)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        //sendData["SCOPEID"] = scopeID.ToString();
+        sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
+        sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
+        sendData["METHOD"] = "getaccount";
+
+        sendData["ScopeID"] = scopeID;
+        sendData["Email"] = email;
+
+        return SendAndGetReply(sendData);
+    }
+
+    public virtual UserAccount GetUserAccount(UUID scopeID, UUID userID)
+    {
+        //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetUserAccount {0}", userID);
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        //sendData["SCOPEID"] = scopeID.ToString();
+        sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
+        sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
+        sendData["METHOD"] = "getaccount";
+
+        sendData["ScopeID"] = scopeID;
+        sendData["UserID"] = userID.ToString();
+
+        return SendAndGetReply(sendData);
+    }
+
+    public List<UserAccount> GetUserAccounts(UUID scopeID, string query)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        //sendData["SCOPEID"] = scopeID.ToString();
+        sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
+        sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
+        sendData["METHOD"] = "getaccounts";
+
+        sendData["ScopeID"] = scopeID.ToString();
+        sendData["query"] = query;
+
+        string reply = string.Empty;
+        string reqString = ServerUtils.BuildQueryString(sendData);
+        string uri = m_ServerURI + "/accounts";
+        // m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
+        try
         {
-            IConfig assetConfig = source.Configs["UserAccountService"];
-            if (assetConfig == null)
+            reply = SynchronousRestFormsRequester.MakeRequest("POST",
+                    uri,
+                    reqString,
+                    m_Auth);
+            if (string.IsNullOrEmpty(reply))
             {
-                m_log.Error("[ACCOUNT CONNECTOR]: UserAccountService missing from OpenSim.ini");
-                throw new Exception("User account connector init error");
+                m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetUserAccounts received null or empty reply");
+                return null;
+            }
+        }
+        catch (Exception e)
+        {
+            m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
+        }
+
+        List<UserAccount> accounts = new List<UserAccount>();
+
+        Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+
+        if (replyData != null)
+        {
+            if (replyData.ContainsKey("result") && replyData["result"].ToString() == "null")
+            {
+                return accounts;
             }
 
-            string serviceURI = assetConfig.GetString("UserAccountServerURI", string.Empty);
-
-            if (string.IsNullOrWhiteSpace(serviceURI))
+            Dictionary<string, object>.ValueCollection accountList = replyData.Values;
+            //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
+            foreach (object acc in accountList)
             {
-                m_log.Error("[ACCOUNT CONNECTOR]: UserAccountServerURI not found in section UserAccountService");
-                throw new Exception("User account connector init error");
-            }
-
-            OSHHTPHost tmp = new OSHHTPHost(serviceURI, true);
-            if (!tmp.IsResolvedHost)
-            {
-                m_log.ErrorFormat("[ACCOUNT CONNECTOR]: {0}", tmp.IsValidHost ? "Could not resolve UserAccountServerURI" : "UserAccountServerURI is a invalid host");
-                throw new Exception("User account connector init error");
-            }
-
-            m_ServerURI = tmp.URI;
-
-            base.Initialise(source, "UserAccountService");
-        }
-
-        public virtual UserAccount GetUserAccount(UUID scopeID, string firstName, string lastName)
-        {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            //sendData["SCOPEID"] = scopeID.ToString();
-            sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
-            sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
-            sendData["METHOD"] = "getaccount";
-
-            sendData["ScopeID"] = scopeID;
-            sendData["FirstName"] = firstName.ToString();
-            sendData["LastName"] = lastName.ToString();
-
-            return SendAndGetReply(sendData);
-        }
-
-        public virtual UserAccount GetUserAccount(UUID scopeID, string email)
-        {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            //sendData["SCOPEID"] = scopeID.ToString();
-            sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
-            sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
-            sendData["METHOD"] = "getaccount";
-
-            sendData["ScopeID"] = scopeID;
-            sendData["Email"] = email;
-
-            return SendAndGetReply(sendData);
-        }
-
-        public virtual UserAccount GetUserAccount(UUID scopeID, UUID userID)
-        {
-            //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetUserAccount {0}", userID);
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            //sendData["SCOPEID"] = scopeID.ToString();
-            sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
-            sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
-            sendData["METHOD"] = "getaccount";
-
-            sendData["ScopeID"] = scopeID;
-            sendData["UserID"] = userID.ToString();
-
-            return SendAndGetReply(sendData);
-        }
-
-        public List<UserAccount> GetUserAccounts(UUID scopeID, string query)
-        {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            //sendData["SCOPEID"] = scopeID.ToString();
-            sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
-            sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
-            sendData["METHOD"] = "getaccounts";
-
-            sendData["ScopeID"] = scopeID.ToString();
-            sendData["query"] = query;
-
-            string reply = string.Empty;
-            string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/accounts";
-            // m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
-            try
-            {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
-                if (string.IsNullOrEmpty(reply))
+                if (acc is Dictionary<string, object>)
                 {
-                    m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetUserAccounts received null or empty reply");
-                    return null;
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
-            }
-
-            List<UserAccount> accounts = new List<UserAccount>();
-
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-
-            if (replyData != null)
-            {
-                if (replyData.ContainsKey("result") && replyData["result"].ToString() == "null")
-                {
-                    return accounts;
-                }
-
-                Dictionary<string, object>.ValueCollection accountList = replyData.Values;
-                //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
-                foreach (object acc in accountList)
-                {
-                    if (acc is Dictionary<string, object>)
-                    {
-                        UserAccount pinfo = new UserAccount((Dictionary<string, object>)acc);
-                        accounts.Add(pinfo);
-                    }
-                    else
-                        m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetUserAccounts received invalid response type {0}",
-                            acc.GetType());
-                }
-            }
-            else
-                m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetUserAccounts received null response");
-
-            return accounts;
-        }
-
-        public virtual List<UserAccount> GetUserAccounts(UUID scopeID, List<string> IDs)
-        {
-            List<UserAccount> accs = new List<UserAccount>();
-            bool multisuported = true;
-            accs = doGetMultiUserAccounts(scopeID, IDs, out multisuported);
-            if(multisuported)
-                return accs;
-
-            // service does not do multi accounts so need to do it one by one
-
-            UUID uuid = UUID.Zero;
-            foreach(string id in IDs)
-            {
-                if(UUID.TryParse(id, out uuid) && !uuid.IsZero())
-                    accs.Add(GetUserAccount(scopeID,uuid));
-            }
-
-            return accs;
-        }
-
-        private List<UserAccount> doGetMultiUserAccounts(UUID scopeID, List<string> IDs, out bool suported)
-        {
-            suported = true;
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            //sendData["SCOPEID"] = scopeID.ToString();
-            sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
-            sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
-            sendData["METHOD"] = "getmultiaccounts";
-
-            sendData["ScopeID"] = scopeID.ToString();
-            sendData["IDS"] = new List<string>(IDs);
-
-            string reply = string.Empty;
-            string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/accounts";
-            // m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
-            try
-            {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
-                if (string.IsNullOrEmpty(reply))
-                {
-                    m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetMultiUserAccounts received null or empty reply");
-                    return null;
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
-            }
-
-            List<UserAccount> accounts = new List<UserAccount>();
-
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-
-            if (replyData != null)
-            {
-                if (replyData.ContainsKey("result"))
-                {
-                    if(replyData["result"].ToString() == "null")
-                        return accounts;
-
-                    if(replyData["result"].ToString() == "Failure")
-                    {
-                        suported = false;
-                        return accounts;
-                    }
-                }
-
-                Dictionary<string, object>.ValueCollection accountList = replyData.Values;
-                //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
-                foreach (object acc in accountList)
-                {
-                    if (acc is Dictionary<string, object>)
-                    {
-                        UserAccount pinfo = new UserAccount((Dictionary<string, object>)acc);
-                        accounts.Add(pinfo);
-                    }
-                    else
-                        m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetMultiUserAccounts received invalid response type {0}",
-                            acc.GetType());
-                }
-            }
-            else
-                m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetMultiUserAccounts received null response");
-
-            return accounts;
-        }
-
-
-        public void InvalidateCache(UUID userID)
-        {
-        }
-
-        public bool SetDisplayName(UUID agentID, string displayName)
-        {
-            //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: SetDisplayName {0}", agentID);
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
-            sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
-            sendData["METHOD"] = "setdisplayname";
-
-            sendData["PrincipalID"] = agentID.ToString();
-            sendData["DisplayName"] = displayName;
-
-            return SendAndGetBoolReply(sendData);
-        }
-
-        public List<UserAccount> GetUserAccountsWhere(UUID scopeID, string where)
-        {
-            return null; // Not implemented for regions
-        }
-
-        public virtual bool StoreUserAccount(UserAccount data)
-        {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            //sendData["SCOPEID"] = scopeID.ToString();
-            sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
-            sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
-            sendData["METHOD"] = "setaccount";
-
-            Dictionary<string, object> structData = data.ToKeyValuePairs();
-
-            foreach (KeyValuePair<string, object> kvp in structData)
-            {
-                if (kvp.Value == null)
-                {
-                    m_log.DebugFormat("[ACCOUNTS CONNECTOR]: Null value for {0}", kvp.Key);
-                    continue;
-                }
-                sendData[kvp.Key] = kvp.Value.ToString();
-            }
-
-            if (SendAndGetReply(sendData) != null)
-                return true;
-            else
-                return false;
-        }
-
-        /// <summary>
-        /// Create user remotely. Note this this is not part of the IUserAccountsService
-        /// </summary>
-        /// <param name="first"></param>
-        /// <param name="last"></param>
-        /// <param name="password"></param>
-        /// <param name="email"></param>
-        /// <param name="scopeID"></param>
-        /// <returns></returns>
-        public virtual UserAccount CreateUser(string first, string last, string password, string email, UUID scopeID)
-        {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            //sendData["SCOPEID"] = scopeID.ToString();
-            sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
-            sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
-            sendData["METHOD"] = "createuser";
-
-            sendData["FirstName"] = first;
-            sendData["LastName"] = last;
-            sendData["Password"] = password;
-            if (!string.IsNullOrEmpty(email))
-                sendData["Email"] = first;
-            sendData["ScopeID"] = scopeID.ToString();
-
-            return SendAndGetReply(sendData);
-        }
-
-        private UserAccount SendAndGetReply(Dictionary<string, object> sendData)
-        {
-            string reply = string.Empty;
-            string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/accounts";
-            // m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
-            try
-            {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
-                if (string.IsNullOrEmpty(reply))
-                {
-                    m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetUserAccount received null or empty reply");
-                    return null;
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
-            }
-
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-            UserAccount account = null;
-
-            if ((replyData != null) && replyData.ContainsKey("result") && (replyData["result"] != null))
-            {
-                if (replyData["result"] is Dictionary<string, object>)
-                {
-                    account = new UserAccount((Dictionary<string, object>)replyData["result"]);
-                }
-            }
-
-            return account;
-
-        }
-
-        private bool SendAndGetBoolReply(Dictionary<string, object> sendData)
-        {
-            string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/accounts";
-            //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
-            try
-            {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
-                if (reply != string.Empty)
-                {
-                    //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: reply = {0}", reply);
-                    Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-
-                    if (replyData.ContainsKey("result"))
-                    {
-                        if (replyData["result"].ToString().ToLower() == "success")
-                            return true;
-                        else
-                            return false;
-                    }
-                    else
-                        m_log.DebugFormat("[ACCOUNTS CONNECTOR]: Set or Create UserAccount reply data does not contain result field");
-
+                    UserAccount pinfo = new UserAccount((Dictionary<string, object>)acc);
+                    accounts.Add(pinfo);
                 }
                 else
-                    m_log.DebugFormat("[ACCOUNTS CONNECTOR]: Set or Create UserAccount received empty reply");
+                    m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetUserAccounts received invalid response type {0}",
+                        acc.GetType());
             }
-            catch (Exception e)
+        }
+        else
+            m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetUserAccounts received null response");
+
+        return accounts;
+    }
+
+    public virtual List<UserAccount> GetUserAccounts(UUID scopeID, List<string> IDs)
+    {
+        List<UserAccount> accs = new List<UserAccount>();
+        bool multisuported = true;
+        accs = doGetMultiUserAccounts(scopeID, IDs, out multisuported);
+        if(multisuported)
+            return accs;
+
+        // service does not do multi accounts so need to do it one by one
+
+        UUID uuid = UUID.Zero;
+        foreach(string id in IDs)
+        {
+            if(UUID.TryParse(id, out uuid) && !uuid.IsZero())
+                accs.Add(GetUserAccount(scopeID,uuid));
+        }
+
+        return accs;
+    }
+
+    private List<UserAccount> doGetMultiUserAccounts(UUID scopeID, List<string> IDs, out bool suported)
+    {
+        suported = true;
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        //sendData["SCOPEID"] = scopeID.ToString();
+        sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
+        sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
+        sendData["METHOD"] = "getmultiaccounts";
+
+        sendData["ScopeID"] = scopeID.ToString();
+        sendData["IDS"] = new List<string>(IDs);
+
+        string reply = string.Empty;
+        string reqString = ServerUtils.BuildQueryString(sendData);
+        string uri = m_ServerURI + "/accounts";
+        // m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
+        try
+        {
+            reply = SynchronousRestFormsRequester.MakeRequest("POST",
+                    uri,
+                    reqString,
+                    m_Auth);
+            if (string.IsNullOrEmpty(reply))
             {
-                m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
+                m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetMultiUserAccounts received null or empty reply");
+                return null;
+            }
+        }
+        catch (Exception e)
+        {
+            m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
+        }
+
+        List<UserAccount> accounts = new List<UserAccount>();
+
+        Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+
+        if (replyData != null)
+        {
+            if (replyData.ContainsKey("result"))
+            {
+                if(replyData["result"].ToString() == "null")
+                    return accounts;
+
+                if(replyData["result"].ToString() == "Failure")
+                {
+                    suported = false;
+                    return accounts;
+                }
             }
 
-            return false;
+            Dictionary<string, object>.ValueCollection accountList = replyData.Values;
+            //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
+            foreach (object acc in accountList)
+            {
+                if (acc is Dictionary<string, object>)
+                {
+                    UserAccount pinfo = new UserAccount((Dictionary<string, object>)acc);
+                    accounts.Add(pinfo);
+                }
+                else
+                    m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetMultiUserAccounts received invalid response type {0}",
+                        acc.GetType());
+            }
         }
+        else
+            m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetMultiUserAccounts received null response");
+
+        return accounts;
+    }
+
+
+    public void InvalidateCache(UUID userID)
+    {
+    }
+
+    public bool SetDisplayName(UUID agentID, string displayName)
+    {
+        //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: SetDisplayName {0}", agentID);
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
+        sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
+        sendData["METHOD"] = "setdisplayname";
+
+        sendData["PrincipalID"] = agentID.ToString();
+        sendData["DisplayName"] = displayName;
+
+        return SendAndGetBoolReply(sendData);
+    }
+
+    public List<UserAccount> GetUserAccountsWhere(UUID scopeID, string where)
+    {
+        return null; // Not implemented for regions
+    }
+
+    public virtual bool StoreUserAccount(UserAccount data)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        //sendData["SCOPEID"] = scopeID.ToString();
+        sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
+        sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
+        sendData["METHOD"] = "setaccount";
+
+        Dictionary<string, object> structData = data.ToKeyValuePairs();
+
+        foreach (KeyValuePair<string, object> kvp in structData)
+        {
+            if (kvp.Value == null)
+            {
+                m_log.DebugFormat("[ACCOUNTS CONNECTOR]: Null value for {0}", kvp.Key);
+                continue;
+            }
+            sendData[kvp.Key] = kvp.Value.ToString();
+        }
+
+        if (SendAndGetReply(sendData) != null)
+            return true;
+        else
+            return false;
+    }
+
+    /// <summary>
+    /// Create user remotely. Note this this is not part of the IUserAccountsService
+    /// </summary>
+    /// <param name="first"></param>
+    /// <param name="last"></param>
+    /// <param name="password"></param>
+    /// <param name="email"></param>
+    /// <param name="scopeID"></param>
+    /// <returns></returns>
+    public virtual UserAccount CreateUser(string first, string last, string password, string email, UUID scopeID)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        //sendData["SCOPEID"] = scopeID.ToString();
+        sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
+        sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
+        sendData["METHOD"] = "createuser";
+
+        sendData["FirstName"] = first;
+        sendData["LastName"] = last;
+        sendData["Password"] = password;
+        if (!string.IsNullOrEmpty(email))
+            sendData["Email"] = first;
+        sendData["ScopeID"] = scopeID.ToString();
+
+        return SendAndGetReply(sendData);
+    }
+
+    private UserAccount SendAndGetReply(Dictionary<string, object> sendData)
+    {
+        string reply = string.Empty;
+        string reqString = ServerUtils.BuildQueryString(sendData);
+        string uri = m_ServerURI + "/accounts";
+        // m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
+        try
+        {
+            reply = SynchronousRestFormsRequester.MakeRequest("POST",
+                    uri,
+                    reqString,
+                    m_Auth);
+            if (string.IsNullOrEmpty(reply))
+            {
+                m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetUserAccount received null or empty reply");
+                return null;
+            }
+        }
+        catch (Exception e)
+        {
+            m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
+        }
+
+        Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+        UserAccount account = null;
+
+        if ((replyData != null) && replyData.ContainsKey("result") && (replyData["result"] != null))
+        {
+            if (replyData["result"] is Dictionary<string, object>)
+            {
+                account = new UserAccount((Dictionary<string, object>)replyData["result"]);
+            }
+        }
+
+        return account;
+
+    }
+
+    private bool SendAndGetBoolReply(Dictionary<string, object> sendData)
+    {
+        string reqString = ServerUtils.BuildQueryString(sendData);
+        string uri = m_ServerURI + "/accounts";
+        //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
+        try
+        {
+            string reply = SynchronousRestFormsRequester.MakeRequest("POST",
+                    uri,
+                    reqString,
+                    m_Auth);
+            if (reply != string.Empty)
+            {
+                //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: reply = {0}", reply);
+                Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+
+                if (replyData.ContainsKey("result"))
+                {
+                    if (replyData["result"].ToString().ToLower() == "success")
+                        return true;
+                    else
+                        return false;
+                }
+                else
+                    m_log.DebugFormat("[ACCOUNTS CONNECTOR]: Set or Create UserAccount reply data does not contain result field");
+
+            }
+            else
+                m_log.DebugFormat("[ACCOUNTS CONNECTOR]: Set or Create UserAccount received empty reply");
+        }
+        catch (Exception e)
+        {
+            m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
+        }
+
+        return false;
     }
 }

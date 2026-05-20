@@ -29,13 +29,12 @@
 // backed by Mono.Addins. Those commands have been retired as part of the
 // Mono.Addins -> DotNetCorePlugins migration.
 
-namespace OpenSim.Server.Base
+namespace OpenSim.Server.Base;
+
+/// <summary>
+/// Retired stub. Plugin/repository management console commands are no longer available.
+/// </summary>
+public class CommandManager
 {
-    /// <summary>
-    /// Retired stub. Plugin/repository management console commands are no longer available.
-    /// </summary>
-    public class CommandManager
-    {
-        public CommandManager() { }
-    }
+    public CommandManager() { }
 }

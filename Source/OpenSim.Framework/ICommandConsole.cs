@@ -26,88 +26,85 @@
  */
 
 using Nini.Config;
-using System;
-using System.Collections.Generic;
 using System.Xml;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public delegate void CommandDelegate(string module, string[] cmd);
+
+public interface ICommands
 {
-    public delegate void CommandDelegate(string module, string[] cmd);
+    void FromXml(XmlElement root, CommandDelegate fn);
 
-    public interface ICommands
-    {
-        void FromXml(XmlElement root, CommandDelegate fn);
+    /// <summary>
+    /// Get help for the given help string
+    /// </summary>
+    /// <param name="cmd">Parsed parts of the help string.  If empty then general help is returned.</param>
+    /// <returns></returns>
+    List<string> GetHelp(string[] cmd);
 
-        /// <summary>
-        /// Get help for the given help string
-        /// </summary>
-        /// <param name="cmd">Parsed parts of the help string.  If empty then general help is returned.</param>
-        /// <returns></returns>
-        List<string> GetHelp(string[] cmd);
+    /// <summary>
+    /// Add a command to those which can be invoked from the console.
+    /// </summary>
+    /// <param name="module"></param>
+    /// <param name="command"></param>
+    /// <param name="help"></param>
+    /// <param name="longhelp"></param>
+    /// <param name="fn"></param>
+    void AddCommand(string module, bool shared, string command, string help, string longhelp, CommandDelegate fn);
 
-        /// <summary>
-        /// Add a command to those which can be invoked from the console.
-        /// </summary>
-        /// <param name="module"></param>
-        /// <param name="command"></param>
-        /// <param name="help"></param>
-        /// <param name="longhelp"></param>
-        /// <param name="fn"></param>
-        void AddCommand(string module, bool shared, string command, string help, string longhelp, CommandDelegate fn);
+    /// <summary>
+    /// Add a command to those which can be invoked from the console.
+    /// </summary>
+    /// <param name="module"></param>
+    /// <param name="command"></param>
+    /// <param name="help"></param>
+    /// <param name="longhelp"></param>
+    /// <param name="descriptivehelp"></param>
+    /// <param name="fn"></param>
+    void AddCommand(string module, bool shared, string command,
+            string help, string longhelp, string descriptivehelp,
+            CommandDelegate fn);
 
-        /// <summary>
-        /// Add a command to those which can be invoked from the console.
-        /// </summary>
-        /// <param name="module"></param>
-        /// <param name="command"></param>
-        /// <param name="help"></param>
-        /// <param name="longhelp"></param>
-        /// <param name="descriptivehelp"></param>
-        /// <param name="fn"></param>
-        void AddCommand(string module, bool shared, string command,
-                string help, string longhelp, string descriptivehelp,
-                CommandDelegate fn);
+    /// <summary>
+    /// Has the given command already been registered?
+    /// </summary>
+    /// <returns></returns>
+    /// <param name="command">Command.</param>
+    bool HasCommand(string command);
 
-        /// <summary>
-        /// Has the given command already been registered?
-        /// </summary>
-        /// <returns></returns>
-        /// <param name="command">Command.</param>
-        bool HasCommand(string command);
+    string[] FindNextOption(string[] command, bool term);
 
-        string[] FindNextOption(string[] command, bool term);
+    string[] Resolve(string[] command);
 
-        string[] Resolve(string[] command);
+    XmlElement GetXml(XmlDocument doc);
+}
 
-        XmlElement GetXml(XmlDocument doc);
-    }
+public delegate void OnOutputDelegate(string message);
+public delegate void OnCntrCCelegate();
 
-    public delegate void OnOutputDelegate(string message);
-    public delegate void OnCntrCCelegate();
+public interface ICommandConsole : IConsole
+{
+    event OnOutputDelegate OnOutput;
 
-    public interface ICommandConsole : IConsole
-    {
-        event OnOutputDelegate OnOutput;
+    ICommands Commands { get; }
 
-        ICommands Commands { get; }
+    /// <summary>
+    /// The default prompt text.
+    /// </summary>
+    string DefaultPrompt { get; set; }
 
-        /// <summary>
-        /// The default prompt text.
-        /// </summary>
-        string DefaultPrompt { get; set; }
+    /// <summary>
+    /// Display a command prompt on the console and wait for user input
+    /// </summary>
+    void Prompt();
 
-        /// <summary>
-        /// Display a command prompt on the console and wait for user input
-        /// </summary>
-        void Prompt();
+    void RunCommand(string cmd);
 
-        void RunCommand(string cmd);
+    string ReadLine(string p, bool isCommand, bool e);
 
-        string ReadLine(string p, bool isCommand, bool e);
+    void WriteLine(string s);
 
-        void WriteLine(string s);
-
-        void ReadConfig(IConfigSource configSource);
-        void SetCntrCHandler(OnCntrCCelegate handler);
-    }
+    void ReadConfig(IConfigSource configSource);
+    void SetCntrCHandler(OnCntrCCelegate handler);
 }

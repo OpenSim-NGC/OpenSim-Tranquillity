@@ -25,24 +25,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
-using OpenSim.Framework;
-using Caps=OpenSim.Framework.Capabilities.Caps;
+using Caps = OpenSim.Framework.Capabilities.Caps;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IExternalCapsModule
 {
-    public interface IExternalCapsModule
-    {
-        /// <summary>
-        /// This function extends the simple URL configuration in the caps handlers
-        /// to facilitate more interesting computation when an external handler is
-        /// sent to the viewer.
-        /// </summary>
-        /// <param name="agentID">New user UUID</param>
-        /// <param name="caps">Internal caps registry, where the external handler will be registered</param>
-        /// <param name="capName">Name of the specific cap we are registering</param>
-        /// <param name="urlSkel">The skeleton URL provided in the caps configuration</param>
-        bool RegisterExternalUserCapsHandler(UUID agentID, Caps caps, String capName, String urlSkel);
-    }
+    /// <summary>
+    /// This function extends the simple URL configuration in the caps handlers
+    /// to facilitate more interesting computation when an external handler is
+    /// sent to the viewer.
+    /// </summary>
+    /// <param name="agentID">New user UUID</param>
+    /// <param name="caps">Internal caps registry, where the external handler will be registered</param>
+    /// <param name="capName">Name of the specific cap we are registering</param>
+    /// <param name="urlSkel">The skeleton URL provided in the caps configuration</param>
+    bool RegisterExternalUserCapsHandler(UUID agentID, Caps caps, String capName, String urlSkel);
 }

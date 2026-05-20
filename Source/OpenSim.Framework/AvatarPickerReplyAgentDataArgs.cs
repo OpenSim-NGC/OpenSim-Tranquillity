@@ -25,24 +25,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+/// <summary>
+/// Args to return to a client that queries picker data
+/// </summary>
+public class AvatarPickerReplyAgentDataArgs : EventArgs
 {
     /// <summary>
-    /// Args to return to a client that queries picker data
+    /// Unique Agent ID
     /// </summary>
-    public class AvatarPickerReplyAgentDataArgs : EventArgs
-    {
-        /// <summary>
-        /// Unique Agent ID
-        /// </summary>
-        public UUID AgentID;
+    public UUID AgentID;
 
-        /// <summary>
-        /// ID of query user submitted
-        /// </summary>
-        public UUID QueryID;
-    }
+    /// <summary>
+    /// ID of query user submitted
+    /// </summary>
+    public UUID QueryID;
 }

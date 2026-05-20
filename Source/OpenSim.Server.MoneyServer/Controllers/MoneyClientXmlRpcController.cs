@@ -1,14 +1,11 @@
 using System.Collections;
 using System.Net;
 
-using Microsoft.Extensions.Logging;
-
 using Nwc.XmlRpc;
 
 using OpenMetaverse;
 using OpenSim.Data.MySQL.MoneyData;
 using OpenSim.Framework;
-using OpenSim.Region.OptionalModules.World.Currency;
 using OpenSim.Server.MoneyServer.Models;
 
 namespace OpenSim.Server.MoneyServer.Controllers;

@@ -36,144 +36,143 @@ using OpenMetaverse;
 using log4net;
 using Nini.Config;
 
-namespace OpenSim.OfflineIM
+namespace OpenSim.OfflineIM;
+
+public class OfflineIMServiceRemoteConnector : IOfflineIMService
 {
-    public class OfflineIMServiceRemoteConnector : IOfflineIMService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private string m_ServerURI = string.Empty;
+    private IServiceAuth m_Auth;
+    private object m_Lock = new object();
+
+    public OfflineIMServiceRemoteConnector(string url)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_ServerURI = url;
+        m_log.DebugFormat("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0}", m_ServerURI);
+    }
 
-        private string m_ServerURI = string.Empty;
-        private IServiceAuth m_Auth;
-        private object m_Lock = new object();
-
-        public OfflineIMServiceRemoteConnector(string url)
+    public OfflineIMServiceRemoteConnector(IConfigSource config)
+    {
+        IConfig cnf = config.Configs["Messaging"];
+        if (cnf == null)
         {
-            m_ServerURI = url;
-            m_log.DebugFormat("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0}", m_ServerURI);
+            m_log.WarnFormat("[OfflineIM.V2.RemoteConnector]: Missing Messaging configuration");
+            return;
         }
 
-        public OfflineIMServiceRemoteConnector(IConfigSource config)
+        m_ServerURI = cnf.GetString("OfflineMessageURL", string.Empty);
+
+        /// This is from BaseServiceConnector
+        string authType = Util.GetConfigVarFromSections<string>(config, "AuthType", new string[] { "Network", "Messaging" }, "None");
+
+        switch (authType)
         {
-            IConfig cnf = config.Configs["Messaging"];
-            if (cnf == null)
-            {
-                m_log.WarnFormat("[OfflineIM.V2.RemoteConnector]: Missing Messaging configuration");
-                return;
-            }
-
-            m_ServerURI = cnf.GetString("OfflineMessageURL", string.Empty);
-
-            /// This is from BaseServiceConnector
-            string authType = Util.GetConfigVarFromSections<string>(config, "AuthType", new string[] { "Network", "Messaging" }, "None");
-
-            switch (authType)
-            {
-                case "BasicHttpAuthentication":
-                    m_Auth = new BasicHttpAuthentication(config, "Messaging");
-                    break;
-            }
-            ///
-            m_log.DebugFormat("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0} with auth {1}",
-                m_ServerURI, (m_Auth == null ? "None" : m_Auth.GetType().ToString()));
+            case "BasicHttpAuthentication":
+                m_Auth = new BasicHttpAuthentication(config, "Messaging");
+                break;
         }
+        ///
+        m_log.DebugFormat("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0} with auth {1}",
+            m_ServerURI, (m_Auth == null ? "None" : m_Auth.GetType().ToString()));
+    }
 
-        #region IOfflineIMService
-        public List<GridInstantMessage> GetMessages(UUID principalID)
-        {
-            List<GridInstantMessage> ims = new List<GridInstantMessage>();
+    #region IOfflineIMService
+    public List<GridInstantMessage> GetMessages(UUID principalID)
+    {
+        List<GridInstantMessage> ims = new List<GridInstantMessage>();
 
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            sendData["PrincipalID"] = principalID;
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["PrincipalID"] = principalID;
 
-            Dictionary<string, object> ret = MakeRequest("GET", sendData);
-            if (ret == null)
-                return ims;
-
-            if (!ret.TryGetValue("RESULT", out object resultobj))
-                return ims;
-
-            if(resultobj is string result)
-            {
-                if (result == "NULL" || result.Equals("false", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    if (ret.TryGetValue("REASON", out object rso))
-                        m_log.Debug($"[OfflineIM.V2.RemoteConnector]: GetMessages for {principalID} failed: {rso}");
-                    else
-                        m_log.Debug($"[OfflineIM.V2.RemoteConnector]: GetMessages for {principalID} failed: Unknown error");
-                    return ims;
-                }
-            }
-            else if(resultobj is Dictionary<string, object> resultdic)
-            {
-                foreach (object v in resultdic.Values)
-                {
-                    if (v is Dictionary<string, object> vdic)
-                    {
-                        GridInstantMessage m = OfflineIMDataUtils.GridInstantMessage(vdic);
-                        ims.Add(m);
-                    }
-                }
-            }
+        Dictionary<string, object> ret = MakeRequest("GET", sendData);
+        if (ret == null)
             return ims;
+
+        if (!ret.TryGetValue("RESULT", out object resultobj))
+            return ims;
+
+        if(resultobj is string result)
+        {
+            if (result == "NULL" || result.Equals("false", StringComparison.InvariantCultureIgnoreCase))
+            {
+                if (ret.TryGetValue("REASON", out object rso))
+                    m_log.Debug($"[OfflineIM.V2.RemoteConnector]: GetMessages for {principalID} failed: {rso}");
+                else
+                    m_log.Debug($"[OfflineIM.V2.RemoteConnector]: GetMessages for {principalID} failed: Unknown error");
+                return ims;
+            }
+        }
+        else if(resultobj is Dictionary<string, object> resultdic)
+        {
+            foreach (object v in resultdic.Values)
+            {
+                if (v is Dictionary<string, object> vdic)
+                {
+                    GridInstantMessage m = OfflineIMDataUtils.GridInstantMessage(vdic);
+                    ims.Add(m);
+                }
+            }
+        }
+        return ims;
+    }
+
+    public bool StoreMessage(GridInstantMessage im, out string reason)
+    {
+        Dictionary<string, object> sendData = OfflineIMDataUtils.GridInstantMessage(im);
+        Dictionary<string, object> ret = MakeRequest("STORE", sendData);
+
+        if (ret == null)
+        {
+            reason = "Bad response from server";
+            return false;
         }
 
-        public bool StoreMessage(GridInstantMessage im, out string reason)
+        if(ret.TryGetValue("RESULT", out object o))
         {
-            Dictionary<string, object> sendData = OfflineIMDataUtils.GridInstantMessage(im);
-            Dictionary<string, object> ret = MakeRequest("STORE", sendData);
-
-            if (ret == null)
+            string result = o.ToString();
+            if (result == "NULL" || result.Equals("false", StringComparison.InvariantCultureIgnoreCase))
             {
-                reason = "Bad response from server";
+                if(ret.TryGetValue("REASON", out object ro))
+                    reason = ro.ToString();
+                else
+                    reason = "Unknown error";
                 return false;
             }
-
-            if(ret.TryGetValue("RESULT", out object o))
-            {
-                string result = o.ToString();
-                if (result == "NULL" || result.Equals("false", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    if(ret.TryGetValue("REASON", out object ro))
-                        reason = ro.ToString();
-                    else
-                        reason = "Unknown error";
-                    return false;
-                }
-            }
-
-            reason = string.Empty;
-            return true;
         }
 
-        public void DeleteMessages(UUID userID)
-        {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            sendData["UserID"] = userID;
-
-            MakeRequest("DELETE", sendData);
-        }
-
-        #endregion
-
-
-        #region Make Request
-
-        private Dictionary<string, object> MakeRequest(string method, Dictionary<string, object> sendData)
-        {
-            sendData["METHOD"] = method;
-
-            string reply = string.Empty;
-            lock (m_Lock)
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                         m_ServerURI + "/offlineim",
-                         ServerUtils.BuildQueryString(sendData),
-                         m_Auth);
-
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-
-            return replyData;
-        }
-        #endregion
-
+        reason = string.Empty;
+        return true;
     }
+
+    public void DeleteMessages(UUID userID)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["UserID"] = userID;
+
+        MakeRequest("DELETE", sendData);
+    }
+
+    #endregion
+
+
+    #region Make Request
+
+    private Dictionary<string, object> MakeRequest(string method, Dictionary<string, object> sendData)
+    {
+        sendData["METHOD"] = method;
+
+        string reply = string.Empty;
+        lock (m_Lock)
+            reply = SynchronousRestFormsRequester.MakeRequest("POST",
+                     m_ServerURI + "/offlineim",
+                     ServerUtils.BuildQueryString(sendData),
+                     m_Auth);
+
+        Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+
+        return replyData;
+    }
+    #endregion
+
 }

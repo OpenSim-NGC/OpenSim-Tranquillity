@@ -24,25 +24,17 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
+namespace OpenSim.Services.Interfaces;
 
-using OpenSim.Framework;
-using OpenMetaverse;
-
-namespace OpenSim.Services.Interfaces
+public interface IBansService
 {
-    public interface IBansService
-    {
-        /// <summary>
-        /// Are any of the given arguments banned from the grid?
-        /// </summary>
-        /// <param name="userID"></param>
-        /// <param name="ip"></param>
-        /// <param name="id0"></param>
-        /// <param name="origin"></param>
-        /// <returns></returns>
-        bool IsBanned(string userID, string ip, string id0, string origin);
-    }
-
+    /// <summary>
+    /// Are any of the given arguments banned from the grid?
+    /// </summary>
+    /// <param name="userID"></param>
+    /// <param name="ip"></param>
+    /// <param name="id0"></param>
+    /// <param name="origin"></param>
+    /// <returns></returns>
+    bool IsBanned(string userID, string ip, string id0, string origin);
 }

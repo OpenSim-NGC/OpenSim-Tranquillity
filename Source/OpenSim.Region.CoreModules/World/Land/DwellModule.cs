@@ -31,95 +31,94 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.World.Land
+namespace OpenSim.Region.CoreModules.World.Land;
+
+public class DefaultDwellModule : INonSharedRegionModule, IDwellModule
 {
-    public class DefaultDwellModule : INonSharedRegionModule, IDwellModule
+    private Scene m_scene;
+    private IConfigSource m_Config;
+    private bool m_Enabled = false;
+
+    public Type ReplaceableInterface
     {
-        private Scene m_scene;
-        private IConfigSource m_Config;
-        private bool m_Enabled = false;
-
-        public Type ReplaceableInterface
-        {
-            get { return typeof(IDwellModule); }
-        }
-
-        public string Name
-        {
-            get { return "DefaultDwellModule"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            m_Config = source;
-
-            IConfig DwellConfig = m_Config.Configs ["Dwell"];
-
-            if (DwellConfig == null) {
-                m_Enabled = false;
-                return;
-            }
-            m_Enabled = (DwellConfig.GetString ("DwellModule", "DefaultDwellModule") == "DefaultDwellModule");
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_scene = scene;
-            m_scene.RegisterModuleInterface<IDwellModule>(this);
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-            m_scene.EventManager.OnNewClient += OnNewClient;
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-            m_scene.EventManager.OnNewClient -= OnNewClient;
-        }
-
-        public void Close()
-        {
-        }
-
-        public void OnNewClient(IClientAPI client)
-        {
-            client.OnParcelDwellRequest += ClientOnParcelDwellRequest;
-        }
-
-        private void ClientOnParcelDwellRequest(int localID, IClientAPI client)
-        {
-            ILandObject parcel = m_scene.LandChannel.GetLandObject(localID);
-            if (parcel == null)
-                return;
-
-            LandData land = parcel.LandData;
-            if(land!= null)
-                client.SendParcelDwellReply(localID, land.FakeID, land.Dwell);
-        }
-
-
-        public int GetDwell(UUID parcelID)
-        {
-            ILandObject parcel = m_scene.LandChannel.GetLandObject(parcelID);
-            if (parcel != null && parcel.LandData != null)
-               return (int)(parcel.LandData.Dwell);
-            return 0;
-        }
-
-        public int GetDwell(LandData land)
-        {
-            if (land != null)
-               return (int)(land.Dwell);
-            return 0;
-        }
-
+        get { return typeof(IDwellModule); }
     }
+
+    public string Name
+    {
+        get { return "DefaultDwellModule"; }
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        m_Config = source;
+
+        IConfig DwellConfig = m_Config.Configs ["Dwell"];
+
+        if (DwellConfig == null) {
+            m_Enabled = false;
+            return;
+        }
+        m_Enabled = (DwellConfig.GetString ("DwellModule", "DefaultDwellModule") == "DefaultDwellModule");
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_scene = scene;
+        m_scene.RegisterModuleInterface<IDwellModule>(this);
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+        m_scene.EventManager.OnNewClient += OnNewClient;
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+        m_scene.EventManager.OnNewClient -= OnNewClient;
+    }
+
+    public void Close()
+    {
+    }
+
+    public void OnNewClient(IClientAPI client)
+    {
+        client.OnParcelDwellRequest += ClientOnParcelDwellRequest;
+    }
+
+    private void ClientOnParcelDwellRequest(int localID, IClientAPI client)
+    {
+        ILandObject parcel = m_scene.LandChannel.GetLandObject(localID);
+        if (parcel == null)
+            return;
+
+        LandData land = parcel.LandData;
+        if(land!= null)
+            client.SendParcelDwellReply(localID, land.FakeID, land.Dwell);
+    }
+
+
+    public int GetDwell(UUID parcelID)
+    {
+        ILandObject parcel = m_scene.LandChannel.GetLandObject(parcelID);
+        if (parcel != null && parcel.LandData != null)
+           return (int)(parcel.LandData.Dwell);
+        return 0;
+    }
+
+    public int GetDwell(LandData land)
+    {
+        if (land != null)
+           return (int)(land.Dwell);
+        return 0;
+    }
+
 }

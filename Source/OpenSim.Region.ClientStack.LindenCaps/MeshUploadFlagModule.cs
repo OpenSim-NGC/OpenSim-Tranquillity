@@ -35,105 +35,104 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
-namespace OpenSim.Region.ClientStack.LindenCaps
+namespace OpenSim.Region.ClientStack.LindenCaps;
+
+/// <summary>
+/// MeshUploadFlag capability. This is required for uploading Mesh.
+/// </summary>
+public class MeshUploadFlagModule : INonSharedRegionModule
 {
-    /// <summary>
-    /// MeshUploadFlag capability. This is required for uploading Mesh.
-    /// </summary>
-    public class MeshUploadFlagModule : INonSharedRegionModule
-    {
 //        private static readonly ILog m_log =
 //            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        /// <summary>
-        /// Is this module enabled?
-        /// </summary>
-        public bool Enabled { get; private set; }
+    /// <summary>
+    /// Is this module enabled?
+    /// </summary>
+    public bool Enabled { get; private set; }
 
-        private Scene m_scene;
+    private Scene m_scene;
 
-        #region ISharedRegionModule Members
+    #region ISharedRegionModule Members
 
-        public MeshUploadFlagModule()
+    public MeshUploadFlagModule()
+    {
+        Enabled = true;
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        IConfig config = source.Configs["Mesh"];
+        if (config == null)
         {
-            Enabled = true;
+            return;
         }
-
-        public void Initialise(IConfigSource source)
+        else
         {
-            IConfig config = source.Configs["Mesh"];
-            if (config == null)
-            {
-                return;
-            }
-            else
-            {
-                Enabled = config.GetBoolean("AllowMeshUpload", Enabled);
-            }
+            Enabled = config.GetBoolean("AllowMeshUpload", Enabled);
         }
+    }
 
-        public void AddRegion(Scene s)
-        {
-            if (!Enabled)
-                return;
+    public void AddRegion(Scene s)
+    {
+        if (!Enabled)
+            return;
 
-            m_scene = s;
-            m_scene.EventManager.OnRegisterCaps += RegisterCaps;
-        }
+        m_scene = s;
+        m_scene.EventManager.OnRegisterCaps += RegisterCaps;
+    }
 
-        public void RemoveRegion(Scene s)
-        {
-            if (!Enabled)
-                return;
+    public void RemoveRegion(Scene s)
+    {
+        if (!Enabled)
+            return;
 
-            m_scene.EventManager.OnRegisterCaps -= RegisterCaps;
-        }
+        m_scene.EventManager.OnRegisterCaps -= RegisterCaps;
+    }
 
-        public void RegionLoaded(Scene s)
-        {
-        }
+    public void RegionLoaded(Scene s)
+    {
+    }
 
-        public void PostInitialise()
-        {
-        }
+    public void PostInitialise()
+    {
+    }
 
-        public void Close() { }
+    public void Close() { }
 
-        public string Name { get { return "MeshUploadFlagModule"; } }
+    public string Name { get { return "MeshUploadFlagModule"; } }
 
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
 
-        #endregion
+    #endregion
 
-        public void RegisterCaps(UUID agentID, Caps caps)
-        {
-            caps.RegisterSimpleHandler("MeshUploadFlag",
-                    new SimpleStreamHandler("/" + UUID.Random(), MeshUploadFlag));
-                    /* to use when/if we do check on dbs
-                    new SimpleStreamHandler("/" + UUID.Random(), delegate (IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-                    {
-                        MeshUploadFlag(httpRequest, httpResponse, agentID);
-                    }));
-                    */
-        }
+    public void RegisterCaps(UUID agentID, Caps caps)
+    {
+        caps.RegisterSimpleHandler("MeshUploadFlag",
+                new SimpleStreamHandler("/" + UUID.Random(), MeshUploadFlag));
+                /* to use when/if we do check on dbs
+                new SimpleStreamHandler("/" + UUID.Random(), delegate (IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+                {
+                    MeshUploadFlag(httpRequest, httpResponse, agentID);
+                }));
+                */
+    }
 
-        //private void MeshUploadFlag(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID agentID)
-        private void MeshUploadFlag(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
+    //private void MeshUploadFlag(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID agentID)
+    private void MeshUploadFlag(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
 //            m_log.DebugFormat("[MESH UPLOAD FLAG MODULE]: MeshUploadFlag request");
-            if(httpRequest.HttpMethod != "GET")
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-                return;
-            }
-
-            OSDMap data = new OSDMap();
-            data["mesh_upload_status"] = "valid";
-            httpResponse.RawBuffer = Encoding.UTF8.GetBytes(OSDParser.SerializeLLSDXmlString(data));
-            httpResponse.StatusCode = (int)HttpStatusCode.OK;
+        if(httpRequest.HttpMethod != "GET")
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+            return;
         }
+
+        OSDMap data = new OSDMap();
+        data["mesh_upload_status"] = "valid";
+        httpResponse.RawBuffer = Encoding.UTF8.GetBytes(OSDParser.SerializeLLSDXmlString(data));
+        httpResponse.StatusCode = (int)HttpStatusCode.OK;
     }
 }

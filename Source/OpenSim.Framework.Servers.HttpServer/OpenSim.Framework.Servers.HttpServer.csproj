@@ -14,7 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Monitoring/OpenSim.Framework.Monitoring.csproj" />
-    <ProjectReference Include="../../ThirdParty/SmartThreadPool/SmartThreadPool.csproj" />
   </ItemGroup>
 
   <ItemGroup>

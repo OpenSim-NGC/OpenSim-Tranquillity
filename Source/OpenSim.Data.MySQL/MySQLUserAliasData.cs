@@ -25,53 +25,48 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
-using OpenSim.Data;
 
-namespace OpenSim.Data.MySQL
+namespace OpenSim.Data.MySQL;
+
+/// <summary>
+/// A MySQL Interface for the User Server - User Aliases
+/// </summary>
+public class MySQLUserAliasData : MySQLGenericTableHandler<UserAliasData>,
+    IUserAliasData
 {
-    /// <summary>
-    /// A MySQL Interface for the User Server - User Aliases
-    /// </summary>
-    public class MySQLUserAliasData : MySQLGenericTableHandler<UserAliasData>,
-        IUserAliasData
+    public MySQLUserAliasData(string connectionString, string realm) :
+            base(connectionString, realm, "UserAlias")
     {
-        public MySQLUserAliasData(string connectionString, string realm) :
-                base(connectionString, realm, "UserAlias")
-        {
-        }
+    }
 
-        public UserAliasData Get(int Id)
-        {
-            UserAliasData[] ret = Get("Id", Id.ToString());
+    public UserAliasData Get(int Id)
+    {
+        UserAliasData[] ret = Get("Id", Id.ToString());
 
-            if (ret.Length == 0)
-                return null;
+        if (ret.Length == 0)
+            return null;
 
-            return ret[0];
-        }
+        return ret[0];
+    }
 
-        public UserAliasData GetUserForAlias(UUID aliasID)
-        {
-            UserAliasData[] ret = Get("AliasID", aliasID.ToString());
+    public UserAliasData GetUserForAlias(UUID aliasID)
+    {
+        UserAliasData[] ret = Get("AliasID", aliasID.ToString());
 
-            if (ret.Length == 0)
-                return null;
+        if (ret.Length == 0)
+            return null;
 
-            return ret[0];
-        }
+        return ret[0];
+    }
 
-        public List<UserAliasData> GetUserAliases(UUID userID)
-        {
-            var aliases = Get("UserID", userID.ToString());
+    public List<UserAliasData> GetUserAliases(UUID userID)
+    {
+        var aliases = Get("UserID", userID.ToString());
 
-            if (aliases.Length == 0)
-                return null;
+        if (aliases.Length == 0)
+            return null;
 
-            return new List<UserAliasData>(aliases);
-        }
+        return new List<UserAliasData>(aliases);
     }
 }

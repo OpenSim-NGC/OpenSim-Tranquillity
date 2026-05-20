@@ -27,15 +27,14 @@
 
 using System.Collections;
 
-namespace OpenSim.Framework.Capabilities
-{
-    [LLSDType("ARRAY")]
-    public class OSDArray
-    {
-        public ArrayList Array = new ArrayList();
+namespace OpenSim.Framework.Capabilities;
 
-        public OSDArray()
-        {
-        }
+[LLSDType("ARRAY")]
+public class OSDArray
+{
+    public ArrayList Array = new ArrayList();
+
+    public OSDArray()
+    {
     }
 }

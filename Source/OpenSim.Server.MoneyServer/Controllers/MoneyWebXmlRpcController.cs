@@ -1,8 +1,6 @@
 using System.Collections;
 using System.Net;
 
-using Microsoft.Extensions.Logging;
-
 using Nwc.XmlRpc;
 
 using OpenSim.Data.MySQL.MoneyData;

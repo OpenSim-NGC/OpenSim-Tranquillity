@@ -8,7 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="Mono.Security.dll" HintPath="../../Library/Mono.Security.dll" />
     <Reference Include="NDesk.Options" HintPath="../../Library/NDesk.Options.dll" />
     <Reference Include="netcd" HintPath="../../Library/netcd.dll" />
     <Reference Include="Nini" HintPath="../../Library/Nini.dll" />

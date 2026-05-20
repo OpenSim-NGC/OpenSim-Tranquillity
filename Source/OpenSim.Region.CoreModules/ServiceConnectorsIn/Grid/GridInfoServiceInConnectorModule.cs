@@ -33,81 +33,80 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Handlers.Grid;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Grid
+namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Grid;
+
+public class GridInfoServiceInConnectorModule : ISharedRegionModule
 {
-    public class GridInfoServiceInConnectorModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static bool m_Enabled = false;
+
+    private IConfigSource m_Config;
+    bool m_Registered = false;
+
+    #region Region Module interface
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private static bool m_Enabled = false;
-
-        private IConfigSource m_Config;
-        bool m_Registered = false;
-
-        #region Region Module interface
-
-        public void Initialise(IConfigSource config)
+        m_Config = config;
+        IConfig moduleConfig = config.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            m_Config = config;
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+            m_Enabled = moduleConfig.GetBoolean("GridInfoServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("GridInfoServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_log.Info("[GRIDINFO IN CONNECTOR]: GridInfo Service In Connector enabled");
-                }
-
+                m_log.Info("[GRIDINFO IN CONNECTOR]: GridInfo Service In Connector enabled");
             }
 
         }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "GridInfoService"; }
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            if (!m_Registered)
-            {
-                m_Registered = true;
-
-                m_log.Info("[GridInfo]: Starting...");
-
-                new GridInfoServerInConnector(m_Config, MainServer.Instance, "GridInfoService");
-            }
-
-        }
-
-        #endregion
 
     }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public string Name
+    {
+        get { return "GridInfoService"; }
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        if (!m_Registered)
+        {
+            m_Registered = true;
+
+            m_log.Info("[GridInfo]: Starting...");
+
+            new GridInfoServerInConnector(m_Config, MainServer.Instance, "GridInfoService");
+        }
+
+    }
+
+    #endregion
+
 }

@@ -25,18 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class ViewerEffectEventHandlerArg : EventArgs
 {
-    public class ViewerEffectEventHandlerArg : EventArgs
-    {
-        public UUID AgentID;
-        public byte[] Color;
-        public float Duration;
-        public UUID ID;
-        public byte Type;
-        public byte[] TypeData;
-    }
+    public UUID AgentID;
+    public byte[] Color;
+    public float Duration;
+    public UUID ID;
+    public byte Type;
+    public byte[] TypeData;
 }

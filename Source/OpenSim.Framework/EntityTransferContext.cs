@@ -25,46 +25,42 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class EntityTransferContext
 {
-    public class EntityTransferContext
+    public EntityTransferContext()
     {
-        public EntityTransferContext()
-        {
-            InboundVersion = VersionInfo.SimulationServiceVersionAcceptedMax;
-            OutboundVersion = VersionInfo.SimulationServiceVersionSupportedMax;
-            WearablesCount = -1;
-        }
+        InboundVersion = VersionInfo.SimulationServiceVersionAcceptedMax;
+        OutboundVersion = VersionInfo.SimulationServiceVersionSupportedMax;
+        WearablesCount = -1;
+    }
 
-        public float InboundVersion { get; set; }
-        public float OutboundVersion { get; set; }
-        public int WearablesCount { get; set; }
+    public float InboundVersion { get; set; }
+    public float OutboundVersion { get; set; }
+    public int WearablesCount { get; set; }
 
-        public OSD Pack()
-        {
-            OSDMap data = new OSDMap();
-            data["InboundVersion"] = OSD.FromReal(InboundVersion);
-            data["OutboundVersion"] = OSD.FromReal(OutboundVersion);
-            data["WearablesCount"] = OSD.FromInteger(WearablesCount);
+    public OSD Pack()
+    {
+        OSDMap data = new OSDMap();
+        data["InboundVersion"] = OSD.FromReal(InboundVersion);
+        data["OutboundVersion"] = OSD.FromReal(OutboundVersion);
+        data["WearablesCount"] = OSD.FromInteger(WearablesCount);
 
-            return data;
-        }
+        return data;
+    }
 
-        public void Unpack(OSD data)
-        {
-            OSDMap map = (OSDMap)data;
-            OSD tmpOSD;
-            if (map.TryGetValue("InboundVersion", out tmpOSD))
-                InboundVersion = (float)tmpOSD.AsReal();
-            if (map.TryGetValue("OutboundVersion", out tmpOSD))
-                OutboundVersion = (float)tmpOSD.AsReal();
-            if (map.TryGetValue("WearablesCount", out tmpOSD))
-                WearablesCount = tmpOSD.AsInteger();
-        }
+    public void Unpack(OSD data)
+    {
+        OSDMap map = (OSDMap)data;
+        OSD tmpOSD;
+        if (map.TryGetValue("InboundVersion", out tmpOSD))
+            InboundVersion = (float)tmpOSD.AsReal();
+        if (map.TryGetValue("OutboundVersion", out tmpOSD))
+            OutboundVersion = (float)tmpOSD.AsReal();
+        if (map.TryGetValue("WearablesCount", out tmpOSD))
+            WearablesCount = tmpOSD.AsInteger();
     }
 }
