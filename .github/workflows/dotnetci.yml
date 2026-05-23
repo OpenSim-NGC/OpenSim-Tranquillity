@@ -25,6 +25,8 @@ jobs:
       run: dotnet --version
 
     - name: Restore dependencies
+      env:
+        GITHUB_TOKEN: ${{ GH_PACKAGES_TOKE }}
       run: dotnet restore ./Tranquillity.sln
 
     - name: Build
