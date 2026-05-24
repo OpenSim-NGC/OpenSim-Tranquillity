@@ -176,8 +176,16 @@ public static SKBitmap Splat(ITerrainChannel terrain, UUID[] textureIDs,
                             using(SKImage image = SKImage.FromBitmap(detailTexture[i]))
                             using(SKData encoded = image.Encode(SKEncodedImageFormat.Png, 100))
                             {
-                                // Cache a PNG copy of this terrain texture
-                                AssetBase newAsset = new AssetBase
+                                if (detailTexture[i].ColorType != SKColorType.Rgb888x ||
+                                   detailTexture[i].Width != 16 || detailTexture[i].Height != 16)
+                                {
+                                    using(SKBitmap origBitmap = detailTexture[i])
+                                        detailTexture[i] = SkiaImageUtils.ResizeImageSolid(origBitmap, 16, 16);
+                                }
+
+                                // Save the decoded and resized texture to the cache
+                                using(SKImage image = SKImage.FromBitmap(detailTexture[i]))
+                                using(SKData encoded = image.Encode(SKEncodedImageFormat.Png, 100))
                                 {
                                     Data = encoded.ToArray(),
                                     Description = "PNG",
@@ -262,8 +270,11 @@ public static SKBitmap Splat(ITerrainChannel terrain, UUID[] textureIDs,
                     {
                         if(detailTexture[i].Width != 16 || detailTexture[i].Height != 16)
                         {
-                            using(SKBitmap origBitmap = detailTexture[i])
-                                detailTexture[i] = SkiaImageUtils.ResizeImageSolid(origBitmap, 16, 16);
+                            if(detailTexture[i].Width != 16 || detailTexture[i].Height != 16)
+                            {
+                                using(SKBitmap origBitmap = detailTexture[i])
+                                    detailTexture[i] = SkiaImageUtils.ResizeImageSolid(origBitmap, 16, 16);
+                            }
                         }
                     }
                 }
