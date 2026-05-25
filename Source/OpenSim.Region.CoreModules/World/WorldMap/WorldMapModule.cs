@@ -1582,12 +1582,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
                         // Resize using SkiaSharp
                         using (SKBitmap scaledSk = SkiaImageUtils.ResizeImageSolid(mapbmp, (int)(bx * scale), (int)(by * scale)))
                         {
-                            float scale = (float)Constants.RegionSize/(float)mb;
-                            // Resize using SkiaSharp
-                            using (SKBitmap scaledSk = SkiaImageUtils.ResizeImageSolid(mapbmp, (int)(bx * scale), (int)(by * scale)))
-                            {
-                                data = EncodeSkBitmapToJpeg(scaledSk, true);
-                            }
+                             data = EncodeSkBitmapToJpeg(scaledSk, true);
                         }
                     }
                     else
