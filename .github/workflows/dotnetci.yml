@@ -26,25 +26,35 @@ jobs:
 
     - name: Restore dependencies
       env:
-        GITHUB_TOKEN: ${{ GH_PACKAGES_TOKE }}
+        GITHUB_TOKEN: ${{ GH_PACKAGES_TOKEN }}
       run: dotnet restore ./Tranquillity.sln
 
     - name: Build
+      env:
+        GITHUB_TOKEN: ${{ GH_PACKAGES_TOKEN }}
       run: dotnet build ./Tranquillity.sln --configuration Release --no-restore
 
 #    - name: Tests
+#      env:
+#        GITHUB_TOKEN: ${{ GH_PACKAGES_TOKEN }}
 #      run: dotnet test ./Tranquillity.sln --verbosity normal
 
     # Publish GridServer for Linux x64
     - name: Publish GridServer for Linux x64
+      env:
+        GITHUB_TOKEN: ${{ GH_PACKAGES_TOKEN }}
       run: dotnet publish ./Source/OpenSim.Server.GridServer/OpenSim.Server.GridServer.csproj -c Release -r linux-x64 -o ./publish/linux-x64/OpenSim.Server.GridServer
 
     # Publish RegionServer for Linux x64
     - name: Publish RegionServer for Linux x64
+      env:
+        GITHUB_TOKEN: ${{ GH_PACKAGES_TOKEN }}
       run: dotnet publish ./Source/OpenSim.Server.RegionServer/OpenSim.Server.RegionServer.csproj -c Release -r linux-x64 -o ./publish/linux-x64/OpenSim.Server.RegionServer
     
     # Publish MoneyServer for Linux x64
     - name: Publish MoneyServer for Linux x64
+      env:
+        GITHUB_TOKEN: ${{ GH_PACKAGES_TOKEN }}
       run: dotnet publish ./Source/OpenSim.Server.MoneyServer/OpenSim.Server.MoneyServer.csproj -c Release -r linux-x64 -o ./publish/linux-x64/OpenSim.Server.MoneyServer
 
     # Upload Project Linux Artifacts
@@ -56,14 +66,20 @@ jobs:
 
     # Publish GridServer for Windows x64
     - name: Publish GridServer for Windows x64
+      env:
+        GITHUB_TOKEN: ${{ GH_PACKAGES_TOKEN }}
       run: dotnet publish ./Source/OpenSim.Server.GridServer/OpenSim.Server.GridServer.csproj -c Release -r win-x64 -o ./publish/win-x64/OpenSim.Server.GridServer
   
     # Publish RegionServer for Windows x64
     - name: Publish RegionServer for Windows x64
+      env:
+        GITHUB_TOKEN: ${{ GH_PACKAGES_TOKEN }}
       run: dotnet publish ./Source/OpenSim.Server.RegionServer/OpenSim.Server.RegionServer.csproj -c Release -r win-x64 -o ./publish/win-x64/OpenSim.Server.RegionServer
   
     # Publish MoneyServer for Windows x64
     - name: Publish MoneyServer for Windows x64
+      env:
+        GITHUB_TOKEN: ${{ GH_PACKAGES_TOKEN }}
       run: dotnet publish ./Source/OpenSim.Server.MoneyServer/OpenSim.Server.MoneyServer.csproj -c Release -r win-x64 -o ./publish/win-x64/OpenSim.Server.MoneyServer
 
     # Upload Windows Build Artifacts
