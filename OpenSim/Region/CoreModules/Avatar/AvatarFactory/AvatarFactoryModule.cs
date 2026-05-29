@@ -227,7 +227,14 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
 
         private void SendAppearance(ScenePresence sp)
         {
-            // Send the appearance to everyone in the scene
+            // Send the updated appearance back to the avatar themselves so that
+            // mLastProcessedAppearance on the viewer is kept current.  Without
+            // this, resetSkeleton() on the viewer replays the stale appearance
+            // from region-entry and reverts the avatar's textures to a previous
+            // outfit.
+            sp.SendAppearanceToAgentNF(sp);
+
+            // Send the appearance to everyone else in the scene
             sp.SendAppearanceToAllOtherAgents();
 
             // Send animations back to the avatar as well
