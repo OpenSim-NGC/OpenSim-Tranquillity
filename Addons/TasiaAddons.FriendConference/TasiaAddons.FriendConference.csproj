@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyTitle>TasiaAddons.FriendConference</AssemblyTitle>
+    <Company>Tasia Extensions</Company>
+    <Product>Tasia Addons - Friend Conference</Product>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Nini" HintPath="..\..\Library\Nini.dll" />
+    <Reference Include="OpenMetaverse" HintPath="..\..\Library\OpenMetaverse.dll" />
+    <Reference Include="OpenMetaverseTypes" HintPath="..\..\Library\OpenMetaverseTypes.dll" />
+    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\Library\OpenMetaverse.StructuredData.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Capabilities\OpenSim.Capabilities.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.3.0" />
+    <PackageReference Include="Mono.Addins" Version="1.4.1" />
+    <PackageReference Include="Mono.Addins.CecilReflector" Version="1.4.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
+  </ItemGroup>
+</Project>
