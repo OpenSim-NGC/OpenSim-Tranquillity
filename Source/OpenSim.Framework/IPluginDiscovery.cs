@@ -253,15 +253,15 @@ public class DotNetCorePluginsDiscovery : IPluginDiscovery
             try
             {
                 string assemblyPath = Path.IsPathRooted(dllPath)? dllPath : Path.GetFullPath(dllPath);
+                Type[] sharedTypes = BuildSharedTypes(requiredTypeHint);
 
                 McMaster.NETCore.Plugins.PluginLoader loader =
                     McMaster.NETCore.Plugins.PluginLoader.CreateFromAssemblyFile(
                         assemblyPath,
-                        sharedTypes: new[] { 
-                            requiredTypeHint
-                        },
+                        sharedTypes: sharedTypes,
                         config => {
                             config.IsLazyLoaded = true;
+                            config.PreferSharedTypes = true;
                         }
                         );
 
@@ -282,6 +282,32 @@ public class DotNetCorePluginsDiscovery : IPluginDiscovery
         m_registeredPlugins = PluginRegistry.FromProviders(m_assemblies, m_log);
 
         return m_assemblies;
+    }
+
+    private static Type[] BuildSharedTypes(Type requiredTypeHint)
+    {
+        HashSet<Type> sharedTypes = new HashSet<Type>();
+
+        if (requiredTypeHint != null)
+            sharedTypes.Add(requiredTypeHint);
+
+        // Keep framework/plugin-registry contracts unified with the host context.
+        sharedTypes.Add(typeof(IPlugin));
+        sharedTypes.Add(typeof(IPluginRegistryProvider));
+
+        // Ensure singleton server state is shared instead of duplicated per plugin load context.
+        TryAddType(sharedTypes, "OpenSim.Framework.Servers.MainServer, OpenSim.Framework.Servers");
+        TryAddType(sharedTypes, "OpenSim.Framework.Servers.IMainServer, OpenSim.Framework.Servers");
+        TryAddType(sharedTypes, "OpenSim.Framework.Servers.HttpServer.IHttpServer, OpenSim.Framework.Servers.HttpServer");
+
+        return sharedTypes.ToArray();
+    }
+
+    private static void TryAddType(HashSet<Type> sharedTypes, string assemblyQualifiedTypeName)
+    {
+        Type resolvedType = Type.GetType(assemblyQualifiedTypeName, false);
+        if (resolvedType != null)
+            sharedTypes.Add(resolvedType);
     }
 
     private static bool ShouldProbeAssembly(string dllPath, Type requiredTypeHint)

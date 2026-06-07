@@ -409,20 +409,29 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                     //HttpServer.AddXmlRPCHandler("SendMoney", SendMoneyHandler);                         // added
                     //HttpServer.AddXmlRPCHandler("MoveMoney", MoveMoneyHandler);                         // added
 
-                    // var httpServer = MainServer.Instance.DefaultServer;
-                    // if (httpServer == null)
-                    // {
-                    //     m_log.ErrorFormat("[MONEY]: AddRegion: MainServer.Instance.DefaultServer is null; cannot add XMLRPC handlers");
-                    //     return;
-                    // }
+                    IHttpServer httpServer = MainServer.Instance.DefaultServer;
+                    if (httpServer == null)
+                    {
+                        m_log.ErrorFormat(
+                            "[MONEY]: AddRegion: MainServer.Instance.DefaultServer is null; moduleAsm={0} mainServerAsm={1}",
+                            typeof(DTLNSLMoneyModule).Assembly.FullName,
+                            typeof(MainServer).Assembly.FullName);
+                        return;
+                    }
+
+                    m_log.InfoFormat(
+                        "[MONEY]: MainServer binding: moduleAsm={0} mainServerAsm={1} defaultPort={2}",
+                        typeof(DTLNSLMoneyModule).Assembly.FullName,
+                        typeof(MainServer).Assembly.FullName,
+                        httpServer.Port);
     
-                    MainServer.Instance.DefaultServer.AddXmlRPCHandler("OnMoneyTransfered", OnMoneyTransferedHandler);
-                    MainServer.Instance.DefaultServer.AddXmlRPCHandler("UpdateBalance", BalanceUpdateHandler);
-                    MainServer.Instance.DefaultServer.AddXmlRPCHandler("UserAlert", UserAlertHandler);
-                    MainServer.Instance.DefaultServer.AddXmlRPCHandler("GetBalance", GetBalanceHandler);              // added
-                    MainServer.Instance.DefaultServer.AddXmlRPCHandler("AddBankerMoney", AddBankerMoneyHandler);      // added
-                    MainServer.Instance.DefaultServer.AddXmlRPCHandler("SendMoney", SendMoneyHandler);                // added
-                    MainServer.Instance.DefaultServer.AddXmlRPCHandler("MoveMoney", MoveMoneyHandler);                // added
+                    httpServer.AddXmlRPCHandler("OnMoneyTransfered", OnMoneyTransferedHandler);
+                    httpServer.AddXmlRPCHandler("UpdateBalance", BalanceUpdateHandler);
+                    httpServer.AddXmlRPCHandler("UserAlert", UserAlertHandler);
+                    httpServer.AddXmlRPCHandler("GetBalance", GetBalanceHandler);              // added
+                    httpServer.AddXmlRPCHandler("AddBankerMoney", AddBankerMoneyHandler);      // added
+                    httpServer.AddXmlRPCHandler("SendMoney", SendMoneyHandler);                // added
+                    httpServer.AddXmlRPCHandler("MoveMoney", MoveMoneyHandler);                // added
 
                     // * For land sales, buy-currency button, and the insufficent funds flows to operate,
                     // * the economy helper uri needs to be present.
