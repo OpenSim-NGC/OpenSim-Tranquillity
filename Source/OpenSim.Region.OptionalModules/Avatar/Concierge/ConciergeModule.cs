@@ -130,7 +130,7 @@ public class ConciergeModule : ChatModule, ISharedRegionModule
     {
         if (!m_enabled) return;
 
-        MainServer.Instance.AddXmlRPCHandler("concierge_update_welcome", XmlRpcUpdateWelcomeMethod, false);
+        MainServer.Instance.DefaultServer.AddXmlRPCHandler("concierge_update_welcome", XmlRpcUpdateWelcomeMethod, false);
 
         lock (m_syncy)
         {
@@ -162,7 +162,7 @@ public class ConciergeModule : ChatModule, ISharedRegionModule
     {
         if (!m_enabled) return;
 
-        MainServer.Instance.RemoveXmlRPCHandler("concierge_update_welcome");
+        MainServer.Instance.DefaultServer.RemoveXmlRPCHandler("concierge_update_welcome");
 
         lock (m_syncy)
         {

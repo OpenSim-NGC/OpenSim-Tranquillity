@@ -62,7 +62,7 @@ public class WebSocketEchoModule : ISharedRegionModule
     public void PostInitialise()
     {
         if (enabled)
-            MainServer.Instance.AddWebSocketHandler("/echo", WebSocketHandlerCallback);
+            MainServer.Instance.DefaultServer.AddWebSocketHandler("/echo", WebSocketHandlerCallback);
     }
 
     // This gets called by BaseHttpServer and gives us an opportunity to set things on the WebSocket handler before we turn it on
@@ -149,7 +149,7 @@ public class WebSocketEchoModule : ISharedRegionModule
             items[i].Dispose();
         }
         _activeHandlers.Clear();
-        MainServer.Instance.RemoveWebSocketHandler("/echo");
+        MainServer.Instance.DefaultServer.RemoveWebSocketHandler("/echo");
     }
 
     public void AddRegion(Scene scene)

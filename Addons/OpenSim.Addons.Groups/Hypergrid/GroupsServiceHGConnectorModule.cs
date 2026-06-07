@@ -129,7 +129,7 @@ public class GroupsServiceHGConnectorModule : ISharedRegionModule, IGroupsServic
             {
                 m_LocalGroupsConnector = new GroupsServiceLocalConnectorModule(m_Config, m_UserManagement);
                 // Also, if local, create the endpoint for the HGGroupsService
-                new HGGroupsServiceRobustConnector(m_Config, MainServer.Instance, string.Empty,
+                new HGGroupsServiceRobustConnector(m_Config, MainServer.Instance.DefaultServer, string.Empty,
                     scene.RequestModuleInterface<IOfflineIMService>(), scene.RequestModuleInterface<IUserAccountService>());
 
             }

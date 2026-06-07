@@ -140,23 +140,23 @@ public class FreeSwitchVoiceModule : ISharedRegionModule, IVoiceModule
             // - buddies: viv_buddy.php
             // - ???: viv_watcher.php
             // - signout: viv_signout.php
-            MainServer.Instance.AddHTTPHandler(String.Format("{0}/viv_get_prelogin.php", m_freeSwitchAPIPrefix),
+            MainServer.Instance.DefaultServer.AddHTTPHandler(String.Format("{0}/viv_get_prelogin.php", m_freeSwitchAPIPrefix),
                                                  FreeSwitchSLVoiceGetPreloginHTTPHandler);
 
-            MainServer.Instance.AddHTTPHandler(String.Format("{0}/freeswitch-config", m_freeSwitchAPIPrefix), FreeSwitchConfigHTTPHandler);
+            MainServer.Instance.DefaultServer.AddHTTPHandler(String.Format("{0}/freeswitch-config", m_freeSwitchAPIPrefix), FreeSwitchConfigHTTPHandler);
 
             // RestStreamHandler h = new
             // RestStreamHandler("GET",
             // String.Format("{0}/viv_get_prelogin.php", m_freeSwitchAPIPrefix), FreeSwitchSLVoiceGetPreloginHTTPHandler);
             //  MainServer.Instance.AddStreamHandler(h);
 
-            MainServer.Instance.AddHTTPHandler(String.Format("{0}/viv_signin.php", m_freeSwitchAPIPrefix),
+            MainServer.Instance.DefaultServer.AddHTTPHandler(String.Format("{0}/viv_signin.php", m_freeSwitchAPIPrefix),
                              FreeSwitchSLVoiceSigninHTTPHandler);
 
-            MainServer.Instance.AddHTTPHandler(String.Format("{0}/viv_buddy.php", m_freeSwitchAPIPrefix),
+            MainServer.Instance.DefaultServer.AddHTTPHandler(String.Format("{0}/viv_buddy.php", m_freeSwitchAPIPrefix),
                              FreeSwitchSLVoiceBuddyHTTPHandler);
 
-            MainServer.Instance.AddHTTPHandler(String.Format("{0}/viv_watcher.php", m_freeSwitchAPIPrefix),
+            MainServer.Instance.DefaultServer.AddHTTPHandler(String.Format("{0}/viv_watcher.php", m_freeSwitchAPIPrefix),
                              FreeSwitchSLVoiceWatcherHTTPHandler);
 
             m_log.InfoFormat("[FreeSwitchVoice]: using FreeSwitch server {0}", m_freeSwitchRealm);
@@ -183,7 +183,7 @@ public class FreeSwitchVoiceModule : ISharedRegionModule, IVoiceModule
         // dotted quad (or should be!) and it can reach this host from
         // a client. The port is grabbed from the region's HTTP server.
         m_openSimWellKnownHTTPAddress = scene.RegionInfo.ExternalHostName;
-        m_freeSwitchServicePort = MainServer.Instance.Port;
+        m_freeSwitchServicePort = MainServer.Instance.DefaultServer.Port;
 
         if (m_Enabled)
         {

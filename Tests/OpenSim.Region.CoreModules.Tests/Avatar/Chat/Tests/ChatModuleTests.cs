@@ -62,8 +62,7 @@ public class ChatModuleTests : OpenSimTestCase
         // XXX: HTTP server is not (and should not be) necessary for this test, though it's absence makes the
         // CapabilitiesModule complain when it can't set up HTTP endpoints.
         BaseHttpServer httpServer = new BaseHttpServer(99999);
-        MainServer.AddHttpServer(httpServer);
-        MainServer.Instance = httpServer;
+        MainServer.Instance.AddHttpServer(httpServer);
 
         // We need entity transfer modules so that when sp2 logs into the east region, the region calls
         // EntityTransferModuleto set up a child agent on the west region.

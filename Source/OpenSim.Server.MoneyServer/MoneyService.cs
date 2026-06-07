@@ -218,7 +218,7 @@ public class MoneyService : IMoneyServiceCore, IHostedService
     protected void Shutdown()
     {
         Watchdog.Enabled = false;
-        MainServer.Stop();
+        MainServer.Instance.Stop();
 
         Thread.Sleep(500);
         WorkManager.Stop();

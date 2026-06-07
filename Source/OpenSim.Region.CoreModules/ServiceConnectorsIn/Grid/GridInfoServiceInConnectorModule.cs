@@ -102,7 +102,7 @@ public class GridInfoServiceInConnectorModule : ISharedRegionModule
 
             m_log.Info("[GridInfo]: Starting...");
 
-            new GridInfoServerInConnector(m_Config, MainServer.Instance, "GridInfoService");
+            new GridInfoServerInConnector(m_Config, MainServer.Instance.DefaultServer, "GridInfoService");
         }
 
     }

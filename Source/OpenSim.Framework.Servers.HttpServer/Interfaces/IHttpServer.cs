@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Net;
+
 namespace OpenSim.Framework.Servers.HttpServer;
 
 /// <summary>
@@ -38,6 +40,9 @@ public interface IHttpServer
 
     uint Port { get; }
     bool UseSSL { get; }
+    public IPAddress ListenIPAddress { get; set; }
+
+    public int DebugLevel { get; set; }
 
 //        // Note that the agent string is provided simply to differentiate
 //        // the handlers - it is NOT required to be an actual agent header
@@ -68,6 +73,8 @@ public interface IHttpServer
     /// <returns></returns>
     bool AddLLSDHandler(string path, LLSDMethod handler);
 
+    void AddGlobalMethodHandler(string key, SimpleStreamMethod sh);
+
     /// <summary>
     /// Add a stream handler to the http server.  If the handler already exists, then nothing happens.
     /// </summary>
@@ -77,6 +84,10 @@ public interface IHttpServer
 
     bool AddXmlRPCHandler(string method, XmlRpcMethod handler);
     bool AddXmlRPCHandler(string method, XmlRpcMethod handler, bool keepAlive);
+    
+    public void HandleXmlRpcRequests(OSHttpRequest request, OSHttpResponse response);
+    public void HandleXmlRpcRequests(OSHttpRequest request, OSHttpResponse response, Dictionary<string, XmlRpcMethod> rpcHandlers);
+
 
     bool AddJsonRPCHandler(string method, JsonRPCMethod handler);
 
@@ -128,4 +139,7 @@ public interface IHttpServer
     void AddIndexPHPMethodHandler(string key, SimpleStreamMethod sh);
     void RemoveIndexPHPMethodHandler(string key);
     SimpleStreamMethod TryGetIndexPHPMethodHandler(string key);
+
+    public void Start();
+    public void Stop();
 }

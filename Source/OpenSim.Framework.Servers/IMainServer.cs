@@ -25,38 +25,32 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenSim.Framework.Servers;
+using System.Net;
+using OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Tests.Common;
+namespace OpenSim.Framework.Servers;
 
-public class OpenSimTestCase : IDisposable
+public interface IMainServer
 {
-    protected OpenSimTestCase()
-    {
-        //TestHelpers.InMethod();
-        // Disable logging for each test so that one where logging is enabled doesn't cause all subsequent tests
-        // to have logging on if it failed with an exception.
-        TestHelpers.DisableLogging();
+    static abstract IMainServer Instance { get; }
 
-        // This is an unfortunate bit of clean up we have to do because MainServer manages things through static
-        // variables and the VM is not restarted between tests.
-        if (MainServer.Instance != null)
-        {
-            MainServer.Instance.RemoveHttpServer(MainServer.Instance.DefaultServer.Port);
-            // MainServer.Instance = null;
-        }
-    }
+    int DebugLevel { get; set; }
 
-    /// <summary>
-    /// For subclasses that override SetUp() - provides per-test setup functionality.
-    /// </summary>
-    public virtual void SetUp()
-    {
-        // Override in subclasses for per-test setup
-    }
+    IHttpServer DefaultServer { get; }
 
-    public virtual void Dispose()
-    {
-        // Do "global" teardown here; Called after every test method.
-    }
+    Dictionary<uint, IHttpServer> Servers { get; }
+
+    void AddHttpServer(IHttpServer server);
+    
+    bool ContainsHttpServer(uint port);   
+    
+    IHttpServer GetHttpServer(uint port);
+    
+    IHttpServer GetHttpServer(uint port, IPAddress ipaddr);
+
+    void RegisterHttpConsoleCommands(ICommandConsole console);
+    
+    bool RemoveHttpServer(uint port);
+    
+    void Stop();
 }

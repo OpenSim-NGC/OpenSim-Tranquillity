@@ -171,12 +171,12 @@ public class ServerMain
             if (parts.Length > 1)
                 friendlyName = parts[1];
 
-            BaseHttpServer server;
+            IHttpServer server;
 
             if (port != 0)
-                server = (BaseHttpServer)MainServer.GetHttpServer(port);
+                server = MainServer.Instance.GetHttpServer(port);
             else
-                server = MainServer.Instance;
+                server = MainServer.Instance.DefaultServer;
 
             if (friendlyName == "LLLoginServiceInConnector")
                 server.AddSimpleStreamHandler(new IndexPHPHandler(server));

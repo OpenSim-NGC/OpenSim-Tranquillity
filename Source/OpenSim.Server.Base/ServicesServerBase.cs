@@ -213,7 +213,7 @@ public class ServicesServerBase : ServerBase
         if (!DoneShutdown)
         {
             DoneShutdown = true;
-            MainServer.Stop();
+            MainServer.Instance.Stop();
 
             MemoryWatchdog.Enabled = false;
             Watchdog.Enabled = false;
@@ -235,7 +235,7 @@ public class ServicesServerBase : ServerBase
         if (!DoneShutdown)
         {
             DoneShutdown = true;
-            MainServer.Stop();
+            MainServer.Instance.Stop();
 
             MemoryWatchdog.Enabled = false;
             Watchdog.Enabled = false;

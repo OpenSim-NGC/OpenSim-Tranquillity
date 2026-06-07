@@ -54,7 +54,7 @@ public class MapImageServiceInConnectorModule : ISharedRegionModule
             if (m_Enabled)
             {
                 m_log.Info("[MAP SERVICE IN CONNECTOR]: MapImage Service In Connector enabled");
-                new MapGetServiceConnector(m_Config, MainServer.Instance, "MapImageService");
+                new MapGetServiceConnector(m_Config, MainServer.Instance.DefaultServer, "MapImageService");
             }
         }
     }

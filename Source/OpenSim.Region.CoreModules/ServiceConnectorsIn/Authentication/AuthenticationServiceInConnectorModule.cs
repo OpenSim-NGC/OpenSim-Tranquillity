@@ -102,7 +102,7 @@ public class AuthenticationServiceInConnectorModule : ISharedRegionModule
 
             m_log.Info("[AUTHENTICATION IN CONNECTOR]: Starting...");
 
-            new AuthenticationServiceConnector(m_Config, MainServer.Instance, "AuthenticationService");
+            new AuthenticationServiceConnector(m_Config, MainServer.Instance.DefaultServer, "AuthenticationService");
         }
 
     }

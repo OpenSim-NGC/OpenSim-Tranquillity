@@ -51,9 +51,9 @@ public class DataRequestHandler
         m_externalData = externalData;
 
         //Register HTTP handler
-        MainServer.UnSecureInstance.AddGloblaMethodHandler("collector", OnGetSnapshot);
+        MainServer.Instance.DefaultServer.AddGlobalMethodHandler("collector", OnGetSnapshot);
         // Register validation callback handler
-        MainServer.UnSecureInstance.AddGloblaMethodHandler("validate", OnValidate);
+        MainServer.Instance.DefaultServer.AddGlobalMethodHandler("validate", OnValidate);
 
         m_log.Info("[DATASNAPSHOT]: Set up snapshot service");
     }

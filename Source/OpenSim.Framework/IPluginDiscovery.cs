@@ -253,14 +253,17 @@ public class DotNetCorePluginsDiscovery : IPluginDiscovery
             try
             {
                 string assemblyPath = Path.IsPathRooted(dllPath)? dllPath : Path.GetFullPath(dllPath);
-                
-                m_log.InfoFormat("[PLUGINS]: Loading assembly {0}", dllPath);
 
                 McMaster.NETCore.Plugins.PluginLoader loader =
                     McMaster.NETCore.Plugins.PluginLoader.CreateFromAssemblyFile(
                         assemblyPath,
-                        sharedTypes: new[] { requiredTypeHint },
-                        config => config.IsLazyLoaded = true);
+                        sharedTypes: new[] { 
+                            requiredTypeHint
+                        },
+                        config => {
+                            config.IsLazyLoaded = true;
+                        }
+                        );
 
                 m_pluginLoaders.Add(loader);
                 m_assemblies.Add(loader.LoadDefaultAssembly());

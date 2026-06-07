@@ -100,7 +100,7 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
         if (!m_Enabled)
             return;
 
-        MainServer.Instance.AddXmlRPCHandler("grid_instant_message", processXMLRPCGridInstantMessage);
+        MainServer.Instance.DefaultServer.AddXmlRPCHandler("grid_instant_message", processXMLRPCGridInstantMessage);
     }
 
     public virtual void RegionLoaded(Scene scene)

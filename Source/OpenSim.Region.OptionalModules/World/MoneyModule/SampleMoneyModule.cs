@@ -131,7 +131,7 @@ public class SampleMoneyModule : IMoneyModule, ISharedRegionModule
         if (m_enabled)
         {
             scene.RegisterModuleInterface<IMoneyModule>(this);
-            IHttpServer httpServer = MainServer.Instance;
+            IHttpServer httpServer = MainServer.Instance.DefaultServer;
 
             lock (m_scenes)
             {
@@ -145,8 +145,8 @@ public class SampleMoneyModule : IMoneyModule, ISharedRegionModule
                     m_rpcHandlers.Add("buyLandPrep", landBuy_func);
 
                     // add php
-                    MainServer.Instance.AddSimpleStreamHandler(new SimpleStreamHandler("/currency.php", processPHP));
-                    MainServer.Instance.AddSimpleStreamHandler(new SimpleStreamHandler("/landtool.php", processPHP));
+                    MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new SimpleStreamHandler("/currency.php", processPHP));
+                    MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new SimpleStreamHandler("/landtool.php", processPHP));
                 }
 
                 if (m_scenes.ContainsKey(scene.RegionInfo.RegionHandle))
@@ -190,7 +190,7 @@ public class SampleMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void processPHP(IOSHttpRequest request, IOSHttpResponse response)
     {
-        MainServer.Instance.HandleXmlRpcRequests((OSHttpRequest)request, (OSHttpResponse)response, m_rpcHandlers);
+        MainServer.Instance.DefaultServer.HandleXmlRpcRequests((OSHttpRequest)request, (OSHttpResponse)response, m_rpcHandlers);
     }
 
     // Please do not refactor these to be just one method

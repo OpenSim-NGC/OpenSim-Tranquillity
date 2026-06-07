@@ -78,7 +78,7 @@ public abstract class RegionApplicationBase : BaseOpenSimServer
                     m_networkServersInfo.HttpSSLCN,
                     m_networkServersInfo.HttpSSLCertPath, m_networkServersInfo.HttpSSLCNCertPass);
             m_httpServer.Start();
-            MainServer.AddHttpServer(m_httpServer);
+            MainServer.Instance.AddHttpServer(m_httpServer);
         }
 
         // unsecure main server
@@ -89,12 +89,11 @@ public abstract class RegionApplicationBase : BaseOpenSimServer
             server.Start();
         }
         else
+        {
             server.Start();
+        }
 
-        MainServer.AddHttpServer(server);
-        MainServer.UnSecureInstance = server;
-
-        MainServer.Instance = m_httpServer;
+        MainServer.Instance.AddHttpServer(server);
 
         // "OOB" Server
         if (m_networkServersInfo.ssl_listener)
@@ -108,7 +107,7 @@ public abstract class RegionApplicationBase : BaseOpenSimServer
 
                 m_log.InfoFormat("[REGION SERVER]: Starting OOB HTTPS server on port {0}", server.SSLPort);
                 server.Start();
-                MainServer.AddHttpServer(server);
+                MainServer.Instance.AddHttpServer(server);
             }
             else
             {
@@ -116,7 +115,7 @@ public abstract class RegionApplicationBase : BaseOpenSimServer
 
                 m_log.InfoFormat("[REGION SERVER]: Starting HTTP server on port {0} for external HTTPS", server.Port);
                 server.Start();
-                MainServer.AddHttpServer(server);
+                MainServer.Instance.AddHttpServer(server);
             }
         }
 

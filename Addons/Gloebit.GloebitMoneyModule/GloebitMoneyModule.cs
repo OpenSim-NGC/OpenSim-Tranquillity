@@ -511,7 +511,8 @@ public class GloebitMoneyModule : IMoneyModule, ISharedRegionModule, GloebitTran
     public void processPHP(IOSHttpRequest request, IOSHttpResponse response)
     {
 #if NEWHTTPFLOW
-        MainServer.Instance.HandleXmlRpcRequests((OSHttpRequest)request, (OSHttpResponse)response, m_rpcHandlers);
+        MainServer.Instance.DefaultServer.HandleXmlRpcRequests(
+            (OSHttpRequest)request, (OSHttpResponse)response, m_rpcHandlers);
 #endif
     }
 
@@ -524,7 +525,7 @@ public class GloebitMoneyModule : IMoneyModule, ISharedRegionModule, GloebitTran
 
         m_log.InfoFormat("[GLOEBITMONEYMODULE] region added {0}", scene.RegionInfo.RegionID.ToString());
         scene.RegisterModuleInterface<IMoneyModule>(this);
-        IHttpServer httpServer = MainServer.Instance;
+        IHttpServer httpServer = MainServer.Instance.DefaultServer;
 
         lock (m_scenel)
         {
@@ -563,8 +564,8 @@ public class GloebitMoneyModule : IMoneyModule, ISharedRegionModule, GloebitTran
                     m_rpcHandlers.Add("preflightBuyLandPrep", preflightBuyLandPrep_func);
                     m_rpcHandlers.Add("buyLandPrep", landBuy_func);
 #if NEWHTTPFLOW
-                    MainServer.Instance.AddSimpleStreamHandler(new SimpleStreamHandler("/landtool.php", processPHP));
-                    MainServer.Instance.AddSimpleStreamHandler(new SimpleStreamHandler("/currency.php", processPHP));
+                    MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new SimpleStreamHandler("/landtool.php", processPHP));
+                    MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new SimpleStreamHandler("/currency.php", processPHP));
 #endif
                 } else {
                     httpServer.AddXmlRPCHandler("getCurrencyQuote", quote_func);

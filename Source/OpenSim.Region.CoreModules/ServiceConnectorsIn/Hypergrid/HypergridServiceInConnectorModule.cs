@@ -118,13 +118,13 @@ public class HypergridServiceInConnectorModule : ISharedRegionModule
 //                IFriendsService friendsService = ServerUtils.LoadPlugin<IFriendsService>(m_LocalServiceDll, args)
             ServerUtils.LoadPlugin<IFriendsService>(m_LocalServiceDll, args);
 
-            m_HypergridHandler = new GatekeeperServiceInConnector(m_Config, MainServer.Instance, simService);
+            m_HypergridHandler = new GatekeeperServiceInConnector(m_Config, MainServer.Instance.DefaultServer, simService);
 
-            m_UASHandler = new UserAgentServerConnector(m_Config, MainServer.Instance, friendsConn);
+            m_UASHandler = new UserAgentServerConnector(m_Config, MainServer.Instance.DefaultServer, friendsConn);
 
-            new HeloServiceInConnector(m_Config, MainServer.Instance, "HeloService");
+            new HeloServiceInConnector(m_Config, MainServer.Instance.DefaultServer, "HeloService");
 
-            new HGFriendsServerConnector(m_Config, MainServer.Instance, "HGFriendsService", friendsConn);
+            new HGFriendsServerConnector(m_Config, MainServer.Instance.DefaultServer, "HGFriendsService", friendsConn);
         }
         scene.RegisterModuleInterface<IGatekeeperService>(m_HypergridHandler.GateKeeper);
         scene.RegisterModuleInterface<IUserAgentService>(m_UASHandler.HomeUsersService);

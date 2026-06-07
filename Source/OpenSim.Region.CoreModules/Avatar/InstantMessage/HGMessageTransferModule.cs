@@ -70,7 +70,7 @@ public class HGMessageTransferModule : ISharedRegionModule, IMessageTransferModu
             return;
         }
 
-        InstantMessageServerConnector imServer = new(config, MainServer.Instance, this);
+        InstantMessageServerConnector imServer = new(config, MainServer.Instance.DefaultServer, this);
         m_IMService = imServer.GetService();
         m_Enabled = true;
     }

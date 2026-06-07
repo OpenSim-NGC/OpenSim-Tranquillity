@@ -31,13 +31,19 @@ using OpenSim.Framework.Servers.HttpServer;
 
 namespace OpenSim.Framework.Servers;
 
-public class MainServer
+public sealed class MainServer : IMainServer
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly IMainServer _instance = new MainServer();
 
-    private static BaseHttpServer instance = null;
-    private static BaseHttpServer unsecureinstance = null;
-    private static Dictionary<uint, BaseHttpServer> m_Servers = new Dictionary<uint, BaseHttpServer>();
+    public static IMainServer Instance => _instance;
+
+    private MainServer()
+    {
+    }
+
+//    private BaseHttpServer _defaultServer = null;
+//    private BaseHttpServer _insecureServer = null;
+    private Dictionary<uint, IHttpServer> _httpServers = new();
 
     /// <summary>
     /// Control the printing of certain debug messages.
@@ -50,20 +56,20 @@ public class MainServer
     /// If DebugLevel >= 5 then the start of the body of incoming non-poll HTTP requests will be logged.
     /// If DebugLevel >= 6 then the entire body of incoming non-poll HTTP requests will be logged.
     /// </remarks>
-    public static int DebugLevel
+    public int DebugLevel
     {
         get { return s_debugLevel; }
         set
         {
             s_debugLevel = value;
 
-            lock (m_Servers)
-                foreach (BaseHttpServer server in m_Servers.Values)
+            lock (_httpServers)
+                foreach (var server in _httpServers.Values)
                     server.DebugLevel = s_debugLevel;
         }
     }
 
-    private static int s_debugLevel;
+    private int s_debugLevel;
 
     /// <summary>
     /// Set the main HTTP server instance.
@@ -74,35 +80,7 @@ public class MainServer
     /// <exception cref='Exception'>
     /// Thrown if the HTTP server has not already been registered via AddHttpServer()
     /// </exception>
-    public static BaseHttpServer Instance
-    {
-        get { return instance; }
-
-        set
-        {
-            lock (m_Servers)
-            {
-                if (!m_Servers.ContainsValue(value))
-                    throw new Exception("HTTP server must already have been registered to be set as the main instance");
-
-                instance = value;
-            }
-        }
-    }
-
-    public static BaseHttpServer UnSecureInstance
-    {
-        get { return unsecureinstance; }
-
-        set
-        {
-            lock (m_Servers)
-                if (!m_Servers.ContainsValue(value))
-                    throw new Exception("HTTP server must already have been registered to be set as the main instance");
-
-            unsecureinstance = value;
-        }
-    }
+    public IHttpServer DefaultServer { get; private set; }
 
     /// <summary>
     /// Get all the registered servers.
@@ -111,12 +89,12 @@ public class MainServer
     /// Returns a copy of the dictionary so this can be iterated through without locking.
     /// </remarks>
     /// <value></value>
-    public static Dictionary<uint, BaseHttpServer> Servers
+    public Dictionary<uint, IHttpServer> Servers
     {
-        get { return new Dictionary<uint, BaseHttpServer>(m_Servers); }
+        get { return new Dictionary<uint, IHttpServer>(_httpServers); }
     }
 
-    public static void RegisterHttpConsoleCommands(ICommandConsole console)
+    public void RegisterHttpConsoleCommands(ICommandConsole console)
     {
         console.Commands.AddCommand(
             "Comms", false, "show http-handlers",
@@ -147,7 +125,7 @@ public class MainServer
     /// Turn on some debugging values for OpenSim.
     /// </summary>
     /// <param name="args"></param>
-    private static void HandleDebugHttpCommand(string module, string[] cmdparams)
+    private void HandleDebugHttpCommand(string module, string[] cmdparams)
     {
         if (cmdparams.Length < 3)
         {
@@ -198,7 +176,7 @@ public class MainServer
 
             if (allReqs || inReqs)
             {
-                MainServer.DebugLevel = newDebug;
+                DebugLevel = newDebug;
                 MainConsole.Instance.Output("IN debug level set to {0}", newDebug);
             }
 
@@ -218,7 +196,7 @@ public class MainServer
         }
     }
 
-    private static void HandleShowHttpHandlersCommand(string module, string[] args)
+    private void HandleShowHttpHandlersCommand(string module, string[] args)
     {
         if (args.Length != 2)
         {
@@ -228,9 +206,9 @@ public class MainServer
 
         StringBuilder handlers = new StringBuilder();
 
-        lock (m_Servers)
+        lock (_httpServers)
         {
-            foreach (BaseHttpServer httpServer in m_Servers.Values)
+            foreach (BaseHttpServer httpServer in _httpServers.Values)
             {
                 handlers.AppendFormat(
                     "Registered HTTP Handlers for server at {0}:{1}\n", httpServer.ListenIPAddress, httpServer.Port);
@@ -246,7 +224,7 @@ public class MainServer
                 lst = httpServer.GetXmlRpcHandlerKeys();
                 if (lst.Count > 0)
                 {
-                    handlers.AppendFormat("* XMLRPC methods ({0}):\n",lst.Count);
+                    handlers.AppendFormat("* XMLRPC methods ({0}):\n", lst.Count);
                     foreach (string s in lst)
                         handlers.AppendFormat("\t{0}\n", s);
                 }
@@ -318,14 +296,16 @@ public class MainServer
     /// Register an already started HTTP server to the collection of known servers.
     /// </summary>
     /// <param name='server'></param>
-    public static void AddHttpServer(BaseHttpServer server)
+    public void AddHttpServer(IHttpServer server)
     {
-        lock (m_Servers)
+        lock (_httpServers)
         {
-            if (m_Servers.ContainsKey(server.Port))
+            if (_httpServers.ContainsKey(server.Port))
                 throw new Exception(string.Format("HTTP server for port {0} already exists.", server.Port));
+            _httpServers.Add(server.Port, server);
 
-            m_Servers.Add(server.Port, server);
+            if (DefaultServer is null)
+                DefaultServer = server;
         }
     }
 
@@ -337,14 +317,14 @@ public class MainServer
     /// </remarks>
     /// <param name='port'></param>
     /// <returns></returns>
-    public static bool RemoveHttpServer(uint port)
+    public bool RemoveHttpServer(uint port)
     {
-        lock (m_Servers)
+        lock (_httpServers)
         {
-            if (instance != null && instance.Port == port)
-                instance = null;
+            if (DefaultServer != null && DefaultServer.Port == port)
+                DefaultServer = null;
 
-            return m_Servers.Remove(port);
+            return _httpServers.Remove(port);
         }
     }
 
@@ -356,10 +336,10 @@ public class MainServer
     /// </remarks>
     /// <param name='port'></param>
     /// <returns>true if a server with the given port is registered, false otherwise.</returns>
-    public static bool ContainsHttpServer(uint port)
+    public bool ContainsHttpServer(uint port)
     {
-        lock (m_Servers)
-            return m_Servers.ContainsKey(port);
+        lock (_httpServers)
+            return _httpServers.ContainsKey(port);
     }
 
     /// <summary>
@@ -370,7 +350,7 @@ public class MainServer
     /// </remarks>
     /// <returns></returns>
     /// <param name='port'>If 0 then the default HTTP server is returned.</param>
-    public static IHttpServer GetHttpServer(uint port)
+    public IHttpServer GetHttpServer(uint port)
     {
         return GetHttpServer(port, null);
     }
@@ -385,35 +365,39 @@ public class MainServer
     /// <returns></returns>
     /// <param name='port'>If 0 then the default HTTP server is returned.</param>
     /// <param name='ipaddr'>A specific IP address to bind to.  If null then the default IP address is used.</param>
-    public static IHttpServer GetHttpServer(uint port, IPAddress ipaddr)
+    public IHttpServer GetHttpServer(uint port, IPAddress ipaddr)
     {
         if (port == 0)
-            return Instance;
-
-        if (instance != null && port == Instance.Port)
-            return Instance;
-
-        lock (m_Servers)
         {
-            if (m_Servers.ContainsKey(port))
-                return m_Servers[port];
+            return DefaultServer;
+        }
 
-            m_Servers[port] = new BaseHttpServer(port);
+        if (DefaultServer != null && port == DefaultServer.Port)
+        {
+            return DefaultServer;
+        }
+
+        lock (_httpServers)
+        {
+            if (_httpServers.ContainsKey(port))
+                return _httpServers[port];
+
+            _httpServers[port] = new BaseHttpServer(port);
 
             if (ipaddr != null)
-                m_Servers[port].ListenIPAddress = ipaddr;
+                _httpServers[port].ListenIPAddress = ipaddr;
 
-            m_Servers[port].Start();
+            _httpServers[port].Start();
 
-            return m_Servers[port];
+            return _httpServers[port];
         }
     }
 
-    public static void Stop()
+    public void Stop()
     {
-        lock (m_Servers)
+        lock (_httpServers)
         {
-            foreach (BaseHttpServer httpServer in m_Servers.Values)
+            foreach (BaseHttpServer httpServer in _httpServers.Values)
             {
                 httpServer.Stop(true);
             }

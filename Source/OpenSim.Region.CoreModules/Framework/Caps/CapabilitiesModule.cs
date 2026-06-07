@@ -140,8 +140,8 @@ public class CapabilitiesModule : INonSharedRegionModule, ICapabilitiesModule
             //    "[CAPS]: Adding capabilities for agent {0} in {1} with path {2}",
             //    agentId, m_scene.RegionInfo.RegionName, capsObjectPath);
 
-            caps = new Caps(MainServer.Instance, m_scene.RegionInfo.ExternalHostName,
-                    (MainServer.Instance is null) ? 0: MainServer.Instance.Port,
+            caps = new Caps(MainServer.Instance.DefaultServer, m_scene.RegionInfo.ExternalHostName,
+                    (MainServer.Instance.DefaultServer is null) ? 0: MainServer.Instance.DefaultServer.Port,
                     capsObjectPath, agentId, m_scene.RegionInfo.RegionName);
 
             m_log.Debug($"[CreateCaps]: new caps agent {agentId}, circuit {circuitCode}, path {caps.CapsObjectPath}");

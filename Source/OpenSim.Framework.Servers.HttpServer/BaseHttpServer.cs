@@ -532,7 +532,7 @@ public class BaseHttpServer : IHttpServer
         return null;
     }
 
-    public void AddGloblaMethodHandler(string key, SimpleStreamMethod sh)
+    public void AddGlobalMethodHandler(string key, SimpleStreamMethod sh)
     {
         m_globalMethods.TryAdd(key, sh);
     }
@@ -2054,6 +2054,11 @@ public class BaseHttpServer : IHttpServer
         m_log.ErrorFormat("[BASE HTTP SERVER]: {0} had an exception {1}", source.ToString(), exception.ToString());
     }
 
+    public void Stop()
+    {
+        Stop(false);
+    }
+
     public void Stop(bool stopPool = false)
     {
         HTTPDRunning = false;
@@ -2271,9 +2276,9 @@ public class HttpServerLogWriter : ILogWriter
 
 public class IndexPHPHandler : SimpleStreamHandler
 {
-    readonly BaseHttpServer m_server;
+    readonly IHttpServer m_server;
 
-    public IndexPHPHandler(BaseHttpServer server)
+    public IndexPHPHandler(IHttpServer server)
         : base("/index.php")
     {
         m_server = server;
@@ -2282,7 +2287,7 @@ public class IndexPHPHandler : SimpleStreamHandler
     protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
         httpResponse.KeepAlive = false;
-        if (m_server is null || !m_server.HTTPDRunning)
+        if (m_server is null)
         {
             httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
             return;

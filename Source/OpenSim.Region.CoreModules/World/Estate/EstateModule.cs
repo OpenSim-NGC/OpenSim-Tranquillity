@@ -61,7 +61,7 @@ public class EstateModule : ISharedRegionModule
 
     public void Initialise(IConfigSource config)
     {
-        uint port = MainServer.Instance.Port;
+        uint port = MainServer.Instance.DefaultServer.Port;
 
         IConfig estateConfig = config.Configs["Estates"];
         if (estateConfig != null)
@@ -83,10 +83,10 @@ public class EstateModule : ISharedRegionModule
         m_EstateConnector = new EstateConnector(this, token, port);
 
         if(port == 0)
-             port = MainServer.Instance.Port;
+             port = MainServer.Instance.DefaultServer.Port;
 
         // Instantiate the request handler
-        IHttpServer server = MainServer.GetHttpServer(port);
+        IHttpServer server = MainServer.Instance.GetHttpServer(port);
         server.AddSimpleStreamHandler(new EstateSimpleRequestHandler(this, token));
     }
 

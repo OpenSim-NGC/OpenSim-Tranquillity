@@ -92,9 +92,10 @@ public class MonitorModule : INonSharedRegionModule
                            "Returns a variety of statistics about the current region and/or simulator",
                            DebugMonitors);
 
-        MainServer.Instance.AddSimpleStreamHandler(new SimpleStreamHandler("/monitorstats/" + m_scene.RegionInfo.RegionID, StatsPage));
-        MainServer.Instance.AddSimpleStreamHandler(new SimpleStreamHandler(
-            "/monitorstats/" + Uri.EscapeDataString(m_scene.RegionInfo.RegionName), StatsPage));
+        MainServer.Instance.DefaultServer.AddSimpleStreamHandler(
+            new SimpleStreamHandler("/monitorstats/" + m_scene.RegionInfo.RegionID, StatsPage));
+        MainServer.Instance.DefaultServer.AddSimpleStreamHandler(
+            new SimpleStreamHandler("/monitorstats/" + Uri.EscapeDataString(m_scene.RegionInfo.RegionName), StatsPage));
 
         AddMonitors();
         RegisterStatsManagerRegionStatistics();
@@ -105,8 +106,8 @@ public class MonitorModule : INonSharedRegionModule
         if (!Enabled)
             return;
 
-        MainServer.Instance.RemoveHTTPHandler("GET", "/monitorstats/" + m_scene.RegionInfo.RegionID);
-        MainServer.Instance.RemoveHTTPHandler("GET", "/monitorstats/" + Uri.EscapeDataString(m_scene.RegionInfo.RegionName));
+        MainServer.Instance.DefaultServer.RemoveHTTPHandler("GET", "/monitorstats/" + m_scene.RegionInfo.RegionID);
+        MainServer.Instance.DefaultServer.RemoveHTTPHandler("GET", "/monitorstats/" + Uri.EscapeDataString(m_scene.RegionInfo.RegionName));
 
         UnRegisterStatsManagerRegionStatistics();
 

@@ -150,14 +150,14 @@ public class Caps : IDisposable
         m_regionName = regionName;
         Flags = CapsFlags.None;
         m_capsActive.Reset();
-        if (MainServer.Instance.UseSSL)
-            m_baseCapsURL = $"https://{MainServer.Instance.SSLCommonName}:{MainServer.Instance.SSLPort}";
+        if (MainServer.Instance.DefaultServer.UseSSL)
+            m_baseCapsURL = $"https://{MainServer.Instance.DefaultServer.SSLCommonName}:{MainServer.Instance.DefaultServer.SSLPort}";
         else
         {
             if (MainServer.Instance is null)
                 m_baseCapsURL = $"http://{m_httpListenerHostName}:0";
             else
-                m_baseCapsURL = $"http://{m_httpListenerHostName}:{MainServer.Instance.Port}";
+                m_baseCapsURL = $"http://{m_httpListenerHostName}:{MainServer.Instance.DefaultServer.Port}";
         }
     }
 
@@ -285,13 +285,13 @@ public class Caps : IDisposable
                     continue;
 
                 string hostName = m_httpListenerHostName;
-                uint port = (MainServer.Instance is null) ? 0 : MainServer.Instance.Port;
+                uint port = (MainServer.Instance is null) ? 0 : MainServer.Instance.DefaultServer.Port;
                 string protocol = "http";
 
-                if (MainServer.Instance.UseSSL)
+                if (MainServer.Instance.DefaultServer.UseSSL)
                 {
-                    hostName = MainServer.Instance.SSLCommonName;
-                    port = MainServer.Instance.SSLPort;
+                    hostName = MainServer.Instance.DefaultServer.SSLCommonName;
+                    port = MainServer.Instance.DefaultServer.SSLPort;
                     protocol = "https";
                 }
                 caps[kvp.Key] = string.Format("{0}://{1}:{2}{3}", protocol, hostName, port, kvp.Value.Url);

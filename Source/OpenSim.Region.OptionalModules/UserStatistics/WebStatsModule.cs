@@ -126,8 +126,8 @@ public class WebStatsModule : ISharedRegionModule
         // End Own reports section
         ////
 
-        MainServer.Instance.AddHTTPHandler("/SStats", HandleStatsRequest);
-        MainServer.Instance.AddHTTPHandler("/VS", HandleUnknownCAPSRequest);
+        MainServer.Instance.DefaultServer.AddHTTPHandler("/SStats", HandleStatsRequest);
+        MainServer.Instance.DefaultServer.AddHTTPHandler("/VS", HandleUnknownCAPSRequest);
     }
 
     public virtual void AddRegion(Scene scene)
@@ -315,7 +315,7 @@ public class WebStatsModule : ISharedRegionModule
         }
         else
         {
-            strOut = MainServer.Instance.GetHTTP404();
+            strOut = MainServer.Instance.DefaultServer.GetHTTP404();
         }
 
         responsedata["int_response_code"] = response_code;

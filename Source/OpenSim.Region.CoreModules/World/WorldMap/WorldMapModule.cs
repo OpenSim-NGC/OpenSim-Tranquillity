@@ -232,9 +232,9 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
         regionimage = regionimage.Replace("-", "");
         m_log.Info("[WORLD MAP]: JPEG Map location: " + m_scene.RegionInfo.ServerURI + "index.php?method=" + regionimage);
 
-        MainServer.Instance.AddIndexPHPMethodHandler(regionimage, OnHTTPGetMapImage);
-        MainServer.Instance.AddSimpleStreamHandler(new SimpleStreamHandler(
-            "/MAP/MapItems/" + m_regionHandle.ToString(), HandleRemoteMapItemRequest));
+        MainServer.Instance.DefaultServer.AddIndexPHPMethodHandler(regionimage, OnHTTPGetMapImage);
+        MainServer.Instance.DefaultServer.AddSimpleStreamHandler(
+            new SimpleStreamHandler("/MAP/MapItems/" + m_regionHandle.ToString(), HandleRemoteMapItemRequest));
 
         m_scene.EventManager.OnRegisterCaps += OnRegisterCaps;
         m_scene.EventManager.OnNewClient += OnNewClient;
@@ -260,10 +260,10 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
 
         m_scene.UnregisterModuleInterface<IWorldMapModule>(this);
 
-        MainServer.Instance.RemoveSimpleStreamHandler("/MAP/MapItems/" + m_scene.RegionInfo.RegionHandle.ToString());
+        MainServer.Instance.DefaultServer.RemoveSimpleStreamHandler("/MAP/MapItems/" + m_scene.RegionInfo.RegionHandle.ToString());
         string regionimage = "regionImage" + m_scene.RegionInfo.RegionID.ToString();
         regionimage = regionimage.Replace("-", "");
-        MainServer.Instance.RemoveIndexPHPMethodHandler(regionimage);
+        MainServer.Instance.DefaultServer.RemoveIndexPHPMethodHandler(regionimage);
     }
 
     public void OnRegisterCaps(UUID agentID, Caps caps)

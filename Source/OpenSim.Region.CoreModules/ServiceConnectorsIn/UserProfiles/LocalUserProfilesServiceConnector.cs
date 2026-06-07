@@ -90,7 +90,7 @@ public class LocalUserProfilesServicesConnector : ISharedRegionModule
         ConfigName = "UserProfilesService";
 
         // Instantiate the request handler
-        IHttpServer Server = MainServer.Instance;
+        IHttpServer Server = MainServer.Instance.DefaultServer;
 
         IConfig config = source.Configs[ConfigName];
         if (config == null)

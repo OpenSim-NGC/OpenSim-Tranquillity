@@ -129,7 +129,7 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
             //                    "[XML RPC MODULE]: Starting up XMLRPC Server on port {0} for llRemoteData commands.",
             //                    m_remoteDataPort);
 
-            IHttpServer httpServer = MainServer.GetHttpServer((uint)m_remoteDataPort);
+            IHttpServer httpServer = MainServer.Instance.GetHttpServer((uint)m_remoteDataPort);
             httpServer.AddXmlRPCHandler("llRemoteData", XmlRpcRemoteData);
         }
     }

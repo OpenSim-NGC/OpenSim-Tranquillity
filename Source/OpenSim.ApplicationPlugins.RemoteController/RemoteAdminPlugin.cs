@@ -117,7 +117,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 m_application = openSim;
                 string bind_ip_address = m_config.GetString("bind_ip_address", "0.0.0.0");
                 IPAddress ipaddr = IPAddress.Parse(bind_ip_address);
-                m_httpServer = MainServer.GetHttpServer((uint)port,ipaddr);
+                m_httpServer = MainServer.Instance.GetHttpServer((uint)port,ipaddr);
 
                 Dictionary<string, XmlRpcMethod> availableMethods = new Dictionary<string, XmlRpcMethod>();
                 availableMethods["admin_alert_user"] = (req, ep) => InvokeXmlRpcMethod(req, ep, XmlRpcAlertUserMethod);

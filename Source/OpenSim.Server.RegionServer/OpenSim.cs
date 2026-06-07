@@ -171,18 +171,18 @@ public class OpenSim : OpenSimBase
 
         base.StartupSpecific();
 
-        MainServer.Instance.AddSimpleStreamHandler(new SimStatusHandler());
-        MainServer.Instance.AddSimpleStreamHandler(new XSimStatusHandler(this));
+        MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new SimStatusHandler());
+        MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new XSimStatusHandler(this));
         if (userStatsURI != String.Empty)
-            MainServer.Instance.AddSimpleStreamHandler(new UXSimStatusHandler(this));
-        MainServer.Instance.AddSimpleStreamHandler(new SimRobotsHandler());
-        MainServer.Instance.AddSimpleStreamHandler(new IndexPHPHandler(MainServer.Instance));
+            MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new UXSimStatusHandler(this));
+        MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new SimRobotsHandler());
+        MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new IndexPHPHandler(MainServer.Instance.DefaultServer));
 
         if (!string.IsNullOrEmpty(managedStatsURI))
         {
             string urlBase = $"/{managedStatsURI}/";
             StatsManager.StatsPassword = managedStatsPassword;
-            MainServer.Instance.AddHTTPHandler(urlBase, StatsManager.HandleStatsRequest);
+            MainServer.Instance.DefaultServer.AddHTTPHandler(urlBase, StatsManager.HandleStatsRequest);
             m_log.InfoFormat("[OPENSIM] Enabling remote managed stats fetch. URL = {0}", urlBase);
         }
 
@@ -193,7 +193,7 @@ public class OpenSim : OpenSimBase
             if (m_consolePort == 0)
                 mi.Invoke(m_console, new object[] { m_httpServer });
             else
-                mi.Invoke(m_console, new object[] { MainServer.GetHttpServer(m_consolePort) });
+                mi.Invoke(m_console, new object[] { MainServer.Instance.GetHttpServer(m_consolePort) });
         }
 
         // Hook up to the watchdog timer
@@ -235,7 +235,7 @@ public class OpenSim : OpenSimBase
     /// </summary>
     private void RegisterConsoleCommands()
     {
-        MainServer.RegisterHttpConsoleCommands(m_console);
+        MainServer.Instance.RegisterHttpConsoleCommands(m_console);
 
         m_console.Commands.AddCommand("Objects", false, "force update",
                                       "force update",

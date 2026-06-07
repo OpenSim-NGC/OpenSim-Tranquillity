@@ -76,7 +76,7 @@ public class WorldViewModule : INonSharedRegionModule
 
         m_log.Info("[WORLDVIEW]: Configured and enabled");
 
-        IHttpServer server = MainServer.GetHttpServer(0);
+        IHttpServer server = MainServer.Instance.GetHttpServer(0);
         server.AddStreamHandler(new WorldViewRequestHandler(this,
                 scene.RegionInfo.RegionID.ToString()));
     }

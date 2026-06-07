@@ -97,7 +97,7 @@ public class IRCBridgeModule : INonSharedRegionModule
                 m_log.InfoFormat("[IRC-Bridge] Connecting region {0}", scene.RegionInfo.RegionName);
 
                 if (!String.IsNullOrEmpty(m_password))
-                    MainServer.Instance.AddXmlRPCHandler("irc_admin", XmlRpcAdminMethod, false);
+                    MainServer.Instance.DefaultServer.AddXmlRPCHandler("irc_admin", XmlRpcAdminMethod, false);
 
                 m_region = new RegionState(scene, m_config);
                 lock (m_regions)
@@ -130,7 +130,7 @@ public class IRCBridgeModule : INonSharedRegionModule
             return;
 
         if (!String.IsNullOrEmpty(m_password))
-            MainServer.Instance.RemoveXmlRPCHandler("irc_admin");
+            MainServer.Instance.DefaultServer.RemoveXmlRPCHandler("irc_admin");
 
         m_region.Close();
 

@@ -176,13 +176,12 @@ public class UrlModule : ISharedRegionModule, IUrlModule
         if (m_enabled && m_HttpServer == null)
         {
             // There can only be one
-            //
-            m_HttpServer = MainServer.GetHttpServer(m_HttpPort);
-            //
+            m_HttpServer = MainServer.Instance.GetHttpServer(m_HttpPort);
+
             // We can use the https if it is enabled
             if (m_HttpsPort > 0)
             {
-                m_HttpsServer = MainServer.GetHttpServer(m_HttpsPort);
+                m_HttpsServer = MainServer.Instance.GetHttpServer(m_HttpsPort);
             }
         }
 

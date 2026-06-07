@@ -109,7 +109,7 @@ public class LLLoginServiceInConnectorModule : ISharedRegionModule
         if (!m_Registered)
         {
             m_Registered = true;
-            new LLLoginServiceInConnector(m_Config, MainServer.Instance, scene);
+            new LLLoginServiceInConnector(m_Config, MainServer.Instance.DefaultServer, scene);
             //Object[] args = new Object[] { m_Config, MainServer.Instance, this, scene };
             //ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:LLLoginServiceInConnector", args);
         }

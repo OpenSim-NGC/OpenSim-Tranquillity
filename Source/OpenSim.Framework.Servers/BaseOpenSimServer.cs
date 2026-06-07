@@ -130,7 +130,7 @@ public abstract class BaseOpenSimServer : ServerBase
         Watchdog.Enabled = false;
         base.ShutdownSpecific();
         
-        MainServer.Stop();
+        MainServer.Instance.Stop();
 
         Thread.Sleep(500);
         WorkManager.Stop();

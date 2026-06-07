@@ -148,9 +148,9 @@ public class PluginLoader
         IHttpServer server;
 
         if(port != 0)
-            server = MainServer.GetHttpServer(port);
+            server = MainServer.Instance.GetHttpServer(port);
         else
-            server = MainServer.Instance;
+            server = MainServer.Instance.DefaultServer;
 
         return server;
     }

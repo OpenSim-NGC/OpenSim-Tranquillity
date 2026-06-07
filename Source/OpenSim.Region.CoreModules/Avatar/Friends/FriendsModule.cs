@@ -178,7 +178,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
             m_FriendsSimConnector = new FriendsSimConnector();
 
             // Instantiate the request handler
-            IHttpServer server = MainServer.GetHttpServer((uint)mPort);
+            IHttpServer server = MainServer.Instance.GetHttpServer((uint)mPort);
 
             server?.AddSimpleStreamHandler(new FriendsSimpleRequestHandler(this));
         }

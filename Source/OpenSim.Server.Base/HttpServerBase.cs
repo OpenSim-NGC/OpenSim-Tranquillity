@@ -104,8 +104,7 @@ public class HttpServerBase : ServicesServerBase
             httpServer = new BaseHttpServer(port, ssl_main, cert_path, cert_pass);
         }
 
-        MainServer.AddHttpServer(httpServer);
-        MainServer.Instance = httpServer;
+        MainServer.Instance.AddHttpServer(httpServer);
 
         // If https_listener = true, then add an ssl listener on the https_port...
         if (ssl_listener == true)
@@ -128,31 +127,31 @@ public class HttpServerBase : ServicesServerBase
                     //Thread.CurrentThread.Abort();
                 }
 
-                MainServer.AddHttpServer(new BaseHttpServer(https_port, ssl_listener, cert_path, cert_pass));
+                MainServer.Instance.AddHttpServer(new BaseHttpServer(https_port, ssl_listener, cert_path, cert_pass));
             }
             else
             {
                 m_log.WarnFormat("[SSL]: SSL port is active but no SSL is used because external SSL was requested.");
-                MainServer.AddHttpServer(new BaseHttpServer(https_port));
+                MainServer.Instance.AddHttpServer(new BaseHttpServer(https_port));
             }
         }
     }
 
     protected override void Initialise()
     {
-        foreach (BaseHttpServer s in MainServer.Servers.Values)
+        foreach (BaseHttpServer s in MainServer.Instance.Servers.Values)
             s.Start();
 
-        MainServer.RegisterHttpConsoleCommands(MainConsole.Instance);
+        MainServer.Instance.RegisterHttpConsoleCommands(MainConsole.Instance);
 
         MethodInfo mi = m_console.GetType().GetMethod("SetServer", BindingFlags.Public | BindingFlags.Instance, null, new Type[] { typeof(BaseHttpServer) }, null);
 
         if (mi != null)
         {
             if (m_consolePort == 0)
-                mi.Invoke(MainConsole.Instance, new object[] { MainServer.Instance });
+                mi.Invoke(MainConsole.Instance, new object[] { MainServer.Instance.DefaultServer });
             else
-                mi.Invoke(MainConsole.Instance, new object[] { MainServer.GetHttpServer(m_consolePort) });
+                mi.Invoke(MainConsole.Instance, new object[] { MainServer.Instance.GetHttpServer(m_consolePort) });
         }
     }
 }
