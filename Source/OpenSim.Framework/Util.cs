@@ -103,7 +103,6 @@ public enum FireAndForgetMethod
     None,
     RegressionTest,
     QueueUserWorkItem,
-    SmartThreadPool,
     Thread
 }
 
@@ -191,7 +190,7 @@ public static class Util
     public static readonly Regex PermissiveUUIDPattern = new(rawUUIDPattern);
     public static readonly Regex UUIDPattern = new(string.Format("^{0}$", rawUUIDPattern));
 
-    public static FireAndForgetMethod DefaultFireAndForgetMethod = FireAndForgetMethod.SmartThreadPool;
+    public static FireAndForgetMethod DefaultFireAndForgetMethod = FireAndForgetMethod.QueueUserWorkItem;
     public static FireAndForgetMethod FireAndForgetMethod = DefaultFireAndForgetMethod;
 
     public static readonly string UUIDZeroString = UUID.Zero.ToString();
@@ -3213,15 +3212,6 @@ public static class Util
     /// <returns>true if so, false if not</returns>
 
     #region FireAndForget Threading Pattern
-
-    public static void InitThreadPool(int minThreads, int maxThreads)
-    {
-        if (maxThreads < 2)
-            throw new ArgumentOutOfRangeException(nameof(maxThreads), "maxThreads must be greater than 2");
-
-        if (minThreads > maxThreads || minThreads < 2)
-            throw new ArgumentOutOfRangeException(nameof(minThreads), "minThreads must be greater than 2 and less than or equal to maxThreads");
-    }
 
     public static int FireAndForgetCount()
     {
