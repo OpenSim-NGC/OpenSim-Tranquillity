@@ -29,7 +29,6 @@ using NDesk.Options;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Region.CoreModules.Avatar.Friends;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
@@ -46,6 +45,7 @@ public class FriendsCommandsModule : ISharedRegionModule
 
     private Scene m_scene;
     private IFriendsModule m_friendsModule;
+    private IFriendsService m_friendsService;
     private IUserManagement m_userManagementModule;
     private IPresenceService m_presenceService;
 
@@ -88,10 +88,11 @@ public class FriendsCommandsModule : ISharedRegionModule
             m_scene = scene;
 
         m_friendsModule = m_scene.RequestModuleInterface<IFriendsModule>();
+        m_friendsService = m_scene.RequestModuleInterface<IFriendsService>();
         m_userManagementModule = m_scene.RequestModuleInterface<IUserManagement>();
         m_presenceService = m_scene.RequestModuleInterface<IPresenceService>();
 
-        if (m_friendsModule != null && ((FriendsModule)m_friendsModule).Scene != null && m_userManagementModule != null && m_presenceService != null)
+        if (m_friendsModule != null && m_friendsService != null && m_userManagementModule != null && m_presenceService != null)
         {
             m_scene.AddCommand(
                 "Friends", this, "friends show",
@@ -145,10 +146,7 @@ public class FriendsCommandsModule : ISharedRegionModule
         }
         else
         {
-            // FIXME: We're forced to do this right now because IFriendsService has no region connectors.  We can't
-            // just expose FriendsModule.GetFriendsFromService() because it forces an IClientAPI requirement that
-            // can't currently be changed because of HGFriendsModule code that takes the scene from the client.
-            friends = ((FriendsModule)m_friendsModule).FriendsService.GetFriends(userId);
+            friends = m_friendsService.GetFriends(userId);
         }
 
         MainConsole.Instance.Output("Friends for {0} {1} {2}:", firstName, lastName, userId);
