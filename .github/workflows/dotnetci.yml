@@ -39,6 +39,30 @@ jobs:
 #        GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
 #      run: dotnet test ./Tranquillity.sln --verbosity normal
 
+    - name: Pack library projects
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+      run: |
+        mkdir -p ./nupkgs
+        for proj in \
+          source/OpenSim.Data.Model/OpenSim.Data.Model.csproj; do
+          dotnet pack "$proj" \
+            -c Release \
+            --no-build \
+            --include-symbols \
+            -o ./nupkgs
+        done
+
+    - name: Publish packages to GitHub Packages
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+      run: |
+        dotnet nuget push "./nupkgs/*.nupkg" \
+          --api-key "${{ secrets.GITHUB_TOKEN }}" \
+          --source "github" \
+          --skip-duplicate
+          
+
     # Publish GridServer for Linux x64
     - name: Publish GridServer for Linux x64
       env:
