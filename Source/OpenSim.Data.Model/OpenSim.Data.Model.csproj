@@ -1,11 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
     <ProjectType>Local</ProjectType>
     <OutputType>Library</OutputType>
     <PackageId>OpenSim.Data.Model</PackageId>
     <Description>OpenSim.Data.Model contains the Entity Framework Core data models for OpenSim.</Description>
-    <TargetFramework>net8.0</TargetFramework>
+    <PackageReadmeFile>readme.md</PackageReadmeFile>
     <AssemblyTitle>OpenSim.Data.Model</AssemblyTitle>
     <Copyright>Copyright (c) Utopia Skye, LLC 2024</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
