@@ -45,7 +45,7 @@ jobs:
       run: |
         mkdir -p ./nupkgs
         for proj in \
-          source/OpenSim.Data.Model/OpenSim.Data.Model.csproj; do
+          Source/OpenSim.Data.Model/OpenSim.Data.Model.csproj; do
           dotnet pack "$proj" -c Release --no-build --include-symbols -o ./nupkgs
         done
 
