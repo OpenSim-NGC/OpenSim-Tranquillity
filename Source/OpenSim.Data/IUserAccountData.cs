@@ -25,31 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+public class UserAccountData
 {
-    public class UserAccountData
-    {
-        public UUID PrincipalID;
-        public UUID ScopeID;
-        public string FirstName;
-        public string LastName;
-        public Dictionary<string, string> Data;
-    }
+    public UUID PrincipalID;
+    public UUID ScopeID;
+    public string FirstName;
+    public string LastName;
+    public Dictionary<string, string> Data;
+}
 
-    /// <summary>
-    /// An interface for connecting to the user accounts datastore
-    /// </summary>
-    public interface IUserAccountData
-    {
-        UserAccountData[] Get(string[] fields, string[] values);
-        bool Store(UserAccountData data);
-        bool Delete(string field, string val);
-        UserAccountData[] GetUsers(UUID scopeID, string query);
-        UserAccountData[] GetUsersWhere(UUID scopeID, string where);
-    }
+/// <summary>
+/// An interface for connecting to the user accounts datastore
+/// </summary>
+public interface IUserAccountData
+{
+    UserAccountData[] Get(string[] fields, string[] values);
+    bool Store(UserAccountData data);
+    bool Delete(string field, string val);
+    UserAccountData[] GetUsers(UUID scopeID, string query);
+    UserAccountData[] GetUsersWhere(UUID scopeID, string where);
 }

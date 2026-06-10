@@ -25,93 +25,91 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public delegate ScenePresence CrossAgentToNewRegionDelegate(ScenePresence agent, Vector3 pos, GridRegion neighbourRegion, bool isFlying, EntityTransferContext ctx);
+public delegate ScenePresence CrossAsyncDelegate(ScenePresence agent, bool isFlying);
+
+public interface IEntityTransferModule
 {
-    public delegate ScenePresence CrossAgentToNewRegionDelegate(ScenePresence agent, Vector3 pos, GridRegion neighbourRegion, bool isFlying, EntityTransferContext ctx);
-    public delegate ScenePresence CrossAsyncDelegate(ScenePresence agent, bool isFlying);
+    /// <summary>
+    /// Teleport an agent within the same or to a different region.
+    /// </summary>
+    /// <param name='agent'></param>
+    /// <param name='regionHandle'>
+    /// The handle of the destination region.  If it's the same as the region currently
+    /// occupied by the agent then the teleport will be within that region.
+    /// </param>
+    /// <param name='agent'></param>
+    /// <param name='regionHandle'></param>
+    /// <param name='position'></param>
+    /// <param name='lookAt'></param>
+    /// <param name='teleportFlags'></param>
+    void Teleport(ScenePresence agent, ulong regionHandle, Vector3 position, Vector3 lookAt, uint teleportFlags);
 
-    public interface IEntityTransferModule
-    {
-        /// <summary>
-        /// Teleport an agent within the same or to a different region.
-        /// </summary>
-        /// <param name='agent'></param>
-        /// <param name='regionHandle'>
-        /// The handle of the destination region.  If it's the same as the region currently
-        /// occupied by the agent then the teleport will be within that region.
-        /// </param>
-        /// <param name='agent'></param>
-        /// <param name='regionHandle'></param>
-        /// <param name='position'></param>
-        /// <param name='lookAt'></param>
-        /// <param name='teleportFlags'></param>
-        void Teleport(ScenePresence agent, ulong regionHandle, Vector3 position, Vector3 lookAt, uint teleportFlags);
+    /// <summary>
+    /// Teleports the agent for the given client to their home destination.
+    /// </summary>
+    /// <param name='id'></param>
+    /// <param name='client'></param>
+    bool TeleportHome(UUID id, IClientAPI client);
 
-        /// <summary>
-        /// Teleports the agent for the given client to their home destination.
-        /// </summary>
-        /// <param name='id'></param>
-        /// <param name='client'></param>
-        bool TeleportHome(UUID id, IClientAPI client);
+    void RequestTeleportLandmark(IClientAPI remoteClient, AssetLandmark lm, Vector3 lookAt);
 
-        void RequestTeleportLandmark(IClientAPI remoteClient, AssetLandmark lm, Vector3 lookAt);
+    /// <summary>
+    /// Teleport an agent directly to a given region without checking whether the region should be substituted.
+    /// </summary>
+    /// <remarks>
+    /// Please use Teleport() instead unless you know exactly what you're doing.
+    /// Do not use for same region teleports.
+    /// </remarks>
+    /// <param name='sp'></param>
+    /// <param name='reg'></param>
+    /// <param name='finalDestination'>/param>
+    /// <param name='position'></param>
+    /// <param name='lookAt'></param>
+    /// <param name='teleportFlags'></param>
+    void DoTeleport(ScenePresence sp, GridRegion reg, GridRegion finalDestination,
+        Vector3 position, Vector3 lookAt, uint teleportFlags);
 
-        /// <summary>
-        /// Teleport an agent directly to a given region without checking whether the region should be substituted.
-        /// </summary>
-        /// <remarks>
-        /// Please use Teleport() instead unless you know exactly what you're doing.
-        /// Do not use for same region teleports.
-        /// </remarks>
-        /// <param name='sp'></param>
-        /// <param name='reg'></param>
-        /// <param name='finalDestination'>/param>
-        /// <param name='position'></param>
-        /// <param name='lookAt'></param>
-        /// <param name='teleportFlags'></param>
-        void DoTeleport(ScenePresence sp, GridRegion reg, GridRegion finalDestination,
-            Vector3 position, Vector3 lookAt, uint teleportFlags);
+    /// <summary>
+    /// Show whether the given agent is being teleported.
+    /// </summary>
+    /// <param name='id'>The agent ID</para></param>
+    /// <returns>true if the agent is in the process of being teleported, false otherwise.</returns>
+    bool IsInTransit(UUID id);
 
-        /// <summary>
-        /// Show whether the given agent is being teleported.
-        /// </summary>
-        /// <param name='id'>The agent ID</para></param>
-        /// <returns>true if the agent is in the process of being teleported, false otherwise.</returns>
-        bool IsInTransit(UUID id);
+    bool Cross(ScenePresence agent, bool isFlying);
 
-        bool Cross(ScenePresence agent, bool isFlying);
+    void AgentArrivedAtDestination(UUID agent);
 
-        void AgentArrivedAtDestination(UUID agent);
+    void EnableChildAgents(ScenePresence agent);
+    void CheckChildAgents(ScenePresence agent);
+    void CloseOldChildAgents(ScenePresence agent);
 
-        void EnableChildAgents(ScenePresence agent);
-        void CheckChildAgents(ScenePresence agent);
-        void CloseOldChildAgents(ScenePresence agent);
+    void EnableChildAgent(ScenePresence agent, GridRegion region);
 
-        void EnableChildAgent(ScenePresence agent, GridRegion region);
+    GridRegion GetDestination(UUID agentID, Vector3 pos, EntityTransferContext ctx, out Vector3 newpos, out string reason);
+    GridRegion GetObjectDestination(SceneObjectGroup grp, Vector3 targetPosition, out Vector3 newpos);
+    bool checkAgentAccessToRegion(ScenePresence agent, GridRegion destiny, Vector3 position, EntityTransferContext ctx, out string reason);
 
-        GridRegion GetDestination(UUID agentID, Vector3 pos, EntityTransferContext ctx, out Vector3 newpos, out string reason);
-        GridRegion GetObjectDestination(SceneObjectGroup grp, Vector3 targetPosition, out Vector3 newpos);
-        bool checkAgentAccessToRegion(ScenePresence agent, GridRegion destiny, Vector3 position, EntityTransferContext ctx, out string reason);
+    bool CrossPrimGroupIntoNewRegion(GridRegion destination, Vector3 newPosition, SceneObjectGroup grp, bool silent, bool removeScripts);
 
-        bool CrossPrimGroupIntoNewRegion(GridRegion destination, Vector3 newPosition, SceneObjectGroup grp, bool silent, bool removeScripts);
+    ScenePresence CrossAgentToNewRegionAsync(ScenePresence agent, Vector3 pos, GridRegion neighbourRegion, bool isFlying, EntityTransferContext ctx);
 
-        ScenePresence CrossAgentToNewRegionAsync(ScenePresence agent, Vector3 pos, GridRegion neighbourRegion, bool isFlying, EntityTransferContext ctx);
+    bool CrossAgentCreateFarChild(ScenePresence agent, GridRegion neighbourRegion, Vector3 pos, EntityTransferContext ctx);
 
-        bool CrossAgentCreateFarChild(ScenePresence agent, GridRegion neighbourRegion, Vector3 pos, EntityTransferContext ctx);
+    bool HandleIncomingSceneObject(SceneObjectGroup so, Vector3 newPosition);
+    bool HandleIncomingAttachments(ScenePresence sp, List<SceneObjectGroup> attachments);
+}
 
-        bool HandleIncomingSceneObject(SceneObjectGroup so, Vector3 newPosition);
-        bool HandleIncomingAttachments(ScenePresence sp, List<SceneObjectGroup> attachments);
-    }
-
-    public interface IUserAgentVerificationModule
-    {
-        bool VerifyClient(AgentCircuitData aCircuit, string token);
-    }
+public interface IUserAgentVerificationModule
+{
+    bool VerifyClient(AgentCircuitData aCircuit, string token);
 }

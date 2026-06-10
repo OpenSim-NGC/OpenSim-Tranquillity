@@ -25,15 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Net;
-using System.Text;
 
-namespace OpenSim.Framework.Client
+namespace OpenSim.Framework.Client;
+
+public interface IClientIPEndpoint
 {
-    public interface IClientIPEndpoint
-    {
-        IPEndPoint  RemoteEndPoint { get; }
-    }
+    IPEndPoint  RemoteEndPoint { get; }
 }

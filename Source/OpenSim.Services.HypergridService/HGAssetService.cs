@@ -24,11 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
-using System.Xml;
 
 using Nini.Config;
 using log4net;
@@ -38,220 +34,218 @@ using OpenSim.Framework;
 using OpenSim.Framework.Serialization.External;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-using OpenSim.Services.AssetService;
 using OpenSim.Services.Base;
 
-namespace OpenSim.Services.HypergridService
+namespace OpenSim.Services.HypergridService;
+
+/// <summary>
+/// Hypergrid asset service. It serves the IAssetService interface,
+/// but implements it in ways that are appropriate for inter-grid
+/// asset exchanges.
+/// </summary>
+public class HGAssetService : ServiceBase, IAssetService
 {
-    /// <summary>
-    /// Hypergrid asset service. It serves the IAssetService interface,
-    /// but implements it in ways that are appropriate for inter-grid
-    /// asset exchanges.
-    /// </summary>
-    public class HGAssetService : ServiceBase, IAssetService
+    private static readonly ILog m_log =
+        LogManager.GetLogger(
+        MethodBase.GetCurrentMethod().DeclaringType);
+
+    private string m_HomeURL;
+    private IUserAccountService m_UserAccountService;
+
+    private UserAccountCache m_Cache;
+
+    private AssetPermissions m_AssetPerms;
+
+    IAssetService m_assetService = null;
+
+    public HGAssetService(IConfigSource config, string configName) : base(config)
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(
-            MethodBase.GetCurrentMethod().DeclaringType);
+        m_log.Debug("[HGAsset Service]: Starting");
+        IConfig assetConfig = config.Configs[configName];
+        if (assetConfig == null)
+            throw new Exception("No HGAssetService configuration");
 
-        private string m_HomeURL;
-        private IUserAccountService m_UserAccountService;
+        string userAccountsDll = assetConfig.GetString("UserAccountsService", string.Empty);
+        if (userAccountsDll.Length == 0)
+            throw new Exception("Please specify UserAccountsService in HGAssetService configuration");
 
-        private UserAccountCache m_Cache;
+        Object[] args = new Object[] { config };
+        m_UserAccountService = ServerUtils.LoadPlugin<IUserAccountService>(userAccountsDll, args);
+        if (m_UserAccountService == null)
+            throw new Exception(String.Format("Unable to create UserAccountService from {0}", userAccountsDll));
 
-        private AssetPermissions m_AssetPerms;
+        m_HomeURL = Util.GetConfigVarFromSections<string>(config, "HomeURI",
+            new string[] { "Startup", "Hypergrid", configName }, string.Empty);
+        if (m_HomeURL.Length == 0)
+            throw new Exception("[HGAssetService] No HomeURI specified");
 
-        IAssetService m_assetService = null;
+        m_Cache = UserAccountCache.CreateUserAccountCache(m_UserAccountService);
 
-        public HGAssetService(IConfigSource config, string configName) : base(config)
+        // Permissions
+        m_AssetPerms = new AssetPermissions(assetConfig);
+
+        string str = assetConfig.GetString("BackingService", "OpenSim.Services.AssetService.dll:AssetService");
+
+        if (str != string.Empty)
         {
-            m_log.Debug("[HGAsset Service]: Starting");
-            IConfig assetConfig = config.Configs[configName];
-            if (assetConfig == null)
-                throw new Exception("No HGAssetService configuration");
-
-            string userAccountsDll = assetConfig.GetString("UserAccountsService", string.Empty);
-            if (userAccountsDll.Length == 0)
-                throw new Exception("Please specify UserAccountsService in HGAssetService configuration");
-
-            Object[] args = new Object[] { config };
-            m_UserAccountService = ServerUtils.LoadPlugin<IUserAccountService>(userAccountsDll, args);
-            if (m_UserAccountService == null)
-                throw new Exception(String.Format("Unable to create UserAccountService from {0}", userAccountsDll));
-
-            m_HomeURL = Util.GetConfigVarFromSections<string>(config, "HomeURI",
-                new string[] { "Startup", "Hypergrid", configName }, string.Empty);
-            if (m_HomeURL.Length == 0)
-                throw new Exception("[HGAssetService] No HomeURI specified");
-
-            m_Cache = UserAccountCache.CreateUserAccountCache(m_UserAccountService);
-
-            // Permissions
-            m_AssetPerms = new AssetPermissions(assetConfig);
-
-            string str = assetConfig.GetString("BackingService", "OpenSim.Services.AssetService.dll:AssetService");
-
-            if (str != string.Empty)
+            args = new object[] { config };
+            m_assetService = LoadPlugin<IAssetService>(str, args);
+            if (m_assetService != null)
             {
-                args = new object[] { config };
-                m_assetService = LoadPlugin<IAssetService>(str, args);
-                if (m_assetService != null)
-                {
-                    m_log.InfoFormat("[HGASSETS]: Backing service loaded: {0}", str);
-                }
-                else
-                {
-                    m_log.ErrorFormat("[HGASSETS]: Failed to load backing service {0}", str);
-                }
+                m_log.InfoFormat("[HGASSETS]: Backing service loaded: {0}", str);
+            }
+            else
+            {
+                m_log.ErrorFormat("[HGASSETS]: Failed to load backing service {0}", str);
             }
         }
+    }
 
-        #region IAssetService
-        public  AssetBase Get(string id)
-        {
-            AssetBase asset = m_assetService.Get(id);
+    #region IAssetService
+    public  AssetBase Get(string id)
+    {
+        AssetBase asset = m_assetService.Get(id);
 
-            if (asset == null)
-                return null;
-
-            if (!m_AssetPerms.AllowedExport(asset.Type))
-                return null;
-
-            if (asset.Metadata.Type == (sbyte)AssetType.Object)
-                asset.Data = AdjustIdentifiers(asset.Data);
-
-            AdjustIdentifiers(asset.Metadata);
-
-            return asset;
-        }
-
-        public AssetBase Get(string id, string ForeignAssetService, bool dummy)
-        {
+        if (asset == null)
             return null;
+
+        if (!m_AssetPerms.AllowedExport(asset.Type))
+            return null;
+
+        if (asset.Metadata.Type == (sbyte)AssetType.Object)
+            asset.Data = AdjustIdentifiers(asset.Data);
+
+        AdjustIdentifiers(asset.Metadata);
+
+        return asset;
+    }
+
+    public AssetBase Get(string id, string ForeignAssetService, bool dummy)
+    {
+        return null;
+    }
+
+    public void Get(string id, string ForeignAssetService, bool StoreOnLocalGrid, SimpleAssetRetrieved callBack)
+    {
+        return;
+    }
+
+    public AssetMetadata GetMetadata(string id)
+    {
+        AssetMetadata meta = m_assetService.GetMetadata(id);
+
+        if (meta == null)
+            return null;
+
+        AdjustIdentifiers(meta);
+
+        return meta;
+    }
+
+    public byte[] GetData(string id)
+    {
+        AssetBase asset = Get(id);
+
+        if (asset == null)
+            return null;
+
+        if (!m_AssetPerms.AllowedExport(asset.Type))
+            return null;
+
+        // Deal with bug introduced in Oct. 20 (1eb3e6cc43e2a7b4053bc1185c7c88e22356c5e8)
+        // Fix bad assets before sending them elsewhere
+        if (asset.Type == (int)AssetType.Object && asset.Data != null)
+        {
+            string xml = ExternalRepresentationUtils.SanitizeXml(Utils.BytesToString(asset.Data));
+            asset.Data = Utils.StringToBytes(xml);
         }
 
-        public void Get(string id, string ForeignAssetService, bool StoreOnLocalGrid, SimpleAssetRetrieved callBack)
+        return asset.Data;
+    }
+
+    //public virtual bool Get(string id, Object sender, AssetRetrieved handler)
+
+    public string Store(AssetBase asset)
+    {
+        if (!m_AssetPerms.AllowedImport(asset.Type))
+            return string.Empty;
+
+        // Deal with bug introduced in Oct. 20 (1eb3e6cc43e2a7b4053bc1185c7c88e22356c5e8)
+        // Fix bad assets before storing on this server
+        if (asset.Type == (int)AssetType.Object && asset.Data != null)
         {
+            string xml = ExternalRepresentationUtils.SanitizeXml(Utils.BytesToString(asset.Data));
+            asset.Data = Utils.StringToBytes(xml);
+        }
+
+        return m_assetService.Store(asset);
+    }
+
+    public bool Delete(string id)
+    {
+        // NOGO
+        return false;
+    }
+
+    public AssetBase GetCached(string id)
+    {
+        AssetBase asset = m_assetService.GetCached(id);
+
+        if (asset == null)
+            return null;
+
+        if (!m_AssetPerms.AllowedExport(asset.Type))
+            return null;
+
+        if (asset.Metadata.Type == (sbyte)AssetType.Object)
+            asset.Data = AdjustIdentifiers(asset.Data);
+
+        AdjustIdentifiers(asset.Metadata);
+
+        return asset;
+    }
+
+    public bool Get(string id, object sender, AssetRetrieved handler)
+    {
+        AssetBase asset = Get(id);
+
+        handler?.Invoke(id, sender, asset);
+
+        return true;
+    }
+
+    public bool[] AssetsExist(string[] ids)
+    {
+        return m_assetService.AssetsExist(ids);
+    }
+
+    public bool UpdateContent(string id, byte[] data)
+    {
+        // NO WAY
+        return false;
+    }
+
+    #endregion
+
+    protected void AdjustIdentifiers(AssetMetadata meta)
+    {
+        if (meta == null || m_Cache == null)
             return;
-        }
 
-        public AssetMetadata GetMetadata(string id)
-        {
-            AssetMetadata meta = m_assetService.GetMetadata(id);
+        UserAccount creator = m_Cache.GetUser(meta.CreatorID);
+        if (creator != null)
+            meta.CreatorID = meta.CreatorID + ";" + m_HomeURL + "/" + creator.FirstName + " " + creator.LastName;
+    }
 
-            if (meta == null)
-                return null;
+    // Only for Object
+    protected byte[] AdjustIdentifiers(byte[] data)
+    {
+        string xml = Utils.BytesToString(data);
 
-            AdjustIdentifiers(meta);
+        // Deal with bug introduced in Oct. 20 (1eb3e6cc43e2a7b4053bc1185c7c88e22356c5e8)
+        // Fix bad assets before sending them elsewhere
+        xml = ExternalRepresentationUtils.SanitizeXml(xml);
 
-            return meta;
-        }
-
-        public byte[] GetData(string id)
-        {
-            AssetBase asset = Get(id);
-
-            if (asset == null)
-                return null;
-
-            if (!m_AssetPerms.AllowedExport(asset.Type))
-                return null;
-
-            // Deal with bug introduced in Oct. 20 (1eb3e6cc43e2a7b4053bc1185c7c88e22356c5e8)
-            // Fix bad assets before sending them elsewhere
-            if (asset.Type == (int)AssetType.Object && asset.Data != null)
-            {
-                string xml = ExternalRepresentationUtils.SanitizeXml(Utils.BytesToString(asset.Data));
-                asset.Data = Utils.StringToBytes(xml);
-            }
-
-            return asset.Data;
-        }
-
-        //public virtual bool Get(string id, Object sender, AssetRetrieved handler)
-
-        public string Store(AssetBase asset)
-        {
-            if (!m_AssetPerms.AllowedImport(asset.Type))
-                return string.Empty;
-
-            // Deal with bug introduced in Oct. 20 (1eb3e6cc43e2a7b4053bc1185c7c88e22356c5e8)
-            // Fix bad assets before storing on this server
-            if (asset.Type == (int)AssetType.Object && asset.Data != null)
-            {
-                string xml = ExternalRepresentationUtils.SanitizeXml(Utils.BytesToString(asset.Data));
-                asset.Data = Utils.StringToBytes(xml);
-            }
-
-            return m_assetService.Store(asset);
-        }
-
-        public bool Delete(string id)
-        {
-            // NOGO
-            return false;
-        }
-
-        public AssetBase GetCached(string id)
-        {
-            AssetBase asset = m_assetService.GetCached(id);
-
-            if (asset == null)
-                return null;
-
-            if (!m_AssetPerms.AllowedExport(asset.Type))
-                return null;
-
-            if (asset.Metadata.Type == (sbyte)AssetType.Object)
-                asset.Data = AdjustIdentifiers(asset.Data);
-
-            AdjustIdentifiers(asset.Metadata);
-
-            return asset;
-        }
-
-        public bool Get(string id, object sender, AssetRetrieved handler)
-        {
-            AssetBase asset = Get(id);
-
-            handler?.Invoke(id, sender, asset);
-
-            return true;
-        }
-
-        public bool[] AssetsExist(string[] ids)
-        {
-            return m_assetService.AssetsExist(ids);
-        }
-
-        public bool UpdateContent(string id, byte[] data)
-        {
-            // NO WAY
-            return false;
-        }
-
-        #endregion
-
-        protected void AdjustIdentifiers(AssetMetadata meta)
-        {
-            if (meta == null || m_Cache == null)
-                return;
-
-            UserAccount creator = m_Cache.GetUser(meta.CreatorID);
-            if (creator != null)
-                meta.CreatorID = meta.CreatorID + ";" + m_HomeURL + "/" + creator.FirstName + " " + creator.LastName;
-        }
-
-        // Only for Object
-        protected byte[] AdjustIdentifiers(byte[] data)
-        {
-            string xml = Utils.BytesToString(data);
-
-            // Deal with bug introduced in Oct. 20 (1eb3e6cc43e2a7b4053bc1185c7c88e22356c5e8)
-            // Fix bad assets before sending them elsewhere
-            xml = ExternalRepresentationUtils.SanitizeXml(xml);
-
-            return Utils.StringToBytes(ExternalRepresentationUtils.RewriteSOP(xml, "HGAssetService", m_HomeURL, m_Cache, UUID.Zero));
-        }
+        return Utils.StringToBytes(ExternalRepresentationUtils.RewriteSOP(xml, "HGAssetService", m_HomeURL, m_Cache, UUID.Zero));
     }
 }

@@ -25,50 +25,47 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using Nini.Config;
 using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Region.CoreModules.Framework.UserManagement;
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.CoreModules.Framework.UserManagement.Tests
+namespace OpenSim.Region.CoreModules.Framework.UserManagement.Tests;
+
+public class HGUserManagementModuleTests : OpenSimTestCase
 {
-    public class HGUserManagementModuleTests : OpenSimTestCase
+    /// <summary>
+    /// Test that a new HG agent (i.e. one without a user account) has their name cached in the UMM upon creation.
+    /// </summary>
+    [Fact]
+    public void TestCachedUserNameForNewAgent()
     {
-        /// <summary>
-        /// Test that a new HG agent (i.e. one without a user account) has their name cached in the UMM upon creation.
-        /// </summary>
-        [Fact]
-        public void TestCachedUserNameForNewAgent()
-        {
-            TestHelpers.InMethod();
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            HGUserManagementModule hgumm = new HGUserManagementModule();
-            UUID userId = TestHelpers.ParseStem("11");
-            string firstName = "Fred";
-            string lastName = "Astaire";
-            string homeUri = "example.com:8002";
+        HGUserManagementModule hgumm = new HGUserManagementModule();
+        UUID userId = TestHelpers.ParseStem("11");
+        string firstName = "Fred";
+        string lastName = "Astaire";
+        string homeUri = "example.com:8002";
 
-            IConfigSource config = new IniConfigSource();
-            config.AddConfig("Modules");
-            config.Configs["Modules"].Set("UserManagementModule", hgumm.Name);
+        IConfigSource config = new IniConfigSource();
+        config.AddConfig("Modules");
+        config.Configs["Modules"].Set("UserManagementModule", hgumm.Name);
 
-            SceneHelpers sceneHelpers = new SceneHelpers();
-            TestScene scene = sceneHelpers.SetupScene();
-            SceneHelpers.SetupSceneModules(scene, config, hgumm);
+        SceneHelpers sceneHelpers = new SceneHelpers();
+        TestScene scene = sceneHelpers.SetupScene();
+        SceneHelpers.SetupSceneModules(scene, config, hgumm);
 
-            AgentCircuitData acd = SceneHelpers.GenerateAgentData(userId);
-            acd.firstname = firstName;
-            acd.lastname = lastName;
-            acd.ServiceURLs["HomeURI"] = "http://" + homeUri;
+        AgentCircuitData acd = SceneHelpers.GenerateAgentData(userId);
+        acd.firstname = firstName;
+        acd.lastname = lastName;
+        acd.ServiceURLs["HomeURI"] = "http://" + homeUri;
 
-            SceneHelpers.AddScenePresence(scene, acd);
+        SceneHelpers.AddScenePresence(scene, acd);
 
-            string name = hgumm.GetUserName(userId);
-            // TODO: Assert.Equal(,)); - incomplete assertion
-        }
+        string name = hgumm.GetUserName(userId);
+        // TODO: Assert.Equal(,)); - incomplete assertion
     }
 }

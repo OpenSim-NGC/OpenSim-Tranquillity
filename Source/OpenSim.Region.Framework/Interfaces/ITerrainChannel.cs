@@ -28,46 +28,45 @@
 using OpenSim.Framework;
 using OpenMetaverse;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface ITerrainChannel
 {
-    public interface ITerrainChannel
-    {
-        int Width { get;}       // X dimension
-        int Height { get;}      // Y dimension
-        int Altitude { get;}    // Z dimension
+    int Width { get;}       // X dimension
+    int Height { get;}      // Y dimension
+    int Altitude { get;}    // Z dimension
 
-        float this[int x, int y] { get; set; }
+    float this[int x, int y] { get; set; }
 
-        float GetHeight(float x, float y);
-        float GetHeightAtXYZ(float x, float y, float z);
+    float GetHeight(float x, float y);
+    float GetHeightAtXYZ(float x, float y, float z);
 
-        // Return the packaged terrain data for passing into lower levels of communication
-        TerrainData GetTerrainData();
+    // Return the packaged terrain data for passing into lower levels of communication
+    TerrainData GetTerrainData();
 
-        /// <summary>
-        /// Squash the entire heightmap into a single dimensioned array
-        /// </summary>
-        /// <returns></returns>
-        float[] GetFloatsSerialised();
+    /// <summary>
+    /// Squash the entire heightmap into a single dimensioned array
+    /// </summary>
+    /// <returns></returns>
+    float[] GetFloatsSerialised();
 
-        double[,] GetDoubles();
+    double[,] GetDoubles();
 
-        // Check if a location has been updated. Clears the taint flag as a side effect.
-        bool Tainted(int x, int y);
+    // Check if a location has been updated. Clears the taint flag as a side effect.
+    bool Tainted(int x, int y);
 
-        ITerrainChannel MakeCopy();
-        string SaveToXmlString();
-        void LoadFromXmlString(string data);
-        // Merge some terrain into this channel
-        void Merge(ITerrainChannel newTerrain, Vector3 displacement, float radianRotation, Vector2 rotationDisplacement);
+    ITerrainChannel MakeCopy();
+    string SaveToXmlString();
+    void LoadFromXmlString(string data);
+    // Merge some terrain into this channel
+    void Merge(ITerrainChannel newTerrain, Vector3 displacement, float radianRotation, Vector2 rotationDisplacement);
 
-        /// </summary>
-        /// <param name="newTerrain"></param>
-        /// <param name="displacement">&lt;x, y, z&gt;</param>
-        /// <param name="rotationDegrees"></param>
-        /// <param name="boundingOrigin">&lt;x, y&gt;</param>
-        /// <param name="boundingSize">&lt;x, y&gt;</param>
-        void MergeWithBounding(ITerrainChannel newTerrain, Vector3 displacement, float rotationDegrees, Vector2 boundingOrigin, Vector2 boundingSize);
-        int MaxHeight();
-    }
+    /// </summary>
+    /// <param name="newTerrain"></param>
+    /// <param name="displacement">&lt;x, y, z&gt;</param>
+    /// <param name="rotationDegrees"></param>
+    /// <param name="boundingOrigin">&lt;x, y&gt;</param>
+    /// <param name="boundingSize">&lt;x, y&gt;</param>
+    void MergeWithBounding(ITerrainChannel newTerrain, Vector3 displacement, float rotationDegrees, Vector2 boundingOrigin, Vector2 boundingSize);
+    int MaxHeight();
 }

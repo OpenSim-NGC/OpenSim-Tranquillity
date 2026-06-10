@@ -25,61 +25,59 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+/// <summary>
+/// ChatFromViewer Arguments
+/// </summary>
+public class OSChatMessage : EventArgs
 {
     /// <summary>
-    /// ChatFromViewer Arguments
+    /// The type of message, eg say, shout, broadcast.
     /// </summary>
-    public class OSChatMessage : EventArgs
+    public ChatTypeEnum Type { get; set; }
+
+    /// <summary>
+    /// Which channel was this message sent on? Different channels may have different listeners. Public chat is on channel zero.
+    /// </summary>
+    public int Channel { get; set; }
+
+    /// <summary>
+    /// The name of the sender (needed for scripts)
+    /// </summary>
+    public string From { get; set; }
+
+    /// <summary>
+    /// The message sent by the user
+    /// </summary>
+    public string Message { get; set; }
+
+    /// <summary>
+    /// The position of the sender at the time of the message broadcast.
+    /// </summary>
+    public Vector3 Position { get; set; }
+
+    /// <summary>
+    /// The client responsible for sending the message, or null.
+    /// </summary>
+    public IClientAPI Sender { get; set; }
+    /// <summary>
+    /// The object responsible for sending the message, or null.
+    /// </summary>
+    public object SenderObject { get; set; }
+
+    public UUID SenderUUID { get; set; }
+    public UUID Destination { get; set; }
+    public IScene Scene { get; set; }
+
+    public OSChatMessage()
     {
-        /// <summary>
-        /// The type of message, eg say, shout, broadcast.
-        /// </summary>
-        public ChatTypeEnum Type { get; set; }
+    }
 
-        /// <summary>
-        /// Which channel was this message sent on? Different channels may have different listeners. Public chat is on channel zero.
-        /// </summary>
-        public int Channel { get; set; }
-
-        /// <summary>
-        /// The name of the sender (needed for scripts)
-        /// </summary>
-        public string From { get; set; }
-
-        /// <summary>
-        /// The message sent by the user
-        /// </summary>
-        public string Message { get; set; }
-
-        /// <summary>
-        /// The position of the sender at the time of the message broadcast.
-        /// </summary>
-        public Vector3 Position { get; set; }
-
-        /// <summary>
-        /// The client responsible for sending the message, or null.
-        /// </summary>
-        public IClientAPI Sender { get; set; }
-        /// <summary>
-        /// The object responsible for sending the message, or null.
-        /// </summary>
-        public object SenderObject { get; set; }
-
-        public UUID SenderUUID { get; set; }
-        public UUID Destination { get; set; }
-        public IScene Scene { get; set; }
-
-        public OSChatMessage()
-        {
-        }
-
-        public override string ToString()
-        {
-            return Message;
-        }
+    public override string ToString()
+    {
+        return Message;
     }
 }

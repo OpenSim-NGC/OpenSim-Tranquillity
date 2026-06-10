@@ -25,55 +25,47 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Data;
-using System.Reflection;
-using OpenMetaverse;
-using OpenSim.Framework;
 using Npgsql;
 
-namespace OpenSim.Data.PGSQL
+namespace OpenSim.Data.PGSQL;
+
+/// <summary>
+/// A database interface class to a user profile storage system
+/// </summary>
+public class PGSqlFramework
 {
-    /// <summary>
-    /// A database interface class to a user profile storage system
-    /// </summary>
-    public class PGSqlFramework
+    private static readonly log4net.ILog m_log = log4net.LogManager.GetLogger( System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected string m_connectionString;
+    protected object m_dbLock = new object();
+
+    protected PGSqlFramework(string connectionString)
     {
-        private static readonly log4net.ILog m_log = log4net.LogManager.GetLogger( System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        m_connectionString = connectionString;
+    }
 
-        protected string m_connectionString;
-        protected object m_dbLock = new object();
-
-        protected PGSqlFramework(string connectionString)
+    //////////////////////////////////////////////////////////////
+    //
+    // All non queries are funneled through one connection
+    // to increase performance a little
+    //
+    protected int ExecuteNonQuery(NpgsqlCommand cmd)
+    {
+        lock (m_dbLock)
         {
-            m_connectionString = connectionString;
-        }
-
-        //////////////////////////////////////////////////////////////
-        //
-        // All non queries are funneled through one connection
-        // to increase performance a little
-        //
-        protected int ExecuteNonQuery(NpgsqlCommand cmd)
-        {
-            lock (m_dbLock)
+            using (NpgsqlConnection dbcon = new NpgsqlConnection(m_connectionString))
             {
-                using (NpgsqlConnection dbcon = new NpgsqlConnection(m_connectionString))
-                {
-                    dbcon.Open();
-                    cmd.Connection = dbcon;
+                dbcon.Open();
+                cmd.Connection = dbcon;
 
-                    try
-                    {
-                        return cmd.ExecuteNonQuery();
-                    }
-                    catch (Exception e)
-                    {
-                        m_log.Error(e.Message, e);
-                        return 0;
-                    }
+                try
+                {
+                    return cmd.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    m_log.Error(e.Message, e);
+                    return 0;
                 }
             }
         }

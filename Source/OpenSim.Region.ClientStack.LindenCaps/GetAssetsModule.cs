@@ -38,356 +38,355 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
-namespace OpenSim.Region.ClientStack.LindenCaps
+namespace OpenSim.Region.ClientStack.LindenCaps;
+
+public class GetAssetsModule : INonSharedRegionModule
 {
-    public class GetAssetsModule : INonSharedRegionModule
-    {
 //        private static readonly ILog m_log =
 //            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
+    private Scene m_scene;
+    private bool m_Enabled;
+
+    private string m_GetTextureURL;
+    private string m_GetMeshURL;
+    private string m_GetMesh2URL;
+    private string m_GetAssetURL;
+
+    class APollRequest
+    {
+        public PollServiceAssetEventArgs thepoll;
+        public UUID reqID;
+        public OSHttpRequest request;
+    }
+
+    public class APollResponse
+    {
+        public OSHttpResponse osresponse;
+    }
+
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private static IAssetService m_assetService = null;
+    private static GetAssetsHandler m_getAssetHandler;
+    private static ObjectJobEngine m_workerpool = null;
+    private static int m_NumberScenes = 0;
+    private static object m_loadLock = new object();
+    protected IUserManagement m_UserManagement = null;
+
+    #region Region Module interfaceBase Members
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        IConfig config = source.Configs["ClientStack.LindenCaps"];
+        if (config == null)
+            return;
+
+        m_GetTextureURL = config.GetString("Cap_GetTexture", string.Empty);
+        if (m_GetTextureURL != string.Empty)
+            m_Enabled = true;
+
+        m_GetMeshURL = config.GetString("Cap_GetMesh", string.Empty);
+        if (m_GetMeshURL != string.Empty)
+            m_Enabled = true;
+
+        m_GetMesh2URL = config.GetString("Cap_GetMesh2", string.Empty);
+        if (m_GetMesh2URL != string.Empty)
+            m_Enabled = true;
+
+        m_GetAssetURL = config.GetString("Cap_GetAsset", string.Empty);
+        if (m_GetAssetURL != string.Empty)
+            m_Enabled = true;
+    }
+
+    public void AddRegion(Scene pScene)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_scene = pScene;
+    }
+
+    public void RemoveRegion(Scene s)
+    {
+        if (!m_Enabled)
+            return;
+
+        s.EventManager.OnRegisterCaps -= RegisterCaps;
+        m_NumberScenes--;
+        m_scene = null;
+    }
+
+    public void RegionLoaded(Scene s)
+    {
+        if (!m_Enabled)
+            return;
+
+        lock(m_loadLock)
+        {
+            if (m_assetService == null)
+            {
+                m_assetService = s.RequestModuleInterface<IAssetService>();
+                // We'll reuse the same handler for all requests.
+                m_getAssetHandler = new GetAssetsHandler(m_assetService);
+            }
+
+            if (m_assetService == null)
+            {
+                m_Enabled = false;
+                return;
+            }
+
+            if(m_UserManagement == null)
+                m_UserManagement = s.RequestModuleInterface<IUserManagement>();
+
+            s.EventManager.OnRegisterCaps += RegisterCaps;
+
+            m_NumberScenes++;
+
+            if (m_workerpool == null)
+                m_workerpool = new ObjectJobEngine(DoAssetRequests, "GetCapsAssetWorker", 1000, 3);
+        }
+    }
+
+    public void Close()
+    {
+        if(m_NumberScenes <= 0 && m_workerpool != null)
+        {
+            m_workerpool.Dispose();
+            m_workerpool = null;
+        }
+    }
+
+    public string Name { get { return "GetAssetsModule"; } }
+
+    #endregion
+
+    private static void DoAssetRequests(object o)
+    {
+        if (m_NumberScenes <= 0)
+            return;
+        APollRequest poolreq = o as APollRequest;
+        if (poolreq != null && !poolreq.reqID.IsZero())
+            poolreq.thepoll.Process(poolreq);
+    }
+
+    private class PollServiceAssetEventArgs : PollServiceEventArgs
+    {
+        //private List<Hashtable> requests = new List<Hashtable>();
+        private List<OSHttpRequest> requests = new List<OSHttpRequest>();
+        private Dictionary<UUID, APollResponse> responses =new Dictionary<UUID, APollResponse>();
+        private HashSet<UUID> dropedResponses = new HashSet<UUID>();
+
         private Scene m_scene;
-        private bool m_Enabled;
-
-        private string m_GetTextureURL;
-        private string m_GetMeshURL;
-        private string m_GetMesh2URL;
-        private string m_GetAssetURL;
-
-        class APollRequest
+        private string m_hgassets = null;
+        public PollServiceAssetEventArgs(string uri, UUID pId, Scene scene, string HGAssetSVC) :
+            base(null, uri, null, null, null, null, pId, int.MaxValue)
         {
-            public PollServiceAssetEventArgs thepoll;
-            public UUID reqID;
-            public OSHttpRequest request;
-        }
+            m_scene = scene;
+            m_hgassets = HGAssetSVC;
 
-        public class APollResponse
-        {
-            public OSHttpResponse osresponse;
-        }
-
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private static IAssetService m_assetService = null;
-        private static GetAssetsHandler m_getAssetHandler;
-        private static ObjectJobEngine m_workerpool = null;
-        private static int m_NumberScenes = 0;
-        private static object m_loadLock = new object();
-        protected IUserManagement m_UserManagement = null;
-
-        #region Region Module interfaceBase Members
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig config = source.Configs["ClientStack.LindenCaps"];
-            if (config == null)
-                return;
-
-            m_GetTextureURL = config.GetString("Cap_GetTexture", string.Empty);
-            if (m_GetTextureURL != string.Empty)
-                m_Enabled = true;
-
-            m_GetMeshURL = config.GetString("Cap_GetMesh", string.Empty);
-            if (m_GetMeshURL != string.Empty)
-                m_Enabled = true;
-
-            m_GetMesh2URL = config.GetString("Cap_GetMesh2", string.Empty);
-            if (m_GetMesh2URL != string.Empty)
-                m_Enabled = true;
-
-            m_GetAssetURL = config.GetString("Cap_GetAsset", string.Empty);
-            if (m_GetAssetURL != string.Empty)
-                m_Enabled = true;
-        }
-
-        public void AddRegion(Scene pScene)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_scene = pScene;
-        }
-
-        public void RemoveRegion(Scene s)
-        {
-            if (!m_Enabled)
-                return;
-
-            s.EventManager.OnRegisterCaps -= RegisterCaps;
-            m_NumberScenes--;
-            m_scene = null;
-        }
-
-        public void RegionLoaded(Scene s)
-        {
-            if (!m_Enabled)
-                return;
-
-            lock(m_loadLock)
+            HasEvents = delegate(UUID requestID, UUID _)
             {
-                if (m_assetService == null)
+                lock (responses)
                 {
-                    m_assetService = s.RequestModuleInterface<IAssetService>();
-                    // We'll reuse the same handler for all requests.
-                    m_getAssetHandler = new GetAssetsHandler(m_assetService);
+                    return responses.ContainsKey(requestID);
                 }
+            };
 
-                if (m_assetService == null)
-                {
-                    m_Enabled = false;
-                    return;
-                }
-
-                if(m_UserManagement == null)
-                    m_UserManagement = s.RequestModuleInterface<IUserManagement>();
-
-                s.EventManager.OnRegisterCaps += RegisterCaps;
-
-                m_NumberScenes++;
-
-                if (m_workerpool == null)
-                    m_workerpool = new ObjectJobEngine(DoAssetRequests, "GetCapsAssetWorker", 1000, 3);
-            }
-        }
-
-        public void Close()
-        {
-            if(m_NumberScenes <= 0 && m_workerpool != null)
+            Drop = delegate(UUID requestID, UUID _)
             {
-                m_workerpool.Dispose();
-                m_workerpool = null;
-            }
-        }
-
-        public string Name { get { return "GetAssetsModule"; } }
-
-        #endregion
-
-        private static void DoAssetRequests(object o)
-        {
-            if (m_NumberScenes <= 0)
-                return;
-            APollRequest poolreq = o as APollRequest;
-            if (poolreq != null && !poolreq.reqID.IsZero())
-                poolreq.thepoll.Process(poolreq);
-        }
-
-        private class PollServiceAssetEventArgs : PollServiceEventArgs
-        {
-            //private List<Hashtable> requests = new List<Hashtable>();
-            private List<OSHttpRequest> requests = new List<OSHttpRequest>();
-            private Dictionary<UUID, APollResponse> responses =new Dictionary<UUID, APollResponse>();
-            private HashSet<UUID> dropedResponses = new HashSet<UUID>();
-
-            private Scene m_scene;
-            private string m_hgassets = null;
-            public PollServiceAssetEventArgs(string uri, UUID pId, Scene scene, string HGAssetSVC) :
-                base(null, uri, null, null, null, null, pId, int.MaxValue)
-            {
-                m_scene = scene;
-                m_hgassets = HGAssetSVC;
-
-                HasEvents = delegate(UUID requestID, UUID _)
+                lock (responses)
                 {
-                    lock (responses)
-                    {
-                        return responses.ContainsKey(requestID);
-                    }
-                };
-
-                Drop = delegate(UUID requestID, UUID _)
-                {
-                    lock (responses)
-                    {
-                        responses.Remove(requestID);
-                        lock(dropedResponses)
-                            dropedResponses.Add(requestID);
-                    }
-                };
-
-                GetEvents = delegate(UUID requestID, UUID _)
-                {
-                    lock (responses)
-                    {
-                        if(responses.Remove(requestID, out APollResponse apr))
-                        {
-                            OSHttpResponse response = apr.osresponse;
-                            if (response.Priority < 0)
-                                response.Priority = 0;
-
-                            Hashtable lixo = new()
-                            {
-                                ["h"] = response
-                            };
-                            return lixo;
-                        }
-                    }
-                    return new Hashtable();
-                };
-                
-                Request = delegate (UUID requestID, OSHttpRequest request)
-                {
-                    APollRequest reqinfo = new()
-                    {
-                        thepoll = this,
-                        reqID = requestID,
-                        request = request
-                    };
-
-                    m_workerpool.Enqueue(reqinfo);
-                    return null;
-                };
-
-                // this should never happen except possible on shutdown
-                NoEvents = delegate (UUID _, UUID _)
-                {
-                    /*
-                    lock (requests)
-                    {
-                        Hashtable request = requests.Find(id => id["RequestID"].ToString() == x.ToString());
-                        requests.Remove(request);
-                    }
-                    */
-                    Hashtable response = new Hashtable();
-
-                    response["int_response_code"] = 500;
-                    response["str_response_string"] = "timeout";
-                    response["content_type"] = "text/plain";
-                    response["keepalive"] = false;
-                    return response;
-                };
-            }
-
-            public void Process(APollRequest requestinfo)
-            {
-                UUID requestID = requestinfo.reqID;
-
-                if(m_scene.ShuttingDown)
-                    return;
-
-                lock(responses)
-                {
+                    responses.Remove(requestID);
                     lock(dropedResponses)
+                        dropedResponses.Add(requestID);
+                }
+            };
+
+            GetEvents = delegate(UUID requestID, UUID _)
+            {
+                lock (responses)
+                {
+                    if(responses.Remove(requestID, out APollResponse apr))
                     {
-                        if(dropedResponses.Contains(requestID))
+                        OSHttpResponse response = apr.osresponse;
+                        if (response.Priority < 0)
+                            response.Priority = 0;
+
+                        Hashtable lixo = new()
                         {
-                            dropedResponses.Remove(requestID);
-                            return;
-                        }
+                            ["h"] = response
+                        };
+                        return lixo;
                     }
-/* can't do this with current viewers; HG problem
-                    // If the avatar is gone, don't bother to get the texture
-                    if(m_scene.GetScenePresence(Id) == null)
+                }
+                return new Hashtable();
+            };
+            
+            Request = delegate (UUID requestID, OSHttpRequest request)
+            {
+                APollRequest reqinfo = new()
+                {
+                    thepoll = this,
+                    reqID = requestID,
+                    request = request
+                };
+
+                m_workerpool.Enqueue(reqinfo);
+                return null;
+            };
+
+            // this should never happen except possible on shutdown
+            NoEvents = delegate (UUID _, UUID _)
+            {
+                /*
+                lock (requests)
+                {
+                    Hashtable request = requests.Find(id => id["RequestID"].ToString() == x.ToString());
+                    requests.Remove(request);
+                }
+                */
+                Hashtable response = new Hashtable();
+
+                response["int_response_code"] = 500;
+                response["str_response_string"] = "timeout";
+                response["content_type"] = "text/plain";
+                response["keepalive"] = false;
+                return response;
+            };
+        }
+
+        public void Process(APollRequest requestinfo)
+        {
+            UUID requestID = requestinfo.reqID;
+
+            if(m_scene.ShuttingDown)
+                return;
+
+            lock(responses)
+            {
+                lock(dropedResponses)
+                {
+                    if(dropedResponses.Contains(requestID))
                     {
-                        curresponse = new Hashtable();
-                        curresponse["int_response_code"] = 500;
-                        curresponse["str_response_string"] = "timeout";
-                        curresponse["content_type"] = "text/plain";
-                        curresponse["keepalive"] = false;
-                        responses[requestID] = new APollResponse() { bytes = 0, response = curresponse };
+                        dropedResponses.Remove(requestID);
                         return;
                     }
-*/
                 }
-                OSHttpResponse response = new OSHttpResponse(requestinfo.request);
-                m_getAssetHandler.Handle(requestinfo.request, response, m_hgassets);
-
-                lock(responses)
+/* can't do this with current viewers; HG problem
+                // If the avatar is gone, don't bother to get the texture
+                if(m_scene.GetScenePresence(Id) == null)
                 {
-                    lock(dropedResponses)
-                    {
-                        if(dropedResponses.Contains(requestID))
-                        {
-                            dropedResponses.Remove(requestID);
-                            return;
-                        }
-                    }
-
-                    APollResponse preq= new APollResponse()
-                    {
-                        osresponse = response
-                    };
-                    responses[requestID] = preq;
+                    curresponse = new Hashtable();
+                    curresponse["int_response_code"] = 500;
+                    curresponse["str_response_string"] = "timeout";
+                    curresponse["content_type"] = "text/plain";
+                    curresponse["keepalive"] = false;
+                    responses[requestID] = new APollResponse() { bytes = 0, response = curresponse };
+                    return;
                 }
+*/
+            }
+            OSHttpResponse response = new OSHttpResponse(requestinfo.request);
+            m_getAssetHandler.Handle(requestinfo.request, response, m_hgassets);
+
+            lock(responses)
+            {
+                lock(dropedResponses)
+                {
+                    if(dropedResponses.Contains(requestID))
+                    {
+                        dropedResponses.Remove(requestID);
+                        return;
+                    }
+                }
+
+                APollResponse preq= new APollResponse()
+                {
+                    osresponse = response
+                };
+                responses[requestID] = preq;
             }
         }
+    }
 
-        public void RegisterCaps(UUID agentID, Caps caps)
+    public void RegisterCaps(UUID agentID, Caps caps)
+    {
+        /*
+        string hostName = m_scene.RegionInfo.ExternalHostName;
+        uint port = (MainServer.Instance == null) ? 0 : MainServer.Instance.Port;
+        string protocol = "http";
+        if (MainServer.Instance.UseSSL)
         {
-            /*
-            string hostName = m_scene.RegionInfo.ExternalHostName;
-            uint port = (MainServer.Instance == null) ? 0 : MainServer.Instance.Port;
-            string protocol = "http";
-            if (MainServer.Instance.UseSSL)
-            {
-                hostName = MainServer.Instance.SSLCommonName;
-                port = MainServer.Instance.SSLPort;
-                protocol = "https";
-            }
-            string baseURL = String.Format("{0}://{1}:{2}", protocol, hostName, port);
-            */
-            string hgassets = null;
-            if(m_UserManagement != null)
-                hgassets = m_UserManagement.GetUserServerURL(agentID, "AssetServerURI");
-
-            IExternalCapsModule handler = m_scene.RequestModuleInterface<IExternalCapsModule>();
-
-            if (m_GetTextureURL.Equals("localhost"))
-            {
-                string capUrl = "/" + UUID.Random();
-
-                if (handler != null)
-                    handler.RegisterExternalUserCapsHandler(agentID, caps, "GetTexture", capUrl);
-                else
-                    caps.RegisterPollHandler("GetTexture", new PollServiceAssetEventArgs(capUrl, agentID, m_scene, hgassets));
-            }
-            else
-            {
-                caps.RegisterHandler("GetTexture", m_GetTextureURL);
-            }
-
-            //GetMesh
-            if (m_GetMeshURL.Equals("localhost"))
-            {
-                string capUrl = "/" + UUID.Random();
-
-                if (handler != null)
-                    handler.RegisterExternalUserCapsHandler(agentID, caps, "GetMesh", capUrl);
-                else
-                    caps.RegisterPollHandler("GetMesh", new PollServiceAssetEventArgs(capUrl, agentID, m_scene, hgassets));
-            }
-            else if (!string.IsNullOrEmpty(m_GetMeshURL))
-                caps.RegisterHandler("GetMesh", m_GetMeshURL);
-
-            //GetMesh2
-            if (m_GetMesh2URL.Equals("localhost"))
-            {
-                string capUrl = "/" + UUID.Random();
-
-                if (handler != null)
-                    handler.RegisterExternalUserCapsHandler(agentID, caps, "GetMesh2", capUrl);
-                else
-                    caps.RegisterPollHandler("GetMesh2", new PollServiceAssetEventArgs(capUrl, agentID, m_scene, hgassets));
-            }
-            else if (!string.IsNullOrEmpty(m_GetMesh2URL))
-                caps.RegisterHandler("GetMesh2", m_GetMesh2URL);
-
-            //ViewerAsset
-            if (m_GetAssetURL.Equals("localhost"))
-            {
-                string capUrl = "/" + UUID.Random();
-
-                if (handler != null)
-                    handler.RegisterExternalUserCapsHandler(agentID, caps, "ViewerAsset", capUrl);
-                else
-                    caps.RegisterPollHandler("ViewerAsset", new PollServiceAssetEventArgs(capUrl, agentID, m_scene, hgassets));
-            }
-            else if (!string.IsNullOrEmpty(m_GetAssetURL))
-                caps.RegisterHandler("ViewerAsset", m_GetAssetURL);
+            hostName = MainServer.Instance.SSLCommonName;
+            port = MainServer.Instance.SSLPort;
+            protocol = "https";
         }
+        string baseURL = String.Format("{0}://{1}:{2}", protocol, hostName, port);
+        */
+        string hgassets = null;
+        if(m_UserManagement != null)
+            hgassets = m_UserManagement.GetUserServerURL(agentID, "AssetServerURI");
+
+        IExternalCapsModule handler = m_scene.RequestModuleInterface<IExternalCapsModule>();
+
+        if (m_GetTextureURL.Equals("localhost"))
+        {
+            string capUrl = "/" + UUID.Random();
+
+            if (handler != null)
+                handler.RegisterExternalUserCapsHandler(agentID, caps, "GetTexture", capUrl);
+            else
+                caps.RegisterPollHandler("GetTexture", new PollServiceAssetEventArgs(capUrl, agentID, m_scene, hgassets));
+        }
+        else
+        {
+            caps.RegisterHandler("GetTexture", m_GetTextureURL);
+        }
+
+        //GetMesh
+        if (m_GetMeshURL.Equals("localhost"))
+        {
+            string capUrl = "/" + UUID.Random();
+
+            if (handler != null)
+                handler.RegisterExternalUserCapsHandler(agentID, caps, "GetMesh", capUrl);
+            else
+                caps.RegisterPollHandler("GetMesh", new PollServiceAssetEventArgs(capUrl, agentID, m_scene, hgassets));
+        }
+        else if (!string.IsNullOrEmpty(m_GetMeshURL))
+            caps.RegisterHandler("GetMesh", m_GetMeshURL);
+
+        //GetMesh2
+        if (m_GetMesh2URL.Equals("localhost"))
+        {
+            string capUrl = "/" + UUID.Random();
+
+            if (handler != null)
+                handler.RegisterExternalUserCapsHandler(agentID, caps, "GetMesh2", capUrl);
+            else
+                caps.RegisterPollHandler("GetMesh2", new PollServiceAssetEventArgs(capUrl, agentID, m_scene, hgassets));
+        }
+        else if (!string.IsNullOrEmpty(m_GetMesh2URL))
+            caps.RegisterHandler("GetMesh2", m_GetMesh2URL);
+
+        //ViewerAsset
+        if (m_GetAssetURL.Equals("localhost"))
+        {
+            string capUrl = "/" + UUID.Random();
+
+            if (handler != null)
+                handler.RegisterExternalUserCapsHandler(agentID, caps, "ViewerAsset", capUrl);
+            else
+                caps.RegisterPollHandler("ViewerAsset", new PollServiceAssetEventArgs(capUrl, agentID, m_scene, hgassets));
+        }
+        else if (!string.IsNullOrEmpty(m_GetAssetURL))
+            caps.RegisterHandler("ViewerAsset", m_GetAssetURL);
     }
 }

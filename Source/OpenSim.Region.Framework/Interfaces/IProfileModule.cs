@@ -27,11 +27,10 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
-{
-    public interface IProfileModule
-    {
-        void RequestAvatarProperties(IClientAPI remoteClient, UUID avatarID);
+namespace OpenSim.Framework;
 
-    }
+public interface IProfileModule
+{
+    void RequestAvatarProperties(IClientAPI remoteClient, UUID avatarID);
+
 }

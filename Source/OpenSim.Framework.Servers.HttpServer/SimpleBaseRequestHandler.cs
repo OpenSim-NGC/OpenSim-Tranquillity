@@ -25,59 +25,56 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
+namespace OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Framework.Servers.HttpServer
+/// <summary>
+/// simple Base streamed request handler
+/// for well defined simple uri paths, any http method
+/// </summary>
+public abstract class SimpleBaseRequestHandler
 {
-    /// <summary>
-    /// simple Base streamed request handler
-    /// for well defined simple uri paths, any http method
-    /// </summary>
-    public abstract class SimpleBaseRequestHandler
+    public int RequestsReceived { get; protected set; }
+
+    public int RequestsHandled { get; protected set; }
+
+    protected string m_path;
+
+    public string Name { get; private set; }
+
+    protected SimpleBaseRequestHandler(string path)
     {
-        public int RequestsReceived { get; protected set; }
+        Name = null;
+        m_path = path;
+    }
 
-        public int RequestsHandled { get; protected set; }
+    protected SimpleBaseRequestHandler(string path, string name)
+    {
+        Name = name;
+        m_path = path;
+    }
 
-        protected string m_path;
+    public string Path
+    {
+        get { return m_path; }
+    }
 
-        public string Name { get; private set; }
-
-        protected SimpleBaseRequestHandler(string path)
+    public string GetParam(string path)
+    {
+        if (CheckParam(path))
         {
-            Name = null;
-            m_path = path;
+            return path.Substring(m_path.Length);
         }
 
-        protected SimpleBaseRequestHandler(string path, string name)
+        return string.Empty;
+    }
+
+    protected bool CheckParam(string path)
+    {
+        if (string.IsNullOrEmpty(path))
         {
-            Name = name;
-            m_path = path;
+            return false;
         }
 
-        public string Path
-        {
-            get { return m_path; }
-        }
-
-        public string GetParam(string path)
-        {
-            if (CheckParam(path))
-            {
-                return path.Substring(m_path.Length);
-            }
-
-            return string.Empty;
-        }
-
-        protected bool CheckParam(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                return false;
-            }
-
-            return path.StartsWith(Path);
-        }
+        return path.StartsWith(Path);
     }
 }

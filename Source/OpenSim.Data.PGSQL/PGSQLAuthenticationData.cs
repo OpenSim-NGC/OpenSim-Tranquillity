@@ -25,228 +25,222 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 using System.Reflection;
 using System.Text;
 using System.Data;
 using Npgsql;
-using NpgsqlTypes;
 
-namespace OpenSim.Data.PGSQL
+namespace OpenSim.Data.PGSQL;
+
+public class PGSQLAuthenticationData : IAuthenticationData
 {
-    public class PGSQLAuthenticationData : IAuthenticationData
+    private string m_Realm;
+    private List<string> m_ColumnNames = null;
+    private int m_LastExpire = 0;
+    private string m_ConnectionString;
+    private PGSQLManager m_database;
+
+    protected virtual Assembly Assembly
     {
-        private string m_Realm;
-        private List<string> m_ColumnNames = null;
-        private int m_LastExpire = 0;
-        private string m_ConnectionString;
-        private PGSQLManager m_database;
+        get { return GetType().Assembly; }
+    }
 
-        protected virtual Assembly Assembly
+    public PGSQLAuthenticationData(string connectionString, string realm)
+    {
+        m_Realm = realm;
+        m_ConnectionString = connectionString;
+        using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
         {
-            get { return GetType().Assembly; }
+            conn.Open();
+            Migration m = new Migration(conn, GetType().Assembly, "AuthStore");
+            m_database = new PGSQLManager(m_ConnectionString);
+            m.Update();
         }
+    }
 
-        public PGSQLAuthenticationData(string connectionString, string realm)
+    public AuthenticationData Get(UUID principalID)
+    {
+        AuthenticationData ret = new AuthenticationData();
+        ret.Data = new Dictionary<string, object>();
+
+        string sql = string.Format("select * from {0} where uuid = :principalID", m_Realm);
+
+        using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
+        using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
         {
-            m_Realm = realm;
-            m_ConnectionString = connectionString;
-            using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
+            cmd.Parameters.Add(m_database.CreateParameter("principalID", principalID));
+            conn.Open();
+            using (NpgsqlDataReader result = cmd.ExecuteReader())
             {
-                conn.Open();
-                Migration m = new Migration(conn, GetType().Assembly, "AuthStore");
-                m_database = new PGSQLManager(m_ConnectionString);
-                m.Update();
-            }
-        }
-
-        public AuthenticationData Get(UUID principalID)
-        {
-            AuthenticationData ret = new AuthenticationData();
-            ret.Data = new Dictionary<string, object>();
-
-            string sql = string.Format("select * from {0} where uuid = :principalID", m_Realm);
-
-            using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
-            using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
-            {
-                cmd.Parameters.Add(m_database.CreateParameter("principalID", principalID));
-                conn.Open();
-                using (NpgsqlDataReader result = cmd.ExecuteReader())
+                if (result.Read())
                 {
-                    if (result.Read())
+                    ret.PrincipalID = principalID;
+
+                    if (m_ColumnNames == null)
                     {
-                        ret.PrincipalID = principalID;
+                        m_ColumnNames = new List<string>();
 
-                        if (m_ColumnNames == null)
-                        {
-                            m_ColumnNames = new List<string>();
-
-                            DataTable schemaTable = result.GetSchemaTable();
-                            foreach (DataRow row in schemaTable.Rows)
-                                m_ColumnNames.Add(row["ColumnName"].ToString());
-                        }
-
-                        foreach (string s in m_ColumnNames)
-                        {
-                            if (s == "UUID"||s == "uuid")
-                                continue;
-
-                            ret.Data[s] = result[s].ToString();
-                        }
-                        return ret;
+                        DataTable schemaTable = result.GetSchemaTable();
+                        foreach (DataRow row in schemaTable.Rows)
+                            m_ColumnNames.Add(row["ColumnName"].ToString());
                     }
+
+                    foreach (string s in m_ColumnNames)
+                    {
+                        if (s == "UUID"||s == "uuid")
+                            continue;
+
+                        ret.Data[s] = result[s].ToString();
+                    }
+                    return ret;
                 }
             }
-            return null;
         }
+        return null;
+    }
 
-        public bool Store(AuthenticationData data)
+    public bool Store(AuthenticationData data)
+    {
+        data.Data.Remove("UUID");
+        data.Data.Remove("uuid");
+
+        /*
+        Dictionary<string, object> oAuth = new Dictionary<string, object>();
+
+        foreach (KeyValuePair<string, object> oDado in data.Data)
         {
-            data.Data.Remove("UUID");
-            data.Data.Remove("uuid");
-
-            /*
-            Dictionary<string, object> oAuth = new Dictionary<string, object>();
-
-            foreach (KeyValuePair<string, object> oDado in data.Data)
+            if (oDado.Key != oDado.Key.ToLower())
             {
-                if (oDado.Key != oDado.Key.ToLower())
-                {
-                    oAuth.Add(oDado.Key.ToLower(), oDado.Value);
-                }
+                oAuth.Add(oDado.Key.ToLower(), oDado.Value);
             }
-            foreach (KeyValuePair<string, object> oDado in data.Data)
-            {
-                if (!oAuth.ContainsKey(oDado.Key.ToLower())) {
-                    oAuth.Add(oDado.Key.ToLower(), oDado.Value);
-                }
+        }
+        foreach (KeyValuePair<string, object> oDado in data.Data)
+        {
+            if (!oAuth.ContainsKey(oDado.Key.ToLower())) {
+                oAuth.Add(oDado.Key.ToLower(), oDado.Value);
             }
-            */
-            string[] fields = new List<string>(data.Data.Keys).ToArray();
-            StringBuilder updateBuilder = new StringBuilder();
+        }
+        */
+        string[] fields = new List<string>(data.Data.Keys).ToArray();
+        StringBuilder updateBuilder = new StringBuilder();
 
-            using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
-            using (NpgsqlCommand cmd = new NpgsqlCommand())
+        using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
+        using (NpgsqlCommand cmd = new NpgsqlCommand())
+        {
+            updateBuilder.AppendFormat("update {0} set ", m_Realm);
+
+            bool first = true;
+            foreach (string field in fields)
             {
-                updateBuilder.AppendFormat("update {0} set ", m_Realm);
+                if (!first)
+                    updateBuilder.Append(", ");
+                updateBuilder.AppendFormat("\"{0}\" = :{0}",field);
 
-                bool first = true;
-                foreach (string field in fields)
-                {
-                    if (!first)
-                        updateBuilder.Append(", ");
-                    updateBuilder.AppendFormat("\"{0}\" = :{0}",field);
+                first = false;
 
-                    first = false;
+                cmd.Parameters.Add(m_database.CreateParameter("" + field, data.Data[field]));
+            }
 
-                    cmd.Parameters.Add(m_database.CreateParameter("" + field, data.Data[field]));
-                }
+            updateBuilder.Append(" where uuid = :principalID");
 
-                updateBuilder.Append(" where uuid = :principalID");
+            cmd.CommandText = updateBuilder.ToString();
+            cmd.Connection = conn;
+            cmd.Parameters.Add(m_database.CreateParameter("principalID", data.PrincipalID));
 
-                cmd.CommandText = updateBuilder.ToString();
-                cmd.Connection = conn;
-                cmd.Parameters.Add(m_database.CreateParameter("principalID", data.PrincipalID));
+            conn.Open();
+            if (cmd.ExecuteNonQuery() < 1)
+            {
+                StringBuilder insertBuilder = new StringBuilder();
 
-                conn.Open();
+                insertBuilder.AppendFormat("insert into {0} (uuid, \"", m_Realm);
+                insertBuilder.Append(String.Join("\", \"", fields));
+                insertBuilder.Append("\") values (:principalID, :");
+                insertBuilder.Append(String.Join(", :", fields));
+                insertBuilder.Append(")");
+
+                cmd.CommandText = insertBuilder.ToString();
+
                 if (cmd.ExecuteNonQuery() < 1)
                 {
-                    StringBuilder insertBuilder = new StringBuilder();
-
-                    insertBuilder.AppendFormat("insert into {0} (uuid, \"", m_Realm);
-                    insertBuilder.Append(String.Join("\", \"", fields));
-                    insertBuilder.Append("\") values (:principalID, :");
-                    insertBuilder.Append(String.Join(", :", fields));
-                    insertBuilder.Append(")");
-
-                    cmd.CommandText = insertBuilder.ToString();
-
-                    if (cmd.ExecuteNonQuery() < 1)
-                    {
-                        return false;
-                    }
+                    return false;
                 }
             }
-            return true;
         }
+        return true;
+    }
 
-        public bool SetDataItem(UUID principalID, string item, string value)
+    public bool SetDataItem(UUID principalID, string item, string value)
+    {
+        string sql = string.Format("update {0} set {1} = :{1} where uuid = :UUID", m_Realm, item);
+        using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
+        using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
         {
-            string sql = string.Format("update {0} set {1} = :{1} where uuid = :UUID", m_Realm, item);
-            using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
-            using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
-            {
-                cmd.Parameters.Add(m_database.CreateParameter("\"" + item + "\"", value));
-                conn.Open();
-                if (cmd.ExecuteNonQuery() > 0)
-                    return true;
-            }
-            return false;
+            cmd.Parameters.Add(m_database.CreateParameter("\"" + item + "\"", value));
+            conn.Open();
+            if (cmd.ExecuteNonQuery() > 0)
+                return true;
         }
+        return false;
+    }
 
-        public bool SetToken(UUID principalID, string token, int lifetime)
+    public bool SetToken(UUID principalID, string token, int lifetime)
+    {
+        if (System.Environment.TickCount - m_LastExpire > 30000)
+            DoExpire();
+
+        string sql = "insert into tokens (uuid, token, validity) values (:principalID, :token, :lifetime)";
+        using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
+        using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
         {
-            if (System.Environment.TickCount - m_LastExpire > 30000)
-                DoExpire();
+            cmd.Parameters.Add(m_database.CreateParameter("principalID", principalID));
+            cmd.Parameters.Add(m_database.CreateParameter("token", token));
+            cmd.Parameters.Add(m_database.CreateParameter("lifetime", DateTime.Now.AddMinutes(lifetime)));
+            conn.Open();
 
-            string sql = "insert into tokens (uuid, token, validity) values (:principalID, :token, :lifetime)";
-            using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
-            using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
+            if (cmd.ExecuteNonQuery() > 0)
             {
-                cmd.Parameters.Add(m_database.CreateParameter("principalID", principalID));
-                cmd.Parameters.Add(m_database.CreateParameter("token", token));
-                cmd.Parameters.Add(m_database.CreateParameter("lifetime", DateTime.Now.AddMinutes(lifetime)));
-                conn.Open();
-
-                if (cmd.ExecuteNonQuery() > 0)
-                {
-                    return true;
-                }
+                return true;
             }
-            return false;
         }
+        return false;
+    }
 
-        public bool CheckToken(UUID principalID, string token, int lifetime)
+    public bool CheckToken(UUID principalID, string token, int lifetime)
+    {
+        if (System.Environment.TickCount - m_LastExpire > 30000)
+            DoExpire();
+
+        DateTime validDate = DateTime.Now.AddMinutes(lifetime);
+        string sql = "update tokens set validity = :validDate where uuid = :principalID and token = :token and validity > (CURRENT_DATE + CURRENT_TIME)";
+
+        using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
+        using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
         {
-            if (System.Environment.TickCount - m_LastExpire > 30000)
-                DoExpire();
+            cmd.Parameters.Add(m_database.CreateParameter("principalID", principalID));
+            cmd.Parameters.Add(m_database.CreateParameter("token", token));
+            cmd.Parameters.Add(m_database.CreateParameter("validDate", validDate));
+            conn.Open();
 
-            DateTime validDate = DateTime.Now.AddMinutes(lifetime);
-            string sql = "update tokens set validity = :validDate where uuid = :principalID and token = :token and validity > (CURRENT_DATE + CURRENT_TIME)";
-
-            using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
-            using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
+            if (cmd.ExecuteNonQuery() > 0)
             {
-                cmd.Parameters.Add(m_database.CreateParameter("principalID", principalID));
-                cmd.Parameters.Add(m_database.CreateParameter("token", token));
-                cmd.Parameters.Add(m_database.CreateParameter("validDate", validDate));
-                conn.Open();
-
-                if (cmd.ExecuteNonQuery() > 0)
-                {
-                    return true;
-                }
+                return true;
             }
-            return false;
         }
+        return false;
+    }
 
-        private void DoExpire()
+    private void DoExpire()
+    {
+        DateTime currentDateTime = DateTime.Now;
+        string sql = "delete from tokens where validity < :currentDateTime";
+        using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
+        using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
         {
-            DateTime currentDateTime = DateTime.Now;
-            string sql = "delete from tokens where validity < :currentDateTime";
-            using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
-            using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
-            {
-                conn.Open();
-                cmd.Parameters.Add(m_database.CreateParameter("currentDateTime", currentDateTime));
-                cmd.ExecuteNonQuery();
-            }
-            m_LastExpire = System.Environment.TickCount;
+            conn.Open();
+            cmd.Parameters.Add(m_database.CreateParameter("currentDateTime", currentDateTime));
+            cmd.ExecuteNonQuery();
         }
+        m_LastExpire = System.Environment.TickCount;
     }
 }

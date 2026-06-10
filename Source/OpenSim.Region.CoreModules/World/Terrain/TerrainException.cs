@@ -25,20 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Region.CoreModules.World.Terrain
+namespace OpenSim.Region.CoreModules.World.Terrain;
+
+public class TerrainException : Exception
 {
-    public class TerrainException : Exception
+    public TerrainException()
     {
-        public TerrainException()
-        {
-        }
+    }
 
-        public TerrainException(string msg) : base(msg)
-        {
-        }
+    public TerrainException(string msg) : base(msg)
+    {
+    }
 
-        public TerrainException(string msg, Exception e) : base(msg, e)
-        {
-        }
+    public TerrainException(string msg, Exception e) : base(msg, e)
+    {
     }
 }

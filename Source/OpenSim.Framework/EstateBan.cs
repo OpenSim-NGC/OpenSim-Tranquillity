@@ -25,145 +25,142 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class EstateBan
 {
-    public class EstateBan
+    private uint m_estateID = 1;
+    /// <summary>
+    /// ID of the estate this ban limits access to.
+    /// </summary>
+    public uint EstateID
     {
-        private uint m_estateID = 1;
-        /// <summary>
-        /// ID of the estate this ban limits access to.
-        /// </summary>
-        public uint EstateID
+        get
         {
-            get
-            {
-                return m_estateID;
-            }
-            set
-            {
-                m_estateID = value;
-            }
+            return m_estateID;
         }
-
-        private UUID m_bannedUserID = UUID.Zero;
-        /// <summary>
-        /// ID of the banned user.
-        /// </summary>
-        public UUID BannedUserID
+        set
         {
-            get
-            {
-                return m_bannedUserID;
-            }
-            set
-            {
-                m_bannedUserID = value;
-            }
+            m_estateID = value;
         }
+    }
 
-        public UUID BanningUserID { get; set; }
-        public int BanTime { get; set; }
-
-        private string m_bannedHostAddress = string.Empty;
-        /// <summary>
-        /// IP address or domain name of the banned client.
-        /// </summary>
-        public string BannedHostAddress
+    private UUID m_bannedUserID = UUID.Zero;
+    /// <summary>
+    /// ID of the banned user.
+    /// </summary>
+    public UUID BannedUserID
+    {
+        get
         {
-            get
-            {
-                return m_bannedHostAddress;
-            }
-            set
-            {
-                m_bannedHostAddress = value;
-            }
+            return m_bannedUserID;
         }
-
-        private string m_bannedHostIPMask = string.Empty;
-        /// <summary>
-        /// IP address mask for banning group of client hosts.
-        /// </summary>
-        public string BannedHostIPMask
+        set
         {
-           get
-            {
-                return m_bannedHostIPMask;
-            }
-            set
-            {
-                m_bannedHostIPMask = value;
-            }
+            m_bannedUserID = value;
         }
+    }
 
-        private string m_bannedHostNameMask = string.Empty;
-        /// <summary>
-        /// Domain name mask for banning group of client hosts.
-        /// </summary>
-        public string BannedHostNameMask
+    public UUID BanningUserID { get; set; }
+    public int BanTime { get; set; }
+
+    private string m_bannedHostAddress = string.Empty;
+    /// <summary>
+    /// IP address or domain name of the banned client.
+    /// </summary>
+    public string BannedHostAddress
+    {
+        get
         {
-            get
-            {
-                return m_bannedHostNameMask;
-            }
-            set
-            {
-                m_bannedHostNameMask = value;
-            }
+            return m_bannedHostAddress;
         }
-
-        public EstateBan() { }
-
-        public Dictionary<string, object> ToMap()
+        set
         {
-            Dictionary<string, object> map = new Dictionary<string, object>();
-            PropertyInfo[] properties = this.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            foreach (PropertyInfo p in properties)
-                map[p.Name] = p.GetValue(this, null);
-
-            return map;
+            m_bannedHostAddress = value;
         }
+    }
 
-        public EstateBan(Dictionary<string, object> map)
+    private string m_bannedHostIPMask = string.Empty;
+    /// <summary>
+    /// IP address mask for banning group of client hosts.
+    /// </summary>
+    public string BannedHostIPMask
+    {
+       get
         {
-            foreach (KeyValuePair<string, object> kvp in map)
-            {
-                PropertyInfo p = this.GetType().GetProperty(kvp.Key, BindingFlags.Public | BindingFlags.Instance);
-                if (p == null)
-                    continue;
-                object value = p.GetValue(this, null);
-                if (value is String)
-                    p.SetValue(this, map[p.Name], null);
-                else if (value is Int32)
-                    p.SetValue(this, Int32.Parse((string)map[p.Name]), null);
-                else if (value is UInt32)
-                    p.SetValue(this, UInt32.Parse((string)map[p.Name]), null);
-                else if (value is Boolean)
-                    p.SetValue(this, Boolean.Parse((string)map[p.Name]), null);
-                else if (value is UUID)
-                    p.SetValue(this, UUID.Parse((string)map[p.Name]), null);
-            }
+            return m_bannedHostIPMask;
         }
-
-
-        /// <summary>
-        ///  For debugging
-        /// </summary>
-        /// <returns></returns>
-        public override string ToString()
+        set
         {
-            Dictionary<string, object> map = ToMap();
-            string result = string.Empty;
-            foreach (KeyValuePair<string, object> kvp in map)
-                result += string.Format("{0}: {1} {2}", kvp.Key, kvp.Value, Environment.NewLine);
-
-            return result;
+            m_bannedHostIPMask = value;
         }
+    }
+
+    private string m_bannedHostNameMask = string.Empty;
+    /// <summary>
+    /// Domain name mask for banning group of client hosts.
+    /// </summary>
+    public string BannedHostNameMask
+    {
+        get
+        {
+            return m_bannedHostNameMask;
+        }
+        set
+        {
+            m_bannedHostNameMask = value;
+        }
+    }
+
+    public EstateBan() { }
+
+    public Dictionary<string, object> ToMap()
+    {
+        Dictionary<string, object> map = new Dictionary<string, object>();
+        PropertyInfo[] properties = this.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
+        foreach (PropertyInfo p in properties)
+            map[p.Name] = p.GetValue(this, null);
+
+        return map;
+    }
+
+    public EstateBan(Dictionary<string, object> map)
+    {
+        foreach (KeyValuePair<string, object> kvp in map)
+        {
+            PropertyInfo p = this.GetType().GetProperty(kvp.Key, BindingFlags.Public | BindingFlags.Instance);
+            if (p == null)
+                continue;
+            object value = p.GetValue(this, null);
+            if (value is String)
+                p.SetValue(this, map[p.Name], null);
+            else if (value is Int32)
+                p.SetValue(this, Int32.Parse((string)map[p.Name]), null);
+            else if (value is UInt32)
+                p.SetValue(this, UInt32.Parse((string)map[p.Name]), null);
+            else if (value is Boolean)
+                p.SetValue(this, Boolean.Parse((string)map[p.Name]), null);
+            else if (value is UUID)
+                p.SetValue(this, UUID.Parse((string)map[p.Name]), null);
+        }
+    }
+
+
+    /// <summary>
+    ///  For debugging
+    /// </summary>
+    /// <returns></returns>
+    public override string ToString()
+    {
+        Dictionary<string, object> map = ToMap();
+        string result = string.Empty;
+        foreach (KeyValuePair<string, object> kvp in map)
+            result += string.Format("{0}: {1} {2}", kvp.Key, kvp.Value, Environment.NewLine);
+
+        return result;
     }
 }

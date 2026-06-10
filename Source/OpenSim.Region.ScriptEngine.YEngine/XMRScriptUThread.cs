@@ -25,80 +25,73 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenSim.Framework;
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Threading;
+namespace OpenSim.Region.ScriptEngine.Yengine;
 
-namespace OpenSim.Region.ScriptEngine.Yengine
+
+public partial class XMRInstance
 {
-
-    public partial class XMRInstance
+    /**
+    * @brief Start script event handler from the beginning.
+    *        Return when either the script event handler completes
+    *        or the script calls Hiber().
+    * @returns null: script did not throw any exception so far
+    *          else: script threw an exception
+    */
+    public Exception StartEx()
     {
-        /**
-        * @brief Start script event handler from the beginning.
-        *        Return when either the script event handler completes
-        *        or the script calls Hiber().
-        * @returns null: script did not throw any exception so far
-        *          else: script threw an exception
-        */
-        public Exception StartEx()
+        // Start script event handler from very beginning.
+        callMode = XMRInstance.CallMode_NORMAL;
+        try
         {
-            // Start script event handler from very beginning.
-            callMode = XMRInstance.CallMode_NORMAL;
-            try
-            {
-                CallSEH();                 // run script event handler
-            }
-            catch(StackHibernateException)
-            {
-                if(callMode != XMRInstance.CallMode_SAVE)
-                    throw new Exception("callMode=" + callMode);
-            }
-            catch(Exception e)
-            {
-                return e;
-            }
-
-            return null;
+            CallSEH();                 // run script event handler
+        }
+        catch(StackHibernateException)
+        {
+            if(callMode != XMRInstance.CallMode_SAVE)
+                throw new Exception("callMode=" + callMode);
+        }
+        catch(Exception e)
+        {
+            return e;
         }
 
-        /**
-         * @brief We now want to run some more script code from where it last hibernated
-         *        until it either finishes the script event handler or until the script
-         *        calls Hiber() again.
-         */
-        public Exception ResumeEx()
+        return null;
+    }
+
+    /**
+     * @brief We now want to run some more script code from where it last hibernated
+     *        until it either finishes the script event handler or until the script
+     *        calls Hiber() again.
+     */
+    public Exception ResumeEx()
+    {
+        // Resume script from captured stack.
+        if (stackFrames is null)
         {
-            // Resume script from captured stack.
-            if (stackFrames is null)
-            {
-                m_log.Error($"ResumeEx: eventcode: None, stackFrame is null");
-                throw new Exception("ResumeEx: stackFrame is null");
-            }
-
-            callMode = XMRInstance.CallMode_RESTORE;
-            suspendOnCheckRunTemp = true;
-            try
-            {
-                CallSEH();                 // run script event handler
-            }
-            catch(StackHibernateException)
-            {
-                if(callMode != XMRInstance.CallMode_SAVE)
-                    throw new Exception("callMode=" + callMode);
-            }
-            catch (Exception e)
-            {
-                return e;
-            }
-
-            return null;
+            m_log.Error($"ResumeEx: eventcode: None, stackFrame is null");
+            throw new Exception("ResumeEx: stackFrame is null");
         }
 
-        public class StackHibernateException: Exception, IXMRUncatchable
+        callMode = XMRInstance.CallMode_RESTORE;
+        suspendOnCheckRunTemp = true;
+        try
         {
+            CallSEH();                 // run script event handler
         }
+        catch(StackHibernateException)
+        {
+            if(callMode != XMRInstance.CallMode_SAVE)
+                throw new Exception("callMode=" + callMode);
+        }
+        catch (Exception e)
+        {
+            return e;
+        }
+
+        return null;
+    }
+
+    public class StackHibernateException: Exception, IXMRUncatchable
+    {
     }
 }

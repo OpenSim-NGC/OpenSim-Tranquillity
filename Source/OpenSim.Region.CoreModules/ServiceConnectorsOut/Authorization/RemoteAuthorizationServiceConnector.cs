@@ -34,134 +34,133 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization;
+
+public class RemoteAuthorizationServicesConnector :
+        AuthorizationServicesConnector, ISharedRegionModule, IAuthorizationService
 {
-    public class RemoteAuthorizationServicesConnector :
-            AuthorizationServicesConnector, ISharedRegionModule, IAuthorizationService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private bool m_Enabled = false;
+    private List<Scene> m_scenes = new List<Scene>();
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        private bool m_Enabled = false;
-        private List<Scene> m_scenes = new List<Scene>();
+    public string Name
+    {
+        get { return "RemoteAuthorizationServicesConnector"; }
+    }
 
-        public Type ReplaceableInterface
+    public override void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "RemoteAuthorizationServicesConnector"; }
-        }
-
-        public override void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("AuthorizationServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("AuthorizationServices", "");
-                if (name == Name)
+                IConfig authorizationConfig = source.Configs["AuthorizationService"];
+                if (authorizationConfig == null)
                 {
-                    IConfig authorizationConfig = source.Configs["AuthorizationService"];
-                    if (authorizationConfig == null)
-                    {
-                        m_log.Info("[REMOTE AUTHORIZATION CONNECTOR]: AuthorizationService missing from OpenSim.ini");
-                        return;
-                    }
+                    m_log.Info("[REMOTE AUTHORIZATION CONNECTOR]: AuthorizationService missing from OpenSim.ini");
+                    return;
+                }
 
-                    m_Enabled = true;
+                m_Enabled = true;
 
-                    base.Initialise(source);
+                base.Initialise(source);
 
-                    m_log.Info("[REMOTE AUTHORIZATION CONNECTOR]: Remote authorization enabled");
+                m_log.Info("[REMOTE AUTHORIZATION CONNECTOR]: Remote authorization enabled");
+            }
+        }
+    }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        if (!m_scenes.Contains(scene))
+        {
+            m_scenes.Add(scene);
+            scene.RegisterModuleInterface<IAuthorizationService>(this);
+        }
+
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_log.InfoFormat("[REMOTE AUTHORIZATION CONNECTOR]: Enabled remote authorization for region {0}", scene.RegionInfo.RegionName);
+
+    }
+
+    public bool IsAuthorizedForRegion(
+         string userID, string firstName, string lastName, string regionID, out string message)
+    {
+        m_log.InfoFormat(
+            "[REMOTE AUTHORIZATION CONNECTOR]: IsAuthorizedForRegion checking {0} for region {1}", userID, regionID);
+
+        bool isAuthorized = true;
+        message = String.Empty;
+
+        // get the scene this call is being made for
+        Scene scene = null;
+        lock (m_scenes)
+        {
+            foreach (Scene nextScene in m_scenes)
+            {
+                if (nextScene.RegionInfo.RegionID.ToString() == regionID)
+                {
+                    scene = nextScene;
                 }
             }
         }
 
-        public void PostInitialise()
+        if (scene != null)
         {
-        }
+            string mail = String.Empty;
 
-        public void Close()
-        {
-        }
+            UserAccount account = scene.UserAccountService.GetUserAccount(UUID.Zero, new UUID(userID));
 
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            if (!m_scenes.Contains(scene))
+            //if account not found, we assume its a foreign visitor from HG, else use account data...
+            if (account != null)
             {
-                m_scenes.Add(scene);
-                scene.RegisterModuleInterface<IAuthorizationService>(this);
+                mail = account.Email;
+                firstName = account.FirstName;
+                lastName = account.LastName;
             }
 
+            isAuthorized
+                = IsAuthorizedForRegion(
+                    userID, firstName, lastName, mail, scene.RegionInfo.RegionName, regionID, out message);
         }
-
-        public void RemoveRegion(Scene scene)
+        else
         {
+            m_log.ErrorFormat(
+                "[REMOTE AUTHORIZATION CONNECTOR] IsAuthorizedForRegion, can't find scene to match region id of {0}",
+                regionID);
         }
 
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_log.InfoFormat("[REMOTE AUTHORIZATION CONNECTOR]: Enabled remote authorization for region {0}", scene.RegionInfo.RegionName);
-
-        }
-
-        public bool IsAuthorizedForRegion(
-             string userID, string firstName, string lastName, string regionID, out string message)
-        {
-            m_log.InfoFormat(
-                "[REMOTE AUTHORIZATION CONNECTOR]: IsAuthorizedForRegion checking {0} for region {1}", userID, regionID);
-
-            bool isAuthorized = true;
-            message = String.Empty;
-
-            // get the scene this call is being made for
-            Scene scene = null;
-            lock (m_scenes)
-            {
-                foreach (Scene nextScene in m_scenes)
-                {
-                    if (nextScene.RegionInfo.RegionID.ToString() == regionID)
-                    {
-                        scene = nextScene;
-                    }
-                }
-            }
-
-            if (scene != null)
-            {
-                string mail = String.Empty;
-
-                UserAccount account = scene.UserAccountService.GetUserAccount(UUID.Zero, new UUID(userID));
-
-                //if account not found, we assume its a foreign visitor from HG, else use account data...
-                if (account != null)
-                {
-                    mail = account.Email;
-                    firstName = account.FirstName;
-                    lastName = account.LastName;
-                }
-
-                isAuthorized
-                    = IsAuthorizedForRegion(
-                        userID, firstName, lastName, mail, scene.RegionInfo.RegionName, regionID, out message);
-            }
-            else
-            {
-                m_log.ErrorFormat(
-                    "[REMOTE AUTHORIZATION CONNECTOR] IsAuthorizedForRegion, can't find scene to match region id of {0}",
-                    regionID);
-            }
-
-            return isAuthorized;
-        }
+        return isAuthorized;
     }
 }

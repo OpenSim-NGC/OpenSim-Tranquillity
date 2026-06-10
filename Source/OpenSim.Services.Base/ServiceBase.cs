@@ -25,93 +25,89 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
-using System.Collections.Generic;
 using System.Reflection;
 using log4net;
 using Nini.Config;
 
-namespace OpenSim.Services.Base
+namespace OpenSim.Services.Base;
+
+public class ServiceBase
 {
-    public class ServiceBase
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    public T LoadPlugin<T>(string dllName) where T:class
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        return LoadPlugin<T>(dllName, new Object[0]);
+    }
 
-        public T LoadPlugin<T>(string dllName) where T:class
+    public T LoadPlugin<T>(string dllName, Object[] args) where T:class
+    {
+        // The path:type separator : is unfortunate because it collides
+        // with Windows paths like C:\...
+        // When the path provided includes the drive, this fails.
+        // Hence the root/noroot thing going on here.
+        string pathRoot = Path.GetPathRoot(dllName);
+        string noRoot = dllName.Substring(pathRoot.Length);
+        string[] parts = noRoot.Split(new char[] {':'});
+
+
+        dllName = pathRoot + parts[0];
+
+        string className = string.Empty;
+
+        if (parts.Length > 1)
+            className = parts[1];
+
+        return LoadPlugin<T>(dllName, className, args);
+    }
+
+    public T LoadPlugin<T>(string dllName, string className, Object[] args) where T:class
+    {
+        string interfaceName = typeof(T).ToString();
+
+        try
         {
-            return LoadPlugin<T>(dllName, new Object[0]);
-        }
+            Assembly pluginAssembly = Assembly.LoadFrom(dllName);
 
-        public T LoadPlugin<T>(string dllName, Object[] args) where T:class
-        {
-            // The path:type separator : is unfortunate because it collides
-            // with Windows paths like C:\...
-            // When the path provided includes the drive, this fails.
-            // Hence the root/noroot thing going on here.
-            string pathRoot = Path.GetPathRoot(dllName);
-            string noRoot = dllName.Substring(pathRoot.Length);
-            string[] parts = noRoot.Split(new char[] {':'});
+            //m_log.DebugFormat("[SERVICE BASE]: Found assembly {0}", dllName);
 
-
-            dllName = pathRoot + parts[0];
-
-            string className = string.Empty;
-
-            if (parts.Length > 1)
-                className = parts[1];
-
-            return LoadPlugin<T>(dllName, className, args);
-        }
-
-        public T LoadPlugin<T>(string dllName, string className, Object[] args) where T:class
-        {
-            string interfaceName = typeof(T).ToString();
-
-            try
+            foreach (Type pluginType in pluginAssembly.GetTypes())
             {
-                Assembly pluginAssembly = Assembly.LoadFrom(dllName);
+                //m_log.DebugFormat("[SERVICE BASE]: Found type {0}", pluginType);
 
-                //m_log.DebugFormat("[SERVICE BASE]: Found assembly {0}", dllName);
-
-                foreach (Type pluginType in pluginAssembly.GetTypes())
+                if (pluginType.IsPublic)
                 {
-                    //m_log.DebugFormat("[SERVICE BASE]: Found type {0}", pluginType);
+                    if (!string.IsNullOrEmpty(className) &&
+                            pluginType.ToString() != pluginType.Namespace + "." + className)
+                        continue;
 
-                    if (pluginType.IsPublic)
+                    Type typeInterface = pluginType.GetInterface(interfaceName);
+                    if (typeInterface is not null)
                     {
-                        if (!string.IsNullOrEmpty(className) &&
-                                pluginType.ToString() != pluginType.Namespace + "." + className)
-                            continue;
-
-                        Type typeInterface = pluginType.GetInterface(interfaceName);
-                        if (typeInterface is not null)
-                        {
-                            return (T)Activator.CreateInstance(pluginType, args);
-                        }
+                        return (T)Activator.CreateInstance(pluginType, args);
                     }
                 }
-
-                return null;
             }
-            catch (Exception e)
-            {
-                List<string> strArgs = new List<string>();
-                foreach (Object arg in args)
-                    strArgs.Add(arg.ToString());
 
-                m_log.ErrorFormat(
-                        "[SERVICE BASE]: Failed to load plugin {0} from {1} with args {2}",
-                        interfaceName, dllName, string.Join(", ", strArgs.ToArray()), e);
-                if (e.InnerException != null)
-                    m_log.Error($"[SERVICE BASE]: inner exception {e.InnerException.Message}");
-
-                return null;
-            }
+            return null;
         }
-
-        public ServiceBase(IConfigSource config)
+        catch (Exception e)
         {
+            List<string> strArgs = new List<string>();
+            foreach (Object arg in args)
+                strArgs.Add(arg.ToString());
+
+            m_log.ErrorFormat(
+                    "[SERVICE BASE]: Failed to load plugin {0} from {1} with args {2}",
+                    interfaceName, dllName, string.Join(", ", strArgs.ToArray()), e);
+            if (e.InnerException != null)
+                m_log.Error($"[SERVICE BASE]: inner exception {e.InnerException.Message}");
+
+            return null;
         }
+    }
+
+    public ServiceBase(IConfigSource config)
+    {
     }
 }

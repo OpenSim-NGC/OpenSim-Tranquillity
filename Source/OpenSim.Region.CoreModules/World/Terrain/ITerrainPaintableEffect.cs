@@ -27,11 +27,10 @@
 
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain
+namespace OpenSim.Region.CoreModules.World.Terrain;
+
+public interface ITerrainPaintableEffect
 {
-    public interface ITerrainPaintableEffect
-    {
-        void PaintEffect(ITerrainChannel map, bool[,] allowMask, float x, float y, float z,
-            float strength, float duration, int startX, int endX, int startY, int endY);
-    }
+    void PaintEffect(ITerrainChannel map, bool[,] allowMask, float x, float y, float z,
+        float strength, float duration, int startX, int endX, int startY, int endY);
 }

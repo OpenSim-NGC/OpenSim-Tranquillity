@@ -33,81 +33,80 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication;
+
+public class RemoteAuthenticationServicesConnector : AuthenticationServicesConnector,
+        ISharedRegionModule, IAuthenticationService
 {
-    public class RemoteAuthenticationServicesConnector : AuthenticationServicesConnector,
-            ISharedRegionModule, IAuthenticationService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private bool m_Enabled = false;
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        private bool m_Enabled = false;
+    public string Name
+    {
+        get { return "RemoteAuthenticationServicesConnector"; }
+    }
 
-        public Type ReplaceableInterface
+    public override void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "RemoteAuthenticationServicesConnector"; }
-        }
-
-        public override void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("AuthenticationServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("AuthenticationServices", "");
-                if (name == Name)
+                IConfig userConfig = source.Configs["AuthenticationService"];
+                if (userConfig == null)
                 {
-                    IConfig userConfig = source.Configs["AuthenticationService"];
-                    if (userConfig == null)
-                    {
-                        m_log.Error("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    m_Enabled = true;
-
-                    base.Initialise(source);
-
-                    m_log.Info("[AUTH CONNECTOR]: Remote Authentication enabled");
+                    m_log.Error("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
+                    return;
                 }
+
+                m_Enabled = true;
+
+                base.Initialise(source);
+
+                m_log.Info("[AUTH CONNECTOR]: Remote Authentication enabled");
             }
         }
+    }
 
-        public void PostInitialise()
-        {
-            if (!m_Enabled)
-                return;
-        }
+    public void PostInitialise()
+    {
+        if (!m_Enabled)
+            return;
+    }
 
-        public void Close()
-        {
-            if (!m_Enabled)
-                return;
-        }
+    public void Close()
+    {
+        if (!m_Enabled)
+            return;
+    }
 
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
 
-            scene.RegisterModuleInterface<IAuthenticationService>(this);
-        }
+        scene.RegisterModuleInterface<IAuthenticationService>(this);
+    }
 
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
 
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
     }
 }

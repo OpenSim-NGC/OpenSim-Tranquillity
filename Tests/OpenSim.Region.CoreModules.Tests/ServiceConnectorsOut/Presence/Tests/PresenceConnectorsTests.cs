@@ -25,20 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenMetaverse;
-using Xunit;
-
-using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence.Tests
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence.Tests;
+
+/// <summary>
+/// Disabled pending conversion from NUnit to xUnit.
+/// This test class requires significant manual work to convert NUnit-specific patterns.
+/// </summary>
+public class PresenceConnectorsTests : OpenSimTestCase
 {
-    /// <summary>
-    /// Disabled pending conversion from NUnit to xUnit.
-    /// This test class requires significant manual work to convert NUnit-specific patterns.
-    /// </summary>
-    public class PresenceConnectorsTests : OpenSimTestCase
-    {
-        // Placeholder for disabled tests
-    }
+    // Placeholder for disabled tests
 }

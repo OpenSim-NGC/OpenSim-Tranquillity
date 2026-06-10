@@ -25,68 +25,65 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Threading;
-using System.Collections.Generic;
-using System.Text;
 using System.Xml;
 using Nini.Config;
 
-namespace OpenSim.Framework.Console
+namespace OpenSim.Framework.Console;
+
+/// <summary>
+/// This is a Fake console that's used when setting up the Scene in Unit Tests
+/// Don't use this except for Unit Testing or you're in for a world of hurt when the
+/// sim gets to ReadLine
+/// </summary>
+public class MockConsole : ICommandConsole
 {
-    /// <summary>
-    /// This is a Fake console that's used when setting up the Scene in Unit Tests
-    /// Don't use this except for Unit Testing or you're in for a world of hurt when the
-    /// sim gets to ReadLine
-    /// </summary>
-    public class MockConsole : ICommandConsole
-    {
 #pragma warning disable 0067
-        public event OnOutputDelegate OnOutput;
+    public event OnOutputDelegate OnOutput;
 #pragma warning restore 0067
 
-        private MockCommands m_commands = new MockCommands();
+    private MockCommands m_commands = new MockCommands();
 
-        public ICommands Commands { get { return m_commands; } }
+    public ICommands Commands { get { return m_commands; } }
 
-        public string DefaultPrompt { get; set; }
+    public string DefaultPrompt { get; set; }
 
-        public void Prompt() {}
+    public void Prompt() {}
 
-        public void RunCommand(string cmd) {}
+    public void RunCommand(string cmd) {}
 
-        public string ReadLine(string p, bool isCommand, bool e) { return ""; }
+    public string ReadLine(string p, bool isCommand, bool e) { return ""; }
 
-        public IScene ConsoleScene {
-            get { return null; }
-            set {}
-        }
+    public void WriteLine(string s) { }
 
-        public void Output(string format) { }
-        public void Output(string format, params object[] components) { }
-
-        public string Prompt(string p) { return ""; }
-        public string Prompt(string p, string def) { return ""; }
-        public string Prompt(string p, List<char> excludedCharacters) { return ""; }
-        public string Prompt(string p, string def, List<char> excludedCharacters, bool echo) { return ""; }
-
-        public string Prompt(string prompt, string defaultresponse, List<string> options) { return ""; }
-
-        public string PasswdPrompt(string p) { return ""; }
-
-        public void ReadConfig(IConfigSource configSource) { }
-        public void SetCntrCHandler(OnCntrCCelegate handler) { }
+    public IScene ConsoleScene {
+        get { return null; }
+        set {}
     }
 
-    public class MockCommands : ICommands
-    {
-        public void FromXml(XmlElement root, CommandDelegate fn) {}
-        public List<string> GetHelp(string[] cmd) { return null; }
-        public void AddCommand(string module, bool shared, string command, string help, string longhelp, CommandDelegate fn) {}
-        public void AddCommand(string module, bool shared, string command, string help, string longhelp, string descriptivehelp, CommandDelegate fn) {}
-        public string[] FindNextOption(string[] cmd, bool term) { return null; }
-        public bool HasCommand(string cmd) { return false; }
-        public string[] Resolve(string[] cmd) { return null; }
-        public XmlElement GetXml(XmlDocument doc) { return null; }
-    }
+    public void Output(string format) { }
+    public void Output(string format, params object[] components) { }
+
+    public string Prompt(string p) { return ""; }
+    public string Prompt(string p, string def) { return ""; }
+    public string Prompt(string p, List<char> excludedCharacters) { return ""; }
+    public string Prompt(string p, string def, List<char> excludedCharacters, bool echo) { return ""; }
+
+    public string Prompt(string prompt, string defaultresponse, List<string> options) { return ""; }
+
+    public string PasswdPrompt(string p) { return ""; }
+
+    public void ReadConfig(IConfigSource configSource) { }
+    public void SetCntrCHandler(OnCntrCCelegate handler) { }
+}
+
+public class MockCommands : ICommands
+{
+    public void FromXml(XmlElement root, CommandDelegate fn) {}
+    public List<string> GetHelp(string[] cmd) { return null; }
+    public void AddCommand(string module, bool shared, string command, string help, string longhelp, CommandDelegate fn) {}
+    public void AddCommand(string module, bool shared, string command, string help, string longhelp, string descriptivehelp, CommandDelegate fn) {}
+    public string[] FindNextOption(string[] cmd, bool term) { return null; }
+    public bool HasCommand(string cmd) { return false; }
+    public string[] Resolve(string[] cmd) { return null; }
+    public XmlElement GetXml(XmlDocument doc) { return null; }
 }

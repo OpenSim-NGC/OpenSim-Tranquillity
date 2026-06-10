@@ -25,32 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Data;
 using OpenMetaverse;
-using OpenSim.Framework;
-using Npgsql;
 
-namespace OpenSim.Data.PGSQL
+namespace OpenSim.Data.PGSQL;
+
+public class PGSQLAgentPreferencesData : PGSQLGenericTableHandler<AgentPreferencesData>, IAgentPreferencesData
 {
-    public class PGSQLAgentPreferencesData : PGSQLGenericTableHandler<AgentPreferencesData>, IAgentPreferencesData
+    public PGSQLAgentPreferencesData(string connectionString, string realm)
+        : base(connectionString, realm, "AgentPrefs")
     {
-        public PGSQLAgentPreferencesData(string connectionString, string realm)
-            : base(connectionString, realm, "AgentPrefs")
-        {
-        }
-
-        public AgentPreferencesData GetPrefs(UUID agentID)
-        {
-
-            AgentPreferencesData[] ret = Get("PrincipalID", agentID.ToString());
-
-            if (ret.Length == 0)
-                return null;
-            return ret[0];
-        }
-
     }
+
+    public AgentPreferencesData GetPrefs(UUID agentID)
+    {
+
+        AgentPreferencesData[] ret = Get("PrincipalID", agentID.ToString());
+
+        if (ret.Length == 0)
+            return null;
+        return ret[0];
+    }
+
 }

@@ -25,20 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-
 using OpenSim.Framework;
 using OpenMetaverse;
 
-namespace OpenSim.Services.Interfaces
-{
-    public interface ILibraryService
-    {
-        InventoryFolderImpl LibraryRootFolder { get; }
+namespace OpenSim.Services.Interfaces;
 
-        Dictionary<UUID, InventoryFolderImpl> GetAllFolders();
-        InventoryItemBase GetItem(UUID itemID);
-        InventoryItemBase[] GetMultipleItems(UUID[] itemIDs);
-    }
+public interface ILibraryService
+{
+    InventoryFolderImpl LibraryRootFolder { get; }
+
+    Dictionary<UUID, InventoryFolderImpl> GetAllFolders();
+    InventoryItemBase GetItem(UUID itemID);
+    InventoryItemBase[] GetMultipleItems(UUID[] itemIDs);
 }

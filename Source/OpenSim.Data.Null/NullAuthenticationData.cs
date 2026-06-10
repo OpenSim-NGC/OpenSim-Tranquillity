@@ -25,50 +25,44 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
-using OpenSim.Data;
 
-namespace OpenSim.Data.Null
+namespace OpenSim.Data.Null;
+
+public class NullAuthenticationData : IAuthenticationData
 {
-    public class NullAuthenticationData : IAuthenticationData
+    private static Dictionary<UUID, AuthenticationData> m_DataByUUID = new Dictionary<UUID, AuthenticationData>();
+    private static Dictionary<UUID, string> m_Tokens = new Dictionary<UUID, string>();
+
+    public NullAuthenticationData(string connectionString, string realm)
     {
-        private static Dictionary<UUID, AuthenticationData> m_DataByUUID = new Dictionary<UUID, AuthenticationData>();
-        private static Dictionary<UUID, string> m_Tokens = new Dictionary<UUID, string>();
+    }
 
-        public NullAuthenticationData(string connectionString, string realm)
-        {
-        }
+    public AuthenticationData Get(UUID principalID)
+    {
+         return m_DataByUUID.TryGetValue(principalID, out AuthenticationData ad) ? ad :null;
+    }
 
-        public AuthenticationData Get(UUID principalID)
-        {
-             return m_DataByUUID.TryGetValue(principalID, out AuthenticationData ad) ? ad :null;
-        }
+    public bool Store(AuthenticationData data)
+    {
+        m_DataByUUID[data.PrincipalID] = data;
+        return true;
+    }
 
-        public bool Store(AuthenticationData data)
-        {
-            m_DataByUUID[data.PrincipalID] = data;
-            return true;
-        }
+    public bool SetDataItem(UUID principalID, string item, string value)
+    {
+        // Not implemented
+        return false;
+    }
 
-        public bool SetDataItem(UUID principalID, string item, string value)
-        {
-            // Not implemented
-            return false;
-        }
+    public bool SetToken(UUID principalID, string token, int lifetime)
+    {
+        m_Tokens[principalID] = token;
+        return true;
+    }
 
-        public bool SetToken(UUID principalID, string token, int lifetime)
-        {
-            m_Tokens[principalID] = token;
-            return true;
-        }
-
-        public bool CheckToken(UUID principalID, string token, int lifetime)
-        {
-            return m_Tokens.TryGetValue(principalID, out string tk) ? tk == token : false;
-        }
+    public bool CheckToken(UUID principalID, string token, int lifetime)
+    {
+        return m_Tokens.TryGetValue(principalID, out string tk) ? tk == token : false;
     }
 }

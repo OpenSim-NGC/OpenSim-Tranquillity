@@ -24,100 +24,96 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Collections.Generic;
-
 using OpenSim.Framework;
 using OpenMetaverse;
 
-namespace OpenSim.Services.Interfaces
+namespace OpenSim.Services.Interfaces;
+
+public interface IOfflineIMService
 {
-    public interface IOfflineIMService
+    List<GridInstantMessage> GetMessages(UUID principalID);
+
+    bool StoreMessage(GridInstantMessage im, out string reason);
+
+    /// <summary>
+    /// Delete messages to or from this user (or group).
+    /// </summary>
+    /// <param name="userID">A user or group ID</param>
+    void DeleteMessages(UUID userID);
+}
+
+public class OfflineIMDataUtils
+{
+    public static GridInstantMessage GridInstantMessage(Dictionary<string, object> dict)
     {
-        List<GridInstantMessage> GetMessages(UUID principalID);
+        GridInstantMessage im = new GridInstantMessage();
+        object otmp;
 
-        bool StoreMessage(GridInstantMessage im, out string reason);
+        if (dict.TryGetValue("BinaryBucket", out otmp) && otmp is string bbs)
+            im.binaryBucket = OpenMetaverse.Utils.HexStringToBytes(bbs, true);
 
-        /// <summary>
-        /// Delete messages to or from this user (or group).
-        /// </summary>
-        /// <param name="userID">A user or group ID</param>
-        void DeleteMessages(UUID userID);
+        if (dict.TryGetValue("Dialog", out otmp) && otmp is string ds)
+            im.dialog = byte.Parse(ds);
+
+        if (dict.TryGetValue("FromAgentID", out otmp) && otmp is string faid)
+            im.fromAgentID = new Guid(faid);
+
+        if (dict.TryGetValue("FromAgentName", out otmp) && otmp is string fan)
+            im.fromAgentName = fan;
+        else
+            im.fromAgentName = string.Empty;
+
+        if (dict.TryGetValue("FromGroup", out otmp) && otmp is string fg)
+            im.fromGroup = bool.Parse(fg);
+
+        if (dict.TryGetValue("SessionID", out otmp) && otmp is string sid)
+            im.imSessionID = new Guid(sid);
+
+        if (dict.TryGetValue("Message", out otmp) && otmp is string msg)
+            im.message = msg;
+        else
+            im.message = string.Empty;
+
+        if (dict.TryGetValue("Offline", out otmp) && otmp is string off)
+            im.offline = byte.Parse(off);
+
+        if (dict.TryGetValue("EstateID", out otmp) && otmp is string eid)
+            im.ParentEstateID = UInt32.Parse(eid);
+
+        if (dict.TryGetValue("Position", out otmp) && otmp is string vpos)
+            im.Position = Vector3.Parse(vpos);
+
+        if (dict.TryGetValue("RegionID", out otmp) && otmp is string rid)
+            im.RegionID = new Guid(rid);
+
+        if (dict.TryGetValue("Timestamp", out otmp) && otmp is string ts)
+            im.timestamp = UInt32.Parse(ts);
+
+        if (dict.TryGetValue("ToAgentID", out otmp) && otmp is string tid)
+            im.toAgentID = new Guid(tid);
+
+        return im;
     }
 
-    public class OfflineIMDataUtils
+    public static Dictionary<string, object> GridInstantMessage(GridInstantMessage im)
     {
-        public static GridInstantMessage GridInstantMessage(Dictionary<string, object> dict)
-        {
-            GridInstantMessage im = new GridInstantMessage();
-            object otmp;
+        Dictionary<string, object> dict = new Dictionary<string, object>();
 
-            if (dict.TryGetValue("BinaryBucket", out otmp) && otmp is string bbs)
-                im.binaryBucket = OpenMetaverse.Utils.HexStringToBytes(bbs, true);
+        dict["BinaryBucket"] = OpenMetaverse.Utils.BytesToHexString(im.binaryBucket, im.binaryBucket.Length, null);
+        dict["Dialog"] = im.dialog.ToString();
+        dict["FromAgentID"] = im.fromAgentID.ToString();
+        dict["FromAgentName"] = im.fromAgentName == null ? string.Empty : im.fromAgentName;
+        dict["FromGroup"] = im.fromGroup.ToString();
+        dict["SessionID"] = im.imSessionID.ToString();
+        dict["Message"] = im.message == null ? string.Empty : im.message;
+        dict["Offline"] = im.offline.ToString();
+        dict["EstateID"] = im.ParentEstateID.ToString();
+        dict["Position"] = im.Position.ToString();
+        dict["RegionID"] = im.RegionID.ToString();
+        dict["Timestamp"] = im.timestamp.ToString();
+        dict["ToAgentID"] = im.toAgentID.ToString();
 
-            if (dict.TryGetValue("Dialog", out otmp) && otmp is string ds)
-                im.dialog = byte.Parse(ds);
-
-            if (dict.TryGetValue("FromAgentID", out otmp) && otmp is string faid)
-                im.fromAgentID = new Guid(faid);
-
-            if (dict.TryGetValue("FromAgentName", out otmp) && otmp is string fan)
-                im.fromAgentName = fan;
-            else
-                im.fromAgentName = string.Empty;
-
-            if (dict.TryGetValue("FromGroup", out otmp) && otmp is string fg)
-                im.fromGroup = bool.Parse(fg);
-
-            if (dict.TryGetValue("SessionID", out otmp) && otmp is string sid)
-                im.imSessionID = new Guid(sid);
-
-            if (dict.TryGetValue("Message", out otmp) && otmp is string msg)
-                im.message = msg;
-            else
-                im.message = string.Empty;
-
-            if (dict.TryGetValue("Offline", out otmp) && otmp is string off)
-                im.offline = byte.Parse(off);
-
-            if (dict.TryGetValue("EstateID", out otmp) && otmp is string eid)
-                im.ParentEstateID = UInt32.Parse(eid);
-
-            if (dict.TryGetValue("Position", out otmp) && otmp is string vpos)
-                im.Position = Vector3.Parse(vpos);
-
-            if (dict.TryGetValue("RegionID", out otmp) && otmp is string rid)
-                im.RegionID = new Guid(rid);
-
-            if (dict.TryGetValue("Timestamp", out otmp) && otmp is string ts)
-                im.timestamp = UInt32.Parse(ts);
-
-            if (dict.TryGetValue("ToAgentID", out otmp) && otmp is string tid)
-                im.toAgentID = new Guid(tid);
-
-            return im;
-        }
-
-        public static Dictionary<string, object> GridInstantMessage(GridInstantMessage im)
-        {
-            Dictionary<string, object> dict = new Dictionary<string, object>();
-
-            dict["BinaryBucket"] = OpenMetaverse.Utils.BytesToHexString(im.binaryBucket, im.binaryBucket.Length, null);
-            dict["Dialog"] = im.dialog.ToString();
-            dict["FromAgentID"] = im.fromAgentID.ToString();
-            dict["FromAgentName"] = im.fromAgentName == null ? string.Empty : im.fromAgentName;
-            dict["FromGroup"] = im.fromGroup.ToString();
-            dict["SessionID"] = im.imSessionID.ToString();
-            dict["Message"] = im.message == null ? string.Empty : im.message;
-            dict["Offline"] = im.offline.ToString();
-            dict["EstateID"] = im.ParentEstateID.ToString();
-            dict["Position"] = im.Position.ToString();
-            dict["RegionID"] = im.RegionID.ToString();
-            dict["Timestamp"] = im.timestamp.ToString();
-            dict["ToAgentID"] = im.toAgentID.ToString();
-
-            return dict;
-        }
-
+        return dict;
     }
+
 }

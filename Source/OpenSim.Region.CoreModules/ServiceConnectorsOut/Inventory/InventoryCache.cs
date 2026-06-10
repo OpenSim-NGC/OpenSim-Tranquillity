@@ -28,108 +28,107 @@
 using OpenSim.Framework;
 using OpenMetaverse;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory;
+
+/// <summary>
+/// Cache root and system inventory folders to reduce number of potentially remote inventory calls and associated holdups.
+/// </summary>
+public class InventoryCache
 {
-    /// <summary>
-    /// Cache root and system inventory folders to reduce number of potentially remote inventory calls and associated holdups.
-    /// </summary>
-    public class InventoryCache
+    private const int CACHE_EXPIRATION = 60000; // 1 minute
+
+    private static ExpiringCacheOS<UUID, InventoryFolderBase> m_RootFolders = new ExpiringCacheOS<UUID, InventoryFolderBase>();
+    private static ExpiringCacheOS<UUID, Dictionary<FolderType, InventoryFolderBase>> m_FolderTypes = new ExpiringCacheOS<UUID, Dictionary<FolderType, InventoryFolderBase>>();
+    private static ExpiringCacheOS<UUID, InventoryCollection> m_Inventories = new ExpiringCacheOS<UUID, InventoryCollection>();
+
+    public void RemoveAll(UUID userID)
     {
-        private const int CACHE_EXPIRATION = 60000; // 1 minute
+        m_RootFolders.Remove(userID);
+        m_FolderTypes.Remove(userID);
+        m_Inventories.Remove(userID);
+    }
 
-        private static ExpiringCacheOS<UUID, InventoryFolderBase> m_RootFolders = new ExpiringCacheOS<UUID, InventoryFolderBase>();
-        private static ExpiringCacheOS<UUID, Dictionary<FolderType, InventoryFolderBase>> m_FolderTypes = new ExpiringCacheOS<UUID, Dictionary<FolderType, InventoryFolderBase>>();
-        private static ExpiringCacheOS<UUID, InventoryCollection> m_Inventories = new ExpiringCacheOS<UUID, InventoryCollection>();
+    public void Cache(UUID userID, InventoryFolderBase root)
+    {
+        m_RootFolders.AddOrUpdate(userID, root, CACHE_EXPIRATION);
+    }
 
-        public void RemoveAll(UUID userID)
+    public InventoryFolderBase GetRootFolder(UUID userID)
+    {
+        if (m_RootFolders.TryGetValue(userID, out InventoryFolderBase root))
+            return root;
+
+        return null;
+    }
+
+    public void Cache(UUID userID, FolderType type, InventoryFolderBase folder)
+    {
+        if (!m_FolderTypes.TryGetValue(userID, out Dictionary<FolderType, InventoryFolderBase> ff))
         {
-            m_RootFolders.Remove(userID);
-            m_FolderTypes.Remove(userID);
-            m_Inventories.Remove(userID);
+            ff = new Dictionary<FolderType, InventoryFolderBase>();
+            m_FolderTypes.Add(userID, ff, CACHE_EXPIRATION);
         }
 
-        public void Cache(UUID userID, InventoryFolderBase root)
+        // We need to lock here since two threads could potentially retrieve the same dictionary
+        // and try to add a folder for that type simultaneously.  Dictionary<>.Add() is not described as thread-safe in the SDK
+        // even if the folders are identical.
+        lock (ff)
         {
-            m_RootFolders.AddOrUpdate(userID, root, CACHE_EXPIRATION);
+            if (!ff.ContainsKey(type))
+                ff.Add(type, folder);
         }
+    }
 
-        public InventoryFolderBase GetRootFolder(UUID userID)
+    public InventoryFolderBase GetFolderForType(UUID userID, FolderType type)
+    {
+        if (m_FolderTypes.TryGetValue(userID, out Dictionary<FolderType, InventoryFolderBase> ff))
         {
-            if (m_RootFolders.TryGetValue(userID, out InventoryFolderBase root))
-                return root;
-
-            return null;
-        }
-
-        public void Cache(UUID userID, FolderType type, InventoryFolderBase folder)
-        {
-            if (!m_FolderTypes.TryGetValue(userID, out Dictionary<FolderType, InventoryFolderBase> ff))
-            {
-                ff = new Dictionary<FolderType, InventoryFolderBase>();
-                m_FolderTypes.Add(userID, ff, CACHE_EXPIRATION);
-            }
-
-            // We need to lock here since two threads could potentially retrieve the same dictionary
-            // and try to add a folder for that type simultaneously.  Dictionary<>.Add() is not described as thread-safe in the SDK
-            // even if the folders are identical.
             lock (ff)
             {
-                if (!ff.ContainsKey(type))
-                    ff.Add(type, folder);
+                if (ff.TryGetValue(type, out InventoryFolderBase f))
+                    return f;
             }
         }
 
-        public InventoryFolderBase GetFolderForType(UUID userID, FolderType type)
+        return null;
+    }
+
+    public void Cache(UUID userID, InventoryCollection inv)
+    {
+        m_Inventories.AddOrUpdate(userID, inv, 120);
+    }
+
+    public InventoryCollection GetFolderContent(UUID userID, UUID folderID)
+    {
+        InventoryCollection c;
+        if (m_Inventories.TryGetValue(userID, out InventoryCollection inv))
         {
-            if (m_FolderTypes.TryGetValue(userID, out Dictionary<FolderType, InventoryFolderBase> ff))
+            c = new InventoryCollection();
+            c.OwnerID = userID;
+
+            c.Folders = inv.Folders.FindAll(delegate(InventoryFolderBase f)
             {
-                lock (ff)
-                {
-                    if (ff.TryGetValue(type, out InventoryFolderBase f))
-                        return f;
-                }
-            }
-
-            return null;
-        }
-
-        public void Cache(UUID userID, InventoryCollection inv)
-        {
-            m_Inventories.AddOrUpdate(userID, inv, 120);
-        }
-
-        public InventoryCollection GetFolderContent(UUID userID, UUID folderID)
-        {
-            InventoryCollection c;
-            if (m_Inventories.TryGetValue(userID, out InventoryCollection inv))
+                return f.ParentID == folderID;
+            });
+            c.Items = inv.Items.FindAll(delegate(InventoryItemBase i)
             {
-                c = new InventoryCollection();
-                c.OwnerID = userID;
-
-                c.Folders = inv.Folders.FindAll(delegate(InventoryFolderBase f)
-                {
-                    return f.ParentID == folderID;
-                });
-                c.Items = inv.Items.FindAll(delegate(InventoryItemBase i)
-                {
-                    return i.Folder == folderID;
-                });
-                return c;
-            }
-            return null;
+                return i.Folder == folderID;
+            });
+            return c;
         }
+        return null;
+    }
 
-        public List<InventoryItemBase> GetFolderItems(UUID userID, UUID folderID)
+    public List<InventoryItemBase> GetFolderItems(UUID userID, UUID folderID)
+    {
+        if (m_Inventories.TryGetValue(userID, out InventoryCollection inv))
         {
-            if (m_Inventories.TryGetValue(userID, out InventoryCollection inv))
+            List<InventoryItemBase> items = inv.Items.FindAll(delegate(InventoryItemBase i)
             {
-                List<InventoryItemBase> items = inv.Items.FindAll(delegate(InventoryItemBase i)
-                {
-                    return i.Folder == folderID;
-                });
-                return items;
-            }
-            return null;
+                return i.Folder == folderID;
+            });
+            return items;
         }
+        return null;
     }
 }

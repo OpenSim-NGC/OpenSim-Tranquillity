@@ -29,69 +29,68 @@ using System.Net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.Agent.IPBan
+namespace OpenSim.Region.CoreModules.Agent.IPBan;
+
+internal class SceneBanner
 {
-    internal class SceneBanner
+    private static readonly log4net.ILog m_log
+                = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
+    private List<string> bans;
+    // private SceneBase m_scene;
+    public SceneBanner(SceneBase scene, List<string> banList)
     {
-        private static readonly log4net.ILog m_log
-                    = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        scene.EventManager.OnNewClient += EventManager_OnClientConnect;
 
-        private List<string> bans;
-        // private SceneBase m_scene;
-        public SceneBanner(SceneBase scene, List<string> banList)
+        bans = banList;
+        // m_scene = scene;
+    }
+
+    void EventManager_OnClientConnect(IClientAPI client)
+    {
+        // Only need to run through all this if there are entries in the ban list
+        if (bans.Count > 0)
         {
-            scene.EventManager.OnNewClient += EventManager_OnClientConnect;
-
-            bans = banList;
-            // m_scene = scene;
-        }
-
-        void EventManager_OnClientConnect(IClientAPI client)
-        {
-            // Only need to run through all this if there are entries in the ban list
-            if (bans.Count > 0)
+            IPAddress end = client.RemoteEndPoint.Address;
+            string endstr = end.ToString();
+            string hostName = null;
+            try
             {
-                IPAddress end = client.RemoteEndPoint.Address;
-                string endstr = end.ToString();
-                string hostName = null;
-                try
-                {
-                    IPHostEntry rDNS = Dns.GetHostEntry(end);
-                    hostName = rDNS.HostName;
-                }
-                catch (System.Net.Sockets.SocketException)
-                {
-                    //m_log.WarnFormat("[IPBAN] IP address \"{0}\" cannot be resolved via DNS", end);
-                    hostName = null;
-                }
+                IPHostEntry rDNS = Dns.GetHostEntry(end);
+                hostName = rDNS.HostName;
+            }
+            catch (System.Net.Sockets.SocketException)
+            {
+                //m_log.WarnFormat("[IPBAN] IP address \"{0}\" cannot be resolved via DNS", end);
+                hostName = null;
+            }
 
-                if(string.IsNullOrEmpty(hostName))
+            if(string.IsNullOrEmpty(hostName))
+            {
+                // just try possible ip match
+                foreach (string ban in bans)
                 {
-                    // just try possible ip match
-                    foreach (string ban in bans)
+                    if (endstr.StartsWith(ban))
                     {
-                        if (endstr.StartsWith(ban))
-                        {
-                            client.Disconnect("Banned - network \"" + ban + "\" is not allowed to connect to this server.");
-                            m_log.Warn("[IPBAN] Disconnected '" + end + "' due to '" + ban + "' ban.");
-                            return;
-                        }
-                    }
-                }
-                else
-                {
-                    foreach (string ban in bans)
-                    {
-                        if (hostName.Contains(ban) || end.ToString().StartsWith(ban))
-                        {
-                            client.Disconnect("Banned - network \"" + ban + "\" is not allowed to connect to this server.");
-                            m_log.Warn("[IPBAN] Disconnected '" + end + "' due to '" + ban + "' ban.");
-                            return;
-                        }
+                        client.Disconnect("Banned - network \"" + ban + "\" is not allowed to connect to this server.");
+                        m_log.Warn("[IPBAN] Disconnected '" + end + "' due to '" + ban + "' ban.");
+                        return;
                     }
                 }
             }
-            // m_log.DebugFormat("[IPBAN] User \"{0}\" not in any ban lists. Allowing connection.", end);
+            else
+            {
+                foreach (string ban in bans)
+                {
+                    if (hostName.Contains(ban) || end.ToString().StartsWith(ban))
+                    {
+                        client.Disconnect("Banned - network \"" + ban + "\" is not allowed to connect to this server.");
+                        m_log.Warn("[IPBAN] Disconnected '" + end + "' due to '" + ban + "' ban.");
+                        return;
+                    }
+                }
+            }
         }
+        // m_log.DebugFormat("[IPBAN] User \"{0}\" not in any ban lists. Allowing connection.", end);
     }
 }

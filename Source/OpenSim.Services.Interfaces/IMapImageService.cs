@@ -25,17 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenSim.Framework;
-using System.Collections.Generic;
 using OpenMetaverse;
 
-namespace OpenSim.Services.Interfaces
+namespace OpenSim.Services.Interfaces;
+
+public interface IMapImageService
 {
-    public interface IMapImageService
-    {
-        //List<MapBlockData> GetMapBlocks(UUID scopeID, int minX, int minY, int maxX, int maxY);
-        bool AddMapTile(int x, int y, byte[] imageData, UUID scopeID, out string reason);
-        bool RemoveMapTile(int x, int y, UUID scopeID, out string reason);
-        byte[] GetMapTile(string fileName, UUID scopeID, out string format);
-    }
+    //List<MapBlockData> GetMapBlocks(UUID scopeID, int minX, int minY, int maxX, int maxY);
+    bool AddMapTile(int x, int y, byte[] imageData, UUID scopeID, out string reason);
+    bool RemoveMapTile(int x, int y, UUID scopeID, out string reason);
+    byte[] GetMapTile(string fileName, UUID scopeID, out string format);
 }

@@ -25,66 +25,64 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using log4net.Appender;
 using log4net.Core;
 
-namespace OpenSim.Framework.Console
+namespace OpenSim.Framework.Console;
+
+/// <summary>
+/// Writes log information out onto the console
+/// </summary>
+public class OpenSimAppender : AnsiColorTerminalAppender
 {
-    /// <summary>
-    /// Writes log information out onto the console
-    /// </summary>
-    public class OpenSimAppender : AnsiColorTerminalAppender
+    private ConsoleBase m_console = null;
+
+    public ConsoleBase Console
     {
-        private ConsoleBase m_console = null;
+        get { return m_console; }
+        set { m_console = value; }
+    }
 
-        public ConsoleBase Console
+    override protected void Append(LoggingEvent le)
+    {
+        //if (m_console != null)
+        //    m_console.LockOutput();
+
+        string loggingMessage = RenderLoggingEvent(le);
+
+        try
         {
-            get { return m_console; }
-            set { m_console = value; }
-        }
-
-        override protected void Append(LoggingEvent le)
-        {
-            //if (m_console != null)
-            //    m_console.LockOutput();
-
-            string loggingMessage = RenderLoggingEvent(le);
-
-            try
+            if (m_console != null)
             {
-                if (m_console != null)
-                {
-                    ConsoleLevel level;
+                ConsoleLevel level;
 
-                    if (le.Level == Level.Error)
-                        level = "error";
-                    else if (le.Level == Level.Warn)
-                        level = "warn";
-                    else
-                        level = "normal";
-
-                    m_console.Output(loggingMessage, level);
-                }
+                if (le.Level == Level.Error)
+                    level = "error";
+                else if (le.Level == Level.Warn)
+                    level = "warn";
                 else
-                {
-                    if (!loggingMessage.EndsWith("\n"))
-                        System.Console.WriteLine(loggingMessage);
-                    else
-                        System.Console.Write(loggingMessage);
-                }
+                    level = "normal";
+
+                m_console.Output(loggingMessage, level);
             }
-            catch (Exception e)
+            else
             {
-                System.Console.WriteLine("Couldn't write out log message: {0}", e.ToString());
+                if (!loggingMessage.EndsWith("\n"))
+                    System.Console.WriteLine(loggingMessage);
+                else
+                    System.Console.Write(loggingMessage);
             }
-            /*
-            finally
-            {
-                if (m_console != null)
-                    m_console.UnlockOutput();
-            }
-            */
         }
+        catch (Exception e)
+        {
+            System.Console.WriteLine("Couldn't write out log message: {0}", e.ToString());
+        }
+        /*
+        finally
+        {
+            if (m_console != null)
+                m_console.UnlockOutput();
+        }
+        */
     }
 }

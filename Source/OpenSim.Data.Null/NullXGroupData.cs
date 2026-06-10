@@ -25,62 +25,52 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Threading;
-using log4net;
 using OpenMetaverse;
-using OpenSim.Framework;
-using OpenSim.Data;
 
-namespace OpenSim.Data.Null
+namespace OpenSim.Data.Null;
+
+public class NullXGroupData : IXGroupData
 {
-    public class NullXGroupData : IXGroupData
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private Dictionary<UUID, XGroup> m_groups = new Dictionary<UUID, XGroup>();
+    private Dictionary<UUID, XGroup> m_groups = new Dictionary<UUID, XGroup>();
 
-        public NullXGroupData(string connectionString, string realm) {}
+    public NullXGroupData(string connectionString, string realm) {}
 
-        public bool StoreGroup(XGroup group)
+    public bool StoreGroup(XGroup group)
+    {
+        lock (m_groups)
         {
-            lock (m_groups)
-            {
-                m_groups[group.groupID] = group.Clone();
-            }
-
-            return true;
+            m_groups[group.groupID] = group.Clone();
         }
 
-        public XGroup GetGroup(UUID groupID)
-        {
-            XGroup group = null;
+        return true;
+    }
 
-            lock (m_groups)
-                m_groups.TryGetValue(groupID, out group);
+    public XGroup GetGroup(UUID groupID)
+    {
+        XGroup group = null;
 
-            return group;
-        }
+        lock (m_groups)
+            m_groups.TryGetValue(groupID, out group);
 
-        public Dictionary<UUID, XGroup> GetGroups()
-        {
-            Dictionary<UUID, XGroup> groupsClone = new Dictionary<UUID, XGroup>();
+        return group;
+    }
 
-            lock (m_groups)
-                foreach (XGroup group in m_groups.Values)
-                    groupsClone[group.groupID] = group.Clone();
+    public Dictionary<UUID, XGroup> GetGroups()
+    {
+        Dictionary<UUID, XGroup> groupsClone = new Dictionary<UUID, XGroup>();
 
-            return groupsClone;
-        }
+        lock (m_groups)
+            foreach (XGroup group in m_groups.Values)
+                groupsClone[group.groupID] = group.Clone();
 
-        public bool DeleteGroup(UUID groupID)
-        {
-            lock (m_groups)
-                return m_groups.Remove(groupID);
-        }
+        return groupsClone;
+    }
+
+    public bool DeleteGroup(UUID groupID)
+    {
+        lock (m_groups)
+            return m_groups.Remove(groupID);
     }
 }

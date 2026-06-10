@@ -27,25 +27,24 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public delegate void ObjectPaid(UUID objectID, UUID agentID, int amount);
+public interface IMoneyModule
 {
-    public delegate void ObjectPaid(UUID objectID, UUID agentID, int amount);
-    public interface IMoneyModule
-    {
-        bool ObjectGiveMoney(UUID objectID, UUID fromID,
-                UUID toID, int amount, UUID txn, out string reason);
+    bool ObjectGiveMoney(UUID objectID, UUID fromID,
+            UUID toID, int amount, UUID txn, out string reason);
 
-        int GetBalance(UUID agentID);
-        bool UploadCovered(UUID agentID, int amount);
-        bool AmountCovered(UUID agentID, int amount);
-        void ApplyCharge(UUID agentID, int amount, MoneyTransactionType type, string extraData = "");
-        void ApplyUploadCharge(UUID agentID, int amount, string text);
-        void MoveMoney(UUID fromUser, UUID toUser, int amount, string text);
-        bool MoveMoney(UUID fromUser, UUID toUser, int amount, MoneyTransactionType type, string text);
+    int GetBalance(UUID agentID);
+    bool UploadCovered(UUID agentID, int amount);
+    bool AmountCovered(UUID agentID, int amount);
+    void ApplyCharge(UUID agentID, int amount, MoneyTransactionType type, string extraData = "");
+    void ApplyUploadCharge(UUID agentID, int amount, string text);
+    void MoveMoney(UUID fromUser, UUID toUser, int amount, string text);
+    bool MoveMoney(UUID fromUser, UUID toUser, int amount, MoneyTransactionType type, string text);
 
-        int UploadCharge { get; }
-        int GroupCreationCharge { get; }
+    int UploadCharge { get; }
+    int GroupCreationCharge { get; }
 
-        event ObjectPaid OnObjectPaid;
-    }
+    event ObjectPaid OnObjectPaid;
 }

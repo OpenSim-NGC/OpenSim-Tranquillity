@@ -27,13 +27,12 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IXmlRpcRouter
 {
-    public interface IXmlRpcRouter
-    {
-        void RegisterNewReceiver(IScriptModule scriptEngine, UUID channelID, UUID objectID, UUID itemID, string url);
-        void ScriptRemoved(UUID itemID);
-        void ObjectRemoved(UUID objectID);
-        void UnRegisterReceiver(string channelID, UUID itemID);
-    }
+    void RegisterNewReceiver(IScriptModule scriptEngine, UUID channelID, UUID objectID, UUID itemID, string url);
+    void ScriptRemoved(UUID itemID);
+    void ObjectRemoved(UUID objectID);
+    void UnRegisterReceiver(string channelID, UUID itemID);
 }

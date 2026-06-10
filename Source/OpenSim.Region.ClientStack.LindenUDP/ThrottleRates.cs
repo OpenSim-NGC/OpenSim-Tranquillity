@@ -28,85 +28,84 @@
 using OpenSim.Framework;
 using Nini.Config;
 
-namespace OpenSim.Region.ClientStack.LindenUDP
+namespace OpenSim.Region.ClientStack.LindenUDP;
+
+/// <summary>
+/// Holds drip rates and maximum burst rates for throttling with hierarchical
+/// token buckets. The maximum burst rates set here are hard limits and can
+/// not be overridden by client requests
+/// </summary>
+public sealed class ThrottleRates
 {
+    /// <summary>Drip rate for resent packets</summary>
+    public int Resend = 6625;
+    /// <summary>Drip rate for terrain packets</summary>
+    public int Land = 9125;
+    /// <summary>Drip rate for wind packets</summary>
+    public int Wind = 1750;
+    /// <summary>Drip rate for cloud packets</summary>
+    public int Cloud = 1750;
+    /// <summary>Drip rate for task packets</summary>
+    public int Task = 18500;
+    /// <summary>Drip rate for texture packets</summary>
+    public int Texture = 18500;
+    /// <summary>Drip rate for asset packets</summary>
+    public int Asset = 10500;
+
+    /// <summary>Drip rate for the parent token bucket</summary>
+    public int Total = 66750;
+
+    /// <summary>Flag used to enable adaptive throttles</summary>
+    public bool AdaptiveThrottlesEnabled;
+
     /// <summary>
-    /// Holds drip rates and maximum burst rates for throttling with hierarchical
-    /// token buckets. The maximum burst rates set here are hard limits and can
-    /// not be overridden by client requests
+    /// Set the minimum rate that the adaptive throttles can set. The viewer
+    /// can still throttle lower than this, but the adaptive throttles will
+    /// never decrease rates below this no matter how many packets are dropped
     /// </summary>
-    public sealed class ThrottleRates
+    public Int64 MinimumAdaptiveThrottleRate;
+
+    public int ClientMaxRate = 640000; // 5,120,000 bps
+    public float BurstTime = 10e-3f;
+
+    /// <summary>
+    /// Default constructor
+    /// </summary>
+    /// <param name="config">Config source to load defaults from</param>
+    public ThrottleRates(IConfigSource config)
     {
-        /// <summary>Drip rate for resent packets</summary>
-        public int Resend = 6625;
-        /// <summary>Drip rate for terrain packets</summary>
-        public int Land = 9125;
-        /// <summary>Drip rate for wind packets</summary>
-        public int Wind = 1750;
-        /// <summary>Drip rate for cloud packets</summary>
-        public int Cloud = 1750;
-        /// <summary>Drip rate for task packets</summary>
-        public int Task = 18500;
-        /// <summary>Drip rate for texture packets</summary>
-        public int Texture = 18500;
-        /// <summary>Drip rate for asset packets</summary>
-        public int Asset = 10500;
-
-        /// <summary>Drip rate for the parent token bucket</summary>
-        public int Total = 66750;
-
-        /// <summary>Flag used to enable adaptive throttles</summary>
-        public bool AdaptiveThrottlesEnabled;
-
-        /// <summary>
-        /// Set the minimum rate that the adaptive throttles can set. The viewer
-        /// can still throttle lower than this, but the adaptive throttles will
-        /// never decrease rates below this no matter how many packets are dropped
-        /// </summary>
-        public Int64 MinimumAdaptiveThrottleRate;
-
-        public int ClientMaxRate = 640000; // 5,120,000 bps
-        public float BurstTime = 10e-3f;
-
-        /// <summary>
-        /// Default constructor
-        /// </summary>
-        /// <param name="config">Config source to load defaults from</param>
-        public ThrottleRates(IConfigSource config)
+        try
         {
-            try
+            IConfig throttleConfig = config.Configs["ClientStack.LindenUDP"];
+            if(throttleConfig != null)
             {
-                IConfig throttleConfig = config.Configs["ClientStack.LindenUDP"];
-                if(throttleConfig != null)
-                {
-                    ClientMaxRate = throttleConfig.GetInt("client_throttle_max_bps", ClientMaxRate);
-                    if (ClientMaxRate > 1000000)
-                        ClientMaxRate = 1000000; // no more than 8Mbps
-                    else if (ClientMaxRate < 6250)
-                        ClientMaxRate = 6250; // no less than 50kbps
+                ClientMaxRate = throttleConfig.GetInt("client_throttle_max_bps", ClientMaxRate);
+                if (ClientMaxRate > 1000000)
+                    ClientMaxRate = 1000000; // no more than 8Mbps
+                else if (ClientMaxRate < 6250)
+                    ClientMaxRate = 6250; // no less than 50kbps
 
-                    // Adaptive is broken
-                    // AdaptiveThrottlesEnabled = throttleConfig.GetBoolean("enable_adaptive_throttles", false);
-                    AdaptiveThrottlesEnabled = false;
-                    MinimumAdaptiveThrottleRate = throttleConfig.GetInt("adaptive_throttle_min_bps", 32000);
-                }
+                // Adaptive is broken
+                // AdaptiveThrottlesEnabled = throttleConfig.GetBoolean("enable_adaptive_throttles", false);
+                AdaptiveThrottlesEnabled = false;
+                MinimumAdaptiveThrottleRate = throttleConfig.GetInt("adaptive_throttle_min_bps", 32000);
             }
-            catch (Exception) { }
         }
+        catch (Exception) { }
+    }
 
-        public int GetRate(ThrottleOutPacketType type)
+    public int GetRate(ThrottleOutPacketType type)
+    {
+        return type switch
         {
-            return type switch
-            {
-                ThrottleOutPacketType.Resend => Resend,
-                ThrottleOutPacketType.Land => Land,
-                ThrottleOutPacketType.Wind => Wind,
-                ThrottleOutPacketType.Cloud => Cloud,
-                ThrottleOutPacketType.Task => Task,
-                ThrottleOutPacketType.Texture => Texture,
-                ThrottleOutPacketType.Asset => Asset,
-                _ => 0,
-            };
-        }
+            ThrottleOutPacketType.Resend => Resend,
+            ThrottleOutPacketType.Land => Land,
+            ThrottleOutPacketType.Wind => Wind,
+            ThrottleOutPacketType.Cloud => Cloud,
+            ThrottleOutPacketType.Task => Task,
+            ThrottleOutPacketType.Texture => Texture,
+            ThrottleOutPacketType.Asset => Asset,
+            _ => 0,
+        };
     }
 }

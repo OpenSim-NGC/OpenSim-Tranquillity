@@ -26,116 +26,146 @@
  */
 
 using System.Runtime.CompilerServices;
-using System.Threading;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class TerrainTaintsArray
 {
-    public class TerrainTaintsArray
+    public const int VectorNumberBits = 32;
+    public const int VectorNumberBitsLog2 = 5;
+    public const int FALSEWORD = 0;
+    public const int TRUEWORD = ~FALSEWORD;
+
+    private int[] m_data;
+    private readonly int m_nbits;
+
+    private volatile int m_ntainted;
+
+    private object m_mainlock = new object();
+
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public TerrainTaintsArray(int lenght) : this(lenght, false) { }
+
+    public TerrainTaintsArray(int lenght, bool preset)
     {
-        public const int VectorNumberBits = 32;
-        public const int VectorNumberBitsLog2 = 5;
-        public const int FALSEWORD = 0;
-        public const int TRUEWORD = ~FALSEWORD;
+        m_nbits = lenght;
+        int nInts = calclen(m_nbits);
 
-        private int[] m_data;
-        private readonly int m_nbits;
-
-        private volatile int m_ntainted;
-
-        private object m_mainlock = new object();
-
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public TerrainTaintsArray(int lenght) : this(lenght, false) { }
-
-        public TerrainTaintsArray(int lenght, bool preset)
+        m_data = new int[nInts];
+        if (preset)
         {
-            m_nbits = lenght;
-            int nInts = calclen(m_nbits);
+            for (int i = 0; i < m_data.Length; i++)
+                m_data[i] = TRUEWORD;
+            m_ntainted = m_nbits;
+        }
+        else
+            m_ntainted = 0;
+    }
 
-            m_data = new int[nInts];
-            if (preset)
+    public int Length
+    {
+        get
+        {
+            return m_nbits;
+        }
+    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public int TaitedCount()
+    {
+        return m_ntainted;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool IsTaited()
+    {
+        return m_ntainted > 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Get(int bitindex)
+    {
+        int indexh = bitindex >> VectorNumberBitsLog2;
+        int mask = 1 << (bitindex & (VectorNumberBits - 1));
+        return (m_data[indexh] & mask) != 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Get(int bitindex, bool clear)
+    {
+        int indexh = bitindex >> VectorNumberBitsLog2;
+        int mask = 1 << (bitindex & (VectorNumberBits - 1));
+
+        lock (m_mainlock)
+        {
+            if ((m_data[indexh] & mask) != 0)
             {
-                for (int i = 0; i < m_data.Length; i++)
-                    m_data[i] = TRUEWORD;
-                m_ntainted = m_nbits;
-            }
-            else
-                m_ntainted = 0;
-        }
-
-        public int Length
-        {
-            get
-            {
-                return m_nbits;
-            }
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int TaitedCount()
-        {
-            return m_ntainted;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsTaited()
-        {
-            return m_ntainted > 0;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Get(int bitindex)
-        {
-            int indexh = bitindex >> VectorNumberBitsLog2;
-            int mask = 1 << (bitindex & (VectorNumberBits - 1));
-            return (m_data[indexh] & mask) != 0;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Get(int bitindex, bool clear)
-        {
-            int indexh = bitindex >> VectorNumberBitsLog2;
-            int mask = 1 << (bitindex & (VectorNumberBits - 1));
-
-            lock (m_mainlock)
-            {
-                if ((m_data[indexh] & mask) != 0)
+                if (clear)
                 {
-                    if (clear)
-                    {
-                        m_data[indexh] ^= mask;
-                        --m_ntainted;
-                    }
-                    return true;
+                    m_data[indexh] ^= mask;
+                    --m_ntainted;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public unsafe bool GetAndClear(int bitindex)
+    {
+        int indexh = bitindex >> VectorNumberBitsLog2;
+        int mask = 1 << (bitindex & (VectorNumberBits - 1));
+        lock (m_mainlock)
+        {
+            if ((m_data[indexh] & mask) != 0)
+            {
+                m_data[indexh] ^= mask;
+                --m_ntainted;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void Set(int bitindex, bool val)
+    {
+        int indexh = bitindex >> VectorNumberBitsLog2;
+        int mask = 1 << (bitindex & (VectorNumberBits - 1));
+        lock (m_mainlock)
+        {
+            if (val)
+            {
+                if ((m_data[indexh] & mask) == 0)
+                {
+                    m_data[indexh] |= mask;
+                    ++m_ntainted;
                 }
             }
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe bool GetAndClear(int bitindex)
-        {
-            int indexh = bitindex >> VectorNumberBitsLog2;
-            int mask = 1 << (bitindex & (VectorNumberBits - 1));
-            lock (m_mainlock)
+            else
             {
                 if ((m_data[indexh] & mask) != 0)
                 {
                     m_data[indexh] ^= mask;
                     --m_ntainted;
-                    return true;
                 }
             }
-            return false;
         }
+    }
 
-        public void Set(int bitindex, bool val)
+    public bool this[int bitindex]
+    {
+        get
+        {
+            return Get(bitindex);
+        }
+        set
         {
             int indexh = bitindex >> VectorNumberBitsLog2;
             int mask = 1 << (bitindex & (VectorNumberBits - 1));
             lock (m_mainlock)
             {
-                if (val)
+                if (value)
                 {
                     if ((m_data[indexh] & mask) == 0)
                     {
@@ -153,155 +183,141 @@ namespace OpenSim.Framework
                 }
             }
         }
+    }
 
-        public bool this[int bitindex]
+    public void SetAll(bool val)
+    {
+        lock (m_mainlock)
         {
-            get
+            if (val)
             {
-                return Get(bitindex);
+                for (int i = 0; i < m_data.Length; ++i)
+                    m_data[i] = TRUEWORD;
+                m_ntainted = m_nbits;
+
             }
-            set
+            else
             {
-                int indexh = bitindex >> VectorNumberBitsLog2;
-                int mask = 1 << (bitindex & (VectorNumberBits - 1));
-                lock (m_mainlock)
-                {
-                    if (value)
-                    {
-                        if ((m_data[indexh] & mask) == 0)
-                        {
-                            m_data[indexh] |= mask;
-                            ++m_ntainted;
-                        }
-                    }
-                    else
-                    {
-                        if ((m_data[indexh] & mask) != 0)
-                        {
-                            m_data[indexh] ^= mask;
-                            --m_ntainted;
-                        }
-                    }
-                }
+                for (int i = 0; i < m_data.Length; ++i)
+                    m_data[i] = 0;
+                m_ntainted = 0;
             }
         }
+    }
 
-        public void SetAll(bool val)
+    public bool IsVectorOfFalse(int vectorIndex)
+    {
+        return m_data[vectorIndex] == 0;
+    }
+
+    public bool IsVectorOfBitFalse(int bitindex)
+    {
+        return m_data[(bitindex >> VectorNumberBitsLog2)] == 0;
+    }
+
+
+    public bool IsVectorTrue(int vectorIndex)
+    {
+        return m_data[vectorIndex] == unchecked(((int)0xffffffff));
+    }
+
+    public bool IsVectorOfBitTrue(int bitindex)
+    {
+        return m_data[(bitindex >> VectorNumberBitsLog2)] == unchecked(((int)0xffffffff));
+    }
+
+    public void Or(TerrainTaintsArray other)
+    {
+        if (m_nbits != other.m_nbits)
+            return;
+        lock (m_mainlock)
         {
-            lock (m_mainlock)
+            lock (other.m_mainlock)
             {
-                if (val)
+                for (int i = 0; i < m_data.Length; ++i)
                 {
-                    for (int i = 0; i < m_data.Length; ++i)
-                        m_data[i] = TRUEWORD;
-                    m_ntainted = m_nbits;
+                    int tr = other.m_data[i];
+                    if (tr == 0)
+                        continue;
 
-                }
-                else
-                {
-                    for (int i = 0; i < m_data.Length; ++i)
-                        m_data[i] = 0;
-                    m_ntainted = 0;
-                }
-            }
-        }
-
-        public bool IsVectorOfFalse(int vectorIndex)
-        {
-            return m_data[vectorIndex] == 0;
-        }
-
-        public bool IsVectorOfBitFalse(int bitindex)
-        {
-            return m_data[(bitindex >> VectorNumberBitsLog2)] == 0;
-        }
-
-
-        public bool IsVectorTrue(int vectorIndex)
-        {
-            return m_data[vectorIndex] == unchecked(((int)0xffffffff));
-        }
-
-        public bool IsVectorOfBitTrue(int bitindex)
-        {
-            return m_data[(bitindex >> VectorNumberBitsLog2)] == unchecked(((int)0xffffffff));
-        }
-
-        public void Or(TerrainTaintsArray other)
-        {
-            if (m_nbits != other.m_nbits)
-                return;
-            lock (m_mainlock)
-            {
-                lock (other.m_mainlock)
-                {
-                    for (int i = 0; i < m_data.Length; ++i)
+                    int tt = m_data[i] | tr;
+                    tr ^= tt;
+                    if (tr != 0)
                     {
-                        int tr = other.m_data[i];
-                        if (tr == 0)
-                            continue;
-
-                        int tt = m_data[i] | tr;
-                        tr ^= tt;
-                        if (tr != 0)
+                        m_data[i] = tt;
+                        for (int j = 1; j != 0; j <<= 1)
                         {
-                            m_data[i] = tt;
-                            for (int j = 1; j != 0; j <<= 1)
-                            {
-                                if ((tr & j) != 0)
-                                    ++m_ntainted;
-                            }
+                            if ((tr & j) != 0)
+                                ++m_ntainted;
                         }
                     }
                 }
             }
         }
+    }
 
-        public int GetNextTrue(int startBitIndex)
+    public int GetNextTrue(int startBitIndex)
+    {
+        if (startBitIndex < 0 || startBitIndex >= m_nbits)
+            return -1;
+
+        int indexh = startBitIndex >> VectorNumberBitsLog2;
+        int j = startBitIndex & (VectorNumberBits - 1);
+
+        int cur = m_data[indexh];
+        if (cur != 0)
         {
-            if (startBitIndex < 0 || startBitIndex >= m_nbits)
-                return -1;
-
-            int indexh = startBitIndex >> VectorNumberBitsLog2;
-            int j = startBitIndex & (VectorNumberBits - 1);
-
-            int cur = m_data[indexh];
+            for (; j < VectorNumberBits; ++j)
+            {
+                if ((cur & (1 << j)) != 0)
+                    return (indexh << VectorNumberBitsLog2) | j;
+            }
+        }
+        while (++indexh < m_data.Length)
+        {
+            cur = m_data[indexh];
             if (cur != 0)
             {
-                for (; j < VectorNumberBits; ++j)
+                for (j = 0; j < VectorNumberBits; ++j)
                 {
                     if ((cur & (1 << j)) != 0)
                         return (indexh << VectorNumberBitsLog2) | j;
                 }
             }
+        }
+        return -1;
+    }
+
+    public int GetAndClearNextTrue(int startBitIndex)
+    {
+        if (m_ntainted <= 0 || startBitIndex < 0 || startBitIndex >= m_nbits)
+            return -1;
+
+        int indexh = startBitIndex >> VectorNumberBitsLog2;
+        int j = startBitIndex & (VectorNumberBits - 1);
+        lock (m_mainlock)
+        {
+            int cur = m_data[indexh];
+            if (cur != 0)
+            {
+                for (; j < VectorNumberBits; ++j)
+                {
+                    int mask = (1 << j);
+                    if ((cur & mask) != 0)
+                    {
+                        m_data[indexh] ^= mask;
+                        --m_ntainted;
+                        return (indexh << VectorNumberBitsLog2) | j;
+                    }
+                }
+            }
+
             while (++indexh < m_data.Length)
             {
                 cur = m_data[indexh];
                 if (cur != 0)
                 {
                     for (j = 0; j < VectorNumberBits; ++j)
-                    {
-                        if ((cur & (1 << j)) != 0)
-                            return (indexh << VectorNumberBitsLog2) | j;
-                    }
-                }
-            }
-            return -1;
-        }
-
-        public int GetAndClearNextTrue(int startBitIndex)
-        {
-            if (m_ntainted <= 0 || startBitIndex < 0 || startBitIndex >= m_nbits)
-                return -1;
-
-            int indexh = startBitIndex >> VectorNumberBitsLog2;
-            int j = startBitIndex & (VectorNumberBits - 1);
-            lock (m_mainlock)
-            {
-                int cur = m_data[indexh];
-                if (cur != 0)
-                {
-                    for (; j < VectorNumberBits; ++j)
                     {
                         int mask = (1 << j);
                         if ((cur & mask) != 0)
@@ -312,32 +328,14 @@ namespace OpenSim.Framework
                         }
                     }
                 }
-
-                while (++indexh < m_data.Length)
-                {
-                    cur = m_data[indexh];
-                    if (cur != 0)
-                    {
-                        for (j = 0; j < VectorNumberBits; ++j)
-                        {
-                            int mask = (1 << j);
-                            if ((cur & mask) != 0)
-                            {
-                                m_data[indexh] ^= mask;
-                                --m_ntainted;
-                                return (indexh << VectorNumberBitsLog2) | j;
-                            }
-                        }
-                    }
-                }
             }
-            return -1;
         }
+        return -1;
+    }
 
 
-        private int calclen(int bitsLen)
-        {
-            return bitsLen > 0 ? ((bitsLen - 1) >> VectorNumberBitsLog2) + 1 : 0;
-        }
+    private int calclen(int bitsLen)
+    {
+        return bitsLen > 0 ? ((bitsLen - 1) >> VectorNumberBitsLog2) + 1 : 0;
     }
 }

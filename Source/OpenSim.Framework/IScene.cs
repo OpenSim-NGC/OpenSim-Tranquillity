@@ -29,119 +29,118 @@ using OpenMetaverse;
 //using OpenSim.Framework.Console;
 using Nini.Config;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public delegate void Restart(RegionInfo thisRegion);
+
+public enum RegionStatus : int
 {
-    public delegate void Restart(RegionInfo thisRegion);
+    Down = 0,
+    Up = 1,
+    Crashed = 2,
+    Starting = 3,
+};
 
-    public enum RegionStatus : int
-    {
-        Down = 0,
-        Up = 1,
-        Crashed = 2,
-        Starting = 3,
-    };
+/// <value>
+/// Indicate what action to take on an object derez request
+/// </value>
+public enum DeRezAction : byte
+{
+    SaveToExistingUserInventoryItem = 0,
+    TakeCopy = 1,
+    Take = 4,
+    GodTakeCopy = 5,
+    Delete = 6,
+    Return = 9
+};
 
-    /// <value>
-    /// Indicate what action to take on an object derez request
-    /// </value>
-    public enum DeRezAction : byte
-    {
-        SaveToExistingUserInventoryItem = 0,
-        TakeCopy = 1,
-        Take = 4,
-        GodTakeCopy = 5,
-        Delete = 6,
-        Return = 9
-    };
+public interface IScene
+{
+    /// <summary>
+    /// The name of this scene.
+    /// </summary>
+    string Name { get; }
 
-    public interface IScene
-    {
-        /// <summary>
-        /// The name of this scene.
-        /// </summary>
-        string Name { get; }
+    RegionInfo RegionInfo { get; }
+    RegionStatus RegionStatus { get; set; }
 
-        RegionInfo RegionInfo { get; }
-        RegionStatus RegionStatus { get; set; }
+    IConfigSource Config { get; }
 
-        IConfigSource Config { get; }
+    /// <summary>
+    /// Are logins enabled on this simulator?
+    /// </summary>
+    bool LoginsEnabled { get; set; }
 
-        /// <summary>
-        /// Are logins enabled on this simulator?
-        /// </summary>
-        bool LoginsEnabled { get; set; }
+    /// <summary>
+    /// Is this region ready for use?
+    /// </summary>
+    /// <remarks>
+    /// This does not mean that logins are enabled, merely that they can be.
+    /// </remarks>
+    bool Ready { get; set; }
 
-        /// <summary>
-        /// Is this region ready for use?
-        /// </summary>
-        /// <remarks>
-        /// This does not mean that logins are enabled, merely that they can be.
-        /// </remarks>
-        bool Ready { get; set; }
+    float TimeDilation { get; }
 
-        float TimeDilation { get; }
+    bool AllowScriptCrossings { get; }
 
-        bool AllowScriptCrossings { get; }
+    event Restart OnRestart;
 
-        event Restart OnRestart;
+    /// <summary>
+    /// Add a new agent with an attached client.  All agents except initial login clients will starts off as a child agent
+    /// - the later agent crossing will promote it to a root agent.
+    /// </summary>
+    /// <param name="client"></param>
+    /// <param name="type">The type of agent to add.</param>
+    /// <returns>
+    /// The scene agent if the new client was added or if an agent that already existed.</returns>
+    ISceneAgent AddNewAgent(IClientAPI client, PresenceType type);
 
-        /// <summary>
-        /// Add a new agent with an attached client.  All agents except initial login clients will starts off as a child agent
-        /// - the later agent crossing will promote it to a root agent.
-        /// </summary>
-        /// <param name="client"></param>
-        /// <param name="type">The type of agent to add.</param>
-        /// <returns>
-        /// The scene agent if the new client was added or if an agent that already existed.</returns>
-        ISceneAgent AddNewAgent(IClientAPI client, PresenceType type);
+    /// <summary>
+    /// Tell a single agent to disconnect from the region.
+    /// </summary>
+    /// <param name="agentID"></param>
+    /// <param name="force">
+    /// Force the agent to close even if it might be in the middle of some other operation.  You do not want to
+    /// force unless you are absolutely sure that the agent is dead and a normal close is not working.
+    /// </param>
+    bool CloseAgent(UUID agentID, bool force);
 
-        /// <summary>
-        /// Tell a single agent to disconnect from the region.
-        /// </summary>
-        /// <param name="agentID"></param>
-        /// <param name="force">
-        /// Force the agent to close even if it might be in the middle of some other operation.  You do not want to
-        /// force unless you are absolutely sure that the agent is dead and a normal close is not working.
-        /// </param>
-        bool CloseAgent(UUID agentID, bool force);
+    void Restart();
 
-        void Restart();
+    string GetSimulatorVersion();
 
-        string GetSimulatorVersion();
+    bool TryGetScenePresence(UUID agentID, out object scenePresence);
 
-        bool TryGetScenePresence(UUID agentID, out object scenePresence);
+    /// <summary>
+    /// Register an interface to a region module.  This allows module methods to be called directly as
+    /// well as via events.  If there is already a module registered for this interface, it is not replaced
+    /// (is this the best behaviour?)
+    /// </summary>
+    /// <param name="mod"></param>
+    void RegisterModuleInterface<M>(M mod);
 
-        /// <summary>
-        /// Register an interface to a region module.  This allows module methods to be called directly as
-        /// well as via events.  If there is already a module registered for this interface, it is not replaced
-        /// (is this the best behaviour?)
-        /// </summary>
-        /// <param name="mod"></param>
-        void RegisterModuleInterface<M>(M mod);
+    void StackModuleInterface<M>(M mod);
 
-        void StackModuleInterface<M>(M mod);
+    /// <summary>
+    /// For the given interface, retrieve the region module which implements it.
+    /// </summary>
+    /// <returns>null if there is no registered module implementing that interface</returns>
+    T RequestModuleInterface<T>();
 
-        /// <summary>
-        /// For the given interface, retrieve the region module which implements it.
-        /// </summary>
-        /// <returns>null if there is no registered module implementing that interface</returns>
-        T RequestModuleInterface<T>();
-
-        /// <summary>
-        /// For the given interface, retrieve an array of region modules that implement it.
-        /// </summary>
-        /// <returns>an empty array if there are no registered modules implementing that interface</returns>
-        T[] RequestModuleInterfaces<T>();
+    /// <summary>
+    /// For the given interface, retrieve an array of region modules that implement it.
+    /// </summary>
+    /// <returns>an empty array if there are no registered modules implementing that interface</returns>
+    T[] RequestModuleInterfaces<T>();
 
 //        void AddCommand(object module, string command, string shorthelp, string longhelp, CommandDelegate callback);
 
-        ISceneObject DeserializeObject(string representation);
+    ISceneObject DeserializeObject(string representation);
 
-        bool CheckClient(UUID agentID, System.Net.IPEndPoint ep);
+    bool CheckClient(UUID agentID, System.Net.IPEndPoint ep);
 
-        /// <summary>
-        /// Start the scene and associated scripts within it.
-        /// </summary>
-        void Start();
-    }
+    /// <summary>
+    /// Start the scene and associated scripts within it.
+    /// </summary>
+    void Start();
 }

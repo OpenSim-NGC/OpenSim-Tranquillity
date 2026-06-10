@@ -36,86 +36,85 @@ using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land;
+
+public class RemoteLandServicesConnector :
+        LandServicesConnector, ISharedRegionModule, ILandService
 {
-    public class RemoteLandServicesConnector :
-            LandServicesConnector, ISharedRegionModule, ILandService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private bool m_Enabled = false;
+    private LocalLandServicesConnector m_LocalService;
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        private bool m_Enabled = false;
-        private LocalLandServicesConnector m_LocalService;
+    public string Name
+    {
+        get { return "RemoteLandServicesConnector"; }
+    }
 
-        public Type ReplaceableInterface
+    public void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "RemoteLandServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("LandServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("LandServices", "");
-                if (name == Name)
-                {
-                    m_LocalService = new LocalLandServicesConnector();
+                m_LocalService = new LocalLandServicesConnector();
 
-                    m_Enabled = true;
+                m_Enabled = true;
 
-                    m_log.Info("[LAND CONNECTOR]: Remote Land connector enabled");
-                }
+                m_log.Info("[LAND CONNECTOR]: Remote Land connector enabled");
             }
         }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_LocalService.AddRegion(scene);
-            scene.RegisterModuleInterface<ILandService>(this);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (m_Enabled)
-                m_LocalService.RemoveRegion(scene);
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (m_Enabled)
-                m_GridService = scene.GridService;
-        }
-
-
-        #region ILandService
-
-        public override LandData GetLandData(UUID scopeID, ulong regionHandle, uint x, uint y, out byte regionAccess)
-        {
-            LandData land = m_LocalService.GetLandData(scopeID, regionHandle, x, y, out regionAccess);
-            if (land != null)
-                return land;
-
-            return base.GetLandData(scopeID, regionHandle, x, y, out regionAccess);
-
-        }
-        #endregion ILandService
     }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_LocalService.AddRegion(scene);
+        scene.RegisterModuleInterface<ILandService>(this);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (m_Enabled)
+            m_LocalService.RemoveRegion(scene);
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (m_Enabled)
+            m_GridService = scene.GridService;
+    }
+
+
+    #region ILandService
+
+    public override LandData GetLandData(UUID scopeID, ulong regionHandle, uint x, uint y, out byte regionAccess)
+    {
+        LandData land = m_LocalService.GetLandData(scopeID, regionHandle, x, y, out regionAccess);
+        if (land != null)
+            return land;
+
+        return base.GetLandData(scopeID, regionHandle, x, y, out regionAccess);
+
+    }
+    #endregion ILandService
 }

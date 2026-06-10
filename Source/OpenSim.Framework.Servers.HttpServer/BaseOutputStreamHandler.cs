@@ -25,36 +25,33 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.IO;
+namespace OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Framework.Servers.HttpServer
+/// <summary>
+/// Base handler for writing to an output stream
+/// </summary>
+/// <remarks>
+/// Inheriting classes should override ProcessRequest() rather than Handle()
+/// </remarks>
+public abstract class BaseOutputStreamHandler : BaseRequestHandler, IRequestHandler
 {
-    /// <summary>
-    /// Base handler for writing to an output stream
-    /// </summary>
-    /// <remarks>
-    /// Inheriting classes should override ProcessRequest() rather than Handle()
-    /// </remarks>
-    public abstract class BaseOutputStreamHandler : BaseRequestHandler, IRequestHandler
+    protected BaseOutputStreamHandler(string httpMethod, string path) : this(httpMethod, path, null, null) {}
+
+    protected BaseOutputStreamHandler(string httpMethod, string path, string name, string description)
+        : base(httpMethod, path, name, description) {}
+
+    public virtual void Handle(
+        string path, Stream request, Stream response, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        protected BaseOutputStreamHandler(string httpMethod, string path) : this(httpMethod, path, null, null) {}
+        RequestsReceived++;
 
-        protected BaseOutputStreamHandler(string httpMethod, string path, string name, string description)
-            : base(httpMethod, path, name, description) {}
+        ProcessRequest(path, request, response, httpRequest, httpResponse);
 
-        public virtual void Handle(
-            string path, Stream request, Stream response, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            RequestsReceived++;
+        RequestsHandled++;
+    }
 
-            ProcessRequest(path, request, response, httpRequest, httpResponse);
-
-            RequestsHandled++;
-        }
-
-        protected virtual void ProcessRequest(
-            string path, Stream request, Stream response, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-        }
+    protected virtual void ProcessRequest(
+        string path, Stream request, Stream response, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
     }
 }

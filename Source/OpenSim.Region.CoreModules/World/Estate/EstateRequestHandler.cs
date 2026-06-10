@@ -38,282 +38,281 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenMetaverse;
 using log4net;
 
-namespace OpenSim.Region.CoreModules.World.Estate
+namespace OpenSim.Region.CoreModules.World.Estate;
+
+public class EstateSimpleRequestHandler :SimpleStreamHandler
 {
-    public class EstateSimpleRequestHandler :SimpleStreamHandler
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected EstateModule m_EstateModule;
+    protected Object m_RequestLock = new Object();
+    private string token;
+
+    public EstateSimpleRequestHandler(EstateModule fmodule, string _token) : base("/estate")
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_EstateModule = fmodule;
+        token = _token;
+    }
 
-        protected EstateModule m_EstateModule;
-        protected Object m_RequestLock = new Object();
-        private string token;
-
-        public EstateSimpleRequestHandler(EstateModule fmodule, string _token) : base("/estate")
+    protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        httpResponse.KeepAlive = false;
+        if (httpRequest.HttpMethod != "POST")
         {
-            m_EstateModule = fmodule;
-            token = _token;
+            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+            return;
         }
 
-        protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        httpResponse.StatusCode = (int)HttpStatusCode.OK;
+
+        // m_log.DebugFormat("[ESTATE HANDLER]: query String: {0}", body);
+
+        try
         {
-            httpResponse.KeepAlive = false;
-            if (httpRequest.HttpMethod != "POST")
+            string body;
+            using (StreamReader sr = new StreamReader(httpRequest.InputStream))
+                body = sr.ReadToEnd();
+
+            body = body.Trim();
+            lock (m_RequestLock)
             {
-                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-                return;
-            }
+                Dictionary<string, object> request = ServerUtils.ParseQueryString(body);
 
-            httpResponse.StatusCode = (int)HttpStatusCode.OK;
-
-            // m_log.DebugFormat("[ESTATE HANDLER]: query String: {0}", body);
-
-            try
-            {
-                string body;
-                using (StreamReader sr = new StreamReader(httpRequest.InputStream))
-                    body = sr.ReadToEnd();
-
-                body = body.Trim();
-                lock (m_RequestLock)
+                bool fail = true;
+                while(true)
                 {
-                    Dictionary<string, object> request = ServerUtils.ParseQueryString(body);
-
-                    bool fail = true;
-                    while(true)
-                    {
-                        if (!request.ContainsKey("METHOD"))
-                            break;
-
-                        if (!request.ContainsKey("TOKEN"))
-                            break;
-
-                        string reqToken = request["TOKEN"].ToString();
-
-                        if(token != reqToken)
-                            break;
-
-                        fail = false;
+                    if (!request.ContainsKey("METHOD"))
                         break;
-                    }
-                    if(fail)
-                    {
-                        httpResponse.RawBuffer = FailureResult();
-                        return;
-                    }
 
-                    string method = request["METHOD"].ToString();
-                    request.Remove("METHOD");
-                    request.Remove("TOKEN");
+                    if (!request.ContainsKey("TOKEN"))
+                        break;
 
-                    try
+                    string reqToken = request["TOKEN"].ToString();
+
+                    if(token != reqToken)
+                        break;
+
+                    fail = false;
+                    break;
+                }
+                if(fail)
+                {
+                    httpResponse.RawBuffer = FailureResult();
+                    return;
+                }
+
+                string method = request["METHOD"].ToString();
+                request.Remove("METHOD");
+                request.Remove("TOKEN");
+
+                try
+                {
+                    m_EstateModule.InInfoUpdate = false;
+                    switch (method)
                     {
-                        m_EstateModule.InInfoUpdate = false;
-                        switch (method)
-                        {
-                            case "update_covenant":
-                                httpResponse.RawBuffer = UpdateCovenant(request);
-                                return;
-                            case "update_estate":
-                                httpResponse.RawBuffer = UpdateEstate(request);
-                                return;
-                            case "estate_message":
-                                httpResponse.RawBuffer = EstateMessage(request);
-                                return;
-                            case "teleport_home_one_user":
-                                httpResponse.RawBuffer = TeleportHomeOneUser(request);
-                                return;
-                            case "teleport_home_all_users":
-                                httpResponse.RawBuffer = TeleportHomeAllUsers(request);
-                                return;
-                        }
-                    }
-                    finally
-                    {
-                        m_EstateModule.InInfoUpdate = false;
+                        case "update_covenant":
+                            httpResponse.RawBuffer = UpdateCovenant(request);
+                            return;
+                        case "update_estate":
+                            httpResponse.RawBuffer = UpdateEstate(request);
+                            return;
+                        case "estate_message":
+                            httpResponse.RawBuffer = EstateMessage(request);
+                            return;
+                        case "teleport_home_one_user":
+                            httpResponse.RawBuffer = TeleportHomeOneUser(request);
+                            return;
+                        case "teleport_home_all_users":
+                            httpResponse.RawBuffer = TeleportHomeAllUsers(request);
+                            return;
                     }
                 }
-            }
-            catch (Exception e)
-            {
-                m_log.Debug("[ESTATE]: Exception {0}" + e.ToString());
-            }
-
-            httpResponse.RawBuffer = FailureResult();
-        }
-
-        byte[] TeleportHomeAllUsers(Dictionary<string, object> request)
-        {
-            UUID PreyID = UUID.Zero;
-            int EstateID = 0;
-
-            if (!request.ContainsKey("EstateID"))
-                return FailureResult();
-
-            if (!Int32.TryParse(request["EstateID"].ToString(), out EstateID))
-                return FailureResult();
-
-            foreach (Scene s in m_EstateModule.Scenes)
-            {
-                if (s.RegionInfo.EstateSettings.EstateID == EstateID)
+                finally
                 {
-                    s.ForEachScenePresence(delegate(ScenePresence p) {
-                        if (p != null && !p.IsChildAgent)
-                        {
-                            p.ControllingClient.SendTeleportStart(16);
-                            s.TeleportClientHome(p.ControllingClient.AgentId, p.ControllingClient);
-                        }
-                    });
+                    m_EstateModule.InInfoUpdate = false;
                 }
             }
-
-            return SuccessResult();
+        }
+        catch (Exception e)
+        {
+            m_log.Debug("[ESTATE]: Exception {0}" + e.ToString());
         }
 
-        byte[] TeleportHomeOneUser(Dictionary<string, object> request)
+        httpResponse.RawBuffer = FailureResult();
+    }
+
+    byte[] TeleportHomeAllUsers(Dictionary<string, object> request)
+    {
+        UUID PreyID = UUID.Zero;
+        int EstateID = 0;
+
+        if (!request.ContainsKey("EstateID"))
+            return FailureResult();
+
+        if (!Int32.TryParse(request["EstateID"].ToString(), out EstateID))
+            return FailureResult();
+
+        foreach (Scene s in m_EstateModule.Scenes)
         {
-            UUID PreyID = UUID.Zero;
-            int EstateID = 0;
-
-            if (!request.ContainsKey("PreyID") ||
-                !request.ContainsKey("EstateID"))
+            if (s.RegionInfo.EstateSettings.EstateID == EstateID)
             {
-                return FailureResult();
-            }
-
-            if (!UUID.TryParse(request["PreyID"].ToString(), out PreyID))
-                return FailureResult();
-
-            if (!Int32.TryParse(request["EstateID"].ToString(), out EstateID))
-                return FailureResult();
-
-            foreach (Scene s in m_EstateModule.Scenes)
-            {
-                if (s.RegionInfo.EstateSettings.EstateID == EstateID)
-                {
-                    ScenePresence p = s.GetScenePresence(PreyID);
+                s.ForEachScenePresence(delegate(ScenePresence p) {
                     if (p != null && !p.IsChildAgent)
                     {
                         p.ControllingClient.SendTeleportStart(16);
-                        s.TeleportClientHome(PreyID, p.ControllingClient);
+                        s.TeleportClientHome(p.ControllingClient.AgentId, p.ControllingClient);
                     }
-                }
+                });
             }
-
-            return SuccessResult();
         }
 
-        byte[] EstateMessage(Dictionary<string, object> request)
-        {
-            UUID FromID = UUID.Zero;
-            string FromName = String.Empty;
-            string Message = String.Empty;
-            int EstateID = 0;
-
-            if (!request.ContainsKey("FromID") ||
-                !request.ContainsKey("FromName") ||
-                !request.ContainsKey("Message") ||
-                !request.ContainsKey("EstateID"))
-            {
-                return FailureResult();
-            }
-
-            if (!UUID.TryParse(request["FromID"].ToString(), out FromID))
-                return FailureResult();
-
-            if (!Int32.TryParse(request["EstateID"].ToString(), out EstateID))
-                return FailureResult();
-
-            FromName = request["FromName"].ToString();
-            Message = request["Message"].ToString();
-
-            foreach (Scene s in m_EstateModule.Scenes)
-            {
-                if (s.RegionInfo.EstateSettings.EstateID == EstateID)
-                {
-                    IDialogModule dm = s.RequestModuleInterface<IDialogModule>();
-
-                    if (dm != null)
-                    {
-                        dm.SendNotificationToUsersInRegion(FromID, FromName,
-                                Message);
-                    }
-                }
-            }
-
-            return SuccessResult();
-        }
-
-        byte[] UpdateCovenant(Dictionary<string, object> request)
-        {
-            UUID CovenantID = UUID.Zero;
-            int EstateID = 0;
-
-            if (!request.ContainsKey("CovenantID") || !request.ContainsKey("EstateID"))
-                return FailureResult();
-
-            if (!UUID.TryParse(request["CovenantID"].ToString(), out CovenantID))
-                return FailureResult();
-
-            if (!Int32.TryParse(request["EstateID"].ToString(), out EstateID))
-                return FailureResult();
-
-            foreach (Scene s in m_EstateModule.Scenes)
-            {
-                if (s.RegionInfo.EstateSettings.EstateID == (uint)EstateID)
-                    s.RegionInfo.RegionSettings.Covenant = CovenantID;
-            }
-
-            return SuccessResult();
-        }
-
-        byte[] UpdateEstate(Dictionary<string, object> request)
-        {
-            int EstateID = 0;
-
-            if (!request.ContainsKey("EstateID"))
-                return FailureResult();
-            if (!Int32.TryParse(request["EstateID"].ToString(), out EstateID))
-                return FailureResult();
-
-            foreach (Scene s in m_EstateModule.Scenes)
-            {
-                if (s.RegionInfo.EstateSettings.EstateID == (uint)EstateID)
-                    s.ReloadEstateData();
-            }
-            return SuccessResult();
-        }
-
-        private byte[] FailureResult()
-        {
-            return BoolResult(false);
-        }
-
-        private byte[] SuccessResult()
-        {
-            return BoolResult(true);
-        }
-
-        private byte[] BoolResult(bool value)
-        {
-            XmlDocument doc = new XmlDocument();
-
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
-
-            doc.AppendChild(xmlnode);
-
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
-
-            doc.AppendChild(rootElement);
-
-            XmlElement result = doc.CreateElement("", "RESULT", "");
-            result.AppendChild(doc.CreateTextNode(value.ToString()));
-
-            rootElement.AppendChild(result);
-
-            return Util.DocToBytes(doc);
-        }
-
+        return SuccessResult();
     }
+
+    byte[] TeleportHomeOneUser(Dictionary<string, object> request)
+    {
+        UUID PreyID = UUID.Zero;
+        int EstateID = 0;
+
+        if (!request.ContainsKey("PreyID") ||
+            !request.ContainsKey("EstateID"))
+        {
+            return FailureResult();
+        }
+
+        if (!UUID.TryParse(request["PreyID"].ToString(), out PreyID))
+            return FailureResult();
+
+        if (!Int32.TryParse(request["EstateID"].ToString(), out EstateID))
+            return FailureResult();
+
+        foreach (Scene s in m_EstateModule.Scenes)
+        {
+            if (s.RegionInfo.EstateSettings.EstateID == EstateID)
+            {
+                ScenePresence p = s.GetScenePresence(PreyID);
+                if (p != null && !p.IsChildAgent)
+                {
+                    p.ControllingClient.SendTeleportStart(16);
+                    s.TeleportClientHome(PreyID, p.ControllingClient);
+                }
+            }
+        }
+
+        return SuccessResult();
+    }
+
+    byte[] EstateMessage(Dictionary<string, object> request)
+    {
+        UUID FromID = UUID.Zero;
+        string FromName = String.Empty;
+        string Message = String.Empty;
+        int EstateID = 0;
+
+        if (!request.ContainsKey("FromID") ||
+            !request.ContainsKey("FromName") ||
+            !request.ContainsKey("Message") ||
+            !request.ContainsKey("EstateID"))
+        {
+            return FailureResult();
+        }
+
+        if (!UUID.TryParse(request["FromID"].ToString(), out FromID))
+            return FailureResult();
+
+        if (!Int32.TryParse(request["EstateID"].ToString(), out EstateID))
+            return FailureResult();
+
+        FromName = request["FromName"].ToString();
+        Message = request["Message"].ToString();
+
+        foreach (Scene s in m_EstateModule.Scenes)
+        {
+            if (s.RegionInfo.EstateSettings.EstateID == EstateID)
+            {
+                IDialogModule dm = s.RequestModuleInterface<IDialogModule>();
+
+                if (dm != null)
+                {
+                    dm.SendNotificationToUsersInRegion(FromID, FromName,
+                            Message);
+                }
+            }
+        }
+
+        return SuccessResult();
+    }
+
+    byte[] UpdateCovenant(Dictionary<string, object> request)
+    {
+        UUID CovenantID = UUID.Zero;
+        int EstateID = 0;
+
+        if (!request.ContainsKey("CovenantID") || !request.ContainsKey("EstateID"))
+            return FailureResult();
+
+        if (!UUID.TryParse(request["CovenantID"].ToString(), out CovenantID))
+            return FailureResult();
+
+        if (!Int32.TryParse(request["EstateID"].ToString(), out EstateID))
+            return FailureResult();
+
+        foreach (Scene s in m_EstateModule.Scenes)
+        {
+            if (s.RegionInfo.EstateSettings.EstateID == (uint)EstateID)
+                s.RegionInfo.RegionSettings.Covenant = CovenantID;
+        }
+
+        return SuccessResult();
+    }
+
+    byte[] UpdateEstate(Dictionary<string, object> request)
+    {
+        int EstateID = 0;
+
+        if (!request.ContainsKey("EstateID"))
+            return FailureResult();
+        if (!Int32.TryParse(request["EstateID"].ToString(), out EstateID))
+            return FailureResult();
+
+        foreach (Scene s in m_EstateModule.Scenes)
+        {
+            if (s.RegionInfo.EstateSettings.EstateID == (uint)EstateID)
+                s.ReloadEstateData();
+        }
+        return SuccessResult();
+    }
+
+    private byte[] FailureResult()
+    {
+        return BoolResult(false);
+    }
+
+    private byte[] SuccessResult()
+    {
+        return BoolResult(true);
+    }
+
+    private byte[] BoolResult(bool value)
+    {
+        XmlDocument doc = new XmlDocument();
+
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
+                "", "");
+
+        doc.AppendChild(xmlnode);
+
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse",
+                "");
+
+        doc.AppendChild(rootElement);
+
+        XmlElement result = doc.CreateElement("", "RESULT", "");
+        result.AppendChild(doc.CreateTextNode(value.ToString()));
+
+        rootElement.AppendChild(result);
+
+        return Util.DocToBytes(doc);
+    }
+
 }

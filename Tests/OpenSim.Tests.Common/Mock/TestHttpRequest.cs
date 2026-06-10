@@ -25,151 +25,145 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Specialized;
-using System.IO;
-using OSHttpServer;
+namespace OpenSim.Tests.Common;
 
-namespace OpenSim.Tests.Common
-{
 /*
-    public class TestHttpRequest: IHttpRequest
+public class TestHttpRequest: IHttpRequest
+{
+    private string _uriPath;
+    public bool BodyIsComplete
     {
-        private string _uriPath;
-        public bool BodyIsComplete
-        {
-            get { return true; }
-        }
-        public string[] AcceptTypes
-        {
-            get {return _acceptTypes; }
-        }
-        private string[] _acceptTypes;
-        public Stream Body
-        {
-            get { return _body; }
-            set { _body = value;}
-        }
-        private Stream _body;
-        public ConnectionType Connection
-        {
-            get { return _connection; }
-            set { _connection = value; }
-        }
-        private ConnectionType _connection;
-        public int ContentLength
-        {
-            get { return _contentLength; }
-            set { _contentLength = value; }
-        }
-        private int _contentLength;
-        public NameValueCollection Headers
-        {
-            get { return _headers; }
-        }
-        private NameValueCollection _headers = new NameValueCollection();
+        get { return true; }
+    }
+    public string[] AcceptTypes
+    {
+        get {return _acceptTypes; }
+    }
+    private string[] _acceptTypes;
+    public Stream Body
+    {
+        get { return _body; }
+        set { _body = value;}
+    }
+    private Stream _body;
+    public ConnectionType Connection
+    {
+        get { return _connection; }
+        set { _connection = value; }
+    }
+    private ConnectionType _connection;
+    public int ContentLength
+    {
+        get { return _contentLength; }
+        set { _contentLength = value; }
+    }
+    private int _contentLength;
+    public NameValueCollection Headers
+    {
+        get { return _headers; }
+    }
+    private NameValueCollection _headers = new NameValueCollection();
 
-        public string HttpVersion { get; set; }
+    public string HttpVersion { get; set; }
 
-        public string Method
-        {
-            get { return _method; }
-            set { _method = value; }
-        }
-        private string _method = null;
-        public HttpInput QueryString
-        {
-            get { return _queryString;  }
-        }
-        private HttpInput _queryString = null;
-        public Uri Uri
-        {
-            get { return _uri; }
-            set { _uri = value; }
-        }
-        private Uri _uri = null;
-        public string[] UriParts
-        {
-            get { return _uri.Segments; }
-        }
-        public HttpParam Param
-        {
-            get { return null; }
-        }
-        public HttpForm Form
-        {
-            get { return null; }
-        }
-        public bool IsAjax
-        {
-            get { return false; }
-        }
-        public RequestCookies Cookies
-        {
-            get { return null; }
-        }
+    public string Method
+    {
+        get { return _method; }
+        set { _method = value; }
+    }
+    private string _method = null;
+    public HttpInput QueryString
+    {
+        get { return _queryString;  }
+    }
+    private HttpInput _queryString = null;
+    public Uri Uri
+    {
+        get { return _uri; }
+        set { _uri = value; }
+    }
+    private Uri _uri = null;
+    public string[] UriParts
+    {
+        get { return _uri.Segments; }
+    }
+    public HttpParam Param
+    {
+        get { return null; }
+    }
+    public HttpForm Form
+    {
+        get { return null; }
+    }
+    public bool IsAjax
+    {
+        get { return false; }
+    }
+    public RequestCookies Cookies
+    {
+        get { return null; }
+    }
 
-        public TestHttpRequest()
-        {
-            HttpVersion = "HTTP/1.1";
-        }
+    public TestHttpRequest()
+    {
+        HttpVersion = "HTTP/1.1";
+    }
 
-        public TestHttpRequest(string contentEncoding, string contentType, string userAgent,
-                               string remoteAddr, string remotePort, string[] acceptTypes,
-                               ConnectionType connectionType, int contentLength, Uri uri) : base()
-        {
-            _headers["content-encoding"] = contentEncoding;
-            _headers["content-type"] = contentType;
-            _headers["user-agent"] = userAgent;
-            _headers["remote_addr"] = remoteAddr;
-            _headers["remote_port"] = remotePort;
+    public TestHttpRequest(string contentEncoding, string contentType, string userAgent,
+                           string remoteAddr, string remotePort, string[] acceptTypes,
+                           ConnectionType connectionType, int contentLength, Uri uri) : base()
+    {
+        _headers["content-encoding"] = contentEncoding;
+        _headers["content-type"] = contentType;
+        _headers["user-agent"] = userAgent;
+        _headers["remote_addr"] = remoteAddr;
+        _headers["remote_port"] = remotePort;
 
-            _acceptTypes = acceptTypes;
-            _connection = connectionType;
-            _contentLength = contentLength;
-            _uri = uri;
-        }
+        _acceptTypes = acceptTypes;
+        _connection = connectionType;
+        _contentLength = contentLength;
+        _uri = uri;
+    }
 
-        public void DecodeBody(FormDecoderProvider providers) {}
-        public void SetCookies(RequestCookies cookies) {}
-        public void AddHeader(string name, string value)
-        {
-            _headers.Add(name, value);
-        }
-        public int AddToBody(byte[] bytes, int offset, int length)
-        {
-            return 0;
-        }
-        public void Clear() {}
+    public void DecodeBody(FormDecoderProvider providers) {}
+    public void SetCookies(RequestCookies cookies) {}
+    public void AddHeader(string name, string value)
+    {
+        _headers.Add(name, value);
+    }
+    public int AddToBody(byte[] bytes, int offset, int length)
+    {
+        return 0;
+    }
+    public void Clear() {}
 
-        public object Clone()
-        {
-            TestHttpRequest clone = new TestHttpRequest();
-            clone._acceptTypes = _acceptTypes;
-            clone._connection = _connection;
-            clone._contentLength = _contentLength;
-            clone._uri = _uri;
-            clone._headers = new NameValueCollection(_headers);
+    public object Clone()
+    {
+        TestHttpRequest clone = new TestHttpRequest();
+        clone._acceptTypes = _acceptTypes;
+        clone._connection = _connection;
+        clone._contentLength = _contentLength;
+        clone._uri = _uri;
+        clone._headers = new NameValueCollection(_headers);
 
-            return clone;
-        }
-        public IHttpResponse CreateResponse(IHttpClientContext context)
+        return clone;
+    }
+    public IHttpResponse CreateResponse(IHttpClientContext context)
+    {
+        return new HttpResponse(context, this);
+    }
+    /// <summary>
+    /// Path and query (will be merged with the host header) and put in Uri
+    /// </summary>
+    /// <see cref="Uri"/>
+    public string UriPath
+    {
+        get { return _uriPath; }
+        set
         {
-            return new HttpResponse(context, this);
-        }
-        /// <summary>
-        /// Path and query (will be merged with the host header) and put in Uri
-        /// </summary>
-        /// <see cref="Uri"/>
-        public string UriPath
-        {
-            get { return _uriPath; }
-            set
-            {
-                _uriPath = value;
+            _uriPath = value;
 
-            }
         }
     }
-*/
 }
+*/

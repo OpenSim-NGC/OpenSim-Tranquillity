@@ -28,14 +28,13 @@
 using OpenSim.Framework;
 using OpenMetaverse;
 
-namespace OpenSim.Services.Interfaces
-{
-    public interface IBakedTextureModule
-    {
-        WearableCacheItem[] Get(UUID id);
+namespace OpenSim.Services.Interfaces;
 
-        void Store(UUID id);
-        void Store(UUID id, WearableCacheItem[] WearableCache);
-        void UpdateMeshAvatar(UUID id);
-    }
+public interface IBakedTextureModule
+{
+    WearableCacheItem[] Get(UUID id);
+
+    void Store(UUID id);
+    void Store(UUID id, WearableCacheItem[] WearableCache);
+    void UpdateMeshAvatar(UUID id);
 }

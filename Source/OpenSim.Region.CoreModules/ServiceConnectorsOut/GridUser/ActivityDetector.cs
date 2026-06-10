@@ -33,90 +33,89 @@ using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 using log4net;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser;
+
+public class ActivityDetector
 {
-    public class ActivityDetector
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IGridUserService m_GridUserService;
+
+    public ActivityDetector(IGridUserService guservice)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_GridUserService = guservice;
+        m_log.DebugFormat("[ACTIVITY DETECTOR]: starting ");
+    }
 
-        private IGridUserService m_GridUserService;
+    public void AddRegion(Scene scene)
+    {
+        // For now the only events we listen to are these
+        // But we could trigger the position update more often
+        scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
+        scene.EventManager.OnNewClient += OnNewClient;
+    }
 
-        public ActivityDetector(IGridUserService guservice)
+    public void RemoveRegion(Scene scene)
+    {
+        scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
+        scene.EventManager.OnNewClient -= OnNewClient;
+    }
+
+   public void OnMakeRootAgent(ScenePresence sp)
+   {
+        if (sp.IsNPC)
+            return;
+
+        if(sp.m_gotCrossUpdate)
         {
-            m_GridUserService = guservice;
-            m_log.DebugFormat("[ACTIVITY DETECTOR]: starting ");
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            // For now the only events we listen to are these
-            // But we could trigger the position update more often
-            scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
-            scene.EventManager.OnNewClient += OnNewClient;
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
-            scene.EventManager.OnNewClient -= OnNewClient;
-        }
-
-       public void OnMakeRootAgent(ScenePresence sp)
-       {
-            if (sp.IsNPC)
-                return;
-
-            if(sp.m_gotCrossUpdate)
+            Util.FireAndForget(delegate
             {
-                Util.FireAndForget(delegate
-                {
-                    DoOnMakeRootAgent(sp);
-                }, null, "ActivityDetector_MakeRoot");
-            }
-            else
                 DoOnMakeRootAgent(sp);
-       }
+            }, null, "ActivityDetector_MakeRoot");
+        }
+        else
+            DoOnMakeRootAgent(sp);
+   }
 
-        public void DoOnMakeRootAgent(ScenePresence sp)
+    public void DoOnMakeRootAgent(ScenePresence sp)
+    {
+        string userid;
+        //m_log.DebugFormat("[ACTIVITY DETECTOR]: Detected root presence {0} in {1}", userid, sp.Scene.RegionInfo.RegionName);
+        if (sp.Scene.UserManagementModule.GetUserUUI(sp.UUID, out userid))
         {
-            string userid;
-            //m_log.DebugFormat("[ACTIVITY DETECTOR]: Detected root presence {0} in {1}", userid, sp.Scene.RegionInfo.RegionName);
-            if (sp.Scene.UserManagementModule.GetUserUUI(sp.UUID, out userid))
+            /* we only setposition on known agents that have a valid lookup */
+            m_GridUserService.SetLastPosition(
+                userid, UUID.Zero, sp.Scene.RegionInfo.RegionID, sp.AbsolutePosition, sp.Lookat);
+        }
+    }
+
+    public void OnNewClient(IClientAPI client)
+    {
+        client.OnConnectionClosed += OnConnectionClose;
+    }
+
+    public void OnConnectionClose(IClientAPI client)
+    {
+        if (client == null)
+            return;
+        if (client.SceneAgent == null)
+            return;
+
+        if (client.SceneAgent.IsChildAgent)
+            return;
+
+        string userId;
+        /* without scene we cannot logout correctly at all since we do not know how to send the loggedout message then */
+        if (client.Scene is Scene)
+        {
+            Scene s = (Scene)client.Scene;
+            if(s.UserManagementModule.GetUserUUI(client.AgentId, out userId))
             {
-                /* we only setposition on known agents that have a valid lookup */
-                m_GridUserService.SetLastPosition(
-                    userid, UUID.Zero, sp.Scene.RegionInfo.RegionID, sp.AbsolutePosition, sp.Lookat);
+                m_GridUserService.LoggedOut(
+                    userId, client.SessionId, client.Scene.RegionInfo.RegionID,
+                    client.SceneAgent.AbsolutePosition, client.SceneAgent.Lookat);
             }
         }
 
-        public void OnNewClient(IClientAPI client)
-        {
-            client.OnConnectionClosed += OnConnectionClose;
-        }
-
-        public void OnConnectionClose(IClientAPI client)
-        {
-            if (client == null)
-                return;
-            if (client.SceneAgent == null)
-                return;
-
-            if (client.SceneAgent.IsChildAgent)
-                return;
-
-            string userId;
-            /* without scene we cannot logout correctly at all since we do not know how to send the loggedout message then */
-            if (client.Scene is Scene)
-            {
-                Scene s = (Scene)client.Scene;
-                if(s.UserManagementModule.GetUserUUI(client.AgentId, out userId))
-                {
-                    m_GridUserService.LoggedOut(
-                        userId, client.SessionId, client.Scene.RegionInfo.RegionID,
-                        client.SceneAgent.AbsolutePosition, client.SceneAgent.Lookat);
-                }
-            }
-
-        }
     }
 }

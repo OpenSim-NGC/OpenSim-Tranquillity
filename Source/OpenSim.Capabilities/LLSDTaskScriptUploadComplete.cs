@@ -26,29 +26,26 @@
  */
 
 using OpenMetaverse;
-using System;
-using System.Collections;
 
-namespace OpenSim.Framework.Capabilities
+namespace OpenSim.Framework.Capabilities;
+
+[OSDMap]
+public class LLSDTaskScriptUploadComplete
 {
-    [OSDMap]
-    public class LLSDTaskScriptUploadComplete
-    {
-        /// <summary>
-        /// The task inventory item that was updated
-        /// </summary>
-        public UUID new_asset;
+    /// <summary>
+    /// The task inventory item that was updated
+    /// </summary>
+    public UUID new_asset;
 
-        /// <summary>
-        /// Was it compiled?
-        /// </summary>
-        public bool compiled;
+    /// <summary>
+    /// Was it compiled?
+    /// </summary>
+    public bool compiled;
 
-        /// <summary>
-        /// State of the upload.  So far have only even seen this set to "complete"
-        /// </summary>
-        public string state;
+    /// <summary>
+    /// State of the upload.  So far have only even seen this set to "complete"
+    /// </summary>
+    public string state;
 
-        public OSDArray errors;
-    }
+    public OSDArray errors;
 }

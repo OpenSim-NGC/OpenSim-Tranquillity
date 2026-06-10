@@ -25,112 +25,107 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
-using System.Reflection;
 using OpenSim.Services.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Data;
 using OpenSim.Framework;
 
-namespace OpenSim.Services.EstateService
+namespace OpenSim.Services.EstateService;
+
+public class EstateDataService : ServiceBase, IEstateDataService
 {
-    public class EstateDataService : ServiceBase, IEstateDataService
-    {
 //        private static readonly ILog m_log =
 //                LogManager.GetLogger(
 //                MethodBase.GetCurrentMethod().DeclaringType);
 
-        protected IEstateDataStore m_database;
+    protected IEstateDataStore m_database;
 
-        public EstateDataService(IConfigSource config)
-            : base(config)
+    public EstateDataService(IConfigSource config)
+        : base(config)
+    {
+        string dllName = String.Empty;
+        string connString = String.Empty;
+
+        // Try reading the [DatabaseService] section, if it exists
+        IConfig dbConfig = config.Configs["DatabaseService"];
+        if (dbConfig != null)
         {
-            string dllName = String.Empty;
-            string connString = String.Empty;
-
-            // Try reading the [DatabaseService] section, if it exists
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig != null)
-            {
-                dllName = dbConfig.GetString("StorageProvider", String.Empty);
-                connString = dbConfig.GetString("ConnectionString", String.Empty);
-                connString = dbConfig.GetString("EstateConnectionString", connString);
-            }
-
-            // Try reading the [EstateDataStore] section, if it exists
-            IConfig estConfig = config.Configs["EstateDataStore"];
-            if (estConfig != null)
-            {
-                dllName = estConfig.GetString("StorageProvider", dllName);
-                connString = estConfig.GetString("ConnectionString", connString);
-            }
-
-            // We tried, but this doesn't exist. We can't proceed
-            if (dllName.Length == 0)
-                throw new Exception("No StorageProvider configured");
-
-            m_database = LoadPlugin<IEstateDataStore>(dllName, new Object[] { connString });
-            if (m_database == null)
-                throw new Exception("Could not find a storage interface in the given module");
+            dllName = dbConfig.GetString("StorageProvider", String.Empty);
+            connString = dbConfig.GetString("ConnectionString", String.Empty);
+            connString = dbConfig.GetString("EstateConnectionString", connString);
         }
 
-        public EstateSettings LoadEstateSettings(UUID regionID, bool create)
+        // Try reading the [EstateDataStore] section, if it exists
+        IConfig estConfig = config.Configs["EstateDataStore"];
+        if (estConfig != null)
         {
-            return m_database.LoadEstateSettings(regionID, create);
+            dllName = estConfig.GetString("StorageProvider", dllName);
+            connString = estConfig.GetString("ConnectionString", connString);
         }
 
-        public EstateSettings LoadEstateSettings(int estateID)
-        {
-            return m_database.LoadEstateSettings(estateID);
-        }
+        // We tried, but this doesn't exist. We can't proceed
+        if (dllName.Length == 0)
+            throw new Exception("No StorageProvider configured");
 
-        public EstateSettings CreateNewEstate(int estateID = 0)
-        {
-            return m_database.CreateNewEstate(estateID);
-        }
+        m_database = LoadPlugin<IEstateDataStore>(dllName, new Object[] { connString });
+        if (m_database == null)
+            throw new Exception("Could not find a storage interface in the given module");
+    }
 
-        public List<EstateSettings> LoadEstateSettingsAll()
-        {
-            return m_database.LoadEstateSettingsAll();
-        }
+    public EstateSettings LoadEstateSettings(UUID regionID, bool create)
+    {
+        return m_database.LoadEstateSettings(regionID, create);
+    }
 
-        public void StoreEstateSettings(EstateSettings es)
-        {
-            m_database.StoreEstateSettings(es);
-        }
+    public EstateSettings LoadEstateSettings(int estateID)
+    {
+        return m_database.LoadEstateSettings(estateID);
+    }
 
-        public List<int> GetEstates(string search)
-        {
-            return m_database.GetEstates(search);
-        }
+    public EstateSettings CreateNewEstate(int estateID = 0)
+    {
+        return m_database.CreateNewEstate(estateID);
+    }
 
-        public List<int> GetEstatesAll()
-        {
-            return m_database.GetEstatesAll();
-        }
+    public List<EstateSettings> LoadEstateSettingsAll()
+    {
+        return m_database.LoadEstateSettingsAll();
+    }
 
-        public List<int> GetEstatesByOwner(UUID ownerID)
-        {
-            return m_database.GetEstatesByOwner(ownerID);
-        }
+    public void StoreEstateSettings(EstateSettings es)
+    {
+        m_database.StoreEstateSettings(es);
+    }
 
-        public bool LinkRegion(UUID regionID, int estateID)
-        {
-            return m_database.LinkRegion(regionID, estateID);
-        }
+    public List<int> GetEstates(string search)
+    {
+        return m_database.GetEstates(search);
+    }
 
-        public List<UUID> GetRegions(int estateID)
-        {
-            return m_database.GetRegions(estateID);
-        }
+    public List<int> GetEstatesAll()
+    {
+        return m_database.GetEstatesAll();
+    }
 
-        public bool DeleteEstate(int estateID)
-        {
-            return m_database.DeleteEstate(estateID);
-        }
+    public List<int> GetEstatesByOwner(UUID ownerID)
+    {
+        return m_database.GetEstatesByOwner(ownerID);
+    }
+
+    public bool LinkRegion(UUID regionID, int estateID)
+    {
+        return m_database.LinkRegion(regionID, estateID);
+    }
+
+    public List<UUID> GetRegions(int estateID)
+    {
+        return m_database.GetRegions(estateID);
+    }
+
+    public bool DeleteEstate(int estateID)
+    {
+        return m_database.DeleteEstate(estateID);
     }
 }

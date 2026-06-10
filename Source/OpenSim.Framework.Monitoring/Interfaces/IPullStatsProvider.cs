@@ -25,17 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Framework.Monitoring.Interfaces
+namespace OpenSim.Framework.Monitoring.Interfaces;
+
+/// <summary>
+/// Implemented by objects which allow statistical information to be pulled from them.
+/// </summary>
+public interface IPullStatsProvider
 {
     /// <summary>
-    /// Implemented by objects which allow statistical information to be pulled from them.
+    /// Provide statistical information.  Only temporary one long string.
     /// </summary>
-    public interface IPullStatsProvider
-    {
-        /// <summary>
-        /// Provide statistical information.  Only temporary one long string.
-        /// </summary>
-        /// <returns></returns>
-        string GetStats();
-    }
+    /// <returns></returns>
+    string GetStats();
 }

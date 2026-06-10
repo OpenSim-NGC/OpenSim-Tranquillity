@@ -26,200 +26,193 @@
  */
 
 using Nini.Config;
-using log4net;
-using System.Reflection;
-using System;
-using System.IO;
 using System.Xml;
-using System.Collections.Generic;
 using OpenSim.Server.Base;
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
 using OpenMetaverse;
 
-namespace OpenSim.ConsoleClient
+namespace OpenSim.ConsoleClient;
+
+public class OpenSimConsoleClient
 {
-    public class OpenSimConsoleClient
+    protected static ServicesServerBase m_Server = null;
+    private static string m_Host;
+    private static int m_Port;
+    private static string m_User;
+    private static string m_Pass;
+    private static UUID m_SessionID;
+
+    static int Main(string[] args)
     {
-        protected static ServicesServerBase m_Server = null;
-        private static string m_Host;
-        private static int m_Port;
-        private static string m_User;
-        private static string m_Pass;
-        private static UUID m_SessionID;
+        m_Server = new ServicesServerBase("Client", args);
 
-        static int Main(string[] args)
+        IConfig serverConfig = m_Server.Config.Configs["Startup"];
+        if (serverConfig == null)
         {
-            m_Server = new ServicesServerBase("Client", args);
-
-            IConfig serverConfig = m_Server.Config.Configs["Startup"];
-            if (serverConfig == null)
-            {
-                System.Console.WriteLine("Startup config section missing in .ini file");
-                throw new Exception("Configuration error");
-            }
-
-            ArgvConfigSource argvConfig = new ArgvConfigSource(args);
-
-            argvConfig.AddSwitch("Startup", "host", "h");
-            argvConfig.AddSwitch("Startup", "port", "p");
-            argvConfig.AddSwitch("Startup", "user", "u");
-            argvConfig.AddSwitch("Startup", "pass", "P");
-
-            m_Server.Config.Merge(argvConfig);
-
-            m_User = serverConfig.GetString("user", "Test");
-            m_Host = serverConfig.GetString("host", "localhost");
-            m_Port = serverConfig.GetInt("port", 8003);
-            m_Pass = serverConfig.GetString("pass", "secret");
-
-            Requester.MakeRequest("http://"+m_Host+":"+m_Port.ToString()+"/StartSession/", String.Format("USER={0}&PASS={1}", m_User, m_Pass), LoginReply);
-
-
-            while (m_Server.Running)
-            {
-                System.Threading.Thread.Sleep(500);
-                MainConsole.Instance.Prompt();
-            }
-
-            string pidFile = serverConfig.GetString("PIDFile", string.Empty);
-            if (pidFile.Length > 0)
-                File.Delete(pidFile);
-
-            Environment.Exit(0);
-
-            return 0;
+            System.Console.WriteLine("Startup config section missing in .ini file");
+            throw new Exception("Configuration error");
         }
 
-        private static void SendCommand(string module, string[] cmd)
+        ArgvConfigSource argvConfig = new ArgvConfigSource(args);
+
+        argvConfig.AddSwitch("Startup", "host", "h");
+        argvConfig.AddSwitch("Startup", "port", "p");
+        argvConfig.AddSwitch("Startup", "user", "u");
+        argvConfig.AddSwitch("Startup", "pass", "P");
+
+        m_Server.Config.Merge(argvConfig);
+
+        m_User = serverConfig.GetString("user", "Test");
+        m_Host = serverConfig.GetString("host", "localhost");
+        m_Port = serverConfig.GetInt("port", 8003);
+        m_Pass = serverConfig.GetString("pass", "secret");
+
+        Requester.MakeRequest("http://"+m_Host+":"+m_Port.ToString()+"/StartSession/", String.Format("USER={0}&PASS={1}", m_User, m_Pass), LoginReply);
+
+
+        while (m_Server.Running)
         {
-            string sendCmd = "";
-            string[] cmdlist = new string[cmd.Length - 1];
-
-            sendCmd = cmd[0];
-
-            if (cmd.Length > 1)
-            {
-                Array.Copy(cmd, 1, cmdlist, 0, cmd.Length - 1);
-                sendCmd += " \"" + String.Join("\" \"", cmdlist) + "\"";
-            }
-
-            Requester.MakeRequest("http://"+m_Host+":"+m_Port.ToString()+"/SessionCommand/", String.Format("ID={0}&COMMAND={1}", m_SessionID, sendCmd), CommandReply);
+            System.Threading.Thread.Sleep(500);
+            MainConsole.Instance.Prompt();
         }
 
-        public static void LoginReply(string requestUrl, string requestData, string replyData)
+        string pidFile = serverConfig.GetString("PIDFile", string.Empty);
+        if (pidFile.Length > 0)
+            File.Delete(pidFile);
+
+        Environment.Exit(0);
+
+        return 0;
+    }
+
+    private static void SendCommand(string module, string[] cmd)
+    {
+        string sendCmd = "";
+        string[] cmdlist = new string[cmd.Length - 1];
+
+        sendCmd = cmd[0];
+
+        if (cmd.Length > 1)
         {
-            XmlDocument doc = new XmlDocument();
-
-            doc.LoadXml(replyData);
-
-            XmlNodeList rootL = doc.GetElementsByTagName("ConsoleSession");
-            if (rootL.Count != 1)
-            {
-                MainConsole.Instance.Output("Connection data info was not valid");
-                Environment.Exit(1);
-            }
-            XmlElement rootNode = (XmlElement)rootL[0];
-
-            if (rootNode == null)
-            {
-                MainConsole.Instance.Output("Connection data info was not valid");
-                Environment.Exit(1);
-            }
-
-            XmlNodeList helpNodeL = rootNode.GetElementsByTagName("HelpTree");
-            if (helpNodeL.Count != 1)
-            {
-                MainConsole.Instance.Output("Connection data info was not valid");
-                Environment.Exit(1);
-            }
-
-            XmlElement helpNode = (XmlElement)helpNodeL[0];
-            if (helpNode == null)
-            {
-                MainConsole.Instance.Output("Connection data info was not valid");
-                Environment.Exit(1);
-            }
-
-            XmlNodeList sessionL = rootNode.GetElementsByTagName("SessionID");
-            if (sessionL.Count != 1)
-            {
-                MainConsole.Instance.Output("Connection data info was not valid");
-                Environment.Exit(1);
-            }
-
-            XmlElement sessionNode = (XmlElement)sessionL[0];
-            if (sessionNode == null)
-            {
-                MainConsole.Instance.Output("Connection data info was not valid");
-                Environment.Exit(1);
-            }
-
-            if (!UUID.TryParse(sessionNode.InnerText, out m_SessionID))
-            {
-                MainConsole.Instance.Output("Connection data info was not valid");
-                Environment.Exit(1);
-            }
-
-            MainConsole.Instance.Commands.FromXml(helpNode, SendCommand);
-
-            Requester.MakeRequest("http://"+m_Host+":"+m_Port.ToString()+"/ReadResponses/"+m_SessionID.ToString()+"/", String.Empty, ReadResponses);
+            Array.Copy(cmd, 1, cmdlist, 0, cmd.Length - 1);
+            sendCmd += " \"" + String.Join("\" \"", cmdlist) + "\"";
         }
 
-        public static void ReadResponses(string requestUrl, string requestData, string replyData)
+        Requester.MakeRequest("http://"+m_Host+":"+m_Port.ToString()+"/SessionCommand/", String.Format("ID={0}&COMMAND={1}", m_SessionID, sendCmd), CommandReply);
+    }
+
+    public static void LoginReply(string requestUrl, string requestData, string replyData)
+    {
+        XmlDocument doc = new XmlDocument();
+
+        doc.LoadXml(replyData);
+
+        XmlNodeList rootL = doc.GetElementsByTagName("ConsoleSession");
+        if (rootL.Count != 1)
         {
-            XmlDocument doc = new XmlDocument();
+            MainConsole.Instance.Output("Connection data info was not valid");
+            Environment.Exit(1);
+        }
+        XmlElement rootNode = (XmlElement)rootL[0];
 
-            doc.LoadXml(replyData);
+        if (rootNode == null)
+        {
+            MainConsole.Instance.Output("Connection data info was not valid");
+            Environment.Exit(1);
+        }
 
-            XmlNodeList rootNodeL = doc.GetElementsByTagName("ConsoleSession");
-            if (rootNodeL.Count != 1 || rootNodeL[0] == null)
-            {
-                Requester.MakeRequest(requestUrl, requestData, ReadResponses);
-                return;
-            }
+        XmlNodeList helpNodeL = rootNode.GetElementsByTagName("HelpTree");
+        if (helpNodeL.Count != 1)
+        {
+            MainConsole.Instance.Output("Connection data info was not valid");
+            Environment.Exit(1);
+        }
 
-            List<string> lines = new List<string>();
+        XmlElement helpNode = (XmlElement)helpNodeL[0];
+        if (helpNode == null)
+        {
+            MainConsole.Instance.Output("Connection data info was not valid");
+            Environment.Exit(1);
+        }
 
-            foreach (XmlNode part in rootNodeL[0].ChildNodes)
-            {
-                if (part.Name != "Line")
-                    continue;
+        XmlNodeList sessionL = rootNode.GetElementsByTagName("SessionID");
+        if (sessionL.Count != 1)
+        {
+            MainConsole.Instance.Output("Connection data info was not valid");
+            Environment.Exit(1);
+        }
 
-                lines.Add(part.InnerText);
-            }
+        XmlElement sessionNode = (XmlElement)sessionL[0];
+        if (sessionNode == null)
+        {
+            MainConsole.Instance.Output("Connection data info was not valid");
+            Environment.Exit(1);
+        }
 
-            // Cut down scrollback to 100 lines (4 screens)
-            // for the command line client
-            //
-            while (lines.Count > 100)
-                lines.RemoveAt(0);
+        if (!UUID.TryParse(sessionNode.InnerText, out m_SessionID))
+        {
+            MainConsole.Instance.Output("Connection data info was not valid");
+            Environment.Exit(1);
+        }
 
-            string prompt = String.Empty;
+        MainConsole.Instance.Commands.FromXml(helpNode, SendCommand);
 
-            foreach (string l in lines)
-            {
-                string[] parts = l.Split(new char[] {':'}, 3);
-                if (parts.Length != 3)
-                    continue;
+        Requester.MakeRequest("http://"+m_Host+":"+m_Port.ToString()+"/ReadResponses/"+m_SessionID.ToString()+"/", String.Empty, ReadResponses);
+    }
 
-                if (parts[2].StartsWith("+++") || parts[2].StartsWith("-++"))
-                    prompt = parts[2];
-                else
-                    MainConsole.Instance.Output(parts[2].Trim(), parts[1]);
-            }
+    public static void ReadResponses(string requestUrl, string requestData, string replyData)
+    {
+        XmlDocument doc = new XmlDocument();
 
+        doc.LoadXml(replyData);
 
+        XmlNodeList rootNodeL = doc.GetElementsByTagName("ConsoleSession");
+        if (rootNodeL.Count != 1 || rootNodeL[0] == null)
+        {
             Requester.MakeRequest(requestUrl, requestData, ReadResponses);
+            return;
+        }
+
+        List<string> lines = new List<string>();
+
+        foreach (XmlNode part in rootNodeL[0].ChildNodes)
+        {
+            if (part.Name != "Line")
+                continue;
+
+            lines.Add(part.InnerText);
+        }
+
+        // Cut down scrollback to 100 lines (4 screens)
+        // for the command line client
+        //
+        while (lines.Count > 100)
+            lines.RemoveAt(0);
+
+        string prompt = String.Empty;
+
+        foreach (string l in lines)
+        {
+            string[] parts = l.Split(new char[] {':'}, 3);
+            if (parts.Length != 3)
+                continue;
+
+            if (parts[2].StartsWith("+++") || parts[2].StartsWith("-++"))
+                prompt = parts[2];
+            else
+                MainConsole.Instance.Output(parts[2].Trim(), parts[1]);
+        }
+
+
+        Requester.MakeRequest(requestUrl, requestData, ReadResponses);
 
 //            if (prompt.StartsWith("+++"))
-                MainConsole.Instance.ReadLine(prompt.Substring(0), true, true);
+            MainConsole.Instance.ReadLine(prompt.Substring(0), true, true);
 //            else if (prompt.StartsWith("-++"))
 //                SendCommand(String.Empty, new string[] { MainConsole.Instance.ReadLine(prompt.Substring(3), false, true) });
-        }
+    }
 
-        public static void CommandReply(string requestUrl, string requestData, string replyData)
-        {
-        }
+    public static void CommandReply(string requestUrl, string requestData, string replyData)
+    {
     }
 }

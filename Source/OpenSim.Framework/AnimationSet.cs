@@ -25,163 +25,159 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
-{
+namespace OpenSim.Framework;
+
 //    public delegate bool AnimationSetValidator(UUID animID);
-    public delegate uint AnimationSetValidator(UUID animID);
+public delegate uint AnimationSetValidator(UUID animID);
 
-    public class AnimationSet
+public class AnimationSet
+{
+    private bool m_parseError = false;
+
+    public const uint createBasePermitions = (uint)(PermissionMask.All); // no export ?
+    public const uint createNextPermitions = (uint)(PermissionMask.Copy | PermissionMask.Modify);
+
+    public const uint allowedBasePermitions = (uint)(PermissionMask.Copy | PermissionMask.Modify);
+    public const uint allowedNextPermitions = 0;
+
+    public static void setCreateItemPermitions(InventoryItemBase it)
     {
-        private bool m_parseError = false;
+        if (it == null)
+            return;
 
-        public const uint createBasePermitions = (uint)(PermissionMask.All); // no export ?
-        public const uint createNextPermitions = (uint)(PermissionMask.Copy | PermissionMask.Modify);
+        it.BasePermissions = createBasePermitions;
+        it.CurrentPermissions = createBasePermitions;
+        //            it.GroupPermissions &= allowedPermitions;
+        it.NextPermissions = createNextPermitions;
+        //            it.EveryOnePermissions &= allowedPermitions;
+        it.GroupPermissions = 0;
+        it.EveryOnePermissions = 0;
+    }
 
-        public const uint allowedBasePermitions = (uint)(PermissionMask.Copy | PermissionMask.Modify);
-        public const uint allowedNextPermitions = 0;
+    public static void enforceItemPermitions(InventoryItemBase it, bool IsCreator)
+    {
+        if (it == null)
+            return;
 
-        public static void setCreateItemPermitions(InventoryItemBase it)
+        uint bp;
+        uint np;
+
+        if (IsCreator)
         {
-            if (it == null)
-                return;
-
-            it.BasePermissions = createBasePermitions;
-            it.CurrentPermissions = createBasePermitions;
-            //            it.GroupPermissions &= allowedPermitions;
-            it.NextPermissions = createNextPermitions;
-            //            it.EveryOnePermissions &= allowedPermitions;
-            it.GroupPermissions = 0;
-            it.EveryOnePermissions = 0;
+            bp = createBasePermitions;
+            np = createNextPermitions;
+        }
+        else
+        {
+            bp = allowedBasePermitions;
+            np = allowedNextPermitions;
         }
 
-        public static void enforceItemPermitions(InventoryItemBase it, bool IsCreator)
+        it.BasePermissions &= bp;
+        it.CurrentPermissions &= bp;
+        //            it.GroupPermissions &= allowedPermitions;
+        it.NextPermissions &= np;
+        //            it.EveryOnePermissions &= allowedPermitions;
+        it.GroupPermissions = 0;
+        it.EveryOnePermissions = 0;
+    }
+
+    public int AnimationCount { get; private set; }
+    private Dictionary<string, KeyValuePair<string, UUID>> m_animations = new Dictionary<string, KeyValuePair<string, UUID>>();
+
+    public UUID GetAnimation(string index)
+    {
+        KeyValuePair<string, UUID> val;
+        if (m_animations.TryGetValue(index, out val))
+            return val.Value;
+
+        return UUID.Zero;
+    }
+
+    public string GetAnimationName(string index)
+    {
+        KeyValuePair<string, UUID> val;
+        if (m_animations.TryGetValue(index, out val))
+            return val.Key;
+
+        return String.Empty;
+    }
+
+    public void SetAnimation(string index, string name, UUID anim)
+    {
+        if (anim.IsZero())
         {
-            if (it == null)
-                return;
-
-            uint bp;
-            uint np;
-
-            if (IsCreator)
-            {
-                bp = createBasePermitions;
-                np = createNextPermitions;
-            }
-            else
-            {
-                bp = allowedBasePermitions;
-                np = allowedNextPermitions;
-            }
-
-            it.BasePermissions &= bp;
-            it.CurrentPermissions &= bp;
-            //            it.GroupPermissions &= allowedPermitions;
-            it.NextPermissions &= np;
-            //            it.EveryOnePermissions &= allowedPermitions;
-            it.GroupPermissions = 0;
-            it.EveryOnePermissions = 0;
+            m_animations.Remove(index);
+            return;
         }
 
-        public int AnimationCount { get; private set; }
-        private Dictionary<string, KeyValuePair<string, UUID>> m_animations = new Dictionary<string, KeyValuePair<string, UUID>>();
+        m_animations[index] = new KeyValuePair<string, UUID>(name, anim);
+    }
 
-        public UUID GetAnimation(string index)
-        {
-            KeyValuePair<string, UUID> val;
-            if (m_animations.TryGetValue(index, out val))
-                return val.Value;
+    public AnimationSet(Byte[] data)
+    {
+        string assetData = System.Text.Encoding.ASCII.GetString(data);
+        Console.WriteLine("--------------------");
+        Console.WriteLine("AnimationSet length {0} bytes", assetData.Length);
+        Console.WriteLine(assetData);
+        Console.WriteLine("--------------------");
+    }
 
-            return UUID.Zero;
-        }
+    public static readonly byte[] ZeroCountBytesReply = osUTF8.GetASCIIBytes("version 1\ncount 0\n");
+    public Byte[] ToBytes()
+    {
+        // If there was an error parsing the input, we give back an
+        // empty set rather than the original data.
+        if (m_parseError || m_animations.Count == 0)
+            return ZeroCountBytesReply;
 
-        public string GetAnimationName(string index)
-        {
-            KeyValuePair<string, UUID> val;
-            if (m_animations.TryGetValue(index, out val))
-                return val.Key;
-
-            return String.Empty;
-        }
-
-        public void SetAnimation(string index, string name, UUID anim)
-        {
-            if (anim.IsZero())
-            {
-                m_animations.Remove(index);
-                return;
-            }
-
-            m_animations[index] = new KeyValuePair<string, UUID>(name, anim);
-        }
-
-        public AnimationSet(Byte[] data)
-        {
-            string assetData = System.Text.Encoding.ASCII.GetString(data);
-            Console.WriteLine("--------------------");
-            Console.WriteLine("AnimationSet length {0} bytes", assetData.Length);
-            Console.WriteLine(assetData);
-            Console.WriteLine("--------------------");
-        }
-
-        public static readonly byte[] ZeroCountBytesReply = osUTF8.GetASCIIBytes("version 1\ncount 0\n");
-        public Byte[] ToBytes()
-        {
-            // If there was an error parsing the input, we give back an
-            // empty set rather than the original data.
-            if (m_parseError || m_animations.Count == 0)
-                return ZeroCountBytesReply;
-
-            osUTF8 sb = OSUTF8Cached.Acquire();
-            sb.AppendASCII("$version 1\ncount {m_animations.Count}\n");
-            foreach (KeyValuePair<string, KeyValuePair<string, UUID>> kvp in m_animations)
-                sb.AppendASCII($"{kvp.Key} {kvp.Value.Value} {kvp.Value.Key}\n");
-            return OSUTF8Cached.GetArrayAndRelease(sb);
-        }
+        osUTF8 sb = OSUTF8Cached.Acquire();
+        sb.AppendASCII("$version 1\ncount {m_animations.Count}\n");
+        foreach (KeyValuePair<string, KeyValuePair<string, UUID>> kvp in m_animations)
+            sb.AppendASCII($"{kvp.Key} {kvp.Value.Value} {kvp.Value.Key}\n");
+        return OSUTF8Cached.GetArrayAndRelease(sb);
+    }
 
 /*
-        public bool Validate(AnimationSetValidator val)
+    public bool Validate(AnimationSetValidator val)
+    {
+        if (m_parseError)
+            return false;
+
+        List<string> badAnims = new List<string>();
+
+        bool allOk = true;
+        foreach (KeyValuePair<string, KeyValuePair<string, UUID>> kvp in m_animations)
         {
-            if (m_parseError)
-                return false;
-
-            List<string> badAnims = new List<string>();
-
-            bool allOk = true;
-            foreach (KeyValuePair<string, KeyValuePair<string, UUID>> kvp in m_animations)
+            if (!val(kvp.Value.Value))
             {
-                if (!val(kvp.Value.Value))
-                {
-                    allOk = false;
-                    badAnims.Add(kvp.Key);
-                }
+                allOk = false;
+                badAnims.Add(kvp.Key);
             }
-
-            foreach (string idx in badAnims)
-                m_animations.Remove(idx);
-
-            return allOk;
         }
+
+        foreach (string idx in badAnims)
+            m_animations.Remove(idx);
+
+        return allOk;
+    }
 */
-        public uint Validate(AnimationSetValidator val)
-        {
-            if (m_parseError)
-                return 0;
+    public uint Validate(AnimationSetValidator val)
+    {
+        if (m_parseError)
+            return 0;
 
-            uint ret = 0x7fffffff;
-            uint t;
-            foreach (KeyValuePair<string, KeyValuePair<string, UUID>> kvp in m_animations)
-            {
-                t = val(kvp.Value.Value);
-                if (t == 0)
-                    return 0;
-                ret &= t;
-            }
-            return ret;
+        uint ret = 0x7fffffff;
+        uint t;
+        foreach (KeyValuePair<string, KeyValuePair<string, UUID>> kvp in m_animations)
+        {
+            t = val(kvp.Value.Value);
+            if (t == 0)
+                return 0;
+            ret &= t;
         }
+        return ret;
     }
 }

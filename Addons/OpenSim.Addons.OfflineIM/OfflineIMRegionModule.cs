@@ -33,217 +33,216 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.OfflineIM
+namespace OpenSim.OfflineIM;
+
+public class OfflineIMRegionModule : ISharedRegionModule, IOfflineIMService
 {
-    public class OfflineIMRegionModule : ISharedRegionModule, IOfflineIMService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private bool m_Enabled = false;
+    private List<Scene> m_SceneList = new List<Scene>();
+    IMessageTransferModule m_TransferModule = null;
+    private bool m_ForwardOfflineGroupMessages = true;
+
+    private IOfflineIMService m_OfflineIMService;
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        IConfig cnf = config.Configs["Messaging"];
+        if (cnf == null)
+            return;
+        if (cnf != null && cnf.GetString("OfflineMessageModule", string.Empty) != Name)
+            return;
 
-        private bool m_Enabled = false;
-        private List<Scene> m_SceneList = new List<Scene>();
-        IMessageTransferModule m_TransferModule = null;
-        private bool m_ForwardOfflineGroupMessages = true;
+        m_Enabled = true;
 
-        private IOfflineIMService m_OfflineIMService;
+        string serviceLocation = cnf.GetString("OfflineMessageURL", string.Empty);
+        if (serviceLocation.Length == 0)
+            m_OfflineIMService = new OfflineIMService(config);
+        else
+            m_OfflineIMService = new OfflineIMServiceRemoteConnector(config);
 
-        public void Initialise(IConfigSource config)
+        m_ForwardOfflineGroupMessages = cnf.GetBoolean("ForwardOfflineGroupMessages", m_ForwardOfflineGroupMessages);
+        m_log.DebugFormat("[OfflineIM.V2]: Offline messages enabled by {0}", Name);
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.RegisterModuleInterface<IOfflineIMService>(this);
+        m_SceneList.Add(scene);
+        scene.EventManager.OnNewClient += OnNewClient;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        if (m_TransferModule == null)
         {
-            IConfig cnf = config.Configs["Messaging"];
-            if (cnf == null)
-                return;
-            if (cnf != null && cnf.GetString("OfflineMessageModule", string.Empty) != Name)
-                return;
-
-            m_Enabled = true;
-
-            string serviceLocation = cnf.GetString("OfflineMessageURL", string.Empty);
-            if (serviceLocation.Length == 0)
-                m_OfflineIMService = new OfflineIMService(config);
-            else
-                m_OfflineIMService = new OfflineIMServiceRemoteConnector(config);
-
-            m_ForwardOfflineGroupMessages = cnf.GetBoolean("ForwardOfflineGroupMessages", m_ForwardOfflineGroupMessages);
-            m_log.DebugFormat("[OfflineIM.V2]: Offline messages enabled by {0}", Name);
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.RegisterModuleInterface<IOfflineIMService>(this);
-            m_SceneList.Add(scene);
-            scene.EventManager.OnNewClient += OnNewClient;
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
+            m_TransferModule = scene.RequestModuleInterface<IMessageTransferModule>();
             if (m_TransferModule == null)
             {
-                m_TransferModule = scene.RequestModuleInterface<IMessageTransferModule>();
-                if (m_TransferModule == null)
-                {
-                    scene.EventManager.OnNewClient -= OnNewClient;
+                scene.EventManager.OnNewClient -= OnNewClient;
 
-                    m_SceneList.Clear();
+                m_SceneList.Clear();
 
-                    m_log.Error("[OfflineIM.V2]: No message transfer module is enabled. Disabling offline messages");
-                }
-                m_TransferModule.OnUndeliveredMessage += UndeliveredMessage;
+                m_log.Error("[OfflineIM.V2]: No message transfer module is enabled. Disabling offline messages");
             }
+            m_TransferModule.OnUndeliveredMessage += UndeliveredMessage;
         }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_SceneList.Remove(scene);
-            scene.EventManager.OnNewClient -= OnNewClient;
-            m_TransferModule.OnUndeliveredMessage -= UndeliveredMessage;
-
-            scene.ForEachClient(delegate(IClientAPI client)
-            {
-                client.OnRetrieveInstantMessages -= RetrieveInstantMessages;
-            });
-        }
-
-        public void PostInitialise()
-        {
-        }
-
-        public string Name
-        {
-            get { return "Offline Message Module V2"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public void Close()
-        {
-            m_SceneList.Clear();
-        }
-
-        private Scene FindScene(UUID agentID)
-        {
-            foreach (Scene s in m_SceneList)
-            {
-                ScenePresence presence = s.GetScenePresence(agentID);
-                if (presence != null && !presence.IsChildAgent)
-                    return s;
-            }
-            return null;
-        }
-
-        private IClientAPI FindClient(UUID agentID)
-        {
-            foreach (Scene s in m_SceneList)
-            {
-                ScenePresence presence = s.GetScenePresence(agentID);
-                if (presence != null && !presence.IsChildAgent)
-                    return presence.ControllingClient;
-            }
-            return null;
-        }
-
-        private void OnNewClient(IClientAPI client)
-        {
-            client.OnRetrieveInstantMessages += RetrieveInstantMessages;
-        }
-
-        private void RetrieveInstantMessages(IClientAPI client)
-        {
-            m_log.DebugFormat("[OfflineIM.V2]: Retrieving stored messages for {0}", client.AgentId);
-
-            List<GridInstantMessage> msglist = m_OfflineIMService.GetMessages(client.AgentId);
-
-            if (msglist == null)
-                m_log.DebugFormat("[OfflineIM.V2]: WARNING null message list.");
-
-            foreach (GridInstantMessage im in msglist)
-            {
-                if (im.dialog == (byte)InstantMessageDialog.InventoryOffered)
-                    // send it directly or else the item will be given twice
-                    client.SendInstantMessage(im);
-                else
-                {
-                    // Send through scene event manager so all modules get a chance
-                    // to look at this message before it gets delivered.
-                    //
-                    // Needed for proper state management for stored group
-                    // invitations
-                    //
-                    Scene s = client.Scene as Scene;
-                    if (s != null)
-                    {
-                        im.offline = 1;
-                        s.EventManager.TriggerIncomingInstantMessage(im);
-                    }
-                }
-            }
-        }
-
-        private void UndeliveredMessage(GridInstantMessage im)
-        {
-            if (im.dialog != (byte)InstantMessageDialog.MessageFromObject &&
-                im.dialog != (byte)InstantMessageDialog.MessageFromAgent &&
-                im.dialog != (byte)InstantMessageDialog.GroupNotice &&
-                im.dialog != (byte)InstantMessageDialog.GroupInvitation &&
-                im.dialog != (byte)InstantMessageDialog.InventoryOffered)
-            {
-                return;
-            }
-
-            if (!m_ForwardOfflineGroupMessages)
-            {
-                if (im.dialog == (byte)InstantMessageDialog.GroupNotice ||
-                    im.dialog == (byte)InstantMessageDialog.GroupInvitation)
-                    return;
-            }
-
-            string reason = string.Empty;
-            bool success = m_OfflineIMService.StoreMessage(im, out reason);
-
-            if (im.dialog == (byte)InstantMessageDialog.MessageFromAgent)
-            {
-                IClientAPI client = FindClient(new UUID(im.fromAgentID));
-                if (client == null)
-                    return;
-
-                client.SendInstantMessage(new GridInstantMessage(
-                        null, new UUID(im.toAgentID),
-                        "System", new UUID(im.fromAgentID),
-                        (byte)InstantMessageDialog.MessageFromAgent,
-                        "User is not logged in. " +
-                        (success ? "Message saved." : "Message not saved: " + reason),
-                        false, new Vector3()));
-            }
-        }
-
-        #region IOfflineIM
-
-        public List<GridInstantMessage> GetMessages(UUID principalID)
-        {
-            return m_OfflineIMService.GetMessages(principalID);
-        }
-
-        public bool StoreMessage(GridInstantMessage im, out string reason)
-        {
-            return m_OfflineIMService.StoreMessage(im, out reason);
-        }
-
-        public void DeleteMessages(UUID userID)
-        {
-            m_OfflineIMService.DeleteMessages(userID);
-        }
-
-        #endregion
     }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_SceneList.Remove(scene);
+        scene.EventManager.OnNewClient -= OnNewClient;
+        m_TransferModule.OnUndeliveredMessage -= UndeliveredMessage;
+
+        scene.ForEachClient(delegate(IClientAPI client)
+        {
+            client.OnRetrieveInstantMessages -= RetrieveInstantMessages;
+        });
+    }
+
+    public void PostInitialise()
+    {
+    }
+
+    public string Name
+    {
+        get { return "Offline Message Module V2"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void Close()
+    {
+        m_SceneList.Clear();
+    }
+
+    private Scene FindScene(UUID agentID)
+    {
+        foreach (Scene s in m_SceneList)
+        {
+            ScenePresence presence = s.GetScenePresence(agentID);
+            if (presence != null && !presence.IsChildAgent)
+                return s;
+        }
+        return null;
+    }
+
+    private IClientAPI FindClient(UUID agentID)
+    {
+        foreach (Scene s in m_SceneList)
+        {
+            ScenePresence presence = s.GetScenePresence(agentID);
+            if (presence != null && !presence.IsChildAgent)
+                return presence.ControllingClient;
+        }
+        return null;
+    }
+
+    private void OnNewClient(IClientAPI client)
+    {
+        client.OnRetrieveInstantMessages += RetrieveInstantMessages;
+    }
+
+    private void RetrieveInstantMessages(IClientAPI client)
+    {
+        m_log.DebugFormat("[OfflineIM.V2]: Retrieving stored messages for {0}", client.AgentId);
+
+        List<GridInstantMessage> msglist = m_OfflineIMService.GetMessages(client.AgentId);
+
+        if (msglist == null)
+            m_log.DebugFormat("[OfflineIM.V2]: WARNING null message list.");
+
+        foreach (GridInstantMessage im in msglist)
+        {
+            if (im.dialog == (byte)InstantMessageDialog.InventoryOffered)
+                // send it directly or else the item will be given twice
+                client.SendInstantMessage(im);
+            else
+            {
+                // Send through scene event manager so all modules get a chance
+                // to look at this message before it gets delivered.
+                //
+                // Needed for proper state management for stored group
+                // invitations
+                //
+                Scene s = client.Scene as Scene;
+                if (s != null)
+                {
+                    im.offline = 1;
+                    s.EventManager.TriggerIncomingInstantMessage(im);
+                }
+            }
+        }
+    }
+
+    private void UndeliveredMessage(GridInstantMessage im)
+    {
+        if (im.dialog != (byte)InstantMessageDialog.MessageFromObject &&
+            im.dialog != (byte)InstantMessageDialog.MessageFromAgent &&
+            im.dialog != (byte)InstantMessageDialog.GroupNotice &&
+            im.dialog != (byte)InstantMessageDialog.GroupInvitation &&
+            im.dialog != (byte)InstantMessageDialog.InventoryOffered)
+        {
+            return;
+        }
+
+        if (!m_ForwardOfflineGroupMessages)
+        {
+            if (im.dialog == (byte)InstantMessageDialog.GroupNotice ||
+                im.dialog == (byte)InstantMessageDialog.GroupInvitation)
+                return;
+        }
+
+        string reason = string.Empty;
+        bool success = m_OfflineIMService.StoreMessage(im, out reason);
+
+        if (im.dialog == (byte)InstantMessageDialog.MessageFromAgent)
+        {
+            IClientAPI client = FindClient(new UUID(im.fromAgentID));
+            if (client == null)
+                return;
+
+            client.SendInstantMessage(new GridInstantMessage(
+                    null, new UUID(im.toAgentID),
+                    "System", new UUID(im.fromAgentID),
+                    (byte)InstantMessageDialog.MessageFromAgent,
+                    "User is not logged in. " +
+                    (success ? "Message saved." : "Message not saved: " + reason),
+                    false, new Vector3()));
+        }
+    }
+
+    #region IOfflineIM
+
+    public List<GridInstantMessage> GetMessages(UUID principalID)
+    {
+        return m_OfflineIMService.GetMessages(principalID);
+    }
+
+    public bool StoreMessage(GridInstantMessage im, out string reason)
+    {
+        return m_OfflineIMService.StoreMessage(im, out reason);
+    }
+
+    public void DeleteMessages(UUID userID)
+    {
+        m_OfflineIMService.DeleteMessages(userID);
+    }
+
+    #endregion
 }
 

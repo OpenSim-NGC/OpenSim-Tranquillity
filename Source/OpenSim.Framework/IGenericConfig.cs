@@ -25,16 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public interface IGenericConfig
 {
-    public interface IGenericConfig
-    {
-        void SetFileName(string fileName);
-        void LoadData();
-        void LoadDataFromString(string data);
-        string GetAttribute(string attributeName);
-        bool SetAttribute(string attributeName, string attributeValue);
-        void Commit();
-        void Close();
-    }
+    void SetFileName(string fileName);
+    void LoadData();
+    void LoadDataFromString(string data);
+    string GetAttribute(string attributeName);
+    bool SetAttribute(string attributeName, string attributeValue);
+    void Commit();
+    void Close();
 }

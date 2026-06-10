@@ -25,8 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Framework.Servers.HttpServer
-{
-    public delegate string RestMethod(string request, string path, string param,
-                                      IOSHttpRequest httpRequest, IOSHttpResponse httpResponse);
-}
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public delegate string RestMethod(string request, string path, string param,
+                                  IOSHttpRequest httpRequest, IOSHttpResponse httpResponse);

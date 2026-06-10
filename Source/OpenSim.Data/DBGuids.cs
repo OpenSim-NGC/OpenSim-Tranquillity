@@ -25,46 +25,42 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
 using OpenMetaverse;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+
+public static class DBGuid
 {
-
-    public static class DBGuid
+    /// <summary>This function converts a value returned from the database in one of the
+    /// supported formats into a UUID.  This function is not actually DBMS-specific right
+    /// now
+    ///
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
+    public static UUID FromDB(object id)
     {
-        /// <summary>This function converts a value returned from the database in one of the
-        /// supported formats into a UUID.  This function is not actually DBMS-specific right
-        /// now
-        ///
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        public static UUID FromDB(object id)
+        if ((id == null) || (id == DBNull.Value))
+            return UUID.Zero;
+
+        Type idtype = id.GetType();
+
+        if (idtype == typeof(string))
         {
-            if ((id == null) || (id == DBNull.Value))
-                return UUID.Zero;
-
-            Type idtype = id.GetType();
-
-            if (idtype == typeof(string))
-            {
-                UUID.TryParse((string)id, out UUID result);
-                return result;
-            }
-
-            if (idtype == typeof(Guid))
-                return new UUID((Guid)id);
-
-            if (idtype == typeof(byte[]))
-            {
-                byte[] idb = (byte[])id;
-                return idb.Length < 16 ? UUID.Zero : new UUID(idb, 0);
-            }
-
-            throw new Exception("Failed to convert db value to UUID: " + id.ToString());
+            UUID.TryParse((string)id, out UUID result);
+            return result;
         }
+
+        if (idtype == typeof(Guid))
+            return new UUID((Guid)id);
+
+        if (idtype == typeof(byte[]))
+        {
+            byte[] idb = (byte[])id;
+            return idb.Length < 16 ? UUID.Zero : new UUID(idb, 0);
+        }
+
+        throw new Exception("Failed to convert db value to UUID: " + id.ToString());
     }
 }

@@ -37,101 +37,100 @@ using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
 
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Neighbour
+namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Neighbour;
+
+public class NeighbourServiceInConnectorModule : ISharedRegionModule, INeighbourService
 {
-    public class NeighbourServiceInConnectorModule : ISharedRegionModule, INeighbourService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static bool m_Enabled = false;
+    private static bool m_Registered = false;
+
+    private IConfigSource m_Config;
+    private List<Scene> m_Scenes = new List<Scene>();
+
+    #region Region Module interface
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private static bool m_Enabled = false;
-        private static bool m_Registered = false;
+        m_Config = config;
 
-        private IConfigSource m_Config;
-        private List<Scene> m_Scenes = new List<Scene>();
-
-        #region Region Module interface
-
-        public void Initialise(IConfigSource config)
+        IConfig moduleConfig = config.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            m_Config = config;
-
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+            m_Enabled = moduleConfig.GetBoolean("NeighbourServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("NeighbourServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_log.Info("[NEIGHBOUR IN CONNECTOR]: NeighbourServiceInConnector enabled");
-                }
-
+                m_log.Info("[NEIGHBOUR IN CONNECTOR]: NeighbourServiceInConnector enabled");
             }
 
         }
 
-        public void PostInitialise()
-        {
-            if (!m_Enabled)
-                return;
+    }
+
+    public void PostInitialise()
+    {
+        if (!m_Enabled)
+            return;
 
 //            m_log.Info("[NEIGHBOUR IN CONNECTOR]: Starting...");
-        }
-
-        public void Close()
-        {
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "NeighbourServiceInConnectorModule"; }
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            if (!m_Registered)
-            {
-                m_Registered = true;
-                Object[] args = new Object[] { m_Config, MainServer.Instance, this, scene };
-                ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:NeighbourServiceInConnector", args);
-            }
-
-            m_Scenes.Add(scene);
-
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (m_Enabled && m_Scenes.Contains(scene))
-                m_Scenes.Remove(scene);
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        #endregion
-
-        #region INeighbourService
-
-        public GridRegion HelloNeighbour(ulong regionHandle, RegionInfo thisRegion)
-        {
-            foreach (Scene s in m_Scenes)
-            {
-                if (s.RegionInfo.RegionHandle == regionHandle)
-                {
-                    //m_log.DebugFormat("[NEIGHBOUR IN CONNECTOR]: HelloNeighbour from {0} to {1}", thisRegion.RegionName, s.RegionInfo.RegionName);
-                    return s.IncomingHelloNeighbour(thisRegion);
-                }
-            }
-            return null;
-        }
-
-        #endregion INeighbourService
     }
+
+    public void Close()
+    {
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public string Name
+    {
+        get { return "NeighbourServiceInConnectorModule"; }
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        if (!m_Registered)
+        {
+            m_Registered = true;
+            Object[] args = new Object[] { m_Config, MainServer.Instance, this, scene };
+            ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:NeighbourServiceInConnector", args);
+        }
+
+        m_Scenes.Add(scene);
+
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (m_Enabled && m_Scenes.Contains(scene))
+            m_Scenes.Remove(scene);
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    #endregion
+
+    #region INeighbourService
+
+    public GridRegion HelloNeighbour(ulong regionHandle, RegionInfo thisRegion)
+    {
+        foreach (Scene s in m_Scenes)
+        {
+            if (s.RegionInfo.RegionHandle == regionHandle)
+            {
+                //m_log.DebugFormat("[NEIGHBOUR IN CONNECTOR]: HelloNeighbour from {0} to {1}", thisRegion.RegionName, s.RegionInfo.RegionName);
+                return s.IncomingHelloNeighbour(thisRegion);
+            }
+        }
+        return null;
+    }
+
+    #endregion INeighbourService
 }

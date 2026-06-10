@@ -27,74 +27,73 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+/// <summary>
+/// User inventory folder
+/// </summary>
+public class InventoryFolderBase : InventoryNodeBase
 {
+    public static readonly string ROOT_FOLDER_NAME = "My Inventory";
+    public static readonly string SUITCASE_FOLDER_NAME = "My Suitcase";
+
     /// <summary>
-    /// User inventory folder
+    /// The folder this folder is contained in
     /// </summary>
-    public class InventoryFolderBase : InventoryNodeBase
+    private UUID _parentID;
+
+    /// <summary>
+    /// Type of items normally stored in this folder
+    /// </summary>
+    private short _type;
+
+    /// <summary>
+    /// This is used to denote the version of folder
+    /// </summary>
+    private ushort _version;
+
+    public virtual UUID ParentID
     {
-        public static readonly string ROOT_FOLDER_NAME = "My Inventory";
-        public static readonly string SUITCASE_FOLDER_NAME = "My Suitcase";
+        get { return _parentID; }
+        set { _parentID = value; }
+    }
 
-        /// <summary>
-        /// The folder this folder is contained in
-        /// </summary>
-        private UUID _parentID;
+    public virtual short Type
+    {
+        get { return _type; }
+        set { _type = value; }
+    }
 
-        /// <summary>
-        /// Type of items normally stored in this folder
-        /// </summary>
-        private short _type;
+    public virtual ushort Version
+    {
+        get { return _version; }
+        set { _version = value; }
+    }
 
-        /// <summary>
-        /// This is used to denote the version of folder
-        /// </summary>
-        private ushort _version;
+    public InventoryFolderBase()
+    {
+    }
 
-        public virtual UUID ParentID
-        {
-            get { return _parentID; }
-            set { _parentID = value; }
-        }
+    public InventoryFolderBase(UUID id) : this()
+    {
+        ID = id;
+    }
 
-        public virtual short Type
-        {
-            get { return _type; }
-            set { _type = value; }
-        }
+    public InventoryFolderBase(UUID id, UUID owner) : this(id)
+    {
+        Owner = owner;
+    }
 
-        public virtual ushort Version
-        {
-            get { return _version; }
-            set { _version = value; }
-        }
+    public InventoryFolderBase(UUID id, string name, UUID owner, UUID parent) : this(id, owner)
+    {
+        Name = name;
+        ParentID = parent;
+    }
 
-        public InventoryFolderBase()
-        {
-        }
-
-        public InventoryFolderBase(UUID id) : this()
-        {
-            ID = id;
-        }
-
-        public InventoryFolderBase(UUID id, UUID owner) : this(id)
-        {
-            Owner = owner;
-        }
-
-        public InventoryFolderBase(UUID id, string name, UUID owner, UUID parent) : this(id, owner)
-        {
-            Name = name;
-            ParentID = parent;
-        }
-
-        public InventoryFolderBase(
-            UUID id, string name, UUID owner, short type, UUID parent, ushort version) : this(id, name, owner, parent)
-        {
-            Type = type;
-            Version = version;
-        }
+    public InventoryFolderBase(
+        UUID id, string name, UUID owner, short type, UUID parent, ushort version) : this(id, name, owner, parent)
+    {
+        Type = type;
+        Version = version;
     }
 }

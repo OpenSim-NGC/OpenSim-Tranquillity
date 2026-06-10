@@ -26,8 +26,6 @@
  */
 
 using OpenSim.Region.ScriptEngine.Shared.ScriptBase;
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Globalization;
@@ -44,935 +42,934 @@ using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
  * @brief Generate script object code to perform type casting
  */
 
-namespace OpenSim.Region.ScriptEngine.Yengine
+namespace OpenSim.Region.ScriptEngine.Yengine;
+
+public class TypeCast
 {
-    public class TypeCast
+    private delegate void CastDelegate(IScriptCodeGen scg, Token errorAt);
+
+    private static ConstructorInfo floatConstructorStringInfo = typeof(LSL_Float).GetConstructor(new Type[] { typeof(string) });
+    private static ConstructorInfo integerConstructorStringInfo = typeof(LSL_Integer).GetConstructor(new Type[] { typeof(string) });
+    private static ConstructorInfo lslFloatConstructorInfo = typeof(LSL_Float).GetConstructor(new Type[] { typeof(double) });
+    private static ConstructorInfo lslIntegerConstructorInfo = typeof(LSL_Integer).GetConstructor(new Type[] { typeof(int) });
+    private static ConstructorInfo lslStringConstructorInfo = typeof(LSL_String).GetConstructor(new Type[] { typeof(string) });
+    private static ConstructorInfo rotationConstrucorStringInfo = typeof(LSL_Rotation).GetConstructor(new Type[] { typeof(string) });
+    private static ConstructorInfo vectorConstrucorStringInfo = typeof(LSL_Vector).GetConstructor(new Type[] { typeof(string) });
+    private static FieldInfo lslFloatValueFieldInfo = typeof(LSL_Float).GetField("value");
+    private static FieldInfo lslIntegerValueFieldInfo = typeof(LSL_Integer).GetField("value");
+    private static FieldInfo lslStringValueFieldInfo = typeof(LSL_String).GetField("m_string");
+    private static FieldInfo sdtcITableFieldInfo = typeof(XMRSDTypeClObj).GetField("sdtcITable");
+    private static MethodInfo boolToListMethodInfo = typeof(TypeCast).GetMethod("BoolToList", new Type[] { typeof(bool) });
+    private static MethodInfo boolToStringMethodInfo = typeof(TypeCast).GetMethod("BoolToString", new Type[] { typeof(bool) });
+    private static MethodInfo charToStringMethodInfo = typeof(TypeCast).GetMethod("CharToString", new Type[] { typeof(char) });
+    private static MethodInfo excToStringMethodInfo = typeof(TypeCast).GetMethod("ExceptionToString", new Type[] { typeof(Exception), typeof(XMRInstAbstract) });
+    private static MethodInfo floatToStringMethodInfo = typeof(TypeCast).GetMethod("FloatToString", new Type[] { typeof(double) });
+    private static MethodInfo intToStringMethodInfo = typeof(TypeCast).GetMethod("IntegerToString", new Type[] { typeof(int) });
+    private static MethodInfo keyToBoolMethodInfo = typeof(TypeCast).GetMethod("KeyToBool", new Type[] { typeof(string) });
+    private static MethodInfo listToBoolMethodInfo = typeof(TypeCast).GetMethod("ListToBool", new Type[] { typeof(LSL_List) });
+    private static MethodInfo listToStringMethodInfo = typeof(TypeCast).GetMethod("ListToString", new Type[] { typeof(LSL_List) });
+    private static MethodInfo objectToFloatMethodInfo = typeof(TypeCast).GetMethod("ObjectToFloat", new Type[] { typeof(object) });
+    private static MethodInfo objectToIntegerMethodInfo = typeof(TypeCast).GetMethod("ObjectToInteger", new Type[] { typeof(object) });
+    private static MethodInfo objectToListMethodInfo = typeof(TypeCast).GetMethod("ObjectToList", new Type[] { typeof(object) });
+    private static MethodInfo objectToRotationMethodInfo = typeof(TypeCast).GetMethod("ObjectToRotation", new Type[] { typeof(object) });
+    private static MethodInfo objectToStringMethodInfo = typeof(TypeCast).GetMethod("ObjectToString", new Type[] { typeof(object) });
+    private static MethodInfo objectToVectorMethodInfo = typeof(TypeCast).GetMethod("ObjectToVector", new Type[] { typeof(object) });
+    private static MethodInfo rotationToBoolMethodInfo = typeof(TypeCast).GetMethod("RotationToBool", new Type[] { typeof(LSL_Rotation) });
+    private static MethodInfo rotationToStringMethodInfo = typeof(TypeCast).GetMethod("RotationToString", new Type[] { typeof(LSL_Rotation) });
+    private static MethodInfo stringToBoolMethodInfo = typeof(TypeCast).GetMethod("StringToBool", new Type[] { typeof(string) });
+    private static MethodInfo vectorToBoolMethodInfo = typeof(TypeCast).GetMethod("VectorToBool", new Type[] { typeof(LSL_Vector) });
+    private static MethodInfo vectorToStringMethodInfo = typeof(TypeCast).GetMethod("VectorToString", new Type[] { typeof(LSL_Vector) });
+    private static MethodInfo sdTypeClassCastClass2ClassMethodInfo = typeof(XMRSDTypeClObj).GetMethod("CastClass2Class", new Type[] { typeof(object), typeof(int) });
+    private static MethodInfo sdTypeClassCastIFace2ClassMethodInfo = typeof(XMRSDTypeClObj).GetMethod("CastIFace2Class", new Type[] { typeof(Delegate[]), typeof(int) });
+    private static MethodInfo sdTypeClassCastObj2IFaceMethodInfo = typeof(XMRSDTypeClObj).GetMethod("CastObj2IFace", new Type[] { typeof(object), typeof(string) });
+    private static MethodInfo charToListMethodInfo = typeof(TypeCast).GetMethod("CharToList", new Type[] { typeof(char) });
+    private static MethodInfo excToListMethodInfo = typeof(TypeCast).GetMethod("ExcToList", new Type[] { typeof(Exception) });
+    private static MethodInfo vectorToListMethodInfo = typeof(TypeCast).GetMethod("VectorToList", new Type[] { typeof(LSL_Vector) });
+    private static MethodInfo floatToListMethodInfo = typeof(TypeCast).GetMethod("FloatToList", new Type[] { typeof(double) });
+    private static MethodInfo integerToListMethodInfo = typeof(TypeCast).GetMethod("IntegerToList", new Type[] { typeof(int) });
+    private static MethodInfo rotationToListMethodInfo = typeof(TypeCast).GetMethod("RotationToList", new Type[] { typeof(LSL_Rotation) });
+    private static MethodInfo stringToListMethodInfo = typeof(TypeCast).GetMethod("StringToList", new Type[] { typeof(string) });
+
+    /*
+     * List of all allowed type casts and how to perform the casting.
+     */
+    private static Dictionary<string, CastDelegate> legalTypeCasts = CreateLegalTypeCasts();
+
+    /**
+     * @brief create a dictionary of legal type casts.
+     * Defines what EXPLICIT type casts are allowed in addition to the IMPLICIT ones.
+     * Key is of the form <oldtype> <newtype> for IMPLICIT casting.
+     * Key is of the form <oldtype>*<newtype> for EXPLICIT casting.
+     * Value is a delegate that generates code to perform the type cast.
+     */
+    private static Dictionary<string, CastDelegate> CreateLegalTypeCasts()
     {
-        private delegate void CastDelegate(IScriptCodeGen scg, Token errorAt);
-
-        private static ConstructorInfo floatConstructorStringInfo = typeof(LSL_Float).GetConstructor(new Type[] { typeof(string) });
-        private static ConstructorInfo integerConstructorStringInfo = typeof(LSL_Integer).GetConstructor(new Type[] { typeof(string) });
-        private static ConstructorInfo lslFloatConstructorInfo = typeof(LSL_Float).GetConstructor(new Type[] { typeof(double) });
-        private static ConstructorInfo lslIntegerConstructorInfo = typeof(LSL_Integer).GetConstructor(new Type[] { typeof(int) });
-        private static ConstructorInfo lslStringConstructorInfo = typeof(LSL_String).GetConstructor(new Type[] { typeof(string) });
-        private static ConstructorInfo rotationConstrucorStringInfo = typeof(LSL_Rotation).GetConstructor(new Type[] { typeof(string) });
-        private static ConstructorInfo vectorConstrucorStringInfo = typeof(LSL_Vector).GetConstructor(new Type[] { typeof(string) });
-        private static FieldInfo lslFloatValueFieldInfo = typeof(LSL_Float).GetField("value");
-        private static FieldInfo lslIntegerValueFieldInfo = typeof(LSL_Integer).GetField("value");
-        private static FieldInfo lslStringValueFieldInfo = typeof(LSL_String).GetField("m_string");
-        private static FieldInfo sdtcITableFieldInfo = typeof(XMRSDTypeClObj).GetField("sdtcITable");
-        private static MethodInfo boolToListMethodInfo = typeof(TypeCast).GetMethod("BoolToList", new Type[] { typeof(bool) });
-        private static MethodInfo boolToStringMethodInfo = typeof(TypeCast).GetMethod("BoolToString", new Type[] { typeof(bool) });
-        private static MethodInfo charToStringMethodInfo = typeof(TypeCast).GetMethod("CharToString", new Type[] { typeof(char) });
-        private static MethodInfo excToStringMethodInfo = typeof(TypeCast).GetMethod("ExceptionToString", new Type[] { typeof(Exception), typeof(XMRInstAbstract) });
-        private static MethodInfo floatToStringMethodInfo = typeof(TypeCast).GetMethod("FloatToString", new Type[] { typeof(double) });
-        private static MethodInfo intToStringMethodInfo = typeof(TypeCast).GetMethod("IntegerToString", new Type[] { typeof(int) });
-        private static MethodInfo keyToBoolMethodInfo = typeof(TypeCast).GetMethod("KeyToBool", new Type[] { typeof(string) });
-        private static MethodInfo listToBoolMethodInfo = typeof(TypeCast).GetMethod("ListToBool", new Type[] { typeof(LSL_List) });
-        private static MethodInfo listToStringMethodInfo = typeof(TypeCast).GetMethod("ListToString", new Type[] { typeof(LSL_List) });
-        private static MethodInfo objectToFloatMethodInfo = typeof(TypeCast).GetMethod("ObjectToFloat", new Type[] { typeof(object) });
-        private static MethodInfo objectToIntegerMethodInfo = typeof(TypeCast).GetMethod("ObjectToInteger", new Type[] { typeof(object) });
-        private static MethodInfo objectToListMethodInfo = typeof(TypeCast).GetMethod("ObjectToList", new Type[] { typeof(object) });
-        private static MethodInfo objectToRotationMethodInfo = typeof(TypeCast).GetMethod("ObjectToRotation", new Type[] { typeof(object) });
-        private static MethodInfo objectToStringMethodInfo = typeof(TypeCast).GetMethod("ObjectToString", new Type[] { typeof(object) });
-        private static MethodInfo objectToVectorMethodInfo = typeof(TypeCast).GetMethod("ObjectToVector", new Type[] { typeof(object) });
-        private static MethodInfo rotationToBoolMethodInfo = typeof(TypeCast).GetMethod("RotationToBool", new Type[] { typeof(LSL_Rotation) });
-        private static MethodInfo rotationToStringMethodInfo = typeof(TypeCast).GetMethod("RotationToString", new Type[] { typeof(LSL_Rotation) });
-        private static MethodInfo stringToBoolMethodInfo = typeof(TypeCast).GetMethod("StringToBool", new Type[] { typeof(string) });
-        private static MethodInfo vectorToBoolMethodInfo = typeof(TypeCast).GetMethod("VectorToBool", new Type[] { typeof(LSL_Vector) });
-        private static MethodInfo vectorToStringMethodInfo = typeof(TypeCast).GetMethod("VectorToString", new Type[] { typeof(LSL_Vector) });
-        private static MethodInfo sdTypeClassCastClass2ClassMethodInfo = typeof(XMRSDTypeClObj).GetMethod("CastClass2Class", new Type[] { typeof(object), typeof(int) });
-        private static MethodInfo sdTypeClassCastIFace2ClassMethodInfo = typeof(XMRSDTypeClObj).GetMethod("CastIFace2Class", new Type[] { typeof(Delegate[]), typeof(int) });
-        private static MethodInfo sdTypeClassCastObj2IFaceMethodInfo = typeof(XMRSDTypeClObj).GetMethod("CastObj2IFace", new Type[] { typeof(object), typeof(string) });
-        private static MethodInfo charToListMethodInfo = typeof(TypeCast).GetMethod("CharToList", new Type[] { typeof(char) });
-        private static MethodInfo excToListMethodInfo = typeof(TypeCast).GetMethod("ExcToList", new Type[] { typeof(Exception) });
-        private static MethodInfo vectorToListMethodInfo = typeof(TypeCast).GetMethod("VectorToList", new Type[] { typeof(LSL_Vector) });
-        private static MethodInfo floatToListMethodInfo = typeof(TypeCast).GetMethod("FloatToList", new Type[] { typeof(double) });
-        private static MethodInfo integerToListMethodInfo = typeof(TypeCast).GetMethod("IntegerToList", new Type[] { typeof(int) });
-        private static MethodInfo rotationToListMethodInfo = typeof(TypeCast).GetMethod("RotationToList", new Type[] { typeof(LSL_Rotation) });
-        private static MethodInfo stringToListMethodInfo = typeof(TypeCast).GetMethod("StringToList", new Type[] { typeof(string) });
-
-        /*
-         * List of all allowed type casts and how to perform the casting.
-         */
-        private static Dictionary<string, CastDelegate> legalTypeCasts = CreateLegalTypeCasts();
-
-        /**
-         * @brief create a dictionary of legal type casts.
-         * Defines what EXPLICIT type casts are allowed in addition to the IMPLICIT ones.
-         * Key is of the form <oldtype> <newtype> for IMPLICIT casting.
-         * Key is of the form <oldtype>*<newtype> for EXPLICIT casting.
-         * Value is a delegate that generates code to perform the type cast.
-         */
-        private static Dictionary<string, CastDelegate> CreateLegalTypeCasts()
+        return new Dictionary<string, CastDelegate>
         {
-            return new Dictionary<string, CastDelegate>
-            {
-                // IMPLICIT type casts (a space is in middle of the key)
-                // EXPLICIT type casts (an * is in middle of the key)
-                // In general, only mark explicit if it might throw an exception
-                { "array object", TypeCastArray2Object },
-                { "bool float", TypeCastBool2Float },
-                { "bool integer", TypeCastBool2Integer },
-                { "bool list", TypeCastBool2List },
-                { "bool object", TypeCastBool2Object },
-                { "bool string", TypeCastBool2String },
-                { "char integer", TypeCastChar2Integer },
-                { "char list", TypeCastChar2List },
-                { "char object", TypeCastChar2Object },
-                { "char string", TypeCastChar2String },
-                { "exception list", TypeCastExc2List },
-                { "exception object", TypeCastExc2Object },
-                { "exception string", TypeCastExc2String },
-                { "float bool", TypeCastFloat2Bool },
-                { "float*integer", TypeCastFloat2Integer },
-                { "float list", TypeCastFloat2List },
-                { "float object", TypeCastFloat2Object },
-                { "float string", TypeCastFloat2String },
-                { "integer bool", TypeCastInteger2Bool },
-                { "integer char", TypeCastInteger2Char },
-                { "integer float", TypeCastInteger2Float },
-                { "integer list", TypeCastInteger2List },
-                { "integer object", TypeCastInteger2Object },
-                { "integer string", TypeCastInteger2String },
-                { "list bool", TypeCastList2Bool },
-                { "list object", TypeCastList2Object },
-                { "list string", TypeCastList2String },
-                { "object*array", TypeCastObject2Array },
-                { "object*bool", TypeCastObject2Bool },
-                { "object*char", TypeCastObject2Char },
-                { "object*exception", TypeCastObject2Exc },
-                { "object*float", TypeCastObject2Float },
-                { "object*integer", TypeCastObject2Integer },
-                { "object*list", TypeCastObject2List },
-                { "object*rotation", TypeCastObject2Rotation },
-                { "object string", TypeCastObject2String },
-                { "object*vector", TypeCastObject2Vector },
-                { "rotation bool", TypeCastRotation2Bool },
-                { "rotation list", TypeCastRotation2List },
-                { "rotation object", TypeCastRotation2Object },
-                { "rotation string", TypeCastRotation2String },
-                { "string bool", TypeCastString2Bool },
-                { "string*float", TypeCastString2Float },
-                { "string*integer", TypeCastString2Integer },
-                { "string list", TypeCastString2List },
-                { "string object", TypeCastString2Object },
-                { "string*rotation", TypeCastString2Rotation },
-                { "string*vector", TypeCastString2Vector },
-                { "vector bool", TypeCastVector2Bool },
-                { "vector list", TypeCastVector2List },
-                { "vector object", TypeCastVector2Object },
-                { "vector string", TypeCastVector2String }
-            };
-        }
+            // IMPLICIT type casts (a space is in middle of the key)
+            // EXPLICIT type casts (an * is in middle of the key)
+            // In general, only mark explicit if it might throw an exception
+            { "array object", TypeCastArray2Object },
+            { "bool float", TypeCastBool2Float },
+            { "bool integer", TypeCastBool2Integer },
+            { "bool list", TypeCastBool2List },
+            { "bool object", TypeCastBool2Object },
+            { "bool string", TypeCastBool2String },
+            { "char integer", TypeCastChar2Integer },
+            { "char list", TypeCastChar2List },
+            { "char object", TypeCastChar2Object },
+            { "char string", TypeCastChar2String },
+            { "exception list", TypeCastExc2List },
+            { "exception object", TypeCastExc2Object },
+            { "exception string", TypeCastExc2String },
+            { "float bool", TypeCastFloat2Bool },
+            { "float*integer", TypeCastFloat2Integer },
+            { "float list", TypeCastFloat2List },
+            { "float object", TypeCastFloat2Object },
+            { "float string", TypeCastFloat2String },
+            { "integer bool", TypeCastInteger2Bool },
+            { "integer char", TypeCastInteger2Char },
+            { "integer float", TypeCastInteger2Float },
+            { "integer list", TypeCastInteger2List },
+            { "integer object", TypeCastInteger2Object },
+            { "integer string", TypeCastInteger2String },
+            { "list bool", TypeCastList2Bool },
+            { "list object", TypeCastList2Object },
+            { "list string", TypeCastList2String },
+            { "object*array", TypeCastObject2Array },
+            { "object*bool", TypeCastObject2Bool },
+            { "object*char", TypeCastObject2Char },
+            { "object*exception", TypeCastObject2Exc },
+            { "object*float", TypeCastObject2Float },
+            { "object*integer", TypeCastObject2Integer },
+            { "object*list", TypeCastObject2List },
+            { "object*rotation", TypeCastObject2Rotation },
+            { "object string", TypeCastObject2String },
+            { "object*vector", TypeCastObject2Vector },
+            { "rotation bool", TypeCastRotation2Bool },
+            { "rotation list", TypeCastRotation2List },
+            { "rotation object", TypeCastRotation2Object },
+            { "rotation string", TypeCastRotation2String },
+            { "string bool", TypeCastString2Bool },
+            { "string*float", TypeCastString2Float },
+            { "string*integer", TypeCastString2Integer },
+            { "string list", TypeCastString2List },
+            { "string object", TypeCastString2Object },
+            { "string*rotation", TypeCastString2Rotation },
+            { "string*vector", TypeCastString2Vector },
+            { "vector bool", TypeCastVector2Bool },
+            { "vector list", TypeCastVector2List },
+            { "vector object", TypeCastVector2Object },
+            { "vector string", TypeCastVector2String }
+        };
+    }
 
-        /**
-         * @brief See if the given type can be cast to the other implicitly.
-         * @param dstType = type being cast to
-         * @param srcType = type being cast from
-         * @returns false: implicit cast not allowed
-         *           true: implicit cast allowed
-         */
-        public static bool IsAssignableFrom(TokenType dstType, TokenType srcType)
+    /**
+     * @brief See if the given type can be cast to the other implicitly.
+     * @param dstType = type being cast to
+     * @param srcType = type being cast from
+     * @returns false: implicit cast not allowed
+     *           true: implicit cast allowed
+     */
+    public static bool IsAssignableFrom(TokenType dstType, TokenType srcType)
+    {
+        // Do a 'dry run' of the casting operation, discarding any emits and not printing any errors.
+        // But if the casting tries to print error(s), return false.
+        // Otherwise assume the cast is allowed and return true.
+        SCGIAF scg = new()
         {
-            // Do a 'dry run' of the casting operation, discarding any emits and not printing any errors.
-            // But if the casting tries to print error(s), return false.
-            // Otherwise assume the cast is allowed and return true.
-            SCGIAF scg = new()
-            {
-                ok = true,
-                _ilGen = migiaf
-            };
-            CastTopOfStack(scg, null, srcType, dstType, false);
-            return scg.ok;
-        }
+            ok = true,
+            _ilGen = migiaf
+        };
+        CastTopOfStack(scg, null, srcType, dstType, false);
+        return scg.ok;
+    }
 
-        private struct SCGIAF: IScriptCodeGen
+    private struct SCGIAF: IScriptCodeGen
+    {
+        public bool ok;
+        public ScriptMyILGen _ilGen;
+
+        // IScriptCodeGen
+        public ScriptMyILGen ilGen
         {
-            public bool ok;
-            public ScriptMyILGen _ilGen;
-
-            // IScriptCodeGen
-            public ScriptMyILGen ilGen
+            get
             {
-                get
-                {
-                    return _ilGen;
-                }
-            }
-            public void ErrorMsg(Token token, string message)
-            {
-                ok = false;
-            }
-            public void PushDefaultValue(TokenType type)
-            {
-            }
-            public void PushXMRInst()
-            {
+                return _ilGen;
             }
         }
-
-        private static readonly MIGIAF migiaf = new MIGIAF();
-        private struct MIGIAF: ScriptMyILGen
+        public void ErrorMsg(Token token, string message)
         {
-            // ScriptMyILGen
-            public string methName
-            {
-                get
-                {
-                    return null;
-                }
-            }
-            public ScriptMyLocal DeclareLocal(Type type, string name)
+            ok = false;
+        }
+        public void PushDefaultValue(TokenType type)
+        {
+        }
+        public void PushXMRInst()
+        {
+        }
+    }
+
+    private static readonly MIGIAF migiaf = new MIGIAF();
+    private struct MIGIAF: ScriptMyILGen
+    {
+        // ScriptMyILGen
+        public string methName
+        {
+            get
             {
                 return null;
             }
-            public ScriptMyLabel DefineLabel(string name)
-            {
-                return null;
-            }
-            public void BeginExceptionBlock()
-            {
-            }
-            public void BeginCatchBlock(Type excType)
-            {
-            }
-            public void BeginFinallyBlock()
-            {
-            }
-            public void EndExceptionBlock()
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode)
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode, FieldInfo field)
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode, ScriptMyLocal myLocal)
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode, Type type)
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode, ScriptMyLabel myLabel)
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode, ScriptMyLabel[] myLabels)
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode, ScriptObjWriter method)
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode, MethodInfo method)
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode, ConstructorInfo ctor)
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode, double value)
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode, float value)
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode, int value)
-            {
-            }
-            public void Emit(Token errorAt, OpCode opcode, string value)
-            {
-            }
-            public void MarkLabel(ScriptMyLabel myLabel)
-            {
-            }
         }
-
-        /**
-         * @brief Emit code that converts the top stack item from 'oldType' to 'newType'
-         * @param scg = what script we are compiling
-         * @param errorAt = token used for source location for error messages
-         * @param oldType = type of item currently on the stack
-         * @param newType = type to convert it to
-         * @param explicitAllowed = false: only consider implicit casts
-         *                           true: consider both implicit and explicit casts
-         * @returns with code emitted for conversion (or error message output if not allowed, and stack left unchanged)
-         */
-        public static void CastTopOfStack(IScriptCodeGen scg, Token errorAt, TokenType oldType, TokenType newType, bool explicitAllowed)
+        public ScriptMyLocal DeclareLocal(Type type, string name)
         {
-            CastDelegate castDelegate;
-            string oldString = oldType.ToString();
-            string newString = newType.ToString();
+            return null;
+        }
+        public ScriptMyLabel DefineLabel(string name)
+        {
+            return null;
+        }
+        public void BeginExceptionBlock()
+        {
+        }
+        public void BeginCatchBlock(Type excType)
+        {
+        }
+        public void BeginFinallyBlock()
+        {
+        }
+        public void EndExceptionBlock()
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode)
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode, FieldInfo field)
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode, ScriptMyLocal myLocal)
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode, Type type)
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode, ScriptMyLabel myLabel)
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode, ScriptMyLabel[] myLabels)
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode, ScriptObjWriter method)
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode, MethodInfo method)
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode, ConstructorInfo ctor)
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode, double value)
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode, float value)
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode, int value)
+        {
+        }
+        public void Emit(Token errorAt, OpCode opcode, string value)
+        {
+        }
+        public void MarkLabel(ScriptMyLabel myLabel)
+        {
+        }
+    }
 
-             // 'key' -> 'bool' is the only time we care about key being different than string.
-            if((oldString == "key") && (newString == "bool"))
-            {
-                LSLUnwrap(scg, errorAt, oldType);
-                scg.ilGen.Emit(errorAt, OpCodes.Call, keyToBoolMethodInfo);
-                LSLWrap(scg, errorAt, newType);
-                return;
-            }
+    /**
+     * @brief Emit code that converts the top stack item from 'oldType' to 'newType'
+     * @param scg = what script we are compiling
+     * @param errorAt = token used for source location for error messages
+     * @param oldType = type of item currently on the stack
+     * @param newType = type to convert it to
+     * @param explicitAllowed = false: only consider implicit casts
+     *                           true: consider both implicit and explicit casts
+     * @returns with code emitted for conversion (or error message output if not allowed, and stack left unchanged)
+     */
+    public static void CastTopOfStack(IScriptCodeGen scg, Token errorAt, TokenType oldType, TokenType newType, bool explicitAllowed)
+    {
+        CastDelegate castDelegate;
+        string oldString = oldType.ToString();
+        string newString = newType.ToString();
 
-             // Treat key and string as same type for all other type casts.
-            if(oldString == "key")
-                oldString = "string";
-            if(newString == "key")
-                newString = "string";
-
-             // If the types are the same, there is no conceptual casting needed.
-             // However, there may be wraping/unwraping to/from the LSL wrappers.
-            if(oldString == newString)
-            {
-                if(oldType.ToLSLWrapType() != newType.ToLSLWrapType())
-                {
-                    LSLUnwrap(scg, errorAt, oldType);
-                    LSLWrap(scg, errorAt, newType);
-                }
-                return;
-            }
-
-             // Script-defined classes can be cast up and down the tree.
-            if((oldType is TokenTypeSDTypeClass oldT) && (newType is TokenTypeSDTypeClass newT))
-            {
-                TokenDeclSDTypeClass oldSDTC = oldT.decl;
-                TokenDeclSDTypeClass newSDTC2 = newT.decl;
-
-                // implicit cast allowed from leaf toward root
-                for(TokenDeclSDTypeClass sdtc = oldSDTC; sdtc is not null; sdtc = sdtc.extends)
-                {
-                    if(sdtc == newSDTC2)
-                        return;
-                }
-
-                // explicit cast allowed from root toward leaf
-                for(TokenDeclSDTypeClass sdtc = newSDTC2; sdtc is not null; sdtc = sdtc.extends)
-                {
-                    if(sdtc == oldSDTC)
-                    {
-                        ExplCheck(scg, errorAt, explicitAllowed, oldString, newString);
-                        scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4, newSDTC2.sdTypeIndex);
-                        scg.ilGen.Emit(errorAt, OpCodes.Call, sdTypeClassCastClass2ClassMethodInfo);
-                        return;
-                    }
-                }
-
-                // not on same branch
-                goto illcast;
-            }
-
-             // One script-defined interface type cannot be cast to another script-defined interface type, 
-             // unless the old interface declares that it implements the new interface.  That proves that 
-             // the underlying object, no matter what type, implements the new interface.
-            if((oldType is TokenTypeSDTypeInterface oldT2) && (newType is TokenTypeSDTypeInterface newT2))
-            {
-                TokenDeclSDTypeInterface oldDecl = oldT2.decl;
-                TokenDeclSDTypeInterface newDecl = newT2.decl;
-                if(!oldDecl.Implements(newDecl))
-                    goto illcast;
-                scg.ilGen.Emit(errorAt, OpCodes.Ldstr, newType.ToString());
-                scg.ilGen.Emit(errorAt, OpCodes.Call, sdTypeClassCastObj2IFaceMethodInfo);
-                return;
-            }
-
-             // A script-defined class type can be implicitly cast to a script-defined interface type that it 
-             // implements.  The result is an array of delegates that give the class's implementation of the 
-             // various methods defined by the interface.
-            if((oldType is TokenTypeSDTypeClass oldtc) && (newType is TokenTypeSDTypeInterface))
-            {
-                TokenDeclSDTypeClass oldSDTC = oldtc.decl;
-                int intfIndex;
-                if(!oldSDTC.intfIndices.TryGetValue(newType.ToString(), out intfIndex))
-                    goto illcast;
-                scg.ilGen.Emit(errorAt, OpCodes.Ldfld, sdtcITableFieldInfo);
-                scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4, intfIndex);
-                scg.ilGen.Emit(errorAt, OpCodes.Ldelem, typeof(Delegate[]));
-                return;
-            }
-
-             // A script-defined interface type can be explicitly cast to a script-defined class type by 
-             // extracting the Target property from element 0 of the delegate array that is the interface
-             // object and making sure it casts to the correct script-defined class type.
-             //
-             // But then only if the class type implements the interface type.
-            if((oldType is TokenTypeSDTypeInterface oldSDTI) && (newType is TokenTypeSDTypeClass newSDTC))
-            {
-                if(!newSDTC.decl.CanCastToIntf(oldSDTI.decl))
-                    goto illcast;
-
-                ExplCheck(scg, errorAt, explicitAllowed, oldString, newString);
-                scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4, newSDTC.decl.sdTypeIndex);
-                scg.ilGen.Emit(errorAt, OpCodes.Call, sdTypeClassCastIFace2ClassMethodInfo);
-                return;
-            }
-
-             // A script-defined interface type can be implicitly cast to object.
-            if((oldType is TokenTypeSDTypeInterface) && (newType is TokenTypeObject))
-            {
-                return;
-            }
-
-             // An object can be explicitly cast to a script-defined interface.
-            if((oldType is TokenTypeObject) && (newType is TokenTypeSDTypeInterface))
-            {
-                ExplCheck(scg, errorAt, explicitAllowed, oldString, newString);
-                scg.ilGen.Emit(errorAt, OpCodes.Ldstr, newString);
-                scg.ilGen.Emit(errorAt, OpCodes.Call, sdTypeClassCastObj2IFaceMethodInfo);
-                return;
-            }
-
-             // Cast to void is always allowed, such as discarding value from 'i++' or function return value.
-            if(newType is TokenTypeVoid)
-            {
-                scg.ilGen.Emit(errorAt, OpCodes.Pop);
-                return;
-            }
-
-             // Cast from undef to object or script-defined type is always allowed.
-            if((oldType is TokenTypeUndef) &&
-                ((newType is TokenTypeObject) ||
-                 (newType is TokenTypeSDTypeClass) ||
-                 (newType is TokenTypeSDTypeInterface)))
-            {
-                return;
-            }
-
-             // Script-defined classes can be implicitly cast to objects.
-            if((oldType is TokenTypeSDTypeClass) && (newType is TokenTypeObject))
-            {
-                return;
-            }
-
-             // Script-defined classes can be explicitly cast from objects and other script-defined classes.
-             // Note that we must manually check that it is the correct SDTypeClass however because as far as 
-             // mono is concerned, all SDTypeClass's are the same.
-            if((oldType is TokenTypeObject) && (newType is TokenTypeSDTypeClass newT3))
-            {
-                ExplCheck(scg, errorAt, explicitAllowed, oldString, newString);
-                scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4, newT3.decl.sdTypeIndex);
-                scg.ilGen.Emit(errorAt, OpCodes.Call, sdTypeClassCastClass2ClassMethodInfo);
-                return;
-            }
-
-             // Delegates can be implicitly cast to/from objects.
-            if((oldType is TokenTypeSDTypeDelegate) && (newType is TokenTypeObject))
-            {
-                return;
-            }
-            if((oldType is TokenTypeObject) && (newType is TokenTypeSDTypeDelegate))
-            {
-                scg.ilGen.Emit(errorAt, OpCodes.Castclass, newType.ToSysType());
-                return;
-            }
-
-             // Some actual conversion is needed, see if it is in table of legal casts.
-            string key = oldString + " " + newString;
-            if(!legalTypeCasts.TryGetValue(key, out castDelegate))
-            {
-                key = oldString + "*" + newString;
-                if(!legalTypeCasts.TryGetValue(key, out castDelegate))
-                    goto illcast;
-                ExplCheck(scg, errorAt, explicitAllowed, oldString, newString);
-            }
-
-             // Ok, output cast.  But make sure it is in native form without any LSL wrapping
-             // before passing to our casting routine.  Then if caller is expecting an LSL-
-             // wrapped value on the stack upon return, wrap it up after our casting.
+         // 'key' -> 'bool' is the only time we care about key being different than string.
+        if((oldString == "key") && (newString == "bool"))
+        {
             LSLUnwrap(scg, errorAt, oldType);
-            castDelegate(scg, errorAt);
+            scg.ilGen.Emit(errorAt, OpCodes.Call, keyToBoolMethodInfo);
             LSLWrap(scg, errorAt, newType);
             return;
-
-            illcast:
-            scg.ErrorMsg(errorAt, "illegal to cast from " + oldString + " to " + newString);
-            if(oldType is not TokenTypeVoid)
-                scg.ilGen.Emit(errorAt, OpCodes.Pop);
-            scg.PushDefaultValue(newType);
-        }
-        private static void ExplCheck(IScriptCodeGen scg, Token errorAt, bool explicitAllowed, string oldString, string newString)
-        {
-            if(!explicitAllowed)
-            {
-                scg.ErrorMsg(errorAt, "must explicitly cast from " + oldString + " to " + newString);
-            }
         }
 
-        /**
-         * @brief If value on the stack is an LSL-style wrapped value, unwrap it.
-         */
-        public static void LSLUnwrap(IScriptCodeGen scg, Token errorAt, TokenType type)
+         // Treat key and string as same type for all other type casts.
+        if(oldString == "key")
+            oldString = "string";
+        if(newString == "key")
+            newString = "string";
+
+         // If the types are the same, there is no conceptual casting needed.
+         // However, there may be wraping/unwraping to/from the LSL wrappers.
+        if(oldString == newString)
         {
-            Type t = type.ToLSLWrapType();
-            if (t == typeof(LSL_String))
+            if(oldType.ToLSLWrapType() != newType.ToLSLWrapType())
             {
-                scg.ilGen.Emit(errorAt, OpCodes.Ldfld, lslStringValueFieldInfo);
+                LSLUnwrap(scg, errorAt, oldType);
+                LSLWrap(scg, errorAt, newType);
             }
-            else if(t == typeof(LSL_Integer))
-            {
-                scg.ilGen.Emit(errorAt, OpCodes.Ldfld, lslIntegerValueFieldInfo);
-            }
-            else if (t == typeof(LSL_Float))
-            {
-                scg.ilGen.Emit(errorAt, OpCodes.Ldfld, lslFloatValueFieldInfo);
-            }
+            return;
         }
 
-        /**
-         * @brief If caller wants the unwrapped value on stack wrapped LSL-style, wrap it.
-         */
-        private static void LSLWrap(IScriptCodeGen scg, Token errorAt, TokenType type)
+         // Script-defined classes can be cast up and down the tree.
+        if((oldType is TokenTypeSDTypeClass oldT) && (newType is TokenTypeSDTypeClass newT))
         {
-            Type t = type.ToLSLWrapType();
-            if (t == typeof(LSL_String))
+            TokenDeclSDTypeClass oldSDTC = oldT.decl;
+            TokenDeclSDTypeClass newSDTC2 = newT.decl;
+
+            // implicit cast allowed from leaf toward root
+            for(TokenDeclSDTypeClass sdtc = oldSDTC; sdtc is not null; sdtc = sdtc.extends)
             {
-                scg.ilGen.Emit(errorAt, OpCodes.Newobj, lslStringConstructorInfo);
+                if(sdtc == newSDTC2)
+                    return;
             }
-            else if (t == typeof(LSL_Integer))
+
+            // explicit cast allowed from root toward leaf
+            for(TokenDeclSDTypeClass sdtc = newSDTC2; sdtc is not null; sdtc = sdtc.extends)
             {
-                scg.ilGen.Emit(errorAt, OpCodes.Newobj, lslIntegerConstructorInfo);
+                if(sdtc == oldSDTC)
+                {
+                    ExplCheck(scg, errorAt, explicitAllowed, oldString, newString);
+                    scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4, newSDTC2.sdTypeIndex);
+                    scg.ilGen.Emit(errorAt, OpCodes.Call, sdTypeClassCastClass2ClassMethodInfo);
+                    return;
+                }
             }
-            else if (t == typeof(LSL_Float))
-            {
-                scg.ilGen.Emit(errorAt, OpCodes.Newobj, lslFloatConstructorInfo);
-            }
+
+            // not on same branch
+            goto illcast;
         }
 
-        /**
-         * @brief These routines output code to perform casting.
-         *        They can assume there are no LSL wrapped values on input
-         *        and they should not output an LSL wrapped value.
-         */
-        private static void TypeCastArray2Object(IScriptCodeGen scg, Token errorAt)
+         // One script-defined interface type cannot be cast to another script-defined interface type, 
+         // unless the old interface declares that it implements the new interface.  That proves that 
+         // the underlying object, no matter what type, implements the new interface.
+        if((oldType is TokenTypeSDTypeInterface oldT2) && (newType is TokenTypeSDTypeInterface newT2))
         {
+            TokenDeclSDTypeInterface oldDecl = oldT2.decl;
+            TokenDeclSDTypeInterface newDecl = newT2.decl;
+            if(!oldDecl.Implements(newDecl))
+                goto illcast;
+            scg.ilGen.Emit(errorAt, OpCodes.Ldstr, newType.ToString());
+            scg.ilGen.Emit(errorAt, OpCodes.Call, sdTypeClassCastObj2IFaceMethodInfo);
+            return;
         }
-        private static void TypeCastBool2Float(IScriptCodeGen scg, Token errorAt)
+
+         // A script-defined class type can be implicitly cast to a script-defined interface type that it 
+         // implements.  The result is an array of delegates that give the class's implementation of the 
+         // various methods defined by the interface.
+        if((oldType is TokenTypeSDTypeClass oldtc) && (newType is TokenTypeSDTypeInterface))
         {
-            if(typeof(double) == typeof(float))
-            {
-                scg.ilGen.Emit(errorAt, OpCodes.Conv_R4);
-            }
-            else if(typeof(double) == typeof(double))
-            {
-                scg.ilGen.Emit(errorAt, OpCodes.Conv_R8);
-            }
-            else
-            {
-                throw new Exception("unknown type");
-            }
+            TokenDeclSDTypeClass oldSDTC = oldtc.decl;
+            int intfIndex;
+            if(!oldSDTC.intfIndices.TryGetValue(newType.ToString(), out intfIndex))
+                goto illcast;
+            scg.ilGen.Emit(errorAt, OpCodes.Ldfld, sdtcITableFieldInfo);
+            scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4, intfIndex);
+            scg.ilGen.Emit(errorAt, OpCodes.Ldelem, typeof(Delegate[]));
+            return;
         }
-        private static void TypeCastBool2Integer(IScriptCodeGen scg, Token errorAt)
+
+         // A script-defined interface type can be explicitly cast to a script-defined class type by 
+         // extracting the Target property from element 0 of the delegate array that is the interface
+         // object and making sure it casts to the correct script-defined class type.
+         //
+         // But then only if the class type implements the interface type.
+        if((oldType is TokenTypeSDTypeInterface oldSDTI) && (newType is TokenTypeSDTypeClass newSDTC))
         {
+            if(!newSDTC.decl.CanCastToIntf(oldSDTI.decl))
+                goto illcast;
+
+            ExplCheck(scg, errorAt, explicitAllowed, oldString, newString);
+            scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4, newSDTC.decl.sdTypeIndex);
+            scg.ilGen.Emit(errorAt, OpCodes.Call, sdTypeClassCastIFace2ClassMethodInfo);
+            return;
         }
-        private static void TypeCastBool2Object(IScriptCodeGen scg, Token errorAt)
+
+         // A script-defined interface type can be implicitly cast to object.
+        if((oldType is TokenTypeSDTypeInterface) && (newType is TokenTypeObject))
         {
-            scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(bool));
+            return;
         }
-        private static void TypeCastChar2Integer(IScriptCodeGen scg, Token errorAt)
+
+         // An object can be explicitly cast to a script-defined interface.
+        if((oldType is TokenTypeObject) && (newType is TokenTypeSDTypeInterface))
         {
+            ExplCheck(scg, errorAt, explicitAllowed, oldString, newString);
+            scg.ilGen.Emit(errorAt, OpCodes.Ldstr, newString);
+            scg.ilGen.Emit(errorAt, OpCodes.Call, sdTypeClassCastObj2IFaceMethodInfo);
+            return;
         }
-        private static void TypeCastChar2List(IScriptCodeGen scg, Token errorAt)
+
+         // Cast to void is always allowed, such as discarding value from 'i++' or function return value.
+        if(newType is TokenTypeVoid)
         {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, charToListMethodInfo);
+            scg.ilGen.Emit(errorAt, OpCodes.Pop);
+            return;
         }
-        private static void TypeCastChar2Object(IScriptCodeGen scg, Token errorAt)
+
+         // Cast from undef to object or script-defined type is always allowed.
+        if((oldType is TokenTypeUndef) &&
+            ((newType is TokenTypeObject) ||
+             (newType is TokenTypeSDTypeClass) ||
+             (newType is TokenTypeSDTypeInterface)))
         {
-            scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(char));
+            return;
         }
-        private static void TypeCastChar2String(IScriptCodeGen scg, Token errorAt)
+
+         // Script-defined classes can be implicitly cast to objects.
+        if((oldType is TokenTypeSDTypeClass) && (newType is TokenTypeObject))
         {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, charToStringMethodInfo);
+            return;
         }
-        private static void TypeCastExc2List(IScriptCodeGen scg, Token errorAt)
+
+         // Script-defined classes can be explicitly cast from objects and other script-defined classes.
+         // Note that we must manually check that it is the correct SDTypeClass however because as far as 
+         // mono is concerned, all SDTypeClass's are the same.
+        if((oldType is TokenTypeObject) && (newType is TokenTypeSDTypeClass newT3))
         {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, excToListMethodInfo);
+            ExplCheck(scg, errorAt, explicitAllowed, oldString, newString);
+            scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4, newT3.decl.sdTypeIndex);
+            scg.ilGen.Emit(errorAt, OpCodes.Call, sdTypeClassCastClass2ClassMethodInfo);
+            return;
         }
-        private static void TypeCastExc2Object(IScriptCodeGen scg, Token errorAt)
+
+         // Delegates can be implicitly cast to/from objects.
+        if((oldType is TokenTypeSDTypeDelegate) && (newType is TokenTypeObject))
         {
+            return;
         }
-        private static void TypeCastExc2String(IScriptCodeGen scg, Token errorAt)
+        if((oldType is TokenTypeObject) && (newType is TokenTypeSDTypeDelegate))
         {
-            scg.PushXMRInst();
-            scg.ilGen.Emit(errorAt, OpCodes.Call, excToStringMethodInfo);
+            scg.ilGen.Emit(errorAt, OpCodes.Castclass, newType.ToSysType());
+            return;
         }
-        private static void TypeCastFloat2Bool(IScriptCodeGen scg, Token errorAt)
+
+         // Some actual conversion is needed, see if it is in table of legal casts.
+        string key = oldString + " " + newString;
+        if(!legalTypeCasts.TryGetValue(key, out castDelegate))
         {
-            scg.ilGen.Emit(errorAt, OpCodes.Ldc_R4, 0.0f);
-            scg.ilGen.Emit(errorAt, OpCodes.Ceq);
-            scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4_1);
-            scg.ilGen.Emit(errorAt, OpCodes.Xor);
+            key = oldString + "*" + newString;
+            if(!legalTypeCasts.TryGetValue(key, out castDelegate))
+                goto illcast;
+            ExplCheck(scg, errorAt, explicitAllowed, oldString, newString);
         }
-        private static void TypeCastFloat2Integer(IScriptCodeGen scg, Token errorAt)
+
+         // Ok, output cast.  But make sure it is in native form without any LSL wrapping
+         // before passing to our casting routine.  Then if caller is expecting an LSL-
+         // wrapped value on the stack upon return, wrap it up after our casting.
+        LSLUnwrap(scg, errorAt, oldType);
+        castDelegate(scg, errorAt);
+        LSLWrap(scg, errorAt, newType);
+        return;
+
+        illcast:
+        scg.ErrorMsg(errorAt, "illegal to cast from " + oldString + " to " + newString);
+        if(oldType is not TokenTypeVoid)
+            scg.ilGen.Emit(errorAt, OpCodes.Pop);
+        scg.PushDefaultValue(newType);
+    }
+    private static void ExplCheck(IScriptCodeGen scg, Token errorAt, bool explicitAllowed, string oldString, string newString)
+    {
+        if(!explicitAllowed)
         {
-            scg.ilGen.Emit(errorAt, OpCodes.Conv_I4);
+            scg.ErrorMsg(errorAt, "must explicitly cast from " + oldString + " to " + newString);
         }
-        private static void TypeCastFloat2Object(IScriptCodeGen scg, Token errorAt)
+    }
+
+    /**
+     * @brief If value on the stack is an LSL-style wrapped value, unwrap it.
+     */
+    public static void LSLUnwrap(IScriptCodeGen scg, Token errorAt, TokenType type)
+    {
+        Type t = type.ToLSLWrapType();
+        if (t == typeof(LSL_String))
         {
-            scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(double));
+            scg.ilGen.Emit(errorAt, OpCodes.Ldfld, lslStringValueFieldInfo);
         }
-        private static void TypeCastInteger2Bool(IScriptCodeGen scg, Token errorAt)
+        else if(t == typeof(LSL_Integer))
         {
-            scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4_0);
-            scg.ilGen.Emit(errorAt, OpCodes.Ceq);
-            scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4_1);
-            scg.ilGen.Emit(errorAt, OpCodes.Xor);
-        }
-        private static void TypeCastInteger2Char(IScriptCodeGen scg, Token errorAt)
-        {
-        }
-        private static void TypeCastInteger2Float(IScriptCodeGen scg, Token errorAt)
-        {
-            if(typeof(double) == typeof(float))
-            {
-                scg.ilGen.Emit(errorAt, OpCodes.Conv_R4);
-            }
-            else if(typeof(double) == typeof(double))
-            {
-                scg.ilGen.Emit(errorAt, OpCodes.Conv_R8);
-            }
-            else
-            {
-                throw new Exception("unknown type");
-            }
-        }
-        private static void TypeCastInteger2Object(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(int));
-        }
-        private static void TypeCastList2Bool(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, listToBoolMethodInfo);
-        }
-        private static void TypeCastList2Object(IScriptCodeGen scg, Token errorAt)
-        {
-            if(typeof(LSL_List).IsValueType)
-            {
-                scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(LSL_List));
-            }
-        }
-        private static void TypeCastObject2Array(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Castclass, typeof(XMR_Array));
-        }
-        private static void TypeCastObject2Bool(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Unbox_Any, typeof(bool));
-        }
-        private static void TypeCastObject2Char(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Unbox_Any, typeof(char));
-        }
-        private static void TypeCastObject2Exc(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Castclass, typeof(Exception));
-        }
-        private static void TypeCastObject2Float(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, objectToFloatMethodInfo);
-        }
-        private static void TypeCastObject2Integer(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, objectToIntegerMethodInfo);
-        }
-        private static void TypeCastObject2List(IScriptCodeGen scg, Token errorAt)
-        {
-            if(typeof(LSL_List).IsValueType)
-            {
-                scg.ilGen.Emit(errorAt, OpCodes.Call, objectToListMethodInfo);
-            }
-            else
-            {
-                scg.ilGen.Emit(errorAt, OpCodes.Castclass, typeof(LSL_List));
-            }
-        }
-        private static void TypeCastObject2Rotation(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, objectToRotationMethodInfo);
-        }
-        private static void TypeCastObject2Vector(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, objectToVectorMethodInfo);
-        }
-        private static void TypeCastRotation2Bool(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, rotationToBoolMethodInfo);
-        }
-        private static void TypeCastRotation2Object(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(LSL_Rotation));
-        }
-        private static void TypeCastString2Bool(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, stringToBoolMethodInfo);
-        }
-        private static void TypeCastString2Object(IScriptCodeGen scg, Token errorAt)
-        {
-        }
-        private static void TypeCastString2Rotation(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Newobj, rotationConstrucorStringInfo);
-        }
-        private static void TypeCastString2Vector(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Newobj, vectorConstrucorStringInfo);
-        }
-        private static void TypeCastVector2Bool(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, vectorToBoolMethodInfo);
-        }
-        private static void TypeCastVector2List(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, vectorToListMethodInfo);
-        }
-        private static void TypeCastVector2Object(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(LSL_Vector));
-        }
-        private static void TypeCastBool2List(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, boolToListMethodInfo);
-        }
-        private static void TypeCastBool2String(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, boolToStringMethodInfo);
-        }
-        private static void TypeCastFloat2List(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, floatToListMethodInfo);
-        }
-        private static void TypeCastFloat2String(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, floatToStringMethodInfo);
-        }
-        private static void TypeCastInteger2List(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, integerToListMethodInfo);
-        }
-        private static void TypeCastInteger2String(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, intToStringMethodInfo);
-        }
-        private static void TypeCastList2String(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, listToStringMethodInfo);
-        }
-        private static void TypeCastObject2String(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, objectToStringMethodInfo);
-        }
-        private static void TypeCastRotation2List(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, rotationToListMethodInfo);
-        }
-        private static void TypeCastRotation2String(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, rotationToStringMethodInfo);
-        }
-        private static void TypeCastString2Float(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Newobj, floatConstructorStringInfo);
-            scg.ilGen.Emit(errorAt, OpCodes.Ldfld, lslFloatValueFieldInfo);
-        }
-        private static void TypeCastString2Integer(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Newobj, integerConstructorStringInfo);
             scg.ilGen.Emit(errorAt, OpCodes.Ldfld, lslIntegerValueFieldInfo);
         }
-        private static void TypeCastString2List(IScriptCodeGen scg, Token errorAt)
+        else if (t == typeof(LSL_Float))
         {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, stringToListMethodInfo);
+            scg.ilGen.Emit(errorAt, OpCodes.Ldfld, lslFloatValueFieldInfo);
         }
-        private static void TypeCastVector2String(IScriptCodeGen scg, Token errorAt)
-        {
-            scg.ilGen.Emit(errorAt, OpCodes.Call, vectorToStringMethodInfo);
-        }
+    }
 
-        /*
-         * Because the calls are funky, let the compiler handle them.
-         */
-        public static bool RotationToBool(LSL_Rotation x)
+    /**
+     * @brief If caller wants the unwrapped value on stack wrapped LSL-style, wrap it.
+     */
+    private static void LSLWrap(IScriptCodeGen scg, Token errorAt, TokenType type)
+    {
+        Type t = type.ToLSLWrapType();
+        if (t == typeof(LSL_String))
         {
-            return !x.Equals(ScriptBaseClass.ZERO_ROTATION);
+            scg.ilGen.Emit(errorAt, OpCodes.Newobj, lslStringConstructorInfo);
         }
-        public static bool StringToBool(string x)
+        else if (t == typeof(LSL_Integer))
         {
-            return x.Length > 0;
+            scg.ilGen.Emit(errorAt, OpCodes.Newobj, lslIntegerConstructorInfo);
         }
-        public static bool VectorToBool(LSL_Vector x)
+        else if (t == typeof(LSL_Float))
         {
-            return !x.Equals(ScriptBaseClass.ZERO_VECTOR);
+            scg.ilGen.Emit(errorAt, OpCodes.Newobj, lslFloatConstructorInfo);
         }
-        public static string BoolToString(bool x)
-        {
-            return x ? "1" : "0";
-        }
-        public static string CharToString(char x)
-        {
-            return x.ToString();
-        }
-        public static string FloatToString(double x)
-        {
-            return x.ToString("0.000000",CultureInfo.InvariantCulture);
-        }
-        public static string IntegerToString(int x)
-        {
-            return x.ToString();
-        }
-        public static bool KeyToBool(string x)
-        {
-            return (x != "") && (x != ScriptBaseClass.NULL_KEY);
-        }
-        public static bool ListToBool(LSL_List x)
-        {
-            return x.Length != 0;
-        }
-        public static string ListToString(LSL_List x)
-        {
-            return x.ToString();
-        }
-        public static string ObjectToString(object x)
-        {
-            return x?.ToString();
-        }
-        public static string RotationToString(LSL_Rotation x)
-        {
-            return x.ToString();
-        }
-        public static string VectorToString(LSL_Vector x)
-        {
-            return x.ToString();
-        }
-        public static LSL_List BoolToList(bool b)
-        {
-            return new LSL_List(new object[] { new LSL_Integer(b ? 1 : 0) });
-        }
-        public static LSL_List CharToList(char c)
-        {
-            return new LSL_List(new object[] { new LSL_Integer(c) });
-        }
-        public static LSL_List ExcToList(Exception e)
-        {
-            return new LSL_List(new object[] { e });
-        }
-        public static LSL_List VectorToList(LSL_Vector v)
-        {
-            return new LSL_List(new object[] { v });
-        }
-        public static LSL_List FloatToList(double f)
-        {
-            return new LSL_List(new object[] { new LSL_Float(f) });
-        }
-        public static LSL_List IntegerToList(int i)
-        {
-            return new LSL_List(new object[] { new LSL_Integer(i) });
-        }
-        public static LSL_List RotationToList(LSL_Rotation r)
-        {
-            return new LSL_List(new object[] { r });
-        }
-        public static LSL_List StringToList(string s)
-        {
-            return new LSL_List(new object[] { new LSL_String(s) });
-        }
+    }
 
-        public static double ObjectToFloat(object x)
+    /**
+     * @brief These routines output code to perform casting.
+     *        They can assume there are no LSL wrapped values on input
+     *        and they should not output an LSL wrapped value.
+     */
+    private static void TypeCastArray2Object(IScriptCodeGen scg, Token errorAt)
+    {
+    }
+    private static void TypeCastBool2Float(IScriptCodeGen scg, Token errorAt)
+    {
+        if(typeof(double) == typeof(float))
         {
-            if(x is LSL_String lsx)
-                return double.Parse(lsx.m_string);
-            if(x is string sx)
-                return double.Parse(sx);
-            if(x is LSL_Float lfx)
-                return lfx.value;
-            if(x is LSL_Integer lix)
-                return lix.value;
-            if(x is int ix)
-                return ix;
-            return (double)x;
+            scg.ilGen.Emit(errorAt, OpCodes.Conv_R4);
         }
-
-        public static int ObjectToInteger(object x)
+        else if(typeof(double) == typeof(double))
         {
-            if (x is int ix)
-                return ix;
-            if (x is LSL_Integer lix)
-                return lix.value;
-            if (x is LSL_String lsx)
-                return int.Parse(lsx.m_string);
-            if(x is string sx)
-                return int.Parse(sx);
-            if (x is LSL_Float lfx)
-                return (int)lfx.value;
-            if (x is double dx)
-                return (int)dx;
-
-            return (int)x;
+            scg.ilGen.Emit(errorAt, OpCodes.Conv_R8);
         }
-
-        public static LSL_List ObjectToList(object x)
+        else
         {
-            return (LSL_List)x;
+            throw new Exception("unknown type");
         }
-
-        public static LSL_Rotation ObjectToRotation(object x)
+    }
+    private static void TypeCastBool2Integer(IScriptCodeGen scg, Token errorAt)
+    {
+    }
+    private static void TypeCastBool2Object(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(bool));
+    }
+    private static void TypeCastChar2Integer(IScriptCodeGen scg, Token errorAt)
+    {
+    }
+    private static void TypeCastChar2List(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, charToListMethodInfo);
+    }
+    private static void TypeCastChar2Object(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(char));
+    }
+    private static void TypeCastChar2String(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, charToStringMethodInfo);
+    }
+    private static void TypeCastExc2List(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, excToListMethodInfo);
+    }
+    private static void TypeCastExc2Object(IScriptCodeGen scg, Token errorAt)
+    {
+    }
+    private static void TypeCastExc2String(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.PushXMRInst();
+        scg.ilGen.Emit(errorAt, OpCodes.Call, excToStringMethodInfo);
+    }
+    private static void TypeCastFloat2Bool(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Ldc_R4, 0.0f);
+        scg.ilGen.Emit(errorAt, OpCodes.Ceq);
+        scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4_1);
+        scg.ilGen.Emit(errorAt, OpCodes.Xor);
+    }
+    private static void TypeCastFloat2Integer(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Conv_I4);
+    }
+    private static void TypeCastFloat2Object(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(double));
+    }
+    private static void TypeCastInteger2Bool(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4_0);
+        scg.ilGen.Emit(errorAt, OpCodes.Ceq);
+        scg.ilGen.Emit(errorAt, OpCodes.Ldc_I4_1);
+        scg.ilGen.Emit(errorAt, OpCodes.Xor);
+    }
+    private static void TypeCastInteger2Char(IScriptCodeGen scg, Token errorAt)
+    {
+    }
+    private static void TypeCastInteger2Float(IScriptCodeGen scg, Token errorAt)
+    {
+        if(typeof(double) == typeof(float))
         {
-            if(x is LSL_String lsx)
-                return new LSL_Rotation(lsx.m_string);
-            if(x is string sx)
-                return new LSL_Rotation(sx);
-            return (LSL_Rotation)x;
+            scg.ilGen.Emit(errorAt, OpCodes.Conv_R4);
         }
-
-        public static LSL_Vector ObjectToVector(object x)
+        else if(typeof(double) == typeof(double))
         {
-            if(x is LSL_String lsx)
-                return new LSL_Vector(lsx);
-            if(x is string sx)
-                return new LSL_Vector(sx);
-            return (LSL_Vector)x;
+            scg.ilGen.Emit(errorAt, OpCodes.Conv_R8);
         }
-
-        public static string ExceptionToString(Exception x, XMRInstAbstract inst)
+        else
         {
-            return XMRInstAbstract.xmrExceptionTypeName(x) + ": " + XMRInstAbstract.xmrExceptionMessage(x) +
-                "\n" + inst.xmrExceptionStackTrace(x);
+            throw new Exception("unknown type");
         }
-
-        /*
-         * These are used by event handler entrypoints to remove any LSL wrapping
-         * from the argument list and return the unboxed/unwrapped value.
-         */
-        public static double EHArgUnwrapFloat(object x)
+    }
+    private static void TypeCastInteger2Object(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(int));
+    }
+    private static void TypeCastList2Bool(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, listToBoolMethodInfo);
+    }
+    private static void TypeCastList2Object(IScriptCodeGen scg, Token errorAt)
+    {
+        if(typeof(LSL_List).IsValueType)
         {
-            if(x is LSL_Float lfx)
-                return lfx.value;
-            return (double)x;
+            scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(LSL_List));
         }
-
-        public static int EHArgUnwrapInteger(object x)
+    }
+    private static void TypeCastObject2Array(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Castclass, typeof(XMR_Array));
+    }
+    private static void TypeCastObject2Bool(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Unbox_Any, typeof(bool));
+    }
+    private static void TypeCastObject2Char(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Unbox_Any, typeof(char));
+    }
+    private static void TypeCastObject2Exc(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Castclass, typeof(Exception));
+    }
+    private static void TypeCastObject2Float(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, objectToFloatMethodInfo);
+    }
+    private static void TypeCastObject2Integer(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, objectToIntegerMethodInfo);
+    }
+    private static void TypeCastObject2List(IScriptCodeGen scg, Token errorAt)
+    {
+        if(typeof(LSL_List).IsValueType)
         {
-            if(x is LSL_Integer lix)
-                return lix.value;
-            return (int)x;
+            scg.ilGen.Emit(errorAt, OpCodes.Call, objectToListMethodInfo);
         }
-
-        public static LSL_Rotation EHArgUnwrapRotation(object x)
+        else
         {
-            if(x is OpenMetaverse.Quaternion oqx)
-                return new LSL_Rotation(oqx);
-            return (LSL_Rotation)x;
+            scg.ilGen.Emit(errorAt, OpCodes.Castclass, typeof(LSL_List));
         }
+    }
+    private static void TypeCastObject2Rotation(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, objectToRotationMethodInfo);
+    }
+    private static void TypeCastObject2Vector(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, objectToVectorMethodInfo);
+    }
+    private static void TypeCastRotation2Bool(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, rotationToBoolMethodInfo);
+    }
+    private static void TypeCastRotation2Object(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(LSL_Rotation));
+    }
+    private static void TypeCastString2Bool(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, stringToBoolMethodInfo);
+    }
+    private static void TypeCastString2Object(IScriptCodeGen scg, Token errorAt)
+    {
+    }
+    private static void TypeCastString2Rotation(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Newobj, rotationConstrucorStringInfo);
+    }
+    private static void TypeCastString2Vector(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Newobj, vectorConstrucorStringInfo);
+    }
+    private static void TypeCastVector2Bool(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, vectorToBoolMethodInfo);
+    }
+    private static void TypeCastVector2List(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, vectorToListMethodInfo);
+    }
+    private static void TypeCastVector2Object(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Box, typeof(LSL_Vector));
+    }
+    private static void TypeCastBool2List(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, boolToListMethodInfo);
+    }
+    private static void TypeCastBool2String(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, boolToStringMethodInfo);
+    }
+    private static void TypeCastFloat2List(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, floatToListMethodInfo);
+    }
+    private static void TypeCastFloat2String(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, floatToStringMethodInfo);
+    }
+    private static void TypeCastInteger2List(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, integerToListMethodInfo);
+    }
+    private static void TypeCastInteger2String(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, intToStringMethodInfo);
+    }
+    private static void TypeCastList2String(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, listToStringMethodInfo);
+    }
+    private static void TypeCastObject2String(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, objectToStringMethodInfo);
+    }
+    private static void TypeCastRotation2List(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, rotationToListMethodInfo);
+    }
+    private static void TypeCastRotation2String(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, rotationToStringMethodInfo);
+    }
+    private static void TypeCastString2Float(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Newobj, floatConstructorStringInfo);
+        scg.ilGen.Emit(errorAt, OpCodes.Ldfld, lslFloatValueFieldInfo);
+    }
+    private static void TypeCastString2Integer(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Newobj, integerConstructorStringInfo);
+        scg.ilGen.Emit(errorAt, OpCodes.Ldfld, lslIntegerValueFieldInfo);
+    }
+    private static void TypeCastString2List(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, stringToListMethodInfo);
+    }
+    private static void TypeCastVector2String(IScriptCodeGen scg, Token errorAt)
+    {
+        scg.ilGen.Emit(errorAt, OpCodes.Call, vectorToStringMethodInfo);
+    }
 
-        public static string EHArgUnwrapString(object x)
-        {
-            if(x is LSL_Key lkx)
-                return lkx.m_string;
-            if(x is LSL_String sx)
-                return sx.m_string;
-            return (string)x;
-        }
+    /*
+     * Because the calls are funky, let the compiler handle them.
+     */
+    public static bool RotationToBool(LSL_Rotation x)
+    {
+        return !x.Equals(ScriptBaseClass.ZERO_ROTATION);
+    }
+    public static bool StringToBool(string x)
+    {
+        return x.Length > 0;
+    }
+    public static bool VectorToBool(LSL_Vector x)
+    {
+        return !x.Equals(ScriptBaseClass.ZERO_VECTOR);
+    }
+    public static string BoolToString(bool x)
+    {
+        return x ? "1" : "0";
+    }
+    public static string CharToString(char x)
+    {
+        return x.ToString();
+    }
+    public static string FloatToString(double x)
+    {
+        return x.ToString("0.000000",CultureInfo.InvariantCulture);
+    }
+    public static string IntegerToString(int x)
+    {
+        return x.ToString();
+    }
+    public static bool KeyToBool(string x)
+    {
+        return (x != "") && (x != ScriptBaseClass.NULL_KEY);
+    }
+    public static bool ListToBool(LSL_List x)
+    {
+        return x.Length != 0;
+    }
+    public static string ListToString(LSL_List x)
+    {
+        return x.ToString();
+    }
+    public static string ObjectToString(object x)
+    {
+        return x?.ToString();
+    }
+    public static string RotationToString(LSL_Rotation x)
+    {
+        return x.ToString();
+    }
+    public static string VectorToString(LSL_Vector x)
+    {
+        return x.ToString();
+    }
+    public static LSL_List BoolToList(bool b)
+    {
+        return new LSL_List(new object[] { new LSL_Integer(b ? 1 : 0) });
+    }
+    public static LSL_List CharToList(char c)
+    {
+        return new LSL_List(new object[] { new LSL_Integer(c) });
+    }
+    public static LSL_List ExcToList(Exception e)
+    {
+        return new LSL_List(new object[] { e });
+    }
+    public static LSL_List VectorToList(LSL_Vector v)
+    {
+        return new LSL_List(new object[] { v });
+    }
+    public static LSL_List FloatToList(double f)
+    {
+        return new LSL_List(new object[] { new LSL_Float(f) });
+    }
+    public static LSL_List IntegerToList(int i)
+    {
+        return new LSL_List(new object[] { new LSL_Integer(i) });
+    }
+    public static LSL_List RotationToList(LSL_Rotation r)
+    {
+        return new LSL_List(new object[] { r });
+    }
+    public static LSL_List StringToList(string s)
+    {
+        return new LSL_List(new object[] { new LSL_String(s) });
+    }
 
-        public static LSL_Vector EHArgUnwrapVector(object x)
-        {
-            if(x is OpenMetaverse.Vector3 ovx)
-                return new LSL_Vector(ovx);
-            return (LSL_Vector)x;
-        }
+    public static double ObjectToFloat(object x)
+    {
+        if(x is LSL_String lsx)
+            return double.Parse(lsx.m_string);
+        if(x is string sx)
+            return double.Parse(sx);
+        if(x is LSL_Float lfx)
+            return lfx.value;
+        if(x is LSL_Integer lix)
+            return lix.value;
+        if(x is int ix)
+            return ix;
+        return (double)x;
+    }
+
+    public static int ObjectToInteger(object x)
+    {
+        if (x is int ix)
+            return ix;
+        if (x is LSL_Integer lix)
+            return lix.value;
+        if (x is LSL_String lsx)
+            return int.Parse(lsx.m_string);
+        if(x is string sx)
+            return int.Parse(sx);
+        if (x is LSL_Float lfx)
+            return (int)lfx.value;
+        if (x is double dx)
+            return (int)dx;
+
+        return (int)x;
+    }
+
+    public static LSL_List ObjectToList(object x)
+    {
+        return (LSL_List)x;
+    }
+
+    public static LSL_Rotation ObjectToRotation(object x)
+    {
+        if(x is LSL_String lsx)
+            return new LSL_Rotation(lsx.m_string);
+        if(x is string sx)
+            return new LSL_Rotation(sx);
+        return (LSL_Rotation)x;
+    }
+
+    public static LSL_Vector ObjectToVector(object x)
+    {
+        if(x is LSL_String lsx)
+            return new LSL_Vector(lsx);
+        if(x is string sx)
+            return new LSL_Vector(sx);
+        return (LSL_Vector)x;
+    }
+
+    public static string ExceptionToString(Exception x, XMRInstAbstract inst)
+    {
+        return XMRInstAbstract.xmrExceptionTypeName(x) + ": " + XMRInstAbstract.xmrExceptionMessage(x) +
+            "\n" + inst.xmrExceptionStackTrace(x);
+    }
+
+    /*
+     * These are used by event handler entrypoints to remove any LSL wrapping
+     * from the argument list and return the unboxed/unwrapped value.
+     */
+    public static double EHArgUnwrapFloat(object x)
+    {
+        if(x is LSL_Float lfx)
+            return lfx.value;
+        return (double)x;
+    }
+
+    public static int EHArgUnwrapInteger(object x)
+    {
+        if(x is LSL_Integer lix)
+            return lix.value;
+        return (int)x;
+    }
+
+    public static LSL_Rotation EHArgUnwrapRotation(object x)
+    {
+        if(x is OpenMetaverse.Quaternion oqx)
+            return new LSL_Rotation(oqx);
+        return (LSL_Rotation)x;
+    }
+
+    public static string EHArgUnwrapString(object x)
+    {
+        if(x is LSL_Key lkx)
+            return lkx.m_string;
+        if(x is LSL_String sx)
+            return sx.m_string;
+        return (string)x;
+    }
+
+    public static LSL_Vector EHArgUnwrapVector(object x)
+    {
+        if(x is OpenMetaverse.Vector3 ovx)
+            return new LSL_Vector(ovx);
+        return (LSL_Vector)x;
     }
 }

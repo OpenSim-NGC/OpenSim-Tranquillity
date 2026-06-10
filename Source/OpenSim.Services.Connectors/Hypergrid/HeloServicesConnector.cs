@@ -26,90 +26,85 @@
  */
 
 using log4net;
-using System;
 using System.Net;
 using System.Reflection;
-using Nini.Config;
-using System.Net.Http;
-using OpenSim.Framework;
 
-namespace OpenSim.Services.Connectors
+namespace OpenSim.Services.Connectors;
+
+public class HeloServicesConnector
 {
-    public class HeloServicesConnector
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private string m_ServerURI = String.Empty;
+
+    public HeloServicesConnector()
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        private string m_ServerURI = String.Empty;
-
-        public HeloServicesConnector()
+    public HeloServicesConnector(string serverURI)
+    {
+        try
         {
-        }
+            Uri uri;
 
-        public HeloServicesConnector(string serverURI)
-        {
-            try
+            if (!serverURI.EndsWith("="))
             {
-                Uri uri;
-
-                if (!serverURI.EndsWith("="))
-                {
-                    // Let's check if this is a valid URI, because it may not be
-                    uri = new Uri(serverURI);
+                // Let's check if this is a valid URI, because it may not be
+                uri = new Uri(serverURI);
+                m_ServerURI = serverURI.TrimEnd('/') + "/helo/";
+            }
+            else
+            {
+                // Simian sends malformed urls like this:
+                // http://valley.virtualportland.org/simtest/Grid/?id=
+                //
+                uri = new Uri(serverURI + "xxx");
+                if (uri.Query.Length == 0)
                     m_ServerURI = serverURI.TrimEnd('/') + "/helo/";
-                }
                 else
                 {
-                    // Simian sends malformed urls like this:
-                    // http://valley.virtualportland.org/simtest/Grid/?id=
-                    //
-                    uri = new Uri(serverURI + "xxx");
-                    if (uri.Query.Length == 0)
-                        m_ServerURI = serverURI.TrimEnd('/') + "/helo/";
-                    else
-                    {
-                        serverURI = serverURI + "xxx";
-                        m_ServerURI = serverURI.Replace(uri.Query, "");
-                        m_ServerURI = m_ServerURI.TrimEnd('/') + "/helo/";
-                    }
+                    serverURI = serverURI + "xxx";
+                    m_ServerURI = serverURI.Replace(uri.Query, "");
+                    m_ServerURI = m_ServerURI.TrimEnd('/') + "/helo/";
                 }
+            }
 
-            }
-            catch (UriFormatException)
-            {
-                m_log.WarnFormat("[HELO SERVICE]: Malformed URL {0}", serverURI);
-            }
         }
-
-        public virtual string Helo()
+        catch (UriFormatException)
         {
-            if (String.IsNullOrEmpty(m_ServerURI))
-            {
-                m_log.WarnFormat("[HELO SERVICE]: Unable to invoke HELO due to empty URL");
-                return String.Empty;
-            }
-
-            try
-            {
-                HttpWebRequest req = (HttpWebRequest)HttpWebRequest.Create(m_ServerURI);
-                // Eventually we need to switch to HEAD
-                /* req.Method = "HEAD"; */
-
-                using (WebResponse response = req.GetResponse())
-                {
-                    if (response.Headers.Get("X-Handlers-Provided") == null) // just in case this ever returns a null
-                        return string.Empty;
-                    return response.Headers.Get("X-Handlers-Provided");
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[HELO SERVICE]: Unable to perform HELO request to {0}: {1}", m_ServerURI, e.Message);
-            }
-
-            // fail
-            return string.Empty;
+            m_log.WarnFormat("[HELO SERVICE]: Malformed URL {0}", serverURI);
         }
+    }
+
+    public virtual string Helo()
+    {
+        if (String.IsNullOrEmpty(m_ServerURI))
+        {
+            m_log.WarnFormat("[HELO SERVICE]: Unable to invoke HELO due to empty URL");
+            return String.Empty;
+        }
+
+        try
+        {
+            HttpWebRequest req = (HttpWebRequest)HttpWebRequest.Create(m_ServerURI);
+            // Eventually we need to switch to HEAD
+            /* req.Method = "HEAD"; */
+
+            using (WebResponse response = req.GetResponse())
+            {
+                if (response.Headers.Get("X-Handlers-Provided") == null) // just in case this ever returns a null
+                    return string.Empty;
+                return response.Headers.Get("X-Handlers-Provided");
+            }
+        }
+        catch (Exception e)
+        {
+            m_log.DebugFormat("[HELO SERVICE]: Unable to perform HELO request to {0}: {1}", m_ServerURI, e.Message);
+        }
+
+        // fail
+        return string.Empty;
     }
 }

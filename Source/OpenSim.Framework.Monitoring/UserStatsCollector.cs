@@ -29,82 +29,81 @@ using System.Timers;
 
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Framework.Monitoring
+namespace OpenSim.Framework.Monitoring;
+
+/// <summary>
+/// Collects user service statistics
+/// </summary>
+public class UserStatsCollector : BaseStatsCollector
 {
-    /// <summary>
-    /// Collects user service statistics
-    /// </summary>
-    public class UserStatsCollector : BaseStatsCollector
+    private System.Timers.Timer ageStatsTimer = new System.Timers.Timer(24 * 60 * 60 * 1000);
+
+    private int successfulLoginsToday;
+    public int SuccessfulLoginsToday { get { return successfulLoginsToday; } }
+
+    private int successfulLoginsYesterday;
+    public int SuccessfulLoginsYesterday { get { return successfulLoginsYesterday; } }
+
+    private int successfulLogins;
+    public int SuccessfulLogins { get { return successfulLogins; } }
+
+    private int logouts;
+    public int Logouts { get { return logouts; } }
+
+    public UserStatsCollector()
     {
-        private System.Timers.Timer ageStatsTimer = new System.Timers.Timer(24 * 60 * 60 * 1000);
+        ageStatsTimer.Elapsed += new ElapsedEventHandler(OnAgeing);
+        ageStatsTimer.Enabled = true;
+    }
 
-        private int successfulLoginsToday;
-        public int SuccessfulLoginsToday { get { return successfulLoginsToday; } }
+    private void OnAgeing(object source, ElapsedEventArgs e)
+    {
+        successfulLoginsYesterday = successfulLoginsToday;
 
-        private int successfulLoginsYesterday;
-        public int SuccessfulLoginsYesterday { get { return successfulLoginsYesterday; } }
+        // There is a possibility that an asset request could occur between the execution of these
+        // two statements.  But we're better off without the synchronization overhead.
+        successfulLoginsToday = 0;
+    }
 
-        private int successfulLogins;
-        public int SuccessfulLogins { get { return successfulLogins; } }
+    /// <summary>
+    /// Record a successful login
+    /// </summary>
+    public void AddSuccessfulLogin()
+    {
+        successfulLogins++;
+        successfulLoginsToday++;
+    }
 
-        private int logouts;
-        public int Logouts { get { return logouts; } }
+    public void AddLogout()
+    {
+        logouts++;
+    }
 
-        public UserStatsCollector()
-        {
-            ageStatsTimer.Elapsed += new ElapsedEventHandler(OnAgeing);
-            ageStatsTimer.Enabled = true;
-        }
-
-        private void OnAgeing(object source, ElapsedEventArgs e)
-        {
-            successfulLoginsYesterday = successfulLoginsToday;
-
-            // There is a possibility that an asset request could occur between the execution of these
-            // two statements.  But we're better off without the synchronization overhead.
-            successfulLoginsToday = 0;
-        }
-
-        /// <summary>
-        /// Record a successful login
-        /// </summary>
-        public void AddSuccessfulLogin()
-        {
-            successfulLogins++;
-            successfulLoginsToday++;
-        }
-
-        public void AddLogout()
-        {
-            logouts++;
-        }
-
-        /// <summary>
-        /// Report back collected statistical information.
-        /// </summary>
-        /// <returns></returns>
-        override public string Report()
-        {
-            return string.Format(
+    /// <summary>
+    /// Report back collected statistical information.
+    /// </summary>
+    /// <returns></returns>
+    override public string Report()
+    {
+        return string.Format(
 @"Successful logins total : {0}, today : {1}, yesterday : {2}
           Logouts total : {3}",
-                SuccessfulLogins, SuccessfulLoginsToday, SuccessfulLoginsYesterday, Logouts);
-        }
+            SuccessfulLogins, SuccessfulLoginsToday, SuccessfulLoginsYesterday, Logouts);
+    }
 
-        public override string XReport(string uptime, string version)
-        {
-            return OSDParser.SerializeJsonString(OReport(uptime, version));
-        }
+    public override string XReport(string uptime, string version)
+    {
+        return OSDParser.SerializeJsonString(OReport(uptime, version));
+    }
 
-        public override OSDMap OReport(string uptime, string version)
-        {
-            OSDMap ret = new OSDMap();
-            ret.Add("SuccessfulLogins", OSD.FromInteger(SuccessfulLogins));
-            ret.Add("SuccessfulLoginsToday", OSD.FromInteger(SuccessfulLoginsToday));
-            ret.Add("SuccessfulLoginsYesterday", OSD.FromInteger(SuccessfulLoginsYesterday));
-            ret.Add("Logouts", OSD.FromInteger(Logouts));
+    public override OSDMap OReport(string uptime, string version)
+    {
+        OSDMap ret = new OSDMap();
+        ret.Add("SuccessfulLogins", OSD.FromInteger(SuccessfulLogins));
+        ret.Add("SuccessfulLoginsToday", OSD.FromInteger(SuccessfulLoginsToday));
+        ret.Add("SuccessfulLoginsYesterday", OSD.FromInteger(SuccessfulLoginsYesterday));
+        ret.Add("Logouts", OSD.FromInteger(Logouts));
 
-            return ret;
-        }
+        return ret;
     }
 }

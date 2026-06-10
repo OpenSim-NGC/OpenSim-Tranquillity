@@ -25,14 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Region.CoreModules.Framework.Monitoring
-{
-    internal delegate void Alert(Type reporter, string reason, bool fatal);
+namespace OpenSim.Region.CoreModules.Framework.Monitoring;
 
-    interface IAlert
-    {
-        string GetName();
-        void Test();
-        event Alert OnTriggerAlert;
-    }
+internal delegate void Alert(Type reporter, string reason, bool fatal);
+
+interface IAlert
+{
+    string GetName();
+    void Test();
+    event Alert OnTriggerAlert;
 }

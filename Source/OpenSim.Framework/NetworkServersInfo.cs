@@ -25,57 +25,55 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using Nini.Config;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class NetworkServersInfo
 {
-    public class NetworkServersInfo
+    public uint HttpListenerPort = ConfigSettings.DefaultRegionHttpPort;
+    public bool secureInventoryServer = false;
+    public bool isSandbox;
+    public bool HttpUsesSSL = false;
+    public string HttpSSLCN = "";
+    public string HttpSSLCertPath = "";
+    public string HttpSSLCNCertPass = "";
+    public uint httpSSLPort = 9001;
+
+    // "Out of band" managemnt https
+    public bool ssl_listener = false;
+    public bool ssl_external = false;
+    public uint https_port = 0;
+    public string cert_path = String.Empty;
+    public string cert_pass = String.Empty;
+
+    public NetworkServersInfo()
     {
-        public uint HttpListenerPort = ConfigSettings.DefaultRegionHttpPort;
-        public bool secureInventoryServer = false;
-        public bool isSandbox;
-        public bool HttpUsesSSL = false;
-        public string HttpSSLCN = "";
-        public string HttpSSLCertPath = "";
-        public string HttpSSLCNCertPass = "";
-        public uint httpSSLPort = 9001;
+    }
 
-        // "Out of band" managemnt https
-        public bool ssl_listener = false;
-        public bool ssl_external = false;
-        public uint https_port = 0;
-        public string cert_path = String.Empty;
-        public string cert_pass = String.Empty;
+    public NetworkServersInfo(uint defaultHomeLocX, uint defaultHomeLocY)
+    {
+    }
 
-        public NetworkServersInfo()
+    public void loadFromConfiguration(IConfigSource config)
+    {
+        HttpListenerPort =
+            (uint) config.Configs["Network"].GetInt("http_listener_port", (int) ConfigSettings.DefaultRegionHttpPort);
+        httpSSLPort =
+            (uint)config.Configs["Network"].GetInt("http_listener_sslport", ((int)ConfigSettings.DefaultRegionHttpPort+1));
+        HttpUsesSSL = config.Configs["Network"].GetBoolean("http_listener_ssl", false);
+        HttpSSLCN = config.Configs["Network"].GetString("http_listener_cn", "localhost");
+        HttpSSLCertPath = config.Configs["Network"].GetString("http_listener_cert_path", HttpSSLCertPath);
+        HttpSSLCNCertPass = config.Configs["Network"].GetString("http_listener_cert_pass", HttpSSLCNCertPass);
+
+        // "Out of band management https"
+        ssl_listener = config.Configs["Network"].GetBoolean("https_listener",false);
+        ssl_external = config.Configs["Network"].GetBoolean("https_external",false);
+        if( ssl_listener)
         {
-        }
-
-        public NetworkServersInfo(uint defaultHomeLocX, uint defaultHomeLocY)
-        {
-        }
-
-        public void loadFromConfiguration(IConfigSource config)
-        {
-            HttpListenerPort =
-                (uint) config.Configs["Network"].GetInt("http_listener_port", (int) ConfigSettings.DefaultRegionHttpPort);
-            httpSSLPort =
-                (uint)config.Configs["Network"].GetInt("http_listener_sslport", ((int)ConfigSettings.DefaultRegionHttpPort+1));
-            HttpUsesSSL = config.Configs["Network"].GetBoolean("http_listener_ssl", false);
-            HttpSSLCN = config.Configs["Network"].GetString("http_listener_cn", "localhost");
-            HttpSSLCertPath = config.Configs["Network"].GetString("http_listener_cert_path", HttpSSLCertPath);
-            HttpSSLCNCertPass = config.Configs["Network"].GetString("http_listener_cert_pass", HttpSSLCNCertPass);
-
-            // "Out of band management https"
-            ssl_listener = config.Configs["Network"].GetBoolean("https_listener",false);
-            ssl_external = config.Configs["Network"].GetBoolean("https_external",false);
-            if( ssl_listener)
-            {
-                cert_path = config.Configs["Network"].GetString("cert_path",String.Empty);
-                cert_pass = config.Configs["Network"].GetString("cert_pass",String.Empty);
-                https_port = (uint)config.Configs["Network"].GetInt("https_port", 0);
-            }
+            cert_path = config.Configs["Network"].GetString("cert_path",String.Empty);
+            cert_pass = config.Configs["Network"].GetString("cert_pass",String.Empty);
+            https_port = (uint)config.Configs["Network"].GetInt("https_port", 0);
         }
     }
 }

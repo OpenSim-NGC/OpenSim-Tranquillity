@@ -28,83 +28,81 @@
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Groups
+namespace OpenSim.Groups;
+
+public interface IGroupsServicesConnector
 {
-    public interface IGroupsServicesConnector
-    {
-        UUID CreateGroup(UUID RequestingAgentID, string name, string charter, bool showInList, UUID insigniaID, int membershipFee,
-            bool openEnrollment, bool allowPublish, bool maturePublish, UUID founderID, out string reason);
-        bool UpdateGroup(string RequestingAgentID, UUID groupID, string charter, bool showInList, UUID insigniaID, int membershipFee,
-            bool openEnrollment, bool allowPublish, bool maturePublish, out string reason);
-        ExtendedGroupRecord GetGroupRecord(string RequestingAgentID, UUID GroupID, string GroupName);
-        List<DirGroupsReplyData> FindGroups(string RequestingAgentIDstr, string search);
-        List<GroupMembersData> GetGroupMembers(string RequestingAgentID, UUID GroupID);
+    UUID CreateGroup(UUID RequestingAgentID, string name, string charter, bool showInList, UUID insigniaID, int membershipFee,
+        bool openEnrollment, bool allowPublish, bool maturePublish, UUID founderID, out string reason);
+    bool UpdateGroup(string RequestingAgentID, UUID groupID, string charter, bool showInList, UUID insigniaID, int membershipFee,
+        bool openEnrollment, bool allowPublish, bool maturePublish, out string reason);
+    ExtendedGroupRecord GetGroupRecord(string RequestingAgentID, UUID GroupID, string GroupName);
+    List<DirGroupsReplyData> FindGroups(string RequestingAgentIDstr, string search);
+    List<GroupMembersData> GetGroupMembers(string RequestingAgentID, UUID GroupID);
 
-        bool AddGroupRole(string RequestingAgentID, UUID groupID, UUID roleID, string name, string description, string title, ulong powers, out string reason);
-        bool UpdateGroupRole(string RequestingAgentID, UUID groupID, UUID roleID, string name, string description, string title, ulong powers);
-        void RemoveGroupRole(string RequestingAgentID, UUID groupID, UUID roleID);
-        List<GroupRolesData> GetGroupRoles(string RequestingAgentID, UUID GroupID);
-        List<GroupRoleMembersData> GetGroupRoleMembers(string RequestingAgentID, UUID GroupID);
+    bool AddGroupRole(string RequestingAgentID, UUID groupID, UUID roleID, string name, string description, string title, ulong powers, out string reason);
+    bool UpdateGroupRole(string RequestingAgentID, UUID groupID, UUID roleID, string name, string description, string title, ulong powers);
+    void RemoveGroupRole(string RequestingAgentID, UUID groupID, UUID roleID);
+    List<GroupRolesData> GetGroupRoles(string RequestingAgentID, UUID GroupID);
+    List<GroupRoleMembersData> GetGroupRoleMembers(string RequestingAgentID, UUID GroupID);
 
-        bool AddAgentToGroup(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID, string token, out string reason);
-        void RemoveAgentFromGroup(string RequestingAgentID, string AgentID, UUID GroupID);
+    bool AddAgentToGroup(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID, string token, out string reason);
+    void RemoveAgentFromGroup(string RequestingAgentID, string AgentID, UUID GroupID);
 
-        bool AddAgentToGroupInvite(string RequestingAgentID, UUID inviteID, UUID groupID, UUID roleID, string agentID);
-        GroupInviteInfo GetAgentToGroupInvite(string RequestingAgentID, UUID inviteID);
-        void RemoveAgentToGroupInvite(string RequestingAgentID, UUID inviteID);
+    bool AddAgentToGroupInvite(string RequestingAgentID, UUID inviteID, UUID groupID, UUID roleID, string agentID);
+    GroupInviteInfo GetAgentToGroupInvite(string RequestingAgentID, UUID inviteID);
+    void RemoveAgentToGroupInvite(string RequestingAgentID, UUID inviteID);
 
-        void AddAgentToGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID);
-        void RemoveAgentFromGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID);
-        List<GroupRolesData> GetAgentGroupRoles(string RequestingAgentID, string AgentID, UUID GroupID);
+    void AddAgentToGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID);
+    void RemoveAgentFromGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID);
+    List<GroupRolesData> GetAgentGroupRoles(string RequestingAgentID, string AgentID, UUID GroupID);
 
-        void SetAgentActiveGroup(string RequestingAgentID, string AgentID, UUID GroupID);
-        ExtendedGroupMembershipData GetAgentActiveMembership(string RequestingAgentID, string AgentID);
+    void SetAgentActiveGroup(string RequestingAgentID, string AgentID, UUID GroupID);
+    ExtendedGroupMembershipData GetAgentActiveMembership(string RequestingAgentID, string AgentID);
 
-        void SetAgentActiveGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID);
-        void UpdateMembership(string RequestingAgentID, string AgentID, UUID GroupID, bool AcceptNotices, bool ListInProfile);
+    void SetAgentActiveGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID);
+    void UpdateMembership(string RequestingAgentID, string AgentID, UUID GroupID, bool AcceptNotices, bool ListInProfile);
 
-        /// <summary>
-        /// Get information about a specific group to which the user belongs.
-        /// </summary>
-        /// <param name="RequestingAgentID">The agent requesting the information.</param>
-        /// <param name="AgentID">The agent requested.</param>
-        /// <param name="GroupID">The group requested.</param>
-        /// <returns>
-        /// If the user is a member of the group then the data structure is returned.  If not, then null is returned.
-        /// </returns>
-        ExtendedGroupMembershipData GetAgentGroupMembership(string RequestingAgentID, string AgentID, UUID GroupID);
+    /// <summary>
+    /// Get information about a specific group to which the user belongs.
+    /// </summary>
+    /// <param name="RequestingAgentID">The agent requesting the information.</param>
+    /// <param name="AgentID">The agent requested.</param>
+    /// <param name="GroupID">The group requested.</param>
+    /// <returns>
+    /// If the user is a member of the group then the data structure is returned.  If not, then null is returned.
+    /// </returns>
+    ExtendedGroupMembershipData GetAgentGroupMembership(string RequestingAgentID, string AgentID, UUID GroupID);
 
-        /// <summary>
-        /// Get information about the groups to which a user belongs.
-        /// </summary>
-        /// <param name="RequestingAgentID">The agent requesting the information.</param>
-        /// <param name="AgentID">The agent requested.</param>
-        /// <returns>
-        /// Information about the groups to which the user belongs.  If the user belongs to no groups then an empty
-        /// list is returned.
-        /// </returns>
-        List<GroupMembershipData> GetAgentGroupMemberships(string RequestingAgentID, string AgentID);
+    /// <summary>
+    /// Get information about the groups to which a user belongs.
+    /// </summary>
+    /// <param name="RequestingAgentID">The agent requesting the information.</param>
+    /// <param name="AgentID">The agent requested.</param>
+    /// <returns>
+    /// Information about the groups to which the user belongs.  If the user belongs to no groups then an empty
+    /// list is returned.
+    /// </returns>
+    List<GroupMembershipData> GetAgentGroupMemberships(string RequestingAgentID, string AgentID);
 
-        bool AddGroupNotice(string RequestingAgentID, UUID groupID, UUID noticeID, string fromName, string subject, string message,
-            bool hasAttachment, byte attType, string attName, UUID attItemID, string attOwnerID);
-        GroupNoticeInfo GetGroupNotice(string RequestingAgentID, UUID noticeID);
-        List<ExtendedGroupNoticeData> GetGroupNotices(string RequestingAgentID, UUID GroupID);
+    bool AddGroupNotice(string RequestingAgentID, UUID groupID, UUID noticeID, string fromName, string subject, string message,
+        bool hasAttachment, byte attType, string attName, UUID attItemID, string attOwnerID);
+    GroupNoticeInfo GetGroupNotice(string RequestingAgentID, UUID noticeID);
+    List<ExtendedGroupNoticeData> GetGroupNotices(string RequestingAgentID, UUID GroupID);
 
-    }
+}
 
-    public class GroupInviteInfo
-    {
-        public UUID GroupID  = UUID.Zero;
-        public UUID RoleID   = UUID.Zero;
-        public string AgentID  = string.Empty;
-        public UUID InviteID = UUID.Zero;
-    }
+public class GroupInviteInfo
+{
+    public UUID GroupID  = UUID.Zero;
+    public UUID RoleID   = UUID.Zero;
+    public string AgentID  = string.Empty;
+    public UUID InviteID = UUID.Zero;
+}
 
-    public class GroupNoticeInfo
-    {
-        public ExtendedGroupNoticeData noticeData = new ExtendedGroupNoticeData();
-        public UUID GroupID = UUID.Zero;
-        public string Message = string.Empty;
-    }
-
+public class GroupNoticeInfo
+{
+    public ExtendedGroupNoticeData noticeData = new ExtendedGroupNoticeData();
+    public UUID GroupID = UUID.Zero;
+    public string Message = string.Empty;
 }

@@ -8,9 +8,6 @@
 
   <ItemGroup>
     <Reference Include="Nini" HintPath="..\..\..\Library\Nini.dll" />
-    <Reference Include="OpenMetaverse" HintPath="..\..\..\Library\OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverse.StructuredData" HintPath="..\..\..\Library\OpenMetaverse.StructuredData.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="..\..\..\Library\OpenMetaverseTypes.dll" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,15 +19,15 @@
     <ProjectReference Include="../../../Source/OpenSim.Services.Base/OpenSim.Services.Base.csproj" />
     <ProjectReference Include="../../../Source/OpenSim.Services.Connectors/OpenSim.Services.Connectors.csproj" />
     <ProjectReference Include="../../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
-    <ProjectReference Include="../WebRtcVoice/WebRtcVoice.csproj" />
+    <ProjectReference Include="../../../Addons/os-webrtc-janus/WebRtcVoice/WebRtcVoice.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
+    <PackageReference Include="OpenMetaverse" Version="1.2.13" />
+    <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />
+    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.13" />
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="Resources/WebRtcVoice.WebRtcRegionModule.addin.xml" />
-  </ItemGroup>
 </Project>

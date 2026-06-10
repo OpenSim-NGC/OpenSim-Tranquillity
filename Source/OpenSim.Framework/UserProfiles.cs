@@ -25,118 +25,115 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
-using System.Collections.Generic;
 
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class UserClassifiedAdd
 {
-    public class UserClassifiedAdd
-    {
-        public UUID ClassifiedId;
-        public UUID CreatorId;
-        public int CreationDate;
-        public int ExpirationDate;
-        public int Category;
-        public string Name = string.Empty;
-        public string Description = string.Empty;
-        public UUID ParcelId;
-        public int ParentEstate = 0;
-        public UUID SnapshotId;
-        public string SimName = string.Empty;
-        public string GlobalPos = "<0,0,0>";
-        public string ParcelName = string.Empty;
-        public byte Flags = 0;
-        public int Price = 0;
-    }
+    public UUID ClassifiedId;
+    public UUID CreatorId;
+    public int CreationDate;
+    public int ExpirationDate;
+    public int Category;
+    public string Name = string.Empty;
+    public string Description = string.Empty;
+    public UUID ParcelId;
+    public int ParentEstate = 0;
+    public UUID SnapshotId;
+    public string SimName = string.Empty;
+    public string GlobalPos = "<0,0,0>";
+    public string ParcelName = string.Empty;
+    public byte Flags = 0;
+    public int Price = 0;
+}
 
-    public class UserProfileProperties
-    {
-        public UUID UserId;
-        public UUID PartnerId;
-        public bool PublishProfile;
-        public bool PublishMature;
-        public string WebUrl = string.Empty;
-        public int WantToMask = 0;
-        public string WantToText = string.Empty;
-        public int SkillsMask = 0;
-        public string SkillsText = string.Empty;
-        public string Language = string.Empty;
-        public UUID ImageId;
-        public string AboutText = string.Empty;
-        public UUID FirstLifeImageId;
-        public string FirstLifeText = string.Empty;
-    }
+public class UserProfileProperties
+{
+    public UUID UserId;
+    public UUID PartnerId;
+    public bool PublishProfile;
+    public bool PublishMature;
+    public string WebUrl = string.Empty;
+    public int WantToMask = 0;
+    public string WantToText = string.Empty;
+    public int SkillsMask = 0;
+    public string SkillsText = string.Empty;
+    public string Language = string.Empty;
+    public UUID ImageId;
+    public string AboutText = string.Empty;
+    public UUID FirstLifeImageId;
+    public string FirstLifeText = string.Empty;
+}
 
-    public class UserProfilePick
-    {
-        public UUID PickId;
-        public UUID CreatorId;
-        public bool TopPick;
-        public string Name = string.Empty;
-        public string OriginalName = string.Empty;
-        public string Desc = string.Empty;
-        public UUID ParcelId;
-        public UUID SnapshotId;
-        public string ParcelName = string.Empty;
-        public string SimName = string.Empty;
-        public string GlobalPos = "<0,0,0>";
-        public string Gatekeeper = string.Empty;
-        public int SortOrder = 0;
-        public bool Enabled = false;
-    }
+public class UserProfilePick
+{
+    public UUID PickId;
+    public UUID CreatorId;
+    public bool TopPick;
+    public string Name = string.Empty;
+    public string OriginalName = string.Empty;
+    public string Desc = string.Empty;
+    public UUID ParcelId;
+    public UUID SnapshotId;
+    public string ParcelName = string.Empty;
+    public string SimName = string.Empty;
+    public string GlobalPos = "<0,0,0>";
+    public string Gatekeeper = string.Empty;
+    public int SortOrder = 0;
+    public bool Enabled = false;
+}
 
-    public class UserProfileNotes
-    {
-        public UUID UserId;
-        public UUID TargetId;
-        public string Notes;
-    }
+public class UserProfileNotes
+{
+    public UUID UserId;
+    public UUID TargetId;
+    public string Notes;
+}
 
-    public class UserPreferences
-    {
-        public UUID UserId;
-        public bool IMViaEmail;
-        public bool Visible;
-        public string EMail = string.Empty;
-    }
+public class UserPreferences
+{
+    public UUID UserId;
+    public bool IMViaEmail;
+    public bool Visible;
+    public string EMail = string.Empty;
+}
 
-    public class UserAccountProperties
-    {
-        public string EmailAddress = string.Empty;
-        public string Firstname = string.Empty;
-        public string LastName = string.Empty;
-        public string Password = string.Empty;
-        public string UserId = string.Empty;
-    }
+public class UserAccountProperties
+{
+    public string EmailAddress = string.Empty;
+    public string Firstname = string.Empty;
+    public string LastName = string.Empty;
+    public string Password = string.Empty;
+    public string UserId = string.Empty;
+}
 
-    public class UserAccountAuth
-    {
-        public string UserId = UUID.Zero.ToString();
-        public string Password = string.Empty;
-    }
+public class UserAccountAuth
+{
+    public string UserId = UUID.Zero.ToString();
+    public string Password = string.Empty;
+}
 
-    public class UserAppData
-    {
-        public string TagId = string.Empty;
-        public string DataKey = string.Empty;
-        public string UserId = UUID.Zero.ToString();
-        public string DataVal = string.Empty;
-    }
+public class UserAppData
+{
+    public string TagId = string.Empty;
+    public string DataKey = string.Empty;
+    public string UserId = UUID.Zero.ToString();
+    public string DataVal = string.Empty;
+}
 
-    public class UserProfileCacheEntry
-    {
-        public Dictionary<UUID, string> picksList;
-        public Dictionary<UUID, UserProfilePick> picks;
-        public Dictionary<UUID, string> classifiedsLists;
-        public Dictionary<UUID, UserClassifiedAdd> classifieds;
-        public UserProfileProperties props;
-        public GroupMembershipData[] avatarGroups;
-        public string born;
-        public byte[] membershipType;
-        public uint flags;
-        public HashSet<IClientAPI> ClientsWaitingProps;
-    }
+public class UserProfileCacheEntry
+{
+    public Dictionary<UUID, string> picksList;
+    public Dictionary<UUID, UserProfilePick> picks;
+    public Dictionary<UUID, string> classifiedsLists;
+    public Dictionary<UUID, UserClassifiedAdd> classifieds;
+    public UserProfileProperties props;
+    public GroupMembershipData[] avatarGroups;
+    public string born;
+    public byte[] membershipType;
+    public uint flags;
+    public HashSet<IClientAPI> ClientsWaitingProps;
 }
 

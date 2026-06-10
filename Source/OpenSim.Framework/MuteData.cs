@@ -27,15 +27,14 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class MuteData
 {
-    public class MuteData
-    {
-        public UUID AgentID;
-        public UUID MuteID;
-        public string MuteName;
-        public int MuteType;
-        public int MuteFlags;
-        public int Stamp;
-    }
+    public UUID AgentID;
+    public UUID MuteID;
+    public string MuteName;
+    public int MuteType;
+    public int MuteFlags;
+    public int Stamp;
 }

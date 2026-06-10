@@ -25,32 +25,29 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
+namespace OpenSim.Data.MySQL;
 
-namespace OpenSim.Data.MySQL
+/// <summary>
+/// A MySQL Interface for user grid data
+/// </summary>
+public class MySQLGridUserData : MySQLGenericTableHandler<GridUserData>, IGridUserData
 {
-    /// <summary>
-    /// A MySQL Interface for user grid data
-    /// </summary>
-    public class MySQLGridUserData : MySQLGenericTableHandler<GridUserData>, IGridUserData
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public MySQLGridUserData(string connectionString, string realm) : base(connectionString, realm, "GridUserStore") {}
+    public MySQLGridUserData(string connectionString, string realm) : base(connectionString, realm, "GridUserStore") {}
 
-        public new GridUserData Get(string userID)
-        {
-            GridUserData[] ret = Get("UserID", userID);
+    public new GridUserData Get(string userID)
+    {
+        GridUserData[] ret = Get("UserID", userID);
 
-            if (ret.Length == 0)
-                return null;
+        if (ret.Length == 0)
+            return null;
 
-            return ret[0];
-        }
+        return ret[0];
+    }
 
-        public GridUserData[] GetAll(string userID)
-        {
-            return base.Get(String.Format("UserID LIKE '{0}%'", userID));
-        }
+    public GridUserData[] GetAll(string userID)
+    {
+        return base.Get(String.Format("UserID LIKE '{0}%'", userID));
     }
 }

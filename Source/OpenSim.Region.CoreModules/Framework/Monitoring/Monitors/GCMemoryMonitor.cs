@@ -25,32 +25,31 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors
+namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors;
+
+class GCMemoryMonitor : IMonitor
 {
-    class GCMemoryMonitor : IMonitor
+    #region Implementation of IMonitor
+
+    public string GetName()
     {
-        #region Implementation of IMonitor
-
-        public string GetName()
-        {
-            return "GCMemoryMonitor";
-        }
-
-        public double GetValue()
-        {
-            return GC.GetTotalMemory(false);
-        }
-
-        public string GetFriendlyName()
-        {
-            return "GC Reported Memory";
-        }
-
-        public string GetFriendlyValue()
-        {
-            return (int)(GetValue() / (1024*1024)) + "MB (Global)";
-        }
-
-        #endregion
+        return "GCMemoryMonitor";
     }
+
+    public double GetValue()
+    {
+        return GC.GetTotalMemory(false);
+    }
+
+    public string GetFriendlyName()
+    {
+        return "GC Reported Memory";
+    }
+
+    public string GetFriendlyValue()
+    {
+        return (int)(GetValue() / (1024*1024)) + "MB (Global)";
+    }
+
+    #endregion
 }

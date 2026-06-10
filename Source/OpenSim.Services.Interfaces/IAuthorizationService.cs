@@ -25,124 +25,120 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using OpenSim.Framework;
+namespace OpenSim.Services.Interfaces;
 
-namespace OpenSim.Services.Interfaces
+// Generic Authorization service used for authorizing principals in a particular region
+
+public interface IAuthorizationService
 {
-    // Generic Authorization service used for authorizing principals in a particular region
+    /// <summary>
+    /// Check whether the user should be given access to the region.
+    /// </summary>
+    /// <remarks>
+    /// We also supply user first name and last name for situations where the user does not have an account
+    /// on the region (e.g. they're a visitor via Hypergrid).
+    /// </remarks>
+    /// <param name="userID"></param>
+    /// <param name="firstName">/param>
+    /// <param name="lastName"></param>
+    /// <param name="regionID"></param>
+    /// <param name="message"></param>
+    /// <returns></returns>
+    bool IsAuthorizedForRegion(
+        string userID, string firstName, string lastName, string regionID, out string message);
+}
 
-    public interface IAuthorizationService
+public class AuthorizationRequest
+{
+    private string m_userID;
+    private string m_firstname;
+    private string m_surname;
+    private string m_email;
+    private string m_regionName;
+    private string m_regionID;
+
+    public AuthorizationRequest()
     {
-        /// <summary>
-        /// Check whether the user should be given access to the region.
-        /// </summary>
-        /// <remarks>
-        /// We also supply user first name and last name for situations where the user does not have an account
-        /// on the region (e.g. they're a visitor via Hypergrid).
-        /// </remarks>
-        /// <param name="userID"></param>
-        /// <param name="firstName">/param>
-        /// <param name="lastName"></param>
-        /// <param name="regionID"></param>
-        /// <param name="message"></param>
-        /// <returns></returns>
-        bool IsAuthorizedForRegion(
-            string userID, string firstName, string lastName, string regionID, out string message);
     }
 
-    public class AuthorizationRequest
+    public AuthorizationRequest(string ID, string RegionID)
     {
-        private string m_userID;
-        private string m_firstname;
-        private string m_surname;
-        private string m_email;
-        private string m_regionName;
-        private string m_regionID;
-
-        public AuthorizationRequest()
-        {
-        }
-
-        public AuthorizationRequest(string ID, string RegionID)
-        {
-            m_userID = ID;
-            m_regionID = RegionID;
-        }
-
-        public AuthorizationRequest(
-            string ID, string FirstName, string SurName, string Email, string RegionName, string RegionID)
-        {
-            m_userID = ID;
-            m_firstname = FirstName;
-            m_surname = SurName;
-            m_email = Email;
-            m_regionName = RegionName;
-            m_regionID = RegionID;
-        }
-
-        public string ID
-        {
-            get { return m_userID; }
-            set { m_userID = value; }
-        }
-
-        public string FirstName
-        {
-            get { return m_firstname; }
-            set { m_firstname = value; }
-        }
-
-        public string SurName
-        {
-            get { return m_surname; }
-            set { m_surname = value; }
-        }
-
-        public string Email
-        {
-            get { return m_email; }
-            set { m_email = value; }
-        }
-
-        public string RegionName
-        {
-            get { return m_regionName; }
-            set { m_regionName = value; }
-        }
-
-        public string RegionID
-        {
-            get { return m_regionID; }
-            set { m_regionID = value; }
-        }
+        m_userID = ID;
+        m_regionID = RegionID;
     }
 
-    public class AuthorizationResponse
+    public AuthorizationRequest(
+        string ID, string FirstName, string SurName, string Email, string RegionName, string RegionID)
     {
-        private bool m_isAuthorized;
-        private string m_message;
+        m_userID = ID;
+        m_firstname = FirstName;
+        m_surname = SurName;
+        m_email = Email;
+        m_regionName = RegionName;
+        m_regionID = RegionID;
+    }
 
-        public AuthorizationResponse()
-        {
-        }
+    public string ID
+    {
+        get { return m_userID; }
+        set { m_userID = value; }
+    }
 
-        public AuthorizationResponse(bool isAuthorized, string message)
-        {
-            m_isAuthorized = isAuthorized;
-            m_message = message;
-        }
+    public string FirstName
+    {
+        get { return m_firstname; }
+        set { m_firstname = value; }
+    }
 
-        public bool IsAuthorized
-        {
-            get { return m_isAuthorized; }
-            set { m_isAuthorized = value; }
-        }
+    public string SurName
+    {
+        get { return m_surname; }
+        set { m_surname = value; }
+    }
 
-        public string Message
-        {
-            get { return m_message; }
-            set { m_message = value; }
-        }
+    public string Email
+    {
+        get { return m_email; }
+        set { m_email = value; }
+    }
+
+    public string RegionName
+    {
+        get { return m_regionName; }
+        set { m_regionName = value; }
+    }
+
+    public string RegionID
+    {
+        get { return m_regionID; }
+        set { m_regionID = value; }
+    }
+}
+
+public class AuthorizationResponse
+{
+    private bool m_isAuthorized;
+    private string m_message;
+
+    public AuthorizationResponse()
+    {
+    }
+
+    public AuthorizationResponse(bool isAuthorized, string message)
+    {
+        m_isAuthorized = isAuthorized;
+        m_message = message;
+    }
+
+    public bool IsAuthorized
+    {
+        get { return m_isAuthorized; }
+        set { m_isAuthorized = value; }
+    }
+
+    public string Message
+    {
+        get { return m_message; }
+        set { m_message = value; }
     }
 }

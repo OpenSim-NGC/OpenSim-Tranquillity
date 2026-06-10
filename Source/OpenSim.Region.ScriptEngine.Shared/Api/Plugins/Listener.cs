@@ -25,48 +25,41 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.CoreModules.Scripting.WorldComm;
-using OpenSim.Region.ScriptEngine.Interfaces;
-using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Shared.Api;
 
-namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
+namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
+
+public class Listener
 {
-    public class Listener
+    // private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
+    public AsyncCommandManager m_CmdManager;
+
+    private IWorldComm m_commsPlugin;
+
+    public int ListenerCount
     {
-        // private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        get { return m_commsPlugin.ListenerCount; }
+    }
 
-        public AsyncCommandManager m_CmdManager;
+    public Listener(AsyncCommandManager CmdManager)
+    {
+        m_CmdManager = CmdManager;
+        m_commsPlugin = m_CmdManager.m_ScriptEngine.World.RequestModuleInterface<IWorldComm>();
+    }
 
-        private IWorldComm m_commsPlugin;
+    public Object[] GetSerializationData(UUID itemID)
+    {
+        if (m_commsPlugin != null)
+            return m_commsPlugin.GetSerializationData(itemID);
+        else
+            return new Object[]{};
+    }
 
-        public int ListenerCount
-        {
-            get { return m_commsPlugin.ListenerCount; }
-        }
-
-        public Listener(AsyncCommandManager CmdManager)
-        {
-            m_CmdManager = CmdManager;
-            m_commsPlugin = m_CmdManager.m_ScriptEngine.World.RequestModuleInterface<IWorldComm>();
-        }
-
-        public Object[] GetSerializationData(UUID itemID)
-        {
-            if (m_commsPlugin != null)
-                return m_commsPlugin.GetSerializationData(itemID);
-            else
-                return new Object[]{};
-        }
-
-        public void CreateFromData( UUID itemID, UUID hostID, Object[] data)
-        {
-            if (m_commsPlugin != null)
-                m_commsPlugin.CreateFromData(itemID, hostID, data);
-        }
+    public void CreateFromData( UUID itemID, UUID hostID, Object[] data)
+    {
+        if (m_commsPlugin != null)
+            m_commsPlugin.CreateFromData(itemID, hostID, data);
     }
 }

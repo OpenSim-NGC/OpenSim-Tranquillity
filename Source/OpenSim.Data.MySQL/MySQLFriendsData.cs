@@ -25,58 +25,56 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using MySqlConnector;
 using OpenMetaverse;
 
-namespace OpenSim.Data.MySQL
+namespace OpenSim.Data.MySQL;
+
+public class MySqlFriendsData : MySQLGenericTableHandler<FriendsData>, IFriendsData
 {
-    public class MySqlFriendsData : MySQLGenericTableHandler<FriendsData>, IFriendsData
+    public MySqlFriendsData(string connectionString, string realm)
+            : base(connectionString, realm, "FriendsStore")
     {
-        public MySqlFriendsData(string connectionString, string realm)
-                : base(connectionString, realm, "FriendsStore")
+    }
+
+    public bool Delete(UUID principalID, string friend)
+    {
+        return Delete(principalID.ToString(), friend);
+    }
+
+    public override bool Delete(string principalID, string friend)
+    {
+        using (MySqlCommand cmd = new MySqlCommand())
         {
+            cmd.CommandText = String.Format("delete from {0} where PrincipalID = ?PrincipalID and Friend = ?Friend", m_Realm);
+            cmd.Parameters.AddWithValue("?PrincipalID", principalID.ToString());
+            cmd.Parameters.AddWithValue("?Friend", friend);
+
+            ExecuteNonQuery(cmd);
         }
 
-        public bool Delete(UUID principalID, string friend)
+        return true;
+    }
+
+    public FriendsData[] GetFriends(UUID principalID)
+    {
+        using (MySqlCommand cmd = new MySqlCommand())
         {
-            return Delete(principalID.ToString(), friend);
+            cmd.CommandText = String.Format("select a.*,case when b.Flags is null then -1 else b.Flags end as TheirFlags from {0} as a left join {0} as b on a.PrincipalID = b.Friend and a.Friend = b.PrincipalID where a.PrincipalID = ?PrincipalID", m_Realm);
+            cmd.Parameters.AddWithValue("?PrincipalID", principalID.ToString());
+
+            return DoQuery(cmd);
         }
+    }
 
-        public override bool Delete(string principalID, string friend)
+    public FriendsData[] GetFriends(string principalID)
+    {
+        using (MySqlCommand cmd = new MySqlCommand())
         {
-            using (MySqlCommand cmd = new MySqlCommand())
-            {
-                cmd.CommandText = String.Format("delete from {0} where PrincipalID = ?PrincipalID and Friend = ?Friend", m_Realm);
-                cmd.Parameters.AddWithValue("?PrincipalID", principalID.ToString());
-                cmd.Parameters.AddWithValue("?Friend", friend);
+            cmd.CommandText = String.Format("select a.*,case when b.Flags is null then -1 else b.Flags end as TheirFlags from {0} as a left join {0} as b on a.PrincipalID = b.Friend and a.Friend = b.PrincipalID where a.PrincipalID LIKE ?PrincipalID", m_Realm);
+            cmd.Parameters.AddWithValue("?PrincipalID", principalID.ToString() + '%');
 
-                ExecuteNonQuery(cmd);
-            }
-
-            return true;
-        }
-
-        public FriendsData[] GetFriends(UUID principalID)
-        {
-            using (MySqlCommand cmd = new MySqlCommand())
-            {
-                cmd.CommandText = String.Format("select a.*,case when b.Flags is null then -1 else b.Flags end as TheirFlags from {0} as a left join {0} as b on a.PrincipalID = b.Friend and a.Friend = b.PrincipalID where a.PrincipalID = ?PrincipalID", m_Realm);
-                cmd.Parameters.AddWithValue("?PrincipalID", principalID.ToString());
-
-                return DoQuery(cmd);
-            }
-        }
-
-        public FriendsData[] GetFriends(string principalID)
-        {
-            using (MySqlCommand cmd = new MySqlCommand())
-            {
-                cmd.CommandText = String.Format("select a.*,case when b.Flags is null then -1 else b.Flags end as TheirFlags from {0} as a left join {0} as b on a.PrincipalID = b.Friend and a.Friend = b.PrincipalID where a.PrincipalID LIKE ?PrincipalID", m_Realm);
-                cmd.Parameters.AddWithValue("?PrincipalID", principalID.ToString() + '%');
-
-                return DoQuery(cmd);
-            }
+            return DoQuery(cmd);
         }
     }
 }

@@ -36,172 +36,171 @@ using OpenMetaverse;
 using log4net;
 using Nini.Config;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser;
+
+public class RemoteGridUserServicesConnector : ISharedRegionModule, IGridUserService
 {
-    public class RemoteGridUserServicesConnector : ISharedRegionModule, IGridUserService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private const int KEEPTIME = 30; // 30 secs
+    private ExpiringCacheOS<string, GridUserInfo> m_Infos = new ExpiringCacheOS<string, GridUserInfo>(10000);
+
+    ~RemoteGridUserServicesConnector()
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        Dispose(false);
+    }
 
-        private const int KEEPTIME = 30; // 30 secs
-        private ExpiringCacheOS<string, GridUserInfo> m_Infos = new ExpiringCacheOS<string, GridUserInfo>(10000);
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
 
-        ~RemoteGridUserServicesConnector()
+    private bool disposed = false;
+    private void Dispose(bool disposing)
+    {
+        if (!disposed)
         {
-            Dispose(false);
+            disposed = true;
+            m_Infos.Dispose();
         }
+    }
 
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
 
-        private bool disposed = false;
-        private void Dispose(bool disposing)
+    #region ISharedRegionModule
+
+    private bool m_Enabled = false;
+
+    private ActivityDetector m_ActivityDetector;
+    private IGridUserService m_RemoteConnector;
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public string Name
+    {
+        get { return "RemoteGridUserServicesConnector"; }
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            if (!disposed)
+            string name = moduleConfig.GetString("GridUserServices", "");
+            if (name == Name)
             {
-                disposed = true;
-                m_Infos.Dispose();
+                m_RemoteConnector = new GridUserServicesConnector(source);
+
+                m_Enabled = true;
+
+                m_ActivityDetector = new ActivityDetector(this);
+
+                m_log.Info("[REMOTE GRID USER CONNECTOR]: Remote grid user enabled");
             }
         }
+    }
 
+    public void PostInitialise()
+    {
+    }
 
-        #region ISharedRegionModule
+    public void Close()
+    {
+    }
 
-        private bool m_Enabled = false;
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
 
-        private ActivityDetector m_ActivityDetector;
-        private IGridUserService m_RemoteConnector;
+        scene.RegisterModuleInterface<IGridUserService>(this);
+        m_ActivityDetector.AddRegion(scene);
 
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "RemoteGridUserServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
-            {
-                string name = moduleConfig.GetString("GridUserServices", "");
-                if (name == Name)
-                {
-                    m_RemoteConnector = new GridUserServicesConnector(source);
-
-                    m_Enabled = true;
-
-                    m_ActivityDetector = new ActivityDetector(this);
-
-                    m_log.Info("[REMOTE GRID USER CONNECTOR]: Remote grid user enabled");
-                }
-            }
-        }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.RegisterModuleInterface<IGridUserService>(this);
-            m_ActivityDetector.AddRegion(scene);
-
-            m_log.InfoFormat("[REMOTE GRID USER CONNECTOR]: Enabled remote grid user for region {0}", scene.RegionInfo.RegionName);
-
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_ActivityDetector.RemoveRegion(scene);
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-        }
-
-        #endregion
-
-        #region IGridUserService
-
-        public GridUserInfo LoggedIn(string userID)
-        {
-            m_log.Warn("[REMOTE GRID USER CONNECTOR]: LoggedIn not implemented at the simulators");
-            return null;
-        }
-
-        public bool LoggedOut(string userID, UUID sessionID, UUID region, Vector3 position, Vector3 lookat)
-        {
-            m_Infos.Remove(userID);
-            return m_RemoteConnector.LoggedOut(userID, sessionID, region, position, lookat);
-        }
-
-        public bool SetHome(string userID, UUID regionID, Vector3 position, Vector3 lookAt)
-        {
-            if (m_RemoteConnector.SetHome(userID, regionID, position, lookAt))
-            {
-                if (m_Infos.TryGetValue(userID, KEEPTIME * 1000, out GridUserInfo info))
-                {
-                    info.HomeRegionID = regionID;
-                    info.HomePosition = position;
-                    info.HomeLookAt = lookAt;
-                }
-                return true;
-            }
-            return false;
-        }
-
-        public bool SetLastPosition(string userID, UUID sessionID, UUID regionID, Vector3 position, Vector3 lookAt)
-        {
-            if (m_RemoteConnector.SetLastPosition(userID, sessionID, regionID, position, lookAt))
-            {
-                if (m_Infos.TryGetValue(userID, KEEPTIME * 1000, out GridUserInfo info))
-                {
-                    info.LastRegionID = regionID;
-                    info.LastPosition = position;
-                    info.LastLookAt = lookAt;
-                }
-                return true;
-            }
-
-            return false;
-        }
-
-        public GridUserInfo GetGridUserInfo(string userID)
-        {
-            if (m_Infos.TryGetValue(userID, KEEPTIME * 1000, out GridUserInfo info))
-                return info;
-
-            info = m_RemoteConnector.GetGridUserInfo(userID);
-            m_Infos.AddOrUpdate(userID, info, KEEPTIME);
-
-            return info;
-        }
-
-        public GridUserInfo[] GetGridUserInfo(string[] userID)
-        {
-            return m_RemoteConnector.GetGridUserInfo(userID);
-        }
-
-        #endregion
+        m_log.InfoFormat("[REMOTE GRID USER CONNECTOR]: Enabled remote grid user for region {0}", scene.RegionInfo.RegionName);
 
     }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_ActivityDetector.RemoveRegion(scene);
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+    }
+
+    #endregion
+
+    #region IGridUserService
+
+    public GridUserInfo LoggedIn(string userID)
+    {
+        m_log.Warn("[REMOTE GRID USER CONNECTOR]: LoggedIn not implemented at the simulators");
+        return null;
+    }
+
+    public bool LoggedOut(string userID, UUID sessionID, UUID region, Vector3 position, Vector3 lookat)
+    {
+        m_Infos.Remove(userID);
+        return m_RemoteConnector.LoggedOut(userID, sessionID, region, position, lookat);
+    }
+
+    public bool SetHome(string userID, UUID regionID, Vector3 position, Vector3 lookAt)
+    {
+        if (m_RemoteConnector.SetHome(userID, regionID, position, lookAt))
+        {
+            if (m_Infos.TryGetValue(userID, KEEPTIME * 1000, out GridUserInfo info))
+            {
+                info.HomeRegionID = regionID;
+                info.HomePosition = position;
+                info.HomeLookAt = lookAt;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public bool SetLastPosition(string userID, UUID sessionID, UUID regionID, Vector3 position, Vector3 lookAt)
+    {
+        if (m_RemoteConnector.SetLastPosition(userID, sessionID, regionID, position, lookAt))
+        {
+            if (m_Infos.TryGetValue(userID, KEEPTIME * 1000, out GridUserInfo info))
+            {
+                info.LastRegionID = regionID;
+                info.LastPosition = position;
+                info.LastLookAt = lookAt;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    public GridUserInfo GetGridUserInfo(string userID)
+    {
+        if (m_Infos.TryGetValue(userID, KEEPTIME * 1000, out GridUserInfo info))
+            return info;
+
+        info = m_RemoteConnector.GetGridUserInfo(userID);
+        m_Infos.AddOrUpdate(userID, info, KEEPTIME);
+
+        return info;
+    }
+
+    public GridUserInfo[] GetGridUserInfo(string[] userID)
+    {
+        return m_RemoteConnector.GetGridUserInfo(userID);
+    }
+
+    #endregion
+
 }

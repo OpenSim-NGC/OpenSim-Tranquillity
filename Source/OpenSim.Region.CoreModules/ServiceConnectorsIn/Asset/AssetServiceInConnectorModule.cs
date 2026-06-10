@@ -34,78 +34,77 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Asset
+namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Asset;
+
+public class AssetServiceInConnectorModule : ISharedRegionModule
 {
-    public class AssetServiceInConnectorModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static bool m_Enabled = false;
+
+    private IConfigSource m_Config;
+    bool m_Registered = false;
+
+    #region Region Module interface
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private static bool m_Enabled = false;
-
-        private IConfigSource m_Config;
-        bool m_Registered = false;
-
-        #region Region Module interface
-
-        public void Initialise(IConfigSource config)
+        m_Config = config;
+        IConfig moduleConfig = config.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            m_Config = config;
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+            m_Enabled = moduleConfig.GetBoolean("AssetServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("AssetServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_log.Info("[ASSET IN CONNECTOR]: AssetServiceInConnector enabled");
-                }
-
+                m_log.Info("[ASSET IN CONNECTOR]: AssetServiceInConnector enabled");
             }
+
         }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "RegionAssetService"; }
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            if (!m_Registered)
-            {
-                m_Registered = true;
-
-                m_log.Info("[HGAssetService]: Starting...");
-
-
-                object[] args = new object[] { m_Config, MainServer.Instance, "HGAssetService" };
-
-                ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:AssetServiceConnector", args);
-            }
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        #endregion
-
     }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public string Name
+    {
+        get { return "RegionAssetService"; }
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        if (!m_Registered)
+        {
+            m_Registered = true;
+
+            m_log.Info("[HGAssetService]: Starting...");
+
+
+            object[] args = new object[] { m_Config, MainServer.Instance, "HGAssetService" };
+
+            ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:AssetServiceConnector", args);
+        }
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    #endregion
+
 }

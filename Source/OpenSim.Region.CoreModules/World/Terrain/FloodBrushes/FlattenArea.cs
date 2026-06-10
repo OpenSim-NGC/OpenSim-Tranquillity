@@ -29,47 +29,46 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Framework;
 
 
-namespace OpenSim.Region.CoreModules.World.Terrain.FloodBrushes
+namespace OpenSim.Region.CoreModules.World.Terrain.FloodBrushes;
+
+public class FlattenArea : ITerrainFloodEffect
 {
-    public class FlattenArea : ITerrainFloodEffect
+    #region ITerrainFloodEffect Members
+
+    public void FloodEffect(ITerrainChannel map, bool[,] fillArea, float height, float strength,
+        int startX, int endX, int startY, int endY)
     {
-        #region ITerrainFloodEffect Members
+        if(height < 0)
+            height = 0;
+        else if(height > Constants.MaxTerrainHeightmap)
+            height = Constants.MaxTerrainHeightmap;
 
-        public void FloodEffect(ITerrainChannel map, bool[,] fillArea, float height, float strength,
-            int startX, int endX, int startY, int endY)
+        strength *= 0.04f;
+        if(strength >= .999f)
         {
-            if(height < 0)
-                height = 0;
-            else if(height > Constants.MaxTerrainHeightmap)
-                height = Constants.MaxTerrainHeightmap;
-
-            strength *= 0.04f;
-            if(strength >= .999f)
-            {
-                for (int x = startX; x <= endX; x++)
-                {
-                    for (int y = startY; y <= endY; y++)
-                    {
-                        if (fillArea[x, y])
-                            map[x, y] = height;
-                    }
-                }
-                return;
-            }
-
-            if(strength < 1e-3)
-                return;
-
             for (int x = startX; x <= endX; x++)
             {
                 for (int y = startY; y <= endY; y++)
                 {
                     if (fillArea[x, y])
-                        map[x, y] = (map[x, y] * (1.0f - strength)) + (height * strength);
+                        map[x, y] = height;
                 }
             }
+            return;
         }
 
-        #endregion
+        if(strength < 1e-3)
+            return;
+
+        for (int x = startX; x <= endX; x++)
+        {
+            for (int y = startY; y <= endY; y++)
+            {
+                if (fillArea[x, y])
+                    map[x, y] = (map[x, y] * (1.0f - strength)) + (height * strength);
+            }
+        }
     }
+
+    #endregion
 }

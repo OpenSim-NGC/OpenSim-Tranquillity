@@ -25,32 +25,31 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Server.Base
+namespace OpenSim.Server.Base;
+
+public class ProtocolVersions
 {
-    public class ProtocolVersions
-    {
-        /// <value>
-        /// This is the external protocol versions.  It is separate from the OpenSimulator project version.
-        ///
-        /// These version numbers should be increased by 1 every time a code
-        /// change in the Service.Connectors and Server.Handlers, espectively,
-        /// makes the previous OpenSimulator revision incompatible
-        /// with the new revision.
-        ///
-        /// Changes which are compatible with an older revision (e.g. older revisions experience degraded functionality
-        /// but not outright failure) do not need a version number increment.
-        ///
-        /// Having this version number allows the grid service to reject connections from regions running a version
-        /// of the code that is too old.
-        ///
-        /// </value>
+    /// <value>
+    /// This is the external protocol versions.  It is separate from the OpenSimulator project version.
+    ///
+    /// These version numbers should be increased by 1 every time a code
+    /// change in the Service.Connectors and Server.Handlers, espectively,
+    /// makes the previous OpenSimulator revision incompatible
+    /// with the new revision.
+    ///
+    /// Changes which are compatible with an older revision (e.g. older revisions experience degraded functionality
+    /// but not outright failure) do not need a version number increment.
+    ///
+    /// Having this version number allows the grid service to reject connections from regions running a version
+    /// of the code that is too old.
+    ///
+    /// </value>
 
-        // The range of acceptable servers for client-side connectors
-        public readonly static int ClientProtocolVersionMin = 1;
-        public readonly static int ClientProtocolVersionMax = 1;
+    // The range of acceptable servers for client-side connectors
+    public readonly static int ClientProtocolVersionMin = 1;
+    public readonly static int ClientProtocolVersionMax = 1;
 
-        // The range of acceptable clients in server-side handlers
-        public readonly static int ServerProtocolVersionMin = 1;
-        public readonly static int ServerProtocolVersionMax = 1;
-    }
+    // The range of acceptable clients in server-side handlers
+    public readonly static int ServerProtocolVersionMin = 1;
+    public readonly static int ServerProtocolVersionMax = 1;
 }

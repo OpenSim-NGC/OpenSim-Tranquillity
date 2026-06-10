@@ -27,18 +27,17 @@
 
 using OpenSim.Framework.Capabilities;
 
-namespace OpenSim.Region.DataSnapshot
-{
-    [OSDMap]
-    public class LLSDDiscoveryResponse
-    {
-        public OSDArray snapshot_resources;
-    }
+namespace OpenSim.Region.DataSnapshot;
 
-    [OSDMap]
-    public class LLSDDiscoveryDataURL
-    {
-        public string snapshot_format;
-        public string snapshot_url;
-    }
+[OSDMap]
+public class LLSDDiscoveryResponse
+{
+    public OSDArray snapshot_resources;
+}
+
+[OSDMap]
+public class LLSDDiscoveryDataURL
+{
+    public string snapshot_format;
+    public string snapshot_url;
 }

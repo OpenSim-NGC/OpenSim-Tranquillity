@@ -25,83 +25,80 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Net;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
 
-namespace OpenSim.Framework.Servers.HttpServer
-{
-    public delegate void ReturnResponse<T>(T reponse);
+namespace OpenSim.Framework.Servers.HttpServer;
 
-    /// <summary>
-    /// Makes an asynchronous REST request with a callback to invoke with the response.
-    /// </summary>
-    public class RestObjectPosterResponse<TResponse>
-    {
+public delegate void ReturnResponse<T>(T reponse);
+
+/// <summary>
+/// Makes an asynchronous REST request with a callback to invoke with the response.
+/// </summary>
+public class RestObjectPosterResponse<TResponse>
+{
 //        private static readonly log4net.ILog m_log
 //            = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
-        public ReturnResponse<TResponse> ResponseCallback;
+    public ReturnResponse<TResponse> ResponseCallback;
 
-        public void BeginPostObject<TRequest>(string requestUrl, TRequest obj)
+    public void BeginPostObject<TRequest>(string requestUrl, TRequest obj)
+    {
+        BeginPostObject("POST", requestUrl, obj);
+    }
+
+    public void BeginPostObject<TRequest>(string verb, string requestUrl, TRequest obj)
+    {
+        Type type = typeof (TRequest);
+
+        WebRequest request = WebRequest.Create(requestUrl);
+        request.Method = verb;
+        request.ContentType = "text/xml";
+        request.Timeout = 10000;
+
+        using (MemoryStream buffer = new MemoryStream())
         {
-            BeginPostObject("POST", requestUrl, obj);
-        }
+            XmlWriterSettings settings = new XmlWriterSettings();
+            settings.Encoding = Encoding.UTF8;
 
-        public void BeginPostObject<TRequest>(string verb, string requestUrl, TRequest obj)
-        {
-            Type type = typeof (TRequest);
-
-            WebRequest request = WebRequest.Create(requestUrl);
-            request.Method = verb;
-            request.ContentType = "text/xml";
-            request.Timeout = 10000;
-
-            using (MemoryStream buffer = new MemoryStream())
+            using (XmlWriter writer = XmlWriter.Create(buffer, settings))
             {
-                XmlWriterSettings settings = new XmlWriterSettings();
-                settings.Encoding = Encoding.UTF8;
-
-                using (XmlWriter writer = XmlWriter.Create(buffer, settings))
-                {
-                    XmlSerializer serializer = new XmlSerializer(type);
-                    serializer.Serialize(writer, obj);
-                    writer.Flush();
-                }
-
-                int length = (int)buffer.Length;
-                request.ContentLength = length;
-
-                using (Stream requestStream = request.GetRequestStream())
-                    requestStream.Write(buffer.ToArray(), 0, length);
+                XmlSerializer serializer = new XmlSerializer(type);
+                serializer.Serialize(writer, obj);
+                writer.Flush();
             }
 
-            // IAsyncResult result = request.BeginGetResponse(AsyncCallback, request);
-            request.BeginGetResponse(AsyncCallback, request);
+            int length = (int)buffer.Length;
+            request.ContentLength = length;
+
+            using (Stream requestStream = request.GetRequestStream())
+                requestStream.Write(buffer.ToArray(), 0, length);
         }
 
-        private void AsyncCallback(IAsyncResult result)
-        {
-            WebRequest request = (WebRequest) result.AsyncState;
-            using (WebResponse resp = request.EndGetResponse(result))
-            {
-                TResponse deserial;
-                XmlSerializer deserializer = new XmlSerializer(typeof (TResponse));
-                Stream stream = resp.GetResponseStream();
+        // IAsyncResult result = request.BeginGetResponse(AsyncCallback, request);
+        request.BeginGetResponse(AsyncCallback, request);
+    }
 
-                // This is currently a bad debug stanza since it gobbles us the response...
+    private void AsyncCallback(IAsyncResult result)
+    {
+        WebRequest request = (WebRequest) result.AsyncState;
+        using (WebResponse resp = request.EndGetResponse(result))
+        {
+            TResponse deserial;
+            XmlSerializer deserializer = new XmlSerializer(typeof (TResponse));
+            Stream stream = resp.GetResponseStream();
+
+            // This is currently a bad debug stanza since it gobbles us the response...
 //                StreamReader reader = new StreamReader(stream);
 //                m_log.DebugFormat("[REST OBJECT POSTER RESPONSE]: Received {0}", reader.ReadToEnd());
 
-                deserial = (TResponse) deserializer.Deserialize(stream);
+            deserial = (TResponse) deserializer.Deserialize(stream);
 
-                if (deserial != null && ResponseCallback != null)
-                {
-                    ResponseCallback(deserial);
-                }
+            if (deserial != null && ResponseCallback != null)
+            {
+                ResponseCallback(deserial);
             }
         }
     }

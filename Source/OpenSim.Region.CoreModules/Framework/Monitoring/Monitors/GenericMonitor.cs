@@ -27,50 +27,49 @@
 
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors
+namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors;
+
+class GenericMonitor : IMonitor
 {
-    class GenericMonitor : IMonitor
+    public Scene Scene { get; private set; }
+    public string Name { get; private set; }
+    public string FriendlyName { get; private set; }
+
+    private readonly Func<GenericMonitor, double> m_getValueAction;
+    private readonly Func<GenericMonitor, string> m_getFriendlyValueAction;
+
+    public GenericMonitor(
+        Scene scene,
+        string name,
+        string friendlyName,
+        Func<GenericMonitor, double> getValueAction,
+        Func<GenericMonitor, string> getFriendlyValueAction)
     {
-        public Scene Scene { get; private set; }
-        public string Name { get; private set; }
-        public string FriendlyName { get; private set; }
+        Scene = scene;
+        Name = name;
+        FriendlyName = name;
+        m_getFriendlyValueAction = getFriendlyValueAction;
+        m_getValueAction = getValueAction;
+    }
 
-        private readonly Func<GenericMonitor, double> m_getValueAction;
-        private readonly Func<GenericMonitor, string> m_getFriendlyValueAction;
+    public double GetValue()
+    {
+        return m_getValueAction(this);
+    }
 
-        public GenericMonitor(
-            Scene scene,
-            string name,
-            string friendlyName,
-            Func<GenericMonitor, double> getValueAction,
-            Func<GenericMonitor, string> getFriendlyValueAction)
-        {
-            Scene = scene;
-            Name = name;
-            FriendlyName = name;
-            m_getFriendlyValueAction = getFriendlyValueAction;
-            m_getValueAction = getValueAction;
-        }
+    public string GetName()
+    {
+        return Name;
+    }
 
-        public double GetValue()
-        {
-            return m_getValueAction(this);
-        }
+    public string GetFriendlyName()
+    {
+        return FriendlyName;
+    }
 
-        public string GetName()
-        {
-            return Name;
-        }
-
-        public string GetFriendlyName()
-        {
-            return FriendlyName;
-        }
-
-        public string GetFriendlyValue()
-        {
-            return m_getFriendlyValueAction(this);
-        }
+    public string GetFriendlyValue()
+    {
+        return m_getFriendlyValueAction(this);
     }
 }
 

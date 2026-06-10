@@ -25,32 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Net;
 
 using OpenMetaverse.StructuredData;
 using OpenMetaverse;
 
-namespace OpenSim.Services.Interfaces
+namespace OpenSim.Services.Interfaces;
+
+public abstract class LoginResponse
 {
-    public abstract class LoginResponse
-    {
-        public abstract Hashtable ToHashtable();
-        public abstract OSD ToOSDMap();
-    }
+    public abstract Hashtable ToHashtable();
+    public abstract OSD ToOSDMap();
+}
 
-    public abstract class FailedLoginResponse : LoginResponse
-    {
-    }
+public abstract class FailedLoginResponse : LoginResponse
+{
+}
 
-    public interface ILoginService
-    {
-        LoginResponse Login(string firstName, string lastName, string passwd, string startLocation, UUID scopeID,
-            string clientVersion, string channel, string mac, string id0, IPEndPoint clientIP);
-        Hashtable SetLevel(string firstName, string lastName, string passwd, int level, IPEndPoint clientIP);
-    }
-
-
+public interface ILoginService
+{
+    LoginResponse Login(string firstName, string lastName, string passwd, string startLocation, UUID scopeID,
+        string clientVersion, string channel, string mac, string id0, IPEndPoint clientIP);
+    Hashtable SetLevel(string firstName, string lastName, string passwd, int level, IPEndPoint clientIP);
 }

@@ -37,52 +37,51 @@ using OpenSim.Region.Framework.Scenes;
 //[assembly: Addin("MyModule", "1.0")]
 //[assembly: AddinDependency("OpenSim", "0.8.1")]
 
-namespace OpenSim.Region.OptionalModules.Example.BareBonesNonShared
+namespace OpenSim.Region.OptionalModules.Example.BareBonesNonShared;
+
+/// <summary>
+/// Simplest possible example of a non-shared region module.
+/// </summary>
+/// <remarks>
+/// This module is the simplest possible example of a non-shared region module (a module where each scene/region
+/// in the simulator has its own copy).  If anybody wants to create a more complex example in the future then
+/// please create a separate class.
+///
+/// When the module is enabled it will print messages when it receives certain events to the screen and the log
+/// file.
+/// </remarks>
+/// To actually load this module you'll need to add it to the [Modules] section of your OpenSim.ini file
+/// and include it in the addin.xml file for this assembly.
+public class BareBonesNonSharedModule : INonSharedRegionModule
 {
-    /// <summary>
-    /// Simplest possible example of a non-shared region module.
-    /// </summary>
-    /// <remarks>
-    /// This module is the simplest possible example of a non-shared region module (a module where each scene/region
-    /// in the simulator has its own copy).  If anybody wants to create a more complex example in the future then
-    /// please create a separate class.
-    ///
-    /// When the module is enabled it will print messages when it receives certain events to the screen and the log
-    /// file.
-    /// </remarks>
-    /// To actually load this module you'll need to add it to the [Modules] section of your OpenSim.ini file
-    /// and include it in the addin.xml file for this assembly.
-    public class BareBonesNonSharedModule : INonSharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    public string Name { get { return "Bare Bones Non Shared Module"; } }
+
+    public Type ReplaceableInterface { get { return null; } }
+
+    public void Initialise(IConfigSource source)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_log.DebugFormat("[BARE BONES NON SHARED]: INITIALIZED MODULE");
+    }
 
-        public string Name { get { return "Bare Bones Non Shared Module"; } }
+    public void Close()
+    {
+        m_log.DebugFormat("[BARE BONES NON SHARED]: CLOSED MODULE");
+    }
 
-        public Type ReplaceableInterface { get { return null; } }
+    public void AddRegion(Scene scene)
+    {
+        m_log.DebugFormat("[BARE BONES NON SHARED]: REGION {0} ADDED", scene.RegionInfo.RegionName);
+    }
 
-        public void Initialise(IConfigSource source)
-        {
-            m_log.DebugFormat("[BARE BONES NON SHARED]: INITIALIZED MODULE");
-        }
+    public void RemoveRegion(Scene scene)
+    {
+        m_log.DebugFormat("[BARE BONES NON SHARED]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
+    }
 
-        public void Close()
-        {
-            m_log.DebugFormat("[BARE BONES NON SHARED]: CLOSED MODULE");
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            m_log.DebugFormat("[BARE BONES NON SHARED]: REGION {0} ADDED", scene.RegionInfo.RegionName);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            m_log.DebugFormat("[BARE BONES NON SHARED]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            m_log.DebugFormat("[BARE BONES NON SHARED]: REGION {0} LOADED", scene.RegionInfo.RegionName);
-        }
+    public void RegionLoaded(Scene scene)
+    {
+        m_log.DebugFormat("[BARE BONES NON SHARED]: REGION {0} LOADED", scene.RegionInfo.RegionName);
     }
 }

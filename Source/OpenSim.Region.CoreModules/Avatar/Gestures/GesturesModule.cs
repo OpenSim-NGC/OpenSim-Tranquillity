@@ -35,77 +35,76 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Region.CoreModules.Avatar.Gestures
+namespace OpenSim.Region.CoreModules.Avatar.Gestures;
+
+public class GesturesModule : INonSharedRegionModule
 {
-    public class GesturesModule : INonSharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected Scene m_scene;
+
+    public void Initialise(IConfigSource source)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        protected Scene m_scene;
+    public void AddRegion(Scene scene)
+    {
+        m_scene = scene;
 
-        public void Initialise(IConfigSource source)
+        m_scene.EventManager.OnNewClient += OnNewClient;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        m_scene.EventManager.OnNewClient -= OnNewClient;
+        m_scene = null;
+    }
+
+    public void Close() {}
+    public string Name { get { return "Gestures Module"; } }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    private void OnNewClient(IClientAPI client)
+    {
+        client.OnActivateGesture += ActivateGesture;
+        client.OnDeactivateGesture += DeactivateGesture;
+    }
+
+    public virtual void ActivateGesture(IClientAPI client, UUID assetId, UUID gestureId)
+    {
+        IInventoryService invService = m_scene.InventoryService;
+
+        InventoryItemBase item = invService.GetItem(client.AgentId, gestureId);
+        if (item != null)
         {
+            item.Flags |= 1;
+            invService.UpdateItem(item);
         }
+        else
+            m_log.WarnFormat(
+                "[GESTURES]: Unable to find gesture {0} to activate for {1}", gestureId, client.Name);
+    }
 
-        public void AddRegion(Scene scene)
+    public virtual void DeactivateGesture(IClientAPI client, UUID gestureId)
+    {
+        IInventoryService invService = m_scene.InventoryService;
+
+        InventoryItemBase item = invService.GetItem(client.AgentId, gestureId);
+        if (item != null)
         {
-            m_scene = scene;
-
-            m_scene.EventManager.OnNewClient += OnNewClient;
+            item.Flags &= ~(uint)1;
+            invService.UpdateItem(item);
         }
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            m_scene.EventManager.OnNewClient -= OnNewClient;
-            m_scene = null;
-        }
-
-        public void Close() {}
-        public string Name { get { return "Gestures Module"; } }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        private void OnNewClient(IClientAPI client)
-        {
-            client.OnActivateGesture += ActivateGesture;
-            client.OnDeactivateGesture += DeactivateGesture;
-        }
-
-        public virtual void ActivateGesture(IClientAPI client, UUID assetId, UUID gestureId)
-        {
-            IInventoryService invService = m_scene.InventoryService;
-
-            InventoryItemBase item = invService.GetItem(client.AgentId, gestureId);
-            if (item != null)
-            {
-                item.Flags |= 1;
-                invService.UpdateItem(item);
-            }
-            else
-                m_log.WarnFormat(
-                    "[GESTURES]: Unable to find gesture {0} to activate for {1}", gestureId, client.Name);
-        }
-
-        public virtual void DeactivateGesture(IClientAPI client, UUID gestureId)
-        {
-            IInventoryService invService = m_scene.InventoryService;
-
-            InventoryItemBase item = invService.GetItem(client.AgentId, gestureId);
-            if (item != null)
-            {
-                item.Flags &= ~(uint)1;
-                invService.UpdateItem(item);
-            }
-            else
-                m_log.ErrorFormat(
-                    "[GESTURES]: Unable to find gesture to deactivate {0} for {1}", gestureId, client.Name);
-        }
+        else
+            m_log.ErrorFormat(
+                "[GESTURES]: Unable to find gesture to deactivate {0} for {1}", gestureId, client.Name);
     }
 }

@@ -35,104 +35,103 @@ using OpenMetaverse;
 using log4net;
 using Nini.Config;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList;
+
+public class RemoteMuteListServicesConnector : ISharedRegionModule, IMuteListService
 {
-    public class RemoteMuteListServicesConnector : ISharedRegionModule, IMuteListService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    #region ISharedRegionModule
+
+    private bool m_Enabled = false;
+
+    private IMuteListService m_remoteConnector;
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        #region ISharedRegionModule
+    public string Name
+    {
+        get { return "RemoteMuteListServicesConnector"; }
+    }
 
-        private bool m_Enabled = false;
+    public void Initialise(IConfigSource source)
+    {
+       // only active for core mute lists module
+        IConfig moduleConfig = source.Configs["Messaging"];
+        if (moduleConfig == null)
+            return;
 
-        private IMuteListService m_remoteConnector;
-
-        public Type ReplaceableInterface
+        if (moduleConfig.GetString("MuteListModule", "None") != "MuteListModule")
+            return;
+        
+        moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "RemoteMuteListServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-           // only active for core mute lists module
-            IConfig moduleConfig = source.Configs["Messaging"];
-            if (moduleConfig == null)
-                return;
-
-            if (moduleConfig.GetString("MuteListModule", "None") != "MuteListModule")
-                return;
-            
-            moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("MuteListService", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("MuteListService", "");
-                if (name == Name)
-                {
-                    m_remoteConnector = new MuteListServicesConnector(source);
-                    m_Enabled = true;
-                }
+                m_remoteConnector = new MuteListServicesConnector(source);
+                m_Enabled = true;
             }
         }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.RegisterModuleInterface<IMuteListService>(this);
-            m_log.InfoFormat("[MUTELIST CONNECTOR]: Enabled for region {0}", scene.RegionInfo.RegionName);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        #endregion
-
-        #region IMuteListService
-        public Byte[] MuteListRequest(UUID agentID, uint crc)
-        {
-            if (!m_Enabled)
-                return null;
-            return m_remoteConnector.MuteListRequest(agentID, crc);
-        }
-
-        public bool UpdateMute(MuteData mute)
-        {
-            if (!m_Enabled)
-                return false;
-            return m_remoteConnector.UpdateMute(mute);
-        }
-
-        public bool RemoveMute(UUID agentID, UUID muteID, string muteName)
-        {
-            if (!m_Enabled)
-                return false;
-            return m_remoteConnector.RemoveMute(agentID, muteID, muteName);
-        }
-
-        #endregion IMuteListService
-
     }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.RegisterModuleInterface<IMuteListService>(this);
+        m_log.InfoFormat("[MUTELIST CONNECTOR]: Enabled for region {0}", scene.RegionInfo.RegionName);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    #endregion
+
+    #region IMuteListService
+    public Byte[] MuteListRequest(UUID agentID, uint crc)
+    {
+        if (!m_Enabled)
+            return null;
+        return m_remoteConnector.MuteListRequest(agentID, crc);
+    }
+
+    public bool UpdateMute(MuteData mute)
+    {
+        if (!m_Enabled)
+            return false;
+        return m_remoteConnector.UpdateMute(mute);
+    }
+
+    public bool RemoveMute(UUID agentID, UUID muteID, string muteName)
+    {
+        if (!m_Enabled)
+            return false;
+        return m_remoteConnector.RemoveMute(agentID, muteID, muteName);
+    }
+
+    #endregion IMuteListService
+
 }

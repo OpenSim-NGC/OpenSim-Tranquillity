@@ -25,12 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenMetaverse;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+public interface ISearchModule
 {
-    public interface ISearchModule
-    {
-        void Refresh();
-    }
+    void Refresh();
 }

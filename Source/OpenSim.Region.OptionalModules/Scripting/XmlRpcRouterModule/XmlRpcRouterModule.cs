@@ -31,83 +31,82 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
 
-namespace OpenSim.Region.OptionalModules.Scripting.XmlRpcRouterModule
+namespace OpenSim.Region.OptionalModules.Scripting.XmlRpcRouterModule;
+
+public class XmlRpcRouter : INonSharedRegionModule, IXmlRpcRouter
 {
-    public class XmlRpcRouter : INonSharedRegionModule, IXmlRpcRouter
+    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private bool m_Enabled;
+
+    #region INonSharedRegionModule
+
+    public void Initialise(IConfigSource config)
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        IConfig startupConfig = config.Configs["XMLRPC"];
+        if (startupConfig == null)
+            return;
 
-        private bool m_Enabled;
+        if (startupConfig.GetString("XmlRpcRouterModule",
+                "XmlRpcRouterModule") == "XmlRpcRouterModule")
+            m_Enabled = true;
+    }
 
-        #region INonSharedRegionModule
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
 
-        public void Initialise(IConfigSource config)
+        scene.RegisterModuleInterface<IXmlRpcRouter>(this);
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.UnregisterModuleInterface<IXmlRpcRouter>(this);
+    }
+
+    public void Close()
+    {
+    }
+
+    public string Name
+    {
+        get { return "XmlRpcRouterModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    #endregion
+
+    public void RegisterNewReceiver(IScriptModule scriptEngine, UUID channel, UUID objectID, UUID itemID, string uri)
+    {
+        if (m_Enabled)
         {
-            IConfig startupConfig = config.Configs["XMLRPC"];
-            if (startupConfig == null)
-                return;
-
-            if (startupConfig.GetString("XmlRpcRouterModule",
-                    "XmlRpcRouterModule") == "XmlRpcRouterModule")
-                m_Enabled = true;
+            scriptEngine.PostScriptEvent(itemID, "xmlrpc_uri", new Object[] { uri });
         }
+    }
 
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
+    public void UnRegisterReceiver(string channelID, UUID itemID)
+    {
+    }
 
-            scene.RegisterModuleInterface<IXmlRpcRouter>(this);
-        }
+    public void ScriptRemoved(UUID itemID)
+    {
+        // System.Console.WriteLine("TEST Script Removed!");
+    }
 
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.UnregisterModuleInterface<IXmlRpcRouter>(this);
-        }
-
-        public void Close()
-        {
-        }
-
-        public string Name
-        {
-            get { return "XmlRpcRouterModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        #endregion
-
-        public void RegisterNewReceiver(IScriptModule scriptEngine, UUID channel, UUID objectID, UUID itemID, string uri)
-        {
-            if (m_Enabled)
-            {
-                scriptEngine.PostScriptEvent(itemID, "xmlrpc_uri", new Object[] { uri });
-            }
-        }
-
-        public void UnRegisterReceiver(string channelID, UUID itemID)
-        {
-        }
-
-        public void ScriptRemoved(UUID itemID)
-        {
-            // System.Console.WriteLine("TEST Script Removed!");
-        }
-
-        public void ObjectRemoved(UUID objectID)
-        {
-            // System.Console.WriteLine("TEST Obj Removed!");
-        }
+    public void ObjectRemoved(UUID objectID)
+    {
+        // System.Console.WriteLine("TEST Obj Removed!");
     }
 }

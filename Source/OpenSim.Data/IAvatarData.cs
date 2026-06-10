@@ -25,25 +25,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+// This MUST be a ref type!
+public class AvatarBaseData
 {
-    // This MUST be a ref type!
-    public class AvatarBaseData
-    {
-        public UUID PrincipalID;
-        public Dictionary<string, string> Data;
-    }
+    public UUID PrincipalID;
+    public Dictionary<string, string> Data;
+}
 
-    public interface IAvatarData
-    {
-        AvatarBaseData[] Get(string field, string val);
-        bool Store(AvatarBaseData data);
-        bool Delete(UUID principalID, string name);
-        bool Delete(string field, string val);
-    }
+public interface IAvatarData
+{
+    AvatarBaseData[] Get(string field, string val);
+    bool Store(AvatarBaseData data);
+    bool Delete(UUID principalID, string name);
+    bool Delete(string field, string val);
 }

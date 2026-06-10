@@ -31,150 +31,149 @@ using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.Framework.InterfaceCommander
+namespace OpenSim.Region.CoreModules.Framework.InterfaceCommander;
+
+/// <summary>
+/// A class to enable modules to register console and script commands, which enforces typing and valid input.
+/// </summary>
+public class Commander : ICommander
 {
-    /// <summary>
-    /// A class to enable modules to register console and script commands, which enforces typing and valid input.
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    /// <value>
+    /// Used in runtime class generation
     /// </summary>
-    public class Commander : ICommander
+    private string m_generatedApiClassName;
+
+    public string Name
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return m_name; }
+    }
+    private string m_name;
 
-        /// <value>
-        /// Used in runtime class generation
-        /// </summary>
-        private string m_generatedApiClassName;
-
-        public string Name
+    public string Help
+    {
+        get
         {
-            get { return m_name; }
-        }
-        private string m_name;
+            StringBuilder sb = new StringBuilder();
 
-        public string Help
-        {
-            get
-            {
-                StringBuilder sb = new StringBuilder();
+            sb.AppendLine("=== " + m_name + " ===");
 
-                sb.AppendLine("=== " + m_name + " ===");
-
-                foreach (ICommand com in m_commands.Values)
-                {
-                    sb.AppendLine("* " + Name + " " + com.Name + " - " + com.Help);
-                }
-
-                return sb.ToString();
-            }
-        }
-
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="name"></param>
-        public Commander(string name)
-        {
-            m_name = name;
-            m_generatedApiClassName = m_name[0].ToString().ToUpper();
-
-            if (m_name.Length > 1)
-                m_generatedApiClassName += m_name.Substring(1);
-        }
-
-        public Dictionary<string, ICommand> Commands
-        {
-            get { return m_commands; }
-        }
-        private Dictionary<string, ICommand> m_commands = new Dictionary<string, ICommand>();
-
-        #region ICommander Members
-
-        public void RegisterCommand(string commandName, ICommand command)
-        {
-            m_commands[commandName] = command;
-        }
-
-        /// <summary>
-        /// Generates a runtime C# class which can be compiled and inserted via reflection to enable modules to register new script commands
-        /// </summary>
-        /// <returns>Returns C# source code to create a binding</returns>
-        public string GenerateRuntimeAPI()
-        {
-            string classSrc = "\n\tpublic class " + m_generatedApiClassName + " {\n";
             foreach (ICommand com in m_commands.Values)
             {
-                classSrc += "\tpublic void " + EscapeRuntimeAPICommand(com.Name) + "( ";
-                foreach (KeyValuePair<string, string> arg in com.Arguments)
-                {
-                    classSrc += arg.Value + " " + Util.Md5Hash(arg.Key) + ",";
-                }
-                classSrc = classSrc.Remove(classSrc.Length - 1); // Delete the last comma
-                classSrc += " )\n\t{\n";
-                classSrc += "\t\tObject[] args = new Object[" + com.Arguments.Count.ToString() + "];\n";
-                int i = 0;
-                foreach (KeyValuePair<string, string> arg in com.Arguments)
-                {
-                    classSrc += "\t\targs[" + i.ToString() + "] = " + Util.Md5Hash(arg.Key) + "  " + ";\n";
-                    i++;
-                }
-                classSrc += "\t\tGetCommander(\"" + m_name + "\").Run(\"" + com.Name + "\", args);\n";
-                classSrc += "\t}\n";
+                sb.AppendLine("* " + Name + " " + com.Name + " - " + com.Help);
             }
-            classSrc += "}\n";
 
-            return classSrc;
+            return sb.ToString();
         }
+    }
 
-        /// <summary>
-        /// Runs a specified function with attached arguments
-        /// *** <b>DO NOT CALL DIRECTLY.</b> ***
-        /// Call ProcessConsoleCommand instead if handling human input.
-        /// </summary>
-        /// <param name="function">The function name to call</param>
-        /// <param name="args">The function parameters</param>
-        public void Run(string function, object[] args)
-        {
-            m_commands[function].Run(args);
-        }
+    /// <summary>
+    /// Constructor
+    /// </summary>
+    /// <param name="name"></param>
+    public Commander(string name)
+    {
+        m_name = name;
+        m_generatedApiClassName = m_name[0].ToString().ToUpper();
 
-        public void ProcessConsoleCommand(string function, string[] args)
+        if (m_name.Length > 1)
+            m_generatedApiClassName += m_name.Substring(1);
+    }
+
+    public Dictionary<string, ICommand> Commands
+    {
+        get { return m_commands; }
+    }
+    private Dictionary<string, ICommand> m_commands = new Dictionary<string, ICommand>();
+
+    #region ICommander Members
+
+    public void RegisterCommand(string commandName, ICommand command)
+    {
+        m_commands[commandName] = command;
+    }
+
+    /// <summary>
+    /// Generates a runtime C# class which can be compiled and inserted via reflection to enable modules to register new script commands
+    /// </summary>
+    /// <returns>Returns C# source code to create a binding</returns>
+    public string GenerateRuntimeAPI()
+    {
+        string classSrc = "\n\tpublic class " + m_generatedApiClassName + " {\n";
+        foreach (ICommand com in m_commands.Values)
         {
-            if (m_commands.ContainsKey(function))
+            classSrc += "\tpublic void " + EscapeRuntimeAPICommand(com.Name) + "( ";
+            foreach (KeyValuePair<string, string> arg in com.Arguments)
             {
-                if (args.Length > 0 && args[0] == "help")
-                {
-                    m_commands[function].ShowConsoleHelp();
-                }
-                else
-                {
-                    m_commands[function].Run(args);
-                }
+                classSrc += arg.Value + " " + Util.Md5Hash(arg.Key) + ",";
+            }
+            classSrc = classSrc.Remove(classSrc.Length - 1); // Delete the last comma
+            classSrc += " )\n\t{\n";
+            classSrc += "\t\tObject[] args = new Object[" + com.Arguments.Count.ToString() + "];\n";
+            int i = 0;
+            foreach (KeyValuePair<string, string> arg in com.Arguments)
+            {
+                classSrc += "\t\targs[" + i.ToString() + "] = " + Util.Md5Hash(arg.Key) + "  " + ";\n";
+                i++;
+            }
+            classSrc += "\t\tGetCommander(\"" + m_name + "\").Run(\"" + com.Name + "\", args);\n";
+            classSrc += "\t}\n";
+        }
+        classSrc += "}\n";
+
+        return classSrc;
+    }
+
+    /// <summary>
+    /// Runs a specified function with attached arguments
+    /// *** <b>DO NOT CALL DIRECTLY.</b> ***
+    /// Call ProcessConsoleCommand instead if handling human input.
+    /// </summary>
+    /// <param name="function">The function name to call</param>
+    /// <param name="args">The function parameters</param>
+    public void Run(string function, object[] args)
+    {
+        m_commands[function].Run(args);
+    }
+
+    public void ProcessConsoleCommand(string function, string[] args)
+    {
+        if (m_commands.ContainsKey(function))
+        {
+            if (args.Length > 0 && args[0] == "help")
+            {
+                m_commands[function].ShowConsoleHelp();
             }
             else
             {
-                if (function == "api")
-                {
-                    m_log.Info(GenerateRuntimeAPI());
-                }
-                else
-                {
-                    if (function != "help")
-                        Console.WriteLine("ERROR: Invalid command - No such command exists");
-
-                    Console.Write(Help);
-                }
+                m_commands[function].Run(args);
             }
         }
-
-        #endregion
-
-        private string EscapeRuntimeAPICommand(string command)
+        else
         {
-            command = command.Replace('-', '_');
-            StringBuilder tmp = new StringBuilder(command);
-            tmp[0] = tmp[0].ToString().ToUpper().ToCharArray()[0];
+            if (function == "api")
+            {
+                m_log.Info(GenerateRuntimeAPI());
+            }
+            else
+            {
+                if (function != "help")
+                    Console.WriteLine("ERROR: Invalid command - No such command exists");
 
-            return tmp.ToString();
+                Console.Write(Help);
+            }
         }
+    }
+
+    #endregion
+
+    private string EscapeRuntimeAPICommand(string command)
+    {
+        command = command.Replace('-', '_');
+        StringBuilder tmp = new StringBuilder(command);
+        tmp[0] = tmp[0].ToString().ToUpper().ToCharArray()[0];
+
+        return tmp.ToString();
     }
 }

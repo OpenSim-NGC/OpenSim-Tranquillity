@@ -25,256 +25,232 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
-using System.Threading;
-using System.Collections;
-using System.Collections.Generic;
 using System.Runtime.Serialization;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Region.CoreModules;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Services.Interfaces;
-using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.ScriptEngine.Shared
+namespace OpenSim.Region.ScriptEngine.Shared;
+
+[Serializable]
+public class EventAbortException : Exception
 {
-    [Serializable]
-    public class EventAbortException : Exception
+    public EventAbortException()
     {
-        public EventAbortException()
-        {
-        }
-
-        protected EventAbortException(
-                SerializationInfo info,
-                StreamingContext context)
-        {
-        }
     }
 
-    [Serializable]
-    public class SelfDeleteException : Exception
+    protected EventAbortException(
+            SerializationInfo info,
+            StreamingContext context)
     {
-        public SelfDeleteException()
-        {
-        }
+    }
+}
 
-        protected SelfDeleteException(
-                SerializationInfo info,
-                StreamingContext context)
-        {
-        }
+[Serializable]
+public class SelfDeleteException : Exception
+{
+    public SelfDeleteException()
+    {
     }
 
-    [Serializable]
-    public class ScriptDeleteException : Exception
+    protected SelfDeleteException(
+            SerializationInfo info,
+            StreamingContext context)
     {
-        public ScriptDeleteException()
-        {
-        }
+    }
+}
 
-        protected ScriptDeleteException(
-                SerializationInfo info,
-                StreamingContext context)
-        {
-        }
+[Serializable]
+public class ScriptDeleteException : Exception
+{
+    public ScriptDeleteException()
+    {
     }
 
-    /// <summary>
-    /// Used to signal when the script is stopping in co-operation with the script engine
-    /// (instead of through Thread.Abort()).
-    /// </summary>
-    [Serializable]
-    public class ScriptCoopStopException : Exception
+    protected ScriptDeleteException(
+            SerializationInfo info,
+            StreamingContext context)
     {
-        public ScriptCoopStopException()
-        {
-        }
+    }
+}
 
-        protected ScriptCoopStopException(
-                SerializationInfo info,
-                StreamingContext context)
-        {
-        }
+/// <summary>
+/// Used to signal when the script is stopping in co-operation with the script engine
+/// (instead of through Thread.Abort()).
+/// </summary>
+[Serializable]
+public class ScriptCoopStopException : Exception
+{
+    public ScriptCoopStopException()
+    {
     }
 
-    public class DetectParams
+    protected ScriptCoopStopException(
+            SerializationInfo info,
+            StreamingContext context)
     {
-        public const int AGENT = 1;
-        public const int ACTIVE = 2;
-        public const int PASSIVE = 4;
-        public const int SCRIPTED = 8;
-        public const int OS_NPC = 0x01000000;
+    }
+}
 
-        public DetectParams()
+public class DetectParams
+{
+    public const int AGENT = 1;
+    public const int ACTIVE = 2;
+    public const int PASSIVE = 4;
+    public const int SCRIPTED = 8;
+    public const int OS_NPC = 0x01000000;
+
+    public DetectParams()
+    {
+        Key = UUID.Zero;
+        OffsetPos = new LSL_Types.Vector3();
+        LinkNum = 0;
+        Group = UUID.Zero;
+        Name = String.Empty;
+        Owner = UUID.Zero;
+        Position = new LSL_Types.Vector3();
+        Rotation = new LSL_Types.Quaternion();
+        Type = 0;
+        Velocity = new LSL_Types.Vector3();
+        initializeSurfaceTouch();
+    }
+
+    public UUID Key;
+    public LSL_Types.Vector3 OffsetPos;
+    public int LinkNum;
+    public UUID Group;
+    public string Name;
+    public UUID Owner;
+    public LSL_Types.Vector3 Position;
+    public LSL_Types.Quaternion Rotation;
+    public int Type;
+    public LSL_Types.Vector3 Velocity;
+
+    private LSL_Types.Vector3 touchST;
+    public LSL_Types.Vector3 TouchST { get { return touchST; } }
+
+    private LSL_Types.Vector3 touchNormal;
+    public LSL_Types.Vector3 TouchNormal { get { return touchNormal; } }
+
+    private LSL_Types.Vector3 touchBinormal;
+    public LSL_Types.Vector3 TouchBinormal { get { return touchBinormal; } }
+
+    private LSL_Types.Vector3 touchPos;
+    public LSL_Types.Vector3 TouchPos { get { return touchPos; } }
+
+    private LSL_Types.Vector3 touchUV;
+    public LSL_Types.Vector3 TouchUV { get { return touchUV; } }
+
+    private int touchFace;
+    public int TouchFace { get { return touchFace; } }
+
+    // This can be done in two places including the constructor
+    // so be carefull what gets added here
+    private void initializeSurfaceTouch()
+    {
+        touchST = new LSL_Types.Vector3(-1.0, -1.0, 0.0);
+        touchNormal = new LSL_Types.Vector3();
+        touchBinormal = new LSL_Types.Vector3();
+        touchPos = new LSL_Types.Vector3();
+        touchUV = new LSL_Types.Vector3(-1.0, -1.0, 0.0);
+        touchFace = -1;
+    }
+
+    /*
+     * Set up the surface touch detected values
+     */
+    public SurfaceTouchEventArgs SurfaceTouchArgs
+    {
+        set
         {
-            Key = UUID.Zero;
-            OffsetPos = new LSL_Types.Vector3();
-            LinkNum = 0;
-            Group = UUID.Zero;
-            Name = String.Empty;
-            Owner = UUID.Zero;
-            Position = new LSL_Types.Vector3();
-            Rotation = new LSL_Types.Quaternion();
-            Type = 0;
-            Velocity = new LSL_Types.Vector3();
-            initializeSurfaceTouch();
-        }
-
-        public UUID Key;
-        public LSL_Types.Vector3 OffsetPos;
-        public int LinkNum;
-        public UUID Group;
-        public string Name;
-        public UUID Owner;
-        public LSL_Types.Vector3 Position;
-        public LSL_Types.Quaternion Rotation;
-        public int Type;
-        public LSL_Types.Vector3 Velocity;
-
-        private LSL_Types.Vector3 touchST;
-        public LSL_Types.Vector3 TouchST { get { return touchST; } }
-
-        private LSL_Types.Vector3 touchNormal;
-        public LSL_Types.Vector3 TouchNormal { get { return touchNormal; } }
-
-        private LSL_Types.Vector3 touchBinormal;
-        public LSL_Types.Vector3 TouchBinormal { get { return touchBinormal; } }
-
-        private LSL_Types.Vector3 touchPos;
-        public LSL_Types.Vector3 TouchPos { get { return touchPos; } }
-
-        private LSL_Types.Vector3 touchUV;
-        public LSL_Types.Vector3 TouchUV { get { return touchUV; } }
-
-        private int touchFace;
-        public int TouchFace { get { return touchFace; } }
-
-        // This can be done in two places including the constructor
-        // so be carefull what gets added here
-        private void initializeSurfaceTouch()
-        {
-            touchST = new LSL_Types.Vector3(-1.0, -1.0, 0.0);
-            touchNormal = new LSL_Types.Vector3();
-            touchBinormal = new LSL_Types.Vector3();
-            touchPos = new LSL_Types.Vector3();
-            touchUV = new LSL_Types.Vector3(-1.0, -1.0, 0.0);
-            touchFace = -1;
-        }
-
-        /*
-         * Set up the surface touch detected values
-         */
-        public SurfaceTouchEventArgs SurfaceTouchArgs
-        {
-            set
+            if (value == null)
             {
-                if (value == null)
-                {
-                    // Initialise to defaults if no value
-                    initializeSurfaceTouch();
-                }
-                else
-                {
-                    // Set the values from the touch data provided by the client
-                    touchST = new LSL_Types.Vector3(value.STCoord);
-                    touchUV = new LSL_Types.Vector3(value.UVCoord);
-                    touchNormal = new LSL_Types.Vector3(value.Normal);
-                    touchBinormal = new LSL_Types.Vector3(value.Binormal);
-                    touchPos = new LSL_Types.Vector3(value.Position);
-                    touchFace = value.FaceIndex;
-                }
+                // Initialise to defaults if no value
+                initializeSurfaceTouch();
             }
-        }
-
-        public void Populate(Scene scene)
-        {
-            SceneObjectPart part = scene.GetSceneObjectPart(Key);
-            if (part == null) // Avatar, maybe?
-            {
-                ScenePresence presence = scene.GetScenePresence(Key);
-                if (presence == null)
-                    return;
-
-                Name = presence.Firstname + " " + presence.Lastname;
-
-                Owner = Key;
-                Position = new LSL_Types.Vector3(presence.AbsolutePosition);
-                Rotation = new LSL_Types.Quaternion(presence.Rotation);
-                Velocity = new LSL_Types.Vector3(presence.Velocity);
-
-                Type = 0x01; // Avatar
-                if (presence.PresenceType == PresenceType.Npc)
-                    Type = 0x20;
-
-                if (presence.Velocity != Vector3.Zero)
-                    Type |= ACTIVE;
-
-                Group = presence.ControllingClient.ActiveGroupId;
-
-                return;
-            }
-
-            part = part.ParentGroup.RootPart; // We detect objects only
-
-            LinkNum = 0; // Not relevant
-
-            Group = part.GroupID;
-            Name = part.Name;
-            Owner = part.OwnerID;
-            if (part.Velocity.IsZero())
-                Type = PASSIVE;
             else
-                Type = ACTIVE;
-
-            foreach (SceneObjectPart p in part.ParentGroup.Parts)
             {
-                if (p.Inventory.ContainsScripts())
-                {
-                    Type |= SCRIPTED; // Scripted
-                    break;
-                }
+                // Set the values from the touch data provided by the client
+                touchST = new LSL_Types.Vector3(value.STCoord);
+                touchUV = new LSL_Types.Vector3(value.UVCoord);
+                touchNormal = new LSL_Types.Vector3(value.Normal);
+                touchBinormal = new LSL_Types.Vector3(value.Binormal);
+                touchPos = new LSL_Types.Vector3(value.Position);
+                touchFace = value.FaceIndex;
             }
+        }
+    }
 
-            Position = new LSL_Types.Vector3(part.AbsolutePosition);
+    public void Populate(Scene scene)
+    {
+        SceneObjectPart part = scene.GetSceneObjectPart(Key);
+        if (part == null) // Avatar, maybe?
+        {
+            ScenePresence presence = scene.GetScenePresence(Key);
+            if (presence == null)
+                return;
 
-            Quaternion wr = part.ParentGroup.GroupRotation;
-            Rotation = new LSL_Types.Quaternion(wr.X, wr.Y, wr.Z, wr.W);
+            Name = presence.Firstname + " " + presence.Lastname;
 
-            Velocity = new LSL_Types.Vector3(part.Velocity);
+            Owner = Key;
+            Position = new LSL_Types.Vector3(presence.AbsolutePosition);
+            Rotation = new LSL_Types.Quaternion(presence.Rotation);
+            Velocity = new LSL_Types.Vector3(presence.Velocity);
+
+            Type = 0x01; // Avatar
+            if (presence.PresenceType == PresenceType.Npc)
+                Type = 0x20;
+
+            if (presence.Velocity != Vector3.Zero)
+                Type |= ACTIVE;
+
+            Group = presence.ControllingClient.ActiveGroupId;
+
+            return;
         }
 
-        public void Populate(Scene scene, DetectedObject obj)
+        part = part.ParentGroup.RootPart; // We detect objects only
+
+        LinkNum = 0; // Not relevant
+
+        Group = part.GroupID;
+        Name = part.Name;
+        Owner = part.OwnerID;
+        if (part.Velocity.IsZero())
+            Type = PASSIVE;
+        else
+            Type = ACTIVE;
+
+        foreach (SceneObjectPart p in part.ParentGroup.Parts)
         {
-            if(obj.keyUUID.IsZero()) // land
+            if (p.Inventory.ContainsScripts())
             {
-                Position = new LSL_Types.Vector3(obj.posVector);
-                Rotation.s = 1.0;
-                return;
+                Type |= SCRIPTED; // Scripted
+                break;
             }
+        }
 
-            if((obj.colliderType & 0x21) != 0) // avatar or npc
-            {
-                ScenePresence presence = scene.GetScenePresence(obj.keyUUID);
-                if (presence == null)
-                    return;
+        Position = new LSL_Types.Vector3(part.AbsolutePosition);
 
-                Name = obj.nameStr;
-                Key = obj.keyUUID;
-                Owner = obj.ownerUUID;
-                Group = obj.groupUUID;
-                Position = new LSL_Types.Vector3(obj.posVector);
-                Rotation = new LSL_Types.Quaternion(obj.rotQuat);
-                Velocity = new LSL_Types.Vector3(obj.velVector);
-                LinkNum = obj.linkNumber;
-                Type = obj.colliderType;
-                return;
-            }
+        Quaternion wr = part.ParentGroup.GroupRotation;
+        Rotation = new LSL_Types.Quaternion(wr.X, wr.Y, wr.Z, wr.W);
 
-            SceneObjectPart part = scene.GetSceneObjectPart(obj.keyUUID);
-            if(part == null)
+        Velocity = new LSL_Types.Vector3(part.Velocity);
+    }
+
+    public void Populate(Scene scene, DetectedObject obj)
+    {
+        if(obj.keyUUID.IsZero()) // land
+        {
+            Position = new LSL_Types.Vector3(obj.posVector);
+            Rotation.s = 1.0;
+            return;
+        }
+
+        if((obj.colliderType & 0x21) != 0) // avatar or npc
+        {
+            ScenePresence presence = scene.GetScenePresence(obj.keyUUID);
+            if (presence == null)
                 return;
 
             Name = obj.nameStr;
@@ -285,45 +261,59 @@ namespace OpenSim.Region.ScriptEngine.Shared
             Rotation = new LSL_Types.Quaternion(obj.rotQuat);
             Velocity = new LSL_Types.Vector3(obj.velVector);
             LinkNum = obj.linkNumber;
-            if(obj.velVector.IsZero())
-                Type = 4;
-            else
-                Type = 2;
+            Type = obj.colliderType;
+            return;
+        }
 
-            part = part.ParentGroup.RootPart;
-            foreach (SceneObjectPart p in part.ParentGroup.Parts)
+        SceneObjectPart part = scene.GetSceneObjectPart(obj.keyUUID);
+        if(part == null)
+            return;
+
+        Name = obj.nameStr;
+        Key = obj.keyUUID;
+        Owner = obj.ownerUUID;
+        Group = obj.groupUUID;
+        Position = new LSL_Types.Vector3(obj.posVector);
+        Rotation = new LSL_Types.Quaternion(obj.rotQuat);
+        Velocity = new LSL_Types.Vector3(obj.velVector);
+        LinkNum = obj.linkNumber;
+        if(obj.velVector.IsZero())
+            Type = 4;
+        else
+            Type = 2;
+
+        part = part.ParentGroup.RootPart;
+        foreach (SceneObjectPart p in part.ParentGroup.Parts)
+        {
+            if (p.Inventory.ContainsScripts())
             {
-                if (p.Inventory.ContainsScripts())
-                {
-                    // at sl a physical prim is active also if has active scripts
-                    // assuming all scripts are in run state to save time
-                    if((part.Flags & PrimFlags.Physics) != 0 )
-                        Type = 10; // script + active
-                    else
-                       Type |= SCRIPTED; // Scripted
-                    break;
-                }
+                // at sl a physical prim is active also if has active scripts
+                // assuming all scripts are in run state to save time
+                if((part.Flags & PrimFlags.Physics) != 0 )
+                    Type = 10; // script + active
+                else
+                   Type |= SCRIPTED; // Scripted
+                break;
             }
         }
     }
+}
 
-    /// <summary>
-    /// Holds all the data required to execute a scripting event.
-    /// </summary>
-    public class EventParams
+/// <summary>
+/// Holds all the data required to execute a scripting event.
+/// </summary>
+public class EventParams
+{
+    public EventParams(string eventName, object[] eventParams, DetectParams[] detectParams)
     {
-        public EventParams(string eventName, object[] eventParams, DetectParams[] detectParams)
-        {
-            EventName = eventName;
-            Params = eventParams;
-            DetectParams = detectParams;
-        }
-
-        public string EventName;
-        public object[] Params;
-        public DetectParams[] DetectParams;
-
-        public static EventParams StateEntryParams = new EventParams("state_entry", new object[0], new DetectParams[0]);
+        EventName = eventName;
+        Params = eventParams;
+        DetectParams = detectParams;
     }
 
+    public string EventName;
+    public object[] Params;
+    public DetectParams[] DetectParams;
+
+    public static EventParams StateEntryParams = new EventParams("state_entry", new object[0], new DetectParams[0]);
 }

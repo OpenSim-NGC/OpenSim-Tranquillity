@@ -27,42 +27,41 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+/// <summary>
+/// Common base class for inventory nodes of different types (files, folders, etc.)
+/// </summary>
+public class InventoryNodeBase
 {
     /// <summary>
-    /// Common base class for inventory nodes of different types (files, folders, etc.)
+    /// The name of the node (64 characters or less)
     /// </summary>
-    public class InventoryNodeBase
+
+    public virtual string Name
     {
-        /// <summary>
-        /// The name of the node (64 characters or less)
-        /// </summary>
-
-        public virtual string Name
-        {
-            get { return UTF8Name == null ? string.Empty : UTF8Name.ToString(); }
-            set { UTF8Name = string.IsNullOrEmpty(value) ? null : new osUTF8(value); }
-        }
-        public osUTF8 UTF8Name;
-
-        /// <summary>
-        /// A UUID containing the ID for the inventory node itself
-        /// </summary>
-        public UUID ID
-        {
-            get { return m_id; }
-            set { m_id = value; }
-        }
-        private UUID m_id;
-
-        /// <summary>
-        /// The agent who's inventory this is contained by
-        /// </summary>
-        public virtual UUID Owner
-        {
-            get { return m_owner; }
-            set { m_owner = value; }
-        }
-        private UUID m_owner;
+        get { return UTF8Name == null ? string.Empty : UTF8Name.ToString(); }
+        set { UTF8Name = string.IsNullOrEmpty(value) ? null : new osUTF8(value); }
     }
+    public osUTF8 UTF8Name;
+
+    /// <summary>
+    /// A UUID containing the ID for the inventory node itself
+    /// </summary>
+    public UUID ID
+    {
+        get { return m_id; }
+        set { m_id = value; }
+    }
+    private UUID m_id;
+
+    /// <summary>
+    /// The agent who's inventory this is contained by
+    /// </summary>
+    public virtual UUID Owner
+    {
+        get { return m_owner; }
+        set { m_owner = value; }
+    }
+    private UUID m_owner;
 }

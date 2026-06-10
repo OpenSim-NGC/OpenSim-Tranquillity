@@ -34,76 +34,75 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Inventory
+namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Inventory;
+
+public class InventoryServiceInConnectorModule : ISharedRegionModule
 {
-    public class InventoryServiceInConnectorModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static bool m_Enabled = false;
+
+    private IConfigSource m_Config;
+    bool m_Registered = false;
+
+    #region Region Module interface
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private static bool m_Enabled = false;
-
-        private IConfigSource m_Config;
-        bool m_Registered = false;
-
-        #region Region Module interface
-
-        public void Initialise(IConfigSource config)
+        m_Config = config;
+        IConfig moduleConfig = config.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            m_Config = config;
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+            m_Enabled = moduleConfig.GetBoolean("InventoryServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("InventoryServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_log.Info("[INVENTORY IN CONNECTOR]: Inventory Service In Connector enabled");
-                }
+                m_log.Info("[INVENTORY IN CONNECTOR]: Inventory Service In Connector enabled");
             }
         }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "RegionInventoryService"; }
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            if (!m_Registered)
-            {
-                m_Registered = true;
-
-                m_log.Info("[RegionInventoryService]: Starting...");
-
-                Object[] args = new Object[] { m_Config, MainServer.Instance, "HGInventoryService" };
-
-                ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:XInventoryInConnector", args);
-            }
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        #endregion
-
     }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public string Name
+    {
+        get { return "RegionInventoryService"; }
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        if (!m_Registered)
+        {
+            m_Registered = true;
+
+            m_log.Info("[RegionInventoryService]: Starting...");
+
+            Object[] args = new Object[] { m_Config, MainServer.Instance, "HGInventoryService" };
+
+            ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:XInventoryInConnector", args);
+        }
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    #endregion
+
 }

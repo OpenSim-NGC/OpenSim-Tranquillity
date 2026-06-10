@@ -25,16 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Framework.Capabilities
-{
-    [LLSDType("MAP")]
-    public class LLSDTest
-    {
-        public int Test1 = 20;
-        public int Test2 = 10;
+namespace OpenSim.Framework.Capabilities;
 
-        public LLSDTest()
-        {
-        }
+[LLSDType("MAP")]
+public class LLSDTest
+{
+    public int Test1 = 20;
+    public int Test2 = 10;
+
+    public LLSDTest()
+    {
     }
 }

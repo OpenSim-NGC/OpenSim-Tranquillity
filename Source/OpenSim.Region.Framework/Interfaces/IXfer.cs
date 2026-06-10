@@ -25,10 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IXfer
 {
-    public interface IXfer
-    {
-        bool AddNewFile(string fileName, byte[] data);
-    }
+    bool AddNewFile(string fileName, byte[] data);
 }

@@ -24,127 +24,124 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
-using System.Net;
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public sealed class ErrorCode
 {
-    public sealed class ErrorCode
+    private ErrorCode() {}
+
+    public const int ParseError = -32700;
+    public const int InvalidRequest = -32600;
+    public const int MethodNotFound = -32601;
+    public const int InvalidParams = -32602;
+    public const int InternalError = -32604;
+
+}
+
+public class JsonRpcError
+{
+    internal OSDMap Error = new OSDMap();
+
+    public int Code
     {
-        private ErrorCode() {}
-
-        public const int ParseError = -32700;
-        public const int InvalidRequest = -32600;
-        public const int MethodNotFound = -32601;
-        public const int InvalidParams = -32602;
-        public const int InternalError = -32604;
-
-    }
-
-    public class JsonRpcError
-    {
-        internal OSDMap Error = new OSDMap();
-
-        public int Code
+        get
         {
-            get
-            {
-                if (Error.ContainsKey("code"))
-                    return Error["code"].AsInteger();
-                else
-                    return 0;
-            }
-            set
-            {
-                Error["code"] = OSD.FromInteger(value);
-            }
+            if (Error.ContainsKey("code"))
+                return Error["code"].AsInteger();
+            else
+                return 0;
         }
-
-        public string Message
+        set
         {
-            get
-            {
-                if (Error.ContainsKey("message"))
-                    return Error["message"].AsString();
-                else
-                    return null;
-            }
-            set
-            {
-                Error["message"] = OSD.FromString(value);
-            }
-        }
-
-        public OSD Data
-        {
-            get; set;
+            Error["code"] = OSD.FromInteger(value);
         }
     }
 
-    public class JsonRpcResponse
+    public string Message
     {
-        public string JsonRpc
+        get
         {
-            get
-            {
-                return Reply["jsonrpc"].AsString();
-            }
-            set
-            {
-                Reply["jsonrpc"] = OSD.FromString(value);
-            }
+            if (Error.ContainsKey("message"))
+                return Error["message"].AsString();
+            else
+                return null;
+        }
+        set
+        {
+            Error["message"] = OSD.FromString(value);
+        }
+    }
+
+    public OSD Data
+    {
+        get; set;
+    }
+}
+
+public class JsonRpcResponse
+{
+    public string JsonRpc
+    {
+        get
+        {
+            return Reply["jsonrpc"].AsString();
+        }
+        set
+        {
+            Reply["jsonrpc"] = OSD.FromString(value);
+        }
+    }
+
+    public string Id
+    {
+        get
+        {
+            return Reply["id"].AsString();
+        }
+        set
+        {
+            Reply["id"] = OSD.FromString(value);
+        }
+    }
+
+    public OSD Result
+    {
+        get; set;
+    }
+
+    public JsonRpcError Error
+    {
+        get; set;
+    }
+
+    public OSDMap Reply = new OSDMap();
+
+    public JsonRpcResponse()
+    {
+        Error = new JsonRpcError();
+    }
+
+    public string Serialize()
+    {
+        if (Result != null)
+            Reply["result"] = Result;
+
+        if (Error.Code != 0)
+        {
+            Reply["error"] = (OSD)Error.Error;
         }
 
-        public string Id
+        string result = string.Empty;
+        try
         {
-            get
-            {
-                return Reply["id"].AsString();
-            }
-            set
-            {
-                Reply["id"] = OSD.FromString(value);
-            }
+            result = OSDParser.SerializeJsonString(Reply);
         }
-
-        public OSD Result
+        catch
         {
-            get; set;
+
         }
-
-        public JsonRpcError Error
-        {
-            get; set;
-        }
-
-        public OSDMap Reply = new OSDMap();
-
-        public JsonRpcResponse()
-        {
-            Error = new JsonRpcError();
-        }
-
-        public string Serialize()
-        {
-            if (Result != null)
-                Reply["result"] = Result;
-
-            if (Error.Code != 0)
-            {
-                Reply["error"] = (OSD)Error.Error;
-            }
-
-            string result = string.Empty;
-            try
-            {
-                result = OSDParser.SerializeJsonString(Reply);
-            }
-            catch
-            {
-
-            }
-            return result;
-        }
+        return result;
     }
 }

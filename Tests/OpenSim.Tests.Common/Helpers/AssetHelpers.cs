@@ -33,39 +33,39 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+public class AssetHelpers
 {
-    public class AssetHelpers
+    /// <summary>
+    /// Create a notecard asset with a random uuids and dummy text.
+    /// </summary>
+    /// <returns></returns>
+    public static AssetBase CreateNotecardAsset()
     {
-        /// <summary>
-        /// Create a notecard asset with a random uuids and dummy text.
-        /// </summary>
-        /// <returns></returns>
-        public static AssetBase CreateNotecardAsset()
-        {
-            return CreateNotecardAsset(UUID.Random());
-        }
+        return CreateNotecardAsset(UUID.Random());
+    }
 
-        /// <summary>
-        /// Create a notecard asset with dummy text and a random owner.
-        /// </summary>
-        /// <param name="assetId">/param>
-        /// <returns></returns>
-        public static AssetBase CreateNotecardAsset(UUID assetId)
-        {
-            return CreateNotecardAsset(assetId, "hello");
-        }
+    /// <summary>
+    /// Create a notecard asset with dummy text and a random owner.
+    /// </summary>
+    /// <param name="assetId">/param>
+    /// <returns></returns>
+    public static AssetBase CreateNotecardAsset(UUID assetId)
+    {
+        return CreateNotecardAsset(assetId, "hello");
+    }
 
-        /// <summary>
-        /// Create a notecard asset with a random owner.
-        /// </summary>
-        /// <param name="assetId">/param>
-        /// <param name="text"></param>
-        /// <returns></returns>
-        public static AssetBase CreateNotecardAsset(UUID assetId, string text)
-        {
-            return CreateAsset(assetId, AssetType.Notecard, text, UUID.Random());
-        }
+    /// <summary>
+    /// Create a notecard asset with a random owner.
+    /// </summary>
+    /// <param name="assetId">/param>
+    /// <param name="text"></param>
+    /// <returns></returns>
+    public static AssetBase CreateNotecardAsset(UUID assetId, string text)
+    {
+        return CreateAsset(assetId, AssetType.Notecard, text, UUID.Random());
+    }
 
 //        /// <summary>
 //        /// Create and store a notecard asset with a random uuid and dummy text.
@@ -79,90 +79,89 @@ namespace OpenSim.Tests.Common
 //            return asset;
 //        }
 
-        /// <summary>
-        /// Create an asset from the given object.
-        /// </summary>
-        /// <param name="assetUuidTail">
-        /// The hexadecimal last part of the UUID for the asset created.  A UUID of the form "00000000-0000-0000-0000-{0:XD12}"
-        /// will be used.
-        /// </param>
-        /// <param name="sog"></param>
-        /// <returns></returns>
-        public static AssetBase CreateAsset(int assetUuidTail, SceneObjectGroup sog)
-        {
-            return CreateAsset(new UUID(string.Format("00000000-0000-0000-0000-{0:X12}", assetUuidTail)), sog);
-        }
+    /// <summary>
+    /// Create an asset from the given object.
+    /// </summary>
+    /// <param name="assetUuidTail">
+    /// The hexadecimal last part of the UUID for the asset created.  A UUID of the form "00000000-0000-0000-0000-{0:XD12}"
+    /// will be used.
+    /// </param>
+    /// <param name="sog"></param>
+    /// <returns></returns>
+    public static AssetBase CreateAsset(int assetUuidTail, SceneObjectGroup sog)
+    {
+        return CreateAsset(new UUID(string.Format("00000000-0000-0000-0000-{0:X12}", assetUuidTail)), sog);
+    }
 
-        /// <summary>
-        /// Create an asset from the given object.
-        /// </summary>
-        /// <param name="assetUuid"></param>
-        /// <param name="sog"></param>
-        /// <returns></returns>
-        public static AssetBase CreateAsset(UUID assetUuid, SceneObjectGroup sog)
-        {
-            return CreateAsset(
-                assetUuid,
-                AssetType.Object,
-                Encoding.ASCII.GetBytes(SceneObjectSerializer.ToOriginalXmlFormat(sog)),
-                sog.OwnerID);
-        }
+    /// <summary>
+    /// Create an asset from the given object.
+    /// </summary>
+    /// <param name="assetUuid"></param>
+    /// <param name="sog"></param>
+    /// <returns></returns>
+    public static AssetBase CreateAsset(UUID assetUuid, SceneObjectGroup sog)
+    {
+        return CreateAsset(
+            assetUuid,
+            AssetType.Object,
+            Encoding.ASCII.GetBytes(SceneObjectSerializer.ToOriginalXmlFormat(sog)),
+            sog.OwnerID);
+    }
 
-        /// <summary>
-        /// Create an asset from the given scene object.
-        /// </summary>
-        /// <param name="assetUuidTail">
-        /// The hexadecimal last part of the UUID for the asset created.  A UUID of the form "00000000-0000-0000-0000-{0:XD12}"
-        /// will be used.
-        /// </param>
-        /// <param name="coa"></param>
-        /// <returns></returns>
-        public static AssetBase CreateAsset(int assetUuidTail, CoalescedSceneObjects coa)
-        {
-            return CreateAsset(new UUID(string.Format("00000000-0000-0000-0000-{0:X12}", assetUuidTail)), coa);
-        }
+    /// <summary>
+    /// Create an asset from the given scene object.
+    /// </summary>
+    /// <param name="assetUuidTail">
+    /// The hexadecimal last part of the UUID for the asset created.  A UUID of the form "00000000-0000-0000-0000-{0:XD12}"
+    /// will be used.
+    /// </param>
+    /// <param name="coa"></param>
+    /// <returns></returns>
+    public static AssetBase CreateAsset(int assetUuidTail, CoalescedSceneObjects coa)
+    {
+        return CreateAsset(new UUID(string.Format("00000000-0000-0000-0000-{0:X12}", assetUuidTail)), coa);
+    }
 
-        /// <summary>
-        /// Create an asset from the given scene object.
-        /// </summary>
-        /// <param name="assetUuid"></param>
-        /// <param name="coa"></param>
-        /// <returns></returns>
-        public static AssetBase CreateAsset(UUID assetUuid, CoalescedSceneObjects coa)
-        {
-            return CreateAsset(
-                assetUuid,
-                AssetType.Object,
-                Encoding.ASCII.GetBytes(CoalescedSceneObjectsSerializer.ToXml(coa)),
-                coa.CreatorId);
-        }
+    /// <summary>
+    /// Create an asset from the given scene object.
+    /// </summary>
+    /// <param name="assetUuid"></param>
+    /// <param name="coa"></param>
+    /// <returns></returns>
+    public static AssetBase CreateAsset(UUID assetUuid, CoalescedSceneObjects coa)
+    {
+        return CreateAsset(
+            assetUuid,
+            AssetType.Object,
+            Encoding.ASCII.GetBytes(CoalescedSceneObjectsSerializer.ToXml(coa)),
+            coa.CreatorId);
+    }
 
-        /// <summary>
-        /// Create an asset from the given data.
-        /// </summary>
-        public static AssetBase CreateAsset(UUID assetUuid, AssetType assetType, string text, UUID creatorID)
-        {
-            AssetNotecard anc = new AssetNotecard();
-            anc.BodyText = text;
-            anc.Encode();
+    /// <summary>
+    /// Create an asset from the given data.
+    /// </summary>
+    public static AssetBase CreateAsset(UUID assetUuid, AssetType assetType, string text, UUID creatorID)
+    {
+        AssetNotecard anc = new AssetNotecard();
+        anc.BodyText = text;
+        anc.Encode();
 
-            return CreateAsset(assetUuid, assetType, anc.AssetData, creatorID);
-        }
+        return CreateAsset(assetUuid, assetType, anc.AssetData, creatorID);
+    }
 
-        /// <summary>
-        /// Create an asset from the given data.
-        /// </summary>
-        public static AssetBase CreateAsset(UUID assetUuid, AssetType assetType, byte[] data, UUID creatorID)
-        {
-            AssetBase asset = new AssetBase(assetUuid, assetUuid.ToString(), (sbyte)assetType, creatorID.ToString());
-            asset.Data = data;
-            return asset;
-        }
+    /// <summary>
+    /// Create an asset from the given data.
+    /// </summary>
+    public static AssetBase CreateAsset(UUID assetUuid, AssetType assetType, byte[] data, UUID creatorID)
+    {
+        AssetBase asset = new AssetBase(assetUuid, assetUuid.ToString(), (sbyte)assetType, creatorID.ToString());
+        asset.Data = data;
+        return asset;
+    }
 
-        public static string ReadAssetAsString(IAssetService assetService, UUID uuid)
-        {
-            byte[] assetData = assetService.GetData(uuid.ToString());
-            return Encoding.ASCII.GetString(assetData);
-        }
+    public static string ReadAssetAsString(IAssetService assetService, UUID uuid)
+    {
+        byte[] assetData = assetService.GetData(uuid.ToString());
+        return Encoding.ASCII.GetString(assetData);
     }
 }

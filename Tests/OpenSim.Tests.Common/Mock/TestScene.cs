@@ -31,42 +31,41 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+public class TestScene : Scene
 {
-    public class TestScene : Scene
+    public TestScene(
+        RegionInfo regInfo, AgentCircuitManager authen,
+        ISimulationDataService simDataService, IEstateDataService estateDataService,
+        IConfigSource config, string simulatorVersion)
+        : base(regInfo, authen, simDataService, estateDataService,
+               config, simulatorVersion)
     {
-        public TestScene(
-            RegionInfo regInfo, AgentCircuitManager authen,
-            ISimulationDataService simDataService, IEstateDataService estateDataService,
-            IConfigSource config, string simulatorVersion)
-            : base(regInfo, authen, simDataService, estateDataService,
-                   config, simulatorVersion)
-        {
-        }
+    }
 
-        ~TestScene()
-        {
-            //Console.WriteLine("TestScene destructor called for {0}", RegionInfo.RegionName);
-            Console.WriteLine("TestScene destructor called");
-        }
+    ~TestScene()
+    {
+        //Console.WriteLine("TestScene destructor called for {0}", RegionInfo.RegionName);
+        Console.WriteLine("TestScene destructor called");
+    }
 
-        /// <summary>
-        /// Temporarily override session authentication for tests (namely teleport).
-        /// </summary>
-        /// <remarks>
-        /// TODO: This needs to be mocked out properly.
-        /// </remarks>
-        /// <param name="agent"></param>
-        /// <returns></returns>
-        public override bool VerifyUserPresence(AgentCircuitData agent, out string reason)
-        {
-            reason = String.Empty;
-            return true;
-        }
+    /// <summary>
+    /// Temporarily override session authentication for tests (namely teleport).
+    /// </summary>
+    /// <remarks>
+    /// TODO: This needs to be mocked out properly.
+    /// </remarks>
+    /// <param name="agent"></param>
+    /// <returns></returns>
+    public override bool VerifyUserPresence(AgentCircuitData agent, out string reason)
+    {
+        reason = String.Empty;
+        return true;
+    }
 
-        public AsyncSceneObjectGroupDeleter SceneObjectGroupDeleter
-        {
-            get { return m_asyncSceneObjectDeleter; }
-        }
+    public AsyncSceneObjectGroupDeleter SceneObjectGroupDeleter
+    {
+        get { return m_asyncSceneObjectDeleter; }
     }
 }

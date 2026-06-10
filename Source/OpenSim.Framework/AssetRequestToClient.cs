@@ -27,34 +27,33 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
-{
-    /// <summary>
-    /// This class was created to refactor OutPacket out of AssetCache
-    /// There is a conflict between
-    /// OpenSim.Framework.Communications.Cache.AssetRequest and OpenSim.Framework.AssetRequest
-    /// and unifying them results in a prebuild chicken and egg problem with OpenSim.Framework requiring
-    /// OpenSim.Framework.Communications.Cache while OpenSim.Framework.Communications.Cache
-    /// requiring OpenSim.Framework
-    /// </summary>
-    public class AssetRequestToClient
-    {
-        public UUID RequestAssetID;
-        public AssetBase AssetInf;
-        public AssetBase ImageInfo;
-        public UUID TransferRequestID;
-        public long DataPointer = 0;
-        public int NumPackets = 0;
-        public int PacketCounter = 0;
-        public bool IsTextureRequest;
-        public byte AssetRequestSource = 2;
-        public byte[] Params = null;
-        //public bool AssetInCache;
-        //public int TimeRequested;
-        public int DiscardLevel = -1;
+namespace OpenSim.Framework;
 
-        public AssetRequestToClient()
-        {
-        }
+/// <summary>
+/// This class was created to refactor OutPacket out of AssetCache
+/// There is a conflict between
+/// OpenSim.Framework.Communications.Cache.AssetRequest and OpenSim.Framework.AssetRequest
+/// and unifying them results in a prebuild chicken and egg problem with OpenSim.Framework requiring
+/// OpenSim.Framework.Communications.Cache while OpenSim.Framework.Communications.Cache
+/// requiring OpenSim.Framework
+/// </summary>
+public class AssetRequestToClient
+{
+    public UUID RequestAssetID;
+    public AssetBase AssetInf;
+    public AssetBase ImageInfo;
+    public UUID TransferRequestID;
+    public long DataPointer = 0;
+    public int NumPackets = 0;
+    public int PacketCounter = 0;
+    public bool IsTextureRequest;
+    public byte AssetRequestSource = 2;
+    public byte[] Params = null;
+    //public bool AssetInCache;
+    //public int TimeRequested;
+    public int DiscardLevel = -1;
+
+    public AssetRequestToClient()
+    {
     }
 }

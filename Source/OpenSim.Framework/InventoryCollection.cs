@@ -25,21 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+/// <summary>
+/// Used to serialize a whole inventory for transfer over the network.
+/// </summary>
+public class InventoryCollection
 {
-    /// <summary>
-    /// Used to serialize a whole inventory for transfer over the network.
-    /// </summary>
-    public class InventoryCollection
-    {
-        public List<InventoryFolderBase> Folders;
-        public List<InventoryItemBase> Items;
-        public UUID OwnerID;
-        public UUID FolderID;
-        public int Version;
-        public int Descendents;
-    }
+    public List<InventoryFolderBase> Folders;
+    public List<InventoryItemBase> Items;
+    public UUID OwnerID;
+    public UUID FolderID;
+    public int Version;
+    public int Descendents;
 }

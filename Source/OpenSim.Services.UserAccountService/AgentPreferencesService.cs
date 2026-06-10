@@ -25,58 +25,54 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Data;
-using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Services.UserAccountService
+namespace OpenSim.Services.UserAccountService;
+
+public class AgentPreferencesService : AgentPreferencesServiceBase, IAgentPreferencesService
 {
-    public class AgentPreferencesService : AgentPreferencesServiceBase, IAgentPreferencesService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    public AgentPreferencesService(IConfigSource config) : base(config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_log.Debug("[AGENT PREFERENCES SERVICE]: Starting agent preferences service");
+    }
 
-        public AgentPreferencesService(IConfigSource config) : base(config)
-        {
-            m_log.Debug("[AGENT PREFERENCES SERVICE]: Starting agent preferences service");
-        }
+    public AgentPrefs GetAgentPreferences(UUID principalID)
+    {
+        AgentPreferencesData d = m_Database.GetPrefs(principalID);
+        AgentPrefs prefs = (d == null) ? null : new AgentPrefs(d.Data);
+        return prefs;
+    }
 
-        public AgentPrefs GetAgentPreferences(UUID principalID)
-        {
-            AgentPreferencesData d = m_Database.GetPrefs(principalID);
-            AgentPrefs prefs = (d == null) ? null : new AgentPrefs(d.Data);
-            return prefs;
-        }
+    public bool StoreAgentPreferences(AgentPrefs data)
+    {
+        AgentPreferencesData d = new AgentPreferencesData();
+        d.Data = new Dictionary<string, string>();
+        d.Data["PrincipalID"] = data.PrincipalID.ToString();
+        d.Data["AccessPrefs"] = data.AccessPrefs;
+        d.Data["HoverHeight"] = data.HoverHeight.ToString();
+        d.Data["Language"] = data.Language;
+        d.Data["LanguageIsPublic"] = (data.LanguageIsPublic ? "1" : "0");
+        d.Data["PermEveryone"] = data.PermEveryone.ToString();
+        d.Data["PermGroup"] = data.PermGroup.ToString();
+        d.Data["PermNextOwner"] = data.PermNextOwner.ToString();
+        return m_Database.Store(d);
+    }
 
-        public bool StoreAgentPreferences(AgentPrefs data)
+    public string GetLang(UUID principalID)
+    {
+        AgentPrefs data = GetAgentPreferences(principalID);
+        if (data != null)
         {
-            AgentPreferencesData d = new AgentPreferencesData();
-            d.Data = new Dictionary<string, string>();
-            d.Data["PrincipalID"] = data.PrincipalID.ToString();
-            d.Data["AccessPrefs"] = data.AccessPrefs;
-            d.Data["HoverHeight"] = data.HoverHeight.ToString();
-            d.Data["Language"] = data.Language;
-            d.Data["LanguageIsPublic"] = (data.LanguageIsPublic ? "1" : "0");
-            d.Data["PermEveryone"] = data.PermEveryone.ToString();
-            d.Data["PermGroup"] = data.PermGroup.ToString();
-            d.Data["PermNextOwner"] = data.PermNextOwner.ToString();
-            return m_Database.Store(d);
+            if (data.LanguageIsPublic)
+                return data.Language;
         }
-
-        public string GetLang(UUID principalID)
-        {
-            AgentPrefs data = GetAgentPreferences(principalID);
-            if (data != null)
-            {
-                if (data.LanguageIsPublic)
-                    return data.Language;
-            }
-            return "en-us";
-        }
+        return "en-us";
     }
 }

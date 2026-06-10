@@ -25,27 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
-using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 
-using Nini.Config;
 
+namespace OpenSim.Server.MoneyServer;
 
-namespace OpenSim.Server.MoneyServer
+public interface IMoneyServiceCore
 {
-    public interface IMoneyServiceCore
-    {
-        BaseHttpServer GetHttpServer();
-        Dictionary<string, string> GetSessionDic();
-        Dictionary<string, string> GetSecureSessionDic();
-        Dictionary<string, string> GetWebSessionDic();
-
-        //
-        IConfig GetServerConfig();
-        IConfig GetCertConfig();
-        bool IsCheckClientCert();
-    }
+    BaseHttpServer HttpServer { get; }
+    Dictionary<string, string> SessionDic { get; }
+    Dictionary<string, string> SecureSessionDic { get; }
+    Dictionary<string, string> WebSessionDic { get; }
 }

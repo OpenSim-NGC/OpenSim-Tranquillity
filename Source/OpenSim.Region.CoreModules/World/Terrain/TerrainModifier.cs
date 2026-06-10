@@ -29,330 +29,329 @@ using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain
+namespace OpenSim.Region.CoreModules.World.Terrain;
+
+public abstract class TerrainModifier : ITerrainModifier
 {
-    public abstract class TerrainModifier : ITerrainModifier
+    protected ITerrainModule m_module;
+    protected static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected TerrainModifier(ITerrainModule module)
     {
-        protected ITerrainModule m_module;
-        protected static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_module = module;
+    }
 
-        protected TerrainModifier(ITerrainModule module)
+    public abstract string ModifyTerrain(ITerrainChannel map, string[] args);
+
+    public abstract string GetUsage();
+
+    public abstract float operate(float[,] map, TerrainModifierData data, int x, int y);
+
+    protected String parseParameters(string[] args, out TerrainModifierData data)
+    {
+        string val;
+        string arg;
+        string result;
+        data = new TerrainModifierData();
+        data.shape = String.Empty;
+        data.bevel = String.Empty;
+        data.dx = 0;
+        data.dy = 0;
+        if (args.Length < 4)
         {
-            m_module = module;
+            result = "Usage: " + GetUsage();
         }
-
-        public abstract string ModifyTerrain(ITerrainChannel map, string[] args);
-
-        public abstract string GetUsage();
-
-        public abstract float operate(float[,] map, TerrainModifierData data, int x, int y);
-
-        protected String parseParameters(string[] args, out TerrainModifierData data)
+        else
         {
-            string val;
-            string arg;
-            string result;
-            data = new TerrainModifierData();
-            data.shape = String.Empty;
-            data.bevel = String.Empty;
-            data.dx = 0;
-            data.dy = 0;
-            if (args.Length < 4)
+            result = this.parseFloat(args[3], out data.elevation);
+        }
+        if (result.Length == 0)
+        {
+            int index = 3;
+            while(++index < args.Length && result.Length == 0)
             {
-                result = "Usage: " + GetUsage();
-            }
-            else
-            {
-                result = this.parseFloat(args[3], out data.elevation);
-            }
-            if (result.Length == 0)
-            {
-                int index = 3;
-                while(++index < args.Length && result.Length == 0)
+                arg = args[index];
+                // check for shape
+                if (arg.StartsWith("-rec=") || arg.StartsWith("-ell="))
                 {
-                    arg = args[index];
-                    // check for shape
-                    if (arg.StartsWith("-rec=") || arg.StartsWith("-ell="))
+                    if (data.shape != String.Empty)
                     {
-                        if (data.shape != String.Empty)
-                        {
-                            result = "Only 1 '-rec' or '-ell' parameter is permitted.";
-                        }
-                        else
-                        {
-                            data.shape = arg.StartsWith("-ell=") ? "ellipse" : "rectangle";
-                            val = arg.Substring(arg.IndexOf("=") + 1);
-                            string[] coords = val.Split(Util.SplitCommaArray);
-                            if ((coords.Length < 3) || (coords.Length > 4))
-                            {
-                                result = String.Format("Bad format for shape parameter {0}", arg);
-                            }
-                            else
-                            {
-                                result = this.parseInt(coords[0], out data.x0);
-                                if (result.Length == 0)
-                                {
-                                    result = this.parseInt(coords[1], out data.y0);
-                                }
-                                if (result.Length == 0)
-                                {
-                                    result = this.parseInt(coords[2], out data.dx);
-                                }
-                                if (result.Length == 0)
-                                {
-                                    if (coords.Length == 4)
-                                    {
-                                        result = this.parseInt(coords[3], out data.dy);
-                                    }
-                                    else
-                                    {
-                                        data.dy = data.dx;
-                                    }
-                                }
-                                if (result.Length == 0)
-                                {
-                                    if ((data.dx <= 0) || (data.dy <= 0))
-                                    {
-                                        result = "Shape sizes must be positive integers";
-                                    }
-                                }
-                                else
-                                {
-                                    result = String.Format("Bad value in shape parameters {0}", arg);
-                                }
-                            }
-                        }
-                    }
-                    else if (arg.StartsWith("-taper="))
-                    {
-                        if (data.bevel != String.Empty)
-                        {
-                            result = "Only 1 '-taper' parameter is permitted.";
-                        }
-                        else
-                        {
-                            data.bevel = "taper";
-                            val = arg.Substring(arg.IndexOf("=") + 1);
-                            result = this.parseFloat(val, out data.bevelevation);
-                            if (result != String.Empty)
-                            {
-                                result = String.Format("Bad format for taper parameter {0}", arg);
-                            }
-                        }
+                        result = "Only 1 '-rec' or '-ell' parameter is permitted.";
                     }
                     else
                     {
-                        result = String.Format("Unrecognized parameter {0}", arg);
-                    }
-                }
-            }
-            return result;
-        }
-
-        protected string parseFloat(String s, out float f)
-        {
-            if (float.TryParse(s, out f))
-                return string.Empty;
-
-            f = -1.0f;
-            return string.Format("{0} is invalid", s);
-        }
-
-        protected string parseInt(String s, out int i)
-        {
-            if (Int32.TryParse(s, out i))
-                return string.Empty;
-
-            return string.Format("{0} is invalid", s);
-        }
-
-        protected void applyModification(ITerrainChannel map, TerrainModifierData data)
-        {
-            bool[,] mask;
-            int xMax;
-            int yMax;
-            int xMid;
-            int yMid;
-            if (data.shape == "ellipse")
-            {
-                mask = this.ellipticalMask(data.dx, data.dy);
-                xMax = mask.GetLength(0);
-                yMax = mask.GetLength(1);
-                xMid = xMax / 2 + xMax % 2;
-                yMid = yMax / 2 + yMax % 2;
-            }
-            else
-            {
-                mask = this.rectangularMask(data.dx, data.dy);
-                xMax = mask.GetLength(0);
-                yMax = mask.GetLength(1);
-                xMid = 0;
-                yMid = 0;
-            }
-//            m_log.DebugFormat("Apply {0} mask {1}x{2} @ {3},{4}", data.shape, xMax, yMax, xMid, yMid);
-
-            float[,] buffer = new float[map.Width, map.Height];
-            for (int x = data.x0; x < xMax; ++x)
-                for (int y = data.y0; y < yMax; ++y)
-                    buffer[x,y] = map[x,y];
-
-            int yDim = yMax;
-            while(--yDim >= 0)
-            {
-                int yPos = data.y0 + yDim - yMid;
-                if ((yPos >= 0) && (yPos < map.Height))
-                {
-                    int xDim = xMax;
-                    while(--xDim >= 0)
-                    {
-                        int xPos = data.x0 + xDim - xMid;
-                        
-                        if ((xPos >= 0) && (xPos < map.Width) && (mask[xDim, yDim]))
+                        data.shape = arg.StartsWith("-ell=") ? "ellipse" : "rectangle";
+                        val = arg.Substring(arg.IndexOf("=") + 1);
+                        string[] coords = val.Split(Util.SplitCommaArray);
+                        if ((coords.Length < 3) || (coords.Length > 4))
                         {
-                            double endElevation = this.operate(buffer, data, xPos, yPos);
-                            map[xPos, yPos] = (float)endElevation;
+                            result = String.Format("Bad format for shape parameter {0}", arg);
+                        }
+                        else
+                        {
+                            result = this.parseInt(coords[0], out data.x0);
+                            if (result.Length == 0)
+                            {
+                                result = this.parseInt(coords[1], out data.y0);
+                            }
+                            if (result.Length == 0)
+                            {
+                                result = this.parseInt(coords[2], out data.dx);
+                            }
+                            if (result.Length == 0)
+                            {
+                                if (coords.Length == 4)
+                                {
+                                    result = this.parseInt(coords[3], out data.dy);
+                                }
+                                else
+                                {
+                                    data.dy = data.dx;
+                                }
+                            }
+                            if (result.Length == 0)
+                            {
+                                if ((data.dx <= 0) || (data.dy <= 0))
+                                {
+                                    result = "Shape sizes must be positive integers";
+                                }
+                            }
+                            else
+                            {
+                                result = String.Format("Bad value in shape parameters {0}", arg);
+                            }
                         }
                     }
                 }
-            }
-        }
-
-        protected float computeBevel(TerrainModifierData data, int x, int y)
-        {
-            int deltaX;
-            int deltaY;
-            int xMax;
-            int yMax;
-            float factor;
-            if (data.bevel == "taper")
-            {
-                if (data.shape == "ellipse")
+                else if (arg.StartsWith("-taper="))
                 {
-                    deltaX = x - data.x0;
-                    deltaY = y - data.y0;
-                    xMax = data.dx;
-                    yMax = data.dy;
-                    factor = ((deltaX * deltaX) + (deltaY * deltaY));
-                    factor /= ((xMax * xMax) + (yMax * yMax));
+                    if (data.bevel != String.Empty)
+                    {
+                        result = "Only 1 '-taper' parameter is permitted.";
+                    }
+                    else
+                    {
+                        data.bevel = "taper";
+                        val = arg.Substring(arg.IndexOf("=") + 1);
+                        result = this.parseFloat(val, out data.bevelevation);
+                        if (result != String.Empty)
+                        {
+                            result = String.Format("Bad format for taper parameter {0}", arg);
+                        }
+                    }
                 }
                 else
                 {
-                    // pyramid
-                    xMax = data.dx / 2 + data.dx % 2;
-                    yMax = data.dy / 2 + data.dy % 2;
-                    deltaX = Math.Abs(data.x0 + xMax - x);
-                    deltaY = Math.Abs(data.y0 + yMax - y);
-                    factor = Math.Max(((float)(deltaY) / yMax), ((float)(deltaX) / xMax));
+                    result = String.Format("Unrecognized parameter {0}", arg);
                 }
+            }
+        }
+        return result;
+    }
+
+    protected string parseFloat(String s, out float f)
+    {
+        if (float.TryParse(s, out f))
+            return string.Empty;
+
+        f = -1.0f;
+        return string.Format("{0} is invalid", s);
+    }
+
+    protected string parseInt(String s, out int i)
+    {
+        if (Int32.TryParse(s, out i))
+            return string.Empty;
+
+        return string.Format("{0} is invalid", s);
+    }
+
+    protected void applyModification(ITerrainChannel map, TerrainModifierData data)
+    {
+        bool[,] mask;
+        int xMax;
+        int yMax;
+        int xMid;
+        int yMid;
+        if (data.shape == "ellipse")
+        {
+            mask = this.ellipticalMask(data.dx, data.dy);
+            xMax = mask.GetLength(0);
+            yMax = mask.GetLength(1);
+            xMid = xMax / 2 + xMax % 2;
+            yMid = yMax / 2 + yMax % 2;
+        }
+        else
+        {
+            mask = this.rectangularMask(data.dx, data.dy);
+            xMax = mask.GetLength(0);
+            yMax = mask.GetLength(1);
+            xMid = 0;
+            yMid = 0;
+        }
+//            m_log.DebugFormat("Apply {0} mask {1}x{2} @ {3},{4}", data.shape, xMax, yMax, xMid, yMid);
+
+        float[,] buffer = new float[map.Width, map.Height];
+        for (int x = data.x0; x < xMax; ++x)
+            for (int y = data.y0; y < yMax; ++y)
+                buffer[x,y] = map[x,y];
+
+        int yDim = yMax;
+        while(--yDim >= 0)
+        {
+            int yPos = data.y0 + yDim - yMid;
+            if ((yPos >= 0) && (yPos < map.Height))
+            {
+                int xDim = xMax;
+                while(--xDim >= 0)
+                {
+                    int xPos = data.x0 + xDim - xMid;
+                    
+                    if ((xPos >= 0) && (xPos < map.Width) && (mask[xDim, yDim]))
+                    {
+                        double endElevation = this.operate(buffer, data, xPos, yPos);
+                        map[xPos, yPos] = (float)endElevation;
+                    }
+                }
+            }
+        }
+    }
+
+    protected float computeBevel(TerrainModifierData data, int x, int y)
+    {
+        int deltaX;
+        int deltaY;
+        int xMax;
+        int yMax;
+        float factor;
+        if (data.bevel == "taper")
+        {
+            if (data.shape == "ellipse")
+            {
+                deltaX = x - data.x0;
+                deltaY = y - data.y0;
+                xMax = data.dx;
+                yMax = data.dy;
+                factor = ((deltaX * deltaX) + (deltaY * deltaY));
+                factor /= ((xMax * xMax) + (yMax * yMax));
             }
             else
             {
-                factor = 0.0f;
+                // pyramid
+                xMax = data.dx / 2 + data.dx % 2;
+                yMax = data.dy / 2 + data.dy % 2;
+                deltaX = Math.Abs(data.x0 + xMax - x);
+                deltaY = Math.Abs(data.y0 + yMax - y);
+                factor = Math.Max(((float)(deltaY) / yMax), ((float)(deltaX) / xMax));
             }
-            return factor;
         }
-
-        private bool[,] rectangularMask(int xSize, int ySize)
+        else
         {
-            bool[,] mask = new bool[xSize, ySize];
-            int yPos = ySize;
-            while(--yPos >= 0)
-            {
-                int xPos = xSize;
-                while(--xPos >= 0)
-                {
-                    mask[xPos, yPos] = true;
-                }
-            }
-            return mask;
+            factor = 0.0f;
         }
+        return factor;
+    }
 
-        /*
-         * Fast ellipse-based derivative of Bresenham algorithm.
-         *   https://web.archive.org/web/20120225095359/http://homepage.smc.edu/kennedy_john/belipse.pdf
-         */
-        private bool[,] ellipticalMask(int xRadius, int yRadius)
+    private bool[,] rectangularMask(int xSize, int ySize)
+    {
+        bool[,] mask = new bool[xSize, ySize];
+        int yPos = ySize;
+        while(--yPos >= 0)
         {
-            long twoASquared = 2L * xRadius * xRadius;
-            long twoBSquared = 2L * yRadius * yRadius;
-
-            bool[,] mask = new bool[2 * xRadius + 1, 2 * yRadius + 1];
-
-            long ellipseError = 0L;
-            long stoppingX = twoBSquared * xRadius;
-            long stoppingY = 0L;
-            long xChange = yRadius * yRadius * (1L - 2L * xRadius);
-            long yChange = xRadius * xRadius;
-
-            int xPos = xRadius;
-            int yPos = 0;
-
-            // first set of points
-            while(stoppingX >= stoppingY)
+            int xPos = xSize;
+            while(--xPos >= 0)
             {
-                int yUpper = yRadius + yPos;
-                int yLower = yRadius - yPos;
-                // fill in the mask
-                int xNow = xPos;
-                while(xNow >= 0)
-                {
-                    mask[xRadius + xNow, yUpper] = true;
-                    mask[xRadius - xNow, yUpper] = true;
-                    mask[xRadius + xNow, yLower] = true;
-                    mask[xRadius - xNow, yLower] = true;
-                    --xNow;
-                }
-                yPos++;
-                stoppingY += twoASquared;
-                ellipseError += yChange;
-                yChange += twoASquared;
-                if ((2L * ellipseError + xChange) > 0L)
-                {
-                    xPos--;
-                    stoppingX -= twoBSquared;
-                    ellipseError += xChange;
-                    xChange += twoBSquared;
-                }
+                mask[xPos, yPos] = true;
             }
+        }
+        return mask;
+    }
 
-            // second set of points
-            xPos = 0;
-            yPos = yRadius;
-            xChange = yRadius * yRadius;
-            yChange = xRadius * xRadius * (1L - 2L * yRadius);
+    /*
+     * Fast ellipse-based derivative of Bresenham algorithm.
+     *   https://web.archive.org/web/20120225095359/http://homepage.smc.edu/kennedy_john/belipse.pdf
+     */
+    private bool[,] ellipticalMask(int xRadius, int yRadius)
+    {
+        long twoASquared = 2L * xRadius * xRadius;
+        long twoBSquared = 2L * yRadius * yRadius;
 
-            ellipseError = 0L;
-            stoppingX = 0L;
-            stoppingY = twoASquared * yRadius;
+        bool[,] mask = new bool[2 * xRadius + 1, 2 * yRadius + 1];
 
-            while(stoppingX <= stoppingY)
+        long ellipseError = 0L;
+        long stoppingX = twoBSquared * xRadius;
+        long stoppingY = 0L;
+        long xChange = yRadius * yRadius * (1L - 2L * xRadius);
+        long yChange = xRadius * xRadius;
+
+        int xPos = xRadius;
+        int yPos = 0;
+
+        // first set of points
+        while(stoppingX >= stoppingY)
+        {
+            int yUpper = yRadius + yPos;
+            int yLower = yRadius - yPos;
+            // fill in the mask
+            int xNow = xPos;
+            while(xNow >= 0)
             {
-                int xUpper = xRadius + xPos;
-                int xLower = xRadius - xPos;
-                // fill in the mask
-                int yNow = yPos;
-                while(yNow >= 0)
-                {
-                    mask[xUpper, yRadius + yNow] = true;
-                    mask[xUpper, yRadius - yNow] = true;
-                    mask[xLower, yRadius + yNow] = true;
-                    mask[xLower, yRadius - yNow] = true;
-                    --yNow;
-                }
-                xPos++;
-                stoppingX += twoBSquared;
+                mask[xRadius + xNow, yUpper] = true;
+                mask[xRadius - xNow, yUpper] = true;
+                mask[xRadius + xNow, yLower] = true;
+                mask[xRadius - xNow, yLower] = true;
+                --xNow;
+            }
+            yPos++;
+            stoppingY += twoASquared;
+            ellipseError += yChange;
+            yChange += twoASquared;
+            if ((2L * ellipseError + xChange) > 0L)
+            {
+                xPos--;
+                stoppingX -= twoBSquared;
                 ellipseError += xChange;
                 xChange += twoBSquared;
-                if ((2L * ellipseError + yChange) > 0L)
-                {
-                    yPos--;
-                    stoppingY -= twoASquared;
-                    ellipseError += yChange;
-                    yChange += twoASquared;
-                }
             }
-            return mask;
         }
+
+        // second set of points
+        xPos = 0;
+        yPos = yRadius;
+        xChange = yRadius * yRadius;
+        yChange = xRadius * xRadius * (1L - 2L * yRadius);
+
+        ellipseError = 0L;
+        stoppingX = 0L;
+        stoppingY = twoASquared * yRadius;
+
+        while(stoppingX <= stoppingY)
+        {
+            int xUpper = xRadius + xPos;
+            int xLower = xRadius - xPos;
+            // fill in the mask
+            int yNow = yPos;
+            while(yNow >= 0)
+            {
+                mask[xUpper, yRadius + yNow] = true;
+                mask[xUpper, yRadius - yNow] = true;
+                mask[xLower, yRadius + yNow] = true;
+                mask[xLower, yRadius - yNow] = true;
+                --yNow;
+            }
+            xPos++;
+            stoppingX += twoBSquared;
+            ellipseError += xChange;
+            xChange += twoBSquared;
+            if ((2L * ellipseError + yChange) > 0L)
+            {
+                yPos--;
+                stoppingY -= twoASquared;
+                ellipseError += yChange;
+                yChange += twoASquared;
+            }
+        }
+        return mask;
     }
 }
 

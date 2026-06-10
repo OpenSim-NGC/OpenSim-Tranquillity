@@ -26,83 +26,81 @@
  */
 
 using System.Collections;
-using System.IO;
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public interface IRequestHandler
 {
-    public interface IRequestHandler
-    {
-        /// <summary>
-        /// Name for this handler.
-        /// </summary>
-        /// <remarks>
-        /// Used for diagnostics.  The path doesn't always describe what the handler does.  Can be null if none
-        /// specified.
-        /// </remarks>
-        string Name { get; }
+    /// <summary>
+    /// Name for this handler.
+    /// </summary>
+    /// <remarks>
+    /// Used for diagnostics.  The path doesn't always describe what the handler does.  Can be null if none
+    /// specified.
+    /// </remarks>
+    string Name { get; }
 
-        /// <summary>
-        /// Description for this handler.
-        /// </summary>
-        /// <remarks>
-        /// Used for diagnostics.  The path doesn't always describe what the handler does.  Can be null if none
-        /// specified.
-        /// </remarks>
-        string Description { get; }
+    /// <summary>
+    /// Description for this handler.
+    /// </summary>
+    /// <remarks>
+    /// Used for diagnostics.  The path doesn't always describe what the handler does.  Can be null if none
+    /// specified.
+    /// </remarks>
+    string Description { get; }
 
-        // Return response content type
-        string ContentType { get; }
+    // Return response content type
+    string ContentType { get; }
 
-        // Return required http method
-        string HttpMethod { get; }
+    // Return required http method
+    string HttpMethod { get; }
 
-        // Return path
-        string Path { get; }
+    // Return path
+    string Path { get; }
 
-        /// <summary>
-        /// Number of requests received by this handler
-        /// </summary>
-        int RequestsReceived { get; }
+    /// <summary>
+    /// Number of requests received by this handler
+    /// </summary>
+    int RequestsReceived { get; }
 
-        /// <summary>
-        /// Number of requests handled.
-        /// </summary>
-        /// <remarks>
-        /// Should be equal to RequestsReceived unless requested are being handled slowly or there is deadlock.
-        /// </remarks>
-        int RequestsHandled { get; }
-    }
-
-    public interface IStreamedRequestHandler : IRequestHandler
-    {
-        // Handle request stream, return byte array
-        byte[] Handle(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse);
-    }
-
-    public interface IStreamHandler : IRequestHandler
-    {
-        void Handle(string path, Stream request, Stream response, IOSHttpRequest httpReqbuest, IOSHttpResponse httpResponse);
-    }
-
-    public interface IGenericHTTPHandler : IRequestHandler
-    {
-        Hashtable Handle(string path, Hashtable request);
-    }
-
-    public interface ISimpleStreamHandler
-    {
-        string Name { get; }
-        string Path { get; }
-
-        int RequestsReceived { get; }
-        int RequestsHandled { get; }
-
-        // Handle request stream, return byte array
-        void Handle(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse);
-    }
-
-    public delegate void SimpleStreamMethod(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse);
-    public delegate void SimpleOSDMapMethod(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap args);
-    public delegate void SimpleBinaryMethod(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, byte[] data);
+    /// <summary>
+    /// Number of requests handled.
+    /// </summary>
+    /// <remarks>
+    /// Should be equal to RequestsReceived unless requested are being handled slowly or there is deadlock.
+    /// </remarks>
+    int RequestsHandled { get; }
 }
+
+public interface IStreamedRequestHandler : IRequestHandler
+{
+    // Handle request stream, return byte array
+    byte[] Handle(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse);
+}
+
+public interface IStreamHandler : IRequestHandler
+{
+    void Handle(string path, Stream request, Stream response, IOSHttpRequest httpReqbuest, IOSHttpResponse httpResponse);
+}
+
+public interface IGenericHTTPHandler : IRequestHandler
+{
+    Hashtable Handle(string path, Hashtable request);
+}
+
+public interface ISimpleStreamHandler
+{
+    string Name { get; }
+    string Path { get; }
+
+    int RequestsReceived { get; }
+    int RequestsHandled { get; }
+
+    // Handle request stream, return byte array
+    void Handle(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse);
+}
+
+public delegate void SimpleStreamMethod(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse);
+public delegate void SimpleOSDMapMethod(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap args);
+public delegate void SimpleBinaryMethod(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, byte[] data);

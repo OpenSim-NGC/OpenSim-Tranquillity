@@ -25,87 +25,85 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Net;
 using OpenSim.Framework.ServiceAuth;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+/// <summary>
+/// simple Base streamed request handler.
+/// for well defined simple uri paths, any http method
+/// </summary>
+/// <remarks>
+/// Inheriting classes should override ProcessRequest() rather than Handle()
+/// </remarks>
+public class SimpleStreamHandler : SimpleBaseRequestHandler, ISimpleStreamHandler
 {
-    /// <summary>
-    /// simple Base streamed request handler.
-    /// for well defined simple uri paths, any http method
-    /// </summary>
-    /// <remarks>
-    /// Inheriting classes should override ProcessRequest() rather than Handle()
-    /// </remarks>
-    public class SimpleStreamHandler : SimpleBaseRequestHandler, ISimpleStreamHandler
+    protected IServiceAuth m_Auth;
+    protected SimpleStreamMethod m_processRequest;
+
+    public SimpleStreamHandler(string path) : base(path) { }
+    public SimpleStreamHandler(string path, string name) : base(path, name) { }
+
+    public SimpleStreamHandler(string path, SimpleStreamMethod processRequest) : base(path)
     {
-        protected IServiceAuth m_Auth;
-        protected SimpleStreamMethod m_processRequest;
+        m_processRequest = processRequest;
+    }
+    public SimpleStreamHandler(string path, SimpleStreamMethod processRequest, string name) : base(path, name)
+    {
+        m_processRequest = processRequest;
+    }
 
-        public SimpleStreamHandler(string path) : base(path) { }
-        public SimpleStreamHandler(string path, string name) : base(path, name) { }
+    public SimpleStreamHandler(string path, IServiceAuth auth) : base(path)
+    {
+        m_Auth = auth;
+    }
 
-        public SimpleStreamHandler(string path, SimpleStreamMethod processRequest) : base(path)
+    public SimpleStreamHandler(string path, IServiceAuth auth, SimpleStreamMethod processRequest)
+        : base(path)
+    {
+        m_Auth = auth;
+        m_processRequest = processRequest;
+    }
+
+    public SimpleStreamHandler(string path, IServiceAuth auth, SimpleStreamMethod processRequest, string name)
+        : base(path, name)
+    {
+        m_Auth = auth;
+        m_processRequest = processRequest;
+    }
+
+    public virtual void Handle(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        RequestsReceived++;
+
+        if (m_Auth != null)
         {
-            m_processRequest = processRequest;
-        }
-        public SimpleStreamHandler(string path, SimpleStreamMethod processRequest, string name) : base(path, name)
-        {
-            m_processRequest = processRequest;
-        }
+            HttpStatusCode statusCode;
 
-        public SimpleStreamHandler(string path, IServiceAuth auth) : base(path)
-        {
-            m_Auth = auth;
-        }
-
-        public SimpleStreamHandler(string path, IServiceAuth auth, SimpleStreamMethod processRequest)
-            : base(path)
-        {
-            m_Auth = auth;
-            m_processRequest = processRequest;
-        }
-
-        public SimpleStreamHandler(string path, IServiceAuth auth, SimpleStreamMethod processRequest, string name)
-            : base(path, name)
-        {
-            m_Auth = auth;
-            m_processRequest = processRequest;
-        }
-
-        public virtual void Handle(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            RequestsReceived++;
-
-            if (m_Auth != null)
+            if (!m_Auth.Authenticate(httpRequest.Headers, httpResponse.AddHeader, out statusCode))
             {
-                HttpStatusCode statusCode;
-
-                if (!m_Auth.Authenticate(httpRequest.Headers, httpResponse.AddHeader, out statusCode))
-                {
-                    httpResponse.StatusCode = (int)statusCode;
-                    return;
-                }
+                httpResponse.StatusCode = (int)statusCode;
+                return;
             }
-
-            try
-            {
-                if (m_processRequest != null)
-                    m_processRequest(httpRequest, httpResponse);
-                else
-                    ProcessRequest(httpRequest, httpResponse);
-            }
-            catch
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.InternalServerError;
-            }
-
-            RequestsHandled++;
         }
 
-        protected virtual void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        try
         {
+            if (m_processRequest != null)
+                m_processRequest(httpRequest, httpResponse);
+            else
+                ProcessRequest(httpRequest, httpResponse);
         }
+        catch
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.InternalServerError;
+        }
+
+        RequestsHandled++;
+    }
+
+    protected virtual void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
     }
 }

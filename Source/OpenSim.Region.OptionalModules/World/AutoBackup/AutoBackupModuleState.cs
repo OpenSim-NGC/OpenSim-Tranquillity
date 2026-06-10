@@ -25,62 +25,61 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Region.OptionalModules.World.AutoBackup
+namespace OpenSim.Region.OptionalModules.World.AutoBackup;
+
+/// <summary>AutoBackupModuleState: Auto-Backup state for one region (scene).
+/// If you use this class in any way outside of AutoBackupModule, you should treat the class as opaque.
+/// Since it is not part of the framework, you really should not rely upon it outside of the AutoBackupModule implementation.
+/// </summary>
+///
+public class AutoBackupModuleState
 {
-    /// <summary>AutoBackupModuleState: Auto-Backup state for one region (scene).
-    /// If you use this class in any way outside of AutoBackupModule, you should treat the class as opaque.
-    /// Since it is not part of the framework, you really should not rely upon it outside of the AutoBackupModule implementation.
-    /// </summary>
-    ///
-    public class AutoBackupModuleState
+    public AutoBackupModuleState()
     {
-        public AutoBackupModuleState()
-        {
-            Enabled = false;
-            SkipAssets = false;
-            NamingType = NamingType.Time;
-            Script = null;
-        }
+        Enabled = false;
+        SkipAssets = false;
+        NamingType = NamingType.Time;
+        Script = null;
+    }
 
-        public AutoBackupModuleState(AutoBackupModuleState copyFrom)
-        {
-            Enabled = copyFrom.Enabled;
-            SkipAssets = copyFrom.SkipAssets;
-            NamingType = copyFrom.NamingType;
-            Script = copyFrom.Script;
-        }
+    public AutoBackupModuleState(AutoBackupModuleState copyFrom)
+    {
+        Enabled = copyFrom.Enabled;
+        SkipAssets = copyFrom.SkipAssets;
+        NamingType = copyFrom.NamingType;
+        Script = copyFrom.Script;
+    }
 
-        public bool Enabled
-        {
-            get;
-            set;
-        }
+    public bool Enabled
+    {
+        get;
+        set;
+    }
 
-        public bool SkipAssets
-        {
-            get;
-            set;
-        }
+    public bool SkipAssets
+    {
+        get;
+        set;
+    }
 
-        public string Script
-        {
-            get;
-            set;
-        }
+    public string Script
+    {
+        get;
+        set;
+    }
 
-        public NamingType NamingType
-        {
-            get;
-            set;
-        }
+    public NamingType NamingType
+    {
+        get;
+        set;
+    }
 
-        public new string ToString()
-        {
-            string retval = "";
-            retval += "[AUTO BACKUP]: AutoBackup: " + (Enabled ? "ENABLED" : "DISABLED") + "\n";
-            retval += "[AUTO BACKUP]: Naming Type: " + NamingType.ToString() + "\n";
-            retval += "[AUTO BACKUP]: Script: " + Script + "\n";
-            return retval;
-        }
+    public new string ToString()
+    {
+        string retval = "";
+        retval += "[AUTO BACKUP]: AutoBackup: " + (Enabled ? "ENABLED" : "DISABLED") + "\n";
+        retval += "[AUTO BACKUP]: Naming Type: " + NamingType.ToString() + "\n";
+        retval += "[AUTO BACKUP]: Script: " + Script + "\n";
+        return retval;
     }
 }

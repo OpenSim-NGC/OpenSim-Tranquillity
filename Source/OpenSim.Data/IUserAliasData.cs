@@ -24,49 +24,45 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+// This MUST be a ref type!
+public class UserAliasData
 {
-    // This MUST be a ref type!
-    public class UserAliasData
-    {
-        public int Id = 0;
-        public UUID AliasID;
-        public UUID UserID = UUID.Zero;
-        public string Description;
-    }
+    public int Id = 0;
+    public UUID AliasID;
+    public UUID UserID = UUID.Zero;
+    public string Description;
+}
+
+/// <summary>
+/// An interface for connecting to the UserAlias datastore
+/// </summary>
+public interface IUserAliasData
+{
+    bool Store(UserAliasData data);
+    
+    UserAliasData Get(int Id);
 
     /// <summary>
-    /// An interface for connecting to the UserAlias datastore
+    /// Lookup and return a local user based on an Alias entry if a local 
+    /// user exists for this aliasID
     /// </summary>
-    public interface IUserAliasData
-    {
-        bool Store(UserAliasData data);
-        
-        UserAliasData Get(int Id);
+    /// <param name="scopeID"></param>
+    /// <param name="aliasID"></param>
+    /// <returns>UserAccount or NULL</returns>
+    UserAliasData GetUserForAlias(UUID aliasID);
 
-        /// <summary>
-        /// Lookup and return a local user based on an Alias entry if a local 
-        /// user exists for this aliasID
-        /// </summary>
-        /// <param name="scopeID"></param>
-        /// <param name="aliasID"></param>
-        /// <returns>UserAccount or NULL</returns>
-        UserAliasData GetUserForAlias(UUID aliasID);
+    /// <summary>
+    /// Giver a userid/user on the local grid. lookup and return a
+    /// list of all the known Aliases IDs for the user.
+    /// </summary>
+    /// <param name="scopeID"></param>
+    /// <param name="userID"></param>
+    /// <returns></returns>
+    List<UserAliasData> GetUserAliases(UUID userID);
 
-        /// <summary>
-        /// Giver a userid/user on the local grid. lookup and return a
-        /// list of all the known Aliases IDs for the user.
-        /// </summary>
-        /// <param name="scopeID"></param>
-        /// <param name="userID"></param>
-        /// <returns></returns>
-        List<UserAliasData> GetUserAliases(UUID userID);
-
-        bool Delete(string field, string val);
-    }
+    bool Delete(string field, string val);
 }

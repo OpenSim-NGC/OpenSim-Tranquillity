@@ -25,14 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
+namespace OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Scenes
+public enum Cardinals
 {
-    public enum Cardinals
-    {
-        N = 1, NE, E, SE, S, SW, W, NW
-    }
+    N = 1, NE, E, SE, S, SW, W, NW
 }

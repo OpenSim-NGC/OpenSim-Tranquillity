@@ -32,40 +32,40 @@ using OpenMetaverse.Packets;
 using OpenSim.Framework;
 using OpenSim.Region.ClientStack.LindenUDP;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+/// <summary>
+/// This class enables regression testing of the LLUDPServer by allowing us to intercept outgoing data.
+/// </summary>
+public class TestLLUDPServer : LLUDPServer
 {
-    /// <summary>
-    /// This class enables regression testing of the LLUDPServer by allowing us to intercept outgoing data.
-    /// </summary>
-    public class TestLLUDPServer : LLUDPServer
+    public List<Packet> PacketsSent { get; private set; }
+
+    public TestLLUDPServer(IPAddress listenIP, uint port, int proxyPortOffsetParm, IConfigSource configSource, AgentCircuitManager circuitManager)
+        : base(listenIP, port, proxyPortOffsetParm, configSource, circuitManager)
     {
-        public List<Packet> PacketsSent { get; private set; }
+        PacketsSent = new List<Packet>();
+    }
 
-        public TestLLUDPServer(IPAddress listenIP, uint port, int proxyPortOffsetParm, IConfigSource configSource, AgentCircuitManager circuitManager)
-            : base(listenIP, port, proxyPortOffsetParm, configSource, circuitManager)
-        {
-            PacketsSent = new List<Packet>();
-        }
+    public override void SendAckImmediate(IPEndPoint remoteEndpoint, PacketAckPacket ack)
+    {
+        PacketsSent.Add(ack);
+    }
 
-        public override void SendAckImmediate(IPEndPoint remoteEndpoint, PacketAckPacket ack)
-        {
-            PacketsSent.Add(ack);
-        }
+    public override void SendPacket(
+        LLUDPClient udpClient, Packet packet, ThrottleOutPacketType category, bool allowSplitting, UnackedPacketMethod method)
+    {
+        PacketsSent.Add(packet);
+    }
 
-        public override void SendPacket(
-            LLUDPClient udpClient, Packet packet, ThrottleOutPacketType category, bool allowSplitting, UnackedPacketMethod method)
-        {
-            PacketsSent.Add(packet);
-        }
+    public void ClientOutgoingPacketHandler(IClientAPI client, bool resendUnacked, bool sendAcks, bool sendPing)
+    {
+        m_resendUnacked = resendUnacked;
+        m_sendAcks = sendAcks;
+        m_sendPing = sendPing;
 
-        public void ClientOutgoingPacketHandler(IClientAPI client, bool resendUnacked, bool sendAcks, bool sendPing)
-        {
-            m_resendUnacked = resendUnacked;
-            m_sendAcks = sendAcks;
-            m_sendPing = sendPing;
-
-            ClientOutgoingPacketHandler(client);
-        }
+        ClientOutgoingPacketHandler(client);
+    }
 
 ////        /// <summary>
 ////        /// The chunks of data to pass to the LLUDPServer when it calls EndReceive
@@ -144,26 +144,25 @@ namespace OpenSim.Tests.Common
 ////            while (m_chunksToLoad.Count > 0)
 ////                OnReceivedData(result);
 //        }
+}
+
+/// <summary>
+/// Record the data and sender tuple
+/// </summary>
+public class ChunkSenderTuple
+{
+    public byte[] Data;
+    public EndPoint Sender;
+    public bool BeginReceiveException;
+
+    public ChunkSenderTuple(byte[] data, EndPoint sender)
+    {
+        Data = data;
+        Sender = sender;
     }
 
-    /// <summary>
-    /// Record the data and sender tuple
-    /// </summary>
-    public class ChunkSenderTuple
+    public ChunkSenderTuple(EndPoint sender)
     {
-        public byte[] Data;
-        public EndPoint Sender;
-        public bool BeginReceiveException;
-
-        public ChunkSenderTuple(byte[] data, EndPoint sender)
-        {
-            Data = data;
-            Sender = sender;
-        }
-
-        public ChunkSenderTuple(EndPoint sender)
-        {
-            Sender = sender;
-        }
+        Sender = sender;
     }
 }

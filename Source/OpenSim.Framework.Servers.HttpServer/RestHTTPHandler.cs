@@ -27,36 +27,35 @@
 
 using System.Collections;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public class RestHTTPHandler : BaseHTTPHandler
 {
-    public class RestHTTPHandler : BaseHTTPHandler
+    private GenericHTTPMethod m_dhttpMethod;
+
+    public GenericHTTPMethod Method
     {
-        private GenericHTTPMethod m_dhttpMethod;
+        get { return m_dhttpMethod; }
+    }
 
-        public GenericHTTPMethod Method
-        {
-            get { return m_dhttpMethod; }
-        }
+    public RestHTTPHandler(string httpMethod, string path, GenericHTTPMethod dhttpMethod)
+        : base(httpMethod, path)
+    {
+        m_dhttpMethod = dhttpMethod;
+    }
 
-        public RestHTTPHandler(string httpMethod, string path, GenericHTTPMethod dhttpMethod)
-            : base(httpMethod, path)
-        {
-            m_dhttpMethod = dhttpMethod;
-        }
+    public RestHTTPHandler(
+        string httpMethod, string path, GenericHTTPMethod dhttpMethod, string name, string description)
+        : base(httpMethod, path, name, description)
+    {
+        m_dhttpMethod = dhttpMethod;
+    }
 
-        public RestHTTPHandler(
-            string httpMethod, string path, GenericHTTPMethod dhttpMethod, string name, string description)
-            : base(httpMethod, path, name, description)
-        {
-            m_dhttpMethod = dhttpMethod;
-        }
-
-        public override Hashtable Handle(string path, Hashtable request)
-        {
-            string param = GetParam(path);
-            request.Add("param", param);
-            request.Add("path", path);
-            return m_dhttpMethod(request);
-        }
+    public override Hashtable Handle(string path, Hashtable request)
+    {
+        string param = GetParam(path);
+        request.Add("param", param);
+        request.Add("path", path);
+        return m_dhttpMethod(request);
     }
 }

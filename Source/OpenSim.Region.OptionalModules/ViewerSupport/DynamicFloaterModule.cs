@@ -33,202 +33,201 @@ using OpenSim.Framework;
 using Nini.Config;
 using log4net;
 
-namespace OpenSim.Region.OptionalModules.ViewerSupport
+namespace OpenSim.Region.OptionalModules.ViewerSupport;
+
+public class DynamicFloaterModule : INonSharedRegionModule, IDynamicFloaterModule
 {
-    public class DynamicFloaterModule : INonSharedRegionModule, IDynamicFloaterModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private Scene m_scene;
+
+    private bool m_Enabled = false;
+
+    private Dictionary<UUID, Dictionary<int, FloaterData>> m_floaters = new Dictionary<UUID, Dictionary<int, FloaterData>>();
+
+    public string Name
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return "DynamicFloaterModule"; }
+    }
 
-        private Scene m_scene;
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
 
-        private bool m_Enabled = false;
-
-        private Dictionary<UUID, Dictionary<int, FloaterData>> m_floaters = new Dictionary<UUID, Dictionary<int, FloaterData>>();
-
-        public string Name
+    public void Initialise(IConfigSource config)
+    {
+        IConfig moduleConfig = config.Configs["DynamicFloaterModule"];
+        if (moduleConfig != null)
         {
-            get { return "DynamicFloaterModule"; }
+            m_Enabled = moduleConfig.GetBoolean("enabled", false);
         }
+    }
 
-        public Type ReplaceableInterface
+    public void Close()
+    {
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if(m_Enabled)
         {
-            get { return null; }
+            m_scene = scene;
+            scene.EventManager.OnNewClient += OnNewClient;
+            scene.EventManager.OnClientClosed += OnClientClosed;
+            m_scene.RegisterModuleInterface<IDynamicFloaterModule>(this);
         }
+    }
 
-        public void Initialise(IConfigSource config)
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+    }
+
+    private void OnNewClient(IClientAPI client)
+    {
+        client.OnChatFromClient += OnChatFromClient;
+    }
+
+    private void OnClientClosed(UUID agentID, Scene scene)
+    {
+        m_floaters.Remove(agentID);
+    }
+
+    private void SendToClient(ScenePresence sp, string msg)
+    {
+        sp.ControllingClient.SendChatMessage(msg,
+                (byte)ChatTypeEnum.Owner,
+                sp.AbsolutePosition,
+                "Server",
+                UUID.Zero,
+                UUID.Zero,
+                (byte)ChatSourceType.Object,
+                (byte)ChatAudibleLevel.Fully);
+    }
+
+    public void DoUserFloater(UUID agentID, FloaterData dialogData, string configuration)
+    {
+        ScenePresence sp = m_scene.GetScenePresence(agentID);
+        if (sp == null || sp.IsChildAgent)
+            return;
+
+        if (!m_floaters.ContainsKey(agentID))
+            m_floaters[agentID] = new Dictionary<int, FloaterData>();
+
+        if (m_floaters[agentID].ContainsKey(dialogData.Channel))
+            return;
+
+        m_floaters[agentID].Add(dialogData.Channel, dialogData);
+
+        string xml;
+        if (dialogData.XmlText != null && dialogData.XmlText != String.Empty)
         {
-            IConfig moduleConfig = config.Configs["DynamicFloaterModule"];
-            if (moduleConfig != null)
+            xml = dialogData.XmlText;
+        }
+        else
+        {
+            using (FileStream fs = File.Open(dialogData.XmlName + ".xml", FileMode.Open, FileAccess.Read))
             {
-                m_Enabled = moduleConfig.GetBoolean("enabled", false);
+                using (StreamReader sr = new StreamReader(fs))
+                    xml = sr.ReadToEnd().Replace("\n", "");
             }
         }
 
-        public void Close()
-        {
-        }
+        List<string> xparts = new List<string>();
 
-        public void AddRegion(Scene scene)
+        while (xml.Length > 0)
         {
-            if(m_Enabled)
+            string x = xml;
+            if (x.Length > 600)
             {
-                m_scene = scene;
-                scene.EventManager.OnNewClient += OnNewClient;
-                scene.EventManager.OnClientClosed += OnClientClosed;
-                m_scene.RegisterModuleInterface<IDynamicFloaterModule>(this);
-            }
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-        }
-
-        private void OnNewClient(IClientAPI client)
-        {
-            client.OnChatFromClient += OnChatFromClient;
-        }
-
-        private void OnClientClosed(UUID agentID, Scene scene)
-        {
-            m_floaters.Remove(agentID);
-        }
-
-        private void SendToClient(ScenePresence sp, string msg)
-        {
-            sp.ControllingClient.SendChatMessage(msg,
-                    (byte)ChatTypeEnum.Owner,
-                    sp.AbsolutePosition,
-                    "Server",
-                    UUID.Zero,
-                    UUID.Zero,
-                    (byte)ChatSourceType.Object,
-                    (byte)ChatAudibleLevel.Fully);
-        }
-
-        public void DoUserFloater(UUID agentID, FloaterData dialogData, string configuration)
-        {
-            ScenePresence sp = m_scene.GetScenePresence(agentID);
-            if (sp == null || sp.IsChildAgent)
-                return;
-
-            if (!m_floaters.ContainsKey(agentID))
-                m_floaters[agentID] = new Dictionary<int, FloaterData>();
-
-            if (m_floaters[agentID].ContainsKey(dialogData.Channel))
-                return;
-
-            m_floaters[agentID].Add(dialogData.Channel, dialogData);
-
-            string xml;
-            if (dialogData.XmlText != null && dialogData.XmlText != String.Empty)
-            {
-                xml = dialogData.XmlText;
+                x = x.Substring(0, 600);
+                xml = xml.Substring(600);
             }
             else
             {
-                using (FileStream fs = File.Open(dialogData.XmlName + ".xml", FileMode.Open, FileAccess.Read))
-                {
-                    using (StreamReader sr = new StreamReader(fs))
-                        xml = sr.ReadToEnd().Replace("\n", "");
-                }
+                xml = String.Empty;
             }
 
-            List<string> xparts = new List<string>();
-
-            while (xml.Length > 0)
-            {
-                string x = xml;
-                if (x.Length > 600)
-                {
-                    x = x.Substring(0, 600);
-                    xml = xml.Substring(600);
-                }
-                else
-                {
-                    xml = String.Empty;
-                }
-
-                xparts.Add(x);
-            }
-
-            for (int i = 0 ; i < xparts.Count ; i++)
-                SendToClient(sp, String.Format("># floater {2} create {0}/{1} " + xparts[i], i + 1, xparts.Count, dialogData.FloaterName));
-
-            SendToClient(sp, String.Format("># floater {0} {{notify:1}} {{channel: {1}}} {{node:cancel {{notify:1}}}} {{node:ok {{notify:1}}}} {2}", dialogData.FloaterName, (uint)dialogData.Channel, configuration));
+            xparts.Add(x);
         }
 
-        private void OnChatFromClient(object sender, OSChatMessage msg)
+        for (int i = 0 ; i < xparts.Count ; i++)
+            SendToClient(sp, String.Format("># floater {2} create {0}/{1} " + xparts[i], i + 1, xparts.Count, dialogData.FloaterName));
+
+        SendToClient(sp, String.Format("># floater {0} {{notify:1}} {{channel: {1}}} {{node:cancel {{notify:1}}}} {{node:ok {{notify:1}}}} {2}", dialogData.FloaterName, (uint)dialogData.Channel, configuration));
+    }
+
+    private void OnChatFromClient(object sender, OSChatMessage msg)
+    {
+        if (msg.Sender == null)
+            return;
+
+        //m_log.DebugFormat("chan {0} msg {1}", msg.Channel, msg.Message);
+
+        IClientAPI client = msg.Sender;
+
+        if (!m_floaters.ContainsKey(client.AgentId))
+            return;
+
+        string[] parts = msg.Message.Split(new char[] {':'});
+        if (parts.Length == 0)
+            return;
+
+        ScenePresence sp = m_scene.GetScenePresence(client.AgentId);
+        if (sp == null || sp.IsChildAgent)
+            return;
+
+        Dictionary<int, FloaterData> d = m_floaters[client.AgentId];
+
+        // Work around a viewer bug - VALUE from any
+        // dialog can appear on this channel and needs to
+        // be dispatched to ALL open dialogs for the user
+        if (msg.Channel == 427169570)
         {
-            if (msg.Sender == null)
-                return;
-
-            //m_log.DebugFormat("chan {0} msg {1}", msg.Channel, msg.Message);
-
-            IClientAPI client = msg.Sender;
-
-            if (!m_floaters.ContainsKey(client.AgentId))
-                return;
-
-            string[] parts = msg.Message.Split(new char[] {':'});
-            if (parts.Length == 0)
-                return;
-
-            ScenePresence sp = m_scene.GetScenePresence(client.AgentId);
-            if (sp == null || sp.IsChildAgent)
-                return;
-
-            Dictionary<int, FloaterData> d = m_floaters[client.AgentId];
-
-            // Work around a viewer bug - VALUE from any
-            // dialog can appear on this channel and needs to
-            // be dispatched to ALL open dialogs for the user
-            if (msg.Channel == 427169570)
+            if (parts[0] == "VALUE")
             {
-                if (parts[0] == "VALUE")
+                foreach (FloaterData dd in d.Values)
                 {
-                    foreach (FloaterData dd in d.Values)
+                    if(dd.Handler(client, dd, parts))
                     {
-                        if(dd.Handler(client, dd, parts))
-                        {
-                            m_floaters[client.AgentId].Remove(dd.Channel);
-                            SendToClient(sp, String.Format("># floater {0} destroy", dd.FloaterName));
-                            break;
-                        }
+                        m_floaters[client.AgentId].Remove(dd.Channel);
+                        SendToClient(sp, String.Format("># floater {0} destroy", dd.FloaterName));
+                        break;
                     }
                 }
-                return;
             }
+            return;
+        }
 
-            if (!d.ContainsKey(msg.Channel))
-                return;
+        if (!d.ContainsKey(msg.Channel))
+            return;
 
-            FloaterData data = d[msg.Channel];
+        FloaterData data = d[msg.Channel];
 
-            if (parts[0] == "NOTIFY")
-            {
-                if (parts[1] == "cancel" || parts[1] == data.FloaterName)
-                {
-                    m_floaters[client.AgentId].Remove(data.Channel);
-                    SendToClient(sp, String.Format("># floater {0} destroy", data.FloaterName));
-                }
-            }
-
-            if (data.Handler != null && data.Handler(client, data, parts))
+        if (parts[0] == "NOTIFY")
+        {
+            if (parts[1] == "cancel" || parts[1] == data.FloaterName)
             {
                 m_floaters[client.AgentId].Remove(data.Channel);
                 SendToClient(sp, String.Format("># floater {0} destroy", data.FloaterName));
             }
         }
 
-        public void FloaterControl(ScenePresence sp, FloaterData d, string msg)
+        if (data.Handler != null && data.Handler(client, data, parts))
         {
-            string sendData = String.Format("># floater {0} {1}", d.FloaterName, msg);
-            SendToClient(sp, sendData);
-
+            m_floaters[client.AgentId].Remove(data.Channel);
+            SendToClient(sp, String.Format("># floater {0} destroy", data.FloaterName));
         }
+    }
+
+    public void FloaterControl(ScenePresence sp, FloaterData d, string msg)
+    {
+        string sendData = String.Format("># floater {0} {1}", d.FloaterName, msg);
+        SendToClient(sp, sendData);
+
     }
 }

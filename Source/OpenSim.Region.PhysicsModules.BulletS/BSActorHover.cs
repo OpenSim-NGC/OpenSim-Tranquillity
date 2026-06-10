@@ -29,141 +29,140 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 
 using OMV = OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModules.BulletS
+namespace OpenSim.Region.PhysicsModules.BulletS;
+
+public class BSActorHover : BSActor
 {
-    public class BSActorHover : BSActor
+    private BSFMotor m_hoverMotor;
+
+    public BSActorHover(BSScene physicsScene, BSPhysObject pObj, string actorName)
+        : base(physicsScene, pObj, actorName)
     {
-        private BSFMotor m_hoverMotor;
+        m_hoverMotor = null;
+        m_physicsScene.DetailLog("{0},BSActorHover,constructor", m_controllingPrim.LocalID);
+    }
 
-        public BSActorHover(BSScene physicsScene, BSPhysObject pObj, string actorName)
-            : base(physicsScene, pObj, actorName)
+    // BSActor.isActive
+    public override bool isActive
+    {
+        get { return Enabled; }
+    }
+
+    // Release any connections and resources used by the actor.
+    // BSActor.Dispose()
+    public override void Dispose()
+    {
+        Enabled = false;
+        DeactivateHover();
+    }
+
+    // Called when physical parameters (properties set in Bullet) need to be re-applied.
+    // Called at taint-time.
+    // BSActor.Refresh()
+    public override void Refresh()
+    {
+        m_physicsScene.DetailLog("{0},BSActorHover,refresh", m_controllingPrim.LocalID);
+
+        // If not active any more, turn me off
+        if (!m_controllingPrim.HoverActive)
         {
-            m_hoverMotor = null;
-            m_physicsScene.DetailLog("{0},BSActorHover,constructor", m_controllingPrim.LocalID);
+            SetEnabled(false);
         }
 
-        // BSActor.isActive
-        public override bool isActive
+        // If the object is physically active, add the hoverer prestep action
+        if (isActive)
         {
-            get { return Enabled; }
+            ActivateHover();
         }
-
-        // Release any connections and resources used by the actor.
-        // BSActor.Dispose()
-        public override void Dispose()
+        else
         {
-            Enabled = false;
             DeactivateHover();
         }
+    }
 
-        // Called when physical parameters (properties set in Bullet) need to be re-applied.
-        // Called at taint-time.
-        // BSActor.Refresh()
-        public override void Refresh()
-        {
-            m_physicsScene.DetailLog("{0},BSActorHover,refresh", m_controllingPrim.LocalID);
-    
-            // If not active any more, turn me off
-            if (!m_controllingPrim.HoverActive)
-            {
-                SetEnabled(false);
-            }
-    
-            // If the object is physically active, add the hoverer prestep action
-            if (isActive)
-            {
-                ActivateHover();
-            }
-            else
-            {
-                DeactivateHover();
-            }
-        }
+    // The object's physical representation is being rebuilt so pick up any physical dependencies (constraints, ...).
+    //     Register a prestep action to restore physical requirements before the next simulation step.
+    // Called at taint-time.
+    // BSActor.RemoveDependencies()
+    public override void RemoveDependencies()
+    {
+        // Nothing to do for the hoverer since it is all software at pre-step action time.
+    }
 
-        // The object's physical representation is being rebuilt so pick up any physical dependencies (constraints, ...).
-        //     Register a prestep action to restore physical requirements before the next simulation step.
-        // Called at taint-time.
-        // BSActor.RemoveDependencies()
-        public override void RemoveDependencies()
+    // If a hover motor has not been created, create one and start the hovering.
+    private void ActivateHover()
+    {
+        if (m_hoverMotor == null)
         {
-            // Nothing to do for the hoverer since it is all software at pre-step action time.
-        }
-
-        // If a hover motor has not been created, create one and start the hovering.
-        private void ActivateHover()
-        {
-            if (m_hoverMotor == null)
-            {
-                // Turning the target on
-                m_hoverMotor = new BSFMotor("BSActorHover",
-                                            m_controllingPrim.HoverTau,               // timeScale
-                                            BSMotor.Infinite,           // decay time scale
-                                            1f                          // efficiency
-                );
-                m_hoverMotor.SetTarget(ComputeCurrentHoverHeight());
-                m_hoverMotor.SetCurrent(m_controllingPrim.RawPosition.Z);
-                m_hoverMotor.PhysicsScene = m_physicsScene; // DEBUG DEBUG so motor will output detail log messages.
-    
-                m_physicsScene.BeforeStep += Hoverer;
-            }
-        }
-
-        private void DeactivateHover()
-        {
-            if (m_hoverMotor != null)
-            {
-                m_physicsScene.BeforeStep -= Hoverer;
-                m_hoverMotor = null;
-            }
-        }
-
-        // Called just before the simulation step. Update the vertical position for hoverness.
-        private void Hoverer(float timeStep)
-        {
-            // Don't do hovering while the object is selected.
-            if (!isActive)
-                return;
-    
-            m_hoverMotor.SetCurrent(m_controllingPrim.RawPosition.Z);
+            // Turning the target on
+            m_hoverMotor = new BSFMotor("BSActorHover",
+                                        m_controllingPrim.HoverTau,               // timeScale
+                                        BSMotor.Infinite,           // decay time scale
+                                        1f                          // efficiency
+            );
             m_hoverMotor.SetTarget(ComputeCurrentHoverHeight());
-            float targetHeight = m_hoverMotor.Step(timeStep);
-    
-            // 'targetHeight' is where we'd like the Z of the prim to be at this moment.
-            // Compute the amount of force to push us there.
-            float moveForce = (targetHeight - m_controllingPrim.RawPosition.Z) * m_controllingPrim.RawMass;
-            // Undo anything the object thinks it's doing at the moment
-            moveForce = -m_controllingPrim.RawVelocity.Z * m_controllingPrim.Mass;
-    
-            m_physicsScene.PE.ApplyCentralImpulse(m_controllingPrim.PhysBody, new OMV.Vector3(0f, 0f, moveForce));
-            m_physicsScene.DetailLog("{0},BSPrim.Hover,move,targHt={1},moveForce={2},mass={3}",
-                            m_controllingPrim.LocalID, targetHeight, moveForce, m_controllingPrim.RawMass);
-        }
+            m_hoverMotor.SetCurrent(m_controllingPrim.RawPosition.Z);
+            m_hoverMotor.PhysicsScene = m_physicsScene; // DEBUG DEBUG so motor will output detail log messages.
 
-        // Based on current position, determine what we should be hovering at now.
-        // Must recompute often. What if we walked offa cliff>
-        private float ComputeCurrentHoverHeight()
-        {
-            float ret = m_controllingPrim.HoverHeight;
-            float groundHeight = m_physicsScene.TerrainManager.GetTerrainHeightAtXYZ(m_controllingPrim.RawPosition);
-    
-            switch (m_controllingPrim.HoverType)
-            {
-                case PIDHoverType.Ground:
-                    ret = groundHeight + m_controllingPrim.HoverHeight;
-                    break;
-                case PIDHoverType.GroundAndWater:
-                    float waterHeight = m_physicsScene.TerrainManager.GetWaterLevelAtXYZ(m_controllingPrim.RawPosition);
-                    if (groundHeight > waterHeight)
-                    {
-                        ret = groundHeight + m_controllingPrim.HoverHeight;
-                    }
-                    else
-                    {
-                        ret = waterHeight + m_controllingPrim.HoverHeight;
-                    }
-                    break;
-            }
-            return ret;
+            m_physicsScene.BeforeStep += Hoverer;
         }
+    }
+
+    private void DeactivateHover()
+    {
+        if (m_hoverMotor != null)
+        {
+            m_physicsScene.BeforeStep -= Hoverer;
+            m_hoverMotor = null;
+        }
+    }
+
+    // Called just before the simulation step. Update the vertical position for hoverness.
+    private void Hoverer(float timeStep)
+    {
+        // Don't do hovering while the object is selected.
+        if (!isActive)
+            return;
+
+        m_hoverMotor.SetCurrent(m_controllingPrim.RawPosition.Z);
+        m_hoverMotor.SetTarget(ComputeCurrentHoverHeight());
+        float targetHeight = m_hoverMotor.Step(timeStep);
+
+        // 'targetHeight' is where we'd like the Z of the prim to be at this moment.
+        // Compute the amount of force to push us there.
+        float moveForce = (targetHeight - m_controllingPrim.RawPosition.Z) * m_controllingPrim.RawMass;
+        // Undo anything the object thinks it's doing at the moment
+        moveForce = -m_controllingPrim.RawVelocity.Z * m_controllingPrim.Mass;
+
+        m_physicsScene.PE.ApplyCentralImpulse(m_controllingPrim.PhysBody, new OMV.Vector3(0f, 0f, moveForce));
+        m_physicsScene.DetailLog("{0},BSPrim.Hover,move,targHt={1},moveForce={2},mass={3}",
+                        m_controllingPrim.LocalID, targetHeight, moveForce, m_controllingPrim.RawMass);
+    }
+
+    // Based on current position, determine what we should be hovering at now.
+    // Must recompute often. What if we walked offa cliff>
+    private float ComputeCurrentHoverHeight()
+    {
+        float ret = m_controllingPrim.HoverHeight;
+        float groundHeight = m_physicsScene.TerrainManager.GetTerrainHeightAtXYZ(m_controllingPrim.RawPosition);
+
+        switch (m_controllingPrim.HoverType)
+        {
+            case PIDHoverType.Ground:
+                ret = groundHeight + m_controllingPrim.HoverHeight;
+                break;
+            case PIDHoverType.GroundAndWater:
+                float waterHeight = m_physicsScene.TerrainManager.GetWaterLevelAtXYZ(m_controllingPrim.RawPosition);
+                if (groundHeight > waterHeight)
+                {
+                    ret = groundHeight + m_controllingPrim.HoverHeight;
+                }
+                else
+                {
+                    ret = waterHeight + m_controllingPrim.HoverHeight;
+                }
+                break;
+        }
+        return ret;
     }
 }

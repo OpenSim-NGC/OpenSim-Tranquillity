@@ -29,69 +29,68 @@ using Nini.Config;
 using OpenSim.Data;
 using OpenSim.Services.Base;
 
-namespace OpenSim.Groups
+namespace OpenSim.Groups;
+
+public class GroupsServiceBase : ServiceBase
 {
-    public class GroupsServiceBase : ServiceBase
+    protected IGroupsData m_Database = null;
+    protected IGridUserData m_GridUserService = null;
+
+    public GroupsServiceBase(IConfigSource config, string cName)
+        : base(config)
     {
-        protected IGroupsData m_Database = null;
-        protected IGridUserData m_GridUserService = null;
+        string dllName = String.Empty;
+        string connString = String.Empty;
+        string realm = "os_groups";
+        string usersRealm = "GridUser";
+        string configName = (cName.Length == 0) ? "Groups" : cName;
 
-        public GroupsServiceBase(IConfigSource config, string cName)
-            : base(config)
+        //
+        // Try reading the [DatabaseService] section, if it exists
+        //
+        IConfig dbConfig = config.Configs["DatabaseService"];
+        if (dbConfig != null)
         {
-            string dllName = String.Empty;
-            string connString = String.Empty;
-            string realm = "os_groups";
-            string usersRealm = "GridUser";
-            string configName = (cName.Length == 0) ? "Groups" : cName;
-
-            //
-            // Try reading the [DatabaseService] section, if it exists
-            //
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig != null)
-            {
-                if (dllName.Length == 0)
-                    dllName = dbConfig.GetString("StorageProvider", String.Empty);
-                if (connString.Length == 0)
-                    connString = dbConfig.GetString("ConnectionString", String.Empty);
-            }
-
-            //
-            // [Groups] section overrides [DatabaseService], if it exists
-            //
-            IConfig groupsConfig = config.Configs[configName];
-            if (groupsConfig != null)
-            {
-                dllName = groupsConfig.GetString("StorageProvider", dllName);
-                connString = groupsConfig.GetString("ConnectionString", connString);
-                realm = groupsConfig.GetString("Realm", realm);
-            }
-
-            //
-            // We tried, but this doesn't exist. We can't proceed.
-            //
-            if (dllName.Equals(String.Empty))
-                throw new Exception("No StorageProvider configured");
-
-            m_Database = LoadPlugin<IGroupsData>(dllName, new Object[] { connString, realm });
-            if (m_Database == null)
-                throw new Exception("Could not find a storage interface in the given module " + dllName);
-
-            //
-            // [GridUserService] section overrides [DatabaseService], if it exists
-            //
-            IConfig usersConfig = config.Configs["GridUserService"];
-            if (usersConfig != null)
-            {
-                dllName = usersConfig.GetString("StorageProvider", dllName);
-                connString = usersConfig.GetString("ConnectionString", connString);
-                usersRealm = usersConfig.GetString("Realm", usersRealm);
-            }
-
-            m_GridUserService = LoadPlugin<IGridUserData>(dllName, new Object[] { connString, usersRealm });
-            if (m_GridUserService == null)
-                throw new Exception("Could not find a storage inferface for the given users module " + dllName);
+            if (dllName.Length == 0)
+                dllName = dbConfig.GetString("StorageProvider", String.Empty);
+            if (connString.Length == 0)
+                connString = dbConfig.GetString("ConnectionString", String.Empty);
         }
+
+        //
+        // [Groups] section overrides [DatabaseService], if it exists
+        //
+        IConfig groupsConfig = config.Configs[configName];
+        if (groupsConfig != null)
+        {
+            dllName = groupsConfig.GetString("StorageProvider", dllName);
+            connString = groupsConfig.GetString("ConnectionString", connString);
+            realm = groupsConfig.GetString("Realm", realm);
+        }
+
+        //
+        // We tried, but this doesn't exist. We can't proceed.
+        //
+        if (dllName.Equals(String.Empty))
+            throw new Exception("No StorageProvider configured");
+
+        m_Database = LoadPlugin<IGroupsData>(dllName, new Object[] { connString, realm });
+        if (m_Database == null)
+            throw new Exception("Could not find a storage interface in the given module " + dllName);
+
+        //
+        // [GridUserService] section overrides [DatabaseService], if it exists
+        //
+        IConfig usersConfig = config.Configs["GridUserService"];
+        if (usersConfig != null)
+        {
+            dllName = usersConfig.GetString("StorageProvider", dllName);
+            connString = usersConfig.GetString("ConnectionString", connString);
+            usersRealm = usersConfig.GetString("Realm", usersRealm);
+        }
+
+        m_GridUserService = LoadPlugin<IGridUserData>(dllName, new Object[] { connString, usersRealm });
+        if (m_GridUserService == null)
+            throw new Exception("Could not find a storage inferface for the given users module " + dllName);
     }
 }

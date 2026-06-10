@@ -36,11 +36,11 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
+namespace OpenSim.Region.CoreModules.World.Serialiser.Tests;
+
+public class SerialiserTests : OpenSimTestCase
 {
-    public class SerialiserTests : OpenSimTestCase
-    {
-        private const string ObjectRootPartStubXml =
+    private const string ObjectRootPartStubXml =
 @"<SceneObjectGroup>
     <RootPart>
         <SceneObjectPart xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
@@ -159,12 +159,12 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
         </SceneObjectPart>
     </RootPart>";
 
-        private const string ObjectWithNoOtherPartsXml = ObjectRootPartStubXml +
+    private const string ObjectWithNoOtherPartsXml = ObjectRootPartStubXml +
 @"
     <OtherParts />
 </SceneObjectGroup>";
 
-        private const string ObjectWithOtherPartsXml = ObjectRootPartStubXml +
+    private const string ObjectWithOtherPartsXml = ObjectRootPartStubXml +
 @"
   <OtherParts>
     <Part>
@@ -384,7 +384,7 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
   </OtherParts>
 </SceneObjectGroup>";
 
-        private const string ObjectWithBadFloatsXml = @"
+    private const string ObjectWithBadFloatsXml = @"
         <SceneObjectGroup>
             <RootPart>
                 <SceneObjectPart xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
@@ -491,7 +491,7 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             <OtherParts />
         </SceneObjectGroup>";
 
-        private const string ObjectWithNoPartsXml2 = @"
+    private const string ObjectWithNoPartsXml2 = @"
         <SceneObjectGroup>
             <SceneObjectPart xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
                 <CreatorID><UUID>b46ef588-411e-4a8b-a284-d7dcfe8e74ef</UUID></CreatorID>
@@ -586,295 +586,294 @@ namespace OpenSim.Region.CoreModules.World.Serialiser.Tests
             <OtherParts />
         </SceneObjectGroup>";
 
-        protected Scene m_scene;
-        protected SerialiserModule m_serialiserModule;
+    protected Scene m_scene;
+    protected SerialiserModule m_serialiserModule;
 
-        private void Init()
+    private void Init()
+    {
+        m_serialiserModule = new SerialiserModule();
+        m_scene = new SceneHelpers().SetupScene();
+        SceneHelpers.SetupSceneModules(m_scene, m_serialiserModule);
+    }
+
+    [Fact]
+    public void TestDeserializeXmlObjectWithNoOtherParts()
+    {
+        TestHelpers.InMethod();
+        TestHelpers.EnableLogging();
+
+        SceneObjectGroup so = SceneObjectSerializer.FromOriginalXmlFormat(ObjectWithNoOtherPartsXml);
+        SceneObjectPart rootPart = so.RootPart;
+
+        // TODO: Assert.Equal(,)); - incomplete assertion
+        // TODO: Assert.Equal(,)); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+        OSDMap store = rootPart.DynAttrs.GetStore("MyNamespace", "MyStore");
+        Assert.Equal(42, store["the answer"].AsInteger());
+
+        // TODO: Check other properties
+    }
+
+    [Fact]
+    public void TestDeserializeXmlObjectWithOtherParts()
+    {
+        TestHelpers.InMethod();
+        TestHelpers.EnableLogging();
+
+        SceneObjectGroup so = SceneObjectSerializer.FromOriginalXmlFormat(ObjectWithOtherPartsXml);
+        SceneObjectPart[] parts = so.Parts;
+        Assert.Equal(3, so.Parts.Length);
+
         {
-            m_serialiserModule = new SerialiserModule();
-            m_scene = new SceneHelpers().SetupScene();
-            SceneHelpers.SetupSceneModules(m_scene, m_serialiserModule);
-        }
-
-        [Fact]
-        public void TestDeserializeXmlObjectWithNoOtherParts()
-        {
-            TestHelpers.InMethod();
-            TestHelpers.EnableLogging();
-
-            SceneObjectGroup so = SceneObjectSerializer.FromOriginalXmlFormat(ObjectWithNoOtherPartsXml);
-            SceneObjectPart rootPart = so.RootPart;
+            SceneObjectPart part = parts[0];
 
             // TODO: Assert.Equal(,)); - incomplete assertion
             // TODO: Assert.Equal(,)); - incomplete assertion
             // TODO: Assert.Equal(,); - incomplete assertion
-            OSDMap store = rootPart.DynAttrs.GetStore("MyNamespace", "MyStore");
+            OSDMap store = part.DynAttrs.GetStore("MyNamespace", "MyStore");
             Assert.Equal(42, store["the answer"].AsInteger());
-
-            // TODO: Check other properties
         }
 
-        [Fact]
-        public void TestDeserializeXmlObjectWithOtherParts()
         {
-            TestHelpers.InMethod();
-            TestHelpers.EnableLogging();
-
-            SceneObjectGroup so = SceneObjectSerializer.FromOriginalXmlFormat(ObjectWithOtherPartsXml);
-            SceneObjectPart[] parts = so.Parts;
-            Assert.Equal(3, so.Parts.Length);
-
-            {
-                SceneObjectPart part = parts[0];
-
-                // TODO: Assert.Equal(,)); - incomplete assertion
-                // TODO: Assert.Equal(,)); - incomplete assertion
-                // TODO: Assert.Equal(,); - incomplete assertion
-                OSDMap store = part.DynAttrs.GetStore("MyNamespace", "MyStore");
-                Assert.Equal(42, store["the answer"].AsInteger());
-            }
-
-            {
-                SceneObjectPart part = parts[1];
-
-                // TODO: Assert.Equal(,)); - incomplete assertion
-                // TODO: Assert.Equal(,)); - incomplete assertion
-                // TODO: Assert.Equal(,); - incomplete assertion
-            }
-
-            {
-                SceneObjectPart part = parts[2];
-
-                // TODO: Assert.Equal(,)); - incomplete assertion
-                // TODO: Assert.Equal(,)); - incomplete assertion
-                // TODO: Assert.Equal(,); - incomplete assertion
-            }
-
-            // TODO: Check other properties
-        }
-
-        [Fact]
-        public void TestDeserializeBadFloatsXml()
-        {
-            TestHelpers.InMethod();
-//            TestHelpers.EnableLogging();
-
-            SceneObjectGroup so = SceneObjectSerializer.FromOriginalXmlFormat(ObjectWithBadFloatsXml);
-            SceneObjectPart rootPart = so.RootPart;
+            SceneObjectPart part = parts[1];
 
             // TODO: Assert.Equal(,)); - incomplete assertion
             // TODO: Assert.Equal(,)); - incomplete assertion
             // TODO: Assert.Equal(,); - incomplete assertion
-
-            // This terminates the deserialization earlier if couldn't be parsed.
-            // TODO: Need to address this
-            // TODO: Assert.Equal(,); - incomplete assertion
-
-            // TODO: Assert.Equal(,); - incomplete assertion
-
-            // Defaults for bad parses
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
-
-            // TODO: Check other properties
         }
 
-        [Fact]
-        public void TestSerializeXml()
         {
-            TestHelpers.InMethod();
+            SceneObjectPart part = parts[2];
+
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,)); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+        }
+
+        // TODO: Check other properties
+    }
+
+    [Fact]
+    public void TestDeserializeBadFloatsXml()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            string rpName = "My Little Donkey";
-            UUID rpUuid = UUID.Parse("00000000-0000-0000-0000-000000000964");
-            UUID rpCreatorId = UUID.Parse("00000000-0000-0000-0000-000000000915");
-            PrimitiveBaseShape shape = PrimitiveBaseShape.CreateSphere();
+        SceneObjectGroup so = SceneObjectSerializer.FromOriginalXmlFormat(ObjectWithBadFloatsXml);
+        SceneObjectPart rootPart = so.RootPart;
+
+        // TODO: Assert.Equal(,)); - incomplete assertion
+        // TODO: Assert.Equal(,)); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+
+        // This terminates the deserialization earlier if couldn't be parsed.
+        // TODO: Need to address this
+        // TODO: Assert.Equal(,); - incomplete assertion
+
+        // TODO: Assert.Equal(,); - incomplete assertion
+
+        // Defaults for bad parses
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+
+        // TODO: Check other properties
+    }
+
+    [Fact]
+    public void TestSerializeXml()
+    {
+        TestHelpers.InMethod();
+//            TestHelpers.EnableLogging();
+
+        string rpName = "My Little Donkey";
+        UUID rpUuid = UUID.Parse("00000000-0000-0000-0000-000000000964");
+        UUID rpCreatorId = UUID.Parse("00000000-0000-0000-0000-000000000915");
+        PrimitiveBaseShape shape = PrimitiveBaseShape.CreateSphere();
 //            Vector3 groupPosition = new Vector3(10, 20, 30);
 //            Quaternion rotationOffset = new Quaternion(20, 30, 40, 50);
 //            Vector3 offsetPosition = new Vector3(5, 10, 15);
 
-            SceneObjectPart rp = new SceneObjectPart();
-            rp.UUID = rpUuid;
-            rp.Name = rpName;
-            rp.CreatorID = rpCreatorId;
-            rp.Shape = shape;
+        SceneObjectPart rp = new SceneObjectPart();
+        rp.UUID = rpUuid;
+        rp.Name = rpName;
+        rp.CreatorID = rpCreatorId;
+        rp.Shape = shape;
 
-            string daNamespace = "MyNamespace";
-            string daStoreName = "MyStore";
-            string daKey = "foo";
-            string daValue = "bar";
-            OSDMap myStore = new OSDMap();
-            myStore.Add(daKey, daValue);
-            rp.DynAttrs = new DAMap();
-            rp.DynAttrs.SetStore(daNamespace, daStoreName, myStore);
+        string daNamespace = "MyNamespace";
+        string daStoreName = "MyStore";
+        string daKey = "foo";
+        string daValue = "bar";
+        OSDMap myStore = new OSDMap();
+        myStore.Add(daKey, daValue);
+        rp.DynAttrs = new DAMap();
+        rp.DynAttrs.SetStore(daNamespace, daStoreName, myStore);
 
-            SceneObjectGroup so = new SceneObjectGroup(rp);
+        SceneObjectGroup so = new SceneObjectGroup(rp);
 
-            // Need to add the object to the scene so that the request to get script state succeeds
-            m_scene.AddSceneObject(so);
+        // Need to add the object to the scene so that the request to get script state succeeds
+        m_scene.AddSceneObject(so);
 
-            string xml = SceneObjectSerializer.ToOriginalXmlFormat(so);
+        string xml = SceneObjectSerializer.ToOriginalXmlFormat(so);
 
-            XmlTextReader xtr = new XmlTextReader(new StringReader(xml));
-            xtr.DtdProcessing = DtdProcessing.Ignore;
-            xtr.ReadStartElement("SceneObjectGroup");
-            xtr.ReadStartElement("RootPart");
-            xtr.ReadStartElement("SceneObjectPart");
+        XmlTextReader xtr = new XmlTextReader(new StringReader(xml));
+        xtr.DtdProcessing = DtdProcessing.Ignore;
+        xtr.ReadStartElement("SceneObjectGroup");
+        xtr.ReadStartElement("RootPart");
+        xtr.ReadStartElement("SceneObjectPart");
 
-            UUID uuid = UUID.Zero;
-            string name = null;
-            UUID creatorId = UUID.Zero;
-            DAMap daMap = null;
+        UUID uuid = UUID.Zero;
+        string name = null;
+        UUID creatorId = UUID.Zero;
+        DAMap daMap = null;
 
-            while (xtr.Read() && xtr.Name != "SceneObjectPart")
+        while (xtr.Read() && xtr.Name != "SceneObjectPart")
+        {
+            if (xtr.NodeType != XmlNodeType.Element)
+                continue;
+
+            switch (xtr.Name)
             {
-                if (xtr.NodeType != XmlNodeType.Element)
-                    continue;
-
-                switch (xtr.Name)
-                {
-                    case "UUID":
-                        xtr.ReadStartElement("UUID");
-                        try
-                        {
-                            uuid = UUID.Parse(xtr.ReadElementString("UUID"));
-                            xtr.ReadEndElement();
-                        }
-                        catch { } // ignore everything but <UUID><UUID>...</UUID></UUID>
-                        break;
-                    case "Name":
-                        name = xtr.ReadElementContentAsString();
-                        break;
-                    case "CreatorID":
-                        xtr.ReadStartElement("CreatorID");
-                        creatorId = UUID.Parse(xtr.ReadElementString("UUID"));
+                case "UUID":
+                    xtr.ReadStartElement("UUID");
+                    try
+                    {
+                        uuid = UUID.Parse(xtr.ReadElementString("UUID"));
                         xtr.ReadEndElement();
-                        break;
-                    case "DynAttrs":
-                        daMap = new DAMap();
-                        daMap.ReadXml(xtr);
-                        break;
-                }
+                    }
+                    catch { } // ignore everything but <UUID><UUID>...</UUID></UUID>
+                    break;
+                case "Name":
+                    name = xtr.ReadElementContentAsString();
+                    break;
+                case "CreatorID":
+                    xtr.ReadStartElement("CreatorID");
+                    creatorId = UUID.Parse(xtr.ReadElementString("UUID"));
+                    xtr.ReadEndElement();
+                    break;
+                case "DynAttrs":
+                    daMap = new DAMap();
+                    daMap.ReadXml(xtr);
+                    break;
             }
-
-            xtr.ReadEndElement();
-            xtr.ReadEndElement();
-            xtr.ReadStartElement("OtherParts");
-            xtr.ReadEndElement();
-            xtr.Close();
-
-            // TODO: More checks
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
-            Assert.NotNull(daMap);
-            Assert.Equal(daValue, daMap.GetStore(daNamespace, daStoreName)[daKey].AsString());
         }
 
-        [Fact]
-        public void TestDeserializeXml2()
-        {
-            TestHelpers.InMethod();
+        xtr.ReadEndElement();
+        xtr.ReadEndElement();
+        xtr.ReadStartElement("OtherParts");
+        xtr.ReadEndElement();
+        xtr.Close();
+
+        // TODO: More checks
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+        Assert.NotNull(daMap);
+        Assert.Equal(daValue, daMap.GetStore(daNamespace, daStoreName)[daKey].AsString());
+    }
+
+    [Fact]
+    public void TestDeserializeXml2()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            SceneObjectGroup so = m_serialiserModule.DeserializeGroupFromXml2(ObjectWithNoPartsXml2);
-            SceneObjectPart rootPart = so.RootPart;
+        SceneObjectGroup so = m_serialiserModule.DeserializeGroupFromXml2(ObjectWithNoPartsXml2);
+        SceneObjectPart rootPart = so.RootPart;
 
-            // TODO: Assert.Equal(,)); - incomplete assertion
-            // TODO: Assert.Equal(,)); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
-            OSDMap store = rootPart.DynAttrs.GetStore("MyNamespace", "MyStore");
-            Assert.Equal("Rosebud", store["last words"].AsString());
+        // TODO: Assert.Equal(,)); - incomplete assertion
+        // TODO: Assert.Equal(,)); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+        OSDMap store = rootPart.DynAttrs.GetStore("MyNamespace", "MyStore");
+        Assert.Equal("Rosebud", store["last words"].AsString());
 
-            // TODO: Check other properties
-        }
+        // TODO: Check other properties
+    }
 
-        [Fact]
-        public void TestSerializeXml2()
-        {
-            TestHelpers.InMethod();
+    [Fact]
+    public void TestSerializeXml2()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            string rpName = "My Little Pony";
-            UUID rpUuid = UUID.Parse("00000000-0000-0000-0000-000000000064");
-            UUID rpCreatorId = UUID.Parse("00000000-0000-0000-0000-000000000015");
-            PrimitiveBaseShape shape = PrimitiveBaseShape.CreateSphere();
+        string rpName = "My Little Pony";
+        UUID rpUuid = UUID.Parse("00000000-0000-0000-0000-000000000064");
+        UUID rpCreatorId = UUID.Parse("00000000-0000-0000-0000-000000000015");
+        PrimitiveBaseShape shape = PrimitiveBaseShape.CreateSphere();
 //            Vector3 groupPosition = new Vector3(10, 20, 30);
 //            Quaternion rotationOffset = new Quaternion(20, 30, 40, 50);
 //            Vector3 offsetPosition = new Vector3(5, 10, 15);
 
-            SceneObjectPart rp = new SceneObjectPart();
-            rp.UUID = rpUuid;
-            rp.Name = rpName;
-            rp.CreatorID = rpCreatorId;
-            rp.Shape = shape;
+        SceneObjectPart rp = new SceneObjectPart();
+        rp.UUID = rpUuid;
+        rp.Name = rpName;
+        rp.CreatorID = rpCreatorId;
+        rp.Shape = shape;
 
-            string daNamespace = "MyNamespace";
-            string daStoreName = "MyStore";
-            string daKey = "foo";
-            string daValue = "bar";
-            OSDMap myStore = new OSDMap();
-            myStore.Add(daKey, daValue);
-            rp.DynAttrs = new DAMap();
-            rp.DynAttrs.SetStore(daNamespace, daStoreName, myStore);
+        string daNamespace = "MyNamespace";
+        string daStoreName = "MyStore";
+        string daKey = "foo";
+        string daValue = "bar";
+        OSDMap myStore = new OSDMap();
+        myStore.Add(daKey, daValue);
+        rp.DynAttrs = new DAMap();
+        rp.DynAttrs.SetStore(daNamespace, daStoreName, myStore);
 
-            SceneObjectGroup so = new SceneObjectGroup(rp);
+        SceneObjectGroup so = new SceneObjectGroup(rp);
 
-            // Need to add the object to the scene so that the request to get script state succeeds
-            m_scene.AddSceneObject(so);
+        // Need to add the object to the scene so that the request to get script state succeeds
+        m_scene.AddSceneObject(so);
 
-            Dictionary<string, object> options = new Dictionary<string, object>();
-            options["old-guids"] = true;
-            string xml2 = m_serialiserModule.SerializeGroupToXml2(so, options);
+        Dictionary<string, object> options = new Dictionary<string, object>();
+        options["old-guids"] = true;
+        string xml2 = m_serialiserModule.SerializeGroupToXml2(so, options);
 
-            XmlTextReader xtr = new XmlTextReader(new StringReader(xml2));
-            xtr.DtdProcessing = DtdProcessing.Ignore;
-            xtr.ReadStartElement("SceneObjectGroup");
-            xtr.ReadStartElement("SceneObjectPart");
+        XmlTextReader xtr = new XmlTextReader(new StringReader(xml2));
+        xtr.DtdProcessing = DtdProcessing.Ignore;
+        xtr.ReadStartElement("SceneObjectGroup");
+        xtr.ReadStartElement("SceneObjectPart");
 
-            UUID uuid = UUID.Zero;
-            string name = null;
-            UUID creatorId = UUID.Zero;
-            DAMap daMap = null;
+        UUID uuid = UUID.Zero;
+        string name = null;
+        UUID creatorId = UUID.Zero;
+        DAMap daMap = null;
 
-            while (xtr.Read() && xtr.Name != "SceneObjectPart")
+        while (xtr.Read() && xtr.Name != "SceneObjectPart")
+        {
+            if (xtr.NodeType != XmlNodeType.Element)
+                continue;
+
+            switch (xtr.Name)
             {
-                if (xtr.NodeType != XmlNodeType.Element)
-                    continue;
-
-                switch (xtr.Name)
-                {
-                    case "UUID":
-                        xtr.ReadStartElement("UUID");
-                        uuid = UUID.Parse(xtr.ReadElementString("Guid"));
-                        xtr.ReadEndElement();
-                        break;
-                    case "Name":
-                        name = xtr.ReadElementContentAsString();
-                        break;
-                    case "CreatorID":
-                        xtr.ReadStartElement("CreatorID");
-                        creatorId = UUID.Parse(xtr.ReadElementString("Guid"));
-                        xtr.ReadEndElement();
-                        break;
-                    case "DynAttrs":
-                        daMap = new DAMap();
-                        daMap.ReadXml(xtr);
-                        break;
-                }
+                case "UUID":
+                    xtr.ReadStartElement("UUID");
+                    uuid = UUID.Parse(xtr.ReadElementString("Guid"));
+                    xtr.ReadEndElement();
+                    break;
+                case "Name":
+                    name = xtr.ReadElementContentAsString();
+                    break;
+                case "CreatorID":
+                    xtr.ReadStartElement("CreatorID");
+                    creatorId = UUID.Parse(xtr.ReadElementString("Guid"));
+                    xtr.ReadEndElement();
+                    break;
+                case "DynAttrs":
+                    daMap = new DAMap();
+                    daMap.ReadXml(xtr);
+                    break;
             }
-
-            xtr.ReadEndElement();
-            xtr.ReadStartElement("OtherParts");
-            xtr.ReadEndElement();
-            xtr.Close();
-
-            // TODO: More checks
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
-            Assert.NotNull(daMap);
-            Assert.Equal(daValue, daMap.GetStore(daNamespace, daStoreName)[daKey].AsString());
         }
+
+        xtr.ReadEndElement();
+        xtr.ReadStartElement("OtherParts");
+        xtr.ReadEndElement();
+        xtr.Close();
+
+        // TODO: More checks
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+        Assert.NotNull(daMap);
+        Assert.Equal(daValue, daMap.GetStore(daNamespace, daStoreName)[daKey].AsString());
     }
 }

@@ -28,11 +28,10 @@
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IDwellModule
 {
-    public interface IDwellModule
-    {
-        int GetDwell(UUID parcelID);
-        int GetDwell(LandData land);
-    }
+    int GetDwell(UUID parcelID);
+    int GetDwell(LandData land);
 }

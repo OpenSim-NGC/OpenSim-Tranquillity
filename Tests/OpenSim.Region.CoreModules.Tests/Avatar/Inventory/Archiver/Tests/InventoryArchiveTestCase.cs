@@ -32,132 +32,131 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
+namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests;
+
+public class InventoryArchiveTestCase : OpenSimTestCase
 {
-    public class InventoryArchiveTestCase : OpenSimTestCase
+    protected ManualResetEvent mre = new ManualResetEvent(false);
+
+    /// <summary>
+    /// A raw array of bytes that we'll use to create an IAR memory stream suitable for isolated use in each test.
+    /// </summary>
+    protected byte[] m_iarStreamBytes;
+
+    /// <summary>
+    /// Stream of data representing a common IAR for load tests.
+    /// </summary>
+    protected MemoryStream m_iarStream;
+
+    protected UserAccount m_uaMT
+        = new UserAccount {
+            PrincipalID = UUID.Parse("00000000-0000-0000-0000-000000000555"),
+            FirstName = "Mr",
+            LastName = "Tiddles" };
+
+    protected UserAccount m_uaLL1
+        = new UserAccount {
+            PrincipalID = UUID.Parse("00000000-0000-0000-0000-000000000666"),
+            FirstName = "Lord",
+            LastName = "Lucan" };
+
+    protected UserAccount m_uaLL2
+        = new UserAccount {
+            PrincipalID = UUID.Parse("00000000-0000-0000-0000-000000000777"),
+            FirstName = "Lord",
+            LastName = "Lucan" };
+
+    protected string m_item1Name = "Ray Gun Item";
+    protected string m_coaItemName = "Coalesced Item";
+
+    public void FixtureSetup()
     {
-        protected ManualResetEvent mre = new ManualResetEvent(false);
+        // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
+        Util.FireAndForgetMethod = FireAndForgetMethod.RegressionTest;
 
-        /// <summary>
-        /// A raw array of bytes that we'll use to create an IAR memory stream suitable for isolated use in each test.
-        /// </summary>
-        protected byte[] m_iarStreamBytes;
+        ConstructDefaultIarBytesForTestLoad();
+    }
 
-        /// <summary>
-        /// Stream of data representing a common IAR for load tests.
-        /// </summary>
-        protected MemoryStream m_iarStream;
+    public void TearDown()
+    {
+        // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple
+        // threads.  Possibly, later tests should be rewritten so none of them require async stuff (which regression
+        // tests really shouldn't).
+        Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
+    }
 
-        protected UserAccount m_uaMT
-            = new UserAccount {
-                PrincipalID = UUID.Parse("00000000-0000-0000-0000-000000000555"),
-                FirstName = "Mr",
-                LastName = "Tiddles" };
+    public override void SetUp()
+    {
+        base.SetUp();
+        m_iarStream = new MemoryStream(m_iarStreamBytes);
+    }
 
-        protected UserAccount m_uaLL1
-            = new UserAccount {
-                PrincipalID = UUID.Parse("00000000-0000-0000-0000-000000000666"),
-                FirstName = "Lord",
-                LastName = "Lucan" };
+    protected void ConstructDefaultIarBytesForTestLoad()
+    {
 
-        protected UserAccount m_uaLL2
-            = new UserAccount {
-                PrincipalID = UUID.Parse("00000000-0000-0000-0000-000000000777"),
-                FirstName = "Lord",
-                LastName = "Lucan" };
+        InventoryArchiverModule archiverModule = new InventoryArchiverModule();
+        Scene scene = new SceneHelpers().SetupScene();
+        SceneHelpers.SetupSceneModules(scene, archiverModule);
 
-        protected string m_item1Name = "Ray Gun Item";
-        protected string m_coaItemName = "Coalesced Item";
+        UserAccountHelpers.CreateUserWithInventory(scene, m_uaLL1, "hampshire");
 
-        public void FixtureSetup()
-        {
-            // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
-            Util.FireAndForgetMethod = FireAndForgetMethod.RegressionTest;
+        MemoryStream archiveWriteStream = new MemoryStream();
 
-            ConstructDefaultIarBytesForTestLoad();
-        }
+        //InventoryFolderBase objects = scene.InventoryService.GetFolderForType(m_uaLL1.PrincipalID, FolderType.Object);
+        // Create scene object asset
+        UUID ownerId = UUID.Parse("00000000-0000-0000-0000-000000000040");
+        SceneObjectGroup object1 = SceneHelpers.CreateSceneObject(1, ownerId, "Ray Gun Object", 0x50);
 
-        public void TearDown()
-        {
-            // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple
-            // threads.  Possibly, later tests should be rewritten so none of them require async stuff (which regression
-            // tests really shouldn't).
-            Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
-        }
+        UUID asset1Id = UUID.Parse("00000000-0000-0000-0000-000000000060");
+        AssetBase asset1 = AssetHelpers.CreateAsset(asset1Id, object1);
+        scene.AssetService.Store(asset1);
 
-        public override void SetUp()
-        {
-            base.SetUp();
-            m_iarStream = new MemoryStream(m_iarStreamBytes);
-        }
+        // Create scene object item
+        InventoryItemBase item1 = new InventoryItemBase();
+        item1.Name = m_item1Name;
+        item1.ID = UUID.Parse("00000000-0000-0000-0000-000000000020");
+        item1.AssetID = asset1.FullID;
+        item1.GroupID = UUID.Random();
+        item1.CreatorId = m_uaLL1.PrincipalID.ToString();
+        item1.Owner = m_uaLL1.PrincipalID;
+        //item1.Folder = objects.ID;
+        item1.Folder = scene.InventoryService.GetRootFolder(m_uaLL1.PrincipalID).ID;
+        scene.AddInventoryItem(item1);
 
-        protected void ConstructDefaultIarBytesForTestLoad()
-        {
+        // Create coalesced objects asset
+        SceneObjectGroup cobj1 = SceneHelpers.CreateSceneObject(1, m_uaLL1.PrincipalID, "Object1", 0x120);
+        cobj1.AbsolutePosition = new Vector3(15, 30, 45);
 
-            InventoryArchiverModule archiverModule = new InventoryArchiverModule();
-            Scene scene = new SceneHelpers().SetupScene();
-            SceneHelpers.SetupSceneModules(scene, archiverModule);
+        SceneObjectGroup cobj2 = SceneHelpers.CreateSceneObject(1, m_uaLL1.PrincipalID, "Object2", 0x140);
+        cobj2.AbsolutePosition = new Vector3(25, 50, 75);
 
-            UserAccountHelpers.CreateUserWithInventory(scene, m_uaLL1, "hampshire");
+        CoalescedSceneObjects coa = new CoalescedSceneObjects(m_uaLL1.PrincipalID, cobj1, cobj2);
 
-            MemoryStream archiveWriteStream = new MemoryStream();
+        AssetBase coaAsset = AssetHelpers.CreateAsset(0x160, coa);
+        scene.AssetService.Store(coaAsset);
 
-            //InventoryFolderBase objects = scene.InventoryService.GetFolderForType(m_uaLL1.PrincipalID, FolderType.Object);
-            // Create scene object asset
-            UUID ownerId = UUID.Parse("00000000-0000-0000-0000-000000000040");
-            SceneObjectGroup object1 = SceneHelpers.CreateSceneObject(1, ownerId, "Ray Gun Object", 0x50);
+        // Create coalesced objects inventory item
+        InventoryItemBase coaItem = new InventoryItemBase();
+        coaItem.Name = m_coaItemName;
+        coaItem.ID = UUID.Parse("00000000-0000-0000-0000-000000000180");
+        coaItem.AssetID = coaAsset.FullID;
+        coaItem.GroupID = UUID.Random();
+        coaItem.CreatorId = m_uaLL1.PrincipalID.ToString();
+        coaItem.Owner = m_uaLL1.PrincipalID;
+        //coaItem.Folder = objects.ID;
+        coaItem.Folder = scene.InventoryService.GetRootFolder(m_uaLL1.PrincipalID).ID;
+        scene.AddInventoryItem(coaItem);
 
-            UUID asset1Id = UUID.Parse("00000000-0000-0000-0000-000000000060");
-            AssetBase asset1 = AssetHelpers.CreateAsset(asset1Id, object1);
-            scene.AssetService.Store(asset1);
+        archiverModule.ArchiveInventory(
+            UUID.Random(), m_uaLL1.FirstName, m_uaLL1.LastName, "/*", "hampshire", archiveWriteStream);
 
-            // Create scene object item
-            InventoryItemBase item1 = new InventoryItemBase();
-            item1.Name = m_item1Name;
-            item1.ID = UUID.Parse("00000000-0000-0000-0000-000000000020");
-            item1.AssetID = asset1.FullID;
-            item1.GroupID = UUID.Random();
-            item1.CreatorId = m_uaLL1.PrincipalID.ToString();
-            item1.Owner = m_uaLL1.PrincipalID;
-            //item1.Folder = objects.ID;
-            item1.Folder = scene.InventoryService.GetRootFolder(m_uaLL1.PrincipalID).ID;
-            scene.AddInventoryItem(item1);
+        m_iarStreamBytes = archiveWriteStream.ToArray();
+    }
 
-            // Create coalesced objects asset
-            SceneObjectGroup cobj1 = SceneHelpers.CreateSceneObject(1, m_uaLL1.PrincipalID, "Object1", 0x120);
-            cobj1.AbsolutePosition = new Vector3(15, 30, 45);
-
-            SceneObjectGroup cobj2 = SceneHelpers.CreateSceneObject(1, m_uaLL1.PrincipalID, "Object2", 0x140);
-            cobj2.AbsolutePosition = new Vector3(25, 50, 75);
-
-            CoalescedSceneObjects coa = new CoalescedSceneObjects(m_uaLL1.PrincipalID, cobj1, cobj2);
-
-            AssetBase coaAsset = AssetHelpers.CreateAsset(0x160, coa);
-            scene.AssetService.Store(coaAsset);
-
-            // Create coalesced objects inventory item
-            InventoryItemBase coaItem = new InventoryItemBase();
-            coaItem.Name = m_coaItemName;
-            coaItem.ID = UUID.Parse("00000000-0000-0000-0000-000000000180");
-            coaItem.AssetID = coaAsset.FullID;
-            coaItem.GroupID = UUID.Random();
-            coaItem.CreatorId = m_uaLL1.PrincipalID.ToString();
-            coaItem.Owner = m_uaLL1.PrincipalID;
-            //coaItem.Folder = objects.ID;
-            coaItem.Folder = scene.InventoryService.GetRootFolder(m_uaLL1.PrincipalID).ID;
-            scene.AddInventoryItem(coaItem);
-
-            archiverModule.ArchiveInventory(
-                UUID.Random(), m_uaLL1.FirstName, m_uaLL1.LastName, "/*", "hampshire", archiveWriteStream);
-
-            m_iarStreamBytes = archiveWriteStream.ToArray();
-        }
-
-        protected void SaveCompleted(
-            UUID id, bool succeeded, UserAccount userInfo, string invPath, Stream saveStream,
-            Exception reportedException, int SaveCount, int FilterCount)
-        {
-            mre.Set();
-        }
+    protected void SaveCompleted(
+        UUID id, bool succeeded, UserAccount userInfo, string invPath, Stream saveStream,
+        Exception reportedException, int SaveCount, int FilterCount)
+    {
+        mre.Set();
     }
 }

@@ -27,90 +27,88 @@
 
 using Nini.Config;
 using OpenSim.Framework;
-using OpenSim.Region.CoreModules.Asset;
 using OpenSim.Tests.Common;
 using Xunit;
 
-namespace OpenSim.Region.CoreModules.Asset.Tests
+namespace OpenSim.Region.CoreModules.Asset.Tests;
+
+/// <summary>
+/// At the moment we're only test the in-memory part of the FlotsamAssetCache.  This is a considerable weakness.
+/// </summary>
+public class FlotsamAssetCacheTests : OpenSimTestCase
 {
-    /// <summary>
-    /// At the moment we're only test the in-memory part of the FlotsamAssetCache.  This is a considerable weakness.
-    /// </summary>
-    public class FlotsamAssetCacheTests : OpenSimTestCase
+    protected TestScene? m_scene;
+    protected FlotsamAssetCache? m_cache;
+
+    public override void SetUp()
     {
-        protected TestScene? m_scene;
-        protected FlotsamAssetCache? m_cache;
+        base.SetUp();
 
-        public override void SetUp()
-        {
-            base.SetUp();
+        IConfigSource config = new IniConfigSource();
 
-            IConfigSource config = new IniConfigSource();
+        config.AddConfig("Modules");
+        config.Configs["Modules"].Set("AssetCaching", "FlotsamAssetCache");
+        config.AddConfig("AssetCache");
+        config.Configs["AssetCache"].Set("FileCacheEnabled", "false");
+        config.Configs["AssetCache"].Set("MemoryCacheEnabled", "true");
 
-            config.AddConfig("Modules");
-            config.Configs["Modules"].Set("AssetCaching", "FlotsamAssetCache");
-            config.AddConfig("AssetCache");
-            config.Configs["AssetCache"].Set("FileCacheEnabled", "false");
-            config.Configs["AssetCache"].Set("MemoryCacheEnabled", "true");
+        m_cache = new FlotsamAssetCache();
+        m_scene = new SceneHelpers().SetupScene();
+        SceneHelpers.SetupSceneModules(m_scene, config, m_cache);
+    }
 
-            m_cache = new FlotsamAssetCache();
-            m_scene = new SceneHelpers().SetupScene();
-            SceneHelpers.SetupSceneModules(m_scene, config, m_cache);
-        }
-
-        [Fact]
-        public void TestCacheAsset()
-        {
-            TestHelpers.InMethod();
+    [Fact]
+    public void TestCacheAsset()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            AssetBase asset = AssetHelpers.CreateNotecardAsset();
-            asset.ID = TestHelpers.ParseTail(0x1).ToString();
+        AssetBase asset = AssetHelpers.CreateNotecardAsset();
+        asset.ID = TestHelpers.ParseTail(0x1).ToString();
 
-            // Check we don't get anything before the asset is put in the cache
-            AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
-            Assert.Null(retrievedAsset);
+        // Check we don't get anything before the asset is put in the cache
+        AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
+        Assert.Null(retrievedAsset);
 
-            m_cache.Store(asset);
+        m_cache.Store(asset);
 
-            // Check that asset is now in cache
-            retrievedAsset = m_cache.Get(asset.ID.ToString());
-            Assert.NotNull(retrievedAsset);
-            Assert.Equal(asset.ID, retrievedAsset.ID);
-        }
+        // Check that asset is now in cache
+        retrievedAsset = m_cache.Get(asset.ID.ToString());
+        Assert.NotNull(retrievedAsset);
+        Assert.Equal(asset.ID, retrievedAsset.ID);
+    }
 
-        [Fact]
-        public void TestExpireAsset()
-        {
-            TestHelpers.InMethod();
+    [Fact]
+    public void TestExpireAsset()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            AssetBase asset = AssetHelpers.CreateNotecardAsset();
-            asset.ID = TestHelpers.ParseTail(0x2).ToString();
+        AssetBase asset = AssetHelpers.CreateNotecardAsset();
+        asset.ID = TestHelpers.ParseTail(0x2).ToString();
 
-            m_cache.Store(asset);
+        m_cache.Store(asset);
 
-            m_cache.Expire(asset.ID);
+        m_cache.Expire(asset.ID);
 
-            AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
-            Assert.Null(retrievedAsset);
-        }
+        AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
+        Assert.Null(retrievedAsset);
+    }
 
-        [Fact]
-        public void TestClearCache()
-        {
-            TestHelpers.InMethod();
+    [Fact]
+    public void TestClearCache()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            AssetBase asset = AssetHelpers.CreateNotecardAsset();
-            asset.ID = TestHelpers.ParseTail(0x2).ToString();
+        AssetBase asset = AssetHelpers.CreateNotecardAsset();
+        asset.ID = TestHelpers.ParseTail(0x2).ToString();
 
-            m_cache.Store(asset);
+        m_cache.Store(asset);
 
-            m_cache.Clear();
+        m_cache.Clear();
 
-            AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
-            Assert.Null(retrievedAsset);
-        }
+        AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
+        Assert.Null(retrievedAsset);
     }
 }

@@ -25,60 +25,53 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Text;
-using System.Xml;
-using System.Xml.Serialization;
-using log4net;
 
-namespace OpenSim.ConsoleClient
+namespace OpenSim.ConsoleClient;
+
+public delegate void ReplyDelegate(string requestUrl, string requestData, string replyData);
+
+public class Requester
 {
-    public delegate void ReplyDelegate(string requestUrl, string requestData, string replyData);
-
-    public class Requester
+    public static void MakeRequest(string requestUrl, string data,
+            ReplyDelegate action)
     {
-        public static void MakeRequest(string requestUrl, string data,
-                ReplyDelegate action)
+        WebRequest request = WebRequest.Create(requestUrl);
+
+        request.Method = "POST";
+
+        request.ContentType = "application/x-www-form-urlencoded";
+
+        byte[] buffer = Encoding.ASCII.GetBytes(data);
+        int length = (int) buffer.Length;
+        request.ContentLength = length;
+
+        request.BeginGetRequestStream(delegate(IAsyncResult res)
         {
-            WebRequest request = WebRequest.Create(requestUrl);
+            Stream requestStream = request.EndGetRequestStream(res);
 
-            request.Method = "POST";
+            requestStream.Write(buffer, 0, length);
 
-            request.ContentType = "application/x-www-form-urlencoded";
-
-            byte[] buffer = Encoding.ASCII.GetBytes(data);
-            int length = (int) buffer.Length;
-            request.ContentLength = length;
-
-            request.BeginGetRequestStream(delegate(IAsyncResult res)
+            request.BeginGetResponse(delegate(IAsyncResult ar)
             {
-                Stream requestStream = request.EndGetRequestStream(res);
+                string reply = String.Empty;
 
-                requestStream.Write(buffer, 0, length);
-
-                request.BeginGetResponse(delegate(IAsyncResult ar)
+                using (WebResponse response = request.EndGetResponse(ar))
                 {
-                    string reply = String.Empty;
-
-                    using (WebResponse response = request.EndGetResponse(ar))
+                    try
                     {
-                        try
-                        {
-                            using (StreamReader r = new StreamReader(response.GetResponseStream()))
-                                reply = r.ReadToEnd();
+                        using (StreamReader r = new StreamReader(response.GetResponseStream()))
+                            reply = r.ReadToEnd();
 
-                        }
-                        catch (System.InvalidOperationException)
-                        {
-                        }
                     }
+                    catch (System.InvalidOperationException)
+                    {
+                    }
+                }
 
-                    action(requestUrl, data, reply);
-                }, null);
+                action(requestUrl, data, reply);
             }, null);
-        }
+        }, null);
     }
 }

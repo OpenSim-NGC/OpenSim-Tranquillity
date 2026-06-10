@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
 using log4net;
 using Nini.Config;
@@ -35,84 +34,83 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Base;
 
-namespace OpenSim.Services.AssetService
+namespace OpenSim.Services.AssetService;
+
+public class XAssetServiceBase : ServiceBase
 {
-    public class XAssetServiceBase : ServiceBase
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected IXAssetDataPlugin m_Database;
+    protected IAssetLoader m_AssetLoader;
+    protected IAssetService m_ChainedAssetService;
+
+    protected bool HasChainedAssetService { get { return m_ChainedAssetService != null; } }
+
+    public XAssetServiceBase(IConfigSource config, string configName) : base(config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        string dllName = String.Empty;
+        string connString = String.Empty;
 
-        protected IXAssetDataPlugin m_Database;
-        protected IAssetLoader m_AssetLoader;
-        protected IAssetService m_ChainedAssetService;
-
-        protected bool HasChainedAssetService { get { return m_ChainedAssetService != null; } }
-
-        public XAssetServiceBase(IConfigSource config, string configName) : base(config)
+        //
+        // Try reading the [AssetService] section first, if it exists
+        //
+        IConfig assetConfig = config.Configs[configName];
+        if (assetConfig != null)
         {
-            string dllName = String.Empty;
-            string connString = String.Empty;
+            dllName = assetConfig.GetString("StorageProvider", dllName);
+            connString = assetConfig.GetString("ConnectionString", connString);
+        }
 
-            //
-            // Try reading the [AssetService] section first, if it exists
-            //
-            IConfig assetConfig = config.Configs[configName];
-            if (assetConfig != null)
+        //
+        // Try reading the [DatabaseService] section, if it exists
+        //
+        IConfig dbConfig = config.Configs["DatabaseService"];
+        if (dbConfig != null)
+        {
+            if (dllName.Length == 0)
+                dllName = dbConfig.GetString("StorageProvider", String.Empty);
+            if (connString.Length == 0)
+                connString = dbConfig.GetString("ConnectionString", String.Empty);
+        }
+
+        //
+        // We tried, but this doesn't exist. We can't proceed.
+        //
+        if (string.IsNullOrEmpty(dllName))
+            throw new Exception("No StorageProvider configured");
+
+        m_Database = LoadPlugin<IXAssetDataPlugin>(dllName);
+        if (m_Database == null)
+            throw new Exception("Could not find a storage interface in the given module");
+
+        string chainedAssetServiceDesignator = assetConfig.GetString("ChainedServiceModule", null);
+
+        if (chainedAssetServiceDesignator != null)
+        {
+            m_log.InfoFormat(
+                "[XASSET SERVICE BASE]: Loading chained asset service from {0}", chainedAssetServiceDesignator);
+
+            Object[] args = new Object[] { config, configName };
+            m_ChainedAssetService = ServerUtils.LoadPlugin<IAssetService>(chainedAssetServiceDesignator, args);
+
+            if (!HasChainedAssetService)
+                throw new Exception(
+                    String.Format("Failed to load ChainedAssetService from {0}", chainedAssetServiceDesignator));
+        }
+
+        m_Database.Initialise(connString);
+
+        if (HasChainedAssetService)
+        {
+            string loaderName = assetConfig.GetString("DefaultAssetLoader",
+                    String.Empty);
+
+            if (loaderName != String.Empty)
             {
-                dllName = assetConfig.GetString("StorageProvider", dllName);
-                connString = assetConfig.GetString("ConnectionString", connString);
-            }
+                m_AssetLoader = LoadPlugin<IAssetLoader>(loaderName);
 
-            //
-            // Try reading the [DatabaseService] section, if it exists
-            //
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig != null)
-            {
-                if (dllName.Length == 0)
-                    dllName = dbConfig.GetString("StorageProvider", String.Empty);
-                if (connString.Length == 0)
-                    connString = dbConfig.GetString("ConnectionString", String.Empty);
-            }
-
-            //
-            // We tried, but this doesn't exist. We can't proceed.
-            //
-            if (string.IsNullOrEmpty(dllName))
-                throw new Exception("No StorageProvider configured");
-
-            m_Database = LoadPlugin<IXAssetDataPlugin>(dllName);
-            if (m_Database == null)
-                throw new Exception("Could not find a storage interface in the given module");
-
-            string chainedAssetServiceDesignator = assetConfig.GetString("ChainedServiceModule", null);
-
-            if (chainedAssetServiceDesignator != null)
-            {
-                m_log.InfoFormat(
-                    "[XASSET SERVICE BASE]: Loading chained asset service from {0}", chainedAssetServiceDesignator);
-
-                Object[] args = new Object[] { config, configName };
-                m_ChainedAssetService = ServerUtils.LoadPlugin<IAssetService>(chainedAssetServiceDesignator, args);
-
-                if (!HasChainedAssetService)
-                    throw new Exception(
-                        String.Format("Failed to load ChainedAssetService from {0}", chainedAssetServiceDesignator));
-            }
-
-            m_Database.Initialise(connString);
-
-            if (HasChainedAssetService)
-            {
-                string loaderName = assetConfig.GetString("DefaultAssetLoader",
-                        String.Empty);
-
-                if (loaderName != String.Empty)
-                {
-                    m_AssetLoader = LoadPlugin<IAssetLoader>(loaderName);
-
-                    if (m_AssetLoader == null)
-                        throw new Exception("Asset loader could not be loaded");
-                }
+                if (m_AssetLoader == null)
+                    throw new Exception("Asset loader could not be loaded");
             }
         }
     }

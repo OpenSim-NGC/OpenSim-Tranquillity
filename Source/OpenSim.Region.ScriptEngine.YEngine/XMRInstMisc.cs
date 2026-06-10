@@ -25,418 +25,410 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Text;
 using OpenMetaverse;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Shared.Api;
 using OpenSim.Region.Framework.Scenes;
-
-using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
-using LSL_Key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
-using LSL_List = OpenSim.Region.ScriptEngine.Shared.LSL_Types.list;
-using LSL_Rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
 using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
 
 // This class exists in the main app domain
 //
-namespace OpenSim.Region.ScriptEngine.Yengine
+namespace OpenSim.Region.ScriptEngine.Yengine;
+
+public partial class XMRInstance
 {
-    public partial class XMRInstance
+
+    private bool m_disposed;
+    // In case Dispose() doesn't get called, we want to be sure to clean
+    // up.  This makes sure we decrement m_CompiledScriptRefCount.
+    ~XMRInstance()
     {
+        Dispose(false);
+    }
 
-        private bool m_disposed;
-        // In case Dispose() doesn't get called, we want to be sure to clean
-        // up.  This makes sure we decrement m_CompiledScriptRefCount.
-        ~XMRInstance()
+    /**
+     * @brief Clean up stuff.
+     *        We specifically leave m_DescName intact for 'xmr ls' command.
+     */
+    public void Dispose()
+    {
+        Dispose(true);
+        //GC.SuppressFinalize(this);
+    }
+
+    public void Dispose(bool fromdispose)
+    {
+        if (m_disposed)
+            return;
+
+        // Tell script stop executing next time it calls CheckRun().
+        suspendOnCheckRunHold = true;
+
+        // Don't send us any more events.
+        lock (m_RunLock)
         {
-            Dispose(false);
-        }
-
-        /**
-         * @brief Clean up stuff.
-         *        We specifically leave m_DescName intact for 'xmr ls' command.
-         */
-        public void Dispose()
-        {
-            Dispose(true);
-            //GC.SuppressFinalize(this);
-        }
-
-        public void Dispose(bool fromdispose)
-        {
-            if (m_disposed)
-                return;
-
-            // Tell script stop executing next time it calls CheckRun().
-            suspendOnCheckRunHold = true;
-
-            // Don't send us any more events.
-            lock (m_RunLock)
+            if(m_Part != null)
             {
-                if(m_Part != null)
-                {
-                    AsyncCommandManager.RemoveScript(m_Engine, m_LocalID, m_ItemID);
-                    m_Part = null;
-                }
-            }
-
-             // Let script methods get garbage collected if no one else is using
-             // them.
-            DecObjCodeRefCount();
-            m_disposed = true;
-        }
-
-        private void DecObjCodeRefCount()
-        {
-            if(m_ObjCode != null)
-            {
-                lock(m_CompileLock)
-                {
-                    if(m_CompiledScriptObjCode.TryGetValue(m_ScriptObjCodeKey, out ScriptObjCode objCode) &&
-                        (objCode == m_ObjCode) &&
-                        (--objCode.refCount == 0))
-                    {
-                        m_CompiledScriptObjCode.Remove(m_ScriptObjCodeKey);
-                    }
-                }
-                m_ObjCode = null;
+                AsyncCommandManager.RemoveScript(m_Engine, m_LocalID, m_ItemID);
+                m_Part = null;
             }
         }
 
-        public void Verbose(string format, params object[] args)
+         // Let script methods get garbage collected if no one else is using
+         // them.
+        DecObjCodeRefCount();
+        m_disposed = true;
+    }
+
+    private void DecObjCodeRefCount()
+    {
+        if(m_ObjCode != null)
         {
-            if(m_Engine.m_Verbose)
-                m_log.DebugFormat(format, args);
+            lock(m_CompileLock)
+            {
+                if(m_CompiledScriptObjCode.TryGetValue(m_ScriptObjCodeKey, out ScriptObjCode objCode) &&
+                    (objCode == m_ObjCode) &&
+                    (--objCode.refCount == 0))
+                {
+                    m_CompiledScriptObjCode.Remove(m_ScriptObjCodeKey);
+                }
+            }
+            m_ObjCode = null;
+        }
+    }
+
+    public void Verbose(string format, params object[] args)
+    {
+        if(m_Engine.m_Verbose)
+            m_log.DebugFormat(format, args);
+    }
+
+    // Called by 'xmr top' console command
+    // to dump this script's state to console
+    //  Sacha 
+    public void RunTestTop()
+    {
+        if(m_InstEHSlice > 0)
+        {
+            Console.WriteLine(m_DescName);
+            Console.WriteLine("    m_LocalID       = " + m_LocalID);
+            Console.WriteLine("    m_ItemID        = " + m_ItemID);
+            Console.WriteLine("    m_Item.AssetID  = " + m_Item.AssetID);
+            Console.WriteLine("    m_StartParam    = " + m_StartParam);
+            Console.WriteLine("    m_PostOnRez     = " + m_PostOnRez);
+            Console.WriteLine("    m_StateSource   = " + m_StateSource);
+            Console.WriteLine("    m_SuspendCount  = " + m_SuspendCount);
+            Console.WriteLine("    m_SleepUntil    = " + m_SleepUntil);
+            Console.WriteLine("    m_IState        = " + m_IState.ToString());
+            Console.WriteLine("    m_StateCode     = " + GetStateName(stateCode));
+            Console.WriteLine("    eventCode       = " + eventCode.ToString());
+            Console.WriteLine("    m_LastRanAt     = " + m_LastRanAt.ToString());
+            Console.WriteLine("    heapUsed/Limit  = " + xmrHeapUsed() + "/" + heapLimit);
+            Console.WriteLine("    m_InstEHEvent   = " + m_InstEHEvent.ToString());
+            Console.WriteLine("    m_InstEHSlice   = " + m_InstEHSlice.ToString());
+        }
+    }
+
+    // Called by 'xmr ls' console command
+    // to dump this script's state to console
+    public string RunTestLs(bool flagFull)
+    {
+        if(flagFull)
+        {
+            StringBuilder sb = new();
+            sb.AppendLine(m_DescName);
+            sb.AppendLine("    m_LocalID            = " + m_LocalID);
+            sb.AppendLine("    m_ItemID             = " + m_ItemID + "  (.state file)");
+            sb.AppendLine("    m_Item.AssetID       = " + m_Item.AssetID);
+            sb.AppendLine("    m_Part.WorldPosition = " + m_Part.GetWorldPosition());
+            sb.AppendLine("    m_ScriptObjCodeKey   = " + m_ScriptObjCodeKey + "  (source text)");
+            sb.AppendLine("    m_StartParam         = " + m_StartParam);
+            sb.AppendLine("    m_PostOnRez          = " + m_PostOnRez);
+            sb.AppendLine("    m_StateSource        = " + m_StateSource);
+            sb.AppendLine("    m_SuspendCount       = " + m_SuspendCount);
+            sb.AppendLine("    m_SleepUntil         = " + m_SleepUntil);
+            sb.AppendLine("    m_SleepEvMask1       = 0x" + m_SleepEventMask1.ToString("X"));
+            sb.AppendLine("    m_SleepEvMask2       = 0x" + m_SleepEventMask2.ToString("X"));
+            sb.AppendLine("    m_IState             = " + m_IState.ToString());
+            sb.AppendLine("    m_StateCode          = " + GetStateName(stateCode));
+            sb.AppendLine("    eventCode            = " + eventCode.ToString());
+            sb.AppendLine("    m_LastRanAt          = " + m_LastRanAt.ToString());
+            //sb.AppendLine("    m_RunOnePhase        = " + m_RunOnePhase);
+            sb.AppendLine("    suspOnCkRunHold      = " + suspendOnCheckRunHold);
+            sb.AppendLine("    suspOnCkRunTemp      = " + suspendOnCheckRunTemp);
+            //sb.AppendLine("    m_CheckRunPhase      = " + m_CheckRunPhase);
+            sb.AppendLine("    heapUsed/Limit       = " + xmrHeapUsed() + "/" + heapLimit);
+            sb.AppendLine("    m_InstEHEvent        = " + m_InstEHEvent.ToString());
+            sb.AppendLine("    m_InstEHSlice        = " + m_InstEHSlice.ToString());
+            sb.AppendLine("    m_CPUTime            = " + m_CPUTime);
+            sb.AppendLine("    callMode             = " + callMode);
+            lock(m_QueueLock)
+            {
+                sb.AppendLine("    m_Running            = " + m_Running);
+                foreach(EventParams evt in m_EventQueue)
+                {
+                    sb.AppendLine("        evt.EventName        = " + evt.EventName);
+                }
+            }
+            return sb.ToString();
+        }
+        else
+        {
+            return String.Format("{0} {1} {2} {3} {4} {5}",
+                    m_ItemID,
+                    m_CPUTime.ToString("F3").PadLeft(9),
+                    m_InstEHEvent.ToString().PadLeft(9),
+                    m_IState.ToString().PadRight(10),
+                    m_Part.GetWorldPosition().ToString().PadRight(32),
+                    m_DescName);
+        }
+    }
+
+    /**
+     * @brief For a given stateCode, get a mask of the low 32 event codes
+     *        that the state has handlers defined for.
+     */
+    public ulong GetStateEventFlags(int state)
+    {
+        if((state < 0) ||
+            (state >= m_ObjCode.scriptEventHandlerTable.GetLength(0)))
+        {
+            return 0;
         }
 
-        // Called by 'xmr top' console command
-        // to dump this script's state to console
-        //  Sacha 
-        public void RunTestTop()
+        ulong flags = 0;
+        for(int i = 0; i <(int)ScriptEventCode.Size; i++)
         {
-            if(m_InstEHSlice > 0)
+            if(m_ObjCode.scriptEventHandlerTable[state, i] != null)
             {
-                Console.WriteLine(m_DescName);
-                Console.WriteLine("    m_LocalID       = " + m_LocalID);
-                Console.WriteLine("    m_ItemID        = " + m_ItemID);
-                Console.WriteLine("    m_Item.AssetID  = " + m_Item.AssetID);
-                Console.WriteLine("    m_StartParam    = " + m_StartParam);
-                Console.WriteLine("    m_PostOnRez     = " + m_PostOnRez);
-                Console.WriteLine("    m_StateSource   = " + m_StateSource);
-                Console.WriteLine("    m_SuspendCount  = " + m_SuspendCount);
-                Console.WriteLine("    m_SleepUntil    = " + m_SleepUntil);
-                Console.WriteLine("    m_IState        = " + m_IState.ToString());
-                Console.WriteLine("    m_StateCode     = " + GetStateName(stateCode));
-                Console.WriteLine("    eventCode       = " + eventCode.ToString());
-                Console.WriteLine("    m_LastRanAt     = " + m_LastRanAt.ToString());
-                Console.WriteLine("    heapUsed/Limit  = " + xmrHeapUsed() + "/" + heapLimit);
-                Console.WriteLine("    m_InstEHEvent   = " + m_InstEHEvent.ToString());
-                Console.WriteLine("    m_InstEHSlice   = " + m_InstEHSlice.ToString());
+                flags |= 1ul << i;
             }
         }
+        return flags;
+    }
 
-        // Called by 'xmr ls' console command
-        // to dump this script's state to console
-        public string RunTestLs(bool flagFull)
+    /**
+     * @brief Get the .state file name.
+     */
+    public static string GetStateFileName(string scriptBasePath, UUID itemID)
+    {
+        return GetScriptFileName(scriptBasePath, itemID.ToString() + ".state");
+    }
+
+    public string GetScriptFileName(string filename)
+    {
+        return GetScriptFileName(m_ScriptBasePath, filename);
+    }
+
+    public string GetScriptILFileName(string filename)
+    {
+        string path = Path.Combine(m_ScriptBasePath, "DebugIL");
+        Directory.CreateDirectory(path);
+        return Path.Combine(path, filename);
+    }
+
+    public static string GetScriptFileName(string scriptBasePath, string filename)
+    {
+         // Get old path, ie, all files lumped in a single huge directory.
+        string oldPath = Path.Combine(scriptBasePath, filename);
+
+         // Get new path, ie, files split up based on first 2 chars of name.
+         //           string subdir = filename.Substring (0, 2);
+         //           filename = filename.Substring (2);
+        string subdir = filename[..1];
+        filename = filename[1..];
+        scriptBasePath = Path.Combine(scriptBasePath, subdir);
+        Directory.CreateDirectory(scriptBasePath);
+        string newPath = Path.Combine(scriptBasePath, filename);
+
+         // If file exists only in old location, move to new location.
+         // If file exists in both locations, delete old location.
+        if(File.Exists(oldPath))
         {
-            if(flagFull)
+            if(File.Exists(newPath))
             {
-                StringBuilder sb = new();
-                sb.AppendLine(m_DescName);
-                sb.AppendLine("    m_LocalID            = " + m_LocalID);
-                sb.AppendLine("    m_ItemID             = " + m_ItemID + "  (.state file)");
-                sb.AppendLine("    m_Item.AssetID       = " + m_Item.AssetID);
-                sb.AppendLine("    m_Part.WorldPosition = " + m_Part.GetWorldPosition());
-                sb.AppendLine("    m_ScriptObjCodeKey   = " + m_ScriptObjCodeKey + "  (source text)");
-                sb.AppendLine("    m_StartParam         = " + m_StartParam);
-                sb.AppendLine("    m_PostOnRez          = " + m_PostOnRez);
-                sb.AppendLine("    m_StateSource        = " + m_StateSource);
-                sb.AppendLine("    m_SuspendCount       = " + m_SuspendCount);
-                sb.AppendLine("    m_SleepUntil         = " + m_SleepUntil);
-                sb.AppendLine("    m_SleepEvMask1       = 0x" + m_SleepEventMask1.ToString("X"));
-                sb.AppendLine("    m_SleepEvMask2       = 0x" + m_SleepEventMask2.ToString("X"));
-                sb.AppendLine("    m_IState             = " + m_IState.ToString());
-                sb.AppendLine("    m_StateCode          = " + GetStateName(stateCode));
-                sb.AppendLine("    eventCode            = " + eventCode.ToString());
-                sb.AppendLine("    m_LastRanAt          = " + m_LastRanAt.ToString());
-                //sb.AppendLine("    m_RunOnePhase        = " + m_RunOnePhase);
-                sb.AppendLine("    suspOnCkRunHold      = " + suspendOnCheckRunHold);
-                sb.AppendLine("    suspOnCkRunTemp      = " + suspendOnCheckRunTemp);
-                //sb.AppendLine("    m_CheckRunPhase      = " + m_CheckRunPhase);
-                sb.AppendLine("    heapUsed/Limit       = " + xmrHeapUsed() + "/" + heapLimit);
-                sb.AppendLine("    m_InstEHEvent        = " + m_InstEHEvent.ToString());
-                sb.AppendLine("    m_InstEHSlice        = " + m_InstEHSlice.ToString());
-                sb.AppendLine("    m_CPUTime            = " + m_CPUTime);
-                sb.AppendLine("    callMode             = " + callMode);
-                lock(m_QueueLock)
-                {
-                    sb.AppendLine("    m_Running            = " + m_Running);
-                    foreach(EventParams evt in m_EventQueue)
-                    {
-                        sb.AppendLine("        evt.EventName        = " + evt.EventName);
-                    }
-                }
-                return sb.ToString();
+                File.Delete(oldPath);
             }
             else
             {
-                return String.Format("{0} {1} {2} {3} {4} {5}",
-                        m_ItemID,
-                        m_CPUTime.ToString("F3").PadLeft(9),
-                        m_InstEHEvent.ToString().PadLeft(9),
-                        m_IState.ToString().PadRight(10),
-                        m_Part.GetWorldPosition().ToString().PadRight(32),
-                        m_DescName);
+                File.Move(oldPath, newPath);
             }
         }
 
-        /**
-         * @brief For a given stateCode, get a mask of the low 32 event codes
-         *        that the state has handlers defined for.
-         */
-        public ulong GetStateEventFlags(int state)
-        {
-            if((state < 0) ||
-                (state >= m_ObjCode.scriptEventHandlerTable.GetLength(0)))
-            {
-                return 0;
-            }
+         // Always return new location.
+        return newPath;
+    }
 
-            ulong flags = 0;
-            for(int i = 0; i <(int)ScriptEventCode.Size; i++)
+    /**
+     * @brief Decode state code (int) to state name (string).
+     */
+    public string GetStateName(int stateCode)
+    {
+        try
+        {
+            return m_ObjCode.stateNames[stateCode];
+        }
+        catch
+        {
+            return stateCode.ToString();
+        }
+    }
+
+    /**
+     * @brief various gets & sets.
+     */
+    public int StartParam
+    {
+        get
+        {
+            return m_StartParam;
+        }
+        set
+        {
+            m_StartParam = value;
+        }
+    }
+
+    public double MinEventDelay
+    {
+        get
+        {
+            return m_minEventDelay;
+        }
+        set
+        {
+            if (value > 0.001)
+                m_minEventDelay = value;
+            else
+                m_minEventDelay = 0.0;
+
+            m_nextEventTime = 0.0; // reset it
+        }
+    }
+
+
+    public SceneObjectPart SceneObject
+    {
+        get
+        {
+            return m_Part;
+        }
+    }
+
+    public DetectParams[] DetectParams
+    {
+        get
+        {
+            return m_DetectParams;
+        }
+        set
+        {
+            m_DetectParams = value;
+        }
+    }
+
+    public UUID ItemID
+    {
+        get
+        {
+            return m_ItemID;
+        }
+    }
+
+    public UUID AssetID
+    {
+        get
+        {
+            return m_Item.AssetID;
+        }
+    }
+
+    public bool Running
+    {
+        get
+        {
+            return m_Running;
+        }
+        set
+        {
+            lock(m_QueueLock)
             {
-                if(m_ObjCode.scriptEventHandlerTable[state, i] != null)
+                m_Running = value;
+                if(value)
                 {
-                    flags |= 1ul << i;
-                }
-            }
-            return flags;
-        }
-
-        /**
-         * @brief Get the .state file name.
-         */
-        public static string GetStateFileName(string scriptBasePath, UUID itemID)
-        {
-            return GetScriptFileName(scriptBasePath, itemID.ToString() + ".state");
-        }
-
-        public string GetScriptFileName(string filename)
-        {
-            return GetScriptFileName(m_ScriptBasePath, filename);
-        }
-
-        public string GetScriptILFileName(string filename)
-        {
-            string path = Path.Combine(m_ScriptBasePath, "DebugIL");
-            Directory.CreateDirectory(path);
-            return Path.Combine(path, filename);
-        }
-
-        public static string GetScriptFileName(string scriptBasePath, string filename)
-        {
-             // Get old path, ie, all files lumped in a single huge directory.
-            string oldPath = Path.Combine(scriptBasePath, filename);
-
-             // Get new path, ie, files split up based on first 2 chars of name.
-             //           string subdir = filename.Substring (0, 2);
-             //           filename = filename.Substring (2);
-            string subdir = filename[..1];
-            filename = filename[1..];
-            scriptBasePath = Path.Combine(scriptBasePath, subdir);
-            Directory.CreateDirectory(scriptBasePath);
-            string newPath = Path.Combine(scriptBasePath, filename);
-
-             // If file exists only in old location, move to new location.
-             // If file exists in both locations, delete old location.
-            if(File.Exists(oldPath))
-            {
-                if(File.Exists(newPath))
-                {
-                    File.Delete(oldPath);
+                    if (m_IState == XMRInstState.SUSPENDED && m_SuspendCount == 0)
+                    {
+                        if(eventCode != ScriptEventCode.None)
+                        {
+                            m_IState = XMRInstState.ONYIELDQ;
+                            m_Engine.QueueToYield(this);
+                        }
+                        else if ((m_EventQueue != null) && (m_EventQueue.First != null))
+                        {
+                            m_IState = XMRInstState.ONSTARTQ;
+                            m_Engine.QueueToStart(this);
+                        }
+                        else
+                            m_IState = XMRInstState.IDLE;
+                    }
+                    //else if(m_SuspendCount != 0)
+                    //    m_IState = XMRInstState.IDLE;
                 }
                 else
                 {
-                    File.Move(oldPath, newPath);
-                }
-            }
-
-             // Always return new location.
-            return newPath;
-        }
-
-        /**
-         * @brief Decode state code (int) to state name (string).
-         */
-        public string GetStateName(int stateCode)
-        {
-            try
-            {
-                return m_ObjCode.stateNames[stateCode];
-            }
-            catch
-            {
-                return stateCode.ToString();
-            }
-        }
-
-        /**
-         * @brief various gets & sets.
-         */
-        public int StartParam
-        {
-            get
-            {
-                return m_StartParam;
-            }
-            set
-            {
-                m_StartParam = value;
-            }
-        }
-
-        public double MinEventDelay
-        {
-            get
-            {
-                return m_minEventDelay;
-            }
-            set
-            {
-                if (value > 0.001)
-                    m_minEventDelay = value;
-                else
-                    m_minEventDelay = 0.0;
-
-                m_nextEventTime = 0.0; // reset it
-            }
-        }
-
-
-        public SceneObjectPart SceneObject
-        {
-            get
-            {
-                return m_Part;
-            }
-        }
-
-        public DetectParams[] DetectParams
-        {
-            get
-            {
-                return m_DetectParams;
-            }
-            set
-            {
-                m_DetectParams = value;
-            }
-        }
-
-        public UUID ItemID
-        {
-            get
-            {
-                return m_ItemID;
-            }
-        }
-
-        public UUID AssetID
-        {
-            get
-            {
-                return m_Item.AssetID;
-            }
-        }
-
-        public bool Running
-        {
-            get
-            {
-                return m_Running;
-            }
-            set
-            {
-                lock(m_QueueLock)
-                {
-                    m_Running = value;
-                    if(value)
+                    if (m_IState == XMRInstState.ONSLEEPQ)
                     {
-                        if (m_IState == XMRInstState.SUSPENDED && m_SuspendCount == 0)
-                        {
-                            if(eventCode != ScriptEventCode.None)
-                            {
-                                m_IState = XMRInstState.ONYIELDQ;
-                                m_Engine.QueueToYield(this);
-                            }
-                            else if ((m_EventQueue != null) && (m_EventQueue.First != null))
-                            {
-                                m_IState = XMRInstState.ONSTARTQ;
-                                m_Engine.QueueToStart(this);
-                            }
-                            else
-                                m_IState = XMRInstState.IDLE;
-                        }
-                        //else if(m_SuspendCount != 0)
-                        //    m_IState = XMRInstState.IDLE;
+                        m_Engine.RemoveFromSleep(this);
+                        m_IState = XMRInstState.SUSPENDED;
                     }
-                    else
-                    {
-                        if (m_IState == XMRInstState.ONSLEEPQ)
-                        {
-                            m_Engine.RemoveFromSleep(this);
-                            m_IState = XMRInstState.SUSPENDED;
-                        }
-                        else if (m_IState == XMRInstState.IDLE)
-                            m_IState = XMRInstState.SUSPENDED;
+                    else if (m_IState == XMRInstState.IDLE)
+                        m_IState = XMRInstState.SUSPENDED;
 
-                        EmptyEventQueues();
-                    }
+                    EmptyEventQueues();
                 }
             }
         }
+    }
 
-        /**
-         * @brief Empty out the event queues.
-         *        Assumes caller has the m_QueueLock locked.
-         */
-        public void EmptyEventQueues()
-        {
-            m_EventQueue.Clear();
-            for(int i = m_EventCounts.Length; --i >= 0;)
-                m_EventCounts[i] = 0;
-        }
+    /**
+     * @brief Empty out the event queues.
+     *        Assumes caller has the m_QueueLock locked.
+     */
+    public void EmptyEventQueues()
+    {
+        m_EventQueue.Clear();
+        for(int i = m_EventCounts.Length; --i >= 0;)
+            m_EventCounts[i] = 0;
+    }
 
-        /**
-         * @brief Convert an LSL vector to an Openmetaverse vector.
-         */
-        public static OpenMetaverse.Vector3 LSLVec2OMVec(LSL_Vector lslVec)
-        {
-            return new OpenMetaverse.Vector3((float)lslVec.x, (float)lslVec.y, (float)lslVec.z);
-        }
+    /**
+     * @brief Convert an LSL vector to an Openmetaverse vector.
+     */
+    public static OpenMetaverse.Vector3 LSLVec2OMVec(LSL_Vector lslVec)
+    {
+        return new OpenMetaverse.Vector3((float)lslVec.x, (float)lslVec.y, (float)lslVec.z);
+    }
 
-        /**
-         * @brief Extract an integer from an element of an LSL_List.
-         */
-        public static int ListInt(object element)
-        {
-            if (element is LSL_Integer linteger)
-                return linteger.value;
-            return (int)element;
-        }
+    /**
+     * @brief Extract an integer from an element of an LSL_List.
+     */
+    public static int ListInt(object element)
+    {
+        if (element is LSL_Integer linteger)
+            return linteger.value;
+        return (int)element;
+    }
 
-        /**
-         * @brief Extract a string from an element of an LSL_List.
-         */
-        public static string ListStr(object element)
-        {
-            if(element is LSL_String ls)
-                return ls.m_string;
-            return (string)element;
-        }
+    /**
+     * @brief Extract a string from an element of an LSL_List.
+     */
+    public static string ListStr(object element)
+    {
+        if(element is LSL_String ls)
+            return ls.m_string;
+        return (string)element;
     }
 }

@@ -25,35 +25,31 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+// This MUST be a ref type!
+public class HGTravelingData
 {
-    // This MUST be a ref type!
-    public class HGTravelingData
-    {
-        public UUID SessionID;
-        public UUID UserID;
-        public Dictionary<string, string> Data;
+    public UUID SessionID;
+    public UUID UserID;
+    public Dictionary<string, string> Data;
 
-        public HGTravelingData()
-        {
-            Data = new Dictionary<string, string>();
-        }
-    }
-
-    /// <summary>
-    /// An interface for connecting to the user grid datastore
-    /// </summary>
-    public interface IHGTravelingData
+    public HGTravelingData()
     {
-        HGTravelingData Get(UUID sessionID);
-        HGTravelingData[] GetSessions(UUID userID);
-        bool Store(HGTravelingData data);
-        bool Delete(UUID sessionID);
-        void DeleteOld();
+        Data = new Dictionary<string, string>();
     }
+}
+
+/// <summary>
+/// An interface for connecting to the user grid datastore
+/// </summary>
+public interface IHGTravelingData
+{
+    HGTravelingData Get(UUID sessionID);
+    HGTravelingData[] GetSessions(UUID userID);
+    bool Store(HGTravelingData data);
+    bool Delete(UUID sessionID);
+    void DeleteOld();
 }

@@ -35,87 +35,86 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Region.OptionalModules.World.WorldView
+namespace OpenSim.Region.OptionalModules.World.WorldView;
+
+public class WorldViewModule : INonSharedRegionModule
 {
-    public class WorldViewModule : INonSharedRegionModule
+    private static readonly ILog m_log =
+        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+
+    private bool m_Enabled = false;
+    private IMapImageGenerator m_Generator;
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        IConfig moduleConfig = config.Configs["Modules"];
+        if (moduleConfig == null)
+            return;
 
+        if (moduleConfig.GetString("WorldViewModule", String.Empty) != Name)
+            return;
 
-        private bool m_Enabled = false;
-        private IMapImageGenerator m_Generator;
+        m_Enabled = true;
+    }
 
-        public void Initialise(IConfigSource config)
+    public void AddRegion(Scene scene)
+    {
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_Generator = scene.RequestModuleInterface<IMapImageGenerator>();
+        if (m_Generator == null)
         {
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig == null)
-                return;
-
-            if (moduleConfig.GetString("WorldViewModule", String.Empty) != Name)
-                return;
-
-            m_Enabled = true;
+            m_Enabled = false;
+            return;
         }
 
-        public void AddRegion(Scene scene)
+        m_log.Info("[WORLDVIEW]: Configured and enabled");
+
+        IHttpServer server = MainServer.Instance.GetHttpServer(0);
+        server.AddStreamHandler(new WorldViewRequestHandler(this,
+                scene.RegionInfo.RegionID.ToString()));
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+    }
+
+    public string Name
+    {
+        get { return "WorldViewModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void Close()
+    {
+    }
+
+    public byte[] GenerateWorldView(Vector3 pos, Vector3 rot, float fov,
+            int width, int height, bool usetex)
+    {
+        if (!m_Enabled)
+            return Array.Empty<byte>();
+
+        using (SKBitmap skBitmap = m_Generator.CreateViewImage(pos, rot, fov, width, height, usetex))
         {
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_Generator = scene.RequestModuleInterface<IMapImageGenerator>();
-            if (m_Generator == null)
-            {
-                m_Enabled = false;
-                return;
-            }
-
-            m_log.Info("[WORLDVIEW]: Configured and enabled");
-
-            IHttpServer server = MainServer.GetHttpServer(0);
-            server.AddStreamHandler(new WorldViewRequestHandler(this,
-                    scene.RegionInfo.RegionID.ToString()));
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-        }
-
-        public string Name
-        {
-            get { return "WorldViewModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public void Close()
-        {
-        }
-
-        public byte[] GenerateWorldView(Vector3 pos, Vector3 rot, float fov,
-                int width, int height, bool usetex)
-        {
-            if (!m_Enabled)
+            if (skBitmap == null)
                 return Array.Empty<byte>();
 
-            using (SKBitmap skBitmap = m_Generator.CreateViewImage(pos, rot, fov, width, height, usetex))
+            // Convert SKBitmap to SKImage and encode to JPEG
+            using (SKImage skImage = SKImage.FromBitmap(skBitmap))
+            using (SKData encoded = skImage.Encode(SKEncodedImageFormat.Jpeg, 95))
             {
-                if (skBitmap == null)
-                    return Array.Empty<byte>();
-
-                // Convert SKBitmap to SKImage and encode to JPEG
-                using (SKImage skImage = SKImage.FromBitmap(skBitmap))
-                using (SKData encoded = skImage.Encode(SKEncodedImageFormat.Jpeg, 95))
-                {
-                    return encoded.ToArray();
-                }
+                return encoded.ToArray();
             }
         }
     }

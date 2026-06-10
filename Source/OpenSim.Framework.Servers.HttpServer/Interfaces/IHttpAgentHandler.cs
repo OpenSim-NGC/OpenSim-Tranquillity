@@ -25,11 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public interface IHttpAgentHandler
 {
-    public interface IHttpAgentHandler
-    {
-        bool Handle(OSHttpRequest req, OSHttpResponse resp);
-        bool Match(OSHttpRequest req, OSHttpResponse resp);
-    }
+    bool Handle(OSHttpRequest req, OSHttpResponse resp);
+    bool Match(OSHttpRequest req, OSHttpResponse resp);
 }

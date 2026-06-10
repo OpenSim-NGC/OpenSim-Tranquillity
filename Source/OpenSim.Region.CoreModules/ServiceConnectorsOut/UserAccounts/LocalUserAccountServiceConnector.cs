@@ -35,220 +35,219 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts;
+
+public class LocalUserAccountServicesConnector : ISharedRegionModule, IUserAccountService
 {
-    public class LocalUserAccountServicesConnector : ISharedRegionModule, IUserAccountService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    /// <summary>
+    /// This is not on the IUserAccountService.  It's only being used so that standalone scenes can punch through
+    /// to a local UserAccountService when setting up an estate manager.
+    /// </summary>
+    public IUserAccountService UserAccountService { get; private set; }
+
+    private UserAccountCache m_Cache;
+
+    private bool m_Enabled = false;
+
+    #region ISharedRegionModule
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
-
-        /// <summary>
-        /// This is not on the IUserAccountService.  It's only being used so that standalone scenes can punch through
-        /// to a local UserAccountService when setting up an estate manager.
-        /// </summary>
-        public IUserAccountService UserAccountService { get; private set; }
-
-        private UserAccountCache m_Cache;
-
-        private bool m_Enabled = false;
-
-        #region ISharedRegionModule
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "LocalUserAccountServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
-            {
-                string name = moduleConfig.GetString("UserAccountServices", "");
-                if (name == Name)
-                {
-                    IConfig userConfig = source.Configs["UserAccountService"];
-                    if (userConfig == null)
-                    {
-                        m_log.Error("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: UserAccountService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    string serviceDll = userConfig.GetString("LocalServiceModule", String.Empty);
-
-                    if (serviceDll.Length == 0)
-                    {
-                        m_log.Error("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: No LocalServiceModule named in section UserService");
-                        return;
-                    }
-
-                    Object[] args = new Object[] { source };
-                    UserAccountService = ServerUtils.LoadPlugin<IUserAccountService>(serviceDll, args);
-
-                    if (UserAccountService == null)
-                    {
-                        m_log.ErrorFormat(
-                            "[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Cannot load user account service specified as {0}", serviceDll);
-                        return;
-                    }
-                    m_Enabled = true;
-                    m_Cache = new UserAccountCache();
-
-                    m_log.Info("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Local user connector enabled");
-                }
-            }
-        }
-
-        public void PostInitialise()
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void Close()
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            // FIXME: Why do we bother setting this module and caching up if we just end up registering the inner
-            // user account service?!
-            scene.RegisterModuleInterface<IUserAccountService>(UserAccountService);
-            scene.RegisterModuleInterface<IUserAccountCacheModule>(m_Cache);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_log.InfoFormat("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Enabled local user accounts for region {0}", scene.RegionInfo.RegionName);
-        }
-
-        #endregion
-
-        #region IUserAccountService
-
-        public UserAccount GetUserAccount(UUID scopeID, UUID userID)
-        {
-            bool inCache = false;
-            UserAccount account;
-            account = m_Cache.Get(userID, out inCache);
-            if (inCache)
-                return account;
-
-            account = UserAccountService.GetUserAccount(scopeID, userID);
-            m_Cache.Cache(userID, account);
-
-            return account;
-        }
-
-        public UserAccount GetUserAccount(UUID scopeID, string firstName, string lastName)
-        {
-            bool inCache = false;
-            UserAccount account;
-            account = m_Cache.Get(firstName + " " + lastName, out inCache);
-            if (inCache)
-                return account;
-
-            account = UserAccountService.GetUserAccount(scopeID, firstName, lastName);
-            if (account != null)
-                m_Cache.Cache(account.PrincipalID, account);
-
-            return account;
-        }
-
-        public UserAccount GetUserAccount(UUID scopeID, string Email)
-        {
-            return UserAccountService.GetUserAccount(scopeID, Email);
-        }
-
-        public List<UserAccount> GetUserAccounts(UUID scopeID, List<string> IDs)
-        {
-            List<UserAccount> ret = new List<UserAccount>();
-            List<string> missing = new List<string>();
-
-            // still another cache..
-            bool inCache = false;
-            UUID uuid = UUID.Zero;
-            UserAccount account;
-            foreach(string id in IDs)
-            {
-                if(UUID.TryParse(id, out uuid))
-                {
-                    account = m_Cache.Get(uuid, out inCache);
-                    if (inCache)
-                        ret.Add(account);
-                    else
-                        missing.Add(id);
-                }
-            }
-
-            if(missing.Count == 0)
-                return ret;
-
-            List<UserAccount> ext = UserAccountService.GetUserAccounts(scopeID, missing);
-            if(ext != null && ext.Count > 0)
-            {
-                foreach(UserAccount acc in ext)
-                {
-                    if(acc != null)
-                    {
-                        ret.Add(acc);
-                        m_Cache.Cache(acc.PrincipalID, acc);
-                    }
-                }
-            }
-            return ret;
-        }
-
-        public List<UserAccount> GetUserAccountsWhere(UUID scopeID, string query)
-        {
-            return null;
-        }
-
-        public List<UserAccount> GetUserAccounts(UUID scopeID, string query)
-        {
-            return UserAccountService.GetUserAccounts(scopeID, query);
-        }
-
-        // Update all updatable fields
-        //
-        public bool StoreUserAccount(UserAccount data)
-        {
-            bool ret = UserAccountService.StoreUserAccount(data);
-            if (ret)
-                m_Cache.Cache(data.PrincipalID, data);
-            return ret;
-        }
-
-        public void InvalidateCache(UUID userID)
-        {
-            m_Cache.Invalidate(userID);
-        }
-
-        public bool SetDisplayName(UUID agentID, string displayName)
-        {
-            return UserAccountService.SetDisplayName(agentID, displayName);
-        }
-
-        #endregion
+        get { return null; }
     }
+
+    public string Name
+    {
+        get { return "LocalUserAccountServicesConnector"; }
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
+        {
+            string name = moduleConfig.GetString("UserAccountServices", "");
+            if (name == Name)
+            {
+                IConfig userConfig = source.Configs["UserAccountService"];
+                if (userConfig == null)
+                {
+                    m_log.Error("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: UserAccountService missing from OpenSim.ini");
+                    return;
+                }
+
+                string serviceDll = userConfig.GetString("LocalServiceModule", String.Empty);
+
+                if (serviceDll.Length == 0)
+                {
+                    m_log.Error("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: No LocalServiceModule named in section UserService");
+                    return;
+                }
+
+                Object[] args = new Object[] { source };
+                UserAccountService = ServerUtils.LoadPlugin<IUserAccountService>(serviceDll, args);
+
+                if (UserAccountService == null)
+                {
+                    m_log.ErrorFormat(
+                        "[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Cannot load user account service specified as {0}", serviceDll);
+                    return;
+                }
+                m_Enabled = true;
+                m_Cache = new UserAccountCache();
+
+                m_log.Info("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Local user connector enabled");
+            }
+        }
+    }
+
+    public void PostInitialise()
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void Close()
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        // FIXME: Why do we bother setting this module and caching up if we just end up registering the inner
+        // user account service?!
+        scene.RegisterModuleInterface<IUserAccountService>(UserAccountService);
+        scene.RegisterModuleInterface<IUserAccountCacheModule>(m_Cache);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_log.InfoFormat("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Enabled local user accounts for region {0}", scene.RegionInfo.RegionName);
+    }
+
+    #endregion
+
+    #region IUserAccountService
+
+    public UserAccount GetUserAccount(UUID scopeID, UUID userID)
+    {
+        bool inCache = false;
+        UserAccount account;
+        account = m_Cache.Get(userID, out inCache);
+        if (inCache)
+            return account;
+
+        account = UserAccountService.GetUserAccount(scopeID, userID);
+        m_Cache.Cache(userID, account);
+
+        return account;
+    }
+
+    public UserAccount GetUserAccount(UUID scopeID, string firstName, string lastName)
+    {
+        bool inCache = false;
+        UserAccount account;
+        account = m_Cache.Get(firstName + " " + lastName, out inCache);
+        if (inCache)
+            return account;
+
+        account = UserAccountService.GetUserAccount(scopeID, firstName, lastName);
+        if (account != null)
+            m_Cache.Cache(account.PrincipalID, account);
+
+        return account;
+    }
+
+    public UserAccount GetUserAccount(UUID scopeID, string Email)
+    {
+        return UserAccountService.GetUserAccount(scopeID, Email);
+    }
+
+    public List<UserAccount> GetUserAccounts(UUID scopeID, List<string> IDs)
+    {
+        List<UserAccount> ret = new List<UserAccount>();
+        List<string> missing = new List<string>();
+
+        // still another cache..
+        bool inCache = false;
+        UUID uuid = UUID.Zero;
+        UserAccount account;
+        foreach(string id in IDs)
+        {
+            if(UUID.TryParse(id, out uuid))
+            {
+                account = m_Cache.Get(uuid, out inCache);
+                if (inCache)
+                    ret.Add(account);
+                else
+                    missing.Add(id);
+            }
+        }
+
+        if(missing.Count == 0)
+            return ret;
+
+        List<UserAccount> ext = UserAccountService.GetUserAccounts(scopeID, missing);
+        if(ext != null && ext.Count > 0)
+        {
+            foreach(UserAccount acc in ext)
+            {
+                if(acc != null)
+                {
+                    ret.Add(acc);
+                    m_Cache.Cache(acc.PrincipalID, acc);
+                }
+            }
+        }
+        return ret;
+    }
+
+    public List<UserAccount> GetUserAccountsWhere(UUID scopeID, string query)
+    {
+        return null;
+    }
+
+    public List<UserAccount> GetUserAccounts(UUID scopeID, string query)
+    {
+        return UserAccountService.GetUserAccounts(scopeID, query);
+    }
+
+    // Update all updatable fields
+    //
+    public bool StoreUserAccount(UserAccount data)
+    {
+        bool ret = UserAccountService.StoreUserAccount(data);
+        if (ret)
+            m_Cache.Cache(data.PrincipalID, data);
+        return ret;
+    }
+
+    public void InvalidateCache(UUID userID)
+    {
+        m_Cache.Invalidate(userID);
+    }
+
+    public bool SetDisplayName(UUID agentID, string displayName)
+    {
+        return UserAccountService.SetDisplayName(agentID, displayName);
+    }
+
+    #endregion
 }

@@ -25,20 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+ /// <summary>
+/// An interface for connecting to the Mute List datastore
+/// </summary>
+public interface IMuteListData
 {
-     /// <summary>
-    /// An interface for connecting to the Mute List datastore
-    /// </summary>
-    public interface IMuteListData
-    {
-        bool Store(MuteData data);
-        MuteData[] Get(UUID agentID);
-        bool Delete(UUID agentID, UUID muteID, string muteName);
-    }
+    bool Store(MuteData data);
+    MuteData[] Get(UUID agentID);
+    bool Delete(UUID agentID, UUID muteID, string muteName);
 }

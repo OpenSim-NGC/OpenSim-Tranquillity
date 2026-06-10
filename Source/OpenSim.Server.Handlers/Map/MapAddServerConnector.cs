@@ -25,9 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 using System.Net;
 
@@ -44,145 +41,144 @@ using OpenSim.Server.Handlers.Base;
 
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
-namespace OpenSim.Server.Handlers.MapImage
+namespace OpenSim.Server.Handlers.MapImage;
+
+public class MapAddServiceConnector : ServiceConnector
 {
-    public class MapAddServiceConnector : ServiceConnector
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IMapImageService m_MapService;
+    private IGridService m_GridService;
+    private string m_ConfigName = "MapImageService";
+
+    public MapAddServiceConnector(IConfigSource config, IHttpServer server, string configName) :
+            base(config, server, configName)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        IConfig serverConfig = config.Configs[m_ConfigName];
+        if (serverConfig == null)
+            throw new Exception(string.Format("No section {0} in config file", m_ConfigName));
 
-        private IMapImageService m_MapService;
-        private IGridService m_GridService;
-        private string m_ConfigName = "MapImageService";
+        string mapService = serverConfig.GetString("LocalServiceModule", string.Empty);
 
-        public MapAddServiceConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
-        {
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(string.Format("No section {0} in config file", m_ConfigName));
+        if (string.IsNullOrWhiteSpace(mapService))
+            throw new Exception("No LocalServiceModule in config file");
 
-            string mapService = serverConfig.GetString("LocalServiceModule", string.Empty);
+        object[] args = new object[] { config };
+        m_MapService = ServerUtils.LoadPlugin<IMapImageService>(mapService, args);
 
-            if (string.IsNullOrWhiteSpace(mapService))
-                throw new Exception("No LocalServiceModule in config file");
+        string gridService = serverConfig.GetString("GridService", string.Empty);
+        if (!string.IsNullOrWhiteSpace(gridService))
+            m_GridService = ServerUtils.LoadPlugin<IGridService>(gridService, args);
 
-            object[] args = new object[] { config };
-            m_MapService = ServerUtils.LoadPlugin<IMapImageService>(mapService, args);
+        if (m_GridService != null)
+            m_log.InfoFormat("[MAP IMAGE HANDLER]: GridService check is ON");
+        else
+            m_log.InfoFormat("[MAP IMAGE HANDLER]: GridService check is OFF");
 
-            string gridService = serverConfig.GetString("GridService", string.Empty);
-            if (!string.IsNullOrWhiteSpace(gridService))
-                m_GridService = ServerUtils.LoadPlugin<IGridService>(gridService, args);
+        bool proxy = serverConfig.GetBoolean("HasProxy", false);
+        IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
+        server.AddSimpleStreamHandler(new MapServerPostHandler(m_MapService, m_GridService, proxy, auth));
+    }
+}
 
-            if (m_GridService != null)
-                m_log.InfoFormat("[MAP IMAGE HANDLER]: GridService check is ON");
-            else
-                m_log.InfoFormat("[MAP IMAGE HANDLER]: GridService check is OFF");
+class MapServerPostHandler : SimpleStreamHandler
+{
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private IMapImageService m_MapService;
+    private IGridService m_GridService;
+    bool m_Proxy;
 
-            bool proxy = serverConfig.GetBoolean("HasProxy", false);
-            IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
-            server.AddSimpleStreamHandler(new MapServerPostHandler(m_MapService, m_GridService, proxy, auth));
-        }
+    public MapServerPostHandler(IMapImageService service, IGridService grid, bool proxy, IServiceAuth auth) :
+        base("/map", auth)
+    {
+        m_MapService = service;
+        m_GridService = grid;
+        m_Proxy = proxy;
     }
 
-    class MapServerPostHandler : SimpleStreamHandler
+    protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private IMapImageService m_MapService;
-        private IGridService m_GridService;
-        bool m_Proxy;
+        //m_log.DebugFormat("[MAP SERVICE IMAGE HANDLER]: Received {0}", path);
 
-        public MapServerPostHandler(IMapImageService service, IGridService grid, bool proxy, IServiceAuth auth) :
-            base("/map", auth)
+        int x = 0, y = 0;
+        UUID scopeID = UUID.Zero;
+        byte[] data = null;
+
+        httpResponse.StatusCode = (int)HttpStatusCode.OK;
+
+        try
         {
-            m_MapService = service;
-            m_GridService = grid;
-            m_Proxy = proxy;
-        }
+            string body;
+            using (StreamReader sr = new StreamReader(httpRequest.InputStream))
+                body = sr.ReadToEnd();
+            body = body.Trim();
 
-        protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            //m_log.DebugFormat("[MAP SERVICE IMAGE HANDLER]: Received {0}", path);
+            Dictionary<string, object> request = ServerUtils.ParseQueryString(body);
 
-            int x = 0, y = 0;
-            UUID scopeID = UUID.Zero;
-            byte[] data = null;
-
-            httpResponse.StatusCode = (int)HttpStatusCode.OK;
-
-            try
+            x = Int32.Parse(request["X"].ToString());
+            y = Int32.Parse(request["Y"].ToString());
+            if (request.TryGetValue("SCOPE", out object o))
+                UUID.TryParse(o.ToString(), out scopeID);
+            if(request.TryGetValue("DATA", out object od))
             {
-                string body;
-                using (StreamReader sr = new StreamReader(httpRequest.InputStream))
-                    body = sr.ReadToEnd();
-                body = body.Trim();
-
-                Dictionary<string, object> request = ServerUtils.ParseQueryString(body);
-
-                x = Int32.Parse(request["X"].ToString());
-                y = Int32.Parse(request["Y"].ToString());
-                if (request.TryGetValue("SCOPE", out object o))
-                    UUID.TryParse(o.ToString(), out scopeID);
-                if(request.TryGetValue("DATA", out object od))
+                data = Convert.FromBase64String(od.ToString());
+                if (data.Length < 10)
                 {
-                    data = Convert.FromBase64String(od.ToString());
-                    if (data.Length < 10)
-                    {
-                        httpResponse.RawBuffer = Util.ResultFailureMessage("Bad request.");
-                        return;
-                    }
+                    httpResponse.RawBuffer = Util.ResultFailureMessage("Bad request.");
+                    return;
                 }
             }
-            catch
+        }
+        catch
+        {
+            httpResponse.RawBuffer = Util.ResultFailureMessage("Bad request.");
+            return;
+        }
+
+        try
+        {
+            m_log.DebugFormat("[MAP ADD SERVER CONNECTOR]: Received map data for region at {0}-{1}", x, y);
+
+            //string type = "image/jpeg";
+            //if (request.ContainsKey("TYPE"))
+            //    type = request["TYPE"].ToString();
+
+            if (m_GridService != null)
             {
-                httpResponse.RawBuffer = Util.ResultFailureMessage("Bad request.");
-                return;
-            }
-
-            try
-            {
-                m_log.DebugFormat("[MAP ADD SERVER CONNECTOR]: Received map data for region at {0}-{1}", x, y);
-
-                //string type = "image/jpeg";
-                //if (request.ContainsKey("TYPE"))
-                //    type = request["TYPE"].ToString();
-
-                if (m_GridService != null)
+                IPAddress ipAddr = httpRequest.RemoteIPEndPoint.Address;
+                GridRegion r = m_GridService.GetRegionByPosition(scopeID, (int)Util.RegionToWorldLoc((uint)x), (int)Util.RegionToWorldLoc((uint)y));
+                if (r != null)
                 {
-                    IPAddress ipAddr = httpRequest.RemoteIPEndPoint.Address;
-                    GridRegion r = m_GridService.GetRegionByPosition(scopeID, (int)Util.RegionToWorldLoc((uint)x), (int)Util.RegionToWorldLoc((uint)y));
-                    if (r != null)
+                    if (r.ExternalEndPoint.Address.ToString() != ipAddr.ToString())
                     {
-                        if (r.ExternalEndPoint.Address.ToString() != ipAddr.ToString())
-                        {
-                            m_log.WarnFormat("[MAP IMAGE HANDLER]: IP address {0} may be trying to impersonate region in IP {1}", ipAddr, r.ExternalEndPoint.Address);
-                            httpResponse.RawBuffer = Util.ResultFailureMessage("IP address of caller does not match IP address of registered region");
-                            //return;
-                        }
-                    }
-                    else
-                    {
-                        m_log.WarnFormat("[MAP IMAGE HANDLER]: IP address {0} may be rogue. Region not found at coordinates {1}-{2}",
-                            ipAddr, x, y);
-                        httpResponse.RawBuffer = Util.ResultFailureMessage("Region not found at given coordinates");
+                        m_log.WarnFormat("[MAP IMAGE HANDLER]: IP address {0} may be trying to impersonate region in IP {1}", ipAddr, r.ExternalEndPoint.Address);
+                        httpResponse.RawBuffer = Util.ResultFailureMessage("IP address of caller does not match IP address of registered region");
                         //return;
                     }
                 }
-
-                bool result;
-                string reason;
-                if (data == null)
-                    result = m_MapService.RemoveMapTile(x, y, scopeID, out reason);
                 else
-                    result = m_MapService.AddMapTile(x, y, data, scopeID, out reason);
-                httpResponse.RawBuffer = result ? Util.sucessResultSuccess : Util.ResultFailureMessage(reason);
-                return;
-            }
-            catch (Exception e)
-            {
-                m_log.ErrorFormat("[MAP SERVICE IMAGE HANDLER]: Exception {0} {1}", e.Message, e.StackTrace);
+                {
+                    m_log.WarnFormat("[MAP IMAGE HANDLER]: IP address {0} may be rogue. Region not found at coordinates {1}-{2}",
+                        ipAddr, x, y);
+                    httpResponse.RawBuffer = Util.ResultFailureMessage("Region not found at given coordinates");
+                    //return;
+                }
             }
 
-            httpResponse.RawBuffer = Util.ResultFailureMessage("Unexpected server error");
+            bool result;
+            string reason;
+            if (data == null)
+                result = m_MapService.RemoveMapTile(x, y, scopeID, out reason);
+            else
+                result = m_MapService.AddMapTile(x, y, data, scopeID, out reason);
+            httpResponse.RawBuffer = result ? Util.sucessResultSuccess : Util.ResultFailureMessage(reason);
+            return;
         }
+        catch (Exception e)
+        {
+            m_log.ErrorFormat("[MAP SERVICE IMAGE HANDLER]: Exception {0} {1}", e.Message, e.StackTrace);
+        }
+
+        httpResponse.RawBuffer = Util.ResultFailureMessage("Unexpected server error");
     }
 }

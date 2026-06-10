@@ -35,144 +35,143 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser;
+
+public class LocalGridUserServicesConnector : ISharedRegionModule, IGridUserService
 {
-    public class LocalGridUserServicesConnector : ISharedRegionModule, IGridUserService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IGridUserService m_GridUserService;
+
+    private ActivityDetector m_ActivityDetector;
+
+    private bool m_Enabled = false;
+
+    #region ISharedRegionModule
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        private IGridUserService m_GridUserService;
+    public string Name
+    {
+        get { return "LocalGridUserServicesConnector"; }
+    }
 
-        private ActivityDetector m_ActivityDetector;
-
-        private bool m_Enabled = false;
-
-        #region ISharedRegionModule
-
-        public Type ReplaceableInterface
+    public void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "LocalGridUserServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("GridUserServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("GridUserServices", "");
-                if (name == Name)
+                IConfig userConfig = source.Configs["GridUserService"];
+                if (userConfig == null)
                 {
-                    IConfig userConfig = source.Configs["GridUserService"];
-                    if (userConfig == null)
-                    {
-                        m_log.Error("[LOCAL GRID USER SERVICE CONNECTOR]: GridUserService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    string serviceDll = userConfig.GetString("LocalServiceModule", String.Empty);
-
-                    if (serviceDll.Length == 0)
-                    {
-                        m_log.Error("[LOCAL GRID USER SERVICE CONNECTOR]: No LocalServiceModule named in section GridUserService");
-                        return;
-                    }
-
-                    Object[] args = new Object[] { source };
-                    m_GridUserService = ServerUtils.LoadPlugin<IGridUserService>(serviceDll, args);
-
-                    if (m_GridUserService == null)
-                    {
-                        m_log.ErrorFormat(
-                            "[LOCAL GRID USER SERVICE CONNECTOR]: Cannot load user account service specified as {0}", serviceDll);
-                        return;
-                    }
-
-                    m_ActivityDetector = new ActivityDetector(this);
-
-                    m_Enabled = true;
-
-                    m_log.Info("[LOCAL GRID USER SERVICE CONNECTOR]: Local grid user connector enabled");
+                    m_log.Error("[LOCAL GRID USER SERVICE CONNECTOR]: GridUserService missing from OpenSim.ini");
+                    return;
                 }
+
+                string serviceDll = userConfig.GetString("LocalServiceModule", String.Empty);
+
+                if (serviceDll.Length == 0)
+                {
+                    m_log.Error("[LOCAL GRID USER SERVICE CONNECTOR]: No LocalServiceModule named in section GridUserService");
+                    return;
+                }
+
+                Object[] args = new Object[] { source };
+                m_GridUserService = ServerUtils.LoadPlugin<IGridUserService>(serviceDll, args);
+
+                if (m_GridUserService == null)
+                {
+                    m_log.ErrorFormat(
+                        "[LOCAL GRID USER SERVICE CONNECTOR]: Cannot load user account service specified as {0}", serviceDll);
+                    return;
+                }
+
+                m_ActivityDetector = new ActivityDetector(this);
+
+                m_Enabled = true;
+
+                m_log.Info("[LOCAL GRID USER SERVICE CONNECTOR]: Local grid user connector enabled");
             }
         }
-
-        public void PostInitialise()
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void Close()
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.RegisterModuleInterface<IGridUserService>(m_GridUserService);
-            m_ActivityDetector.AddRegion(scene);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.UnregisterModuleInterface<IGridUserService>(this);
-            m_ActivityDetector.RemoveRegion(scene);
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_log.InfoFormat("[LOCAL GRID USER SERVICE CONNECTOR]: Enabled local grid user for region {0}", scene.RegionInfo.RegionName);
-        }
-
-        #endregion
-
-        #region IGridUserService
-
-        public GridUserInfo LoggedIn(string userID)
-        {
-            return m_GridUserService.LoggedIn(userID);
-        }
-
-        public bool LoggedOut(string userID, UUID sessionID, UUID regionID, Vector3 lastPosition, Vector3 lastLookAt)
-        {
-            return m_GridUserService.LoggedOut(userID, sessionID, regionID, lastPosition, lastLookAt);
-        }
-
-        public bool SetHome(string userID, UUID homeID, Vector3 homePosition, Vector3 homeLookAt)
-        {
-            return m_GridUserService.SetHome(userID, homeID, homePosition, homeLookAt);
-        }
-
-        public bool SetLastPosition(string userID, UUID sessionID, UUID regionID, Vector3 lastPosition, Vector3 lastLookAt)
-        {
-            return m_GridUserService.SetLastPosition(userID, sessionID, regionID, lastPosition, lastLookAt);
-        }
-
-        public GridUserInfo GetGridUserInfo(string userID)
-        {
-            return m_GridUserService.GetGridUserInfo(userID);
-        }
-        public GridUserInfo[] GetGridUserInfo(string[] userID)
-        {
-            return m_GridUserService.GetGridUserInfo(userID);
-        }
-
-        #endregion
-
     }
+
+    public void PostInitialise()
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void Close()
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.RegisterModuleInterface<IGridUserService>(m_GridUserService);
+        m_ActivityDetector.AddRegion(scene);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.UnregisterModuleInterface<IGridUserService>(this);
+        m_ActivityDetector.RemoveRegion(scene);
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_log.InfoFormat("[LOCAL GRID USER SERVICE CONNECTOR]: Enabled local grid user for region {0}", scene.RegionInfo.RegionName);
+    }
+
+    #endregion
+
+    #region IGridUserService
+
+    public GridUserInfo LoggedIn(string userID)
+    {
+        return m_GridUserService.LoggedIn(userID);
+    }
+
+    public bool LoggedOut(string userID, UUID sessionID, UUID regionID, Vector3 lastPosition, Vector3 lastLookAt)
+    {
+        return m_GridUserService.LoggedOut(userID, sessionID, regionID, lastPosition, lastLookAt);
+    }
+
+    public bool SetHome(string userID, UUID homeID, Vector3 homePosition, Vector3 homeLookAt)
+    {
+        return m_GridUserService.SetHome(userID, homeID, homePosition, homeLookAt);
+    }
+
+    public bool SetLastPosition(string userID, UUID sessionID, UUID regionID, Vector3 lastPosition, Vector3 lastLookAt)
+    {
+        return m_GridUserService.SetLastPosition(userID, sessionID, regionID, lastPosition, lastLookAt);
+    }
+
+    public GridUserInfo GetGridUserInfo(string userID)
+    {
+        return m_GridUserService.GetGridUserInfo(userID);
+    }
+    public GridUserInfo[] GetGridUserInfo(string[] userID)
+    {
+        return m_GridUserService.GetGridUserInfo(userID);
+    }
+
+    #endregion
+
 }

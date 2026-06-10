@@ -25,32 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
-using OpenSim.Framework;
-using OpenMetaverse;
 using Npgsql;
 
-namespace OpenSim.Data.PGSQL
+namespace OpenSim.Data.PGSQL;
+
+public class PGSQLOfflineIMData : PGSQLGenericTableHandler<OfflineIMData>, IOfflineIMData
 {
-    public class PGSQLOfflineIMData : PGSQLGenericTableHandler<OfflineIMData>, IOfflineIMData
+    public PGSQLOfflineIMData(string connectionString, string realm)
+        : base(connectionString, realm, "IM_Store")
     {
-        public PGSQLOfflineIMData(string connectionString, string realm)
-            : base(connectionString, realm, "IM_Store")
+    }
+
+    public void DeleteOld()
+    {
+        using (NpgsqlCommand cmd = new NpgsqlCommand())
         {
+            cmd.CommandText = String.Format("delete from {0} where \"TMStamp\" < CURRENT_DATE - INTERVAL '2 week'", m_Realm);
+
+            ExecuteNonQuery(cmd);
         }
 
-        public void DeleteOld()
-        {
-            using (NpgsqlCommand cmd = new NpgsqlCommand())
-            {
-                cmd.CommandText = String.Format("delete from {0} where \"TMStamp\" < CURRENT_DATE - INTERVAL '2 week'", m_Realm);
-
-                ExecuteNonQuery(cmd);
-            }
-
-        }
     }
 }

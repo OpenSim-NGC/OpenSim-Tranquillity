@@ -45,97 +45,96 @@ using log4net;
  * it's always availabe and thus the default in case of configuration errors
 */
 
-namespace OpenSim.Region.PhysicsModules.Meshing
+namespace OpenSim.Region.PhysicsModules.Meshing;
+
+public class ZeroMesher : IMesher, INonSharedRegionModule
 {
-    public class ZeroMesher : IMesher, INonSharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private bool m_Enabled = false;
+
+    #region INonSharedRegionModule
+    public string Name
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private bool m_Enabled = false;
-
-        #region INonSharedRegionModule
-        public string Name
-        {
-            get { return "ZeroMesher"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            // TODO: Move this out of Startup
-            IConfig config = source.Configs["Startup"];
-            if (config != null)
-            {
-                // This is the default Mesher
-                string mesher = config.GetString("meshing", Name);
-                if (mesher == Name)
-                    m_Enabled = true;
-            }
-        }
-
-        public void Close()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.RegisterModuleInterface<IMesher>(this);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.UnregisterModuleInterface<IMesher>(this);
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-        #endregion
-
-        #region IMesher
-        public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod)
-        {
-            return CreateMesh(primName, primShape, size, lod, false);
-        }
-
-        public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool shouldCache, bool convex, bool forOde)
-        {
-            return CreateMesh(primName, primShape, size, lod, false);
-        }
-
-        public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool convex,bool forOde)
-        {
-            return CreateMesh(primName, primShape, size, lod, false);
-        }
-
-        public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical)
-        {
-            // Remove the reference to the encoded JPEG2000 data so it can be GCed
-            primShape.SculptData = OpenMetaverse.Utils.EmptyBytes;
-
-            return null;
-        }
-
-        public IMesh GetMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool convex)
-        {
-            return null;
-        }
-
-        public void ReleaseMesh(IMesh mesh) { }
-        public void ExpireReleaseMeshs() { }
-        public void ExpireFileCache() { }
-
-        #endregion
+        get { return "ZeroMesher"; }
     }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        // TODO: Move this out of Startup
+        IConfig config = source.Configs["Startup"];
+        if (config != null)
+        {
+            // This is the default Mesher
+            string mesher = config.GetString("meshing", Name);
+            if (mesher == Name)
+                m_Enabled = true;
+        }
+    }
+
+    public void Close()
+    {
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.RegisterModuleInterface<IMesher>(this);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.UnregisterModuleInterface<IMesher>(this);
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+    #endregion
+
+    #region IMesher
+    public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod)
+    {
+        return CreateMesh(primName, primShape, size, lod, false);
+    }
+
+    public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool shouldCache, bool convex, bool forOde)
+    {
+        return CreateMesh(primName, primShape, size, lod, false);
+    }
+
+    public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool convex,bool forOde)
+    {
+        return CreateMesh(primName, primShape, size, lod, false);
+    }
+
+    public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical)
+    {
+        // Remove the reference to the encoded JPEG2000 data so it can be GCed
+        primShape.SculptData = OpenMetaverse.Utils.EmptyBytes;
+
+        return null;
+    }
+
+    public IMesh GetMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool convex)
+    {
+        return null;
+    }
+
+    public void ReleaseMesh(IMesh mesh) { }
+    public void ExpireReleaseMeshs() { }
+    public void ExpireFileCache() { }
+
+    #endregion
 }

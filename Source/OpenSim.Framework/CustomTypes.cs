@@ -25,19 +25,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+public enum CustomAssetType : sbyte
 {
-    public enum CustomAssetType : sbyte
-    {
-        CustomTypeBase = 0x60,
-        AnimationSet = 0x60,
-    }
+    CustomTypeBase = 0x60,
+    AnimationSet = 0x60,
+}
 
-    public enum CustomInventoryType : sbyte
-    {
-        CustomTypeBase = 0x60,
-        AnimationSet = 0x60,
-    }
+public enum CustomInventoryType : sbyte
+{
+    CustomTypeBase = 0x60,
+    AnimationSet = 0x60,
 }

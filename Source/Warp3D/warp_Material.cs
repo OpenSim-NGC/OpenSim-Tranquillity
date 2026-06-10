@@ -1,8 +1,5 @@
-using System;
-using System.IO;
+namespace Warp3D;
 
-namespace Warp3D
-{
 	/// <summary>
 	/// Summary description for warp_Material.
 	/// </summary>
@@ -45,11 +42,11 @@ namespace Warp3D
 
 		public warp_Material(String path)
 		{
-            using(FileStream fs = new FileStream(path,FileMode.Open))
-            {
-                using(BinaryReader br = new BinaryReader(fs))
-                    importFromStream(br);
-            }
+        using(FileStream fs = new FileStream(path,FileMode.Open))
+        {
+            using(BinaryReader br = new BinaryReader(fs))
+                importFromStream(br);
+        }
 		}
 
 		private void importFromStream(BinaryReader inStream)
@@ -158,7 +155,7 @@ namespace Warp3D
 		{
 			texture=t;
 			if (texture!=null)
-                texture.resize();
+            texture.resize();
 		}
 
 		public void setEnvmap(warp_Texture env)
@@ -173,16 +170,16 @@ namespace Warp3D
 		}
 
 		public bool opaque
+    {
+        get
         {
-            get
-            {
-                if((color & warp_Color.MASKALPHA) != warp_Color.MASKALPHA)
-                    return false;
-                if(texture != null)
-                    return texture.opaque;
-                return true;
-            }
+            if((color & warp_Color.MASKALPHA) != warp_Color.MASKALPHA)
+                return false;
+            if(texture != null)
+                return texture.opaque;
+            return true;
         }
+    }
 
 		public void setReflectivity(int factor)
 		{
@@ -239,4 +236,3 @@ namespace Warp3D
 			return wireframe;
 		}
 	}
-}

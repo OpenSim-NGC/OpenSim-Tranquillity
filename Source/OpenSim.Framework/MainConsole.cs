@@ -25,16 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Framework
-{
-    public class MainConsole
-    {
-        private static ICommandConsole instance;
+namespace OpenSim.Framework;
 
-        public static ICommandConsole Instance
-        {
-            get { return instance; }
-            set { instance = value; }
-        }
+public class MainConsole
+{
+    private static ICommandConsole instance;
+
+    public static ICommandConsole Instance
+    {
+        get { return instance; }
+        set { instance = value; }
     }
 }

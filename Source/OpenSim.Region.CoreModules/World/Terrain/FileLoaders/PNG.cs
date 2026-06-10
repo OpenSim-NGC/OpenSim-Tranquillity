@@ -28,63 +28,62 @@
 using SkiaSharp;
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
+namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders;
+
+/// <summary>
+/// PNG terrain file loader using SkiaSharp.
+/// Saves and loads terrain from PNG images.
+/// </summary>
+internal class PNG : GenericSystemDrawing
 {
-    /// <summary>
-    /// PNG terrain file loader using SkiaSharp.
-    /// Saves and loads terrain from PNG images.
-    /// </summary>
-    internal class PNG : GenericSystemDrawing
+    public override int SupportedHeight
     {
-        public override int SupportedHeight
-        {
-            get { return 256; }
-        }
+        get { return 256; }
+    }
 
-        public override void SaveFile(string filename, ITerrainChannel map)
+    public override void SaveFile(string filename, ITerrainChannel map)
+    {
+        using(var bitmap = CreateGrayscaleBitmapFromMap(map))
         {
-            using(var bitmap = CreateGrayscaleBitmapFromMap(map))
+            using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
             {
-                using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+                using (var file = File.Create(filename))
                 {
-                    using (var file = File.Create(filename))
-                    {
-                        data.SaveTo(file);
-                    }
+                    data.SaveTo(file);
                 }
             }
         }
+    }
 
-        /// <summary>
-        /// Exports a stream using SkiaSharp PNG encoder.
-        /// </summary>
-        /// <param name="stream">The target stream</param>
-        /// <param name="map">The terrain channel being saved</param>
-        public override void SaveStream(Stream stream, ITerrainChannel map)
+    /// <summary>
+    /// Exports a stream using SkiaSharp PNG encoder.
+    /// </summary>
+    /// <param name="stream">The target stream</param>
+    /// <param name="map">The terrain channel being saved</param>
+    public override void SaveStream(Stream stream, ITerrainChannel map)
+    {
+        using(var bitmap = CreateGrayscaleBitmapFromMap(map))
         {
-            using(var bitmap = CreateGrayscaleBitmapFromMap(map))
+            using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
             {
-                using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
-                {
-                    data.SaveTo(stream);
-                }
+                data.SaveTo(stream);
             }
         }
+    }
 
-        public override string ToString()
-        {
-            return "PNG";
-        }
+    public override string ToString()
+    {
+        return "PNG";
+    }
 
-        //Returns true if this extension is supported for terrain save-tile
-        public override bool SupportsTileSave()
-        {
-            return true;
-        }
+    //Returns true if this extension is supported for terrain save-tile
+    public override bool SupportsTileSave()
+    {
+        return true;
+    }
 
-        public override bool SupportsExtendedTileSave()
-        {
-            return false;
-        }
+    public override bool SupportsExtendedTileSave()
+    {
+        return false;
     }
 }

@@ -27,29 +27,28 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IWindModule : INonSharedRegionModule
 {
-    public interface IWindModule : INonSharedRegionModule
-    {
 
-        /// <summary>
-        /// Retrieves the current wind speed at the given Region Coordinates
-        /// </summary>
-        Vector3 WindSpeed(int x, int y, int z);
+    /// <summary>
+    /// Retrieves the current wind speed at the given Region Coordinates
+    /// </summary>
+    Vector3 WindSpeed(int x, int y, int z);
 
-        /// <summary>
-        /// Set Wind Plugin Parameter
-        /// </summary>
-        void WindParamSet(string plugin, string param, float value);
+    /// <summary>
+    /// Set Wind Plugin Parameter
+    /// </summary>
+    void WindParamSet(string plugin, string param, float value);
 
-        /// <summary>
-        /// Get Wind Plugin Parameter
-        /// </summary>
-        float WindParamGet(string plugin, string param);
+    /// <summary>
+    /// Get Wind Plugin Parameter
+    /// </summary>
+    float WindParamGet(string plugin, string param);
 
-        /// <summary>
-        /// Current active wind model plugin or String.Empty
-        /// </summary>
-        string WindActiveModelPluginName { get; }
-    }
+    /// <summary>
+    /// Current active wind model plugin or String.Empty
+    /// </summary>
+    string WindActiveModelPluginName { get; }
 }

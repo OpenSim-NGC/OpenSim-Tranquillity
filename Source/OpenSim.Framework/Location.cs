@@ -25,85 +25,83 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+[Serializable]
+public class Location : ICloneable
 {
-    [Serializable]
-    public class Location : ICloneable
+    private readonly uint m_x;
+    private readonly uint m_y;
+
+    public Location(uint x, uint y)
     {
-        private readonly uint m_x;
-        private readonly uint m_y;
+        m_x = x;
+        m_y = y;
+    }
 
-        public Location(uint x, uint y)
+    public Location(ulong regionHandle)
+    {
+        m_x =  (uint)(regionHandle >> 32);
+        m_y = (uint)(regionHandle & (ulong)uint.MaxValue);
+    }
+
+    public ulong RegionHandle
+    {
+        get { return Utils.UIntsToLong(m_x, m_y); }
+    }
+
+    public uint X
+    {
+        get { return m_x; }
+    }
+
+    public uint Y
+    {
+        get { return m_y; }
+    }
+
+    public override bool Equals(object obj)
+    {
+        if (ReferenceEquals(obj, this))
+            return true;
+
+        if (obj is Location)
         {
-            m_x = x;
-            m_y = y;
+            return Equals((Location) obj);
         }
 
-        public Location(ulong regionHandle)
-        {
-            m_x =  (uint)(regionHandle >> 32);
-            m_y = (uint)(regionHandle & (ulong)uint.MaxValue);
-        }
+        return base.Equals(obj);
+    }
 
-        public ulong RegionHandle
-        {
-            get { return Utils.UIntsToLong(m_x, m_y); }
-        }
+    public bool Equals(Location loc)
+    {
+        return loc.X == X && loc.Y == Y;
+    }
 
-        public uint X
-        {
-            get { return m_x; }
-        }
+    public bool Equals(int x, int y)
+    {
+        return X == x && y == Y;
+    }
 
-        public uint Y
-        {
-            get { return m_y; }
-        }
+    public static bool operator ==(Location o, object o2)
+    {
+        return o.Equals(o2);
+    }
 
-        public override bool Equals(object obj)
-        {
-            if (ReferenceEquals(obj, this))
-                return true;
+    public static bool operator !=(Location o, object o2)
+    {
+        return !o.Equals(o2);
+    }
 
-            if (obj is Location)
-            {
-                return Equals((Location) obj);
-            }
+    public override int GetHashCode()
+    {
+        return X.GetHashCode() ^ Y.GetHashCode();
+    }
 
-            return base.Equals(obj);
-        }
-
-        public bool Equals(Location loc)
-        {
-            return loc.X == X && loc.Y == Y;
-        }
-
-        public bool Equals(int x, int y)
-        {
-            return X == x && y == Y;
-        }
-
-        public static bool operator ==(Location o, object o2)
-        {
-            return o.Equals(o2);
-        }
-
-        public static bool operator !=(Location o, object o2)
-        {
-            return !o.Equals(o2);
-        }
-
-        public override int GetHashCode()
-        {
-            return X.GetHashCode() ^ Y.GetHashCode();
-        }
-
-        public object Clone()
-        {
-            return new Location(X, Y);
-        }
+    public object Clone()
+    {
+        return new Location(X, Y);
     }
 }

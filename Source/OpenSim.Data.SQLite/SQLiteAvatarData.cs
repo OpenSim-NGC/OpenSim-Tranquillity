@@ -28,34 +28,33 @@
 using OpenMetaverse;
 using System.Data.SQLite;
 
-namespace OpenSim.Data.SQLite
+namespace OpenSim.Data.SQLite;
+
+/// <summary>
+/// A SQLite Interface for Avatar Data
+/// </summary>
+public class SQLiteAvatarData : SQLiteGenericTableHandler<AvatarBaseData>,
+        IAvatarData
 {
-    /// <summary>
-    /// A SQLite Interface for Avatar Data
-    /// </summary>
-    public class SQLiteAvatarData : SQLiteGenericTableHandler<AvatarBaseData>,
-            IAvatarData
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public SQLiteAvatarData(string connectionString, string realm) :
-                base(connectionString, realm, "Avatar")
+    public SQLiteAvatarData(string connectionString, string realm) :
+            base(connectionString, realm, "Avatar")
+    {
+    }
+
+    public bool Delete(UUID principalID, string name)
+    {
+        using (SQLiteCommand cmd = new SQLiteCommand())
         {
+            cmd.CommandText = String.Format("delete from {0} where `PrincipalID` = :PrincipalID and `Name` = :Name", m_Realm);
+            cmd.Parameters.AddWithValue(":PrincipalID", principalID.ToString());
+            cmd.Parameters.AddWithValue(":Name", name);
+
+            if (ExecuteNonQuery(cmd, m_Connection) > 0)
+                return true;
         }
 
-        public bool Delete(UUID principalID, string name)
-        {
-            using (SQLiteCommand cmd = new SQLiteCommand())
-            {
-                cmd.CommandText = String.Format("delete from {0} where `PrincipalID` = :PrincipalID and `Name` = :Name", m_Realm);
-                cmd.Parameters.AddWithValue(":PrincipalID", principalID.ToString());
-                cmd.Parameters.AddWithValue(":Name", name);
-
-                if (ExecuteNonQuery(cmd, m_Connection) > 0)
-                    return true;
-            }
-
-            return false;
-        }
+        return false;
     }
 }

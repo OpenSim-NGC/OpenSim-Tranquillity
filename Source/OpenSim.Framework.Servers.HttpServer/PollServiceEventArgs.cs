@@ -25,55 +25,53 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
 using OpenMetaverse;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public delegate OSHttpResponse RequestMethod(UUID ID, OSHttpRequest request);
+public delegate bool HasEventsMethod(UUID requestID, UUID pId);
+public delegate Hashtable GetEventsMethod(UUID requestID, UUID pId);
+
+public delegate Hashtable NoEventsMethod(UUID requestID, UUID pId);
+public delegate void DropMethod(UUID requestID, UUID pId);
+
+public class PollServiceEventArgs : EventArgs
 {
-    public delegate OSHttpResponse RequestMethod(UUID ID, OSHttpRequest request);
-    public delegate bool HasEventsMethod(UUID requestID, UUID pId);
-    public delegate Hashtable GetEventsMethod(UUID requestID, UUID pId);
+    public HasEventsMethod HasEvents;
+    public GetEventsMethod GetEvents;
+    public NoEventsMethod NoEvents;
+    public RequestMethod Request;
+    public DropMethod Drop;
+    public UUID Id;
+    public int TimeOutms;
 
-    public delegate Hashtable NoEventsMethod(UUID requestID, UUID pId);
-    public delegate void DropMethod(UUID requestID, UUID pId);
+    public string Url { get; set; }
 
-    public class PollServiceEventArgs : EventArgs
+    /// <summary>
+    /// Number of requests received for this poll service.
+    /// </summary>
+    public int RequestsReceived { get; set; }
+
+    /// <summary>
+    /// Number of requests handled by this poll service.
+    /// </summary>
+    public int RequestsHandled { get; set; }
+
+    public PollServiceEventArgs(
+        RequestMethod pRequest,
+        string pUrl,
+        HasEventsMethod pHasEvents, GetEventsMethod pGetEvents, NoEventsMethod pNoEvents,
+        DropMethod pDrop, UUID pId, int pTimeOutms)
     {
-        public HasEventsMethod HasEvents;
-        public GetEventsMethod GetEvents;
-        public NoEventsMethod NoEvents;
-        public RequestMethod Request;
-        public DropMethod Drop;
-        public UUID Id;
-        public int TimeOutms;
-
-        public string Url { get; set; }
-
-        /// <summary>
-        /// Number of requests received for this poll service.
-        /// </summary>
-        public int RequestsReceived { get; set; }
-
-        /// <summary>
-        /// Number of requests handled by this poll service.
-        /// </summary>
-        public int RequestsHandled { get; set; }
-
-        public PollServiceEventArgs(
-            RequestMethod pRequest,
-            string pUrl,
-            HasEventsMethod pHasEvents, GetEventsMethod pGetEvents, NoEventsMethod pNoEvents,
-            DropMethod pDrop, UUID pId, int pTimeOutms)
-        {
-            Request = pRequest;
-            Url = pUrl;
-            HasEvents = pHasEvents;
-            GetEvents = pGetEvents;
-            NoEvents = pNoEvents;
-            Drop = pDrop;
-            Id = pId;
-            TimeOutms = pTimeOutms;
-        }
+        Request = pRequest;
+        Url = pUrl;
+        HasEvents = pHasEvents;
+        GetEvents = pGetEvents;
+        NoEvents = pNoEvents;
+        Drop = pDrop;
+        Id = pId;
+        TimeOutms = pTimeOutms;
     }
 }

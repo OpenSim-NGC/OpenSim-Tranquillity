@@ -25,59 +25,54 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Reflection;
 using Nini.Config;
-using OpenSim.Framework;
 using OpenSim.Data;
-using OpenSim.Services.Interfaces;
 using OpenSim.Services.Base;
 
-namespace OpenSim.Services.AuthorizationService
+namespace OpenSim.Services.AuthorizationService;
+
+public class AuthorizationServiceBase : ServiceBase
 {
-    public class AuthorizationServiceBase : ServiceBase
+    protected IAssetDataPlugin m_Database = null;
+
+    public AuthorizationServiceBase(IConfigSource config) : base(config)
     {
-        protected IAssetDataPlugin m_Database = null;
+        string dllName = String.Empty;
+        string connString = String.Empty;
 
-        public AuthorizationServiceBase(IConfigSource config) : base(config)
+        //
+        // Try reading the [AuthorizationService] section first, if it exists
+        //
+        IConfig assetConfig = config.Configs["AuthorizationService"];
+        if (assetConfig != null)
         {
-            string dllName = String.Empty;
-            string connString = String.Empty;
-
-            //
-            // Try reading the [AuthorizationService] section first, if it exists
-            //
-            IConfig assetConfig = config.Configs["AuthorizationService"];
-            if (assetConfig != null)
-            {
-                dllName = assetConfig.GetString("StorageProvider", dllName);
-                connString = assetConfig.GetString("ConnectionString", connString);
-            }
-
-            //
-            // Try reading the [DatabaseService] section, if it exists
-            //
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig != null)
-            {
-                if (dllName.Length == 0)
-                    dllName = dbConfig.GetString("StorageProvider", String.Empty);
-                if (connString.Length == 0)
-                    connString = dbConfig.GetString("ConnectionString", String.Empty);
-            }
-
-            //
-            // We tried, but this doesn't exist. We can't proceed.
-            //
-            if (string.IsNullOrEmpty(dllName))
-                throw new Exception("No StorageProvider configured");
-
-            m_Database = LoadPlugin<IAssetDataPlugin>(dllName);
-            if (m_Database == null)
-                throw new Exception("Could not find a storage interface in the given module");
-
-            m_Database.Initialise(connString);
-
+            dllName = assetConfig.GetString("StorageProvider", dllName);
+            connString = assetConfig.GetString("ConnectionString", connString);
         }
+
+        //
+        // Try reading the [DatabaseService] section, if it exists
+        //
+        IConfig dbConfig = config.Configs["DatabaseService"];
+        if (dbConfig != null)
+        {
+            if (dllName.Length == 0)
+                dllName = dbConfig.GetString("StorageProvider", String.Empty);
+            if (connString.Length == 0)
+                connString = dbConfig.GetString("ConnectionString", String.Empty);
+        }
+
+        //
+        // We tried, but this doesn't exist. We can't proceed.
+        //
+        if (string.IsNullOrEmpty(dllName))
+            throw new Exception("No StorageProvider configured");
+
+        m_Database = LoadPlugin<IAssetDataPlugin>(dllName);
+        if (m_Database == null)
+            throw new Exception("Could not find a storage interface in the given module");
+
+        m_Database.Initialise(connString);
+
     }
 }

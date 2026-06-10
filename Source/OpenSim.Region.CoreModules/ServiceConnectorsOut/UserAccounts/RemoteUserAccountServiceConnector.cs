@@ -36,172 +36,171 @@ using OpenSim.Framework;
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts;
+
+public class RemoteUserAccountServicesConnector : UserAccountServicesConnector,
+        ISharedRegionModule, IUserAccountService
 {
-    public class RemoteUserAccountServicesConnector : UserAccountServicesConnector,
-            ISharedRegionModule, IUserAccountService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private bool m_Enabled = false;
+    private UserAccountCache m_Cache;
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
-
-        private bool m_Enabled = false;
-        private UserAccountCache m_Cache;
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "RemoteUserAccountServicesConnector"; }
-        }
-
-        public override void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
-            {
-                string name = moduleConfig.GetString("UserAccountServices", "");
-                if (name == Name)
-                {
-                    IConfig userConfig = source.Configs["UserAccountService"];
-                    if (userConfig == null)
-                    {
-                        m_log.Error("[USER CONNECTOR]: UserAccountService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    m_Enabled = true;
-
-                    base.Initialise(source);
-                    m_Cache = new UserAccountCache();
-
-                    m_log.Info("[USER CONNECTOR]: Remote users enabled");
-                }
-            }
-        }
-
-        public void PostInitialise()
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void Close()
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.RegisterModuleInterface<IUserAccountService>(this);
-            scene.RegisterModuleInterface<IUserAccountCacheModule>(m_Cache);
-
-            scene.EventManager.OnNewClient += OnNewClient;
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        // When a user actually enters the sim, clear them from
-        // cache so the sim will have the current values for
-        // flags, title, etc. And country, don't forget country!
-        private void OnNewClient(IClientAPI client)
-        {
-            m_Cache.Remove(client.Name);
-        }
-
-        #region Overwritten methods from IUserAccountService
-
-        public override UserAccount GetUserAccount(UUID scopeID, UUID userID)
-        {
-            bool inCache = false;
-            UserAccount account;
-            account = m_Cache.Get(userID, out inCache);
-            if (inCache)
-                return account;
-
-            account = base.GetUserAccount(scopeID, userID);
-            m_Cache.Cache(userID, account);
-
-            return account;
-        }
-
-        public override UserAccount GetUserAccount(UUID scopeID, string firstName, string lastName)
-        {
-            bool inCache = false;
-            UserAccount account;
-            account = m_Cache.Get(firstName + " " + lastName, out inCache);
-            if (inCache)
-                return account;
-
-            account = base.GetUserAccount(scopeID, firstName, lastName);
-            if (account != null)
-                m_Cache.Cache(account.PrincipalID, account);
-
-            return account;
-        }
-
-        public override List<UserAccount> GetUserAccounts(UUID scopeID, List<string> IDs)
-        {
-            List<UserAccount> accs = new List<UserAccount>();
-            List<string> missing = new List<string>();
-
-            UUID uuid = UUID.Zero;
-            UserAccount account;
-            bool inCache = false;
-
-            foreach(string id in IDs)
-            {
-                if(UUID.TryParse(id, out uuid))
-                {
-                    account = m_Cache.Get(uuid, out inCache);
-                    if (inCache)
-                        accs.Add(account);
-                    else
-                        missing.Add(id);
-                }
-            }
-
-            if(missing.Count > 0)
-            {
-                List<UserAccount> ext = base.GetUserAccounts(scopeID, missing);
-                if(ext != null && ext.Count >0 )
-                {
-                    foreach(UserAccount acc in ext)
-                    {
-                        if(acc != null)
-                        {
-                            accs.Add(acc);
-                            m_Cache.Cache(acc.PrincipalID, acc);
-                        }
-                    }
-                }
-            }
-            return accs;
-        }
-
-        public override bool StoreUserAccount(UserAccount data)
-        {
-            // This remote connector refuses to serve this method
-            return false;
-        }
-
-        #endregion
+        get { return null; }
     }
+
+    public string Name
+    {
+        get { return "RemoteUserAccountServicesConnector"; }
+    }
+
+    public override void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
+        {
+            string name = moduleConfig.GetString("UserAccountServices", "");
+            if (name == Name)
+            {
+                IConfig userConfig = source.Configs["UserAccountService"];
+                if (userConfig == null)
+                {
+                    m_log.Error("[USER CONNECTOR]: UserAccountService missing from OpenSim.ini");
+                    return;
+                }
+
+                m_Enabled = true;
+
+                base.Initialise(source);
+                m_Cache = new UserAccountCache();
+
+                m_log.Info("[USER CONNECTOR]: Remote users enabled");
+            }
+        }
+    }
+
+    public void PostInitialise()
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void Close()
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.RegisterModuleInterface<IUserAccountService>(this);
+        scene.RegisterModuleInterface<IUserAccountCacheModule>(m_Cache);
+
+        scene.EventManager.OnNewClient += OnNewClient;
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    // When a user actually enters the sim, clear them from
+    // cache so the sim will have the current values for
+    // flags, title, etc. And country, don't forget country!
+    private void OnNewClient(IClientAPI client)
+    {
+        m_Cache.Remove(client.Name);
+    }
+
+    #region Overwritten methods from IUserAccountService
+
+    public override UserAccount GetUserAccount(UUID scopeID, UUID userID)
+    {
+        bool inCache = false;
+        UserAccount account;
+        account = m_Cache.Get(userID, out inCache);
+        if (inCache)
+            return account;
+
+        account = base.GetUserAccount(scopeID, userID);
+        m_Cache.Cache(userID, account);
+
+        return account;
+    }
+
+    public override UserAccount GetUserAccount(UUID scopeID, string firstName, string lastName)
+    {
+        bool inCache = false;
+        UserAccount account;
+        account = m_Cache.Get(firstName + " " + lastName, out inCache);
+        if (inCache)
+            return account;
+
+        account = base.GetUserAccount(scopeID, firstName, lastName);
+        if (account != null)
+            m_Cache.Cache(account.PrincipalID, account);
+
+        return account;
+    }
+
+    public override List<UserAccount> GetUserAccounts(UUID scopeID, List<string> IDs)
+    {
+        List<UserAccount> accs = new List<UserAccount>();
+        List<string> missing = new List<string>();
+
+        UUID uuid = UUID.Zero;
+        UserAccount account;
+        bool inCache = false;
+
+        foreach(string id in IDs)
+        {
+            if(UUID.TryParse(id, out uuid))
+            {
+                account = m_Cache.Get(uuid, out inCache);
+                if (inCache)
+                    accs.Add(account);
+                else
+                    missing.Add(id);
+            }
+        }
+
+        if(missing.Count > 0)
+        {
+            List<UserAccount> ext = base.GetUserAccounts(scopeID, missing);
+            if(ext != null && ext.Count >0 )
+            {
+                foreach(UserAccount acc in ext)
+                {
+                    if(acc != null)
+                    {
+                        accs.Add(acc);
+                        m_Cache.Cache(acc.PrincipalID, acc);
+                    }
+                }
+            }
+        }
+        return accs;
+    }
+
+    public override bool StoreUserAccount(UserAccount data)
+    {
+        // This remote connector refuses to serve this method
+        return false;
+    }
+
+    #endregion
 }

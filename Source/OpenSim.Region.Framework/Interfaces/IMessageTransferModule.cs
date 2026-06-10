@@ -27,35 +27,34 @@
 
 using OpenSim.Framework;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public delegate void MessageResultNotification(bool success);
+public delegate void UndeliveredMessage(GridInstantMessage im);
+
+public interface IMessageTransferModule
 {
-    public delegate void MessageResultNotification(bool success);
-    public delegate void UndeliveredMessage(GridInstantMessage im);
+    event UndeliveredMessage OnUndeliveredMessage;
 
-    public interface IMessageTransferModule
-    {
-        event UndeliveredMessage OnUndeliveredMessage;
+    /// <summary>
+    /// Attempt to send an instant message to a given destination.
+    /// </summary>
+    /// <remarks>
+    /// If the message cannot be delivered for any reason, this will be signalled on the OnUndeliveredMessage
+    /// event.  result(false) will also be called if the message cannot be delievered unless the type is
+    /// InstantMessageDialog.MessageFromAgent.  For successful message delivery, result(true) is called.
+    /// </remarks>
+    /// <param name="im"></param>
+    /// <param name="result"></param>
+    void SendInstantMessage(GridInstantMessage im, MessageResultNotification result, bool ToRootOnly = false);
 
-        /// <summary>
-        /// Attempt to send an instant message to a given destination.
-        /// </summary>
-        /// <remarks>
-        /// If the message cannot be delivered for any reason, this will be signalled on the OnUndeliveredMessage
-        /// event.  result(false) will also be called if the message cannot be delievered unless the type is
-        /// InstantMessageDialog.MessageFromAgent.  For successful message delivery, result(true) is called.
-        /// </remarks>
-        /// <param name="im"></param>
-        /// <param name="result"></param>
-        void SendInstantMessage(GridInstantMessage im, MessageResultNotification result, bool ToRootOnly = false);
-
-        /// <summary>
-        /// Appropriately handle a known undeliverable message without attempting a send.
-        /// </summary>
-        /// <remarks>
-        /// Essentially, this invokes the OnUndeliveredMessage event.
-        /// </remarks>
-        /// <param name="im"></param>
-        /// <param name="result"></param>
-        void HandleUndeliverableMessage(GridInstantMessage im, MessageResultNotification result);
-    }
+    /// <summary>
+    /// Appropriately handle a known undeliverable message without attempting a send.
+    /// </summary>
+    /// <remarks>
+    /// Essentially, this invokes the OnUndeliveredMessage event.
+    /// </remarks>
+    /// <param name="im"></param>
+    /// <param name="result"></param>
+    void HandleUndeliverableMessage(GridInstantMessage im, MessageResultNotification result);
 }

@@ -25,46 +25,43 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Data;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+/// <summary>
+/// In memory asset data plugin for test purposes.  Could be another dll when properly filled out and when the
+/// mono addin plugin system starts co-operating with the unit test system.  Currently no locking since unit
+/// tests are single threaded.
+/// </summary>
+public class MockAssetDataPlugin : BaseAssetRepository, IAssetDataPlugin
 {
-    /// <summary>
-    /// In memory asset data plugin for test purposes.  Could be another dll when properly filled out and when the
-    /// mono addin plugin system starts co-operating with the unit test system.  Currently no locking since unit
-    /// tests are single threaded.
-    /// </summary>
-    public class MockAssetDataPlugin : BaseAssetRepository, IAssetDataPlugin
+    public string Version { get { return "0"; } }
+    public string Name { get { return "MockAssetDataPlugin"; } }
+
+    public void Initialise() {}
+    public void Initialise(string connect) {}
+    public void Dispose() {}
+
+    private readonly List<AssetBase> assets = new List<AssetBase>();
+
+    public AssetBase GetAsset(UUID uuid)
     {
-        public string Version { get { return "0"; } }
-        public string Name { get { return "MockAssetDataPlugin"; } }
+        return assets.Find(x=>x.FullID == uuid);
+    }
 
-        public void Initialise() {}
-        public void Initialise(string connect) {}
-        public void Dispose() {}
+    public bool StoreAsset(AssetBase asset)
+    {
+        assets.Add(asset);
+        return true;
+    }
 
-        private readonly List<AssetBase> assets = new List<AssetBase>();
+    public List<AssetMetadata> FetchAssetMetadataSet(int start, int count) { return new List<AssetMetadata>(count); }
 
-        public AssetBase GetAsset(UUID uuid)
-        {
-            return assets.Find(x=>x.FullID == uuid);
-        }
-
-        public bool StoreAsset(AssetBase asset)
-        {
-            assets.Add(asset);
-            return true;
-        }
-
-        public List<AssetMetadata> FetchAssetMetadataSet(int start, int count) { return new List<AssetMetadata>(count); }
-
-        public bool Delete(string id)
-        {
-            return false;
-        }
+    public bool Delete(string id)
+    {
+        return false;
     }
 }

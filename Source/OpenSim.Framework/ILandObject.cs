@@ -25,183 +25,181 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public delegate int overrideParcelMaxPrimCountDelegate(ILandObject obj);
+public delegate int overrideSimulatorMaxPrimCountDelegate(ILandObject obj);
+
+public interface ILandObject
 {
-    public delegate int overrideParcelMaxPrimCountDelegate(ILandObject obj);
-    public delegate int overrideSimulatorMaxPrimCountDelegate(ILandObject obj);
+    int GetParcelMaxPrimCount();
+    int GetSimulatorMaxPrimCount();
+    int GetPrimsFree();
+    Dictionary<UUID, int> GetLandObjectOwners();
 
-    public interface ILandObject
-    {
-        int GetParcelMaxPrimCount();
-        int GetSimulatorMaxPrimCount();
-        int GetPrimsFree();
-        Dictionary<UUID, int> GetLandObjectOwners();
+    LandData LandData { get; set; }
+    bool[,] LandBitmap { get; set; }
+    UUID RegionUUID { get; }
 
-        LandData LandData { get; set; }
-        bool[,] LandBitmap { get; set; }
-        UUID RegionUUID { get; }
+    UUID GlobalID { get; }
+    UUID FakeID { get; }
+    int LocalID { get; }
+    UUID OwnerID { get; }
+    UUID GroupID { get; }
 
-        UUID GlobalID { get; }
-        UUID FakeID { get; }
-        int LocalID { get; }
-        UUID OwnerID { get; }
-        UUID GroupID { get; }
+    /// <summary>
+    /// Prim counts for this land object.
+    /// </summary>
+    IPrimCounts PrimCounts { get; set; }
 
-        /// <summary>
-        /// Prim counts for this land object.
-        /// </summary>
-        IPrimCounts PrimCounts { get; set; }
+    /// <summary>
+    /// The start point for the land object.  This is the northern-most point as one scans land working from
+    /// west to east.
+    /// </summary>
+    Vector2 StartPoint { get; }
 
-        /// <summary>
-        /// The start point for the land object.  This is the northern-most point as one scans land working from
-        /// west to east.
-        /// </summary>
-        Vector2 StartPoint { get; }
+    /// <summary>
+    /// The end point for the land object.  This is the southern-most point as one scans land working from
+    /// west to east.
+    /// </summary>
+    Vector2 EndPoint { get; }
 
-        /// <summary>
-        /// The end point for the land object.  This is the southern-most point as one scans land working from
-        /// west to east.
-        /// </summary>
-        Vector2 EndPoint { get; }
+    // a estimation of a parcel center.
+    Vector2 CenterPoint { get; }
 
-        // a estimation of a parcel center.
-        Vector2 CenterPoint { get; }
+    // get positions
+    Vector2? GetNearestPoint(Vector3 pos);
+    Vector2? GetNearestPointAlongDirection(Vector3 pos, Vector3 pdirection);
 
-        // get positions
-        Vector2? GetNearestPoint(Vector3 pos);
-        Vector2? GetNearestPointAlongDirection(Vector3 pos, Vector3 pdirection);
+    bool ContainsPoint(int x, int y);
 
-        bool ContainsPoint(int x, int y);
+    ILandObject Copy();
 
-        ILandObject Copy();
+    void SendLandUpdateToAvatarsOverMe();
+    void SendLandUpdateToAvatars();
 
-        void SendLandUpdateToAvatarsOverMe();
-        void SendLandUpdateToAvatars();
+    void SendLandProperties(int sequence_id, bool snap_selection, int request_result, IClientAPI remote_client);
+    bool UpdateLandProperties(LandUpdateArgs args, IClientAPI remote_client, out bool snap_selection, out bool needOverlay);
+    bool IsEitherBannedOrRestricted(UUID avatar);
+    bool IsBannedFromLand(UUID avatar);
+    bool CanBeOnThisLand(UUID avatar, float posHeight);
+    bool IsRestrictedFromLand(UUID avatar);
+    bool IsInLandAccessList(UUID avatar);
+    void SendLandUpdateToClient(IClientAPI remote_client);
+    void SendLandUpdateToClient(bool snap_selection, IClientAPI remote_client);
+    List<LandAccessEntry> CreateAccessListArrayByFlag(AccessList flag);
+    void SendAccessList(UUID agentID, UUID sessionID, uint flags, int sequenceID, IClientAPI remote_client);
+    void UpdateAccessList(uint flags, UUID transationID, List<LandAccessEntry> entries);
+    void UpdateLandBitmapByteArray();
+    void SetLandBitmapFromByteArray();
+    bool[,] GetLandBitmap();
+    void ForceUpdateLandInfo();
+    void SetLandBitmap(bool[,] bitmap);
 
-        void SendLandProperties(int sequence_id, bool snap_selection, int request_result, IClientAPI remote_client);
-        bool UpdateLandProperties(LandUpdateArgs args, IClientAPI remote_client, out bool snap_selection, out bool needOverlay);
-        bool IsEitherBannedOrRestricted(UUID avatar);
-        bool IsBannedFromLand(UUID avatar);
-        bool CanBeOnThisLand(UUID avatar, float posHeight);
-        bool IsRestrictedFromLand(UUID avatar);
-        bool IsInLandAccessList(UUID avatar);
-        void SendLandUpdateToClient(IClientAPI remote_client);
-        void SendLandUpdateToClient(bool snap_selection, IClientAPI remote_client);
-        List<LandAccessEntry> CreateAccessListArrayByFlag(AccessList flag);
-        void SendAccessList(UUID agentID, UUID sessionID, uint flags, int sequenceID, IClientAPI remote_client);
-        void UpdateAccessList(uint flags, UUID transationID, List<LandAccessEntry> entries);
-        void UpdateLandBitmapByteArray();
-        void SetLandBitmapFromByteArray();
-        bool[,] GetLandBitmap();
-        void ForceUpdateLandInfo();
-        void SetLandBitmap(bool[,] bitmap);
+    /// <summary>
+    /// Get a land bitmap that would cover an entire region.
+    /// </summary>
+    /// <returns>The bitmap created.</returns>
+    bool[,] BasicFullRegionLandBitmap();
 
-        /// <summary>
-        /// Get a land bitmap that would cover an entire region.
-        /// </summary>
-        /// <returns>The bitmap created.</returns>
-        bool[,] BasicFullRegionLandBitmap();
+    /// <summary>
+    /// Create a land bitmap.
+    /// Square name is wrong kept bc legacy
+    /// </summary>
+    /// <remarks>
+    /// Land co-ordinates are zero indexed.  The inputs are treated as points.  So if you want to create a bitmap
+    /// that covers an entire 256 x 256m region apart from a strip of land on the east, then you would need to
+    /// specify start_x = 0, start_y = 0, end_x = 252 (or anything up to 255), end_y = 255.
+    ///
+    /// At the moment, the smallest parcel of land is 4m x 4m, so if the
+    /// region is 256 x 256m (the SL size), the bitmap returned will start at (0,0) and end at (63,63).
+    /// The value of the set_value needs to be true to define an active parcel of the given size.
+    /// </remarks>
+    /// <param name="start_x"></param>
+    /// <param name="start_y"></param>
+    /// <param name="end_x"></param>
+    /// <param name="end_y"></param>
+    /// <param name="set_value"></param>
+    /// <returns>The bitmap created.</returns>
+    
+    bool[,] GetSquareLandBitmap(int start_x, int start_y, int end_x, int end_y, bool set_value = true);
 
-        /// <summary>
-        /// Create a land bitmap.
-        /// Square name is wrong kept bc legacy
-        /// </summary>
-        /// <remarks>
-        /// Land co-ordinates are zero indexed.  The inputs are treated as points.  So if you want to create a bitmap
-        /// that covers an entire 256 x 256m region apart from a strip of land on the east, then you would need to
-        /// specify start_x = 0, start_y = 0, end_x = 252 (or anything up to 255), end_y = 255.
-        ///
-        /// At the moment, the smallest parcel of land is 4m x 4m, so if the
-        /// region is 256 x 256m (the SL size), the bitmap returned will start at (0,0) and end at (63,63).
-        /// The value of the set_value needs to be true to define an active parcel of the given size.
-        /// </remarks>
-        /// <param name="start_x"></param>
-        /// <param name="start_y"></param>
-        /// <param name="end_x"></param>
-        /// <param name="end_y"></param>
-        /// <param name="set_value"></param>
-        /// <returns>The bitmap created.</returns>
-        
-        bool[,] GetSquareLandBitmap(int start_x, int start_y, int end_x, int end_y, bool set_value = true);
+    bool[,] ModifyLandBitmapSquare(bool[,] land_bitmap, int start_x, int start_y, int end_x, int end_y, bool set_value);
 
-        bool[,] ModifyLandBitmapSquare(bool[,] land_bitmap, int start_x, int start_y, int end_x, int end_y, bool set_value);
+    /// <summary>
+    /// Merge two (same size) land bitmaps.
+    /// </summary>
+    /// <param name="bitmap_base"></param>
+    /// <param name="bitmap_add"></param>
+    /// <returns>The modified bitmap.</returns>
+    bool[,] MergeLandBitmaps(bool[,] bitmap_base, bool[,] bitmap_add);
 
-        /// <summary>
-        /// Merge two (same size) land bitmaps.
-        /// </summary>
-        /// <param name="bitmap_base"></param>
-        /// <param name="bitmap_add"></param>
-        /// <returns>The modified bitmap.</returns>
-        bool[,] MergeLandBitmaps(bool[,] bitmap_base, bool[,] bitmap_add);
+    /// <summary>
+    /// Remap a land bitmap. Takes the supplied land bitmap and rotates it, crops it and finally offsets it into
+    /// a final land bitmap of the target region size.
+    /// </summary>
+    /// <param name="bitmap_base">The original parcel bitmap</param>
+    /// <param name="rotationDegrees"></param>
+    /// <param name="displacement">&lt;x,y,?&gt;</param>
+    /// <param name="boundingOrigin">&lt;x,y,?&gt;</param>
+    /// <param name="boundingSize">&lt;x,y,?&gt;</param>
+    /// <param name="regionSize">&lt;x,y,?&gt;</param>
+    /// <param name="isEmptyNow">out: This is set if the resultant bitmap is now empty</param>
+    /// <param name="AABBMin">out: parcel.AABBMin &lt;x,y,0&gt</param>
+    /// <param name="AABBMax">out: parcel.AABBMax &lt;x,y,0&gt</param>
+    /// <returns>New parcel bitmap</returns>
+    bool[,] RemapLandBitmap(bool[,] bitmap_base, Vector2 displacement, float rotationDegrees, Vector2 boundingOrigin, Vector2 boundingSize, Vector2 regionSize, out bool isEmptyNow);
 
-        /// <summary>
-        /// Remap a land bitmap. Takes the supplied land bitmap and rotates it, crops it and finally offsets it into
-        /// a final land bitmap of the target region size.
-        /// </summary>
-        /// <param name="bitmap_base">The original parcel bitmap</param>
-        /// <param name="rotationDegrees"></param>
-        /// <param name="displacement">&lt;x,y,?&gt;</param>
-        /// <param name="boundingOrigin">&lt;x,y,?&gt;</param>
-        /// <param name="boundingSize">&lt;x,y,?&gt;</param>
-        /// <param name="regionSize">&lt;x,y,?&gt;</param>
-        /// <param name="isEmptyNow">out: This is set if the resultant bitmap is now empty</param>
-        /// <param name="AABBMin">out: parcel.AABBMin &lt;x,y,0&gt</param>
-        /// <param name="AABBMax">out: parcel.AABBMax &lt;x,y,0&gt</param>
-        /// <returns>New parcel bitmap</returns>
-        bool[,] RemapLandBitmap(bool[,] bitmap_base, Vector2 displacement, float rotationDegrees, Vector2 boundingOrigin, Vector2 boundingSize, Vector2 regionSize, out bool isEmptyNow);
+    /// <summary>
+    /// Clears any parcel data in bitmap_base where there exists parcel data in bitmap_new. In other words the parcel data
+    /// in bitmap_new takes over the space of the parcel data in bitmap_base.
+    /// </summary>
+    /// <param name="bitmap_base"></param>
+    /// <param name="bitmap_new"></param>
+    /// <param name="isEmptyNow">out: This is set if the resultant bitmap is now empty</param>
+    /// <param name="AABBMin">out: parcel.AABBMin &lt;x,y,0&gt;</param>
+    /// <param name="AABBMax">out: parcel.AABBMax &lt;x,y,0&gt</param>
+    /// <returns>New parcel bitmap</returns>
+    bool[,] RemoveFromLandBitmap(bool[,] bitmap_base, bool[,] bitmap_new, out bool isEmptyNow);
 
-        /// <summary>
-        /// Clears any parcel data in bitmap_base where there exists parcel data in bitmap_new. In other words the parcel data
-        /// in bitmap_new takes over the space of the parcel data in bitmap_base.
-        /// </summary>
-        /// <param name="bitmap_base"></param>
-        /// <param name="bitmap_new"></param>
-        /// <param name="isEmptyNow">out: This is set if the resultant bitmap is now empty</param>
-        /// <param name="AABBMin">out: parcel.AABBMin &lt;x,y,0&gt;</param>
-        /// <param name="AABBMax">out: parcel.AABBMax &lt;x,y,0&gt</param>
-        /// <returns>New parcel bitmap</returns>
-        bool[,] RemoveFromLandBitmap(bool[,] bitmap_base, bool[,] bitmap_new, out bool isEmptyNow);
+    byte[] ConvertLandBitmapToBytes();
+    bool[,] ConvertBytesToLandBitmap(bool overrideRegionSize = false);
+    bool IsLandBitmapEmpty(bool[,] landBitmap);
+    void DebugLandBitmap(bool[,] landBitmap);
 
-        byte[] ConvertLandBitmapToBytes();
-        bool[,] ConvertBytesToLandBitmap(bool overrideRegionSize = false);
-        bool IsLandBitmapEmpty(bool[,] landBitmap);
-        void DebugLandBitmap(bool[,] landBitmap);
+    void SendForceObjectSelect(int local_id, int request_type, List<UUID> returnIDs, IClientAPI remote_client);
+    void SendLandObjectOwners(IClientAPI remote_client);
+    void ReturnLandObjects(uint type, UUID[] owners, UUID[] tasks, IClientAPI remote_client);
+    void ResetOverMeRecord();
+    void UpdateLandSold(UUID avatarID, UUID groupID, bool groupOwned, uint AuctionID, int claimprice, int area);
 
-        void SendForceObjectSelect(int local_id, int request_type, List<UUID> returnIDs, IClientAPI remote_client);
-        void SendLandObjectOwners(IClientAPI remote_client);
-        void ReturnLandObjects(uint type, UUID[] owners, UUID[] tasks, IClientAPI remote_client);
-        void ResetOverMeRecord();
-        void UpdateLandSold(UUID avatarID, UUID groupID, bool groupOwned, uint AuctionID, int claimprice, int area);
+    void DeedToGroup(UUID groupID);
 
-        void DeedToGroup(UUID groupID);
+    void SetParcelObjectMaxOverride(overrideParcelMaxPrimCountDelegate overrideDel);
+    void SetSimulatorObjectMaxOverride(overrideSimulatorMaxPrimCountDelegate overrideDel);
+    
+    void StoreEnvironment(ViewerEnvironment VEnv);
 
-        void SetParcelObjectMaxOverride(overrideParcelMaxPrimCountDelegate overrideDel);
-        void SetSimulatorObjectMaxOverride(overrideSimulatorMaxPrimCountDelegate overrideDel);
-        
-        void StoreEnvironment(ViewerEnvironment VEnv);
+    /// <summary>
+    /// Set the media url for this land parcel
+    /// </summary>
+    /// <param name="url"></param>
+    void SetMediaUrl(string url);
 
-        /// <summary>
-        /// Set the media url for this land parcel
-        /// </summary>
-        /// <param name="url"></param>
-        void SetMediaUrl(string url);
+    /// <summary>
+    /// Set the music url for this land parcel
+    /// </summary>
+    /// <param name="url"></param>
+    void SetMusicUrl(string url);
 
-        /// <summary>
-        /// Set the music url for this land parcel
-        /// </summary>
-        /// <param name="url"></param>
-        void SetMusicUrl(string url);
+    /// <summary>
+    /// Get the music url for this land parcel
+    /// </summary>
+    /// <returns>The music url.</returns>
+    string GetMusicUrl();
 
-        /// <summary>
-        /// Get the music url for this land parcel
-        /// </summary>
-        /// <returns>The music url.</returns>
-        string GetMusicUrl();
-
-        void Clear();
-        ISceneObject[] GetSceneObjectGroups();
-    }
+    void Clear();
+    ISceneObject[] GetSceneObjectGroups();
 }
