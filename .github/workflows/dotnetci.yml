@@ -46,11 +46,7 @@ jobs:
         mkdir -p ./nupkgs
         for proj in \
           source/OpenSim.Data.Model/OpenSim.Data.Model.csproj; do
-          dotnet pack "$proj" \
-            -c Release \
-            --no-build \
-            --include-symbols \
-            -o ./nupkgs
+          dotnet pack "$proj" -c Release --no-build --include-symbols -o ./nupkgs
         done
 
     - name: Publish packages to GitHub Packages
@@ -62,7 +58,6 @@ jobs:
           --source "github" \
           --skip-duplicate
           
-
     # Publish GridServer for Linux x64
     - name: Publish GridServer for Linux x64
       env:
