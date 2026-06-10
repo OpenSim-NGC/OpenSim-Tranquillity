@@ -32,116 +32,115 @@ using OpenSim.Region.DataSnapshot.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Region.DataSnapshot.Providers
+namespace OpenSim.Region.DataSnapshot.Providers;
+
+public class EstateSnapshot : IDataSnapshotProvider
 {
-    public class EstateSnapshot : IDataSnapshotProvider
+    /* This module doesn't check for changes, since it's *assumed* there are none.
+     * Nevertheless, it's possible to have changes, since all the fields are public.
+     * There's no event to subscribe to. :/
+     *
+     * I don't think anything changes the fields beyond RegionModule PostInit, however.
+     */
+    private Scene m_scene = null;
+    // private DataSnapshotManager m_parent = null;
+    private bool m_stale = true;
+
+    #region IDataSnapshotProvider Members
+
+    public XmlNode RequestSnapshotData(XmlDocument factory)
     {
-        /* This module doesn't check for changes, since it's *assumed* there are none.
-         * Nevertheless, it's possible to have changes, since all the fields are public.
-         * There's no event to subscribe to. :/
-         *
-         * I don't think anything changes the fields beyond RegionModule PostInit, however.
-         */
-        private Scene m_scene = null;
-        // private DataSnapshotManager m_parent = null;
-        private bool m_stale = true;
+        //Estate data section - contains who owns a set of sims and the name of the set.
+        //Now in DataSnapshotProvider module form!
+        XmlNode estatedata = factory.CreateNode(XmlNodeType.Element, "estate", "");
 
-        #region IDataSnapshotProvider Members
+        UUID ownerid = m_scene.RegionInfo.EstateSettings.EstateOwner;
 
-        public XmlNode RequestSnapshotData(XmlDocument factory)
+        UserAccount userInfo = m_scene.UserAccountService.GetUserAccount(m_scene.RegionInfo.ScopeID, ownerid);
+        //TODO: Change to query userserver about the master avatar UUID ?
+        String firstname;
+        String lastname;
+
+        if (userInfo != null)
         {
-            //Estate data section - contains who owns a set of sims and the name of the set.
-            //Now in DataSnapshotProvider module form!
-            XmlNode estatedata = factory.CreateNode(XmlNodeType.Element, "estate", "");
+            firstname = userInfo.FirstName;
+            lastname = userInfo.LastName;
 
-            UUID ownerid = m_scene.RegionInfo.EstateSettings.EstateOwner;
-
-            UserAccount userInfo = m_scene.UserAccountService.GetUserAccount(m_scene.RegionInfo.ScopeID, ownerid);
-            //TODO: Change to query userserver about the master avatar UUID ?
-            String firstname;
-            String lastname;
-
-            if (userInfo != null)
-            {
-                firstname = userInfo.FirstName;
-                lastname = userInfo.LastName;
-
-                //TODO: Fix the marshalling system to have less copypasta gruntwork
-                XmlNode user = factory.CreateNode(XmlNodeType.Element, "user", "");
+            //TODO: Fix the marshalling system to have less copypasta gruntwork
+            XmlNode user = factory.CreateNode(XmlNodeType.Element, "user", "");
 //                XmlAttribute type = (XmlAttribute)factory.CreateNode(XmlNodeType.Attribute, "type", "");
 //                type.Value = "owner";
 //                user.Attributes.Append(type);
 
-                //TODO: Create more TODOs
-                XmlNode username = factory.CreateNode(XmlNodeType.Element, "name", "");
-                username.InnerText = firstname + " " + lastname;
-                user.AppendChild(username);
+            //TODO: Create more TODOs
+            XmlNode username = factory.CreateNode(XmlNodeType.Element, "name", "");
+            username.InnerText = firstname + " " + lastname;
+            user.AppendChild(username);
 
-                XmlNode useruuid = factory.CreateNode(XmlNodeType.Element, "uuid", "");
-                useruuid.InnerText = ownerid.ToString();
-                user.AppendChild(useruuid);
+            XmlNode useruuid = factory.CreateNode(XmlNodeType.Element, "uuid", "");
+            useruuid.InnerText = ownerid.ToString();
+            user.AppendChild(useruuid);
 
-                estatedata.AppendChild(user);
-            }
-
-            XmlNode estatename = factory.CreateNode(XmlNodeType.Element, "name", "");
-            estatename.InnerText = m_scene.RegionInfo.EstateSettings.EstateName.ToString();
-            estatedata.AppendChild(estatename);
-
-            XmlNode estateid = factory.CreateNode(XmlNodeType.Element, "id", "");
-            estateid.InnerText = m_scene.RegionInfo.EstateSettings.EstateID.ToString();
-            estatedata.AppendChild(estateid);
-
-            XmlNode parentid = factory.CreateNode(XmlNodeType.Element, "parentid", "");
-            parentid.InnerText = m_scene.RegionInfo.EstateSettings.ParentEstateID.ToString();
-            estatedata.AppendChild(parentid);
-
-            XmlNode flags = factory.CreateNode(XmlNodeType.Element, "flags", "");
-
-            XmlAttribute teleport = (XmlAttribute)factory.CreateNode(XmlNodeType.Attribute, "teleport", "");
-            teleport.Value = m_scene.RegionInfo.EstateSettings.AllowDirectTeleport.ToString();
-            flags.Attributes.Append(teleport);
-
-            XmlAttribute publicaccess = (XmlAttribute)factory.CreateNode(XmlNodeType.Attribute, "public", "");
-            publicaccess.Value = m_scene.RegionInfo.EstateSettings.PublicAccess.ToString();
-            flags.Attributes.Append(publicaccess);
-
-            estatedata.AppendChild(flags);
-
-            this.Stale = false;
-            return estatedata;
+            estatedata.AppendChild(user);
         }
 
-        public void Initialize(Scene scene, DataSnapshotManager parent)
-        {
-            m_scene = scene;
-            // m_parent = parent;
-        }
+        XmlNode estatename = factory.CreateNode(XmlNodeType.Element, "name", "");
+        estatename.InnerText = m_scene.RegionInfo.EstateSettings.EstateName.ToString();
+        estatedata.AppendChild(estatename);
 
-        public Scene GetParentScene
-        {
-            get { return m_scene; }
-        }
+        XmlNode estateid = factory.CreateNode(XmlNodeType.Element, "id", "");
+        estateid.InnerText = m_scene.RegionInfo.EstateSettings.EstateID.ToString();
+        estatedata.AppendChild(estateid);
 
-        public String Name {
-            get { return "EstateSnapshot"; }
-        }
+        XmlNode parentid = factory.CreateNode(XmlNodeType.Element, "parentid", "");
+        parentid.InnerText = m_scene.RegionInfo.EstateSettings.ParentEstateID.ToString();
+        estatedata.AppendChild(parentid);
 
-        public bool Stale
-        {
-            get {
-                return m_stale;
-            }
-            set {
-                m_stale = value;
+        XmlNode flags = factory.CreateNode(XmlNodeType.Element, "flags", "");
 
-                if (m_stale)
-                    OnStale(this);
-            }
-        }
+        XmlAttribute teleport = (XmlAttribute)factory.CreateNode(XmlNodeType.Attribute, "teleport", "");
+        teleport.Value = m_scene.RegionInfo.EstateSettings.AllowDirectTeleport.ToString();
+        flags.Attributes.Append(teleport);
 
-        public event ProviderStale OnStale;
+        XmlAttribute publicaccess = (XmlAttribute)factory.CreateNode(XmlNodeType.Attribute, "public", "");
+        publicaccess.Value = m_scene.RegionInfo.EstateSettings.PublicAccess.ToString();
+        flags.Attributes.Append(publicaccess);
 
-        #endregion
+        estatedata.AppendChild(flags);
+
+        this.Stale = false;
+        return estatedata;
     }
+
+    public void Initialize(Scene scene, DataSnapshotManager parent)
+    {
+        m_scene = scene;
+        // m_parent = parent;
+    }
+
+    public Scene GetParentScene
+    {
+        get { return m_scene; }
+    }
+
+    public String Name {
+        get { return "EstateSnapshot"; }
+    }
+
+    public bool Stale
+    {
+        get {
+            return m_stale;
+        }
+        set {
+            m_stale = value;
+
+            if (m_stale)
+                OnStale(this);
+        }
+    }
+
+    public event ProviderStale OnStale;
+
+    #endregion
 }

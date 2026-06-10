@@ -25,168 +25,163 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.IO;
 using System.Net;
 using System.Text;
-using System.Web;
 using OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+public class TestOSHttpRequest : IOSHttpRequest
 {
-    public class TestOSHttpRequest : IOSHttpRequest
+    public string[] AcceptTypes
     {
-        public string[] AcceptTypes
+        get
         {
-            get
-            {
-                throw new NotImplementedException ();
-            }
+            throw new NotImplementedException ();
         }
+    }
 
-        public Encoding ContentEncoding
+    public Encoding ContentEncoding
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException ();
-            }
+            throw new NotImplementedException ();
         }
+    }
 
-        public long ContentLength
+    public long ContentLength
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException ();
-            }
+            throw new NotImplementedException ();
         }
+    }
 
-        public long ContentLength64
+    public long ContentLength64
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException ();
-            }
+            throw new NotImplementedException ();
         }
+    }
 
-        public string ContentType
+    public string ContentType
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException ();
-            }
+            throw new NotImplementedException ();
         }
+    }
 
 
-        public bool HasEntityBody
+    public bool HasEntityBody
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException ();
-            }
+            throw new NotImplementedException ();
         }
+    }
 
-        public NameValueCollection Headers { get; set; }
+    public NameValueCollection Headers { get; set; }
 
-        public string HttpMethod
+    public string HttpMethod
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException ();
-            }
+            throw new NotImplementedException ();
         }
+    }
 
-        public Stream InputStream { get; set;}
+    public Stream InputStream { get; set;}
 
-        public bool IsSecured
+    public bool IsSecured
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException ();
-            }
+            throw new NotImplementedException ();
         }
+    }
 
-        public bool KeepAlive
+    public bool KeepAlive
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException ();
-            }
+            throw new NotImplementedException ();
         }
+    }
 
-        public NameValueCollection QueryString
+    public NameValueCollection QueryString
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException ();
-            }
+            throw new NotImplementedException ();
         }
+    }
 
-        public Hashtable Query
+    public Hashtable Query
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException();
-            }
+            throw new NotImplementedException();
         }
+    }
 
-        public Dictionary<string, string> QueryAsDictionary
+    public Dictionary<string, string> QueryAsDictionary
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException();
-            }
+            throw new NotImplementedException();
         }
+    }
 
-        public HashSet<string> QueryFlags
+    public HashSet<string> QueryFlags
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException();
-            }
+            throw new NotImplementedException();
         }
+    }
 
-        public string RawUrl
+    public string RawUrl
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException ();
-            }
+            throw new NotImplementedException ();
         }
+    }
 
-        public IPEndPoint RemoteIPEndPoint
+    public IPEndPoint RemoteIPEndPoint
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException();
-            }
+            throw new NotImplementedException();
         }
+    }
 
-        public IPEndPoint LocalIPEndPoint
+    public IPEndPoint LocalIPEndPoint
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException();
-            }
+            throw new NotImplementedException();
         }
+    }
 
-        public Uri Url { get; set; }
-        public string UriPath { get;}
-        public double ArrivalTS { get; }
+    public Uri Url { get; set; }
+    public string UriPath { get;}
+    public double ArrivalTS { get; }
 
-        public string UserAgent
+    public string UserAgent
+    {
+        get
         {
-            get
-            {
-                throw new NotImplementedException ();
-            }
+            throw new NotImplementedException ();
         }
+    }
 
-        public TestOSHttpRequest()
-        {
-            Headers = new NameValueCollection();
-        }
+    public TestOSHttpRequest()
+    {
+        Headers = new NameValueCollection();
     }
 }

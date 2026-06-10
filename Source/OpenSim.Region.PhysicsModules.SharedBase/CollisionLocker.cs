@@ -25,49 +25,45 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
+namespace OpenSim.Region.PhysicsModules.SharedBase;
 
-namespace OpenSim.Region.PhysicsModules.SharedBase
+public class CollisionLocker
 {
-    public class CollisionLocker
+    private List<IntPtr> worldlock = new List<IntPtr>();
+
+    public CollisionLocker()
     {
-        private List<IntPtr> worldlock = new List<IntPtr>();
 
-        public CollisionLocker()
+    }
+
+    public void dlock(IntPtr world)
+    {
+        lock (worldlock)
         {
-
+            worldlock.Add(world);
         }
 
-        public void dlock(IntPtr world)
-        {
-            lock (worldlock)
-            {
-                worldlock.Add(world);
-            }
+    }
 
+    public void dunlock(IntPtr world)
+    {
+        lock (worldlock)
+        {
+            worldlock.Remove(world);
         }
+    }
 
-        public void dunlock(IntPtr world)
+    public bool lockquery()
+    {
+        return (worldlock.Count > 0);
+    }
+
+    public void drelease(IntPtr world)
+    {
+        lock (worldlock)
         {
-            lock (worldlock)
-            {
+            if (worldlock.Contains(world))
                 worldlock.Remove(world);
-            }
-        }
-
-        public bool lockquery()
-        {
-            return (worldlock.Count > 0);
-        }
-
-        public void drelease(IntPtr world)
-        {
-            lock (worldlock)
-            {
-                if (worldlock.Contains(world))
-                    worldlock.Remove(world);
-            }
         }
     }
 }

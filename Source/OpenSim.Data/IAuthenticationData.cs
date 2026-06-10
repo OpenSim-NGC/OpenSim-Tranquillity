@@ -25,32 +25,28 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+public class AuthenticationData
 {
-    public class AuthenticationData
-    {
-        public UUID PrincipalID;
-        public Dictionary<string, object> Data;
-    }
+    public UUID PrincipalID;
+    public Dictionary<string, object> Data;
+}
 
-    /// <summary>
-    /// An interface for connecting to the authentication datastore
-    /// </summary>
-    public interface IAuthenticationData
-    {
-        AuthenticationData Get(UUID principalID);
+/// <summary>
+/// An interface for connecting to the authentication datastore
+/// </summary>
+public interface IAuthenticationData
+{
+    AuthenticationData Get(UUID principalID);
 
-        bool Store(AuthenticationData data);
+    bool Store(AuthenticationData data);
 
-        bool SetDataItem(UUID principalID, string item, string value);
+    bool SetDataItem(UUID principalID, string item, string value);
 
-        bool SetToken(UUID principalID, string token, int lifetime);
+    bool SetToken(UUID principalID, string token, int lifetime);
 
-        bool CheckToken(UUID principalID, string token, int lifetime);
-    }
+    bool CheckToken(UUID principalID, string token, int lifetime);
 }

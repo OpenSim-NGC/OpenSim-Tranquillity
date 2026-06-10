@@ -35,176 +35,176 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 
-namespace OpenSim.Region.CoreModules.World.Serialiser
+namespace OpenSim.Region.CoreModules.World.Serialiser;
+
+public class SerialiserModule : ISharedRegionModule, IRegionSerialiserModule
 {
-    public class SerialiserModule : ISharedRegionModule, IRegionSerialiserModule
-    {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILog m_log =
+        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
 //        private Commander m_commander = new Commander("export");
-        private List<Scene> m_regions = new List<Scene>();
-        private string m_savedir = "exports";
-        private List<IFileSerialiser> m_serialisers = new List<IFileSerialiser>();
+    private List<Scene> m_regions = new List<Scene>();
+    private string m_savedir = "exports";
+    private List<IFileSerialiser> m_serialisers = new List<IFileSerialiser>();
 
-        #region ISharedRegionModule Members
+    #region ISharedRegionModule Members
 
-        public Type ReplaceableInterface
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        IConfig config = source.Configs["Serialiser"];
+        if (config != null)
         {
-            get { return null; }
+            m_savedir = config.GetString("save_dir", m_savedir);
         }
 
-        public void Initialise(IConfigSource source)
-        {
-            IConfig config = source.Configs["Serialiser"];
-            if (config != null)
-            {
-                m_savedir = config.GetString("save_dir", m_savedir);
-            }
+        m_log.InfoFormat("[Serialiser] Enabled, using save dir \"{0}\"", m_savedir);
+    }
 
-            m_log.InfoFormat("[Serialiser] Enabled, using save dir \"{0}\"", m_savedir);
+    public void PostInitialise()
+    {
+        lock (m_serialisers)
+        {
+            m_serialisers.Add(new SerialiseTerrain());
+            m_serialisers.Add(new SerialiseObjects());
         }
-
-        public void PostInitialise()
-        {
-            lock (m_serialisers)
-            {
-                m_serialisers.Add(new SerialiseTerrain());
-                m_serialisers.Add(new SerialiseObjects());
-            }
 
 //            LoadCommanderCommands();
-        }
+    }
 
-        public void AddRegion(Scene scene)
-        {
+    public void AddRegion(Scene scene)
+    {
 //            scene.RegisterModuleCommander(m_commander);
 //            scene.EventManager.OnPluginConsole += EventManager_OnPluginConsole;
-            scene.RegisterModuleInterface<IRegionSerialiserModule>(this);
+        scene.RegisterModuleInterface<IRegionSerialiserModule>(this);
 
-            lock (m_regions)
+        lock (m_regions)
+        {
+            m_regions.Add(scene);
+        }
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        lock (m_regions)
+        {
+            m_regions.Remove(scene);
+        }
+    }
+
+    public void Close()
+    {
+        m_regions.Clear();
+    }
+
+    public string Name
+    {
+        get { return "ExportSerialisationModule"; }
+    }
+
+    #endregion
+
+
+    #region IRegionSerialiser Members
+
+    public void LoadPrimsFromXml(Scene scene, string fileName, bool newIDS, Vector3 loadOffset)
+    {
+        SceneXmlLoader.LoadPrimsFromXml(scene, fileName, newIDS, loadOffset);
+    }
+
+    public void SavePrimsToXml(Scene scene, string fileName)
+    {
+        SceneXmlLoader.SavePrimsToXml(scene, fileName);
+    }
+
+    public void LoadPrimsFromXml2(Scene scene, string fileName)
+    {
+        SceneXmlLoader.LoadPrimsFromXml2(scene, fileName);
+    }
+
+    public void LoadPrimsFromXml2(Scene scene, TextReader reader, bool startScripts)
+    {
+        SceneXmlLoader.LoadPrimsFromXml2(scene, reader, startScripts);
+    }
+
+    public void SavePrimsToXml2(Scene scene, string fileName)
+    {
+        SceneXmlLoader.SavePrimsToXml2(scene, fileName);
+    }
+
+    public void SavePrimsToXml2(Scene scene, TextWriter stream, Vector3 min, Vector3 max)
+    {
+        SceneXmlLoader.SavePrimsToXml2(scene, stream, min, max);
+    }
+
+    public void SaveNamedPrimsToXml2(Scene scene, string primName, string fileName)
+    {
+        SceneXmlLoader.SaveNamedPrimsToXml2(scene, primName, fileName);
+    }
+
+    public SceneObjectGroup DeserializeGroupFromXml2(string xmlString)
+    {
+        return SceneXmlLoader.DeserializeGroupFromXml2(xmlString);
+    }
+
+    public string SerializeGroupToXml2(SceneObjectGroup grp, Dictionary<string, object> options)
+    {
+        return SceneXmlLoader.SaveGroupToXml2(grp, options);
+    }
+
+    public void SavePrimListToXml2(EntityBase[] entityList, string fileName)
+    {
+        SceneXmlLoader.SavePrimListToXml2(entityList, fileName);
+    }
+
+    public void SavePrimListToXml2(EntityBase[] entityList, TextWriter stream, Vector3 min, Vector3 max)
+    {
+        SceneXmlLoader.SavePrimListToXml2(entityList, stream, min, max);
+    }
+
+    public List<string> SerialiseRegion(Scene scene, string saveDir)
+    {
+        List<string> results = new List<string>();
+
+        if (!Directory.Exists(saveDir))
+        {
+            Directory.CreateDirectory(saveDir);
+        }
+
+        lock (m_serialisers)
+        {
+            foreach (IFileSerialiser serialiser in m_serialisers)
             {
-                m_regions.Add(scene);
+                results.Add(serialiser.WriteToFile(scene, saveDir));
             }
         }
 
-        public void RegionLoaded(Scene scene)
+        TextWriter regionInfoWriter = new StreamWriter(Path.Combine(saveDir, "README.TXT"));
+        regionInfoWriter.WriteLine("Region Name: " + scene.RegionInfo.RegionName);
+        regionInfoWriter.WriteLine("Region ID: " + scene.RegionInfo.RegionID.ToString());
+        regionInfoWriter.WriteLine("Backup Time: UTC " + DateTime.UtcNow.ToString());
+        regionInfoWriter.WriteLine("Serialise Version: 0.1");
+        regionInfoWriter.Close();
+
+        TextWriter manifestWriter = new StreamWriter(Path.Combine(saveDir, "region.manifest"));
+        foreach (string line in results)
         {
+            manifestWriter.WriteLine(line);
         }
+        manifestWriter.Close();
 
-        public void RemoveRegion(Scene scene)
-        {
-            lock (m_regions)
-            {
-                m_regions.Remove(scene);
-            }
-        }
+        return results;
+    }
 
-        public void Close()
-        {
-            m_regions.Clear();
-        }
-
-        public string Name
-        {
-            get { return "ExportSerialisationModule"; }
-        }
-
-        #endregion
-
-
-        #region IRegionSerialiser Members
-
-        public void LoadPrimsFromXml(Scene scene, string fileName, bool newIDS, Vector3 loadOffset)
-        {
-            SceneXmlLoader.LoadPrimsFromXml(scene, fileName, newIDS, loadOffset);
-        }
-
-        public void SavePrimsToXml(Scene scene, string fileName)
-        {
-            SceneXmlLoader.SavePrimsToXml(scene, fileName);
-        }
-
-        public void LoadPrimsFromXml2(Scene scene, string fileName)
-        {
-            SceneXmlLoader.LoadPrimsFromXml2(scene, fileName);
-        }
-
-        public void LoadPrimsFromXml2(Scene scene, TextReader reader, bool startScripts)
-        {
-            SceneXmlLoader.LoadPrimsFromXml2(scene, reader, startScripts);
-        }
-
-        public void SavePrimsToXml2(Scene scene, string fileName)
-        {
-            SceneXmlLoader.SavePrimsToXml2(scene, fileName);
-        }
-
-        public void SavePrimsToXml2(Scene scene, TextWriter stream, Vector3 min, Vector3 max)
-        {
-            SceneXmlLoader.SavePrimsToXml2(scene, stream, min, max);
-        }
-
-        public void SaveNamedPrimsToXml2(Scene scene, string primName, string fileName)
-        {
-            SceneXmlLoader.SaveNamedPrimsToXml2(scene, primName, fileName);
-        }
-
-        public SceneObjectGroup DeserializeGroupFromXml2(string xmlString)
-        {
-            return SceneXmlLoader.DeserializeGroupFromXml2(xmlString);
-        }
-
-        public string SerializeGroupToXml2(SceneObjectGroup grp, Dictionary<string, object> options)
-        {
-            return SceneXmlLoader.SaveGroupToXml2(grp, options);
-        }
-
-        public void SavePrimListToXml2(EntityBase[] entityList, string fileName)
-        {
-            SceneXmlLoader.SavePrimListToXml2(entityList, fileName);
-        }
-
-        public void SavePrimListToXml2(EntityBase[] entityList, TextWriter stream, Vector3 min, Vector3 max)
-        {
-            SceneXmlLoader.SavePrimListToXml2(entityList, stream, min, max);
-        }
-
-        public List<string> SerialiseRegion(Scene scene, string saveDir)
-        {
-            List<string> results = new List<string>();
-
-            if (!Directory.Exists(saveDir))
-            {
-                Directory.CreateDirectory(saveDir);
-            }
-
-            lock (m_serialisers)
-            {
-                foreach (IFileSerialiser serialiser in m_serialisers)
-                {
-                    results.Add(serialiser.WriteToFile(scene, saveDir));
-                }
-            }
-
-            TextWriter regionInfoWriter = new StreamWriter(Path.Combine(saveDir, "README.TXT"));
-            regionInfoWriter.WriteLine("Region Name: " + scene.RegionInfo.RegionName);
-            regionInfoWriter.WriteLine("Region ID: " + scene.RegionInfo.RegionID.ToString());
-            regionInfoWriter.WriteLine("Backup Time: UTC " + DateTime.UtcNow.ToString());
-            regionInfoWriter.WriteLine("Serialise Version: 0.1");
-            regionInfoWriter.Close();
-
-            TextWriter manifestWriter = new StreamWriter(Path.Combine(saveDir, "region.manifest"));
-            foreach (string line in results)
-            {
-                manifestWriter.WriteLine(line);
-            }
-            manifestWriter.Close();
-
-            return results;
-        }
-
-        #endregion
+    #endregion
 
 //        private void EventManager_OnPluginConsole(string[] args)
 //        {
@@ -219,26 +219,26 @@ namespace OpenSim.Region.CoreModules.World.Serialiser
 //            }
 //        }
 
-        private void InterfaceSaveRegion(Object[] args)
+    private void InterfaceSaveRegion(Object[] args)
+    {
+        foreach (Scene region in m_regions)
         {
-            foreach (Scene region in m_regions)
-            {
-                if (region.RegionInfo.RegionName == (string) args[0])
-                {
-                    // List<string> results = SerialiseRegion(region, m_savedir + region.RegionInfo.RegionID.ToString() + "/");
-                    SerialiseRegion(region, Path.Combine(m_savedir, region.RegionInfo.RegionID.ToString()));
-                }
-            }
-        }
-
-        private void InterfaceSaveAllRegions(Object[] args)
-        {
-            foreach (Scene region in m_regions)
+            if (region.RegionInfo.RegionName == (string) args[0])
             {
                 // List<string> results = SerialiseRegion(region, m_savedir + region.RegionInfo.RegionID.ToString() + "/");
                 SerialiseRegion(region, Path.Combine(m_savedir, region.RegionInfo.RegionID.ToString()));
             }
         }
+    }
+
+    private void InterfaceSaveAllRegions(Object[] args)
+    {
+        foreach (Scene region in m_regions)
+        {
+            // List<string> results = SerialiseRegion(region, m_savedir + region.RegionInfo.RegionID.ToString() + "/");
+            SerialiseRegion(region, Path.Combine(m_savedir, region.RegionInfo.RegionID.ToString()));
+        }
+    }
 
 //        private void LoadCommanderCommands()
 //        {
@@ -250,5 +250,4 @@ namespace OpenSim.Region.CoreModules.World.Serialiser
 //            m_commander.RegisterCommand("save", serialiseSceneCommand);
 //            m_commander.RegisterCommand("save-all", serialiseAllScenesCommand);
 //        }
-    }
 }

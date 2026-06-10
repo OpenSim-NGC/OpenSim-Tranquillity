@@ -25,107 +25,102 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
-using System.Text;
 using System.Reflection;
 using OpenSim.Framework;
 using OpenSim.Services.Base;
 using OpenSim.Services.Interfaces;
 using Nini.Config;
 using log4net;
-using OpenMetaverse;
 
-namespace OpenSim.Server.Handlers.BakedTextures
+namespace OpenSim.Server.Handlers.BakedTextures;
+
+public class XBakes : ServiceBase, IBakedTextureService
 {
-    public class XBakes : ServiceBase, IBakedTextureService
+    private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected string m_FSBase;
+
+    public XBakes(IConfigSource config) : base(config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
+        MainConsole.Instance.Commands.AddCommand("fs", false,
+                "delete bakes", "delete bakes <ID>",
+                "Delete agent's baked textures from server",
+                HandleDeleteBakes);
 
-        protected string m_FSBase;
-
-        public XBakes(IConfigSource config) : base(config)
+        IConfig assetConfig = config.Configs["BakedTextureService"];
+        if (assetConfig == null)
         {
-            MainConsole.Instance.Commands.AddCommand("fs", false,
-                    "delete bakes", "delete bakes <ID>",
-                    "Delete agent's baked textures from server",
-                    HandleDeleteBakes);
-
-            IConfig assetConfig = config.Configs["BakedTextureService"];
-            if (assetConfig == null)
-            {
-                throw new Exception("No BakedTextureService configuration");
-            }
-
-            m_FSBase = assetConfig.GetString("BaseDirectory", string.Empty);
-            if (m_FSBase.Length == 0)
-            {
-                m_log.ErrorFormat("[BAKES]: BaseDirectory not specified");
-                throw new Exception("Configuration error");
-            }
-
-            m_log.Info("[BAKES]: XBakes service enabled");
+            throw new Exception("No BakedTextureService configuration");
         }
 
-        public byte[] Get(string id)
+        m_FSBase = assetConfig.GetString("BaseDirectory", string.Empty);
+        if (m_FSBase.Length == 0)
         {
-            string file = HashToFile(id);
-            string diskFile = Path.Combine(m_FSBase, file);
-
-            try
-            {
-                byte[] content = File.ReadAllBytes(diskFile);
-                return content;
-            }
-            catch
-            {
-            }
-            return Array.Empty<byte>();
+            m_log.ErrorFormat("[BAKES]: BaseDirectory not specified");
+            throw new Exception("Configuration error");
         }
 
-        public void Store(string id, byte[] data, int dataLength)
+        m_log.Info("[BAKES]: XBakes service enabled");
+    }
+
+    public byte[] Get(string id)
+    {
+        string file = HashToFile(id);
+        string diskFile = Path.Combine(m_FSBase, file);
+
+        try
         {
-            string file = HashToFile(id);
-            string diskFile = Path.Combine(m_FSBase, file);
+            byte[] content = File.ReadAllBytes(diskFile);
+            return content;
+        }
+        catch
+        {
+        }
+        return Array.Empty<byte>();
+    }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(diskFile));
+    public void Store(string id, byte[] data, int dataLength)
+    {
+        string file = HashToFile(id);
+        string diskFile = Path.Combine(m_FSBase, file);
 
+        Directory.CreateDirectory(Path.GetDirectoryName(diskFile));
+
+        File.Delete(diskFile);
+        using (FileStream fs = File.Create(diskFile))
+            fs.Write(data, 0, dataLength);
+    }
+
+    private void HandleDeleteBakes(string module, string[] args)
+    {
+        if (args.Length < 3)
+        {
+            MainConsole.Instance.Output("Syntax: delete bakes <ID>");
+            return;
+        }
+
+        string file = HashToFile(args[2]);
+        string diskFile = Path.Combine(m_FSBase, file);
+
+        if (File.Exists(diskFile))
+        {
             File.Delete(diskFile);
-            using (FileStream fs = File.Create(diskFile))
-                fs.Write(data, 0, dataLength);
+            MainConsole.Instance.Output("Bakes deleted");
+            return;
         }
+        MainConsole.Instance.Output("Bakes not found");
+    }
 
-        private void HandleDeleteBakes(string module, string[] args)
-        {
-            if (args.Length < 3)
-            {
-                MainConsole.Instance.Output("Syntax: delete bakes <ID>");
-                return;
-            }
+    public string HashToPath(string hash)
+    {
+        return Path.Combine(hash.Substring(0, 2),
+               Path.Combine(hash.Substring(2, 2),
+               Path.Combine(hash.Substring(4, 2),
+               hash.Substring(6, 4))));
+    }
 
-            string file = HashToFile(args[2]);
-            string diskFile = Path.Combine(m_FSBase, file);
-
-            if (File.Exists(diskFile))
-            {
-                File.Delete(diskFile);
-                MainConsole.Instance.Output("Bakes deleted");
-                return;
-            }
-            MainConsole.Instance.Output("Bakes not found");
-        }
-
-        public string HashToPath(string hash)
-        {
-            return Path.Combine(hash.Substring(0, 2),
-                   Path.Combine(hash.Substring(2, 2),
-                   Path.Combine(hash.Substring(4, 2),
-                   hash.Substring(6, 4))));
-        }
-
-        public string HashToFile(string hash)
-        {
-            return Path.Combine(HashToPath(hash), hash);
-        }
+    public string HashToFile(string hash)
+    {
+        return Path.Combine(HashToPath(hash), hash);
     }
 }

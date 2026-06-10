@@ -36,292 +36,291 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory;
+
+public class LocalInventoryServicesConnector : ISharedRegionModule, IInventoryService
 {
-    public class LocalInventoryServicesConnector : ISharedRegionModule, IInventoryService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    /// <summary>
+    /// Scene used by this module.  This currently needs to be publicly settable for HGInventoryBroker.
+    /// </summary>
+    public Scene Scene { get; set; }
+
+    private IInventoryService m_InventoryService;
+
+    private IUserManagement m_UserManager;
+    private IUserManagement UserManager
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        /// <summary>
-        /// Scene used by this module.  This currently needs to be publicly settable for HGInventoryBroker.
-        /// </summary>
-        public Scene Scene { get; set; }
-
-        private IInventoryService m_InventoryService;
-
-        private IUserManagement m_UserManager;
-        private IUserManagement UserManager
+        get
         {
-            get
+            m_UserManager ??= Scene.RequestModuleInterface<IUserManagement>();
+            return m_UserManager;
+        }
+    }
+
+    private bool m_Enabled = false;
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public string Name
+    {
+        get { return "LocalInventoryServicesConnector"; }
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
+        {
+            string name = moduleConfig.GetString("InventoryServices", "");
+            if (name == Name)
             {
-                m_UserManager ??= Scene.RequestModuleInterface<IUserManagement>();
-                return m_UserManager;
-            }
-        }
-
-        private bool m_Enabled = false;
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "LocalInventoryServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
-            {
-                string name = moduleConfig.GetString("InventoryServices", "");
-                if (name == Name)
+                IConfig inventoryConfig = source.Configs["InventoryService"];
+                if (inventoryConfig == null)
                 {
-                    IConfig inventoryConfig = source.Configs["InventoryService"];
-                    if (inventoryConfig == null)
-                    {
-                        m_log.Error("[LOCAL INVENTORY SERVICES CONNECTOR]: InventoryService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    string serviceDll = inventoryConfig.GetString("LocalServiceModule", string.Empty);
-
-                    if (serviceDll.Length == 0)
-                    {
-                        m_log.Error("[LOCAL INVENTORY SERVICES CONNECTOR]: No LocalServiceModule named in section InventoryService");
-                        return;
-                    }
-
-                    m_log.DebugFormat("[LOCAL INVENTORY SERVICES CONNECTOR]: Service dll = {0}", serviceDll);
-
-                    m_InventoryService = ServerUtils.LoadPlugin<IInventoryService>(serviceDll, [source]);
-
-                    if (m_InventoryService == null)
-                    {
-                        m_log.Error("[LOCAL INVENTORY SERVICES CONNECTOR]: Can't load inventory service");
-                        throw new Exception("Unable to proceed. Please make sure your ini files in config-include are updated according to .example's");
-                    }
-
-                    m_Enabled = true;
-                    m_log.Info("[LOCAL INVENTORY SERVICES CONNECTOR]: Local inventory connector enabled");
+                    m_log.Error("[LOCAL INVENTORY SERVICES CONNECTOR]: InventoryService missing from OpenSim.ini");
+                    return;
                 }
-            }
-        }
 
-        public void PostInitialise()
-        {
-        }
+                string serviceDll = inventoryConfig.GetString("LocalServiceModule", string.Empty);
 
-        public void Close()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.RegisterModuleInterface<IInventoryService>(this);
-
-            Scene ??= scene;
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        #region IInventoryService
-
-        public bool CreateUserInventory(UUID user)
-        {
-            return m_InventoryService.CreateUserInventory(user);
-        }
-
-        public List<InventoryFolderBase> GetInventorySkeleton(UUID userId)
-        {
-            return m_InventoryService.GetInventorySkeleton(userId);
-        }
-
-        public InventoryFolderBase GetRootFolder(UUID userID)
-        {
-            return m_InventoryService.GetRootFolder(userID);
-        }
-
-        public InventoryFolderBase GetFolderForType(UUID userID, FolderType type)
-        {
-            return m_InventoryService.GetFolderForType(userID, type);
-        }
-
-        public InventoryCollection GetFolderContent(UUID userID, UUID folderID)
-        {
-            InventoryCollection invCol = m_InventoryService.GetFolderContent(userID, folderID);
-
-            if (UserManager != null)
-            {
-                // Protect ourselves against the caller subsequently modifying the items list
-                List<InventoryItemBase> items = new List<InventoryItemBase>(invCol.Items);
-
-                WorkManager.RunInThreadPool(delegate
+                if (serviceDll.Length == 0)
                 {
-                    foreach (InventoryItemBase item in items)
-                        if (!string.IsNullOrEmpty(item.CreatorData))
-                            UserManager.AddCreatorUser(item.CreatorIdAsUuid, item.CreatorData);
-                }, null, $"GetFolderContent (user {userID}, folder {folderID})");
+                    m_log.Error("[LOCAL INVENTORY SERVICES CONNECTOR]: No LocalServiceModule named in section InventoryService");
+                    return;
+                }
+
+                m_log.DebugFormat("[LOCAL INVENTORY SERVICES CONNECTOR]: Service dll = {0}", serviceDll);
+
+                m_InventoryService = ServerUtils.LoadPlugin<IInventoryService>(serviceDll, [source]);
+
+                if (m_InventoryService == null)
+                {
+                    m_log.Error("[LOCAL INVENTORY SERVICES CONNECTOR]: Can't load inventory service");
+                    throw new Exception("Unable to proceed. Please make sure your ini files in config-include are updated according to .example's");
+                }
+
+                m_Enabled = true;
+                m_log.Info("[LOCAL INVENTORY SERVICES CONNECTOR]: Local inventory connector enabled");
             }
-
-            return invCol;
         }
+    }
 
-        public virtual InventoryCollection[] GetMultipleFoldersContent(UUID principalID, UUID[] folderIDs)
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.RegisterModuleInterface<IInventoryService>(this);
+
+        Scene ??= scene;
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    #region IInventoryService
+
+    public bool CreateUserInventory(UUID user)
+    {
+        return m_InventoryService.CreateUserInventory(user);
+    }
+
+    public List<InventoryFolderBase> GetInventorySkeleton(UUID userId)
+    {
+        return m_InventoryService.GetInventorySkeleton(userId);
+    }
+
+    public InventoryFolderBase GetRootFolder(UUID userID)
+    {
+        return m_InventoryService.GetRootFolder(userID);
+    }
+
+    public InventoryFolderBase GetFolderForType(UUID userID, FolderType type)
+    {
+        return m_InventoryService.GetFolderForType(userID, type);
+    }
+
+    public InventoryCollection GetFolderContent(UUID userID, UUID folderID)
+    {
+        InventoryCollection invCol = m_InventoryService.GetFolderContent(userID, folderID);
+
+        if (UserManager != null)
         {
-            InventoryCollection[] invColl = new InventoryCollection[folderIDs.Length];
-            int i = 0;
-            foreach (UUID fid in folderIDs)
+            // Protect ourselves against the caller subsequently modifying the items list
+            List<InventoryItemBase> items = new List<InventoryItemBase>(invCol.Items);
+
+            WorkManager.RunInThreadPool(delegate
             {
-                invColl[i++] = GetFolderContent(principalID, fid);
-            }
-
-            return invColl;
+                foreach (InventoryItemBase item in items)
+                    if (!string.IsNullOrEmpty(item.CreatorData))
+                        UserManager.AddCreatorUser(item.CreatorIdAsUuid, item.CreatorData);
+            }, null, $"GetFolderContent (user {userID}, folder {folderID})");
         }
 
-        public List<InventoryItemBase> GetFolderItems(UUID userID, UUID folderID)
+        return invCol;
+    }
+
+    public virtual InventoryCollection[] GetMultipleFoldersContent(UUID principalID, UUID[] folderIDs)
+    {
+        InventoryCollection[] invColl = new InventoryCollection[folderIDs.Length];
+        int i = 0;
+        foreach (UUID fid in folderIDs)
         {
-            return m_InventoryService.GetFolderItems(userID, folderID);
+            invColl[i++] = GetFolderContent(principalID, fid);
         }
 
-        /// <summary>
-        /// Add a new folder to the user's inventory
-        /// </summary>
-        /// <param name="folder"></param>
-        /// <returns>true if the folder was successfully added</returns>
-        public bool AddFolder(InventoryFolderBase folder)
-        {
-            return m_InventoryService.AddFolder(folder);
-        }
+        return invColl;
+    }
 
-        /// <summary>
-        /// Update a folder in the user's inventory
-        /// </summary>
-        /// <param name="folder"></param>
-        /// <returns>true if the folder was successfully updated</returns>
-        public bool UpdateFolder(InventoryFolderBase folder)
-        {
-            return m_InventoryService.UpdateFolder(folder);
-        }
+    public List<InventoryItemBase> GetFolderItems(UUID userID, UUID folderID)
+    {
+        return m_InventoryService.GetFolderItems(userID, folderID);
+    }
 
-        /// <summary>
-        /// Move an inventory folder to a new location
-        /// </summary>
-        /// <param name="folder">A folder containing the details of the new location</param>
-        /// <returns>true if the folder was successfully moved</returns>
-        public bool MoveFolder(InventoryFolderBase folder)
-        {
-            return m_InventoryService.MoveFolder(folder);
-        }
+    /// <summary>
+    /// Add a new folder to the user's inventory
+    /// </summary>
+    /// <param name="folder"></param>
+    /// <returns>true if the folder was successfully added</returns>
+    public bool AddFolder(InventoryFolderBase folder)
+    {
+        return m_InventoryService.AddFolder(folder);
+    }
 
-        public bool DeleteFolders(UUID ownerID, List<UUID> folderIDs)
-        {
-            return m_InventoryService.DeleteFolders(ownerID, folderIDs);
-        }
+    /// <summary>
+    /// Update a folder in the user's inventory
+    /// </summary>
+    /// <param name="folder"></param>
+    /// <returns>true if the folder was successfully updated</returns>
+    public bool UpdateFolder(InventoryFolderBase folder)
+    {
+        return m_InventoryService.UpdateFolder(folder);
+    }
 
-        /// <summary>
-        /// Purge an inventory folder of all its items and subfolders.
-        /// </summary>
-        /// <param name="folder"></param>
-        /// <returns>true if the folder was successfully purged</returns>
-        public bool PurgeFolder(InventoryFolderBase folder)
-        {
-            return m_InventoryService.PurgeFolder(folder);
-        }
+    /// <summary>
+    /// Move an inventory folder to a new location
+    /// </summary>
+    /// <param name="folder">A folder containing the details of the new location</param>
+    /// <returns>true if the folder was successfully moved</returns>
+    public bool MoveFolder(InventoryFolderBase folder)
+    {
+        return m_InventoryService.MoveFolder(folder);
+    }
 
-        public bool AddItem(InventoryItemBase item)
-        {
+    public bool DeleteFolders(UUID ownerID, List<UUID> folderIDs)
+    {
+        return m_InventoryService.DeleteFolders(ownerID, folderIDs);
+    }
+
+    /// <summary>
+    /// Purge an inventory folder of all its items and subfolders.
+    /// </summary>
+    /// <param name="folder"></param>
+    /// <returns>true if the folder was successfully purged</returns>
+    public bool PurgeFolder(InventoryFolderBase folder)
+    {
+        return m_InventoryService.PurgeFolder(folder);
+    }
+
+    public bool AddItem(InventoryItemBase item)
+    {
 //            m_log.DebugFormat(
 //                "[LOCAL INVENTORY SERVICES CONNECTOR]: Adding inventory item {0} to user {1} folder {2}",
 //                item.Name, item.Owner, item.Folder);
 
-            return m_InventoryService.AddItem(item);
-        }
+        return m_InventoryService.AddItem(item);
+    }
 
-        /// <summary>
-        /// Update an item in the user's inventory
-        /// </summary>
-        /// <param name="item"></param>
-        /// <returns>true if the item was successfully updated</returns>
-        public bool UpdateItem(InventoryItemBase item)
-        {
-            return m_InventoryService.UpdateItem(item);
-        }
+    /// <summary>
+    /// Update an item in the user's inventory
+    /// </summary>
+    /// <param name="item"></param>
+    /// <returns>true if the item was successfully updated</returns>
+    public bool UpdateItem(InventoryItemBase item)
+    {
+        return m_InventoryService.UpdateItem(item);
+    }
 
-        public bool MoveItems(UUID ownerID, List<InventoryItemBase> items)
-        {
-            return m_InventoryService.MoveItems(ownerID, items);
-        }
+    public bool MoveItems(UUID ownerID, List<InventoryItemBase> items)
+    {
+        return m_InventoryService.MoveItems(ownerID, items);
+    }
 
-        /// <summary>
-        /// Delete an item from the user's inventory
-        /// </summary>
-        /// <param name="item"></param>
-        /// <returns>true if the item was successfully deleted</returns>
-        public bool DeleteItems(UUID ownerID, List<UUID> itemIDs)
-        {
-            return m_InventoryService.DeleteItems(ownerID, itemIDs);
-        }
+    /// <summary>
+    /// Delete an item from the user's inventory
+    /// </summary>
+    /// <param name="item"></param>
+    /// <returns>true if the item was successfully deleted</returns>
+    public bool DeleteItems(UUID ownerID, List<UUID> itemIDs)
+    {
+        return m_InventoryService.DeleteItems(ownerID, itemIDs);
+    }
 
-        public InventoryItemBase GetItem(UUID principalID, UUID itemID)
-        {
+    public InventoryItemBase GetItem(UUID principalID, UUID itemID)
+    {
 //            m_log.DebugFormat("[LOCAL INVENTORY SERVICES CONNECTOR]: Requesting inventory item {0}", item.ID);
 
 //            UUID requestedItemId = item.ID;
 
-            InventoryItemBase item = m_InventoryService.GetItem(principalID, itemID);
+        InventoryItemBase item = m_InventoryService.GetItem(principalID, itemID);
 
 //            if (null == item)
 //                m_log.ErrorFormat(
 //                    "[LOCAL INVENTORY SERVICES CONNECTOR]: Could not find item with id {0}", requestedItemId);
 
-            return item;
-        }
-
-        public InventoryItemBase[] GetMultipleItems(UUID userID, UUID[] itemIDs)
-        {
-            return m_InventoryService.GetMultipleItems(userID, itemIDs);
-        }
-
-        public InventoryFolderBase GetFolder(UUID principalID, UUID folderID)
-        {
-            return m_InventoryService.GetFolder(principalID, folderID);
-        }
-
-        /// <summary>
-        /// Does the given user have an inventory structure?
-        /// </summary>
-        /// <param name="userID"></param>
-        /// <returns></returns>
-        public bool HasInventoryForUser(UUID userID)
-        {
-            return m_InventoryService.HasInventoryForUser(userID);
-        }
-
-        public List<InventoryItemBase> GetActiveGestures(UUID userId)
-        {
-            return m_InventoryService.GetActiveGestures(userId);
-        }
-
-        public int GetAssetPermissions(UUID userID, UUID assetID)
-        {
-            return m_InventoryService.GetAssetPermissions(userID, assetID);
-        }
-        #endregion IInventoryService
+        return item;
     }
+
+    public InventoryItemBase[] GetMultipleItems(UUID userID, UUID[] itemIDs)
+    {
+        return m_InventoryService.GetMultipleItems(userID, itemIDs);
+    }
+
+    public InventoryFolderBase GetFolder(UUID principalID, UUID folderID)
+    {
+        return m_InventoryService.GetFolder(principalID, folderID);
+    }
+
+    /// <summary>
+    /// Does the given user have an inventory structure?
+    /// </summary>
+    /// <param name="userID"></param>
+    /// <returns></returns>
+    public bool HasInventoryForUser(UUID userID)
+    {
+        return m_InventoryService.HasInventoryForUser(userID);
+    }
+
+    public List<InventoryItemBase> GetActiveGestures(UUID userId)
+    {
+        return m_InventoryService.GetActiveGestures(userId);
+    }
+
+    public int GetAssetPermissions(UUID userID, UUID assetID)
+    {
+        return m_InventoryService.GetAssetPermissions(userID, assetID);
+    }
+    #endregion IInventoryService
 }

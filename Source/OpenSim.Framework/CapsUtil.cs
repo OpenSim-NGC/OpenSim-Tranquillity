@@ -28,32 +28,31 @@
 using OpenMetaverse;
 using System.Runtime.CompilerServices;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+/// <summary>
+/// Capabilities utility methods
+/// </summary>
+public class CapsUtil
 {
     /// <summary>
-    /// Capabilities utility methods
+    /// Generate a CAPS seed path using a previously generated CAPS object path component
     /// </summary>
-    public class CapsUtil
+    /// <param name="capsKey"></param>
+    /// <returns></returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static string GetCapsSeedPath(string capsObjectPath)
     {
-        /// <summary>
-        /// Generate a CAPS seed path using a previously generated CAPS object path component
-        /// </summary>
-        /// <param name="capsKey"></param>
-        /// <returns></returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static string GetCapsSeedPath(string capsObjectPath)
-        {
-            return $"CAPS/{capsObjectPath}0000/";
-        }
+        return $"CAPS/{capsObjectPath}0000/";
+    }
 
-        /// <summary>
-        /// Get a random CAPS object path component that will be used as the identifying part of all future CAPS requests
-        /// </summary>
-        /// <returns></returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static string GetRandomCapsObjectPath()
-        {
-            return UUID.Random().ToString();
-        }
+    /// <summary>
+    /// Get a random CAPS object path component that will be used as the identifying part of all future CAPS requests
+    /// </summary>
+    /// <returns></returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static string GetRandomCapsObjectPath()
+    {
+        return UUID.Random().ToString();
     }
 }

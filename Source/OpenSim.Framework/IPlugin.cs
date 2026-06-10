@@ -25,56 +25,52 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+/// <summary>
+/// Exception thrown if Initialise has been called, but failed.
+/// </summary>
+public class PluginNotInitialisedException : Exception
+{
+    public PluginNotInitialisedException () : base() {}
+    public PluginNotInitialisedException (string msg) : base(msg) {}
+    public PluginNotInitialisedException (string msg, Exception e) : base(msg, e) {}
+}
+
+/// <summary>
+/// This interface, describes a generic plugin
+/// </summary>
+public interface IPlugin : IDisposable
 {
     /// <summary>
-    /// Exception thrown if Initialise has been called, but failed.
+    /// Returns the plugin version
     /// </summary>
-    public class PluginNotInitialisedException : Exception
-    {
-        public PluginNotInitialisedException () : base() {}
-        public PluginNotInitialisedException (string msg) : base(msg) {}
-        public PluginNotInitialisedException (string msg, Exception e) : base(msg, e) {}
-    }
+    /// <returns>Plugin version in MAJOR.MINOR.REVISION.BUILD format</returns>
+    string Version { get; }
 
     /// <summary>
-    /// This interface, describes a generic plugin
+    /// Returns the plugin name
     /// </summary>
-    public interface IPlugin : IDisposable
-    {
-        /// <summary>
-        /// Returns the plugin version
-        /// </summary>
-        /// <returns>Plugin version in MAJOR.MINOR.REVISION.BUILD format</returns>
-        string Version { get; }
-
-        /// <summary>
-        /// Returns the plugin name
-        /// </summary>
-        /// <returns>Plugin name, eg MySQL User Provider</returns>
-        string Name { get; }
-
-        /// <summary>
-        /// Default-initialises the plugin
-        /// </summary>
-        void Initialise();
-    }
+    /// <returns>Plugin name, eg MySQL User Provider</returns>
+    string Name { get; }
 
     /// <summary>
-    /// Any plugins which need to pass parameters to their initialisers must
-    /// inherit this class and use it to set the PluginLoader Initialiser property
+    /// Default-initialises the plugin
     /// </summary>
-    public class PluginInitialiserBase
+    void Initialise();
+}
+
+/// <summary>
+/// Any plugins which need to pass parameters to their initialisers must
+/// inherit this class and use it to set the PluginLoader Initialiser property
+/// </summary>
+public class PluginInitialiserBase
+{
+    // this would be a lot simpler if C# supported currying or typedefs
+
+    // default initialisation
+    public virtual void Initialise (IPlugin plugin)
     {
-        // this would be a lot simpler if C# supported currying or typedefs
-
-        // default initialisation
-        public virtual void Initialise (IPlugin plugin)
-        {
-            plugin.Initialise();
-        }
+        plugin.Initialise();
     }
-
 }

@@ -26,26 +26,24 @@
  */
 
 using MySqlConnector;
-using System;
 
-namespace OpenSim.Data.MySQL
+namespace OpenSim.Data.MySQL;
+
+public class MySQLOfflineIMData : MySQLGenericTableHandler<OfflineIMData>, IOfflineIMData
 {
-    public class MySQLOfflineIMData : MySQLGenericTableHandler<OfflineIMData>, IOfflineIMData
+    public MySQLOfflineIMData(string connectionString, string realm)
+        : base(connectionString, realm, "IM_Store")
     {
-        public MySQLOfflineIMData(string connectionString, string realm)
-            : base(connectionString, realm, "IM_Store")
+    }
+
+    public void DeleteOld()
+    {
+        using (MySqlCommand cmd = new MySqlCommand())
         {
+            cmd.CommandText = String.Format("delete from {0} where TMStamp < NOW() - INTERVAL 2 WEEK", m_Realm);
+
+            ExecuteNonQuery(cmd);
         }
 
-        public void DeleteOld()
-        {
-            using (MySqlCommand cmd = new MySqlCommand())
-            {
-                cmd.CommandText = String.Format("delete from {0} where TMStamp < NOW() - INTERVAL 2 WEEK", m_Realm);
-
-                ExecuteNonQuery(cmd);
-            }
-
-        }
     }
 }

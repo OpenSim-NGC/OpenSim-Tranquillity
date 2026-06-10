@@ -35,82 +35,81 @@ using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Simulation
+namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Simulation;
+
+public class SimulationServiceInConnectorModule : ISharedRegionModule
 {
-    public class SimulationServiceInConnectorModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static bool m_Enabled = false;
+
+    private IConfigSource m_Config;
+    bool m_Registered = false;
+
+    #region Region Module interface
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private static bool m_Enabled = false;
+        m_Config = config;
 
-        private IConfigSource m_Config;
-        bool m_Registered = false;
-
-        #region Region Module interface
-
-        public void Initialise(IConfigSource config)
+        IConfig moduleConfig = config.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            m_Config = config;
-
-            IConfig moduleConfig = config.Configs["Modules"];
-            if (moduleConfig != null)
+            m_Enabled = moduleConfig.GetBoolean("SimulationServiceInConnector", false);
+            if (m_Enabled)
             {
-                m_Enabled = moduleConfig.GetBoolean("SimulationServiceInConnector", false);
-                if (m_Enabled)
-                {
-                    m_log.Info("[SIM SERVICE]: SimulationService IN connector enabled");
+                m_log.Info("[SIM SERVICE]: SimulationService IN connector enabled");
 
-                }
-            }
-
-        }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "SimulationServiceInConnectorModule"; }
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            if (!m_Registered)
-            {
-                m_Registered = true;
-
-                m_log.Info("[SIM SERVICE]: Starting...");
-
-                Object[] args = new Object[] { m_Config, MainServer.Instance, scene };
-
-                ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:SimulationServiceInConnector", args);
             }
         }
-
-        #endregion
 
     }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public string Name
+    {
+        get { return "SimulationServiceInConnectorModule"; }
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        if (!m_Registered)
+        {
+            m_Registered = true;
+
+            m_log.Info("[SIM SERVICE]: Starting...");
+
+            Object[] args = new Object[] { m_Config, MainServer.Instance, scene };
+
+            ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:SimulationServiceInConnector", args);
+        }
+    }
+
+    #endregion
+
 }

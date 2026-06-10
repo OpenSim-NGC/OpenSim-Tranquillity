@@ -35,166 +35,165 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.OptionalModules.Scripting.XmlRpcGridRouterModule
+namespace OpenSim.Region.OptionalModules.Scripting.XmlRpcGridRouterModule;
+
+public class XmlRpcInfo
 {
-    public class XmlRpcInfo
+    public UUID item;
+    public UUID channel;
+    public string uri;
+}
+
+public class XmlRpcGridRouter : INonSharedRegionModule, IXmlRpcRouter
+{
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private Dictionary<UUID, UUID> m_Channels =
+            new Dictionary<UUID, UUID>();
+
+    private bool m_Enabled = false;
+    private string m_ServerURI = String.Empty;
+
+    #region INonSharedRegionModule
+
+    public void Initialise(IConfigSource config)
     {
-        public UUID item;
-        public UUID channel;
-        public string uri;
+        IConfig startupConfig = config.Configs["XMLRPC"];
+        if (startupConfig == null)
+            return;
+
+        if (startupConfig.GetString("XmlRpcRouterModule",
+                "XmlRpcRouterModule") == "XmlRpcGridRouterModule")
+        {
+            m_ServerURI = startupConfig.GetString("XmlRpcHubURI", String.Empty);
+            if (m_ServerURI.Length == 0)
+            {
+                m_log.Error("[XMLRPC GRID ROUTER] Module configured but no URI given. Disabling");
+                return;
+            }
+            m_Enabled = true;
+        }
     }
 
-    public class XmlRpcGridRouter : INonSharedRegionModule, IXmlRpcRouter
+    public void AddRegion(Scene scene)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        if (!m_Enabled)
+            return;
 
-        private Dictionary<UUID, UUID> m_Channels =
-                new Dictionary<UUID, UUID>();
+        scene.RegisterModuleInterface<IXmlRpcRouter>(this);
 
-        private bool m_Enabled = false;
-        private string m_ServerURI = String.Empty;
-
-        #region INonSharedRegionModule
-
-        public void Initialise(IConfigSource config)
+        IScriptModule scriptEngine = scene.RequestModuleInterface<IScriptModule>();
+        if ( scriptEngine != null )
         {
-            IConfig startupConfig = config.Configs["XMLRPC"];
-            if (startupConfig == null)
-                return;
+            scriptEngine.OnScriptRemoved += this.ScriptRemoved;
+            scriptEngine.OnObjectRemoved += this.ObjectRemoved;
 
-            if (startupConfig.GetString("XmlRpcRouterModule",
-                    "XmlRpcRouterModule") == "XmlRpcGridRouterModule")
-            {
-                m_ServerURI = startupConfig.GetString("XmlRpcHubURI", String.Empty);
-                if (m_ServerURI.Length == 0)
-                {
-                    m_log.Error("[XMLRPC GRID ROUTER] Module configured but no URI given. Disabling");
-                    return;
-                }
-                m_Enabled = true;
-            }
+        }
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.UnregisterModuleInterface<IXmlRpcRouter>(this);
+    }
+
+    public void Close()
+    {
+    }
+
+    public string Name
+    {
+        get { return "XmlRpcGridRouterModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    #endregion
+
+    public void RegisterNewReceiver(IScriptModule scriptEngine, UUID channel, UUID objectID, UUID itemID, string uri)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_log.InfoFormat("[XMLRPC GRID ROUTER]: New receiver Obj: {0} Ch: {1} ID: {2} URI: {3}",
+                            objectID.ToString(), channel.ToString(), itemID.ToString(), uri);
+
+        XmlRpcInfo info = new XmlRpcInfo();
+        info.channel = channel;
+        info.uri = uri;
+        info.item = itemID;
+
+        bool success = SynchronousRestObjectRequester.MakeRequest<XmlRpcInfo, bool>(
+                "POST", m_ServerURI+"/RegisterChannel/", info);
+
+        if (!success)
+        {
+            m_log.Error("[XMLRPC GRID ROUTER] Error contacting server");
         }
 
-        public void AddRegion(Scene scene)
+        m_Channels[itemID] = channel;
+
+    }
+
+    public void UnRegisterReceiver(string channelID, UUID itemID)
+    {
+        if (!m_Enabled)
+            return;
+
+        RemoveChannel(itemID);
+
+    }
+
+    public void ScriptRemoved(UUID itemID)
+    {
+        if (!m_Enabled)
+            return;
+
+        RemoveChannel(itemID);
+
+    }
+
+    public void ObjectRemoved(UUID objectID)
+    {
+        // m_log.InfoFormat("[XMLRPC GRID ROUTER]: Object Removed {0}",objectID.ToString());
+    }
+
+    private bool RemoveChannel(UUID itemID)
+    {
+        if(!m_Channels.ContainsKey(itemID))
         {
-            if (!m_Enabled)
-                return;
-
-            scene.RegisterModuleInterface<IXmlRpcRouter>(this);
-
-            IScriptModule scriptEngine = scene.RequestModuleInterface<IScriptModule>();
-            if ( scriptEngine != null )
-            {
-                scriptEngine.OnScriptRemoved += this.ScriptRemoved;
-                scriptEngine.OnObjectRemoved += this.ObjectRemoved;
-
-            }
+            //m_log.InfoFormat("[XMLRPC GRID ROUTER]: Attempted to unregister non-existing Item: {0}", itemID.ToString());
+            return false;
         }
 
-        public void RegionLoaded(Scene scene)
+        XmlRpcInfo info = new XmlRpcInfo();
+
+        info.channel = m_Channels[itemID];
+        info.item = itemID;
+        info.uri = "http://0.0.0.0:00";
+
+        if (info != null)
         {
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.UnregisterModuleInterface<IXmlRpcRouter>(this);
-        }
-
-        public void Close()
-        {
-        }
-
-        public string Name
-        {
-            get { return "XmlRpcGridRouterModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        #endregion
-
-        public void RegisterNewReceiver(IScriptModule scriptEngine, UUID channel, UUID objectID, UUID itemID, string uri)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_log.InfoFormat("[XMLRPC GRID ROUTER]: New receiver Obj: {0} Ch: {1} ID: {2} URI: {3}",
-                                objectID.ToString(), channel.ToString(), itemID.ToString(), uri);
-
-            XmlRpcInfo info = new XmlRpcInfo();
-            info.channel = channel;
-            info.uri = uri;
-            info.item = itemID;
-
             bool success = SynchronousRestObjectRequester.MakeRequest<XmlRpcInfo, bool>(
-                    "POST", m_ServerURI+"/RegisterChannel/", info);
+                    "POST", m_ServerURI+"/RemoveChannel/", info);
 
             if (!success)
             {
                 m_log.Error("[XMLRPC GRID ROUTER] Error contacting server");
             }
 
-            m_Channels[itemID] = channel;
-
+            m_Channels.Remove(itemID);
+            return true;
         }
-
-        public void UnRegisterReceiver(string channelID, UUID itemID)
-        {
-            if (!m_Enabled)
-                return;
-
-            RemoveChannel(itemID);
-
-        }
-
-        public void ScriptRemoved(UUID itemID)
-        {
-            if (!m_Enabled)
-                return;
-
-            RemoveChannel(itemID);
-
-        }
-
-        public void ObjectRemoved(UUID objectID)
-        {
-            // m_log.InfoFormat("[XMLRPC GRID ROUTER]: Object Removed {0}",objectID.ToString());
-        }
-
-        private bool RemoveChannel(UUID itemID)
-        {
-            if(!m_Channels.ContainsKey(itemID))
-            {
-                //m_log.InfoFormat("[XMLRPC GRID ROUTER]: Attempted to unregister non-existing Item: {0}", itemID.ToString());
-                return false;
-            }
-
-            XmlRpcInfo info = new XmlRpcInfo();
-
-            info.channel = m_Channels[itemID];
-            info.item = itemID;
-            info.uri = "http://0.0.0.0:00";
-
-            if (info != null)
-            {
-                bool success = SynchronousRestObjectRequester.MakeRequest<XmlRpcInfo, bool>(
-                        "POST", m_ServerURI+"/RemoveChannel/", info);
-
-                if (!success)
-                {
-                    m_log.Error("[XMLRPC GRID ROUTER] Error contacting server");
-                }
-
-                m_Channels.Remove(itemID);
-                return true;
-            }
-            return false;
-        }
+        return false;
     }
 }

@@ -35,132 +35,131 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases;
+
+public class LocalUserAliasServicesConnector : ISharedRegionModule, IUserAliasService
 {
-    public class LocalUserAliasServicesConnector : ISharedRegionModule, IUserAliasService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    public IUserAliasService UserAliasService { get; private set; }
+
+    private bool m_Enabled = false;
+
+    #region ISharedRegionModule
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        public IUserAliasService UserAliasService { get; private set; }
+    public string Name
+    {
+        get { return "LocalUserAliasServicesConnector"; }
+    }
 
-        private bool m_Enabled = false;
-
-        #region ISharedRegionModule
-
-        public Type ReplaceableInterface
+    public void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "LocalUserAliasServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("UserAliasServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("UserAliasServices", "");
-                if (name == Name)
+                IConfig userConfig = source.Configs["UserAliasService"];
+                if (userConfig == null)
                 {
-                    IConfig userConfig = source.Configs["UserAliasService"];
-                    if (userConfig == null)
-                    {
-                        m_log.Error("[LOCAL USER ALIAS SERVICE CONNECTOR]: UserAliasService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    string serviceDll = userConfig.GetString("LocalServiceModule", String.Empty);
-
-                    if (serviceDll.Length == 0)
-                    {
-                        m_log.Error("[LOCAL USER ALIAS SERVICE CONNECTOR]: No LocalServiceModule named in section UserAliasService");
-                        return;
-                    }
-
-                    Object[] args = new Object[] { source };
-                    UserAliasService = ServerUtils.LoadPlugin<IUserAliasService>(serviceDll, args);
-
-                    if (UserAliasService == null)
-                    {
-                        m_log.ErrorFormat(
-                            "[USER ALIAS SERVICE CONNECTOR]: Cannot load user account alias specified as {0}", serviceDll);
-                        return;
-                    }
-
-                    m_Enabled = true;
-
-                    m_log.Info("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Local user connector enabled");
+                    m_log.Error("[LOCAL USER ALIAS SERVICE CONNECTOR]: UserAliasService missing from OpenSim.ini");
+                    return;
                 }
+
+                string serviceDll = userConfig.GetString("LocalServiceModule", String.Empty);
+
+                if (serviceDll.Length == 0)
+                {
+                    m_log.Error("[LOCAL USER ALIAS SERVICE CONNECTOR]: No LocalServiceModule named in section UserAliasService");
+                    return;
+                }
+
+                Object[] args = new Object[] { source };
+                UserAliasService = ServerUtils.LoadPlugin<IUserAliasService>(serviceDll, args);
+
+                if (UserAliasService == null)
+                {
+                    m_log.ErrorFormat(
+                        "[USER ALIAS SERVICE CONNECTOR]: Cannot load user account alias specified as {0}", serviceDll);
+                    return;
+                }
+
+                m_Enabled = true;
+
+                m_log.Info("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Local user connector enabled");
             }
         }
-
-        public void PostInitialise()
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void Close()
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.RegisterModuleInterface<IUserAliasService>(UserAliasService);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_log.InfoFormat("[LOCAL USER ALIAS SERVICE CONNECTOR]: Enabled local user aliases for region {0}", scene.RegionInfo.RegionName);
-        }
-
-        #endregion
-
-        #region IUserAliasService
-
-        public UserAlias GetUserForAlias(UUID aliasID)
-        {
-            var alias = UserAliasService.GetUserForAlias(aliasID);
-            return alias;
-        }
-
-        public List<UserAlias> GetUserAliases(UUID userID)
-        {
-            var userAliases = UserAliasService.GetUserAliases(userID);
-            return userAliases;
-        }
-
-        public UserAlias CreateAlias(UUID AliasID, UUID UserID, string Description)
-        {
-            var useralias = UserAliasService.CreateAlias(AliasID, UserID, Description); 
-            return useralias;
-        }
-
-        public bool DeleteAlias(UUID aliasID)
-        {
-            var result =  UserAliasService.DeleteAlias(aliasID);
-            return result;
-        }
-
-        #endregion
     }
+
+    public void PostInitialise()
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void Close()
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.RegisterModuleInterface<IUserAliasService>(UserAliasService);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_log.InfoFormat("[LOCAL USER ALIAS SERVICE CONNECTOR]: Enabled local user aliases for region {0}", scene.RegionInfo.RegionName);
+    }
+
+    #endregion
+
+    #region IUserAliasService
+
+    public UserAlias GetUserForAlias(UUID aliasID)
+    {
+        var alias = UserAliasService.GetUserForAlias(aliasID);
+        return alias;
+    }
+
+    public List<UserAlias> GetUserAliases(UUID userID)
+    {
+        var userAliases = UserAliasService.GetUserAliases(userID);
+        return userAliases;
+    }
+
+    public UserAlias CreateAlias(UUID AliasID, UUID UserID, string Description)
+    {
+        var useralias = UserAliasService.CreateAlias(AliasID, UserID, Description); 
+        return useralias;
+    }
+
+    public bool DeleteAlias(UUID aliasID)
+    {
+        var result =  UserAliasService.DeleteAlias(aliasID);
+        return result;
+    }
+
+    #endregion
 }

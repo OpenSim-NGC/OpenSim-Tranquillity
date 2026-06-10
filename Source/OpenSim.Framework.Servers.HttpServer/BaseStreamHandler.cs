@@ -25,62 +25,59 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Net;
 using OpenSim.Framework.ServiceAuth;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+/// <summary>
+/// Base streamed request handler.
+/// </summary>
+/// <remarks>
+/// Inheriting classes should override ProcessRequest() rather than Handle()
+/// </remarks>
+public abstract class BaseStreamHandler : BaseRequestHandler, IStreamedRequestHandler
 {
-    /// <summary>
-    /// Base streamed request handler.
-    /// </summary>
-    /// <remarks>
-    /// Inheriting classes should override ProcessRequest() rather than Handle()
-    /// </remarks>
-    public abstract class BaseStreamHandler : BaseRequestHandler, IStreamedRequestHandler
+    protected IServiceAuth m_Auth;
+
+    protected BaseStreamHandler(string httpMethod, string path) : this(httpMethod, path, null, null) { }
+
+    protected BaseStreamHandler(string httpMethod, string path, string name, string description)
+        : base(httpMethod, path, name, description) {}
+
+    protected BaseStreamHandler(string httpMethod, string path, IServiceAuth auth)
+        : base(httpMethod, path, null, null)
     {
-        protected IServiceAuth m_Auth;
+        m_Auth = auth;
+    }
 
-        protected BaseStreamHandler(string httpMethod, string path) : this(httpMethod, path, null, null) { }
+    public virtual byte[] Handle(
+        string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        RequestsReceived++;
 
-        protected BaseStreamHandler(string httpMethod, string path, string name, string description)
-            : base(httpMethod, path, name, description) {}
-
-        protected BaseStreamHandler(string httpMethod, string path, IServiceAuth auth)
-            : base(httpMethod, path, null, null)
+        if (m_Auth != null)
         {
-            m_Auth = auth;
-        }
+            HttpStatusCode statusCode;
 
-        public virtual byte[] Handle(
-            string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            RequestsReceived++;
-
-            if (m_Auth != null)
+            if (!m_Auth.Authenticate(httpRequest.Headers, httpResponse.AddHeader, out statusCode))
             {
-                HttpStatusCode statusCode;
-
-                if (!m_Auth.Authenticate(httpRequest.Headers, httpResponse.AddHeader, out statusCode))
-                {
-                    httpResponse.StatusCode = (int)statusCode;
-                    httpResponse.ContentType = "text/plain";
-                    return Array.Empty<byte>();
-                }
+                httpResponse.StatusCode = (int)statusCode;
+                httpResponse.ContentType = "text/plain";
+                return Array.Empty<byte>();
             }
-
-            byte[] result = ProcessRequest(path, request, httpRequest, httpResponse);
-
-            RequestsHandled++;
-
-            return result;
         }
 
-        protected virtual byte[] ProcessRequest(
-            string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            return null;
-        }
+        byte[] result = ProcessRequest(path, request, httpRequest, httpResponse);
+
+        RequestsHandled++;
+
+        return result;
+    }
+
+    protected virtual byte[] ProcessRequest(
+        string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        return null;
     }
 }

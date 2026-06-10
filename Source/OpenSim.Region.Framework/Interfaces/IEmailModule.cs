@@ -27,22 +27,21 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.Framework.Interfaces
-{
-    public class Email
-    {
-        public string time;
-        public string sender;
-        public string subject;
-        public string message;
-        public int numLeft;
-    }
+namespace OpenSim.Region.Framework.Interfaces;
 
-    public interface IEmailModule
-    {
-        void SendEmail(UUID objectID, UUID ownerID, string address, string subject, string body);
-        Email GetNextEmail(UUID objectID, string sender, string subject);
-        void AddPartMailBox(UUID objectID);
-        void RemovePartMailBox(UUID objectID);
-    }
+public class Email
+{
+    public string time;
+    public string sender;
+    public string subject;
+    public string message;
+    public int numLeft;
+}
+
+public interface IEmailModule
+{
+    void SendEmail(UUID objectID, UUID ownerID, string address, string subject, string body);
+    Email GetNextEmail(UUID objectID, string sender, string subject);
+    void AddPartMailBox(UUID objectID);
+    void RemovePartMailBox(UUID objectID);
 }

@@ -25,104 +25,101 @@
  * THE SOFTWARE.
  */
 
-using System;
+namespace OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet;
 
-namespace OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet
+public class int3
 {
-    public class int3
+    public int x;
+    public int y;
+    public int z;
+
+    public int3()
     {
-        public int x;
-        public int y;
-        public int z;
+    }
 
-        public int3()
-        {
-        }
+    public int3(int _x, int _y, int _z)
+    {
+        x = _x;
+        y = _y;
+        z = _z;
+    }
 
-        public int3(int _x, int _y, int _z)
+    public int this[int i]
+    {
+        get
         {
-            x = _x;
-            y = _y;
-            z = _z;
-        }
-
-        public int this[int i]
-        {
-            get
+            switch (i)
             {
-                switch (i)
-                {
-                    case 0: return x;
-                    case 1: return y;
-                    case 2: return z;
-                }
-                throw new ArgumentOutOfRangeException();
+                case 0: return x;
+                case 1: return y;
+                case 2: return z;
             }
-            set
+            throw new ArgumentOutOfRangeException();
+        }
+        set
+        {
+            switch (i)
             {
-                switch (i)
-                {
-                    case 0: x = value; return;
-                    case 1: y = value; return;
-                    case 2: z = value; return;
-                }
-                throw new ArgumentOutOfRangeException();
+                case 0: x = value; return;
+                case 1: y = value; return;
+                case 2: z = value; return;
             }
+            throw new ArgumentOutOfRangeException();
         }
+    }
 
-        public override int GetHashCode()
-        {
-            return x.GetHashCode() ^ y.GetHashCode() ^ z.GetHashCode();
-        }
+    public override int GetHashCode()
+    {
+        return x.GetHashCode() ^ y.GetHashCode() ^ z.GetHashCode();
+    }
 
-        public override bool Equals(object obj)
-        {
-            int3 i = obj as int3;
-            if (i == null)
-                return false;
+    public override bool Equals(object obj)
+    {
+        int3 i = obj as int3;
+        if (i == null)
+            return false;
 
-            return this == i;
-        }
+        return this == i;
+    }
 
-        public static bool operator ==(int3 a, int3 b)
-        {
-            // If both are null, or both are same instance, return true.
-            if (System.Object.ReferenceEquals(a, b))
-                return true;
-            // If one is null, but not both, return false.
-            if (((object)a == null) || ((object)b == null))
-                return false;
-
-            for (int i = 0; i < 3; i++)
-            {
-                if (a[i] != b[i])
-                    return false;
-            }
+    public static bool operator ==(int3 a, int3 b)
+    {
+        // If both are null, or both are same instance, return true.
+        if (System.Object.ReferenceEquals(a, b))
             return true;
-        }
+        // If one is null, but not both, return false.
+        if (((object)a == null) || ((object)b == null))
+            return false;
 
-        public static bool operator !=(int3 a, int3 b)
+        for (int i = 0; i < 3; i++)
         {
-            return !(a == b);
+            if (a[i] != b[i])
+                return false;
         }
+        return true;
+    }
 
-        public static int3 roll3(int3 a)
-        {
-            int tmp = a[0];
-            a[0] = a[1];
-            a[1] = a[2];
-            a[2] = tmp;
-            return a;
-        }
+    public static bool operator !=(int3 a, int3 b)
+    {
+        return !(a == b);
+    }
 
-        public static bool isa(int3 a, int3 b)
-        {
-            return (a == b || roll3(a) == b || a == roll3(b));
-        }
+    public static int3 roll3(int3 a)
+    {
+        int tmp = a[0];
+        a[0] = a[1];
+        a[1] = a[2];
+        a[2] = tmp;
+        return a;
+    }
 
-        public static bool b2b(int3 a, int3 b)
-        {
-            return isa(a, new int3(b[2], b[1], b[0]));
-        }
+    public static bool isa(int3 a, int3 b)
+    {
+        return (a == b || roll3(a) == b || a == roll3(b));
+    }
+
+    public static bool b2b(int3 a, int3 b)
+    {
+        return isa(a, new int3(b[2], b[1], b[0]));
     }
 }

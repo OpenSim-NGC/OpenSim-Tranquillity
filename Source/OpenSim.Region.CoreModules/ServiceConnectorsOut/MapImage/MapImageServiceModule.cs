@@ -38,279 +38,278 @@ using OpenSim.Server.Base;
 using OpenMetaverse;
 using SkiaSharp;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MapImage
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MapImage;
+
+public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
 {
-    public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
+    private static readonly ILog m_log =
+        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static string LogHeader = "[MAP IMAGE SERVICE MODULE]:";
+
+    private bool m_enabled = false;
+    private IMapImageService m_MapService;
+
+    private Dictionary<UUID, Scene> m_scenes = new Dictionary<UUID, Scene>();
+
+    private int m_refreshtime = 0;
+    private int m_lastrefresh = 0;
+    private System.Timers.Timer m_refreshTimer;
+
+    #region ISharedRegionModule
+
+    public Type ReplaceableInterface { get { return null; } }
+    public string Name { get { return "MapImageServiceModule"; } }
+    public void RegionLoaded(Scene scene) { }
+    public void Close() { }
+    public void PostInitialise() { }
+
+    ///<summary>
+    ///
+    ///</summary>
+    public void Initialise(IConfigSource source)
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private static string LogHeader = "[MAP IMAGE SERVICE MODULE]:";
-
-        private bool m_enabled = false;
-        private IMapImageService m_MapService;
-
-        private Dictionary<UUID, Scene> m_scenes = new Dictionary<UUID, Scene>();
-
-        private int m_refreshtime = 0;
-        private int m_lastrefresh = 0;
-        private System.Timers.Timer m_refreshTimer;
-
-        #region ISharedRegionModule
-
-        public Type ReplaceableInterface { get { return null; } }
-        public string Name { get { return "MapImageServiceModule"; } }
-        public void RegionLoaded(Scene scene) { }
-        public void Close() { }
-        public void PostInitialise() { }
-
-        ///<summary>
-        ///
-        ///</summary>
-        public void Initialise(IConfigSource source)
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
-            {
-                string name = moduleConfig.GetString("MapImageService", "");
-                if (name != Name)
-                    return;
-            }
-
-            IConfig config = source.Configs["MapImageService"];
-            if (config == null)
+            string name = moduleConfig.GetString("MapImageService", "");
+            if (name != Name)
                 return;
-
-            int refreshminutes = Convert.ToInt32(config.GetString("RefreshTime"));
-            if (refreshminutes < 0)
-            {
-                m_log.WarnFormat("[MAP IMAGE SERVICE MODULE]: Negative refresh time given in config. Module disabled.");
-                return;
-            }
-
-            string service = config.GetString("LocalServiceModule", string.Empty);
-            if (service.Length == 0)
-            {
-                m_log.WarnFormat("[MAP IMAGE SERVICE MODULE]: No service dll given in config. Unable to proceed.");
-                return;
-            }
-
-            Object[] args = new Object[] { source };
-            m_MapService = ServerUtils.LoadPlugin<IMapImageService>(service, args);
-            if (m_MapService == null)
-            {
-                m_log.WarnFormat("[MAP IMAGE SERVICE MODULE]: Unable to load LocalServiceModule from {0}. MapService module disabled. Please fix the configuration.", service);
-                return;
-            }
-
-            // we don't want the timer if the interval is zero, but we still want this module enables
-            if(refreshminutes > 0)
-            {
-                m_refreshtime = refreshminutes * 60 * 1000; // convert from minutes to ms
-
-                m_refreshTimer = new System.Timers.Timer();
-                m_refreshTimer.Enabled = true;
-                m_refreshTimer.AutoReset = true;
-                m_refreshTimer.Interval = m_refreshtime;
-                m_refreshTimer.Elapsed += new ElapsedEventHandler(HandleMaptileRefresh);
-
-
-                m_log.InfoFormat("[MAP IMAGE SERVICE MODULE]: enabled with refresh time {0} min and service object {1}",
-                             refreshminutes, service);
-            }
-            else
-            {
-                m_log.InfoFormat("[MAP IMAGE SERVICE MODULE]: enabled with no refresh and service object {0}", service);
-            }
-            m_enabled = true;
         }
 
-        ///<summary>
-        ///
-        ///</summary>
-        public void AddRegion(Scene scene)
+        IConfig config = source.Configs["MapImageService"];
+        if (config == null)
+            return;
+
+        int refreshminutes = Convert.ToInt32(config.GetString("RefreshTime"));
+        if (refreshminutes < 0)
         {
-            if (!m_enabled)
-                return;
-
-            // Every shared region module has to maintain an indepedent list of
-            // currently running regions
-            lock (m_scenes)
-                m_scenes[scene.RegionInfo.RegionID] = scene;
-
-            // v2 Map generation on startup is now handled by scene to allow bmp to be shared with
-            // v1 service and not generate map tiles twice as was previous behavior
-            //scene.EventManager.OnRegionReadyStatusChange += s => { if (s.Ready) UploadMapTile(s); };
-
-            scene.RegisterModuleInterface<IMapImageUploadModule>(this);
+            m_log.WarnFormat("[MAP IMAGE SERVICE MODULE]: Negative refresh time given in config. Module disabled.");
+            return;
         }
 
-        ///<summary>
-        ///
-        ///</summary>
-        public void RemoveRegion(Scene scene)
+        string service = config.GetString("LocalServiceModule", string.Empty);
+        if (service.Length == 0)
         {
-            if (! m_enabled)
-                return;
-
-            lock (m_scenes)
-                m_scenes.Remove(scene.RegionInfo.RegionID);
+            m_log.WarnFormat("[MAP IMAGE SERVICE MODULE]: No service dll given in config. Unable to proceed.");
+            return;
         }
 
-        #endregion ISharedRegionModule
-
-        ///<summary>
-        ///
-        ///</summary>
-        private void HandleMaptileRefresh(object sender, EventArgs ea)
+        Object[] args = new Object[] { source };
+        m_MapService = ServerUtils.LoadPlugin<IMapImageService>(service, args);
+        if (m_MapService == null)
         {
-            // this approach is a bit convoluted becase we want to wait for the
-            // first upload to happen on startup but after all the objects are
-            // loaded and initialized
-            if (m_lastrefresh > 0 && Util.EnvironmentTickCountSubtract(m_lastrefresh) < m_refreshtime)
-                return;
+            m_log.WarnFormat("[MAP IMAGE SERVICE MODULE]: Unable to load LocalServiceModule from {0}. MapService module disabled. Please fix the configuration.", service);
+            return;
+        }
 
-            m_log.DebugFormat("[MAP IMAGE SERVICE MODULE]: map refresh!");
-            lock (m_scenes)
+        // we don't want the timer if the interval is zero, but we still want this module enables
+        if(refreshminutes > 0)
+        {
+            m_refreshtime = refreshminutes * 60 * 1000; // convert from minutes to ms
+
+            m_refreshTimer = new System.Timers.Timer();
+            m_refreshTimer.Enabled = true;
+            m_refreshTimer.AutoReset = true;
+            m_refreshTimer.Interval = m_refreshtime;
+            m_refreshTimer.Elapsed += new ElapsedEventHandler(HandleMaptileRefresh);
+
+
+            m_log.InfoFormat("[MAP IMAGE SERVICE MODULE]: enabled with refresh time {0} min and service object {1}",
+                         refreshminutes, service);
+        }
+        else
+        {
+            m_log.InfoFormat("[MAP IMAGE SERVICE MODULE]: enabled with no refresh and service object {0}", service);
+        }
+        m_enabled = true;
+    }
+
+    ///<summary>
+    ///
+    ///</summary>
+    public void AddRegion(Scene scene)
+    {
+        if (!m_enabled)
+            return;
+
+        // Every shared region module has to maintain an indepedent list of
+        // currently running regions
+        lock (m_scenes)
+            m_scenes[scene.RegionInfo.RegionID] = scene;
+
+        // v2 Map generation on startup is now handled by scene to allow bmp to be shared with
+        // v1 service and not generate map tiles twice as was previous behavior
+        //scene.EventManager.OnRegionReadyStatusChange += s => { if (s.Ready) UploadMapTile(s); };
+
+        scene.RegisterModuleInterface<IMapImageUploadModule>(this);
+    }
+
+    ///<summary>
+    ///
+    ///</summary>
+    public void RemoveRegion(Scene scene)
+    {
+        if (! m_enabled)
+            return;
+
+        lock (m_scenes)
+            m_scenes.Remove(scene.RegionInfo.RegionID);
+    }
+
+    #endregion ISharedRegionModule
+
+    ///<summary>
+    ///
+    ///</summary>
+    private void HandleMaptileRefresh(object sender, EventArgs ea)
+    {
+        // this approach is a bit convoluted becase we want to wait for the
+        // first upload to happen on startup but after all the objects are
+        // loaded and initialized
+        if (m_lastrefresh > 0 && Util.EnvironmentTickCountSubtract(m_lastrefresh) < m_refreshtime)
+            return;
+
+        m_log.DebugFormat("[MAP IMAGE SERVICE MODULE]: map refresh!");
+        lock (m_scenes)
+        {
+            foreach (IScene scene in m_scenes.Values)
             {
-                foreach (IScene scene in m_scenes.Values)
+                try
                 {
-                    try
-                    {
-                        UploadMapTile(scene);
-                    }
-                    catch (Exception ex)
-                    {
-                        m_log.WarnFormat("[MAP IMAGE SERVICE MODULE]: something bad happened {0}", ex.Message);
-                    }
+                    UploadMapTile(scene);
+                }
+                catch (Exception ex)
+                {
+                    m_log.WarnFormat("[MAP IMAGE SERVICE MODULE]: something bad happened {0}", ex.Message);
                 }
             }
-
-            m_lastrefresh = Util.EnvironmentTickCount();
         }
 
-        ///<summary>
-        /// Upload map tile using SKBitmap
-        ///</summary>
-        public void UploadMapTile(IScene scene)
+        m_lastrefresh = Util.EnvironmentTickCount();
+    }
+
+    ///<summary>
+    /// Upload map tile using SKBitmap
+    ///</summary>
+    public void UploadMapTile(IScene scene)
+    {
+        m_log.DebugFormat("{0}: upload maptile for {1}", LogHeader, scene.RegionInfo.RegionName);
+
+        // Create a JPG map tile and upload it to the AddMapTile API
+        IMapImageGenerator tileGenerator = scene.RequestModuleInterface<IMapImageGenerator>();
+        if (tileGenerator == null)
         {
-            m_log.DebugFormat("{0}: upload maptile for {1}", LogHeader, scene.RegionInfo.RegionName);
-
-            // Create a JPG map tile and upload it to the AddMapTile API
-            IMapImageGenerator tileGenerator = scene.RequestModuleInterface<IMapImageGenerator>();
-            if (tileGenerator == null)
-            {
-                m_log.WarnFormat("{0} Cannot upload map tile without an ImageGenerator", LogHeader);
-                return;
-            }
-
-            // New IMapImageGenerator returns an SKBitmap (SkiaSharp). Convert or pass through.
-            using (SKBitmap mapTile = tileGenerator.CreateMapTile())
-            {
-                // The MapImageModule will return a null if the user has chosen not to create map tiles and there
-                // is no static map tile.
-                if (mapTile == null)
-                    return;
-
-                UploadMapTile(scene, mapTile);
-            }
+            m_log.WarnFormat("{0} Cannot upload map tile without an ImageGenerator", LogHeader);
+            return;
         }
 
-        /// <summary>
-        /// IMapImageUploadModule implementation for SKBitmap map tiles.
-        /// </summary>
-        /// <param name="scene"></param>
-        /// <param name="mapTile"></param>
-        public void UploadMapTile(IScene scene, SKBitmap mapTile)
+        // New IMapImageGenerator returns an SKBitmap (SkiaSharp). Convert or pass through.
+        using (SKBitmap mapTile = tileGenerator.CreateMapTile())
         {
+            // The MapImageModule will return a null if the user has chosen not to create map tiles and there
+            // is no static map tile.
             if (mapTile == null)
-            {
-                m_log.WarnFormat("{0} Cannot upload null image", LogHeader);
                 return;
-            }
 
-            // If the region/maptile is legacy sized, just upload the one tile like it has always been done
-            if (mapTile.Width == Constants.RegionSize && mapTile.Height == Constants.RegionSize)
-            {
-                m_log.DebugFormat("{0} Upload maptile for {1}", LogHeader, scene.Name);
-                ConvertAndUploadMaptile(scene, mapTile,
-                                        scene.RegionInfo.RegionLocX, scene.RegionInfo.RegionLocY,
-                                        scene.RegionInfo.RegionName);
-            }
-            else
-            {
-                m_log.DebugFormat("{0} Upload {1} maptiles for {2}", LogHeader,
-                    (mapTile.Width * mapTile.Height) / (Constants.RegionSize * Constants.RegionSize),
-                    scene.Name);
+            UploadMapTile(scene, mapTile);
+        }
+    }
 
-                // For larger regions (varregion) we must cut the region image into legacy sized
-                //    pieces since that is how the maptile system works.
-                // Note the assumption that varregions are always a multiple of legacy size.
-                for (uint xx = 0; xx < (uint)mapTile.Width; xx += Constants.RegionSize)
+    /// <summary>
+    /// IMapImageUploadModule implementation for SKBitmap map tiles.
+    /// </summary>
+    /// <param name="scene"></param>
+    /// <param name="mapTile"></param>
+    public void UploadMapTile(IScene scene, SKBitmap mapTile)
+    {
+        if (mapTile == null)
+        {
+            m_log.WarnFormat("{0} Cannot upload null image", LogHeader);
+            return;
+        }
+
+        // If the region/maptile is legacy sized, just upload the one tile like it has always been done
+        if (mapTile.Width == Constants.RegionSize && mapTile.Height == Constants.RegionSize)
+        {
+            m_log.DebugFormat("{0} Upload maptile for {1}", LogHeader, scene.Name);
+            ConvertAndUploadMaptile(scene, mapTile,
+                                    scene.RegionInfo.RegionLocX, scene.RegionInfo.RegionLocY,
+                                    scene.RegionInfo.RegionName);
+        }
+        else
+        {
+            m_log.DebugFormat("{0} Upload {1} maptiles for {2}", LogHeader,
+                (mapTile.Width * mapTile.Height) / (Constants.RegionSize * Constants.RegionSize),
+                scene.Name);
+
+            // For larger regions (varregion) we must cut the region image into legacy sized
+            //    pieces since that is how the maptile system works.
+            // Note the assumption that varregions are always a multiple of legacy size.
+            for (uint xx = 0; xx < (uint)mapTile.Width; xx += Constants.RegionSize)
+            {
+                for (uint yy = 0; yy < (uint)mapTile.Height; yy += Constants.RegionSize)
                 {
-                    for (uint yy = 0; yy < (uint)mapTile.Height; yy += Constants.RegionSize)
+                    // Images are addressed from the upper left corner so have to do funny
+                    //     math to pick out the sub-tile since regions are numbered from
+                    //     the lower left.
+                    int left = (int)xx;
+                    int top = mapTile.Height - (int)yy - (int)Constants.RegionSize;
+                    int tileW = (int)Constants.RegionSize;
+                    int tileH = (int)Constants.RegionSize;
+
+                    SKRectI subset = new SKRectI(left, top, left + tileW, top + tileH);
+                    SKBitmap subMapTile = new SKBitmap();
+                    if (!mapTile.ExtractSubset(subMapTile, subset))
                     {
-                        // Images are addressed from the upper left corner so have to do funny
-                        //     math to pick out the sub-tile since regions are numbered from
-                        //     the lower left.
-                        int left = (int)xx;
-                        int top = mapTile.Height - (int)yy - (int)Constants.RegionSize;
-                        int tileW = (int)Constants.RegionSize;
-                        int tileH = (int)Constants.RegionSize;
+                        m_log.WarnFormat("{0} Failed to extract sub-tile at {1},{2}", LogHeader, left, top);
+                        continue;
+                    }
 
-                        SKRectI subset = new SKRectI(left, top, left + tileW, top + tileH);
-                        SKBitmap subMapTile = new SKBitmap();
-                        if (!mapTile.ExtractSubset(subMapTile, subset))
-                        {
-                            m_log.WarnFormat("{0} Failed to extract sub-tile at {1},{2}", LogHeader, left, top);
-                            continue;
-                        }
-
-                        if (!ConvertAndUploadMaptile(scene, subMapTile,
-                                                    scene.RegionInfo.RegionLocX + (xx / Constants.RegionSize),
-                                                    scene.RegionInfo.RegionLocY + (yy / Constants.RegionSize),
-                                                    scene.Name))
-                        {
-                            m_log.DebugFormat("{0} Upload maptileS for {1} aborted!", LogHeader, scene.Name);
-                            return; // abort rest;
-                        }
+                    if (!ConvertAndUploadMaptile(scene, subMapTile,
+                                                scene.RegionInfo.RegionLocX + (xx / Constants.RegionSize),
+                                                scene.RegionInfo.RegionLocY + (yy / Constants.RegionSize),
+                                                scene.Name))
+                    {
+                        m_log.DebugFormat("{0} Upload maptileS for {1} aborted!", LogHeader, scene.Name);
+                        return; // abort rest;
                     }
                 }
             }
         }
+    }
 
-        // New SKBitmap-based upload path using SkiaSharp for JPEG encoding.
-        private bool ConvertAndUploadMaptile(IScene scene, SKBitmap tileImage, uint locX, uint locY, string regionName)
+    // New SKBitmap-based upload path using SkiaSharp for JPEG encoding.
+    private bool ConvertAndUploadMaptile(IScene scene, SKBitmap tileImage, uint locX, uint locY, string regionName)
+    {
+        byte[] jpgData = Utils.EmptyBytes;
+
+        try
         {
-            byte[] jpgData = Utils.EmptyBytes;
-
-            try
+            using (SKImage img = SKImage.FromBitmap(tileImage))
+            using (SKData data = img.Encode(SKEncodedImageFormat.Jpeg, 95))
             {
-                using (SKImage img = SKImage.FromBitmap(tileImage))
-                using (SKData data = img.Encode(SKEncodedImageFormat.Jpeg, 95))
-                {
-                    jpgData = data.ToArray();
-                }
+                jpgData = data.ToArray();
             }
-            catch (Exception e)
-            {
-                m_log.WarnFormat("{0} Failed encoding SKBitmap to JPEG for region {1}: {2}", LogHeader, regionName, e.Message);
-                return false;
-            }
-
-            if (jpgData == Utils.EmptyBytes)
-            {
-                m_log.WarnFormat("{0} Tile image generation failed for region {1}", LogHeader, regionName);
-                return false;
-            }
-
-            string reason = string.Empty;
-            if (!m_MapService.AddMapTile((int)locX, (int)locY, jpgData, scene.RegionInfo.ScopeID, out reason))
-            {
-                m_log.DebugFormat("{0} Unable to upload tile image for {1} at {2}-{3}: {4}", LogHeader,
-                    regionName, locX, locY, reason);
-                return false;
-            }
-            return true;
         }
+        catch (Exception e)
+        {
+            m_log.WarnFormat("{0} Failed encoding SKBitmap to JPEG for region {1}: {2}", LogHeader, regionName, e.Message);
+            return false;
+        }
+
+        if (jpgData == Utils.EmptyBytes)
+        {
+            m_log.WarnFormat("{0} Tile image generation failed for region {1}", LogHeader, regionName);
+            return false;
+        }
+
+        string reason = string.Empty;
+        if (!m_MapService.AddMapTile((int)locX, (int)locY, jpgData, scene.RegionInfo.ScopeID, out reason))
+        {
+            m_log.DebugFormat("{0} Unable to upload tile image for {1} at {2}-{3}: {4}", LogHeader,
+                regionName, locX, locY, reason);
+            return false;
+        }
+        return true;
     }
 }

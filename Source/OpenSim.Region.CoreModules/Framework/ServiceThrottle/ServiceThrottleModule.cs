@@ -35,114 +35,112 @@ using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Scenes;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
-namespace OpenSim.Region.CoreModules.Framework.ServiceThrottle
+namespace OpenSim.Region.CoreModules.Framework.ServiceThrottle;
+
+public class ServiceThrottleModule : ISharedRegionModule, IServiceThrottleModule
 {
-    public class ServiceThrottleModule : ISharedRegionModule, IServiceThrottleModule
+    private static readonly ILog m_log = LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private readonly List<Scene> m_scenes = new List<Scene>();
+    private JobEngine m_processorJobEngine;
+
+    #region ISharedRegionModule
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
-
-        private readonly List<Scene> m_scenes = new List<Scene>();
-        private JobEngine m_processorJobEngine;
-
-        #region ISharedRegionModule
-
-        public void Initialise(IConfigSource config)
-        {
-            m_processorJobEngine = new JobEngine("ServiceThrottle","ServiceThrottle", 5000, 2);
-            m_processorJobEngine.Start();
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            lock (m_scenes)
-            {
-                m_scenes.Add(scene);
-                scene.RegisterModuleInterface<IServiceThrottleModule>(this);
-                scene.EventManager.OnNewClient += OnNewClient;
-            }
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            lock (m_scenes)
-            {
-                m_scenes.Remove(scene);
-                scene.EventManager.OnNewClient -= OnNewClient;
-            }
-        }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-            m_processorJobEngine.Stop();
-        }
-
-        public string Name
-        {
-            get { return "ServiceThrottleModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        #endregion ISharedRegionMOdule
-
-        #region Events
-
-        void OnNewClient(IClientAPI client)
-        {
-            client.OnRegionHandleRequest += OnRegionHandleRequest;
-        }
-
-        public void OnRegionHandleRequest(IClientAPI client, UUID regionID)
-        {
-            //m_log.DebugFormat("[SERVICE THROTTLE]: RegionHandleRequest {0}", regionID);
-            Action action = delegate
-            {
-                if(!client.IsActive || m_scenes.Count == 0 || m_scenes[0] == null )
-                {
-                    client = null;
-                    return;
-                }
-
-                Scene baseScene = m_scenes[0];
-                if(baseScene.ShuttingDown)
-                {
-                    client = null;
-                    return;
-                }
-
-                GridRegion r = baseScene.GridService.GetRegionByUUID(UUID.Zero, regionID);
-
-                if (client.IsActive && r != null && r.RegionHandle != 0)
-                    client.SendRegionHandle(regionID, r.RegionHandle);
-
-                client = null;
-            };
-
-            m_processorJobEngine.QueueJob("regionHandle", action, regionID.ToString());
-        }
-
-        #endregion Events
-
-        #region IServiceThrottleModule
-
-        public void Enqueue(string category, string itemid, Action continuation)
-        {
-                m_processorJobEngine.QueueJob(category, continuation, itemid);
-        }
-
-        #endregion IServiceThrottleModule
+        m_processorJobEngine = new JobEngine("ServiceThrottle","ServiceThrottle", 5000, 2);
+        m_processorJobEngine.Start();
     }
 
+    public void AddRegion(Scene scene)
+    {
+        lock (m_scenes)
+        {
+            m_scenes.Add(scene);
+            scene.RegisterModuleInterface<IServiceThrottleModule>(this);
+            scene.EventManager.OnNewClient += OnNewClient;
+        }
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        lock (m_scenes)
+        {
+            m_scenes.Remove(scene);
+            scene.EventManager.OnNewClient -= OnNewClient;
+        }
+    }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+        m_processorJobEngine.Stop();
+    }
+
+    public string Name
+    {
+        get { return "ServiceThrottleModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    #endregion ISharedRegionMOdule
+
+    #region Events
+
+    void OnNewClient(IClientAPI client)
+    {
+        client.OnRegionHandleRequest += OnRegionHandleRequest;
+    }
+
+    public void OnRegionHandleRequest(IClientAPI client, UUID regionID)
+    {
+        //m_log.DebugFormat("[SERVICE THROTTLE]: RegionHandleRequest {0}", regionID);
+        Action action = delegate
+        {
+            if(!client.IsActive || m_scenes.Count == 0 || m_scenes[0] == null )
+            {
+                client = null;
+                return;
+            }
+
+            Scene baseScene = m_scenes[0];
+            if(baseScene.ShuttingDown)
+            {
+                client = null;
+                return;
+            }
+
+            GridRegion r = baseScene.GridService.GetRegionByUUID(UUID.Zero, regionID);
+
+            if (client.IsActive && r != null && r.RegionHandle != 0)
+                client.SendRegionHandle(regionID, r.RegionHandle);
+
+            client = null;
+        };
+
+        m_processorJobEngine.QueueJob("regionHandle", action, regionID.ToString());
+    }
+
+    #endregion Events
+
+    #region IServiceThrottleModule
+
+    public void Enqueue(string category, string itemid, Action continuation)
+    {
+            m_processorJobEngine.QueueJob(category, continuation, itemid);
+    }
+
+    #endregion IServiceThrottleModule
 }

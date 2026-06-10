@@ -27,51 +27,50 @@
 
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.PaintBrushes
+namespace OpenSim.Region.CoreModules.World.Terrain.PaintBrushes;
+
+public class RevertSphere : ITerrainPaintableEffect
 {
-    public class RevertSphere : ITerrainPaintableEffect
+    private readonly ITerrainChannel m_revertmap;
+
+    public RevertSphere(ITerrainChannel revertmap)
     {
-        private readonly ITerrainChannel m_revertmap;
+        m_revertmap = revertmap;
+    }
 
-        public RevertSphere(ITerrainChannel revertmap)
+    #region ITerrainPaintableEffect Members
+
+    public void PaintEffect(ITerrainChannel map, bool[,] mask, float rx, float ry, float rz,
+        float size, float strength, int startX, int endX, int startY, int endY)
+    {
+         if (strength < 0)
+            return;
+
+        if (strength > 1.0f)
+            strength = 1.0f;
+
+        int x, y;
+        float distancefactor;
+        float dx2;
+
+        for (x = startX; x <= endX; x++)
         {
-            m_revertmap = revertmap;
-        }
-
-        #region ITerrainPaintableEffect Members
-
-        public void PaintEffect(ITerrainChannel map, bool[,] mask, float rx, float ry, float rz,
-            float size, float strength, int startX, int endX, int startY, int endY)
-        {
-             if (strength < 0)
-                return;
-
-            if (strength > 1.0f)
-                strength = 1.0f;
-
-            int x, y;
-            float distancefactor;
-            float dx2;
-
-            for (x = startX; x <= endX; x++)
+            dx2 = (x - rx) * (x - rx);
+            for (y = startY; y <= endY; y++)
             {
-                dx2 = (x - rx) * (x - rx);
-                for (y = startY; y <= endY; y++)
-                {
-                    if (!mask[x, y])
-                        continue;
+                if (!mask[x, y])
+                    continue;
 
-                    // Calculate a sphere and add it to the heighmap
-                    distancefactor = (dx2 + (y - ry) * (y - ry)) / size;
-                    if (distancefactor > 1.0f)
-                        continue;
+                // Calculate a sphere and add it to the heighmap
+                distancefactor = (dx2 + (y - ry) * (y - ry)) / size;
+                if (distancefactor > 1.0f)
+                    continue;
 
-                    distancefactor = strength * (1.0f - distancefactor);
-                    map[x, y] = (map[x, y] * (1.0f - distancefactor)) + (m_revertmap[x, y] * distancefactor);
-                }
+                distancefactor = strength * (1.0f - distancefactor);
+                map[x, y] = (map[x, y] * (1.0f - distancefactor)) + (m_revertmap[x, y] * distancefactor);
             }
         }
-
-        #endregion
     }
+
+    #endregion
 }

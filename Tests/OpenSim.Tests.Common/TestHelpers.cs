@@ -28,85 +28,84 @@
 using System.Diagnostics;
 using OpenMetaverse;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+public class TestHelpers
 {
-    public class TestHelpers
+    /// <summary>
+    /// A debugging method that can be used to print out which test method you are in
+    /// </summary>
+    public static void InMethod()
     {
-        /// <summary>
-        /// A debugging method that can be used to print out which test method you are in
-        /// </summary>
-        public static void InMethod()
-        {
-            StackTrace stackTrace = new StackTrace();
-            Console.WriteLine();
-            Console.WriteLine("===> In Test Method : {0} <===", stackTrace.GetFrame(1).GetMethod().Name);
-        }
+        StackTrace stackTrace = new StackTrace();
+        Console.WriteLine();
+        Console.WriteLine("===> In Test Method : {0} <===", stackTrace.GetFrame(1).GetMethod().Name);
+    }
 
-        public static void EnableLogging()
-        {
-            // TODO: enable logging while testing in the Microsoft.Extension.Logging framework
-        }
+    public static void EnableLogging()
+    {
+        // TODO: enable logging while testing in the Microsoft.Extension.Logging framework
+    }
 
-        /// <summary>
-        /// Disable logging whilst running the tests.
-        /// </summary>
-        /// <remarks>
-        /// Remember, if a regression test throws an exception before completing this will not be invoked if it's at
-        /// the end of the test.
-        /// TODO: Always invoke this after every test - probably need to make all test cases inherit from a common
-        /// TestCase class where this can be done.
-        /// </remarks>
-        public static void DisableLogging()
-        {
-            // TODO: disable logging while testing in the Microsoft.Extension.Logging framework
-        }
+    /// <summary>
+    /// Disable logging whilst running the tests.
+    /// </summary>
+    /// <remarks>
+    /// Remember, if a regression test throws an exception before completing this will not be invoked if it's at
+    /// the end of the test.
+    /// TODO: Always invoke this after every test - probably need to make all test cases inherit from a common
+    /// TestCase class where this can be done.
+    /// </remarks>
+    public static void DisableLogging()
+    {
+        // TODO: disable logging while testing in the Microsoft.Extension.Logging framework
+    }
 
-        /// <summary>
-        /// Parse a UUID stem into a full UUID.
-        /// </summary>
-        /// <remarks>
-        /// The fragment will come at the start of the UUID.  The rest will be 0s
-        /// </remarks>
-        /// <returns></returns>
-        /// <param name='frag'>
-        /// A UUID fragment that will be parsed into a full UUID.  Therefore, it can only contain
-        /// cahracters which are valid in a UUID, except for "-" which is currently only allowed if a full UUID is
-        /// given as the 'fragment'.
-        /// </param>
-        public static UUID ParseStem(string stem)
-        {
-            string rawUuid = stem.PadRight(32, '0');
+    /// <summary>
+    /// Parse a UUID stem into a full UUID.
+    /// </summary>
+    /// <remarks>
+    /// The fragment will come at the start of the UUID.  The rest will be 0s
+    /// </remarks>
+    /// <returns></returns>
+    /// <param name='frag'>
+    /// A UUID fragment that will be parsed into a full UUID.  Therefore, it can only contain
+    /// cahracters which are valid in a UUID, except for "-" which is currently only allowed if a full UUID is
+    /// given as the 'fragment'.
+    /// </param>
+    public static UUID ParseStem(string stem)
+    {
+        string rawUuid = stem.PadRight(32, '0');
 
-            return UUID.Parse(rawUuid);
-        }
+        return UUID.Parse(rawUuid);
+    }
 
-        /// <summary>
-        /// Parse tail section into full UUID.
-        /// </summary>
-        /// <param name="tail"></param>
-        /// <returns></returns>
-        public static UUID ParseTail(int tail)
-        {
-            return new UUID(string.Format("00000000-0000-0000-0000-{0:X12}", tail));
-        }
+    /// <summary>
+    /// Parse tail section into full UUID.
+    /// </summary>
+    /// <param name="tail"></param>
+    /// <returns></returns>
+    public static UUID ParseTail(int tail)
+    {
+        return new UUID(string.Format("00000000-0000-0000-0000-{0:X12}", tail));
+    }
 
-        /// <summary>
-        /// Parse a UUID tail section into a full UUID.
-        /// </summary>
-        /// <remarks>
-        /// The fragment will come at the end of the UUID.  The rest will be 0s
-        /// </remarks>
-        /// <returns></returns>
-        /// <param name='frag'>
-        /// A UUID fragment that will be parsed into a full UUID.  Therefore, it can only contain
-        /// cahracters which are valid in a UUID, except for "-" which is currently only allowed if a full UUID is
-        /// given as the 'fragment'.
-        /// </param>
-        public static UUID ParseTail(string stem)
-        {
-            string rawUuid = stem.PadLeft(32, '0');
+    /// <summary>
+    /// Parse a UUID tail section into a full UUID.
+    /// </summary>
+    /// <remarks>
+    /// The fragment will come at the end of the UUID.  The rest will be 0s
+    /// </remarks>
+    /// <returns></returns>
+    /// <param name='frag'>
+    /// A UUID fragment that will be parsed into a full UUID.  Therefore, it can only contain
+    /// cahracters which are valid in a UUID, except for "-" which is currently only allowed if a full UUID is
+    /// given as the 'fragment'.
+    /// </param>
+    public static UUID ParseTail(string stem)
+    {
+        string rawUuid = stem.PadLeft(32, '0');
 
-            return UUID.Parse(rawUuid);
-        }
+        return UUID.Parse(rawUuid);
     }
 }

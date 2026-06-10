@@ -27,27 +27,26 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
-{
-    public enum EventDataFlags
-    {
-        Mature = 1 << 0,
-    }
+namespace OpenSim.Framework;
 
-    public class EventData
-    {
-        public uint eventID;
-        public string creator;
-        public string name;
-        public string category;
-        public string description;
-        public string date;
-        public uint dateUTC;
-        public uint duration;
-        public uint cover;
-        public uint amount;
-        public string simName;
-        public Vector3 globalPos;
-        public uint eventFlags;
-    }
+public enum EventDataFlags
+{
+    Mature = 1 << 0,
+}
+
+public class EventData
+{
+    public uint eventID;
+    public string creator;
+    public string name;
+    public string category;
+    public string description;
+    public string date;
+    public uint dateUTC;
+    public uint duration;
+    public uint cover;
+    public uint amount;
+    public string simName;
+    public Vector3 globalPos;
+    public uint eventFlags;
 }

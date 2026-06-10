@@ -25,120 +25,117 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
-using OpenSim.Data;
 using OpenMetaverse;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+public class GroupData
 {
-    public class GroupData
-    {
-        public UUID GroupID;
-        public Dictionary<string, string> Data;
-    }
+    public UUID GroupID;
+    public Dictionary<string, string> Data;
+}
 
-    public class MembershipData
-    {
-        public UUID GroupID;
-        public string PrincipalID;
-        public Dictionary<string, string> Data;
-    }
+public class MembershipData
+{
+    public UUID GroupID;
+    public string PrincipalID;
+    public Dictionary<string, string> Data;
+}
 
-    public class RoleData
-    {
-        public UUID GroupID;
-        public UUID RoleID;
-        public Dictionary<string, string> Data;
-    }
+public class RoleData
+{
+    public UUID GroupID;
+    public UUID RoleID;
+    public Dictionary<string, string> Data;
+}
 
-    public class RoleMembershipData
-    {
-        public UUID GroupID;
-        public UUID RoleID;
-        public string PrincipalID;
-    }
+public class RoleMembershipData
+{
+    public UUID GroupID;
+    public UUID RoleID;
+    public string PrincipalID;
+}
 
-    public class PrincipalData
-    {
-        public string PrincipalID;
-        public UUID ActiveGroupID;
-    }
+public class PrincipalData
+{
+    public string PrincipalID;
+    public UUID ActiveGroupID;
+}
 
-    public class InvitationData
-    {
-        public UUID InviteID;
-        public UUID GroupID;
-        public UUID RoleID;
-        public string PrincipalID;
-        public Dictionary<string, string> Data;
-    }
+public class InvitationData
+{
+    public UUID InviteID;
+    public UUID GroupID;
+    public UUID RoleID;
+    public string PrincipalID;
+    public Dictionary<string, string> Data;
+}
 
-    public class NoticeData
-    {
-        public UUID GroupID;
-        public UUID NoticeID;
-        public Dictionary<string, string> Data;
-    }
+public class NoticeData
+{
+    public UUID GroupID;
+    public UUID NoticeID;
+    public Dictionary<string, string> Data;
+}
 
 
-    public interface IGroupsData
-    {
-        // groups table
-        bool StoreGroup(GroupData data);
-        GroupData RetrieveGroup(UUID groupID);
-        GroupData RetrieveGroup(string name);
-        GroupData[] RetrieveGroups(string pattern);
-        bool DeleteGroup(UUID groupID);
-        int GroupsCount();
+public interface IGroupsData
+{
+    // groups table
+    bool StoreGroup(GroupData data);
+    GroupData RetrieveGroup(UUID groupID);
+    GroupData RetrieveGroup(string name);
+    GroupData[] RetrieveGroups(string pattern);
+    bool DeleteGroup(UUID groupID);
+    int GroupsCount();
 
-        // membership table
-        MembershipData RetrieveMember(UUID groupID, string pricipalID);
-        MembershipData[] RetrieveMembers(UUID groupID);
-        MembershipData[] RetrieveMemberships(string pricipalID);
-        bool StoreMember(MembershipData data);
-        bool DeleteMember(UUID groupID, string pricipalID);
-        int MemberCount(UUID groupID);
+    // membership table
+    MembershipData RetrieveMember(UUID groupID, string pricipalID);
+    MembershipData[] RetrieveMembers(UUID groupID);
+    MembershipData[] RetrieveMemberships(string pricipalID);
+    bool StoreMember(MembershipData data);
+    bool DeleteMember(UUID groupID, string pricipalID);
+    int MemberCount(UUID groupID);
 
-        // roles table
-        bool StoreRole(RoleData data);
-        RoleData RetrieveRole(UUID groupID, UUID roleID);
-        RoleData[] RetrieveRoles(UUID groupID);
-        bool DeleteRole(UUID groupID, UUID roleID);
-        int RoleCount(UUID groupID);
+    // roles table
+    bool StoreRole(RoleData data);
+    RoleData RetrieveRole(UUID groupID, UUID roleID);
+    RoleData[] RetrieveRoles(UUID groupID);
+    bool DeleteRole(UUID groupID, UUID roleID);
+    int RoleCount(UUID groupID);
 
-        // rolememberhip table
-        RoleMembershipData[] RetrieveRolesMembers(UUID groupID);
-        RoleMembershipData[] RetrieveRoleMembers(UUID groupID, UUID roleID);
-        RoleMembershipData[] RetrieveMemberRoles(UUID groupID, string principalID);
-        RoleMembershipData RetrieveRoleMember(UUID groupID, UUID roleID, string principalID);
-        int RoleMemberCount(UUID groupID, UUID roleID);
-        bool StoreRoleMember(RoleMembershipData data);
-        bool DeleteRoleMember(RoleMembershipData data);
-        bool DeleteMemberAllRoles(UUID groupID, string principalID);
+    // rolememberhip table
+    RoleMembershipData[] RetrieveRolesMembers(UUID groupID);
+    RoleMembershipData[] RetrieveRoleMembers(UUID groupID, UUID roleID);
+    RoleMembershipData[] RetrieveMemberRoles(UUID groupID, string principalID);
+    RoleMembershipData RetrieveRoleMember(UUID groupID, UUID roleID, string principalID);
+    int RoleMemberCount(UUID groupID, UUID roleID);
+    bool StoreRoleMember(RoleMembershipData data);
+    bool DeleteRoleMember(RoleMembershipData data);
+    bool DeleteMemberAllRoles(UUID groupID, string principalID);
 
-        // principals table
-        bool StorePrincipal(PrincipalData data);
-        PrincipalData RetrievePrincipal(string principalID);
-        bool DeletePrincipal(string principalID);
+    // principals table
+    bool StorePrincipal(PrincipalData data);
+    PrincipalData RetrievePrincipal(string principalID);
+    bool DeletePrincipal(string principalID);
 
-        // invites table
-        bool StoreInvitation(InvitationData data);
-        InvitationData RetrieveInvitation(UUID inviteID);
-        InvitationData RetrieveInvitation(UUID groupID, string principalID);
-        bool DeleteInvite(UUID inviteID);
-        void DeleteOldInvites();
+    // invites table
+    bool StoreInvitation(InvitationData data);
+    InvitationData RetrieveInvitation(UUID inviteID);
+    InvitationData RetrieveInvitation(UUID groupID, string principalID);
+    bool DeleteInvite(UUID inviteID);
+    void DeleteOldInvites();
 
-        // notices table
-        bool StoreNotice(NoticeData data);
-        NoticeData RetrieveNotice(UUID noticeID);
-        NoticeData[] RetrieveNotices(UUID groupID);
-        bool DeleteNotice(UUID noticeID);
-        void DeleteOldNotices();
+    // notices table
+    bool StoreNotice(NoticeData data);
+    NoticeData RetrieveNotice(UUID noticeID);
+    NoticeData[] RetrieveNotices(UUID groupID);
+    bool DeleteNotice(UUID noticeID);
+    void DeleteOldNotices();
 
-        // combinations
-        MembershipData RetrievePrincipalGroupMembership(string principalID, UUID groupID);
-        MembershipData[] RetrievePrincipalGroupMemberships(string principalID);
+    // combinations
+    MembershipData RetrievePrincipalGroupMembership(string principalID, UUID groupID);
+    MembershipData[] RetrievePrincipalGroupMemberships(string principalID);
 
-        // Misc
-    }
+    // Misc
 }

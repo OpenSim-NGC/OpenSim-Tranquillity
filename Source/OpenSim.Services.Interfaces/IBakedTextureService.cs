@@ -25,14 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using Nini.Config;
+namespace OpenSim.Services.Interfaces;
 
-namespace OpenSim.Services.Interfaces
+public interface IBakedTextureService
 {
-    public interface IBakedTextureService
-    {
-        byte[] Get(string id);
-        void Store(string id, byte[] data, int datalenght);
-    }
+    byte[] Get(string id);
+    void Store(string id, byte[] data, int datalenght);
 }

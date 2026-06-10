@@ -25,14 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenSim.Framework;
 using OpenMetaverse;
 
-namespace OpenSim.Services.Interfaces
+namespace OpenSim.Services.Interfaces;
+
+public interface ILandService
 {
-    public interface ILandService
-    {
-        LandData GetLandData(UUID scopeID, ulong regionHandle, uint x, uint y, out byte regionAccess);
-    }
+    LandData GetLandData(UUID scopeID, ulong regionHandle, uint x, uint y, out byte regionAccess);
 }

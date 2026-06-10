@@ -29,17 +29,16 @@
 using System.Xml;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.DataSnapshot.Interfaces
-{
-    public delegate void ProviderStale(IDataSnapshotProvider provider);
+namespace OpenSim.Region.DataSnapshot.Interfaces;
 
-    public interface IDataSnapshotProvider
-    {
-        XmlNode RequestSnapshotData(XmlDocument document);
-        void Initialize(Scene scene, DataSnapshotManager parent);
-        Scene GetParentScene { get; }
-        String Name { get; }
-        bool Stale { get; set; }
-        event ProviderStale OnStale;
-    }
+public delegate void ProviderStale(IDataSnapshotProvider provider);
+
+public interface IDataSnapshotProvider
+{
+    XmlNode RequestSnapshotData(XmlDocument document);
+    void Initialize(Scene scene, DataSnapshotManager parent);
+    Scene GetParentScene { get; }
+    String Name { get; }
+    bool Stale { get; set; }
+    event ProviderStale OnStale;
 }

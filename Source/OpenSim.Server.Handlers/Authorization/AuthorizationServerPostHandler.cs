@@ -25,49 +25,38 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
 using System.Xml.Serialization;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Server.Handlers.Authorization
+namespace OpenSim.Server.Handlers.Authorization;
+
+public class AuthorizationServerPostHandler : BaseStreamHandler
 {
-    public class AuthorizationServerPostHandler : BaseStreamHandler
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private IAuthorizationService m_AuthorizationService;
+    private IAuthorizationService m_AuthorizationService;
 
-        public AuthorizationServerPostHandler(IAuthorizationService service) :
-                base("POST", "/authorization")
-        {
-            m_AuthorizationService = service;
-        }
+    public AuthorizationServerPostHandler(IAuthorizationService service) :
+            base("POST", "/authorization")
+    {
+        m_AuthorizationService = service;
+    }
 
-        protected override byte[] ProcessRequest(string path, Stream request,
-                IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            XmlSerializer xs = new XmlSerializer(typeof (AuthorizationRequest));
-            AuthorizationRequest Authorization = (AuthorizationRequest) xs.Deserialize(request);
+    protected override byte[] ProcessRequest(string path, Stream request,
+            IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        XmlSerializer xs = new XmlSerializer(typeof (AuthorizationRequest));
+        AuthorizationRequest Authorization = (AuthorizationRequest) xs.Deserialize(request);
 
-            string message = String.Empty;
-            bool authorized = m_AuthorizationService.IsAuthorizedForRegion(Authorization.ID, Authorization.FirstName, Authorization.SurName, Authorization.RegionID, out message);
+        string message = String.Empty;
+        bool authorized = m_AuthorizationService.IsAuthorizedForRegion(Authorization.ID, Authorization.FirstName, Authorization.SurName, Authorization.RegionID, out message);
 
-            AuthorizationResponse result = new AuthorizationResponse(authorized, Authorization.ID + " has been authorized");
+        AuthorizationResponse result = new AuthorizationResponse(authorized, Authorization.ID + " has been authorized");
 
-            xs = new XmlSerializer(typeof(AuthorizationResponse));
-            return ServerUtils.SerializeResult(xs, result);
+        xs = new XmlSerializer(typeof(AuthorizationResponse));
+        return ServerUtils.SerializeResult(xs, result);
 
-        }
     }
 }

@@ -30,56 +30,55 @@ using Nini.Config;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IOpenSimBase
 {
-    public interface IOpenSimBase
-    {
-        IConfigSource ConfigSource { get; }
-        IRegistryCore ApplicationRegistry { get; }
-        IEstateDataService EstateDataService { get; }
-        SceneManager SceneManager { get; }
+    IConfigSource ConfigSource { get; }
+    IRegistryCore ApplicationRegistry { get; }
+    IEstateDataService EstateDataService { get; }
+    SceneManager SceneManager { get; }
 
-        string GetVersionText();
-        void Shutdown();
+    string GetVersionText();
+    void Shutdown();
 
-        void CreateRegion(RegionInfo regionInfo, bool portadd_flag, out IScene scene);
-        void CreateRegion(RegionInfo regionInfo, out IScene scene);
-        void RemoveRegion(Scene scene, bool cleanup);
-        void CloseRegion(Scene scene);
-        bool PopulateRegionEstateInfo(RegionInfo regInfo);
-    }
+    void CreateRegion(RegionInfo regionInfo, bool portadd_flag, out IScene scene);
+    void CreateRegion(RegionInfo regionInfo, out IScene scene);
+    void RemoveRegion(Scene scene, bool cleanup);
+    void CloseRegion(Scene scene);
+    bool PopulateRegionEstateInfo(RegionInfo regInfo);
+}
+
+/// <summary>
+/// OpenSimulator Application Plugin framework interface
+/// </summary>
+public interface IApplicationPlugin : IPlugin
+{
+    /// <summary>
+    /// Initialize the Plugin
+    /// </summary>
+    /// <param name="openSim">The Application instance</param>
+    void Initialise(IOpenSimBase openSim);
 
     /// <summary>
-    /// OpenSimulator Application Plugin framework interface
+    /// Called when the application loading is completed
     /// </summary>
-    public interface IApplicationPlugin : IPlugin
-    {
-        /// <summary>
-        /// Initialize the Plugin
-        /// </summary>
-        /// <param name="openSim">The Application instance</param>
-        void Initialise(IOpenSimBase openSim);
+    void PostInitialise();
+}
 
-        /// <summary>
-        /// Called when the application loading is completed
-        /// </summary>
-        void PostInitialise();
+
+public class ApplicationPluginInitialiser : PluginInitialiserBase
+{
+    private IOpenSimBase server;
+
+    public ApplicationPluginInitialiser(IOpenSimBase s)
+    {
+        server = s;
     }
 
-
-    public class ApplicationPluginInitialiser : PluginInitialiserBase
+    public override void Initialise(IPlugin plugin)
     {
-        private IOpenSimBase server;
-
-        public ApplicationPluginInitialiser(IOpenSimBase s)
-        {
-            server = s;
-        }
-
-        public override void Initialise(IPlugin plugin)
-        {
-            IApplicationPlugin p = plugin as IApplicationPlugin;
-            p.Initialise(server);
-        }
+        IApplicationPlugin p = plugin as IApplicationPlugin;
+        p.Initialise(server);
     }
 }

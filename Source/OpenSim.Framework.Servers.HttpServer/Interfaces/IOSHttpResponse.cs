@@ -25,110 +25,108 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.IO;
 using System.Net;
 using System.Text;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public interface IOSHttpResponse
 {
-    public interface IOSHttpResponse
-    {
-        /// <summary>
-        /// Content type property.
-        /// </summary>
-        /// <remarks>
-        /// Setting this property will also set IsContentTypeSet to
-        /// true.
-        /// </remarks>
-        string ContentType { get; set; }
+    /// <summary>
+    /// Content type property.
+    /// </summary>
+    /// <remarks>
+    /// Setting this property will also set IsContentTypeSet to
+    /// true.
+    /// </remarks>
+    string ContentType { get; set; }
 
-        /// <summary>
-        /// Boolean property indicating whether the content type
-        /// property actively has been set.
-        /// </summary>
-        /// <remarks>
-        /// IsContentTypeSet will go away together with .NET base.
-        /// </remarks>
-        // public bool IsContentTypeSet
-        // {
-        //     get { return _contentTypeSet; }
-        // }
-        // private bool _contentTypeSet;
+    /// <summary>
+    /// Boolean property indicating whether the content type
+    /// property actively has been set.
+    /// </summary>
+    /// <remarks>
+    /// IsContentTypeSet will go away together with .NET base.
+    /// </remarks>
+    // public bool IsContentTypeSet
+    // {
+    //     get { return _contentTypeSet; }
+    // }
+    // private bool _contentTypeSet;
 
-        /// <summary>
-        /// Length of the body content; 0 if there is no body.
-        /// </summary>
-        long ContentLength { get; set; }
+    /// <summary>
+    /// Length of the body content; 0 if there is no body.
+    /// </summary>
+    long ContentLength { get; set; }
 
-        /// <summary>
-        /// Alias for ContentLength.
-        /// </summary>
-        long ContentLength64 { get; set; }
+    /// <summary>
+    /// Alias for ContentLength.
+    /// </summary>
+    long ContentLength64 { get; set; }
 
-        /// <summary>
-        /// Encoding of the body content.
-        /// </summary>
-        Encoding ContentEncoding { get; set; }
+    /// <summary>
+    /// Encoding of the body content.
+    /// </summary>
+    Encoding ContentEncoding { get; set; }
 
-        bool KeepAlive { get; set; }
+    bool KeepAlive { get; set; }
 
-        /// <summary>
-        /// Get or set the keep alive timeout property (default is
-        /// 20). Setting this to 0 also disables KeepAlive. Setting
-        /// this to something else but 0 also enable KeepAlive.
-        /// </summary>
-        int KeepAliveTimeout { get; set; }
+    /// <summary>
+    /// Get or set the keep alive timeout property (default is
+    /// 20). Setting this to 0 also disables KeepAlive. Setting
+    /// this to something else but 0 also enable KeepAlive.
+    /// </summary>
+    int KeepAliveTimeout { get; set; }
 
-        /// <summary>
-        /// Return the output stream feeding the body.
-        /// </summary>
-        /// <remarks>
-        /// On its way out...
-        /// </remarks>
-        Stream OutputStream { get; }
+    /// <summary>
+    /// Return the output stream feeding the body.
+    /// </summary>
+    /// <remarks>
+    /// On its way out...
+    /// </remarks>
+    Stream OutputStream { get; }
 
-        string ProtocolVersion { get; set; }
-        int Priority { get; set; }
-        byte[] RawBuffer { get; set; }
-        int RawBufferStart { get; set; }
-        int RawBufferLen { get; set; }
+    string ProtocolVersion { get; set; }
+    int Priority { get; set; }
+    byte[] RawBuffer { get; set; }
+    int RawBufferStart { get; set; }
+    int RawBufferLen { get; set; }
 
-        /// <summary>
-        /// Return the output stream feeding the body.
-        /// </summary>
-        Stream Body { get; }
+    /// <summary>
+    /// Return the output stream feeding the body.
+    /// </summary>
+    Stream Body { get; }
 
-        /// <summary>
-        /// Chunk transfers.
-        /// </summary>
-        bool SendChunked { get; set; }
+    /// <summary>
+    /// Chunk transfers.
+    /// </summary>
+    bool SendChunked { get; set; }
 
-        /// <summary>
-        /// HTTP status code.
-        /// </summary>
-        int StatusCode { get; set; }
+    /// <summary>
+    /// HTTP status code.
+    /// </summary>
+    int StatusCode { get; set; }
 
-        /// <summary>
-        /// HTTP status description.
-        /// </summary>
-        string StatusDescription { get; set; }
+    /// <summary>
+    /// HTTP status description.
+    /// </summary>
+    string StatusDescription { get; set; }
 
-        double RequestTS { get; }
+    double RequestTS { get; }
 
-        /// <summary>
-        /// Set response as a http redirect
-        /// </summary>
-        /// <param name="url">redirection target url</param>
-        /// <param name="redirStatusCode">the response Status, must be Found, Redirect, Moved,MovedPermanently,RedirectKeepVerb, RedirectMethod, TemporaryRedirect. Defaults to Redirect</param>
-        void Redirect(string url, HttpStatusCode redirStatusCode = HttpStatusCode.Redirect);
+    /// <summary>
+    /// Set response as a http redirect
+    /// </summary>
+    /// <param name="url">redirection target url</param>
+    /// <param name="redirStatusCode">the response Status, must be Found, Redirect, Moved,MovedPermanently,RedirectKeepVerb, RedirectMethod, TemporaryRedirect. Defaults to Redirect</param>
+    void Redirect(string url, HttpStatusCode redirStatusCode = HttpStatusCode.Redirect);
 
-        /// <summary>
-        /// Add a header field and content to the response.
-        /// </summary>
-        /// <param name="key">string containing the header field
-        /// name</param>
-        /// <param name="value">string containing the header field
-        /// value</param>
-        void AddHeader(string key, string value);
-    }
+    /// <summary>
+    /// Add a header field and content to the response.
+    /// </summary>
+    /// <param name="key">string containing the header field
+    /// name</param>
+    /// <param name="value">string containing the header field
+    /// value</param>
+    void AddHeader(string key, string value);
 }

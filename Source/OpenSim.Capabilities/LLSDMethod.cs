@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Framework.Capabilities
-{
-    public delegate TResponse LLSDMethod<TRequest, TResponse>(TRequest request);
-}
+namespace OpenSim.Framework.Capabilities;
+
+public delegate TResponse LLSDMethod<TRequest, TResponse>(TRequest request);

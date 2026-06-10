@@ -31,230 +31,229 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.PhysicsModules.SharedBase;
 
-namespace OpenSim.Region.OptionalModules.PhysicsParameters
+namespace OpenSim.Region.OptionalModules.PhysicsParameters;
+
+/// <summary>
+/// </summary>
+/// <remarks>
+/// </remarks>
+public class PhysicsParameters : ISharedRegionModule
 {
-    /// <summary>
-    /// </summary>
-    /// <remarks>
-    /// </remarks>
-    public class PhysicsParameters : ISharedRegionModule
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 //        private static string LogHeader = "[PHYSICS PARAMETERS]";
 
-        private List<Scene> m_scenes = new List<Scene>();
-        private static bool m_commandsLoaded = false;
+    private List<Scene> m_scenes = new List<Scene>();
+    private static bool m_commandsLoaded = false;
 
-        #region ISharedRegionModule
-        public string Name { get { return "Runtime Physics Parameter Module"; } }
+    #region ISharedRegionModule
+    public string Name { get { return "Runtime Physics Parameter Module"; } }
 
-        public Type ReplaceableInterface { get { return null; } }
+    public Type ReplaceableInterface { get { return null; } }
 
-        public void Initialise(IConfigSource source)
+    public void Initialise(IConfigSource source)
+    {
+        // m_log.DebugFormat("{0}: INITIALIZED MODULE", LogHeader);
+    }
+
+    public void PostInitialise()
+    {
+        // m_log.DebugFormat("[{0}: POST INITIALIZED MODULE", LogHeader);
+        InstallInterfaces();
+    }
+
+    public void Close()
+    {
+        // m_log.DebugFormat("{0}: CLOSED MODULE", LogHeader);
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        // m_log.DebugFormat("{0}: REGION {1} ADDED", LogHeader, scene.RegionInfo.RegionName);
+        m_scenes.Add(scene);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        // m_log.DebugFormat("{0}: REGION {1} REMOVED", LogHeader, scene.RegionInfo.RegionName);
+        if (m_scenes.Contains(scene))
+            m_scenes.Remove(scene);
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        // m_log.DebugFormat("{0}: REGION {1} LOADED", LogHeader, scene.RegionInfo.RegionName);
+    }
+    #endregion INonSharedRegionModule
+
+    private const string getInvocation = "physics get [<param>|ALL]";
+    private const string setInvocation = "physics set <param> [<value>|TRUE|FALSE] [localID|ALL]";
+    private const string listInvocation = "physics list";
+    private void InstallInterfaces()
+    {
+        if (!m_commandsLoaded)
         {
-            // m_log.DebugFormat("{0}: INITIALIZED MODULE", LogHeader);
+            MainConsole.Instance.Commands.AddCommand(
+                "Regions", false, "physics set",
+                setInvocation,
+                "Set physics parameter from currently selected region",
+                ProcessPhysicsSet);
+
+            MainConsole.Instance.Commands.AddCommand(
+                "Regions", false, "physics get",
+                getInvocation,
+                "Get physics parameter from currently selected region",
+                ProcessPhysicsGet);
+
+            MainConsole.Instance.Commands.AddCommand(
+                "Regions", false, "physics list",
+                listInvocation,
+                "List settable physics parameters",
+                ProcessPhysicsList);
+
+            m_commandsLoaded = true;
+        }
+    }
+
+    // TODO: extend get so you can get a value from an individual localID
+    private void ProcessPhysicsGet(string module, string[] cmdparms)
+    {
+        if (cmdparms.Length != 3)
+        {
+            WriteError("Parameter count error. Invocation: " + getInvocation);
+            return;
+        }
+        string parm = cmdparms[2];
+
+        if (SceneManager.Instance == null || SceneManager.Instance.CurrentScene == null)
+        {
+            WriteError("Error: no region selected. Use 'change region' to select a region.");
+            return;
         }
 
-        public void PostInitialise()
+        Scene scene = SceneManager.Instance.CurrentScene;
+        IPhysicsParameters physScene = scene.PhysicsScene as IPhysicsParameters;
+        if (physScene != null)
         {
-            // m_log.DebugFormat("[{0}: POST INITIALIZED MODULE", LogHeader);
-            InstallInterfaces();
-        }
-
-        public void Close()
-        {
-            // m_log.DebugFormat("{0}: CLOSED MODULE", LogHeader);
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            // m_log.DebugFormat("{0}: REGION {1} ADDED", LogHeader, scene.RegionInfo.RegionName);
-            m_scenes.Add(scene);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            // m_log.DebugFormat("{0}: REGION {1} REMOVED", LogHeader, scene.RegionInfo.RegionName);
-            if (m_scenes.Contains(scene))
-                m_scenes.Remove(scene);
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            // m_log.DebugFormat("{0}: REGION {1} LOADED", LogHeader, scene.RegionInfo.RegionName);
-        }
-        #endregion INonSharedRegionModule
-
-        private const string getInvocation = "physics get [<param>|ALL]";
-        private const string setInvocation = "physics set <param> [<value>|TRUE|FALSE] [localID|ALL]";
-        private const string listInvocation = "physics list";
-        private void InstallInterfaces()
-        {
-            if (!m_commandsLoaded)
+            if (parm.ToLower() == "all")
             {
-                MainConsole.Instance.Commands.AddCommand(
-                    "Regions", false, "physics set",
-                    setInvocation,
-                    "Set physics parameter from currently selected region",
-                    ProcessPhysicsSet);
-
-                MainConsole.Instance.Commands.AddCommand(
-                    "Regions", false, "physics get",
-                    getInvocation,
-                    "Get physics parameter from currently selected region",
-                    ProcessPhysicsGet);
-
-                MainConsole.Instance.Commands.AddCommand(
-                    "Regions", false, "physics list",
-                    listInvocation,
-                    "List settable physics parameters",
-                    ProcessPhysicsList);
-
-                m_commandsLoaded = true;
-            }
-        }
-
-        // TODO: extend get so you can get a value from an individual localID
-        private void ProcessPhysicsGet(string module, string[] cmdparms)
-        {
-            if (cmdparms.Length != 3)
-            {
-                WriteError("Parameter count error. Invocation: " + getInvocation);
-                return;
-            }
-            string parm = cmdparms[2];
-
-            if (SceneManager.Instance == null || SceneManager.Instance.CurrentScene == null)
-            {
-                WriteError("Error: no region selected. Use 'change region' to select a region.");
-                return;
-            }
-
-            Scene scene = SceneManager.Instance.CurrentScene;
-            IPhysicsParameters physScene = scene.PhysicsScene as IPhysicsParameters;
-            if (physScene != null)
-            {
-                if (parm.ToLower() == "all")
+                foreach (PhysParameterEntry ppe in physScene.GetParameterList())
                 {
-                    foreach (PhysParameterEntry ppe in physScene.GetParameterList())
+                    string val = string.Empty;
+                    if (physScene.GetPhysicsParameter(ppe.name, out val))
                     {
-                        string val = string.Empty;
-                        if (physScene.GetPhysicsParameter(ppe.name, out val))
-                        {
-                            WriteOut("  {0}/{1} = {2}", scene.RegionInfo.RegionName, ppe.name, val);
-                        }
-                        else
-                        {
-                            WriteOut("  {0}/{1} = {2}", scene.RegionInfo.RegionName, ppe.name, "unknown");
-                        }
+                        WriteOut("  {0}/{1} = {2}", scene.RegionInfo.RegionName, ppe.name, val);
                     }
+                    else
+                    {
+                        WriteOut("  {0}/{1} = {2}", scene.RegionInfo.RegionName, ppe.name, "unknown");
+                    }
+                }
+            }
+            else
+            {
+                string val = string.Empty;
+                if (physScene.GetPhysicsParameter(parm, out val))
+                {
+                    WriteOut("  {0}/{1} = {2}", scene.RegionInfo.RegionName, parm, val);
                 }
                 else
                 {
-                    string val = string.Empty;
-                    if (physScene.GetPhysicsParameter(parm, out val))
-                    {
-                        WriteOut("  {0}/{1} = {2}", scene.RegionInfo.RegionName, parm, val);
-                    }
-                    else
-                    {
-                        WriteError("Failed fetch of parameter '{0}' from region '{1}'", parm, scene.RegionInfo.RegionName);
-                    }
+                    WriteError("Failed fetch of parameter '{0}' from region '{1}'", parm, scene.RegionInfo.RegionName);
                 }
             }
-            else
+        }
+        else
+        {
+            WriteError("Region '{0}' physics engine has no gettable physics parameters", scene.RegionInfo.RegionName);
+        }
+        return;
+    }
+
+    private void ProcessPhysicsSet(string module, string[] cmdparms)
+    {
+        if (cmdparms.Length < 4 || cmdparms.Length > 5)
+        {
+            WriteError("Parameter count error. Invocation: " + getInvocation);
+            return;
+        }
+        string parm = "xxx";
+        string valparm = String.Empty;
+        uint localID = (uint)PhysParameterEntry.APPLY_TO_NONE;  // set default value
+        try
+        {
+            parm = cmdparms[2];
+            valparm = cmdparms[3].ToLower();
+            if (cmdparms.Length > 4)
             {
-                WriteError("Region '{0}' physics engine has no gettable physics parameters", scene.RegionInfo.RegionName);
+                if (cmdparms[4].ToLower() == "all")
+                    localID = (uint)PhysParameterEntry.APPLY_TO_ALL;
+                else
+                    localID = uint.Parse(cmdparms[2], Culture.NumberFormatInfo);
             }
+        }
+        catch
+        {
+            WriteError("  Error parsing parameters. Invocation: " + setInvocation);
             return;
         }
 
-        private void ProcessPhysicsSet(string module, string[] cmdparms)
+        if (SceneManager.Instance == null || SceneManager.Instance.CurrentScene == null)
         {
-            if (cmdparms.Length < 4 || cmdparms.Length > 5)
-            {
-                WriteError("Parameter count error. Invocation: " + getInvocation);
-                return;
-            }
-            string parm = "xxx";
-            string valparm = String.Empty;
-            uint localID = (uint)PhysParameterEntry.APPLY_TO_NONE;  // set default value
-            try
-            {
-                parm = cmdparms[2];
-                valparm = cmdparms[3].ToLower();
-                if (cmdparms.Length > 4)
-                {
-                    if (cmdparms[4].ToLower() == "all")
-                        localID = (uint)PhysParameterEntry.APPLY_TO_ALL;
-                    else
-                        localID = uint.Parse(cmdparms[2], Culture.NumberFormatInfo);
-                }
-            }
-            catch
-            {
-                WriteError("  Error parsing parameters. Invocation: " + setInvocation);
-                return;
-            }
-
-            if (SceneManager.Instance == null || SceneManager.Instance.CurrentScene == null)
-            {
-                WriteError("Error: no region selected. Use 'change region' to select a region.");
-                return;
-            }
-
-            Scene scene = SceneManager.Instance.CurrentScene;
-            IPhysicsParameters physScene = scene.PhysicsScene as IPhysicsParameters;
-            if (physScene != null)
-            {
-                if (!physScene.SetPhysicsParameter(parm, valparm, localID))
-                {
-                    WriteError("Failed set of parameter '{0}' for region '{1}'", parm, scene.RegionInfo.RegionName);
-                }
-            }
-            else
-            {
-                WriteOut("Region '{0}'s physics engine has no settable physics parameters", scene.RegionInfo.RegionName);
-            }
+            WriteError("Error: no region selected. Use 'change region' to select a region.");
             return;
         }
 
-        private void ProcessPhysicsList(string module, string[] cmdparms)
+        Scene scene = SceneManager.Instance.CurrentScene;
+        IPhysicsParameters physScene = scene.PhysicsScene as IPhysicsParameters;
+        if (physScene != null)
         {
-            if (SceneManager.Instance == null || SceneManager.Instance.CurrentScene == null)
+            if (!physScene.SetPhysicsParameter(parm, valparm, localID))
             {
-                WriteError("Error: no region selected. Use 'change region' to select a region.");
-                return;
+                WriteError("Failed set of parameter '{0}' for region '{1}'", parm, scene.RegionInfo.RegionName);
             }
-            Scene scene = SceneManager.Instance.CurrentScene;
+        }
+        else
+        {
+            WriteOut("Region '{0}'s physics engine has no settable physics parameters", scene.RegionInfo.RegionName);
+        }
+        return;
+    }
 
-            IPhysicsParameters physScene = scene.PhysicsScene as IPhysicsParameters;
-            if (physScene != null)
-            {
-                WriteOut("Available physics parameters:");
-                PhysParameterEntry[] parms = physScene.GetParameterList();
-                foreach (PhysParameterEntry ent in parms)
-                {
-                    WriteOut("   {0}: {1}", ent.name, ent.desc);
-                }
-            }
-            else
-            {
-                WriteError("Current regions's physics engine has no settable physics parameters");
-            }
+    private void ProcessPhysicsList(string module, string[] cmdparms)
+    {
+        if (SceneManager.Instance == null || SceneManager.Instance.CurrentScene == null)
+        {
+            WriteError("Error: no region selected. Use 'change region' to select a region.");
             return;
         }
+        Scene scene = SceneManager.Instance.CurrentScene;
 
-        private void WriteOut(string msg, params object[] args)
+        IPhysicsParameters physScene = scene.PhysicsScene as IPhysicsParameters;
+        if (physScene != null)
         {
-            // m_log.InfoFormat(msg, args);
-            MainConsole.Instance.Output(msg, args);
+            WriteOut("Available physics parameters:");
+            PhysParameterEntry[] parms = physScene.GetParameterList();
+            foreach (PhysParameterEntry ent in parms)
+            {
+                WriteOut("   {0}: {1}", ent.name, ent.desc);
+            }
         }
+        else
+        {
+            WriteError("Current regions's physics engine has no settable physics parameters");
+        }
+        return;
+    }
 
-        private void WriteError(string msg, params object[] args)
-        {
-            // m_log.ErrorFormat(msg, args);
-            MainConsole.Instance.Output(msg, args);
-        }
+    private void WriteOut(string msg, params object[] args)
+    {
+        // m_log.InfoFormat(msg, args);
+        MainConsole.Instance.Output(msg, args);
+    }
+
+    private void WriteError(string msg, params object[] args)
+    {
+        // m_log.ErrorFormat(msg, args);
+        MainConsole.Instance.Output(msg, args);
     }
 }

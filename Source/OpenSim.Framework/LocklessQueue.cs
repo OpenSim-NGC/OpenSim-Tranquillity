@@ -24,118 +24,114 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Threading;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+public class LocklessQueue<T>
 {
-    public class LocklessQueue<T>
+    private sealed class SingleLinkNode
     {
-        private sealed class SingleLinkNode
+        public SingleLinkNode Next;
+        public T Item;
+    }
+
+    SingleLinkNode head;
+    SingleLinkNode tail;
+    int count;
+
+    public virtual int Count { get { return count; } }
+
+    public LocklessQueue()
+    {
+        Init();
+    }
+
+    public void Enqueue(T item)
+    {
+        SingleLinkNode oldTail = null;
+        SingleLinkNode oldTailNext;
+
+        SingleLinkNode newNode = new SingleLinkNode();
+        newNode.Item = item;
+
+        bool newNodeWasAdded = false;
+
+        while (!newNodeWasAdded)
         {
-            public SingleLinkNode Next;
-            public T Item;
-        }
+            oldTail = tail;
+            oldTailNext = oldTail.Next;
 
-        SingleLinkNode head;
-        SingleLinkNode tail;
-        int count;
-
-        public virtual int Count { get { return count; } }
-
-        public LocklessQueue()
-        {
-            Init();
-        }
-
-        public void Enqueue(T item)
-        {
-            SingleLinkNode oldTail = null;
-            SingleLinkNode oldTailNext;
-
-            SingleLinkNode newNode = new SingleLinkNode();
-            newNode.Item = item;
-
-            bool newNodeWasAdded = false;
-
-            while (!newNodeWasAdded)
+            if (tail == oldTail)
             {
-                oldTail = tail;
-                oldTailNext = oldTail.Next;
-
-                if (tail == oldTail)
-                {
-                    if (oldTailNext == null)
-                        newNodeWasAdded = CAS(ref tail.Next, null, newNode);
-                    else
-                        CAS(ref tail, oldTail, oldTailNext);
-                }
+                if (oldTailNext == null)
+                    newNodeWasAdded = CAS(ref tail.Next, null, newNode);
+                else
+                    CAS(ref tail, oldTail, oldTailNext);
             }
-
-            CAS(ref tail, oldTail, newNode);
-            Interlocked.Increment(ref count);
         }
 
-        public virtual bool Dequeue(out T item)
+        CAS(ref tail, oldTail, newNode);
+        Interlocked.Increment(ref count);
+    }
+
+    public virtual bool Dequeue(out T item)
+    {
+        item = default(T);
+        SingleLinkNode oldHead = null;
+        bool haveAdvancedHead = false;
+
+        while (!haveAdvancedHead)
         {
-            item = default(T);
-            SingleLinkNode oldHead = null;
-            bool haveAdvancedHead = false;
+            oldHead = head;
+            SingleLinkNode oldTail = tail;
+            SingleLinkNode oldHeadNext = oldHead.Next;
 
-            while (!haveAdvancedHead)
+            if (oldHead == head)
             {
-                oldHead = head;
-                SingleLinkNode oldTail = tail;
-                SingleLinkNode oldHeadNext = oldHead.Next;
-
-                if (oldHead == head)
+                if (oldHead == oldTail)
                 {
-                    if (oldHead == oldTail)
+                    if (oldHeadNext == null)
                     {
-                        if (oldHeadNext == null)
-                        {
-                            count = 0;
-                            return false;
-                        }
-
-                        CAS(ref tail, oldTail, oldHeadNext);
+                        count = 0;
+                        return false;
                     }
-                    else
+
+                    CAS(ref tail, oldTail, oldHeadNext);
+                }
+                else
+                {
+                    item = oldHeadNext.Item;
+                    haveAdvancedHead = CAS(ref head, oldHead, oldHeadNext);
+                    if (haveAdvancedHead)
                     {
-                        item = oldHeadNext.Item;
-                        haveAdvancedHead = CAS(ref head, oldHead, oldHeadNext);
-                        if (haveAdvancedHead)
-                        {
-                            oldHeadNext.Item = default(T);
-                            oldHead.Next = null;
-                        }
+                        oldHeadNext.Item = default(T);
+                        oldHead.Next = null;
                     }
                 }
             }
-
-            Interlocked.Decrement(ref count);
-            return true;
         }
 
-        public void Clear()
-        {
-            // ugly
-            T item;
-            while(Dequeue(out item));
-            Init();
-        }
+        Interlocked.Decrement(ref count);
+        return true;
+    }
 
-        private void Init()
-        {
-            count = 0;
-            head = tail = new SingleLinkNode();
-        }
+    public void Clear()
+    {
+        // ugly
+        T item;
+        while(Dequeue(out item));
+        Init();
+    }
 
-        private static bool CAS(ref SingleLinkNode location, SingleLinkNode comparand, SingleLinkNode newValue)
-        {
-            return
-                (object)comparand ==
-                (object)Interlocked.CompareExchange<SingleLinkNode>(ref location, newValue, comparand);
-        }
+    private void Init()
+    {
+        count = 0;
+        head = tail = new SingleLinkNode();
+    }
+
+    private static bool CAS(ref SingleLinkNode location, SingleLinkNode comparand, SingleLinkNode newValue)
+    {
+        return
+            (object)comparand ==
+            (object)Interlocked.CompareExchange<SingleLinkNode>(ref location, newValue, comparand);
     }
 }

@@ -25,82 +25,79 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Diagnostics;
 using System.Text;
-using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Framework.Monitoring
+namespace OpenSim.Framework.Monitoring;
+
+/// <summary>
+/// Statistics which all collectors are interested in reporting
+/// </summary>
+public class BaseStatsCollector : IStatsCollector
 {
-    /// <summary>
-    /// Statistics which all collectors are interested in reporting
-    /// </summary>
-    public class BaseStatsCollector : IStatsCollector
+    public virtual string Report(IScene scene = null)
     {
-        public virtual string Report(IScene scene = null)
+        return string.Empty;
+    }
+
+    public virtual string Report()
+    {
+        StringBuilder sb = new StringBuilder(Environment.NewLine);
+        sb.AppendFormat(
+            "Heap allocated:  {0}MB \t allocation rate (last/avg): {1}/{2}MB/s\n",
+            Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0),
+            Math.Round((MemoryWatchdog.LastHeapAllocationRate * 1000) / 1048576.0, 3),
+            Math.Round((MemoryWatchdog.AverageHeapAllocationRate * 1000) / 1048576.0, 3));
+
+        GCMemoryInfo gcmem = GC.GetGCMemoryInfo();
+        sb.AppendFormat(
+            "GCTotalCommited: {0}MB \t GCTotalAvaiable {1}MB \t GCHMthreshold {2}MB\n",
+            Math.Round(gcmem.TotalCommittedBytes / 1024.0 / 1024.0),
+            Math.Round(gcmem.TotalAvailableMemoryBytes / 1024.0 / 1024.0),
+        Math.Round(gcmem.HighMemoryLoadThresholdBytes / 1024.0 / 1024.0));
+
+        try
         {
-            return string.Empty;
-        }
-
-        public virtual string Report()
-        {
-            StringBuilder sb = new StringBuilder(Environment.NewLine);
-            sb.AppendFormat(
-                "Heap allocated:  {0}MB \t allocation rate (last/avg): {1}/{2}MB/s\n",
-                Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0),
-                Math.Round((MemoryWatchdog.LastHeapAllocationRate * 1000) / 1048576.0, 3),
-                Math.Round((MemoryWatchdog.AverageHeapAllocationRate * 1000) / 1048576.0, 3));
-
-            GCMemoryInfo gcmem = GC.GetGCMemoryInfo();
-            sb.AppendFormat(
-                "GCTotalCommited: {0}MB \t GCTotalAvaiable {1}MB \t GCHMthreshold {2}MB\n",
-                Math.Round(gcmem.TotalCommittedBytes / 1024.0 / 1024.0),
-                Math.Round(gcmem.TotalAvailableMemoryBytes / 1024.0 / 1024.0),
-            Math.Round(gcmem.HighMemoryLoadThresholdBytes / 1024.0 / 1024.0));
-
-            try
+            using (Process myprocess = Process.GetCurrentProcess())
             {
-                using (Process myprocess = Process.GetCurrentProcess())
-                {
-                    sb.AppendFormat(
-                            "Process memory:      Physical {0}MB \t Paged {1}MB\n",
-                            Math.Round(myprocess.WorkingSet64 / 1024.0 / 1024.0),
-                            Math.Round(myprocess.PagedMemorySize64 / 1024.0 / 1024.0));
-                    sb.AppendFormat(
-                            "Peak process memory: Physical {0}MB \t Paged {1}MB \t\n",
-                            Math.Round(myprocess.PeakWorkingSet64 / 1024.0 / 1024.0),
-                            Math.Round(myprocess.PeakPagedMemorySize64 / 1024.0 / 1024.0));
-                    sb.AppendFormat("\nTotal process Threads {0}\n", myprocess.Threads.Count);
-                }
+                sb.AppendFormat(
+                        "Process memory:      Physical {0}MB \t Paged {1}MB\n",
+                        Math.Round(myprocess.WorkingSet64 / 1024.0 / 1024.0),
+                        Math.Round(myprocess.PagedMemorySize64 / 1024.0 / 1024.0));
+                sb.AppendFormat(
+                        "Peak process memory: Physical {0}MB \t Paged {1}MB \t\n",
+                        Math.Round(myprocess.PeakWorkingSet64 / 1024.0 / 1024.0),
+                        Math.Round(myprocess.PeakPagedMemorySize64 / 1024.0 / 1024.0));
+                sb.AppendFormat("\nTotal process Threads {0}\n", myprocess.Threads.Count);
             }
-            catch
-            { }
-            return sb.ToString();
         }
+        catch
+        { }
+        return sb.ToString();
+    }
 
-        public virtual string XReport(string uptime, string version)
-        {
-            return (string)Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0).ToString();
-        }
+    public virtual string XReport(string uptime, string version)
+    {
+        return (string)Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0).ToString();
+    }
 
-        public virtual OSDMap OReport(string uptime, string version)
-        {
-            OSDMap ret = new OSDMap();
-            ret.Add("TotalMemory", new OSDReal(Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0)));
-            return ret;
-        }
+    public virtual OSDMap OReport(string uptime, string version)
+    {
+        OSDMap ret = new OSDMap();
+        ret.Add("TotalMemory", new OSDReal(Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0)));
+        return ret;
+    }
 
-        public virtual string XReport(string uptime, string version, string scene)
-        {
-            return (string)Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0).ToString();
-        }
+    public virtual string XReport(string uptime, string version, string scene)
+    {
+        return (string)Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0).ToString();
+    }
 
-        public virtual OSDMap OReport(string uptime, string version, string scene)
-        {
-            OSDMap ret = new OSDMap();
-            ret.Add("TotalMemory", new OSDReal(Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0)));
-            return ret;
-        }
+    public virtual OSDMap OReport(string uptime, string version, string scene)
+    {
+        OSDMap ret = new OSDMap();
+        ret.Add("TotalMemory", new OSDReal(Math.Round(GC.GetTotalMemory(false) / 1024.0 / 1024.0)));
+        return ret;
     }
 }

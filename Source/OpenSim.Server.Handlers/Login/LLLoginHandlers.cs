@@ -25,289 +25,279 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.IO;
 using System.Reflection;
 using System.Net;
-using System.Text;
-
-using OpenSim.Server.Base;
-using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
-using OpenSim.Framework.Servers.HttpServer;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using Nwc.XmlRpc;
-using Nini.Config;
 using log4net;
 
 
-namespace OpenSim.Server.Handlers.Login
+namespace OpenSim.Server.Handlers.Login;
+
+public class LLLoginHandlers
 {
-    public class LLLoginHandlers
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private ILoginService m_LocalService;
+    private bool m_Proxy;
+
+
+    public LLLoginHandlers(ILoginService service, bool hasProxy)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_LocalService = service;
+        m_Proxy = hasProxy;
+    }
 
-        private ILoginService m_LocalService;
-        private bool m_Proxy;
-
-
-        public LLLoginHandlers(ILoginService service, bool hasProxy)
+    public XmlRpcResponse HandleXMLRPCLogin(XmlRpcRequest request, IPEndPoint remoteClient)
+    {
+        Hashtable requestData = (Hashtable)request.Params[0];
+        if (request.Params[3] != null)
         {
-            m_LocalService = service;
-            m_Proxy = hasProxy;
+            IPEndPoint ep = Util.GetClientIPFromXFF((string)request.Params[3]);
+            if (ep != null)
+                // Bang!
+                remoteClient = ep;
         }
 
-        public XmlRpcResponse HandleXMLRPCLogin(XmlRpcRequest request, IPEndPoint remoteClient)
+        if (requestData != null)
         {
-            Hashtable requestData = (Hashtable)request.Params[0];
-            if (request.Params[3] != null)
-            {
-                IPEndPoint ep = Util.GetClientIPFromXFF((string)request.Params[3]);
-                if (ep != null)
-                    // Bang!
-                    remoteClient = ep;
-            }
+            // Debug code to show exactly what login parameters the viewer is sending us.
+            // TODO: Extract into a method that can be generally applied if one doesn't already exist.
+            // foreach (string key in requestData.Keys)
+            // {
+            //     object value = requestData[key];
+            //     Console.WriteLine("{0}:{1}", key, value);
+            //     if (value is ArrayList)
+            //     {
+            //         ICollection col = value as ICollection;
+            //         foreach (object item in col)
+            //             Console.WriteLine("  {0}", item);
+            //     }
+            // }
 
-            if (requestData != null)
+            if (requestData.ContainsKey("first") && requestData["first"] != null &&
+                requestData.ContainsKey("last") && requestData["last"] != null && (
+                    (requestData.ContainsKey("passwd") && requestData["passwd"] != null) ||
+                    (!requestData.ContainsKey("passwd") && requestData.ContainsKey("web_login_key") && requestData["web_login_key"] != null && requestData["web_login_key"].ToString() != UUID.ZeroString)
+                ))
             {
-                // Debug code to show exactly what login parameters the viewer is sending us.
-                // TODO: Extract into a method that can be generally applied if one doesn't already exist.
-                // foreach (string key in requestData.Keys)
-                // {
-                //     object value = requestData[key];
-                //     Console.WriteLine("{0}:{1}", key, value);
-                //     if (value is ArrayList)
-                //     {
-                //         ICollection col = value as ICollection;
-                //         foreach (object item in col)
-                //             Console.WriteLine("  {0}", item);
-                //     }
-                // }
-
-                if (requestData.ContainsKey("first") && requestData["first"] != null &&
-                    requestData.ContainsKey("last") && requestData["last"] != null && (
-                        (requestData.ContainsKey("passwd") && requestData["passwd"] != null) ||
-                        (!requestData.ContainsKey("passwd") && requestData.ContainsKey("web_login_key") && requestData["web_login_key"] != null && requestData["web_login_key"].ToString() != UUID.ZeroString)
-                    ))
+                string first = requestData["first"].ToString();
+                string last = requestData["last"].ToString();
+                string passwd = null;
+                if (requestData.ContainsKey("passwd"))
                 {
-                    string first = requestData["first"].ToString();
-                    string last = requestData["last"].ToString();
-                    string passwd = null;
-                    if (requestData.ContainsKey("passwd"))
-                    {
-                        passwd = requestData["passwd"].ToString();
-                    }
-                    else if (requestData.ContainsKey("web_login_key"))
-                    {
-                        passwd = "$1$" + requestData["web_login_key"].ToString();
-                        m_log.InfoFormat("[LOGIN]: XMLRPC Login Req key {0}", passwd);
-                    }
-                    string startLocation = string.Empty;
-                    UUID scopeID = UUID.Zero;
-                    if (requestData["scope_id"] != null)
-                        scopeID = new UUID(requestData["scope_id"].ToString());
-                    if (requestData.ContainsKey("start"))
-                        startLocation = requestData["start"].ToString();
-
-                    string clientVersion = "Unknown";
-                    if (requestData.Contains("version") && requestData["version"] != null)
-                        clientVersion = requestData["version"].ToString();
-                    // We should do something interesting with the client version...
-
-                    string channel = "Unknown";
-                    if (requestData.Contains("channel") && requestData["channel"] != null)
-                        channel = requestData["channel"].ToString();
-
-                    string mac = "Unknown";
-                    if (requestData.Contains("mac") && requestData["mac"] != null)
-                        mac = requestData["mac"].ToString();
-
-                    string id0 = "Unknown";
-                    if (requestData.Contains("id0") && requestData["id0"] != null)
-                        id0 = requestData["id0"].ToString();
-
-                    //m_log.InfoFormat("[LOGIN]: XMLRPC Login Requested for {0} {1}, starting in {2}, using {3}", first, last, startLocation, clientVersion);
-
-                    LoginResponse reply = null;
-                    reply = m_LocalService.Login(first, last, passwd, startLocation, scopeID, clientVersion, channel, mac, id0, remoteClient);
-
-                    XmlRpcResponse response = new XmlRpcResponse();
-                    response.Value = reply.ToHashtable();
-                    return response;
-
+                    passwd = requestData["passwd"].ToString();
                 }
-            }
-
-            return FailedXMLRPCResponse();
-
-        }
-        public XmlRpcResponse HandleXMLRPCLoginBlocked(XmlRpcRequest request, IPEndPoint client)
-        {
-            XmlRpcResponse response = new XmlRpcResponse();
-            Hashtable resp = new Hashtable();
-
-            resp["reason"] = "presence";
-            resp["message"] = "Logins are currently restricted. Please try again later.";
-            resp["login"] = "false";
-            response.Value = resp;
-            return response;
-        }
-
-        public XmlRpcResponse HandleXMLRPCSetLoginLevel(XmlRpcRequest request, IPEndPoint remoteClient)
-        {
-            Hashtable requestData = (Hashtable)request.Params[0];
-
-            if (requestData != null)
-            {
-                if (requestData.ContainsKey("first") && requestData["first"] != null &&
-                    requestData.ContainsKey("last") && requestData["last"] != null &&
-                    requestData.ContainsKey("level") && requestData["level"] != null &&
-                    requestData.ContainsKey("passwd") && requestData["passwd"] != null)
+                else if (requestData.ContainsKey("web_login_key"))
                 {
-                    string first = requestData["first"].ToString();
-                    string last = requestData["last"].ToString();
-                    string passwd = requestData["passwd"].ToString();
-                    int level = Int32.Parse(requestData["level"].ToString());
-
-                    m_log.InfoFormat("[LOGIN]: XMLRPC Set Level to {2} Requested by {0} {1}", first, last, level);
-
-                    Hashtable reply = m_LocalService.SetLevel(first, last, passwd, level, remoteClient);
-
-                    XmlRpcResponse response = new XmlRpcResponse();
-                    response.Value = reply;
-
-                    return response;
-
+                    passwd = "$1$" + requestData["web_login_key"].ToString();
+                    m_log.InfoFormat("[LOGIN]: XMLRPC Login Req key {0}", passwd);
                 }
+                string startLocation = string.Empty;
+                UUID scopeID = UUID.Zero;
+                if (requestData["scope_id"] != null)
+                    scopeID = new UUID(requestData["scope_id"].ToString());
+                if (requestData.ContainsKey("start"))
+                    startLocation = requestData["start"].ToString();
+
+                string clientVersion = "Unknown";
+                if (requestData.Contains("version") && requestData["version"] != null)
+                    clientVersion = requestData["version"].ToString();
+                // We should do something interesting with the client version...
+
+                string channel = "Unknown";
+                if (requestData.Contains("channel") && requestData["channel"] != null)
+                    channel = requestData["channel"].ToString();
+
+                string mac = "Unknown";
+                if (requestData.Contains("mac") && requestData["mac"] != null)
+                    mac = requestData["mac"].ToString();
+
+                string id0 = "Unknown";
+                if (requestData.Contains("id0") && requestData["id0"] != null)
+                    id0 = requestData["id0"].ToString();
+
+                //m_log.InfoFormat("[LOGIN]: XMLRPC Login Requested for {0} {1}, starting in {2}, using {3}", first, last, startLocation, clientVersion);
+
+                LoginResponse reply = null;
+                reply = m_LocalService.Login(first, last, passwd, startLocation, scopeID, clientVersion, channel, mac, id0, remoteClient);
+
+                XmlRpcResponse response = new XmlRpcResponse();
+                response.Value = reply.ToHashtable();
+                return response;
+
             }
-
-            XmlRpcResponse failResponse = new XmlRpcResponse();
-            Hashtable failHash = new Hashtable();
-            failHash["success"] = "false";
-            failResponse.Value = failHash;
-            return failResponse;
-
         }
 
-        public OSD HandleLLSDLogin(OSD request, IPEndPoint remoteClient)
+        return FailedXMLRPCResponse();
+
+    }
+    public XmlRpcResponse HandleXMLRPCLoginBlocked(XmlRpcRequest request, IPEndPoint client)
+    {
+        XmlRpcResponse response = new XmlRpcResponse();
+        Hashtable resp = new Hashtable();
+
+        resp["reason"] = "presence";
+        resp["message"] = "Logins are currently restricted. Please try again later.";
+        resp["login"] = "false";
+        response.Value = resp;
+        return response;
+    }
+
+    public XmlRpcResponse HandleXMLRPCSetLoginLevel(XmlRpcRequest request, IPEndPoint remoteClient)
+    {
+        Hashtable requestData = (Hashtable)request.Params[0];
+
+        if (requestData != null)
         {
-            if (request.Type == OSDType.Map)
+            if (requestData.ContainsKey("first") && requestData["first"] != null &&
+                requestData.ContainsKey("last") && requestData["last"] != null &&
+                requestData.ContainsKey("level") && requestData["level"] != null &&
+                requestData.ContainsKey("passwd") && requestData["passwd"] != null)
             {
-                OSDMap map = (OSDMap)request;
-                if (map.TryGetValue("first", out OSD ofirst) &&
-                    map.TryGetValue("last", out OSD olast) &&
-                    map.TryGetValue("passwd", out OSD opass))
-                {
-                    string first = ofirst.AsString();
-                    string last = olast.AsString();
-                    string passwd = opass.AsString();
+                string first = requestData["first"].ToString();
+                string last = requestData["last"].ToString();
+                string passwd = requestData["passwd"].ToString();
+                int level = Int32.Parse(requestData["level"].ToString());
 
-                    string startLocation = string.Empty;
-                    OSD otmp;
-                    if (map.TryGetValue("start", out otmp))
-                        startLocation = otmp.AsString();
+                m_log.InfoFormat("[LOGIN]: XMLRPC Set Level to {2} Requested by {0} {1}", first, last, level);
 
-                    UUID scopeID = UUID.Zero;
+                Hashtable reply = m_LocalService.SetLevel(first, last, passwd, level, remoteClient);
 
-                    if (map.TryGetValue("scope_id", out otmp))
-                        scopeID = new UUID(otmp.AsString());
+                XmlRpcResponse response = new XmlRpcResponse();
+                response.Value = reply;
 
-                    m_log.Info("[LOGIN]: LLSD Login Requested for: '" + first + "' '" + last + "' / " + startLocation);
+                return response;
 
-                    LoginResponse reply = null;
-                    reply = m_LocalService.Login(first, last, passwd, startLocation, scopeID,
-                        map["version"].AsString(), map["channel"].AsString(), map["mac"].AsString(),
-                        map["id0"].AsString(), remoteClient);
-                    return reply.ToOSDMap();
-                }
             }
-
-            return FailedOSDResponse();
         }
-        /* not used anywhere we can see
-        public void HandleWebSocketLoginEvents(string path, WebSocketHttpServerHandler sock)
+
+        XmlRpcResponse failResponse = new XmlRpcResponse();
+        Hashtable failHash = new Hashtable();
+        failHash["success"] = "false";
+        failResponse.Value = failHash;
+        return failResponse;
+
+    }
+
+    public OSD HandleLLSDLogin(OSD request, IPEndPoint remoteClient)
+    {
+        if (request.Type == OSDType.Map)
         {
-            sock.MaxPayloadSize = 16384; //16 kb payload
-            sock.InitialMsgTimeout = 5000; //5 second first message to trigger at least one of these events
-            sock.NoDelay_TCP_Nagle = true;
-            sock.OnData += delegate(object sender, WebsocketDataEventArgs data) { sock.Close("fail"); };
-            sock.OnPing += delegate(object sender, PingEventArgs pingdata) { sock.Close("fail"); };
-            sock.OnPong += delegate(object sender, PongEventArgs pongdata) { sock.Close("fail"); };
-            sock.OnText += delegate(object sender, WebsocketTextEventArgs text)
+            OSDMap map = (OSDMap)request;
+            if (map.TryGetValue("first", out OSD ofirst) &&
+                map.TryGetValue("last", out OSD olast) &&
+                map.TryGetValue("passwd", out OSD opass))
+            {
+                string first = ofirst.AsString();
+                string last = olast.AsString();
+                string passwd = opass.AsString();
+
+                string startLocation = string.Empty;
+                OSD otmp;
+                if (map.TryGetValue("start", out otmp))
+                    startLocation = otmp.AsString();
+
+                UUID scopeID = UUID.Zero;
+
+                if (map.TryGetValue("scope_id", out otmp))
+                    scopeID = new UUID(otmp.AsString());
+
+                m_log.Info("[LOGIN]: LLSD Login Requested for: '" + first + "' '" + last + "' / " + startLocation);
+
+                LoginResponse reply = null;
+                reply = m_LocalService.Login(first, last, passwd, startLocation, scopeID,
+                    map["version"].AsString(), map["channel"].AsString(), map["mac"].AsString(),
+                    map["id0"].AsString(), remoteClient);
+                return reply.ToOSDMap();
+            }
+        }
+
+        return FailedOSDResponse();
+    }
+    /* not used anywhere we can see
+    public void HandleWebSocketLoginEvents(string path, WebSocketHttpServerHandler sock)
+    {
+        sock.MaxPayloadSize = 16384; //16 kb payload
+        sock.InitialMsgTimeout = 5000; //5 second first message to trigger at least one of these events
+        sock.NoDelay_TCP_Nagle = true;
+        sock.OnData += delegate(object sender, WebsocketDataEventArgs data) { sock.Close("fail"); };
+        sock.OnPing += delegate(object sender, PingEventArgs pingdata) { sock.Close("fail"); };
+        sock.OnPong += delegate(object sender, PongEventArgs pongdata) { sock.Close("fail"); };
+        sock.OnText += delegate(object sender, WebsocketTextEventArgs text)
+                           {
+                               OSD request = null;
+                               try
                                {
-                                   OSD request = null;
-                                   try
-                                   {
-                                       request = OSDParser.DeserializeJson(text.Data);
-                                       if (!(request is OSDMap))
-                                       {
-                                           sock.SendMessage(OSDParser.SerializeJsonString(FailedOSDResponse()));
-                                       }
-                                       else
-                                       {
-                                           OSDMap req = request as OSDMap;
-                                           string first = req["firstname"].AsString();
-                                           string last = req["lastname"].AsString();
-                                           string passwd = req["passwd"].AsString();
-                                           string start = req["startlocation"].AsString();
-                                           string version = req["version"].AsString();
-                                           string channel = req["channel"].AsString();
-                                           string mac = req["mac"].AsString();
-                                           string id0 = req["id0"].AsString();
-                                           UUID scope = UUID.Zero;
-                                           IPEndPoint endPoint =
-                                               (sender as WebSocketHttpServerHandler).GetRemoteIPEndpoint();
-                                           LoginResponse reply = null;
-                                           reply = m_LocalService.Login(first, last, passwd, start, scope, version,
-                                                                        channel, mac, id0, endPoint);
-                                           sock.SendMessage(OSDParser.SerializeJsonString(reply.ToOSDMap()));
-
-                                       }
-
-                                   }
-                                   catch (Exception)
+                                   request = OSDParser.DeserializeJson(text.Data);
+                                   if (!(request is OSDMap))
                                    {
                                        sock.SendMessage(OSDParser.SerializeJsonString(FailedOSDResponse()));
                                    }
-                                   finally
+                                   else
                                    {
-                                       sock.Close("success");
+                                       OSDMap req = request as OSDMap;
+                                       string first = req["firstname"].AsString();
+                                       string last = req["lastname"].AsString();
+                                       string passwd = req["passwd"].AsString();
+                                       string start = req["startlocation"].AsString();
+                                       string version = req["version"].AsString();
+                                       string channel = req["channel"].AsString();
+                                       string mac = req["mac"].AsString();
+                                       string id0 = req["id0"].AsString();
+                                       UUID scope = UUID.Zero;
+                                       IPEndPoint endPoint =
+                                           (sender as WebSocketHttpServerHandler).GetRemoteIPEndpoint();
+                                       LoginResponse reply = null;
+                                       reply = m_LocalService.Login(first, last, passwd, start, scope, version,
+                                                                    channel, mac, id0, endPoint);
+                                       sock.SendMessage(OSDParser.SerializeJsonString(reply.ToOSDMap()));
+
                                    }
-                               };
 
-            sock.HandshakeAndUpgrade();
+                               }
+                               catch (Exception)
+                               {
+                                   sock.SendMessage(OSDParser.SerializeJsonString(FailedOSDResponse()));
+                               }
+                               finally
+                               {
+                                   sock.Close("success");
+                               }
+                           };
 
-        }
-        */
+        sock.HandshakeAndUpgrade();
 
-        private XmlRpcResponse FailedXMLRPCResponse()
-        {
-            Hashtable hash = new Hashtable();
-            hash["reason"] = "key";
-            hash["message"] = "Incomplete login credentials. Check your username and password.";
-            hash["login"] = "false";
+    }
+    */
 
-            XmlRpcResponse response = new XmlRpcResponse();
-            response.Value = hash;
+    private XmlRpcResponse FailedXMLRPCResponse()
+    {
+        Hashtable hash = new Hashtable();
+        hash["reason"] = "key";
+        hash["message"] = "Incomplete login credentials. Check your username and password.";
+        hash["login"] = "false";
 
-            return response;
-        }
+        XmlRpcResponse response = new XmlRpcResponse();
+        response.Value = hash;
 
-        private OSD FailedOSDResponse()
-        {
-            OSDMap map = new OSDMap();
+        return response;
+    }
 
-            map["reason"] = OSD.FromString("key");
-            map["message"] = OSD.FromString("Invalid login credentials. Check your username and passwd.");
-            map["login"] = OSD.FromString("false");
+    private OSD FailedOSDResponse()
+    {
+        OSDMap map = new OSDMap();
 
-            return map;
-        }
+        map["reason"] = OSD.FromString("key");
+        map["message"] = OSD.FromString("Invalid login credentials. Check your username and passwd.");
+        map["login"] = OSD.FromString("false");
 
+        return map;
     }
 
 }

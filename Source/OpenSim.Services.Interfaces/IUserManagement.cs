@@ -25,74 +25,70 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-
 using OpenMetaverse;
 
 //namespace OpenSim.Services.Interfaces
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+/// <summary>
+/// This maintains the relationship between a UUID and a user name.
+/// </summary>
+public interface IUserManagement
 {
+    UserData GetUserData(UUID id);
+    string GetUserName(UUID uuid);
+    bool GetUserName(UUID uuid, out string FirstName, out string LastName);
+    string GetUserHomeURL(UUID uuid);
+    string GetUserHomeURL(UUID uuid, out bool failedWeb);
+    string GetUserUUI(UUID uuid);
+    bool GetUserUUI(UUID userID, out string uui);
+    string GetUserServerURL(UUID uuid, string serverType);
+    string GetUserServerURL(UUID uuid, string serverType, out bool failedWeb);
+    Dictionary<UUID, string> GetUsersNames(string[] ids, UUID scopeID);
+    Dictionary<UUID, string> GetKnownUserNames(string[] ids, UUID scopeID);
+    List<UserData> GetKnownUsers(string[] ids, UUID scopeID);
+    void UserWebFailed(UUID id);
+
     /// <summary>
-    /// This maintains the relationship between a UUID and a user name.
+    /// Get user ID by the given name.
     /// </summary>
-    public interface IUserManagement
-    {
-        UserData GetUserData(UUID id);
-        string GetUserName(UUID uuid);
-        bool GetUserName(UUID uuid, out string FirstName, out string LastName);
-        string GetUserHomeURL(UUID uuid);
-        string GetUserHomeURL(UUID uuid, out bool failedWeb);
-        string GetUserUUI(UUID uuid);
-        bool GetUserUUI(UUID userID, out string uui);
-        string GetUserServerURL(UUID uuid, string serverType);
-        string GetUserServerURL(UUID uuid, string serverType, out bool failedWeb);
-        Dictionary<UUID, string> GetUsersNames(string[] ids, UUID scopeID);
-        Dictionary<UUID, string> GetKnownUserNames(string[] ids, UUID scopeID);
-        List<UserData> GetKnownUsers(string[] ids, UUID scopeID);
-        void UserWebFailed(UUID id);
+    /// <param name="name"></param>
+    /// <returns>UUID.Zero if no user with that name is found or if the name is "Unknown User"</returns>
+    UUID GetUserIdByName(string name);
 
-        /// <summary>
-        /// Get user ID by the given name.
-        /// </summary>
-        /// <param name="name"></param>
-        /// <returns>UUID.Zero if no user with that name is found or if the name is "Unknown User"</returns>
-        UUID GetUserIdByName(string name);
-
-        /// <summary>
-        /// Get user ID by the given name.
-        /// </summary>
-        /// <param name="firstName"></param>
-        /// <param name="lastName"></param>
-        /// <returns>UUID.Zero if no user with that name is found or if the name is "Unknown User"</returns>
-        UUID GetUserIdByName(string firstName, string lastName);
+    /// <summary>
+    /// Get user ID by the given name.
+    /// </summary>
+    /// <param name="firstName"></param>
+    /// <param name="lastName"></param>
+    /// <returns>UUID.Zero if no user with that name is found or if the name is "Unknown User"</returns>
+    UUID GetUserIdByName(string firstName, string lastName);
 
 
-        void AddSystemUser(UUID uuid, string first, string last);
-        void AddNPCUser(UUID uuid, string first, string last);
-        /// <summary>
-        /// Add a creator user.
-        /// </summary>
-        /// <remarks>
-        /// If an account is found for the UUID, then the names in this will be used rather than any information
-        /// extracted from creatorData.
-        /// </remarks>
-        /// <param name="uuid"></param>
-        /// <param name="creatorData">The creator data for this user.</param>
-        void AddCreatorUser(UUID uuid, string creatorData);
+    void AddSystemUser(UUID uuid, string first, string last);
+    void AddNPCUser(UUID uuid, string first, string last);
+    /// <summary>
+    /// Add a creator user.
+    /// </summary>
+    /// <remarks>
+    /// If an account is found for the UUID, then the names in this will be used rather than any information
+    /// extracted from creatorData.
+    /// </remarks>
+    /// <param name="uuid"></param>
+    /// <param name="creatorData">The creator data for this user.</param>
+    void AddCreatorUser(UUID uuid, string creatorData);
 
-        /// <summary>
-        /// Add a user.
-        /// </summary>
-        /// <remarks>
-        /// </remarks>
-        /// <param name="uuid"></param>
-        /// <param name="firstName"></param>
-        /// <param name="homeURL"></param>
-        void AddUser(UUID uuid, string firstName, string lastName, string homeURL);
-        bool RemoveUser(UUID uuid);
-        bool IsLocalGridUser(UUID uuid);
+    /// <summary>
+    /// Add a user.
+    /// </summary>
+    /// <remarks>
+    /// </remarks>
+    /// <param name="uuid"></param>
+    /// <param name="firstName"></param>
+    /// <param name="homeURL"></param>
+    void AddUser(UUID uuid, string firstName, string lastName, string homeURL);
+    bool RemoveUser(UUID uuid);
+    bool IsLocalGridUser(UUID uuid);
 
-        bool SetDisplayName(UUID agentID, string displayName);
-    }
+    bool SetDisplayName(UUID agentID, string displayName);
 }

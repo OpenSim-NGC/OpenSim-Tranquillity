@@ -25,54 +25,52 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+/// <summary>
+/// An agent in the scene.
+/// </summary>
+/// <remarks>
+/// Interface is a work in progress.  Please feel free to add other required properties and methods.
+/// </remarks>
+public interface ISceneAgent : ISceneEntity
 {
+    /// <value>
+    /// The client controlling this presence
+    /// </value>
+    IClientAPI ControllingClient { get; }
+
     /// <summary>
-    /// An agent in the scene.
+    /// What type of presence is this?  User, NPC, etc.
+    /// </summary>
+    PresenceType PresenceType { get; }
+
+    /// <summary>
+    /// If true, then the agent has no avatar in the scene.
+    /// The agent exists to relay data from a region that neighbours the current position of the user's avatar.
+    /// Occasionally data is relayed, such as which a user clicks an item in a neighbouring region.
+    /// </summary>
+    bool IsChildAgent { get; }
+
+    bool IsInTransit { get; }
+    bool IsNPC { get;}
+
+    bool Invulnerable { get; set; }
+    /// <summary>
+    /// Avatar appearance data.
     /// </summary>
     /// <remarks>
-    /// Interface is a work in progress.  Please feel free to add other required properties and methods.
+    // Because appearance setting is in a module, we actually need
+    // to give it access to our appearance directly, otherwise we
+    // get a synchronization issue.
     /// </remarks>
-    public interface ISceneAgent : ISceneEntity
-    {
-        /// <value>
-        /// The client controlling this presence
-        /// </value>
-        IClientAPI ControllingClient { get; }
+    AvatarAppearance Appearance { get; set; }
 
-        /// <summary>
-        /// What type of presence is this?  User, NPC, etc.
-        /// </summary>
-        PresenceType PresenceType { get; }
-
-        /// <summary>
-        /// If true, then the agent has no avatar in the scene.
-        /// The agent exists to relay data from a region that neighbours the current position of the user's avatar.
-        /// Occasionally data is relayed, such as which a user clicks an item in a neighbouring region.
-        /// </summary>
-        bool IsChildAgent { get; }
-
-        bool IsInTransit { get; }
-        bool IsNPC { get;}
-
-        bool Invulnerable { get; set; }
-        /// <summary>
-        /// Avatar appearance data.
-        /// </summary>
-        /// <remarks>
-        // Because appearance setting is in a module, we actually need
-        // to give it access to our appearance directly, otherwise we
-        // get a synchronization issue.
-        /// </remarks>
-        AvatarAppearance Appearance { get; set; }
-
-        /// <summary>
-        /// Direction in which the scene presence is looking.
-        /// </summary>
-        /// <remarks>Will be Vector3.Zero for a child agent.</remarks>
-        Vector3 Lookat { get; }
-    }
+    /// <summary>
+    /// Direction in which the scene presence is looking.
+    /// </summary>
+    /// <remarks>Will be Vector3.Zero for a child agent.</remarks>
+    Vector3 Lookat { get; }
 }

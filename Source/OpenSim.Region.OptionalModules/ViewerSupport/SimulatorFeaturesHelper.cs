@@ -33,27 +33,26 @@ using OpenSim.Services.Interfaces;
 //using OpenSim.Framework.Capabilities;
 using log4net;
 
-namespace OpenSim.Region.OptionalModules.ViewerSupport
+namespace OpenSim.Region.OptionalModules.ViewerSupport;
+
+public class SimulatorFeaturesHelper
 {
-    public class SimulatorFeaturesHelper
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private Scene m_scene;
+
+    public SimulatorFeaturesHelper(Scene scene)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_scene = scene;
+    }
 
-        private Scene m_scene;
+    public int UserLevel(UUID agentID)
+    {
+        int level = 0;
+        UserAccount account = m_scene.UserAccountService.GetUserAccount(m_scene.RegionInfo.ScopeID, agentID);
+        if (account != null)
+            level = account.UserLevel;
 
-        public SimulatorFeaturesHelper(Scene scene)
-        {
-            m_scene = scene;
-        }
-
-        public int UserLevel(UUID agentID)
-        {
-            int level = 0;
-            UserAccount account = m_scene.UserAccountService.GetUserAccount(m_scene.RegionInfo.ScopeID, agentID);
-            if (account != null)
-                level = account.UserLevel;
-
-            return level;
-        }
+        return level;
     }
 }

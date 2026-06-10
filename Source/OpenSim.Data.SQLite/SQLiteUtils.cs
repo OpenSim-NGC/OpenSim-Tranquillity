@@ -28,279 +28,278 @@
 using System.Data;
 using System.Data.SQLite;
 
-namespace OpenSim.Data.SQLite
+namespace OpenSim.Data.SQLite;
+
+/// <summary>
+/// A base class for methods needed by all SQLite database classes
+/// </summary>
+public class SQLiteUtil
 {
+    /***********************************************************************
+     *
+     *  Database Definition Helper Functions
+     *
+     *  This should be db agnostic as we define them in ADO.NET terms
+     *
+     **********************************************************************/
+
     /// <summary>
-    /// A base class for methods needed by all SQLite database classes
+    ///
     /// </summary>
-    public class SQLiteUtil
+    /// <param name="dt"></param>
+    /// <param name="name"></param>
+    /// <param name="type"></param>
+    public static void createCol(DataTable dt, string name, Type type)
     {
-        /***********************************************************************
-         *
-         *  Database Definition Helper Functions
-         *
-         *  This should be db agnostic as we define them in ADO.NET terms
-         *
-         **********************************************************************/
+        DataColumn col = new DataColumn(name, type);
+        dt.Columns.Add(col);
+    }
 
-        /// <summary>
-        ///
-        /// </summary>
-        /// <param name="dt"></param>
-        /// <param name="name"></param>
-        /// <param name="type"></param>
-        public static void createCol(DataTable dt, string name, Type type)
+    /***********************************************************************
+     *
+     *  SQL Statement Creation Functions
+     *
+     *  These functions create SQL statements for update, insert, and create.
+     *  They can probably be factored later to have a db independant
+     *  portion and a db specific portion
+     *
+     **********************************************************************/
+
+    /// <summary>
+    /// Create an insert command
+    /// </summary>
+    /// <param name="table">table name</param>
+    /// <param name="dt">data table</param>
+    /// <returns>the created command</returns>
+    /// <remarks>
+    /// This is subtle enough to deserve some commentary.
+    /// Instead of doing *lots* and *lots of hardcoded strings
+    /// for database definitions we'll use the fact that
+    /// realistically all insert statements look like "insert
+    /// into A(b, c) values(:b, :c) on the parameterized query
+    /// front.  If we just have a list of b, c, etc... we can
+    /// generate these strings instead of typing them out.
+    /// </remarks>
+    public static SQLiteCommand createInsertCommand(string table, DataTable dt)
+    {
+
+        string[] cols = new string[dt.Columns.Count];
+        for (int i = 0; i < dt.Columns.Count; i++)
         {
-            DataColumn col = new DataColumn(name, type);
-            dt.Columns.Add(col);
+            DataColumn col = dt.Columns[i];
+            cols[i] = col.ColumnName;
         }
 
-        /***********************************************************************
-         *
-         *  SQL Statement Creation Functions
-         *
-         *  These functions create SQL statements for update, insert, and create.
-         *  They can probably be factored later to have a db independant
-         *  portion and a db specific portion
-         *
-         **********************************************************************/
+        string sql = "insert into " + table + "(";
+        sql += String.Join(", ", cols);
+        // important, the first ':' needs to be here, the rest get added in the join
+        sql += ") values (:";
+        sql += String.Join(", :", cols);
+        sql += ")";
+        SQLiteCommand cmd = new SQLiteCommand(sql);
 
-        /// <summary>
-        /// Create an insert command
-        /// </summary>
-        /// <param name="table">table name</param>
-        /// <param name="dt">data table</param>
-        /// <returns>the created command</returns>
-        /// <remarks>
-        /// This is subtle enough to deserve some commentary.
-        /// Instead of doing *lots* and *lots of hardcoded strings
-        /// for database definitions we'll use the fact that
-        /// realistically all insert statements look like "insert
-        /// into A(b, c) values(:b, :c) on the parameterized query
-        /// front.  If we just have a list of b, c, etc... we can
-        /// generate these strings instead of typing them out.
-        /// </remarks>
-        public static SQLiteCommand createInsertCommand(string table, DataTable dt)
+        // this provides the binding for all our parameters, so
+        // much less code than it used to be
+        foreach (DataColumn col in dt.Columns)
         {
-
-            string[] cols = new string[dt.Columns.Count];
-            for (int i = 0; i < dt.Columns.Count; i++)
-            {
-                DataColumn col = dt.Columns[i];
-                cols[i] = col.ColumnName;
-            }
-
-            string sql = "insert into " + table + "(";
-            sql += String.Join(", ", cols);
-            // important, the first ':' needs to be here, the rest get added in the join
-            sql += ") values (:";
-            sql += String.Join(", :", cols);
-            sql += ")";
-            SQLiteCommand cmd = new SQLiteCommand(sql);
-
-            // this provides the binding for all our parameters, so
-            // much less code than it used to be
-            foreach (DataColumn col in dt.Columns)
-            {
-                cmd.Parameters.Add(createSQLiteParameter(col.ColumnName, col.DataType));
-            }
-            return cmd;
+            cmd.Parameters.Add(createSQLiteParameter(col.ColumnName, col.DataType));
         }
+        return cmd;
+    }
 
-        /// <summary>
-        /// create an update command
-        /// </summary>
-        /// <param name="table">table name</param>
-        /// <param name="pk"></param>
-        /// <param name="dt"></param>
-        /// <returns>the created command</returns>
-        public static SQLiteCommand createUpdateCommand(string table, string pk, DataTable dt)
+    /// <summary>
+    /// create an update command
+    /// </summary>
+    /// <param name="table">table name</param>
+    /// <param name="pk"></param>
+    /// <param name="dt"></param>
+    /// <returns>the created command</returns>
+    public static SQLiteCommand createUpdateCommand(string table, string pk, DataTable dt)
+    {
+        string sql = "update " + table + " set ";
+        string subsql = String.Empty;
+        foreach (DataColumn col in dt.Columns)
         {
-            string sql = "update " + table + " set ";
-            string subsql = String.Empty;
-            foreach (DataColumn col in dt.Columns)
+            if (subsql.Length > 0)
             {
-                if (subsql.Length > 0)
-                {
-                    // a map function would rock so much here
-                    subsql += ", ";
-                }
-                subsql += col.ColumnName + "= :" + col.ColumnName;
+                // a map function would rock so much here
+                subsql += ", ";
             }
-            sql += subsql;
-            sql += " where " + pk;
-            SQLiteCommand cmd = new SQLiteCommand(sql);
-
-            // this provides the binding for all our parameters, so
-            // much less code than it used to be
-
-            foreach (DataColumn col in dt.Columns)
-            {
-                cmd.Parameters.Add(createSQLiteParameter(col.ColumnName, col.DataType));
-            }
-            return cmd;
+            subsql += col.ColumnName + "= :" + col.ColumnName;
         }
+        sql += subsql;
+        sql += " where " + pk;
+        SQLiteCommand cmd = new SQLiteCommand(sql);
 
-        /// <summary>
-        ///
-        /// </summary>
-        /// <param name="dt">Data Table</param>
-        /// <returns></returns>
-        public static string defineTable(DataTable dt)
+        // this provides the binding for all our parameters, so
+        // much less code than it used to be
+
+        foreach (DataColumn col in dt.Columns)
         {
-            string sql = "create table " + dt.TableName + "(";
-            string subsql = String.Empty;
-            foreach (DataColumn col in dt.Columns)
+            cmd.Parameters.Add(createSQLiteParameter(col.ColumnName, col.DataType));
+        }
+        return cmd;
+    }
+
+    /// <summary>
+    ///
+    /// </summary>
+    /// <param name="dt">Data Table</param>
+    /// <returns></returns>
+    public static string defineTable(DataTable dt)
+    {
+        string sql = "create table " + dt.TableName + "(";
+        string subsql = String.Empty;
+        foreach (DataColumn col in dt.Columns)
+        {
+            if (subsql.Length > 0)
             {
-                if (subsql.Length > 0)
+                // a map function would rock so much here
+                subsql += ",\n";
+            }
+            subsql += col.ColumnName + " " + sqliteType(col.DataType);
+            if (dt.PrimaryKey.Length > 0)
+            {
+                if (col == dt.PrimaryKey[0])
                 {
-                    // a map function would rock so much here
-                    subsql += ",\n";
-                }
-                subsql += col.ColumnName + " " + sqliteType(col.DataType);
-                if (dt.PrimaryKey.Length > 0)
-                {
-                    if (col == dt.PrimaryKey[0])
-                    {
-                        subsql += " primary key";
-                    }
+                    subsql += " primary key";
                 }
             }
-            sql += subsql;
-            sql += ")";
-            return sql;
         }
+        sql += subsql;
+        sql += ")";
+        return sql;
+    }
 
-        /***********************************************************************
-         *
-         *  Database Binding functions
-         *
-         *  These will be db specific due to typing, and minor differences
-         *  in databases.
-         *
-         **********************************************************************/
+    /***********************************************************************
+     *
+     *  Database Binding functions
+     *
+     *  These will be db specific due to typing, and minor differences
+     *  in databases.
+     *
+     **********************************************************************/
 
-        ///<summary>
-        /// <para>
-        /// This is a convenience function that collapses 5 repetitive
-        /// lines for defining SQLiteParameters to 2 parameters:
-        /// column name and database type.
-        /// </para>
-        ///
-        /// <para>
-        /// It assumes certain conventions like :param as the param
-        /// name to replace in parametrized queries, and that source
-        /// version is always current version, both of which are fine
-        /// for us.
-        /// </para>
-        ///</summary>
-        /// <param name="name"></param>
-        /// <param name="type"></param>
-        ///<returns>a built sqlite parameter</returns>
-        public static SQLiteParameter createSQLiteParameter(string name, Type type)
+    ///<summary>
+    /// <para>
+    /// This is a convenience function that collapses 5 repetitive
+    /// lines for defining SQLiteParameters to 2 parameters:
+    /// column name and database type.
+    /// </para>
+    ///
+    /// <para>
+    /// It assumes certain conventions like :param as the param
+    /// name to replace in parametrized queries, and that source
+    /// version is always current version, both of which are fine
+    /// for us.
+    /// </para>
+    ///</summary>
+    /// <param name="name"></param>
+    /// <param name="type"></param>
+    ///<returns>a built sqlite parameter</returns>
+    public static SQLiteParameter createSQLiteParameter(string name, Type type)
+    {
+        SQLiteParameter param = new SQLiteParameter();
+        param.ParameterName = ":" + name;
+        param.DbType = dbtypeFromType(type);
+        param.SourceColumn = name;
+        param.SourceVersion = DataRowVersion.Current;
+        return param;
+    }
+
+    /***********************************************************************
+     *
+     *  Type conversion functions
+     *
+     **********************************************************************/
+
+    /// <summary>
+    /// Type conversion function
+    /// </summary>
+    /// <param name="type">a type</param>
+    /// <returns>a DbType</returns>
+    public static DbType dbtypeFromType(Type type)
+    {
+        if (type == typeof (String))
         {
-            SQLiteParameter param = new SQLiteParameter();
-            param.ParameterName = ":" + name;
-            param.DbType = dbtypeFromType(type);
-            param.SourceColumn = name;
-            param.SourceVersion = DataRowVersion.Current;
-            return param;
+            return DbType.String;
         }
-
-        /***********************************************************************
-         *
-         *  Type conversion functions
-         *
-         **********************************************************************/
-
-        /// <summary>
-        /// Type conversion function
-        /// </summary>
-        /// <param name="type">a type</param>
-        /// <returns>a DbType</returns>
-        public static DbType dbtypeFromType(Type type)
+        else if (type == typeof (Int32))
         {
-            if (type == typeof (String))
-            {
-                return DbType.String;
-            }
-            else if (type == typeof (Int32))
-            {
-                return DbType.Int32;
-            }
-            else if (type == typeof (UInt32))
-            {
-                return DbType.UInt32;
-            }
-            else if (type == typeof (Int64))
-            {
-                return DbType.Int64;
-            }
-            else if (type == typeof (UInt64))
-            {
-                return DbType.UInt64;
-            }
-            else if (type == typeof (Double))
-            {
-                return DbType.Double;
-            }
-            else if (type == typeof (Boolean))
-            {
-                return DbType.Boolean;
-            }
-            else if (type == typeof (Byte[]))
-            {
-                return DbType.Binary;
-            }
-            else
-            {
-                return DbType.String;
-            }
+            return DbType.Int32;
         }
-
-        /// <summary>
-        /// </summary>
-        /// <param name="type">a Type</param>
-        /// <returns>a string</returns>
-        /// <remarks>this is something we'll need to implement for each db slightly differently.</remarks>
-        public static string sqliteType(Type type)
+        else if (type == typeof (UInt32))
         {
-            if (type == typeof (String))
-            {
-                return "varchar(255)";
-            }
-            else if (type == typeof (Int32))
-            {
-                return "integer";
-            }
-            else if (type == typeof (UInt32))
-            {
-                return "integer";
-            }
-            else if (type == typeof (Int64))
-            {
-                return "varchar(255)";
-            }
-            else if (type == typeof (UInt64))
-            {
-                return "varchar(255)";
-            }
-            else if (type == typeof (Double))
-            {
-                return "float";
-            }
-            else if (type == typeof (Boolean))
-            {
-                return "integer";
-            }
-            else if (type == typeof (Byte[]))
-            {
-                return "blob";
-            }
-            else
-            {
-                return "string";
-            }
+            return DbType.UInt32;
+        }
+        else if (type == typeof (Int64))
+        {
+            return DbType.Int64;
+        }
+        else if (type == typeof (UInt64))
+        {
+            return DbType.UInt64;
+        }
+        else if (type == typeof (Double))
+        {
+            return DbType.Double;
+        }
+        else if (type == typeof (Boolean))
+        {
+            return DbType.Boolean;
+        }
+        else if (type == typeof (Byte[]))
+        {
+            return DbType.Binary;
+        }
+        else
+        {
+            return DbType.String;
+        }
+    }
+
+    /// <summary>
+    /// </summary>
+    /// <param name="type">a Type</param>
+    /// <returns>a string</returns>
+    /// <remarks>this is something we'll need to implement for each db slightly differently.</remarks>
+    public static string sqliteType(Type type)
+    {
+        if (type == typeof (String))
+        {
+            return "varchar(255)";
+        }
+        else if (type == typeof (Int32))
+        {
+            return "integer";
+        }
+        else if (type == typeof (UInt32))
+        {
+            return "integer";
+        }
+        else if (type == typeof (Int64))
+        {
+            return "varchar(255)";
+        }
+        else if (type == typeof (UInt64))
+        {
+            return "varchar(255)";
+        }
+        else if (type == typeof (Double))
+        {
+            return "float";
+        }
+        else if (type == typeof (Boolean))
+        {
+            return "integer";
+        }
+        else if (type == typeof (Byte[]))
+        {
+            return "blob";
+        }
+        else
+        {
+            return "string";
         }
     }
 }

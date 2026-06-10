@@ -25,79 +25,76 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using System.Reflection;
 using log4net;
-using Nini.Config;
 using OpenSim.Framework;
 using OpenMetaverse;
 
-namespace OpenSim.Region.PhysicsModules.SharedBase
+namespace OpenSim.Region.PhysicsModules.SharedBase;
+
+class NullPhysicsScene : PhysicsScene
 {
-    class NullPhysicsScene : PhysicsScene
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private static int m_workIndicator;
+
+    public override PhysicsActor AddAvatar(
+        string avName, Vector3 position, Vector3 velocity, Vector3 size, bool isFlying)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_log.InfoFormat("[PHYSICS]: NullPhysicsScene : AddAvatar({0})", position);
+        return PhysicsActor.Null;
+    }
 
-        private static int m_workIndicator;
+    public override void RemoveAvatar(PhysicsActor actor)
+    {
+    }
 
-        public override PhysicsActor AddAvatar(
-            string avName, Vector3 position, Vector3 velocity, Vector3 size, bool isFlying)
-        {
-            m_log.InfoFormat("[PHYSICS]: NullPhysicsScene : AddAvatar({0})", position);
-            return PhysicsActor.Null;
-        }
+    public override void RemovePrim(PhysicsActor prim)
+    {
+    }
+    public override void SetWaterLevel(float baseheight)
+    {
 
-        public override void RemoveAvatar(PhysicsActor actor)
-        {
-        }
-
-        public override void RemovePrim(PhysicsActor prim)
-        {
-        }
-        public override void SetWaterLevel(float baseheight)
-        {
-
-        }
+    }
 
 /*
-        public override PhysicsActor AddPrim(Vector3 position, Vector3 size, Quaternion rotation)
-        {
-            m_log.InfoFormat("NullPhysicsScene : AddPrim({0},{1})", position, size);
-            return PhysicsActor.Null;
-        }
+    public override PhysicsActor AddPrim(Vector3 position, Vector3 size, Quaternion rotation)
+    {
+        m_log.InfoFormat("NullPhysicsScene : AddPrim({0},{1})", position, size);
+        return PhysicsActor.Null;
+    }
 */
 
-        public override PhysicsActor AddPrimShape(string primName, PrimitiveBaseShape pbs, Vector3 position,
-                                                  Vector3 size, Quaternion rotation, bool isPhysical, uint localid)
-        {
-            m_log.InfoFormat("[PHYSICS]: NullPhysicsScene : AddPrim({0},{1})", position, size);
-            return PhysicsActor.Null;
-        }
+    public override PhysicsActor AddPrimShape(string primName, PrimitiveBaseShape pbs, Vector3 position,
+                                              Vector3 size, Quaternion rotation, bool isPhysical, uint localid)
+    {
+        m_log.InfoFormat("[PHYSICS]: NullPhysicsScene : AddPrim({0},{1})", position, size);
+        return PhysicsActor.Null;
+    }
 
-        public override float Simulate(float timeStep)
-        {
-            m_workIndicator = (m_workIndicator + 1) % 10;
+    public override float Simulate(float timeStep)
+    {
+        m_workIndicator = (m_workIndicator + 1) % 10;
 
-            return 0f;
-        }
+        return 0f;
+    }
 
-        public override void SetTerrain(float[] heightMap)
-        {
-            m_log.InfoFormat("[PHYSICS]: NullPhysicsScene : SetTerrain({0} items)", heightMap.Length);
-        }
+    public override void SetTerrain(float[] heightMap)
+    {
+        m_log.InfoFormat("[PHYSICS]: NullPhysicsScene : SetTerrain({0} items)", heightMap.Length);
+    }
 
-        public override void DeleteTerrain()
-        {
-        }
+    public override void DeleteTerrain()
+    {
+    }
 
-        public override void Dispose()
-        {
-        }
+    public override void Dispose()
+    {
+    }
 
-        public override Dictionary<uint,float> GetTopColliders()
-        {
-            Dictionary<uint, float> returncolliders = new Dictionary<uint, float>();
-            return returncolliders;
-        }
+    public override Dictionary<uint,float> GetTopColliders()
+    {
+        Dictionary<uint, float> returncolliders = new Dictionary<uint, float>();
+        return returncolliders;
     }
 }

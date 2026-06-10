@@ -25,39 +25,35 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.IO;
 using System.Net;
 using System.Text;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public interface IOSHttpRequest
 {
-    public interface IOSHttpRequest
-    {
-        string[] AcceptTypes { get; }
-        Encoding ContentEncoding { get; }
-        long ContentLength { get; }
-        long ContentLength64 { get; }
-        string ContentType { get; }
-        bool HasEntityBody { get; }
-        NameValueCollection Headers { get; }
-        string HttpMethod { get; }
-        Stream InputStream { get; }
-        bool IsSecured { get; }
-        bool KeepAlive { get; }
-        NameValueCollection QueryString { get; }
-        Hashtable Query { get; }
-        HashSet<string> QueryFlags { get; }
-        Dictionary<string, string> QueryAsDictionary { get; } //faster than Query
-        string RawUrl { get; }
-        IPEndPoint RemoteIPEndPoint { get; }
-        IPEndPoint LocalIPEndPoint { get; }
-        Uri Url { get; }
-        string UriPath { get; }
-        string UserAgent { get; }
-        double ArrivalTS { get; }
-    }
+    string[] AcceptTypes { get; }
+    Encoding ContentEncoding { get; }
+    long ContentLength { get; }
+    long ContentLength64 { get; }
+    string ContentType { get; }
+    bool HasEntityBody { get; }
+    NameValueCollection Headers { get; }
+    string HttpMethod { get; }
+    Stream InputStream { get; }
+    bool IsSecured { get; }
+    bool KeepAlive { get; }
+    NameValueCollection QueryString { get; }
+    Hashtable Query { get; }
+    HashSet<string> QueryFlags { get; }
+    Dictionary<string, string> QueryAsDictionary { get; } //faster than Query
+    string RawUrl { get; }
+    IPEndPoint RemoteIPEndPoint { get; }
+    IPEndPoint LocalIPEndPoint { get; }
+    Uri Url { get; }
+    string UriPath { get; }
+    string UserAgent { get; }
+    double ArrivalTS { get; }
 }

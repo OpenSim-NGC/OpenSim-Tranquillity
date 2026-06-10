@@ -33,85 +33,84 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.Framework.DynamicAttributes
+namespace OpenSim.Region.CoreModules.Framework.DynamicAttributes;
+
+public class DAExampleModule : INonSharedRegionModule
 {
-    public class DAExampleModule : INonSharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private readonly bool ENABLED = false;   // enable for testing
+
+    public const string Namespace = "Example";
+    public const string StoreName = "DA";
+
+    protected Scene m_scene;
+    protected IDialogModule m_dialogMod;
+
+    public string Name { get { return "DAExample Module"; } }
+    public Type ReplaceableInterface { get { return null; } }
+
+    public void Initialise(IConfigSource source) {}
+
+    public void AddRegion(Scene scene)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private readonly bool ENABLED = false;   // enable for testing
-
-        public const string Namespace = "Example";
-        public const string StoreName = "DA";
-
-        protected Scene m_scene;
-        protected IDialogModule m_dialogMod;
-
-        public string Name { get { return "DAExample Module"; } }
-        public Type ReplaceableInterface { get { return null; } }
-
-        public void Initialise(IConfigSource source) {}
-
-        public void AddRegion(Scene scene)
+        if (ENABLED)
         {
-            if (ENABLED)
-            {
-                m_scene = scene;
-                m_scene.EventManager.OnSceneGroupMove += OnSceneGroupMove;
-                m_dialogMod = m_scene.RequestModuleInterface<IDialogModule>();
+            m_scene = scene;
+            m_scene.EventManager.OnSceneGroupMove += OnSceneGroupMove;
+            m_dialogMod = m_scene.RequestModuleInterface<IDialogModule>();
 
-                m_log.DebugFormat("[DA EXAMPLE MODULE]: Added region {0}", m_scene.Name);
-            }
+            m_log.DebugFormat("[DA EXAMPLE MODULE]: Added region {0}", m_scene.Name);
         }
+    }
 
-        public void RemoveRegion(Scene scene)
+    public void RemoveRegion(Scene scene)
+    {
+        if (ENABLED)
         {
-            if (ENABLED)
-            {
-                m_scene.EventManager.OnSceneGroupMove -= OnSceneGroupMove;
-            }
+            m_scene.EventManager.OnSceneGroupMove -= OnSceneGroupMove;
         }
+    }
 
-        public void RegionLoaded(Scene scene) {}
+    public void RegionLoaded(Scene scene) {}
 
-        public void Close()
-        {
-            RemoveRegion(m_scene);
-        }
+    public void Close()
+    {
+        RemoveRegion(m_scene);
+    }
 
-        protected bool OnSceneGroupMove(UUID groupId, Vector3 delta)
-        {
-            OSDMap attrs = null;
-            SceneObjectPart sop = m_scene.GetSceneObjectPart(groupId);
+    protected bool OnSceneGroupMove(UUID groupId, Vector3 delta)
+    {
+        OSDMap attrs = null;
+        SceneObjectPart sop = m_scene.GetSceneObjectPart(groupId);
 
-            if (sop == null || sop.DynAttrs == null)
-                return true;
-
-            if (!sop.DynAttrs.TryGetStore(Namespace, StoreName, out attrs))
-                attrs = new OSDMap();
-
-            OSDInteger newValue;
-
-            // We have to lock on the entire dynamic attributes map to avoid race conditions with serialization code.
-            lock (sop.DynAttrs)
-            {
-                if (!attrs.ContainsKey("moves"))
-                    newValue = new OSDInteger(1);
-                else
-                    newValue = new OSDInteger(attrs["moves"].AsInteger() + 1);
-
-                attrs["moves"] = newValue;
-
-                sop.DynAttrs.SetStore(Namespace, StoreName, attrs);
-            }
-
-            sop.ParentGroup.HasGroupChanged = true;
-
-            string msg = string.Format("{0} {1} moved {2} times", sop.Name, sop.UUID, newValue);
-            m_log.DebugFormat("[DA EXAMPLE MODULE]: {0}", msg);
-            m_dialogMod.SendGeneralAlert(msg);
-
+        if (sop == null || sop.DynAttrs == null)
             return true;
+
+        if (!sop.DynAttrs.TryGetStore(Namespace, StoreName, out attrs))
+            attrs = new OSDMap();
+
+        OSDInteger newValue;
+
+        // We have to lock on the entire dynamic attributes map to avoid race conditions with serialization code.
+        lock (sop.DynAttrs)
+        {
+            if (!attrs.ContainsKey("moves"))
+                newValue = new OSDInteger(1);
+            else
+                newValue = new OSDInteger(attrs["moves"].AsInteger() + 1);
+
+            attrs["moves"] = newValue;
+
+            sop.DynAttrs.SetStore(Namespace, StoreName, attrs);
         }
+
+        sop.ParentGroup.HasGroupChanged = true;
+
+        string msg = string.Format("{0} {1} moved {2} times", sop.Name, sop.UUID, newValue);
+        m_log.DebugFormat("[DA EXAMPLE MODULE]: {0}", msg);
+        m_dialogMod.SendGeneralAlert(msg);
+
+        return true;
     }
 }

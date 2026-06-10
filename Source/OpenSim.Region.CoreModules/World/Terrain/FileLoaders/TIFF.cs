@@ -28,57 +28,18 @@
 using SkiaSharp;
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
+namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders;
+
+/// <summary>
+/// TIFF terrain file loader using SkiaSharp.
+/// Saves and loads terrain from TIFF images.
+/// Note: SkiaSharp does not support TIFF encoding, so PNG is used as the fallback format.
+/// </summary>
+internal class TIFF : GenericSystemDrawing
 {
-    /// <summary>
-    /// TIFF terrain file loader using SkiaSharp.
-    /// Saves and loads terrain from TIFF images.
-    /// Note: SkiaSharp does not support TIFF encoding, so PNG is used as the fallback format.
-    /// </summary>
-    internal class TIFF : GenericSystemDrawing
+    public override void SaveFile(string filename, ITerrainChannel map)
     {
-        public override void SaveFile(string filename, ITerrainChannel map)
-        {
-            using(var bitmap = CreateGrayscaleBitmapFromMap(map))
-            {
-                using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
-                {
-                    using (var file = File.Create(filename))
-                    {
-                        data.SaveTo(file);
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Exports a stream using SkiaSharp PNG encoder (TIFF not supported).
-        /// </summary>
-        /// <param name="stream">The target stream</param>
-        /// <param name="map">The terrain channel being saved</param>
-        public override void SaveStream(Stream stream, ITerrainChannel map)
-        {
-            using(var bitmap = CreateGrayscaleBitmapFromMap(map))
-            {
-                using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
-                {
-                    data.SaveTo(stream);
-                }
-            }
-        }
-
-        public override string ToString()
-        {
-            return "TIFF";
-        }
-
-        //Returns true if this extension is supported for terrain save-tile
-        public override bool SupportsTileSave()
-        {
-            return false;
-        }
-
-        protected override void Save(SKBitmap bitmap, string filename)
+        using(var bitmap = CreateGrayscaleBitmapFromMap(map))
         {
             using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
             {
@@ -86,6 +47,44 @@ namespace OpenSim.Region.CoreModules.World.Terrain.FileLoaders
                 {
                     data.SaveTo(file);
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Exports a stream using SkiaSharp PNG encoder (TIFF not supported).
+    /// </summary>
+    /// <param name="stream">The target stream</param>
+    /// <param name="map">The terrain channel being saved</param>
+    public override void SaveStream(Stream stream, ITerrainChannel map)
+    {
+        using(var bitmap = CreateGrayscaleBitmapFromMap(map))
+        {
+            using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+            {
+                data.SaveTo(stream);
+            }
+        }
+    }
+
+    public override string ToString()
+    {
+        return "TIFF";
+    }
+
+    //Returns true if this extension is supported for terrain save-tile
+    public override bool SupportsTileSave()
+    {
+        return false;
+    }
+
+    protected override void Save(SKBitmap bitmap, string filename)
+    {
+        using (var data = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+        {
+            using (var file = File.Create(filename))
+            {
+                data.SaveTo(file);
             }
         }
     }

@@ -26,120 +26,114 @@
  */
 
 using log4net;
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
-using Nini.Config;
 using OpenSim.Framework;
 
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 using Nwc.XmlRpc;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
-using System.Net.Http;
 
-namespace OpenSim.Services.Connectors
+namespace OpenSim.Services.Connectors;
+
+public class LandServicesConnector : ILandService
 {
-    public class LandServicesConnector : ILandService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected IGridService m_GridService = null;
+
+    public LandServicesConnector()
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        protected IGridService m_GridService = null;
+    public LandServicesConnector(IGridService gridServices)
+    {
+        Initialise(gridServices);
+    }
 
-        public LandServicesConnector()
+    public virtual void Initialise(IGridService gridServices)
+    {
+        m_GridService = gridServices;
+    }
+
+    public virtual LandData GetLandData(UUID scopeID, ulong regionHandle, uint x, uint y, out byte regionAccess)
+    {
+        LandData landData = null;
+
+        IList paramList = new ArrayList();
+        regionAccess = 42; // Default to adult. Better safe...
+
+        try
         {
-        }
+            uint xpos = 0, ypos = 0;
+            Util.RegionHandleToWorldLoc(regionHandle, out xpos, out ypos);
 
-        public LandServicesConnector(IGridService gridServices)
-        {
-            Initialise(gridServices);
-        }
-
-        public virtual void Initialise(IGridService gridServices)
-        {
-            m_GridService = gridServices;
-        }
-
-        public virtual LandData GetLandData(UUID scopeID, ulong regionHandle, uint x, uint y, out byte regionAccess)
-        {
-            LandData landData = null;
-
-            IList paramList = new ArrayList();
-            regionAccess = 42; // Default to adult. Better safe...
-
-            try
+            GridRegion info = m_GridService.GetRegionByPosition(scopeID, (int)xpos, (int)ypos);
+            if (info != null) // just to be sure
             {
-                uint xpos = 0, ypos = 0;
-                Util.RegionHandleToWorldLoc(regionHandle, out xpos, out ypos);
-
-                GridRegion info = m_GridService.GetRegionByPosition(scopeID, (int)xpos, (int)ypos);
-                if (info != null) // just to be sure
+                string targetHandlestr = info.RegionHandle.ToString();
+                if( ypos == 0 ) //HG proxy?
                 {
-                    string targetHandlestr = info.RegionHandle.ToString();
-                    if( ypos == 0 ) //HG proxy?
-                    {
-                        // this is real region handle on hg proxies hack
-                        targetHandlestr = info.RegionSecret;
-                    }
+                    // this is real region handle on hg proxies hack
+                    targetHandlestr = info.RegionSecret;
+                }
 
-                    Hashtable hash = new Hashtable();
-                    hash["region_handle"] = targetHandlestr;
-                    hash["x"] = x.ToString();
-                    hash["y"] = y.ToString();
-                    paramList.Add(hash);
+                Hashtable hash = new Hashtable();
+                hash["region_handle"] = targetHandlestr;
+                hash["x"] = x.ToString();
+                hash["y"] = y.ToString();
+                paramList.Add(hash);
 
-                    XmlRpcRequest request = new XmlRpcRequest("land_data", paramList);
-                    using HttpClient hclient = WebUtil.GetNewGlobalHttpClient(10000);
-                    XmlRpcResponse response = request.Send(info.ServerURI, hclient);
-                    if (response.IsFault)
-                    {
-                        m_log.ErrorFormat("[LAND CONNECTOR]: remote call returned an error: {0}", response.FaultString);
-                    }
-                    else
-                    {
-                        hash = (Hashtable)response.Value;
-                        try
-                        {
-                            landData = new LandData();
-                            landData.AABBMax = Vector3.Parse((string)hash["AABBMax"]);
-                            landData.AABBMin = Vector3.Parse((string)hash["AABBMin"]);
-                            landData.Area = Convert.ToInt32(hash["Area"]);
-                            landData.AuctionID = Convert.ToUInt32(hash["AuctionID"]);
-                            landData.Description = (string)hash["Description"];
-                            landData.Flags = Convert.ToUInt32(hash["Flags"]);
-                            landData.GlobalID = new UUID((string)hash["GlobalID"]);
-                            landData.Name = (string)hash["Name"];
-                            landData.OwnerID = new UUID((string)hash["OwnerID"]);
-                            landData.SalePrice = Convert.ToInt32(hash["SalePrice"]);
-                            landData.SnapshotID = new UUID((string)hash["SnapshotID"]);
-                            landData.UserLocation = Vector3.Parse((string)hash["UserLocation"]);
-                            if (hash["RegionAccess"] != null)
-                                regionAccess = (byte)Convert.ToInt32((string)hash["RegionAccess"]);
-                            if(hash["Dwell"] != null)
-                                landData.Dwell = Convert.ToSingle((string)hash["Dwell"]);
-                            //m_log.DebugFormat("[LAND CONNECTOR]: Got land data for parcel {0}", landData.Name);
-                        }
-                        catch (Exception e)
-                        {
-                            m_log.ErrorFormat(
-                                "[LAND CONNECTOR]: Got exception while parsing land-data: {0} {1}",
-                                e.Message, e.StackTrace);
-                        }
-                    }
+                XmlRpcRequest request = new XmlRpcRequest("land_data", paramList);
+                using HttpClient hclient = WebUtil.GetNewGlobalHttpClient(10000);
+                XmlRpcResponse response = request.Send(info.ServerURI, hclient);
+                if (response.IsFault)
+                {
+                    m_log.ErrorFormat("[LAND CONNECTOR]: remote call returned an error: {0}", response.FaultString);
                 }
                 else
-                    m_log.WarnFormat("[LAND CONNECTOR]: Couldn't find region with handle {0}", regionHandle);
+                {
+                    hash = (Hashtable)response.Value;
+                    try
+                    {
+                        landData = new LandData();
+                        landData.AABBMax = Vector3.Parse((string)hash["AABBMax"]);
+                        landData.AABBMin = Vector3.Parse((string)hash["AABBMin"]);
+                        landData.Area = Convert.ToInt32(hash["Area"]);
+                        landData.AuctionID = Convert.ToUInt32(hash["AuctionID"]);
+                        landData.Description = (string)hash["Description"];
+                        landData.Flags = Convert.ToUInt32(hash["Flags"]);
+                        landData.GlobalID = new UUID((string)hash["GlobalID"]);
+                        landData.Name = (string)hash["Name"];
+                        landData.OwnerID = new UUID((string)hash["OwnerID"]);
+                        landData.SalePrice = Convert.ToInt32(hash["SalePrice"]);
+                        landData.SnapshotID = new UUID((string)hash["SnapshotID"]);
+                        landData.UserLocation = Vector3.Parse((string)hash["UserLocation"]);
+                        if (hash["RegionAccess"] != null)
+                            regionAccess = (byte)Convert.ToInt32((string)hash["RegionAccess"]);
+                        if(hash["Dwell"] != null)
+                            landData.Dwell = Convert.ToSingle((string)hash["Dwell"]);
+                        //m_log.DebugFormat("[LAND CONNECTOR]: Got land data for parcel {0}", landData.Name);
+                    }
+                    catch (Exception e)
+                    {
+                        m_log.ErrorFormat(
+                            "[LAND CONNECTOR]: Got exception while parsing land-data: {0} {1}",
+                            e.Message, e.StackTrace);
+                    }
+                }
             }
-            catch (Exception e)
-            {
-                m_log.ErrorFormat("[LAND CONNECTOR]: Couldn't contact region {0}: {1}", regionHandle, e.Message);
-            }
-
-            return landData;
+            else
+                m_log.WarnFormat("[LAND CONNECTOR]: Couldn't find region with handle {0}", regionHandle);
         }
+        catch (Exception e)
+        {
+            m_log.ErrorFormat("[LAND CONNECTOR]: Couldn't contact region {0}: {1}", regionHandle, e.Message);
+        }
+
+        return landData;
     }
 }

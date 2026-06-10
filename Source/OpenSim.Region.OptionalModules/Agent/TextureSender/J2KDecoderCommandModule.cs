@@ -31,115 +31,114 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.OptionalModules.Agent.TextureSender
+namespace OpenSim.Region.OptionalModules.Agent.TextureSender;
+
+/// <summary>
+/// Commands for the J2KDecoder module.  For debugging purposes.
+/// </summary>
+/// <remarks>
+/// Placed here so that they can be removed if not required and to keep the J2KDecoder module itself simple.
+/// </remarks>
+public class J2KDecoderCommandModule : ISharedRegionModule
 {
-    /// <summary>
-    /// Commands for the J2KDecoder module.  For debugging purposes.
-    /// </summary>
-    /// <remarks>
-    /// Placed here so that they can be removed if not required and to keep the J2KDecoder module itself simple.
-    /// </remarks>
-    public class J2KDecoderCommandModule : ISharedRegionModule
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private Scene m_scene;
+    private Scene m_scene;
 
-        public string Name { get { return "Asset Information Module"; } }
+    public string Name { get { return "Asset Information Module"; } }
 
-        public Type ReplaceableInterface { get { return null; } }
+    public Type ReplaceableInterface { get { return null; } }
 
-        public void Initialise(IConfigSource source)
-        {
+    public void Initialise(IConfigSource source)
+    {
 //            m_log.DebugFormat("[J2K DECODER COMMAND MODULE]: INITIALIZED MODULE");
-        }
+    }
 
-        public void PostInitialise()
-        {
+    public void PostInitialise()
+    {
 //            m_log.DebugFormat("[J2K DECODER COMMAND MODULE]: POST INITIALIZED MODULE");
-        }
+    }
 
-        public void Close()
-        {
+    public void Close()
+    {
 //            m_log.DebugFormat("[J2K DECODER COMMAND MODULE]: CLOSED MODULE");
-        }
+    }
 
-        public void AddRegion(Scene scene)
-        {
+    public void AddRegion(Scene scene)
+    {
 //            m_log.DebugFormat("[J2K DECODER COMMAND MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
-        }
+    }
 
-        public void RemoveRegion(Scene scene)
-        {
+    public void RemoveRegion(Scene scene)
+    {
 //            m_log.DebugFormat("[J2K DECODER COMMAND MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
-        }
+    }
 
-        public void RegionLoaded(Scene scene)
-        {
+    public void RegionLoaded(Scene scene)
+    {
 //            m_log.DebugFormat("[J2K DECODER COMMAND MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
 
-            if (m_scene == null)
-                m_scene = scene;
+        if (m_scene == null)
+            m_scene = scene;
 
-            MainConsole.Instance.Commands.AddCommand(
-                "Assets",
-                false,
-                "j2k decode",
-                "j2k decode <ID>",
-                "Do JPEG2000 decoding of an asset.",
-                "This is for debugging purposes.  The asset id given must contain JPEG2000 data.",
-                HandleDecode);
+        MainConsole.Instance.Commands.AddCommand(
+            "Assets",
+            false,
+            "j2k decode",
+            "j2k decode <ID>",
+            "Do JPEG2000 decoding of an asset.",
+            "This is for debugging purposes.  The asset id given must contain JPEG2000 data.",
+            HandleDecode);
+    }
+
+    void HandleDecode(string module, string[] args)
+    {
+        if (args.Length < 3)
+        {
+            MainConsole.Instance.Output("Usage is j2k decode <ID>");
+            return;
         }
 
-        void HandleDecode(string module, string[] args)
+        UUID assetId;
+        string rawAssetId = args[2];
+
+        if (!UUID.TryParse(rawAssetId, out assetId))
         {
-            if (args.Length < 3)
-            {
-                MainConsole.Instance.Output("Usage is j2k decode <ID>");
-                return;
-            }
+            MainConsole.Instance.Output("ERROR: {0} is not a valid ID format", rawAssetId);
+            return;
+        }
 
-            UUID assetId;
-            string rawAssetId = args[2];
+        AssetBase asset = m_scene.AssetService.Get(assetId.ToString());
+        if (asset == null)
+        {
+            MainConsole.Instance.Output("ERROR: No asset found with ID {0}", assetId);
+            return;
+        }
 
-            if (!UUID.TryParse(rawAssetId, out assetId))
-            {
-                MainConsole.Instance.Output("ERROR: {0} is not a valid ID format", rawAssetId);
-                return;
-            }
+        if (asset.Type != (sbyte)AssetType.Texture)
+        {
+            MainConsole.Instance.Output("ERROR: Asset {0} is not a texture type", assetId);
+            return;
+        }
 
-            AssetBase asset = m_scene.AssetService.Get(assetId.ToString());
-            if (asset == null)
-            {
-                MainConsole.Instance.Output("ERROR: No asset found with ID {0}", assetId);
-                return;
-            }
+        IJ2KDecoder decoder = m_scene.RequestModuleInterface<IJ2KDecoder>();
+        if (decoder == null)
+        {
+            MainConsole.Instance.Output("ERROR: No IJ2KDecoder module available");
+            return;
+        }
 
-            if (asset.Type != (sbyte)AssetType.Texture)
-            {
-                MainConsole.Instance.Output("ERROR: Asset {0} is not a texture type", assetId);
-                return;
-            }
-
-            IJ2KDecoder decoder = m_scene.RequestModuleInterface<IJ2KDecoder>();
-            if (decoder == null)
-            {
-                MainConsole.Instance.Output("ERROR: No IJ2KDecoder module available");
-                return;
-            }
-
-            J2KLayerInfo[] layers;
-            int components;
-            if (decoder.Decode(assetId, asset.Data, out layers, out components))
-            {
-                MainConsole.Instance.Output(
-                    "Successfully decoded asset {0} with {1} layers and {2} components",
-                    assetId, layers.Length, components);
-            }
-            else
-            {
-                MainConsole.Instance.Output("Decode of asset {0} failed", assetId);
-            }
+        J2KLayerInfo[] layers;
+        int components;
+        if (decoder.Decode(assetId, asset.Data, out layers, out components))
+        {
+            MainConsole.Instance.Output(
+                "Successfully decoded asset {0} with {1} layers and {2} components",
+                assetId, layers.Length, components);
+        }
+        else
+        {
+            MainConsole.Instance.Output("Decode of asset {0} failed", assetId);
         }
     }
 }

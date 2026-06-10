@@ -25,65 +25,61 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
 
-namespace OpenSim.Framework.ServiceAuth
+namespace OpenSim.Framework.ServiceAuth;
+
+public class CompoundAuthentication : IServiceAuth
 {
-    public class CompoundAuthentication : IServiceAuth
+    public string Name { get { return "Compound"; } }
+
+    private List<IServiceAuth> m_authentications = new List<IServiceAuth>();
+
+    public int Count { get { return m_authentications.Count; } }
+
+    public List<IServiceAuth> GetAuthentors()
     {
-        public string Name { get { return "Compound"; } }
+        return new List<IServiceAuth>(m_authentications);
+    }
 
-        private List<IServiceAuth> m_authentications = new List<IServiceAuth>();
+    public void AddAuthenticator(IServiceAuth auth)
+    {
+        m_authentications.Add(auth);
+    }
 
-        public int Count { get { return m_authentications.Count; } }
+    public void RemoveAuthenticator(IServiceAuth auth)
+    {
+        m_authentications.Remove(auth);
+    }
 
-        public List<IServiceAuth> GetAuthentors()
+    public void AddAuthorization(NameValueCollection headers)
+    {
+        foreach (IServiceAuth auth in m_authentications)
+            auth.AddAuthorization(headers);
+    }
+
+    public void AddAuthorization(HttpRequestHeaders headers)
+    {
+        foreach (IServiceAuth auth in m_authentications)
+            auth.AddAuthorization(headers);
+    }
+
+    public bool Authenticate(string data)
+    {
+        return m_authentications.TrueForAll(a => a.Authenticate(data));
+    }
+
+    public bool Authenticate(NameValueCollection requestHeaders, AddHeaderDelegate d, out HttpStatusCode statusCode)
+    {
+        foreach (IServiceAuth auth in m_authentications)
         {
-            return new List<IServiceAuth>(m_authentications);
+            if (!auth.Authenticate(requestHeaders, d, out statusCode))
+                return false;
         }
 
-        public void AddAuthenticator(IServiceAuth auth)
-        {
-            m_authentications.Add(auth);
-        }
-
-        public void RemoveAuthenticator(IServiceAuth auth)
-        {
-            m_authentications.Remove(auth);
-        }
-
-        public void AddAuthorization(NameValueCollection headers)
-        {
-            foreach (IServiceAuth auth in m_authentications)
-                auth.AddAuthorization(headers);
-        }
-
-        public void AddAuthorization(HttpRequestHeaders headers)
-        {
-            foreach (IServiceAuth auth in m_authentications)
-                auth.AddAuthorization(headers);
-        }
-
-        public bool Authenticate(string data)
-        {
-            return m_authentications.TrueForAll(a => a.Authenticate(data));
-        }
-
-        public bool Authenticate(NameValueCollection requestHeaders, AddHeaderDelegate d, out HttpStatusCode statusCode)
-        {
-            foreach (IServiceAuth auth in m_authentications)
-            {
-                if (!auth.Authenticate(requestHeaders, d, out statusCode))
-                    return false;
-            }
-
-            statusCode = HttpStatusCode.OK;
-            return true;
-        }
+        statusCode = HttpStatusCode.OK;
+        return true;
     }
 }

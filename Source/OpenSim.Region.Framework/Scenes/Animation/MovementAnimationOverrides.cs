@@ -25,83 +25,67 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Xml;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Threading;
-using System.Timers;
-using Timer = System.Timers.Timer;
 using OpenMetaverse;
 using log4net;
-using Nini.Config;
-using OpenSim.Framework;
-using OpenSim.Framework.Client;
-using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.Framework.Scenes.Animation;
-using OpenSim.Region.Framework.Scenes.Types;
-using OpenSim.Region.PhysicsModules.SharedBase;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
-using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Region.Framework.Scenes
+namespace OpenSim.Region.Framework.Scenes;
+
+public class MovementAnimationOverrides
 {
-    public class MovementAnimationOverrides
+    private static readonly ILog m_log =
+        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private object MAOLock = new object();
+    private Dictionary<string, UUID> m_overrides = new Dictionary<string, UUID>();
+    public void SetOverride(string state, UUID animID)
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private object MAOLock = new object();
-        private Dictionary<string, UUID> m_overrides = new Dictionary<string, UUID>();
-        public void SetOverride(string state, UUID animID)
+        if (animID.IsZero())
         {
-            if (animID.IsZero())
-            {
-                if (state == "ALL")
-                    m_overrides.Clear();
-                else
-                    m_overrides.Remove(state);
-                return;
-            }
-
-            m_log.DebugFormat("Setting override for {0} to {1}", state, animID);
-
-            lock (MAOLock)
-                m_overrides[state] = animID;
-        }
-
-        public UUID GetOverriddenAnimation(string state)
-        {
-            lock (MAOLock)
-            {
-                if (m_overrides.ContainsKey(state))
-                    return m_overrides[state];
-            }
-
-            return UUID.Zero;
-        }
-
-        public bool TryGetOverriddenAnimation(string state, out UUID animID)
-        {
-            lock (MAOLock)
-                return m_overrides.TryGetValue(state, out animID);
-        }
-
-        public Dictionary<string, UUID> CloneAOPairs()
-        {
-            lock (MAOLock)
-            {
-                return new Dictionary<string, UUID>(m_overrides);
-            }
-        }
-
-        public void CopyAOPairsFrom(Dictionary<string, UUID> src)
-        {
-            lock (MAOLock)
-            {
+            if (state == "ALL")
                 m_overrides.Clear();
-                m_overrides = new Dictionary<string, UUID>(src);
-            }
+            else
+                m_overrides.Remove(state);
+            return;
+        }
+
+        m_log.DebugFormat("Setting override for {0} to {1}", state, animID);
+
+        lock (MAOLock)
+            m_overrides[state] = animID;
+    }
+
+    public UUID GetOverriddenAnimation(string state)
+    {
+        lock (MAOLock)
+        {
+            if (m_overrides.ContainsKey(state))
+                return m_overrides[state];
+        }
+
+        return UUID.Zero;
+    }
+
+    public bool TryGetOverriddenAnimation(string state, out UUID animID)
+    {
+        lock (MAOLock)
+            return m_overrides.TryGetValue(state, out animID);
+    }
+
+    public Dictionary<string, UUID> CloneAOPairs()
+    {
+        lock (MAOLock)
+        {
+            return new Dictionary<string, UUID>(m_overrides);
+        }
+    }
+
+    public void CopyAOPairsFrom(Dictionary<string, UUID> src)
+    {
+        lock (MAOLock)
+        {
+            m_overrides.Clear();
+            m_overrides = new Dictionary<string, UUID>(src);
         }
     }
 }

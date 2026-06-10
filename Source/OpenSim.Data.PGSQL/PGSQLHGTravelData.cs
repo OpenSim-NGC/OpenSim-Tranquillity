@@ -25,56 +25,48 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Reflection;
-using System.Threading;
-using log4net;
 using OpenMetaverse;
-using OpenSim.Framework;
 using Npgsql;
 
-namespace OpenSim.Data.PGSQL
+namespace OpenSim.Data.PGSQL;
+
+/// <summary>
+/// A PGSQL Interface for user grid data
+/// </summary>
+public class PGSQLHGTravelData : PGSQLGenericTableHandler<HGTravelingData>, IHGTravelingData
 {
-    /// <summary>
-    /// A PGSQL Interface for user grid data
-    /// </summary>
-    public class PGSQLHGTravelData : PGSQLGenericTableHandler<HGTravelingData>, IHGTravelingData
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public PGSQLHGTravelData(string connectionString, string realm) : base(connectionString, realm, "HGTravelStore") { }
+    public PGSQLHGTravelData(string connectionString, string realm) : base(connectionString, realm, "HGTravelStore") { }
 
-        public HGTravelingData Get(UUID sessionID)
+    public HGTravelingData Get(UUID sessionID)
+    {
+        HGTravelingData[] ret = Get("SessionID", sessionID.ToString());
+
+        if (ret.Length == 0)
+            return null;
+
+        return ret[0];
+    }
+
+    public HGTravelingData[] GetSessions(UUID userID)
+    {
+        return base.Get("UserID", userID.ToString());
+    }
+
+    public bool Delete(UUID sessionID)
+    {
+        return Delete("SessionID", sessionID.ToString());
+    }
+
+    public void DeleteOld()
+    {
+        using (NpgsqlCommand cmd = new NpgsqlCommand())
         {
-            HGTravelingData[] ret = Get("SessionID", sessionID.ToString());
+            cmd.CommandText = String.Format(@"delete from {0} where ""TMStamp"" < CURRENT_DATE - INTERVAL '2 day'", m_Realm);
 
-            if (ret.Length == 0)
-                return null;
-
-            return ret[0];
+            ExecuteNonQuery(cmd);
         }
 
-        public HGTravelingData[] GetSessions(UUID userID)
-        {
-            return base.Get("UserID", userID.ToString());
-        }
-
-        public bool Delete(UUID sessionID)
-        {
-            return Delete("SessionID", sessionID.ToString());
-        }
-
-        public void DeleteOld()
-        {
-            using (NpgsqlCommand cmd = new NpgsqlCommand())
-            {
-                cmd.CommandText = String.Format(@"delete from {0} where ""TMStamp"" < CURRENT_DATE - INTERVAL '2 day'", m_Realm);
-
-                ExecuteNonQuery(cmd);
-            }
-
-        }
     }
 }

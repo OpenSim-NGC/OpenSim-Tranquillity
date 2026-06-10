@@ -25,50 +25,46 @@
  * THE SOFTWARE.
  */
 
-using System;
-using System.Collections.Generic;
+namespace OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet;
 
-namespace OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet
+public class ConvexResult
 {
-    public class ConvexResult
+    public List<float3> HullVertices;
+    public List<int> HullIndices;
+
+    public float mHullVolume; // the volume of the convex hull.
+
+    //public float[] OBBSides = new float[3]; // the width, height and breadth of the best fit OBB
+    //public float[] OBBCenter = new float[3]; // the center of the OBB
+    //public float[] OBBOrientation = new float[4]; // the quaternion rotation of the OBB.
+    //public float[] OBBTransform = new float[16]; // the 4x4 transform of the OBB.
+    //public float OBBVolume; // the volume of the OBB
+
+    //public float SphereRadius; // radius and center of best fit sphere
+    //public float[] SphereCenter = new float[3];
+    //public float SphereVolume; // volume of the best fit sphere
+
+    public ConvexResult()
     {
-        public List<float3> HullVertices;
-        public List<int> HullIndices;
+        HullVertices = new List<float3>();
+        HullIndices = new List<int>();
+    }
 
-        public float mHullVolume; // the volume of the convex hull.
+    public ConvexResult(List<float3> hvertices, List<int> hindices)
+    {
+        HullVertices = hvertices;
+        HullIndices = hindices;
+    }
 
-        //public float[] OBBSides = new float[3]; // the width, height and breadth of the best fit OBB
-        //public float[] OBBCenter = new float[3]; // the center of the OBB
-        //public float[] OBBOrientation = new float[4]; // the quaternion rotation of the OBB.
-        //public float[] OBBTransform = new float[16]; // the 4x4 transform of the OBB.
-        //public float OBBVolume; // the volume of the OBB
+    public ConvexResult(ConvexResult r)
+    {
+        HullVertices = new List<float3>(r.HullVertices);
+        HullIndices = new List<int>(r.HullIndices);
+    }
 
-        //public float SphereRadius; // radius and center of best fit sphere
-        //public float[] SphereCenter = new float[3];
-        //public float SphereVolume; // volume of the best fit sphere
-
-        public ConvexResult()
-        {
-            HullVertices = new List<float3>();
-            HullIndices = new List<int>();
-        }
-
-        public ConvexResult(List<float3> hvertices, List<int> hindices)
-        {
-            HullVertices = hvertices;
-            HullIndices = hindices;
-        }
-
-        public ConvexResult(ConvexResult r)
-        {
-            HullVertices = new List<float3>(r.HullVertices);
-            HullIndices = new List<int>(r.HullIndices);
-        }
-
-        public void Dispose()
-        {
-            HullVertices = null;
-            HullIndices = null;
-        }
+    public void Dispose()
+    {
+        HullVertices = null;
+        HullIndices = null;
     }
 }

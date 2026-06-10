@@ -25,38 +25,36 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using MySqlConnector;
 using OpenMetaverse;
 
-namespace OpenSim.Data.MySQL
+namespace OpenSim.Data.MySQL;
+
+/// <summary>
+/// A MySQL Interface for the Grid Server
+/// </summary>
+public class MySQLAvatarData : MySQLGenericTableHandler<AvatarBaseData>,
+        IAvatarData
 {
-    /// <summary>
-    /// A MySQL Interface for the Grid Server
-    /// </summary>
-    public class MySQLAvatarData : MySQLGenericTableHandler<AvatarBaseData>,
-            IAvatarData
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public MySQLAvatarData(string connectionString, string realm) :
-                base(connectionString, realm, "Avatar")
+    public MySQLAvatarData(string connectionString, string realm) :
+            base(connectionString, realm, "Avatar")
+    {
+    }
+
+    public bool Delete(UUID principalID, string name)
+    {
+        using (MySqlCommand cmd = new MySqlCommand())
         {
+            cmd.CommandText = String.Format("delete from {0} where `PrincipalID` = ?PrincipalID and `Name` = ?Name", m_Realm);
+            cmd.Parameters.AddWithValue("?PrincipalID", principalID.ToString());
+            cmd.Parameters.AddWithValue("?Name", name);
+
+            if (ExecuteNonQuery(cmd) > 0)
+                return true;
         }
 
-        public bool Delete(UUID principalID, string name)
-        {
-            using (MySqlCommand cmd = new MySqlCommand())
-            {
-                cmd.CommandText = String.Format("delete from {0} where `PrincipalID` = ?PrincipalID and `Name` = ?Name", m_Realm);
-                cmd.Parameters.AddWithValue("?PrincipalID", principalID.ToString());
-                cmd.Parameters.AddWithValue("?Name", name);
-
-                if (ExecuteNonQuery(cmd) > 0)
-                    return true;
-            }
-
-            return false;
-        }
+        return false;
     }
 }

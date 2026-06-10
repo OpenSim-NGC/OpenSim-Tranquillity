@@ -25,166 +25,160 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Net;
-using System.Net.Sockets;
 using System.Reflection;
-using System.Text;
-using System.IO;
 using OpenMetaverse.StructuredData;
 using OpenMetaverse;
 using log4net;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+/// <summary>
+/// Json rpc request manager.
+/// </summary>
+public class JsonRpcRequestManager
 {
-    /// <summary>
-    /// Json rpc request manager.
-    /// </summary>
-    public class JsonRpcRequestManager
+    static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    public JsonRpcRequestManager()
     {
-        static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        public JsonRpcRequestManager()
+    /// <summary>
+    /// Sends json-rpc request with a serializable type.
+    /// </summary>
+    /// <returns>
+    /// OSD Map.
+    /// </returns>
+    /// <param name='parameters'>
+    /// Serializable type .
+    /// </param>
+    /// <param name='method'>
+    /// Json-rpc method to call.
+    /// </param>
+    /// <param name='uri'>
+    /// URI of json-rpc service.
+    /// </param>
+    /// <param name='jsonId'>
+    /// Id for our call.
+    /// </param>
+    public bool JsonRpcRequest(ref object parameters, string method, string uri, string jsonId)
+    {
+        if (jsonId is null)
+            throw new ArgumentNullException("jsonId");
+        if (uri is null)
+            throw new ArgumentNullException("uri");
+        if (method is null)
+            throw new ArgumentNullException("method");
+        if (parameters is null)
+            throw new ArgumentNullException("parameters");
+
+        if(string.IsNullOrWhiteSpace(uri))
+            return false;
+
+        OSDMap request = new()
         {
+            { "jsonrpc", OSD.FromString("2.0") },
+            { "id", OSD.FromString(jsonId) },
+            { "method", OSD.FromString(method) },
+            { "params", OSD.SerializeMembers(parameters) }
+        };
+
+        OSDMap outerResponse;
+        try
+        {
+            outerResponse = WebUtil.PostToService(uri, request, 10000, true);
+        }
+        catch (Exception e)
+        {
+            m_log.Debug(string.Format("JsonRpc request '{0}' to {1} failed", method, uri), e);
+            return false;
         }
 
-        /// <summary>
-        /// Sends json-rpc request with a serializable type.
-        /// </summary>
-        /// <returns>
-        /// OSD Map.
-        /// </returns>
-        /// <param name='parameters'>
-        /// Serializable type .
-        /// </param>
-        /// <param name='method'>
-        /// Json-rpc method to call.
-        /// </param>
-        /// <param name='uri'>
-        /// URI of json-rpc service.
-        /// </param>
-        /// <param name='jsonId'>
-        /// Id for our call.
-        /// </param>
-        public bool JsonRpcRequest(ref object parameters, string method, string uri, string jsonId)
+        OSD osdtmp;
+        if (!outerResponse.TryGetValue("_Result", out osdtmp) || (osdtmp is not OSDMap response))
         {
-            if (jsonId is null)
-                throw new ArgumentNullException("jsonId");
-            if (uri is null)
-                throw new ArgumentNullException("uri");
-            if (method is null)
-                throw new ArgumentNullException("method");
-            if (parameters is null)
-                throw new ArgumentNullException("parameters");
-
-            if(string.IsNullOrWhiteSpace(uri))
-                return false;
-
-            OSDMap request = new()
-            {
-                { "jsonrpc", OSD.FromString("2.0") },
-                { "id", OSD.FromString(jsonId) },
-                { "method", OSD.FromString(method) },
-                { "params", OSD.SerializeMembers(parameters) }
-            };
-
-            OSDMap outerResponse;
-            try
-            {
-                outerResponse = WebUtil.PostToService(uri, request, 10000, true);
-            }
-            catch (Exception e)
-            {
-                m_log.Debug(string.Format("JsonRpc request '{0}' to {1} failed", method, uri), e);
-                return false;
-            }
-
-            OSD osdtmp;
-            if (!outerResponse.TryGetValue("_Result", out osdtmp) || (osdtmp is not OSDMap response))
-            {
-                m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an invalid response: {2}",
-                    method, uri, OSDParser.SerializeJsonString(outerResponse));
-                return false;
-            }
-
-            if (response.TryGetValue("error", out osdtmp))
-            {
-                m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an error: {2}",
-                    method, uri, OSDParser.SerializeJsonString(osdtmp));
-                return false;
-            }
-
-            if (!response.TryGetValue("result", out osdtmp) || (osdtmp is not OSDMap resultmap))
-            {
-                m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an invalid response: {2}",
-                    method, uri, OSDParser.SerializeJsonString(response));
-                return false;
-            }
-
-            OSD.DeserializeMembers(ref parameters, resultmap);
-            return true;
+            m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an invalid response: {2}",
+                method, uri, OSDParser.SerializeJsonString(outerResponse));
+            return false;
         }
 
-        /// <summary>
-        /// Sends json-rpc request with OSD parameter.
-        /// </summary>
-        /// <returns>
-        /// The rpc request.
-        /// </returns>
-        /// <param name='data'>
-        /// data - incoming as parameters, outgoing as result/error
-        /// </param>
-        /// <param name='method'>
-        /// Json-rpc method to call.
-        /// </param>
-        /// <param name='uri'>
-        /// URI of json-rpc service.
-        /// </param>
-        /// <param name='jsonId'>
-        /// If set to <c>true</c> json identifier.
-        /// </param>
-        public bool JsonRpcRequest(ref OSD data, string method, string uri, string jsonId)
+        if (response.TryGetValue("error", out osdtmp))
         {
-            if (string.IsNullOrEmpty(jsonId))
-                jsonId = UUID.Random().ToString();
-
-            OSDMap request = new()
-            {
-                { "jsonrpc", OSD.FromString("2.0") },
-                { "id", OSD.FromString(jsonId) },
-                { "method", OSD.FromString(method) },
-                { "params", data }
-            };
-
-            OSDMap outerresponse;
-            try
-            {
-                outerresponse = WebUtil.PostToService(uri, request, 10000, true);
-            }
-            catch (Exception e)
-            {
-                m_log.Debug(string.Format("JsonRpc request '{0}' to {1} failed", method, uri), e);
-                return false;
-            }
-
-            OSD osdtmp;
-            if (!outerresponse.TryGetValue("_Result", out osdtmp) || (osdtmp is not OSDMap response))
-            {
-                m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an invalid response: {2}",
-                    method, uri, OSDParser.SerializeJsonString(outerresponse));
-                return false;
-            }
-
-            if (response.TryGetValue("error", out osdtmp))
-            {
-                data = osdtmp;
-                m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an error: {2}",
-                    method, uri, OSDParser.SerializeJsonString(osdtmp));
-                return false;
-            }
-
-            data = response;
-            return true;
+            m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an error: {2}",
+                method, uri, OSDParser.SerializeJsonString(osdtmp));
+            return false;
         }
+
+        if (!response.TryGetValue("result", out osdtmp) || (osdtmp is not OSDMap resultmap))
+        {
+            m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an invalid response: {2}",
+                method, uri, OSDParser.SerializeJsonString(response));
+            return false;
+        }
+
+        OSD.DeserializeMembers(ref parameters, resultmap);
+        return true;
+    }
+
+    /// <summary>
+    /// Sends json-rpc request with OSD parameter.
+    /// </summary>
+    /// <returns>
+    /// The rpc request.
+    /// </returns>
+    /// <param name='data'>
+    /// data - incoming as parameters, outgoing as result/error
+    /// </param>
+    /// <param name='method'>
+    /// Json-rpc method to call.
+    /// </param>
+    /// <param name='uri'>
+    /// URI of json-rpc service.
+    /// </param>
+    /// <param name='jsonId'>
+    /// If set to <c>true</c> json identifier.
+    /// </param>
+    public bool JsonRpcRequest(ref OSD data, string method, string uri, string jsonId)
+    {
+        if (string.IsNullOrEmpty(jsonId))
+            jsonId = UUID.Random().ToString();
+
+        OSDMap request = new()
+        {
+            { "jsonrpc", OSD.FromString("2.0") },
+            { "id", OSD.FromString(jsonId) },
+            { "method", OSD.FromString(method) },
+            { "params", data }
+        };
+
+        OSDMap outerresponse;
+        try
+        {
+            outerresponse = WebUtil.PostToService(uri, request, 10000, true);
+        }
+        catch (Exception e)
+        {
+            m_log.Debug(string.Format("JsonRpc request '{0}' to {1} failed", method, uri), e);
+            return false;
+        }
+
+        OSD osdtmp;
+        if (!outerresponse.TryGetValue("_Result", out osdtmp) || (osdtmp is not OSDMap response))
+        {
+            m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an invalid response: {2}",
+                method, uri, OSDParser.SerializeJsonString(outerresponse));
+            return false;
+        }
+
+        if (response.TryGetValue("error", out osdtmp))
+        {
+            data = osdtmp;
+            m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an error: {2}",
+                method, uri, OSDParser.SerializeJsonString(osdtmp));
+            return false;
+        }
+
+        data = response;
+        return true;
     }
 }

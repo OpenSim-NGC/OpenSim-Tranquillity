@@ -25,16 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using OpenSim.Framework;
 using System.Collections;
 
-namespace OpenSim.Services.Interfaces
+namespace OpenSim.Services.Interfaces;
+
+public interface IFreeswitchService
 {
-    public interface IFreeswitchService
-    {
-        Hashtable HandleDirectoryRequest(Hashtable requestBody);
-        Hashtable HandleDialplanRequest(Hashtable requestBody);
-        string GetJsonConfig();
-    }
+    Hashtable HandleDirectoryRequest(Hashtable requestBody);
+    Hashtable HandleDialplanRequest(Hashtable requestBody);
+    string GetJsonConfig();
 }

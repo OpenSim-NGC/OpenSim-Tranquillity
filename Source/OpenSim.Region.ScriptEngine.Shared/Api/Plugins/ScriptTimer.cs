@@ -25,193 +25,190 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 
-namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
+namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
+
+public class ScriptTimer
 {
-    public class ScriptTimer
+    public class TimerInfo
     {
-        public class TimerInfo
-        {
-            public UUID itemID;
-            public uint localID;
-            public long interval;
-            public long next;
+        public UUID itemID;
+        public uint localID;
+        public long interval;
+        public long next;
 
-            public TimerInfo Clone()
-            {
-                return (TimerInfo)this.MemberwiseClone();
-            }
+        public TimerInfo Clone()
+        {
+            return (TimerInfo)this.MemberwiseClone();
         }
+    }
 
-        public AsyncCommandManager m_CmdManager;
+    public AsyncCommandManager m_CmdManager;
 
-        public int TimersCount
+    public int TimersCount
+    {
+        get
         {
-            get
-            {
-                lock (TimerListLock)
-                    return Timers.Count;
-            }
-        }
-
-        public ScriptTimer(AsyncCommandManager CmdManager)
-        {
-            m_CmdManager = CmdManager;
-        }
-
-        //
-        // TIMER
-        //
-        private static string MakeTimerKey(uint localID, UUID itemID)
-        {
-            return localID.ToString() + itemID.ToString();
-        }
-
-        private readonly Dictionary<string,TimerInfo> Timers = new();
-        private readonly object TimerListLock = new();
-        private List<TimerInfo> TimersCache = null;
-
-        public void SetTimerEvent(uint _localID, UUID _itemID, double sec)
-        {
-            if (sec == 0.0) // Disabling timer
-            {
-                UnSetTimerEvents(_localID, _itemID);
-                return;
-            }
-
-            string key = MakeTimerKey(_localID, _itemID);
-            long intervalTicks = (long)(sec * TimeSpan.TicksPerSecond);
-
             lock (TimerListLock)
-            {
-                if (Timers.TryGetValue(key, out TimerInfo ts))
-                {
-                    ts.interval = intervalTicks;
-                    ts.next = DateTime.UtcNow.Ticks + ts.interval;
-                }
-                else
-                {
-                    ts = new TimerInfo()
-                    {
-                        localID = _localID,
-                        itemID = _itemID,
-                        interval = intervalTicks,
-                        next = DateTime.UtcNow.Ticks + intervalTicks
-                    };
-                    Timers[key] = ts;
-                    TimersCache = null;
-                }
-            }
+                return Timers.Count;
+        }
+    }
+
+    public ScriptTimer(AsyncCommandManager CmdManager)
+    {
+        m_CmdManager = CmdManager;
+    }
+
+    //
+    // TIMER
+    //
+    private static string MakeTimerKey(uint localID, UUID itemID)
+    {
+        return localID.ToString() + itemID.ToString();
+    }
+
+    private readonly Dictionary<string,TimerInfo> Timers = new();
+    private readonly object TimerListLock = new();
+    private List<TimerInfo> TimersCache = null;
+
+    public void SetTimerEvent(uint _localID, UUID _itemID, double sec)
+    {
+        if (sec == 0.0) // Disabling timer
+        {
+            UnSetTimerEvents(_localID, _itemID);
+            return;
         }
 
-        public void UnSetTimerEvents(uint m_localID, UUID m_itemID)
+        string key = MakeTimerKey(_localID, _itemID);
+        long intervalTicks = (long)(sec * TimeSpan.TicksPerSecond);
+
+        lock (TimerListLock)
         {
-            // Remove from timer
-            string key = MakeTimerKey(m_localID, m_itemID);
-            lock (TimerListLock)
+            if (Timers.TryGetValue(key, out TimerInfo ts))
             {
-                if (Timers.Remove(key, out TimerInfo ts))
+                ts.interval = intervalTicks;
+                ts.next = DateTime.UtcNow.Ticks + ts.interval;
+            }
+            else
+            {
+                ts = new TimerInfo()
                 {
-                    m_CmdManager.m_ScriptEngine.CancelScriptEvent(ts.itemID, "timer");
-                    TimersCache = null;
-                }
-            }
-        }
-
-        public void CheckTimerEvents()
-        {
-            List<TimerInfo> tvals;
-            lock (TimerListLock)
-            {
-                if (Timers.Count == 0)
-                    return;
-                tvals = TimersCache ?? new List<TimerInfo>(Timers.Values);
-            }
-
-            long now = DateTime.UtcNow.Ticks;
-            foreach (TimerInfo ts in tvals)
-            {
-                // Time has passed?
-                if (ts.next <= now)
-                {
-                    // Add it to queue
-                    m_CmdManager.m_ScriptEngine.PostScriptEvent(ts.itemID,
-                            new EventParams("timer", new Object[0],
-                            new DetectParams[0]));
-                    // set next interval
-                    ts.next = now + ts.interval;
-                }
-            }
-        }
-
-        public Object[] GetSerializationData(UUID itemID)
-        {
-            List<Object> data = new();
-
-            List<TimerInfo> tvals;
-            lock (TimerListLock)
-            {
-                if (Timers.Count == 0)
-                    return new object[0];
-                tvals = TimersCache ?? new List<TimerInfo>(Timers.Values);
-            }
-
-            long now = DateTime.UtcNow.Ticks;
-            foreach (TimerInfo ts in tvals)
-            {
-                if (ts.itemID.Equals(itemID))
-                {
-                    data.Add(ts.interval);
-                    data.Add(ts.next - now);
-                }
-            }
-
-            return data.ToArray();
-        }
-
-        public void CreateFromData(uint localID, UUID itemID, UUID objectID, Object[] data)
-        {
-            int idx = 0;
-            long now = DateTime.UtcNow.Ticks;
-
-            while (idx < data.Length)
-            {
-                TimerInfo ts = new()
-                { 
-                    localID = localID,
-                    itemID = itemID,
-                    interval = (long)data[idx],
-                    next = now + (long)data[idx+1]
+                    localID = _localID,
+                    itemID = _itemID,
+                    interval = intervalTicks,
+                    next = DateTime.UtcNow.Ticks + intervalTicks
                 };
+                Timers[key] = ts;
+                TimersCache = null;
+            }
+        }
+    }
 
-                idx += 2;
-                string tskey = MakeTimerKey(localID, itemID);
-                lock (TimerListLock)
-                {
-                    Timers.Add(tskey, ts);
-                    TimersCache = null;
-                }
+    public void UnSetTimerEvents(uint m_localID, UUID m_itemID)
+    {
+        // Remove from timer
+        string key = MakeTimerKey(m_localID, m_itemID);
+        lock (TimerListLock)
+        {
+            if (Timers.Remove(key, out TimerInfo ts))
+            {
+                m_CmdManager.m_ScriptEngine.CancelScriptEvent(ts.itemID, "timer");
+                TimersCache = null;
+            }
+        }
+    }
+
+    public void CheckTimerEvents()
+    {
+        List<TimerInfo> tvals;
+        lock (TimerListLock)
+        {
+            if (Timers.Count == 0)
+                return;
+            tvals = TimersCache ?? new List<TimerInfo>(Timers.Values);
+        }
+
+        long now = DateTime.UtcNow.Ticks;
+        foreach (TimerInfo ts in tvals)
+        {
+            // Time has passed?
+            if (ts.next <= now)
+            {
+                // Add it to queue
+                m_CmdManager.m_ScriptEngine.PostScriptEvent(ts.itemID,
+                        new EventParams("timer", new Object[0],
+                        new DetectParams[0]));
+                // set next interval
+                ts.next = now + ts.interval;
+            }
+        }
+    }
+
+    public Object[] GetSerializationData(UUID itemID)
+    {
+        List<Object> data = new();
+
+        List<TimerInfo> tvals;
+        lock (TimerListLock)
+        {
+            if (Timers.Count == 0)
+                return new object[0];
+            tvals = TimersCache ?? new List<TimerInfo>(Timers.Values);
+        }
+
+        long now = DateTime.UtcNow.Ticks;
+        foreach (TimerInfo ts in tvals)
+        {
+            if (ts.itemID.Equals(itemID))
+            {
+                data.Add(ts.interval);
+                data.Add(ts.next - now);
             }
         }
 
-        public List<TimerInfo> GetTimersInfo()
+        return data.ToArray();
+    }
+
+    public void CreateFromData(uint localID, UUID itemID, UUID objectID, Object[] data)
+    {
+        int idx = 0;
+        long now = DateTime.UtcNow.Ticks;
+
+        while (idx < data.Length)
         {
-            List<TimerInfo> retList = new();
-            List<TimerInfo> tvals;
+            TimerInfo ts = new()
+            { 
+                localID = localID,
+                itemID = itemID,
+                interval = (long)data[idx],
+                next = now + (long)data[idx+1]
+            };
+
+            idx += 2;
+            string tskey = MakeTimerKey(localID, itemID);
             lock (TimerListLock)
             {
-                if (Timers.Count == 0)
-                    return retList;
-                tvals = TimersCache ?? new List<TimerInfo>(Timers.Values);
+                Timers.Add(tskey, ts);
+                TimersCache = null;
             }
-
-            foreach (TimerInfo i in tvals)
-                retList.Add(i.Clone());
-
-            return retList;
         }
+    }
+
+    public List<TimerInfo> GetTimersInfo()
+    {
+        List<TimerInfo> retList = new();
+        List<TimerInfo> tvals;
+        lock (TimerListLock)
+        {
+            if (Timers.Count == 0)
+                return retList;
+            tvals = TimersCache ?? new List<TimerInfo>(Timers.Values);
+        }
+
+        foreach (TimerInfo i in tvals)
+            retList.Add(i.Clone());
+
+        return retList;
     }
 }

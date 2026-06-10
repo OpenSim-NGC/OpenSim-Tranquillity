@@ -25,77 +25,74 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class UserData
 {
-    public class UserData
+    public UUID Id;
+    public string FirstName;
+    public string LastName;
+    public string HomeURL;
+    public Dictionary<string, object> ServerURLs;
+    public bool IsUnknownUser;
+    public bool HasGridUserTried;
+    public bool IsLocal;
+    public double LastWebFail = -1;
+    public string DisplayName;
+    public DateTime NameChanged;
+
+    public bool IsNameDefault
     {
-        public UUID Id;
-        public string FirstName;
-        public string LastName;
-        public string HomeURL;
-        public Dictionary<string, object> ServerURLs;
-        public bool IsUnknownUser;
-        public bool HasGridUserTried;
-        public bool IsLocal;
-        public double LastWebFail = -1;
-        public string DisplayName;
-        public DateTime NameChanged;
-
-        public bool IsNameDefault
+        get
         {
-            get
-            {
-                return string.IsNullOrWhiteSpace(DisplayName);
-            }
-        }
-
-        public string LegacyName
-        {
-            get
-            {
-                if (LastName.ToLower() == "resident")
-                    return FirstName;
-                else return $"{FirstName} {LastName}";
-            }
-        }
-
-        public string Username
-        {
-            get
-            {
-                if (LastName.ToLower() == "resident")
-                    return FirstName;
-                else if(LastName.StartsWith("@"))
-                    return $"{FirstName}{LastName}";
-                else return $"{FirstName}.{LastName}";
-            }
-        }
-
-        public string LowerUsername
-        {
-            get
-            {
-                return Username.ToLower();
-            }
-        }
-
-        public string ViewerDisplayName
-        {
-            get
-            {
-                if (IsNameDefault)
-                    return LegacyName;
-                else return DisplayName;
-            }
+            return string.IsNullOrWhiteSpace(DisplayName);
         }
     }
 
-    public interface IPeople
+    public string LegacyName
     {
-        List<UserData> GetUserData(string query, int page_size, int page_number);
+        get
+        {
+            if (LastName.ToLower() == "resident")
+                return FirstName;
+            else return $"{FirstName} {LastName}";
+        }
     }
+
+    public string Username
+    {
+        get
+        {
+            if (LastName.ToLower() == "resident")
+                return FirstName;
+            else if(LastName.StartsWith("@"))
+                return $"{FirstName}{LastName}";
+            else return $"{FirstName}.{LastName}";
+        }
+    }
+
+    public string LowerUsername
+    {
+        get
+        {
+            return Username.ToLower();
+        }
+    }
+
+    public string ViewerDisplayName
+    {
+        get
+        {
+            if (IsNameDefault)
+                return LegacyName;
+            else return DisplayName;
+        }
+    }
+}
+
+public interface IPeople
+{
+    List<UserData> GetUserData(string query, int page_size, int page_number);
 }

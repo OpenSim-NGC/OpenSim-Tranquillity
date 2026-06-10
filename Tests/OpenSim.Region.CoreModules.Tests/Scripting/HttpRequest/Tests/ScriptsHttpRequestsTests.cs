@@ -25,22 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Net;
-using System.Runtime.Serialization;
-using System.Text;
-using Xunit;
-
-using OpenSim.Framework;
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.CoreModules.Scripting.HttpRequest.Tests
+namespace OpenSim.Region.CoreModules.Scripting.HttpRequest.Tests;
+
+/// <summary>
+/// Disabled pending conversion from NUnit to xUnit.
+/// This test class requires significant manual work to convert NUnit-specific patterns.
+/// </summary>
+public class ScriptsHttpRequestsTests : OpenSimTestCase
 {
-    /// <summary>
-    /// Disabled pending conversion from NUnit to xUnit.
-    /// This test class requires significant manual work to convert NUnit-specific patterns.
-    /// </summary>
-    public class ScriptsHttpRequestsTests : OpenSimTestCase
-    {
-        // Placeholder for disabled tests
-    }
+    // Placeholder for disabled tests
 }

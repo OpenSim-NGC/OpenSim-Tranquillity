@@ -36,182 +36,181 @@ using OpenSim.Region.Framework.Scenes;
 using OpenMetaverse;
 using log4net;
 
-namespace OpenSim.Region.CoreModules.World.Estate
+namespace OpenSim.Region.CoreModules.World.Estate;
+
+public class EstateConnector
 {
-    public class EstateConnector
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected EstateModule m_EstateModule;
+    private string token;
+    uint port = 0;
+
+    public EstateConnector(EstateModule module, string _token, uint _port)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_EstateModule = module;
+        token = _token;
+        port = _port;
+    }
 
-        protected EstateModule m_EstateModule;
-        private string token;
-        uint port = 0;
+    public void SendTeleportHomeOneUser(uint EstateID, UUID PreyID)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["METHOD"] = "teleport_home_one_user";
+        sendData["TOKEN"] = token;
 
-        public EstateConnector(EstateModule module, string _token, uint _port)
+        sendData["EstateID"] = EstateID.ToString();
+        sendData["PreyID"] = PreyID.ToString();
+
+        SendToEstate(EstateID, sendData);
+    }
+
+    public void SendTeleportHomeAllUsers(uint EstateID)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["METHOD"] = "teleport_home_all_users";
+        sendData["TOKEN"] = token;
+
+        sendData["EstateID"] = EstateID.ToString();
+
+        SendToEstate(EstateID, sendData);
+    }
+
+    public bool SendUpdateCovenant(uint EstateID, UUID CovenantID)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["METHOD"] = "update_covenant";
+        sendData["TOKEN"] = token;
+
+        sendData["CovenantID"] = CovenantID.ToString();
+        sendData["EstateID"] = EstateID.ToString();
+
+        // Handle local regions locally
+        //
+        foreach (Scene s in m_EstateModule.Scenes)
         {
-            m_EstateModule = module;
-            token = _token;
-            port = _port;
-        }
-
-        public void SendTeleportHomeOneUser(uint EstateID, UUID PreyID)
-        {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            sendData["METHOD"] = "teleport_home_one_user";
-            sendData["TOKEN"] = token;
-
-            sendData["EstateID"] = EstateID.ToString();
-            sendData["PreyID"] = PreyID.ToString();
-
-            SendToEstate(EstateID, sendData);
-        }
-
-        public void SendTeleportHomeAllUsers(uint EstateID)
-        {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            sendData["METHOD"] = "teleport_home_all_users";
-            sendData["TOKEN"] = token;
-
-            sendData["EstateID"] = EstateID.ToString();
-
-            SendToEstate(EstateID, sendData);
-        }
-
-        public bool SendUpdateCovenant(uint EstateID, UUID CovenantID)
-        {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            sendData["METHOD"] = "update_covenant";
-            sendData["TOKEN"] = token;
-
-            sendData["CovenantID"] = CovenantID.ToString();
-            sendData["EstateID"] = EstateID.ToString();
-
-            // Handle local regions locally
-            //
-            foreach (Scene s in m_EstateModule.Scenes)
-            {
-                if (s.RegionInfo.EstateSettings.EstateID == EstateID)
-                    s.RegionInfo.RegionSettings.Covenant = CovenantID;
+            if (s.RegionInfo.EstateSettings.EstateID == EstateID)
+                s.RegionInfo.RegionSettings.Covenant = CovenantID;
 //                    s.ReloadEstateData();
-            }
-
-            SendToEstate(EstateID, sendData);
-
-            return true;
         }
 
-        public bool SendUpdateEstate(uint EstateID)
+        SendToEstate(EstateID, sendData);
+
+        return true;
+    }
+
+    public bool SendUpdateEstate(uint EstateID)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["METHOD"] = "update_estate";
+        sendData["TOKEN"] = token;
+
+        sendData["EstateID"] = EstateID.ToString();
+
+        // Handle local regions locally
+        //
+        foreach (Scene s in m_EstateModule.Scenes)
         {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            sendData["METHOD"] = "update_estate";
-            sendData["TOKEN"] = token;
+            if (s.RegionInfo.EstateSettings.EstateID == EstateID)
+                s.ReloadEstateData();
+        }
 
-            sendData["EstateID"] = EstateID.ToString();
+        SendToEstate(EstateID, sendData);
 
-            // Handle local regions locally
-            //
+        return true;
+    }
+
+    public void SendEstateMessage(uint EstateID, UUID FromID, string FromName, string Message)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["METHOD"] = "estate_message";
+        sendData["TOKEN"] = token;
+
+        sendData["EstateID"] = EstateID.ToString();
+        sendData["FromID"] = FromID.ToString();
+        sendData["FromName"] = FromName;
+        sendData["Message"] = Message;
+
+        SendToEstate(EstateID, sendData);
+    }
+
+    private void SendToEstate(uint EstateID, Dictionary<string, object> sendData)
+    {
+        List<UUID> regions = m_EstateModule.Scenes[0].GetEstateRegions((int)EstateID);
+
+        // Don't send to the same instance twice
+        HashSet<string> done = new HashSet<string>();
+
+        // Handle local regions locally
+        lock (m_EstateModule.Scenes)
+        {
             foreach (Scene s in m_EstateModule.Scenes)
             {
-                if (s.RegionInfo.EstateSettings.EstateID == EstateID)
-                    s.ReloadEstateData();
-            }
-
-            SendToEstate(EstateID, sendData);
-
-            return true;
-        }
-
-        public void SendEstateMessage(uint EstateID, UUID FromID, string FromName, string Message)
-        {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            sendData["METHOD"] = "estate_message";
-            sendData["TOKEN"] = token;
-
-            sendData["EstateID"] = EstateID.ToString();
-            sendData["FromID"] = FromID.ToString();
-            sendData["FromName"] = FromName;
-            sendData["Message"] = Message;
-
-            SendToEstate(EstateID, sendData);
-        }
-
-        private void SendToEstate(uint EstateID, Dictionary<string, object> sendData)
-        {
-            List<UUID> regions = m_EstateModule.Scenes[0].GetEstateRegions((int)EstateID);
-
-            // Don't send to the same instance twice
-            HashSet<string> done = new HashSet<string>();
-
-            // Handle local regions locally
-            lock (m_EstateModule.Scenes)
-            {
-                foreach (Scene s in m_EstateModule.Scenes)
+                RegionInfo sreg = s.RegionInfo;
+                if (regions.Contains(sreg.RegionID))
                 {
-                    RegionInfo sreg = s.RegionInfo;
-                    if (regions.Contains(sreg.RegionID))
-                    {
-                        string url = sreg.ExternalHostName + ":" + sreg.HttpPort;
-                        regions.Remove(sreg.RegionID);
-                        if(!done.Contains(url)) // we may have older regs with same url lost in dbs
-                            done.Add(url);
-                    }
-                }
-            }
-
-            if(regions.Count == 0)
-                return;
-
-            Scene baseScene = m_EstateModule.Scenes[0];
-            UUID ScopeID = baseScene.RegionInfo.ScopeID;
-            IGridService gridService = baseScene.GridService;
-            if(gridService == null)
-                return;
-
-            // Send to remote regions
-            foreach (UUID regionID in regions)
-            {
-                GridRegion region = gridService.GetRegionByUUID(ScopeID, regionID);
-                if (region != null)
-                {
-                    string url = region.ExternalHostName + ":" + region.HttpPort;
-                    if(done.Contains(url))
-                        continue;
-                    Call(region, sendData);
-                    done.Add(url);
+                    string url = sreg.ExternalHostName + ":" + sreg.HttpPort;
+                    regions.Remove(sreg.RegionID);
+                    if(!done.Contains(url)) // we may have older regs with same url lost in dbs
+                        done.Add(url);
                 }
             }
         }
 
-        private bool Call(GridRegion region, Dictionary<string, object> sendData)
+        if(regions.Count == 0)
+            return;
+
+        Scene baseScene = m_EstateModule.Scenes[0];
+        UUID ScopeID = baseScene.RegionInfo.ScopeID;
+        IGridService gridService = baseScene.GridService;
+        if(gridService == null)
+            return;
+
+        // Send to remote regions
+        foreach (UUID regionID in regions)
         {
-            string reqString = ServerUtils.BuildQueryString(sendData);
-            // m_log.DebugFormat("[ESTATE CONNECTOR]: queryString = {0}", reqString);
-            try
+            GridRegion region = gridService.GetRegionByUUID(ScopeID, regionID);
+            if (region != null)
             {
-                //string url = "";
-                //if(region.HttpPort != 0)
-                //    url = "http://" + region.ExternalHostName + ":" + region.HttpPort + "/";
-                //else
-                //    url = region.ServerURI;
-
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                //        url + "estate",
-                        region.ServerURI + "estate",
-                        reqString);
-
-                if (!string.IsNullOrEmpty(reply))
-                {
-                        int indx = reply.IndexOf("true", StringComparison.InvariantCultureIgnoreCase);
-                        return indx > 0;
-                }
-                else
-                    m_log.DebugFormat("[ESTATE CONNECTOR]: received empty reply");
+                string url = region.ExternalHostName + ":" + region.HttpPort;
+                if(done.Contains(url))
+                    continue;
+                Call(region, sendData);
+                done.Add(url);
             }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[ESTATE CONNECTOR]: Exception when contacting remote sim: {0}", e.Message);
-            }
-
-            return false;
         }
+    }
+
+    private bool Call(GridRegion region, Dictionary<string, object> sendData)
+    {
+        string reqString = ServerUtils.BuildQueryString(sendData);
+        // m_log.DebugFormat("[ESTATE CONNECTOR]: queryString = {0}", reqString);
+        try
+        {
+            //string url = "";
+            //if(region.HttpPort != 0)
+            //    url = "http://" + region.ExternalHostName + ":" + region.HttpPort + "/";
+            //else
+            //    url = region.ServerURI;
+
+            string reply = SynchronousRestFormsRequester.MakeRequest("POST",
+            //        url + "estate",
+                    region.ServerURI + "estate",
+                    reqString);
+
+            if (!string.IsNullOrEmpty(reply))
+            {
+                    int indx = reply.IndexOf("true", StringComparison.InvariantCultureIgnoreCase);
+                    return indx > 0;
+            }
+            else
+                m_log.DebugFormat("[ESTATE CONNECTOR]: received empty reply");
+        }
+        catch (Exception e)
+        {
+            m_log.DebugFormat("[ESTATE CONNECTOR]: Exception when contacting remote sim: {0}", e.Message);
+        }
+
+        return false;
     }
 }

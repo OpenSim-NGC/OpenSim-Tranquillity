@@ -26,64 +26,62 @@
  */
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.Modifiers
+namespace OpenSim.Region.CoreModules.World.Terrain.Modifiers;
+
+public class LowerModifier : TerrainModifier
 {
-    public class LowerModifier : TerrainModifier
+    public LowerModifier(ITerrainModule module) : base(module)
     {
-        public LowerModifier(ITerrainModule module) : base(module)
+    }
+
+    public override string ModifyTerrain(ITerrainChannel map, string[] args)
+    {
+        string result;
+        if (args.Length < 3)
         {
+            result = "Usage: " + GetUsage();
         }
-
-        public override string ModifyTerrain(ITerrainChannel map, string[] args)
+        else
         {
-            string result;
-            if (args.Length < 3)
-            {
-                result = "Usage: " + GetUsage();
-            }
-            else
-            {
-                TerrainModifierData data;
-                result = this.parseParameters(args, out data);
+            TerrainModifierData data;
+            result = this.parseParameters(args, out data);
 
-                // Context-specific validation
-                if (result.Length == 0)
+            // Context-specific validation
+            if (result.Length == 0)
+            {
+                if (data.shape.Length == 0)
                 {
-                    if (data.shape.Length == 0)
-                    {
-                        data.shape = "rectangle";
-                        data.x0 = 0;
-                        data.y0 = 0;
-                        data.dx = map.Width;
-                        data.dy = map.Height;
-                    }
-                }
-
-                // if it's all good, then do the work
-                if (result.Length == 0)
-                {
-                    this.applyModification(map, data);
+                    data.shape = "rectangle";
+                    data.x0 = 0;
+                    data.y0 = 0;
+                    data.dx = map.Width;
+                    data.dy = map.Height;
                 }
             }
 
-            return result;
+            // if it's all good, then do the work
+            if (result.Length == 0)
+            {
+                this.applyModification(map, data);
+            }
         }
 
-        public override string GetUsage()
-        {
-            string val = "lower <delta> [ -rec=x1,y1,dx[,dy] | -ell=x0,y0,rx[,ry] ] [-taper=<delta2>]"
-                            + "\nLowers all points within the specified range by the specified amount.";
-            return val;
+        return result;
+    }
 
-        }
+    public override string GetUsage()
+    {
+        string val = "lower <delta> [ -rec=x1,y1,dx[,dy] | -ell=x0,y0,rx[,ry] ] [-taper=<delta2>]"
+                        + "\nLowers all points within the specified range by the specified amount.";
+        return val;
 
-        public override float operate(float[,] map, TerrainModifierData data, int x, int y)
-        {
-            float factor = this.computeBevel(data, x, y);
-            float result = map[x, y] - (data.elevation - (data.elevation - data.bevelevation) * factor);
-            return result;
-        }
+    }
 
+    public override float operate(float[,] map, TerrainModifierData data, int x, int y)
+    {
+        float factor = this.computeBevel(data, x, y);
+        float result = map[x, y] - (data.elevation - (data.elevation - data.bevelevation) * factor);
+        return result;
     }
 
 }

@@ -33,200 +33,199 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
+namespace OpenSim.Region.CoreModules.Avatar.InstantMessage;
+
+public class MuteListModule : ISharedRegionModule
 {
-    public class MuteListModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected bool m_Enabled = false;
+    protected List<Scene> m_SceneList = new List<Scene>();
+    protected IMuteListService m_service = null;
+    private IUserManagement m_userManagementModule;
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        IConfig cnf = config.Configs["Messaging"];
+        if (cnf == null)
+            return;
 
-        protected bool m_Enabled = false;
-        protected List<Scene> m_SceneList = new List<Scene>();
-        protected IMuteListService m_service = null;
-        private IUserManagement m_userManagementModule;
+        if (cnf.GetString("MuteListModule", "None") != "MuteListModule")
+            return;
 
-        public void Initialise(IConfigSource config)
+        m_Enabled = true;
+    }
+
+    public void AddRegion(Scene scene)
+    {
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        IXfer xfer = scene.RequestModuleInterface<IXfer>();
+        if (xfer == null)
         {
-            IConfig cnf = config.Configs["Messaging"];
-            if (cnf == null)
-                return;
-
-            if (cnf.GetString("MuteListModule", "None") != "MuteListModule")
-                return;
-
-            m_Enabled = true;
+            m_log.ErrorFormat("[MuteListModule]: Xfer not available in region {0}. Module Disabled", scene.Name);
+            m_Enabled = false;
+            return;
         }
 
-        public void AddRegion(Scene scene)
+        IMuteListService srv = scene.RequestModuleInterface<IMuteListService>();
+        if(srv == null)
         {
+            m_log.ErrorFormat("[MuteListModule]: MuteListService not available in region {0}. Module Disabled", scene.Name);
+            m_Enabled = false;
+            return;
         }
 
-        public void RegionLoaded(Scene scene)
+        lock (m_SceneList)
         {
-            if (!m_Enabled)
-                return;
-
-            IXfer xfer = scene.RequestModuleInterface<IXfer>();
-            if (xfer == null)
-            {
-                m_log.ErrorFormat("[MuteListModule]: Xfer not available in region {0}. Module Disabled", scene.Name);
-                m_Enabled = false;
-                return;
-            }
-
-            IMuteListService srv = scene.RequestModuleInterface<IMuteListService>();
-            if(srv == null)
-            {
-                m_log.ErrorFormat("[MuteListModule]: MuteListService not available in region {0}. Module Disabled", scene.Name);
-                m_Enabled = false;
-                return;
-            }
-
-            lock (m_SceneList)
-            {
-                if(m_service == null)
-                    m_service = srv;
-                if(m_userManagementModule == null)
-                     m_userManagementModule = scene.RequestModuleInterface<IUserManagement>();
-                m_SceneList.Add(scene);
-                scene.EventManager.OnNewClient += OnNewClient;
-            }
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            lock (m_SceneList)
-            {
-                if(m_SceneList.Contains(scene))
-                {
-                    m_SceneList.Remove(scene);
-                    scene.EventManager.OnNewClient -= OnNewClient;
-                }
-            }
-        }
-
-        public void PostInitialise()
-        {
-            if (!m_Enabled)
-                return;
-
-            m_log.Debug("[MuteListModule]: enabled");
-        }
-
-        public string Name
-        {
-            get { return "MuteListModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public void Close()
-        {
-        }
-
-        private bool IsForeign(IClientAPI client)
-        {
+            if(m_service == null)
+                m_service = srv;
             if(m_userManagementModule == null)
-                return false; // we can't check
-
-            return !m_userManagementModule.IsLocalGridUser(client.AgentId);
+                 m_userManagementModule = scene.RequestModuleInterface<IUserManagement>();
+            m_SceneList.Add(scene);
+            scene.EventManager.OnNewClient += OnNewClient;
         }
+    }
 
-        private void OnNewClient(IClientAPI client)
+    public void RemoveRegion(Scene scene)
+    {
+        lock (m_SceneList)
         {
-            client.OnMuteListRequest += OnMuteListRequest;
-            client.OnUpdateMuteListEntry += OnUpdateMuteListEntry;
-            client.OnRemoveMuteListEntry += OnRemoveMuteListEntry;
+            if(m_SceneList.Contains(scene))
+            {
+                m_SceneList.Remove(scene);
+                scene.EventManager.OnNewClient -= OnNewClient;
+            }
         }
+    }
 
-        private void OnMuteListRequest(IClientAPI client, uint crc)
+    public void PostInitialise()
+    {
+        if (!m_Enabled)
+            return;
+
+        m_log.Debug("[MuteListModule]: enabled");
+    }
+
+    public string Name
+    {
+        get { return "MuteListModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void Close()
+    {
+    }
+
+    private bool IsForeign(IClientAPI client)
+    {
+        if(m_userManagementModule == null)
+            return false; // we can't check
+
+        return !m_userManagementModule.IsLocalGridUser(client.AgentId);
+    }
+
+    private void OnNewClient(IClientAPI client)
+    {
+        client.OnMuteListRequest += OnMuteListRequest;
+        client.OnUpdateMuteListEntry += OnUpdateMuteListEntry;
+        client.OnRemoveMuteListEntry += OnRemoveMuteListEntry;
+    }
+
+    private void OnMuteListRequest(IClientAPI client, uint crc)
+    {
+        if (!m_Enabled || IsForeign(client))
         {
-            if (!m_Enabled || IsForeign(client))
-            {
-                if(crc == 0)
-                    client.SendEmpytMuteList();
-                else
-                    client.SendUseCachedMuteList();
-                return;
-            }
-
-            IXfer xfer = client.Scene.RequestModuleInterface<IXfer>();
-            if (xfer == null)
-            {
-                if(crc == 0)
-                    client.SendEmpytMuteList();
-                else
-                    client.SendUseCachedMuteList();
-                return;
-            }
-
-            Byte[] data = m_service.MuteListRequest(client.AgentId, crc);
-            if (data == null)
-            {
-                if(crc == 0)
-                    client.SendEmpytMuteList();
-                else
-                    client.SendUseCachedMuteList();
-                return;
-            }
-
-            if (data.Length == 0)
-            {
+            if(crc == 0)
                 client.SendEmpytMuteList();
-                return;
-            }
-
-            if (data.Length == 1)
-            {
-                if(crc == 0)
-                    client.SendEmpytMuteList();
-                else
-                    client.SendUseCachedMuteList();
-                return;
-            }
-
-            string filename = "mutes" + client.AgentId.ToString();
-            xfer.AddNewFile(filename, data);
-            client.SendMuteListUpdate(filename);
+            else
+                client.SendUseCachedMuteList();
+            return;
         }
 
-        private void OnUpdateMuteListEntry(IClientAPI client, UUID muteID, string muteName, int muteType, uint muteFlags)
+        IXfer xfer = client.Scene.RequestModuleInterface<IXfer>();
+        if (xfer == null)
         {
-            if (!m_Enabled || IsForeign(client))
-                return;
-
-            UUID agentID = client.AgentId;
-            if(muteType == 1) // agent
-            {
-                if(agentID == muteID)
-                    return;
-                if(m_SceneList[0].Permissions.IsAdministrator(muteID))
-                {
-                    OnMuteListRequest(client, 0);
-                    return;
-                }
-            }
-
-            MuteData mute = new MuteData();
-            mute.AgentID = agentID;
-            mute.MuteID = muteID;
-            mute.MuteName = muteName;
-            mute.MuteType = muteType;
-            mute.MuteFlags = (int)muteFlags;
-            mute.Stamp = Util.UnixTimeSinceEpoch();
-
-            m_service.UpdateMute(mute);
+            if(crc == 0)
+                client.SendEmpytMuteList();
+            else
+                client.SendUseCachedMuteList();
+            return;
         }
 
-        private void OnRemoveMuteListEntry(IClientAPI client, UUID muteID, string muteName)
+        Byte[] data = m_service.MuteListRequest(client.AgentId, crc);
+        if (data == null)
         {
-            if (!m_Enabled || IsForeign(client))
-                return;
-            m_service.RemoveMute(client.AgentId, muteID, muteName);
+            if(crc == 0)
+                client.SendEmpytMuteList();
+            else
+                client.SendUseCachedMuteList();
+            return;
         }
+
+        if (data.Length == 0)
+        {
+            client.SendEmpytMuteList();
+            return;
+        }
+
+        if (data.Length == 1)
+        {
+            if(crc == 0)
+                client.SendEmpytMuteList();
+            else
+                client.SendUseCachedMuteList();
+            return;
+        }
+
+        string filename = "mutes" + client.AgentId.ToString();
+        xfer.AddNewFile(filename, data);
+        client.SendMuteListUpdate(filename);
+    }
+
+    private void OnUpdateMuteListEntry(IClientAPI client, UUID muteID, string muteName, int muteType, uint muteFlags)
+    {
+        if (!m_Enabled || IsForeign(client))
+            return;
+
+        UUID agentID = client.AgentId;
+        if(muteType == 1) // agent
+        {
+            if(agentID == muteID)
+                return;
+            if(m_SceneList[0].Permissions.IsAdministrator(muteID))
+            {
+                OnMuteListRequest(client, 0);
+                return;
+            }
+        }
+
+        MuteData mute = new MuteData();
+        mute.AgentID = agentID;
+        mute.MuteID = muteID;
+        mute.MuteName = muteName;
+        mute.MuteType = muteType;
+        mute.MuteFlags = (int)muteFlags;
+        mute.Stamp = Util.UnixTimeSinceEpoch();
+
+        m_service.UpdateMute(mute);
+    }
+
+    private void OnRemoveMuteListEntry(IClientAPI client, UUID muteID, string muteName)
+    {
+        if (!m_Enabled || IsForeign(client))
+            return;
+        m_service.RemoveMute(client.AgentId, muteID, muteName);
     }
 }
 

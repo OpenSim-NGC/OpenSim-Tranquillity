@@ -27,41 +27,40 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Data.MySQL.MoneyData
+namespace OpenSim.Data.MySQL.MoneyData;
+
+public interface IMoneyManager
 {
-    public interface IMoneyManager
-    {
-        int getBalance(string userID);
+    int getBalance(string userID);
 
-        //int getBalanceStatus(string userID);
+    //int getBalanceStatus(string userID);
 
-        //bool updateBalanceStatus(string userID,int status);
+    //bool updateBalanceStatus(string userID,int status);
 
-        bool withdrawMoney(UUID transactionID, string senderID, int amount);
+    bool withdrawMoney(UUID transactionID, string senderID, int amount);
 
-        bool giveMoney(UUID transactionID, string receiverID, int amount);
+    bool giveMoney(UUID transactionID, string receiverID, int amount);
 
-        bool addTransaction(TransactionData transaction);
+    bool addTransaction(TransactionData transaction);
 
-        bool updateTransactionStatus(UUID transactionID, int status, string description);
+    bool updateTransactionStatus(UUID transactionID, int status, string description);
 
-        TransactionData FetchTransaction(UUID transactionID);
+    TransactionData FetchTransaction(UUID transactionID);
 
-        TransactionData[] FetchTransaction(string userID, int startTime, int endTime, uint index, uint retNum);
+    TransactionData[] FetchTransaction(string userID, int startTime, int endTime, uint index, uint retNum);
 
-        int getTransactionNum(string userID, int startTime, int endTime);
+    int getTransactionNum(string userID, int startTime, int endTime);
 
-        bool addUser(string userID, int balance, int status, int type);
+    bool addUser(string userID, int balance, int status, int type);
 
-        bool SetTransExpired(int deadTime);
+    bool SetTransExpired(int deadTime);
 
-        bool ValidateTransfer(string secureCode, UUID transactionID);
+    bool ValidateTransfer(string secureCode, UUID transactionID);
 
-        bool addUserInfo(UserInfo user);
+    bool addUserInfo(UserInfo user);
 
-        UserInfo fetchUserInfo(string userID);
+    UserInfo fetchUserInfo(string userID);
 
-        bool updateUserInfo(UserInfo user);
+    bool updateUserInfo(UserInfo user);
 
-    }
 }

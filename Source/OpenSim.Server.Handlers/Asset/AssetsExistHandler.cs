@@ -25,63 +25,52 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System;
-using System.Reflection;
-using System.IO;
 using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
 using System.Xml.Serialization;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
-using OpenMetaverse;
 
-namespace OpenSim.Server.Handlers.Asset
+namespace OpenSim.Server.Handlers.Asset;
+
+public class AssetsExistHandler : BaseStreamHandler
 {
-    public class AssetsExistHandler : BaseStreamHandler
+    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IAssetService m_AssetService;
+
+    public AssetsExistHandler(IAssetService service) :
+        base("POST", "/get_assets_exist")
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_AssetService = service;
+    }
 
-        private IAssetService m_AssetService;
+    public AssetsExistHandler(IAssetService service, IServiceAuth auth) :
+        base("POST", "/get_assets_exist", auth)
+    {
+        m_AssetService = service;
+    }
 
-        public AssetsExistHandler(IAssetService service) :
-            base("POST", "/get_assets_exist")
+    protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        XmlSerializer xs;
+
+        string[] ids;
+        try
         {
-            m_AssetService = service;
+            xs = new XmlSerializer(typeof(string[]));
+            ids = (string[])xs.Deserialize(request);
+        }
+        catch (Exception)
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+            return null;
         }
 
-        public AssetsExistHandler(IAssetService service, IServiceAuth auth) :
-            base("POST", "/get_assets_exist", auth)
-        {
-            m_AssetService = service;
-        }
+        bool[] exist = m_AssetService.AssetsExist(ids);
 
-        protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            XmlSerializer xs;
-
-            string[] ids;
-            try
-            {
-                xs = new XmlSerializer(typeof(string[]));
-                ids = (string[])xs.Deserialize(request);
-            }
-            catch (Exception)
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
-                return null;
-            }
-
-            bool[] exist = m_AssetService.AssetsExist(ids);
-
-            xs = new XmlSerializer(typeof(bool[]));
-            return ServerUtils.SerializeResult(xs, exist);
-        }
+        xs = new XmlSerializer(typeof(bool[]));
+        return ServerUtils.SerializeResult(xs, exist);
     }
 }

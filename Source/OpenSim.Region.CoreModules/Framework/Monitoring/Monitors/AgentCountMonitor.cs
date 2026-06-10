@@ -27,39 +27,38 @@
 
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors
+namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors;
+
+class AgentCountMonitor : IMonitor
 {
-    class AgentCountMonitor : IMonitor
+    private readonly Scene m_scene;
+
+    public AgentCountMonitor(Scene scene)
     {
-        private readonly Scene m_scene;
-
-        public AgentCountMonitor(Scene scene)
-        {
-            m_scene = scene;
-        }
-
-        #region Implementation of IMonitor
-
-        public string GetName()
-        {
-            return "AgentCountMonitor";
-        }
-
-        public double GetValue()
-        {
-            return m_scene.SceneGraph.GetRootAgentCount();
-        }
-
-        public string GetFriendlyName()
-        {
-            return "Root Agent Count";
-        }
-
-        public string GetFriendlyValue()
-        {
-            return (int)GetValue() + " agent(s)";
-        }
-
-        #endregion
+        m_scene = scene;
     }
+
+    #region Implementation of IMonitor
+
+    public string GetName()
+    {
+        return "AgentCountMonitor";
+    }
+
+    public double GetValue()
+    {
+        return m_scene.SceneGraph.GetRootAgentCount();
+    }
+
+    public string GetFriendlyName()
+    {
+        return "Root Agent Count";
+    }
+
+    public string GetFriendlyValue()
+    {
+        return (int)GetValue() + " agent(s)";
+    }
+
+    #endregion
 }

@@ -38,211 +38,210 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Region.CoreModules.Avatar.BakedTextures
+namespace OpenSim.Region.CoreModules.Avatar.BakedTextures;
+
+public class XBakesModule : INonSharedRegionModule, IBakedTextureModule
 {
-    public class XBakesModule : INonSharedRegionModule, IBakedTextureModule
+    protected Scene m_Scene;
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private UTF8Encoding enc = new UTF8Encoding();
+    private string m_URL = String.Empty;
+    private static XmlSerializer m_serializer = new XmlSerializer(typeof(AssetBase));
+    private static bool m_enabled = false;
+
+    private static IServiceAuth m_Auth;
+
+    public void Initialise(IConfigSource configSource)
     {
-        protected Scene m_Scene;
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private UTF8Encoding enc = new UTF8Encoding();
-        private string m_URL = String.Empty;
-        private static XmlSerializer m_serializer = new XmlSerializer(typeof(AssetBase));
-        private static bool m_enabled = false;
+        IConfig config = configSource.Configs["XBakes"];
+        if (config == null)
+            return;
 
-        private static IServiceAuth m_Auth;
+        m_URL = config.GetString("URL", String.Empty);
+        if (m_URL.Length == 0)
+            return;
 
-        public void Initialise(IConfigSource configSource)
+        m_enabled = true;
+
+        m_Auth = ServiceAuth.Create(configSource, "XBakes");
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_enabled)
+            return;
+
+        // m_log.InfoFormat("[XBakes]: Enabled for region {0}", scene.RegionInfo.RegionName);
+        m_Scene = scene;
+
+        scene.RegisterModuleInterface<IBakedTextureModule>(this);
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public string Name
+    {
+        get { return "XBakesModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public WearableCacheItem[] Get(UUID id)
+    {
+        if (m_URL.Length == 0)
+            return null;
+
+        using (RestClient rc = new RestClient(m_URL))
         {
-            IConfig config = configSource.Configs["XBakes"];
-            if (config == null)
-                return;
+            List<WearableCacheItem> ret = new List<WearableCacheItem>();
+            rc.AddResourcePath("bakes/" + id.ToString());
+            rc.RequestMethod = "GET";
 
-            m_URL = config.GetString("URL", String.Empty);
-            if (m_URL.Length == 0)
-                return;
-
-            m_enabled = true;
-
-            m_Auth = ServiceAuth.Create(configSource, "XBakes");
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_enabled)
-                return;
-
-            // m_log.InfoFormat("[XBakes]: Enabled for region {0}", scene.RegionInfo.RegionName);
-            m_Scene = scene;
-
-            scene.RegisterModuleInterface<IBakedTextureModule>(this);
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-        }
-
-        public void Close()
-        {
-        }
-
-        public string Name
-        {
-            get { return "XBakesModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public WearableCacheItem[] Get(UUID id)
-        {
-            if (m_URL.Length == 0)
-                return null;
-
-            using (RestClient rc = new RestClient(m_URL))
+            try
             {
-                List<WearableCacheItem> ret = new List<WearableCacheItem>();
-                rc.AddResourcePath("bakes/" + id.ToString());
-                rc.RequestMethod = "GET";
-
-                try
+                using(MemoryStream s = rc.Request(m_Auth))
                 {
-                    using(MemoryStream s = rc.Request(m_Auth))
+                    using(XmlTextReader sr = new XmlTextReader(s))
                     {
-                        using(XmlTextReader sr = new XmlTextReader(s))
+                        sr.DtdProcessing = DtdProcessing.Ignore;
+                        sr.ReadStartElement("BakedAppearance");
+                        while (sr.LocalName == "BakedTexture")
                         {
-                            sr.DtdProcessing = DtdProcessing.Ignore;
-                            sr.ReadStartElement("BakedAppearance");
-                            while (sr.LocalName == "BakedTexture")
-                            {
-                                string sTextureIndex = sr.GetAttribute("TextureIndex");
-                                int lTextureIndex = Convert.ToInt32(sTextureIndex);
-                                string sCacheId = sr.GetAttribute("CacheId");
-                                UUID.TryParse(sCacheId, out UUID lCacheId);
+                            string sTextureIndex = sr.GetAttribute("TextureIndex");
+                            int lTextureIndex = Convert.ToInt32(sTextureIndex);
+                            string sCacheId = sr.GetAttribute("CacheId");
+                            UUID.TryParse(sCacheId, out UUID lCacheId);
 
-                                sr.ReadStartElement("BakedTexture");
-                                if (sr.Name == "AssetBase")
-                                {
-                                    AssetBase a = (AssetBase)m_serializer.Deserialize(sr);
-                                    ret.Add(new WearableCacheItem()
-                                    {
-                                        CacheId = lCacheId,
-                                        TextureIndex = (uint)lTextureIndex,
-                                        TextureAsset = a,
-                                        TextureID = a.FullID
-                                    });
-                                    sr.ReadEndElement();
-                                }
-                            }
-                            while (sr.LocalName == "BESetA")
+                            sr.ReadStartElement("BakedTexture");
+                            if (sr.Name == "AssetBase")
                             {
-                                string sTextureIndex = sr.GetAttribute("TextureIndex");
-                                int lTextureIndex = Convert.ToInt32(sTextureIndex);
-                                string sCacheId = sr.GetAttribute("CacheId");
-                                UUID.TryParse(sCacheId, out UUID lCacheId);
-
-                                sr.ReadStartElement("BESetA");
-                                if (sr.Name == "AssetBase")
+                                AssetBase a = (AssetBase)m_serializer.Deserialize(sr);
+                                ret.Add(new WearableCacheItem()
                                 {
-                                    AssetBase a = (AssetBase)m_serializer.Deserialize(sr);
-                                    ret.Add(new WearableCacheItem()
-                                    {
-                                        CacheId = lCacheId,
-                                        TextureIndex = (uint)lTextureIndex,
-                                        TextureAsset = a,
-                                        TextureID = a.FullID
-                                    });
-                                    sr.ReadEndElement();
-                                }
+                                    CacheId = lCacheId,
+                                    TextureIndex = (uint)lTextureIndex,
+                                    TextureAsset = a,
+                                    TextureID = a.FullID
+                                });
+                                sr.ReadEndElement();
                             }
-                            m_log.DebugFormat("[XBakes]: read {0} textures for user {1}",ret.Count,id);
                         }
-                        return ret.ToArray();
+                        while (sr.LocalName == "BESetA")
+                        {
+                            string sTextureIndex = sr.GetAttribute("TextureIndex");
+                            int lTextureIndex = Convert.ToInt32(sTextureIndex);
+                            string sCacheId = sr.GetAttribute("CacheId");
+                            UUID.TryParse(sCacheId, out UUID lCacheId);
+
+                            sr.ReadStartElement("BESetA");
+                            if (sr.Name == "AssetBase")
+                            {
+                                AssetBase a = (AssetBase)m_serializer.Deserialize(sr);
+                                ret.Add(new WearableCacheItem()
+                                {
+                                    CacheId = lCacheId,
+                                    TextureIndex = (uint)lTextureIndex,
+                                    TextureAsset = a,
+                                    TextureID = a.FullID
+                                });
+                                sr.ReadEndElement();
+                            }
+                        }
+                        m_log.DebugFormat("[XBakes]: read {0} textures for user {1}",ret.Count,id);
                     }
-                }
-                catch (XmlException)
-                {
-                    return null;
+                    return ret.ToArray();
                 }
             }
-        }
-
-        public void Store(UUID agentId)
-        {
-        }
-
-        public void UpdateMeshAvatar(UUID agentId)
-        {
-        }
-
-        public void Store(UUID agentId, WearableCacheItem[] data)
-        {
-            if (m_URL.Length == 0)
-                return;
-
-            int numberWears = 0;
-            byte[] uploadData;
-
-            using (MemoryStream bakeStream = new MemoryStream())
-            using (XmlTextWriter bakeWriter = new XmlTextWriter(bakeStream, null))
+            catch (XmlException)
             {
-                bakeWriter.WriteStartElement(String.Empty, "BakedAppearance", String.Empty);
-                List<int> extended = new List<int>();
-                for (int i = 0; i < data.Length; i++)
+                return null;
+            }
+        }
+    }
+
+    public void Store(UUID agentId)
+    {
+    }
+
+    public void UpdateMeshAvatar(UUID agentId)
+    {
+    }
+
+    public void Store(UUID agentId, WearableCacheItem[] data)
+    {
+        if (m_URL.Length == 0)
+            return;
+
+        int numberWears = 0;
+        byte[] uploadData;
+
+        using (MemoryStream bakeStream = new MemoryStream())
+        using (XmlTextWriter bakeWriter = new XmlTextWriter(bakeStream, null))
+        {
+            bakeWriter.WriteStartElement(String.Empty, "BakedAppearance", String.Empty);
+            List<int> extended = new List<int>();
+            for (int i = 0; i < data.Length; i++)
+            {
+                if (data[i] != null && data[i].TextureAsset != null)
                 {
-                    if (data[i] != null && data[i].TextureAsset != null)
+                    if(data[i].TextureIndex > 26)
                     {
-                        if(data[i].TextureIndex > 26)
-                        {
-                            extended.Add(i);
-                            continue;
-                        }
-                        bakeWriter.WriteStartElement(String.Empty, "BakedTexture", String.Empty);
+                        extended.Add(i);
+                        continue;
+                    }
+                    bakeWriter.WriteStartElement(String.Empty, "BakedTexture", String.Empty);
+                    bakeWriter.WriteAttributeString(String.Empty, "TextureIndex", String.Empty, data[i].TextureIndex.ToString());
+                    bakeWriter.WriteAttributeString(String.Empty, "CacheId", String.Empty, data[i].CacheId.ToString());
+                    //                        if (data[i].TextureAsset != null)
+                    m_serializer.Serialize(bakeWriter, data[i].TextureAsset);
+
+                    bakeWriter.WriteEndElement();
+                    numberWears++;
+                }
+            }
+
+            if(extended.Count > 0)
+            {
+                foreach(int i in extended)
+                {
+                        bakeWriter.WriteStartElement(String.Empty, "BESetA", String.Empty);
                         bakeWriter.WriteAttributeString(String.Empty, "TextureIndex", String.Empty, data[i].TextureIndex.ToString());
                         bakeWriter.WriteAttributeString(String.Empty, "CacheId", String.Empty, data[i].CacheId.ToString());
-                        //                        if (data[i].TextureAsset != null)
                         m_serializer.Serialize(bakeWriter, data[i].TextureAsset);
-
                         bakeWriter.WriteEndElement();
                         numberWears++;
-                    }
                 }
-
-                if(extended.Count > 0)
-                {
-                    foreach(int i in extended)
-                    {
-                            bakeWriter.WriteStartElement(String.Empty, "BESetA", String.Empty);
-                            bakeWriter.WriteAttributeString(String.Empty, "TextureIndex", String.Empty, data[i].TextureIndex.ToString());
-                            bakeWriter.WriteAttributeString(String.Empty, "CacheId", String.Empty, data[i].CacheId.ToString());
-                            m_serializer.Serialize(bakeWriter, data[i].TextureAsset);
-                            bakeWriter.WriteEndElement();
-                            numberWears++;
-                    }
-                }
-
-                bakeWriter.WriteEndElement();
-                bakeWriter.Flush();
-
-                uploadData = bakeStream.ToArray();
             }
-            Util.FireAndForget(
-              delegate
-              {
-                    using(RestClient rc = new RestClient(m_URL))
-                    {
-                        rc.AddResourcePath("bakes/" + agentId.ToString());
-                        rc.POSTRequest(uploadData, m_Auth);
-                        m_log.DebugFormat("[XBakes]: stored {0} textures for user {1}", numberWears, agentId);
-                    }
-                    uploadData = null;
-                }, null, "XBakesModule.Store"
-            );
+
+            bakeWriter.WriteEndElement();
+            bakeWriter.Flush();
+
+            uploadData = bakeStream.ToArray();
         }
+        Util.FireAndForget(
+          delegate
+          {
+                using(RestClient rc = new RestClient(m_URL))
+                {
+                    rc.AddResourcePath("bakes/" + agentId.ToString());
+                    rc.POSTRequest(uploadData, m_Auth);
+                    m_log.DebugFormat("[XBakes]: stored {0} textures for user {1}", numberWears, agentId);
+                }
+                uploadData = null;
+            }, null, "XBakesModule.Store"
+        );
     }
 }

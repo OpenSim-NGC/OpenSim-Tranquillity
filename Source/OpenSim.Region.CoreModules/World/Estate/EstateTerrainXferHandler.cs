@@ -28,86 +28,85 @@
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.CoreModules.World.Estate
+namespace OpenSim.Region.CoreModules.World.Estate;
+
+
+public class EstateTerrainXferHandler
 {
+    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-    public class EstateTerrainXferHandler
+    private AssetBase m_asset;
+
+    public delegate void TerrainUploadComplete(string name, byte[] filedata, IClientAPI remoteClient);
+    public event TerrainUploadComplete TerrainUploadDone;
+
+    //private string m_description = String.Empty;
+    //private string m_name = String.Empty;
+    //private UUID TransactionID = UUID.Zero;
+    private sbyte type = 0;
+
+    public ulong mXferID;
+
+    public EstateTerrainXferHandler(IClientAPI pRemoteClient, string pClientFilename)
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private AssetBase m_asset;
-
-        public delegate void TerrainUploadComplete(string name, byte[] filedata, IClientAPI remoteClient);
-        public event TerrainUploadComplete TerrainUploadDone;
-
-        //private string m_description = String.Empty;
-        //private string m_name = String.Empty;
-        //private UUID TransactionID = UUID.Zero;
-        private sbyte type = 0;
-
-        public ulong mXferID;
-
-        public EstateTerrainXferHandler(IClientAPI pRemoteClient, string pClientFilename)
+        m_asset = new AssetBase(UUID.Zero, pClientFilename, type, pRemoteClient.AgentId.ToString())
         {
-            m_asset = new AssetBase(UUID.Zero, pClientFilename, type, pRemoteClient.AgentId.ToString())
+            Data = Array.Empty<byte>(),
+            Description = "empty",
+            Local = true,
+            Temporary = true
+        };
+    }
+
+    public ulong XferID
+    {
+        get { return mXferID; }
+    }
+
+    public void RequestStartXfer(IClientAPI pRemoteClient)
+    {
+        mXferID = Util.GetNextXferID();
+        pRemoteClient.SendXferRequest(mXferID, m_asset.Type, m_asset.FullID, 0, Utils.StringToBytes(m_asset.Name));
+    }
+
+    /// <summary>
+    /// Process transfer data received from the client.
+    /// </summary>
+    /// <param name="xferID"></param>
+    /// <param name="packetID"></param>
+    /// <param name="data"></param>
+    public void XferReceive(IClientAPI remoteClient, ulong xferID, uint packetID, byte[] data)
+    {
+        if (mXferID != xferID)
+            return;
+
+        lock (this)
+        {
+            if (m_asset.Data.Length > 1)
             {
-                Data = Array.Empty<byte>(),
-                Description = "empty",
-                Local = true,
-                Temporary = true
-            };
-        }
-
-        public ulong XferID
-        {
-            get { return mXferID; }
-        }
-
-        public void RequestStartXfer(IClientAPI pRemoteClient)
-        {
-            mXferID = Util.GetNextXferID();
-            pRemoteClient.SendXferRequest(mXferID, m_asset.Type, m_asset.FullID, 0, Utils.StringToBytes(m_asset.Name));
-        }
-
-        /// <summary>
-        /// Process transfer data received from the client.
-        /// </summary>
-        /// <param name="xferID"></param>
-        /// <param name="packetID"></param>
-        /// <param name="data"></param>
-        public void XferReceive(IClientAPI remoteClient, ulong xferID, uint packetID, byte[] data)
-        {
-            if (mXferID != xferID)
-                return;
-
-            lock (this)
+                byte[] destinationArray = new byte[m_asset.Data.Length + data.Length];
+                Array.Copy(m_asset.Data, 0, destinationArray, 0, m_asset.Data.Length);
+                Array.Copy(data, 0, destinationArray, m_asset.Data.Length, data.Length);
+                m_asset.Data = destinationArray;
+            }
+            else
             {
-                if (m_asset.Data.Length > 1)
-                {
-                    byte[] destinationArray = new byte[m_asset.Data.Length + data.Length];
-                    Array.Copy(m_asset.Data, 0, destinationArray, 0, m_asset.Data.Length);
-                    Array.Copy(data, 0, destinationArray, m_asset.Data.Length, data.Length);
-                    m_asset.Data = destinationArray;
-                }
-                else
-                {
-                    byte[] buffer2 = new byte[data.Length - 4];
-                    Array.Copy(data, 4, buffer2, 0, data.Length - 4);
-                    m_asset.Data = buffer2;
-                }
+                byte[] buffer2 = new byte[data.Length - 4];
+                Array.Copy(data, 4, buffer2, 0, data.Length - 4);
+                m_asset.Data = buffer2;
+            }
 
-                remoteClient.SendConfirmXfer(xferID, packetID);
+            remoteClient.SendConfirmXfer(xferID, packetID);
 
-                if ((packetID & 0x80000000) != 0)
-                {
-                    SendCompleteMessage(remoteClient);
-                }
+            if ((packetID & 0x80000000) != 0)
+            {
+                SendCompleteMessage(remoteClient);
             }
         }
+    }
 
-        public void SendCompleteMessage(IClientAPI remoteClient)
-        {
-            TerrainUploadDone?.Invoke(m_asset.Name, m_asset.Data, remoteClient);
-        }
+    public void SendCompleteMessage(IClientAPI remoteClient)
+    {
+        TerrainUploadDone?.Invoke(m_asset.Name, m_asset.Data, remoteClient);
     }
 }

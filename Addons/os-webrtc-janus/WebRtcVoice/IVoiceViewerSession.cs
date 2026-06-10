@@ -25,30 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Threading.Tasks;
-
 using OMV = OpenMetaverse;
 
-namespace osWebRtcVoice
+namespace osWebRtcVoice;
+
+/// <summary>
+/// This is the interface for the viewer session. It is used to store the
+/// state of the viewer session and to disconnect the session when needed.
+/// </summary>
+public interface IVoiceViewerSession
 {
-    /// <summary>
-    /// This is the interface for the viewer session. It is used to store the
-    /// state of the viewer session and to disconnect the session when needed.
-    /// </summary>
-    public interface IVoiceViewerSession
-    {
-        // This ID is passed to and from the viewer to identify the session
-        public string ViewerSessionID { get; set; }
-        public IWebRtcVoiceService VoiceService { get; set; }
-        // THis ID is passed between us and the voice service to idetify the session
-        public string VoiceServiceSessionId { get; set; }
-        // The UUID of the region that is being connected to
-        public OMV.UUID RegionId { get; set; }
+    // This ID is passed to and from the viewer to identify the session
+    public string ViewerSessionID { get; set; }
+    public IWebRtcVoiceService VoiceService { get; set; }
+    // THis ID is passed between us and the voice service to idetify the session
+    public string VoiceServiceSessionId { get; set; }
+    // The UUID of the region that is being connected to
+    public OMV.UUID RegionId { get; set; }
 
-        // The simulator has a GUID to identify the user
-        public OMV.UUID AgentId { get; set; }
+    // The simulator has a GUID to identify the user
+    public OMV.UUID AgentId { get; set; }
 
-        // Disconnect the connection to the voice service for this session
-        public Task Shutdown();
-    }
+    // Disconnect the connection to the voice service for this session
+    public Task Shutdown();
 }

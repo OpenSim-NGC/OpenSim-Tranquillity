@@ -28,135 +28,134 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class GroupRecord
 {
-    public class GroupRecord
-    {
-        public UUID GroupID;
-        public string GroupName;
-        public bool AllowPublish = true;
-        public bool MaturePublish = true;
-        public string Charter;
-        public UUID FounderID = UUID.Zero;
-        public UUID GroupPicture = UUID.Zero;
-        public int MembershipFee = 0;
-        public bool OpenEnrollment = true;
-        public UUID OwnerRoleID = UUID.Zero;
-        public bool ShowInList = false;
-    }
+    public UUID GroupID;
+    public string GroupName;
+    public bool AllowPublish = true;
+    public bool MaturePublish = true;
+    public string Charter;
+    public UUID FounderID = UUID.Zero;
+    public UUID GroupPicture = UUID.Zero;
+    public int MembershipFee = 0;
+    public bool OpenEnrollment = true;
+    public UUID OwnerRoleID = UUID.Zero;
+    public bool ShowInList = false;
+}
 
-    public class GroupMembershipData
-    {
-        // Group base data
-        public UUID GroupID;
-        public string GroupName;
-        public bool AllowPublish = true;
-        public bool MaturePublish = true;
-        public string Charter;
-        public UUID FounderID = UUID.Zero;
-        public UUID GroupPicture = UUID.Zero;
-        public int MembershipFee = 0;
-        public bool OpenEnrollment = true;
-        public bool ShowInList = true;
+public class GroupMembershipData
+{
+    // Group base data
+    public UUID GroupID;
+    public string GroupName;
+    public bool AllowPublish = true;
+    public bool MaturePublish = true;
+    public string Charter;
+    public UUID FounderID = UUID.Zero;
+    public UUID GroupPicture = UUID.Zero;
+    public int MembershipFee = 0;
+    public bool OpenEnrollment = true;
+    public bool ShowInList = true;
 
-        // Per user data
-        public bool AcceptNotices = true;
-        public int Contribution = 0;
-        public ulong GroupPowers = 0;
-        public bool Active = false;
-        public UUID ActiveRole = UUID.Zero;
-        public bool ListInProfile = false;
-        public string GroupTitle;
-    }
+    // Per user data
+    public bool AcceptNotices = true;
+    public int Contribution = 0;
+    public ulong GroupPowers = 0;
+    public bool Active = false;
+    public UUID ActiveRole = UUID.Zero;
+    public bool ListInProfile = false;
+    public string GroupTitle;
+}
 
-    public struct GroupTitlesData
-    {
-        public string Name;
-        public UUID UUID;
-        public bool Selected;
-    }
+public struct GroupTitlesData
+{
+    public string Name;
+    public UUID UUID;
+    public bool Selected;
+}
 
-    public struct GroupProfileData
-    {
-        public UUID GroupID;
-        public string Name;
-        public string Charter;
-        public bool ShowInList;
-        public string MemberTitle;
-        public ulong PowersMask;
-        public UUID InsigniaID;
-        public UUID FounderID;
-        public int MembershipFee;
-        public bool OpenEnrollment;
-        public int Money;
-        public int GroupMembershipCount;
-        public int GroupRolesCount;
-        public bool AllowPublish;
-        public bool MaturePublish;
-        public UUID OwnerRole;
-    }
+public struct GroupProfileData
+{
+    public UUID GroupID;
+    public string Name;
+    public string Charter;
+    public bool ShowInList;
+    public string MemberTitle;
+    public ulong PowersMask;
+    public UUID InsigniaID;
+    public UUID FounderID;
+    public int MembershipFee;
+    public bool OpenEnrollment;
+    public int Money;
+    public int GroupMembershipCount;
+    public int GroupRolesCount;
+    public bool AllowPublish;
+    public bool MaturePublish;
+    public UUID OwnerRole;
+}
 
-    public struct GroupMembersData
-    {
-        public UUID AgentID;
-        public int Contribution;
-        public string OnlineStatus;
-        public ulong AgentPowers;
-        public string Title;
-        public bool IsOwner;
-        public bool ListInProfile;
-        public bool AcceptNotices;
-    }
+public struct GroupMembersData
+{
+    public UUID AgentID;
+    public int Contribution;
+    public string OnlineStatus;
+    public ulong AgentPowers;
+    public string Title;
+    public bool IsOwner;
+    public bool ListInProfile;
+    public bool AcceptNotices;
+}
 
-    public struct GroupRolesData
-    {
-        public UUID RoleID;
-        public string Name;
-        public string Title;
-        public string Description;
-        public ulong Powers;
-        public int Members;
-    }
+public struct GroupRolesData
+{
+    public UUID RoleID;
+    public string Name;
+    public string Title;
+    public string Description;
+    public ulong Powers;
+    public int Members;
+}
 
-    public struct GroupRoleMembersData
-    {
-        public UUID RoleID;
-        public UUID MemberID;
-    }
+public struct GroupRoleMembersData
+{
+    public UUID RoleID;
+    public UUID MemberID;
+}
 
-    public struct GroupNoticeData
-    {
-        public UUID NoticeID;
-        public uint Timestamp;
-        public string FromName;
-        public string Subject;
-        public bool HasAttachment;
-        public byte AssetType;
-    }
+public struct GroupNoticeData
+{
+    public UUID NoticeID;
+    public uint Timestamp;
+    public string FromName;
+    public string Subject;
+    public bool HasAttachment;
+    public byte AssetType;
+}
 
-    public struct GroupVoteHistory
-    {
-        public string VoteID;
-        public string VoteInitiator;
-        public string Majority;
-        public string Quorum;
-        public string TerseDateID;
-        public string StartDateTime;
-        public string EndDateTime;
-        public string VoteType;
-        public string VoteResult;
-        public string ProposalText;
-    }
+public struct GroupVoteHistory
+{
+    public string VoteID;
+    public string VoteInitiator;
+    public string Majority;
+    public string Quorum;
+    public string TerseDateID;
+    public string StartDateTime;
+    public string EndDateTime;
+    public string VoteType;
+    public string VoteResult;
+    public string ProposalText;
+}
 
-    public struct GroupActiveProposals
-    {
-        public string VoteID;
-        public string VoteInitiator;
-        public string Majority;
-        public string Quorum;
-        public string TerseDateID;
-        public string StartDateTime;
-        public string EndDateTime;
-        public string ProposalText;
-    }
+public struct GroupActiveProposals
+{
+    public string VoteID;
+    public string VoteInitiator;
+    public string Majority;
+    public string Quorum;
+    public string TerseDateID;
+    public string StartDateTime;
+    public string EndDateTime;
+    public string ProposalText;
 }

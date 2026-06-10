@@ -30,87 +30,86 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.Agent.IPBan
+namespace OpenSim.Region.CoreModules.Agent.IPBan;
+
+public class IPBanModule : ISharedRegionModule
 {
-    public class IPBanModule : ISharedRegionModule
+    #region Implementation of ISharedRegionModule
+
+    private List<string> m_bans = new List<string>();
+
+    public void Initialise(IConfigSource source)
     {
-        #region Implementation of ISharedRegionModule
+    }
 
-        private List<string> m_bans = new List<string>();
+    public void AddRegion(Scene scene)
+    {
+        new SceneBanner(scene, m_bans);
 
-        public void Initialise(IConfigSource source)
+        lock (m_bans)
         {
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            new SceneBanner(scene, m_bans);
-
-            lock (m_bans)
+            foreach (EstateBan ban in scene.RegionInfo.EstateSettings.EstateBans)
             {
-                foreach (EstateBan ban in scene.RegionInfo.EstateSettings.EstateBans)
-                {
-                    if (!String.IsNullOrEmpty(ban.BannedHostIPMask))
-                        m_bans.Add(ban.BannedHostIPMask);
-                    if (!String.IsNullOrEmpty(ban.BannedHostNameMask))
-                        m_bans.Add(ban.BannedHostNameMask);
-                }
+                if (!String.IsNullOrEmpty(ban.BannedHostIPMask))
+                    m_bans.Add(ban.BannedHostIPMask);
+                if (!String.IsNullOrEmpty(ban.BannedHostNameMask))
+                    m_bans.Add(ban.BannedHostNameMask);
             }
         }
+    }
 
-        public void RemoveRegion(Scene scene)
-        {
-        }
+    public void RemoveRegion(Scene scene)
+    {
+    }
 
-        public void RegionLoaded(Scene scene)
-        {
-        }
+    public void RegionLoaded(Scene scene)
+    {
+    }
 
-        public void PostInitialise()
+    public void PostInitialise()
+    {
+        if (File.Exists("bans.txt"))
         {
-            if (File.Exists("bans.txt"))
+            string[] bans = File.ReadAllLines("bans.txt");
+            foreach (string ban in bans)
             {
-                string[] bans = File.ReadAllLines("bans.txt");
-                foreach (string ban in bans)
-                {
-                    m_bans.Add(ban);
-                }
+                m_bans.Add(ban);
             }
         }
+    }
 
-        public void Close()
-        {
+    public void Close()
+    {
 
-        }
+    }
 
-        public string Name
-        {
-            get { return "IPBanModule"; }
-        }
+    public string Name
+    {
+        get { return "IPBanModule"; }
+    }
 
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
 
-        #endregion
+    #endregion
 
-        /// <summary>
-        /// Bans all users from the specified network from connecting.
-        /// DNS bans are in the form "somewhere.com" will block ANY
-        /// matching domain (including "betasomewhere.com", "beta.somewhere.com",
-        /// "somewhere.com.beta") - make sure to be reasonably specific in DNS
-        /// bans.
-        ///
-        /// IP address bans match on first characters, so,
-        /// "127.0.0.1" will ban only that address,
-        /// "127.0.1" will ban "127.0.10.0"
-        /// but "127.0.1." will ban only the "127.0.1.*" network
-        /// </summary>
-        /// <param name="host">See summary for explanation of parameter</param>
-        public void Ban(string host)
-        {
-            m_bans.Add(host);
-        }
+    /// <summary>
+    /// Bans all users from the specified network from connecting.
+    /// DNS bans are in the form "somewhere.com" will block ANY
+    /// matching domain (including "betasomewhere.com", "beta.somewhere.com",
+    /// "somewhere.com.beta") - make sure to be reasonably specific in DNS
+    /// bans.
+    ///
+    /// IP address bans match on first characters, so,
+    /// "127.0.0.1" will ban only that address,
+    /// "127.0.1" will ban "127.0.10.0"
+    /// but "127.0.1." will ban only the "127.0.1.*" network
+    /// </summary>
+    /// <param name="host">See summary for explanation of parameter</param>
+    public void Ban(string host)
+    {
+        m_bans.Add(host);
     }
 }

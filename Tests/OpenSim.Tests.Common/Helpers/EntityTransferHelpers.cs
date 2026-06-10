@@ -28,70 +28,69 @@
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+public static class EntityTransferHelpers
 {
-    public static class EntityTransferHelpers
+   /// <summary>
+    /// Set up correct handling of the InformClientOfNeighbour call from the source region that triggers the
+    /// viewer to setup a connection with the destination region.
+    /// </summary>
+    /// <param name='tc'></param>
+    /// <param name='neighbourTcs'>
+    /// A list that will be populated with any TestClients set up in response to
+    /// being informed about a destination region.
+    /// </param>
+    public static void SetupInformClientOfNeighbourTriggersNeighbourClientCreate(
+        TestClient tc, List<TestClient> neighbourTcs)
     {
-       /// <summary>
-        /// Set up correct handling of the InformClientOfNeighbour call from the source region that triggers the
-        /// viewer to setup a connection with the destination region.
-        /// </summary>
-        /// <param name='tc'></param>
-        /// <param name='neighbourTcs'>
-        /// A list that will be populated with any TestClients set up in response to
-        /// being informed about a destination region.
-        /// </param>
-        public static void SetupInformClientOfNeighbourTriggersNeighbourClientCreate(
-            TestClient tc, List<TestClient> neighbourTcs)
+        // XXX: Confusingly, this is also used for non-neighbour notification (as in teleports that do not use the
+        // event queue).
+
+        tc.OnTestClientInformClientOfNeighbour += (neighbourHandle, neighbourExternalEndPoint) =>
         {
-            // XXX: Confusingly, this is also used for non-neighbour notification (as in teleports that do not use the
-            // event queue).
+            uint x, y;
+            Util.RegionHandleToRegionLoc(neighbourHandle, out x, out y);
 
-            tc.OnTestClientInformClientOfNeighbour += (neighbourHandle, neighbourExternalEndPoint) =>
-            {
-                uint x, y;
-                Util.RegionHandleToRegionLoc(neighbourHandle, out x, out y);
+            AgentCircuitData newAgent = tc.RequestClientInfo();
 
-                AgentCircuitData newAgent = tc.RequestClientInfo();
+            Scene neighbourScene;
+            SceneManager.Instance.TryGetScene(x, y, out neighbourScene);
 
-                Scene neighbourScene;
-                SceneManager.Instance.TryGetScene(x, y, out neighbourScene);
+            TestClient neighbourTc = new TestClient(newAgent, neighbourScene);
+            neighbourTcs.Add(neighbourTc);
+            neighbourScene.AddNewAgent(neighbourTc, PresenceType.User);
+        };
+    }
 
-                TestClient neighbourTc = new TestClient(newAgent, neighbourScene);
-                neighbourTcs.Add(neighbourTc);
-                neighbourScene.AddNewAgent(neighbourTc, PresenceType.User);
-            };
-        }
-
-        /// <summary>
-        /// Set up correct handling of the InformClientOfNeighbour call from the source region that triggers the
-        /// viewer to setup a connection with the destination region.
-        /// </summary>
-        /// <param name='tc'></param>
-        /// <param name='neighbourTcs'>
-        /// A list that will be populated with any TestClients set up in response to
-        /// being informed about a destination region.
-        /// </param>
-        public static void SetupSendRegionTeleportTriggersDestinationClientCreateAndCompleteMovement(
-            TestClient client, List<TestClient> destinationClients)
+    /// <summary>
+    /// Set up correct handling of the InformClientOfNeighbour call from the source region that triggers the
+    /// viewer to setup a connection with the destination region.
+    /// </summary>
+    /// <param name='tc'></param>
+    /// <param name='neighbourTcs'>
+    /// A list that will be populated with any TestClients set up in response to
+    /// being informed about a destination region.
+    /// </param>
+    public static void SetupSendRegionTeleportTriggersDestinationClientCreateAndCompleteMovement(
+        TestClient client, List<TestClient> destinationClients)
+    {
+        client.OnTestClientSendRegionTeleport
+            += (regionHandle, simAccess, regionExternalEndPoint, locationID, flags, capsURL) =>
         {
-            client.OnTestClientSendRegionTeleport
-                += (regionHandle, simAccess, regionExternalEndPoint, locationID, flags, capsURL) =>
-            {
-                uint x, y;
-                Util.RegionHandleToRegionLoc(regionHandle, out x, out y);
+            uint x, y;
+            Util.RegionHandleToRegionLoc(regionHandle, out x, out y);
 
-                AgentCircuitData newAgent = client.RequestClientInfo();
+            AgentCircuitData newAgent = client.RequestClientInfo();
 
-                Scene destinationScene;
-                SceneManager.Instance.TryGetScene(x, y, out destinationScene);
+            Scene destinationScene;
+            SceneManager.Instance.TryGetScene(x, y, out destinationScene);
 
-                TestClient destinationClient = new TestClient(newAgent, destinationScene);
-                destinationClients.Add(destinationClient);
-                destinationScene.AddNewAgent(destinationClient, PresenceType.User);
+            TestClient destinationClient = new TestClient(newAgent, destinationScene);
+            destinationClients.Add(destinationClient);
+            destinationScene.AddNewAgent(destinationClient, PresenceType.User);
 
-                ThreadPool.UnsafeQueueUserWorkItem(o => destinationClient.CompleteMovement(), null);
-            };
-        }
+            ThreadPool.UnsafeQueueUserWorkItem(o => destinationClient.CompleteMovement(), null);
+        };
     }
 }

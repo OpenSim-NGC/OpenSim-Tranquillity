@@ -25,37 +25,35 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections.Specialized;
 using System.Net;
 using System.Net.Http.Headers;
 
-namespace OpenSim.Framework.ServiceAuth
+namespace OpenSim.Framework.ServiceAuth;
+
+public class DisallowLlHttpRequest : IServiceAuth
 {
-    public class DisallowLlHttpRequest : IServiceAuth
+    public string Name { get { return "DisallowllHTTPRequest"; } }
+
+    public void AddAuthorization(NameValueCollection headers) { }
+    public void AddAuthorization(HttpRequestHeaders headers) { }
+
+    public bool Authenticate(string data)
     {
-        public string Name { get { return "DisallowllHTTPRequest"; } }
+        return false;
+    }
 
-        public void AddAuthorization(NameValueCollection headers) { }
-        public void AddAuthorization(HttpRequestHeaders headers) { }
+    public bool Authenticate(NameValueCollection requestHeaders, AddHeaderDelegate d, out HttpStatusCode statusCode)
+    {
+//            Console.WriteLine("DisallowLlHttpRequest");
 
-        public bool Authenticate(string data)
+        if (requestHeaders["X-SecondLife-Shard"] != null)
         {
+            statusCode = HttpStatusCode.Forbidden;
             return false;
         }
 
-        public bool Authenticate(NameValueCollection requestHeaders, AddHeaderDelegate d, out HttpStatusCode statusCode)
-        {
-//            Console.WriteLine("DisallowLlHttpRequest");
-
-            if (requestHeaders["X-SecondLife-Shard"] != null)
-            {
-                statusCode = HttpStatusCode.Forbidden;
-                return false;
-            }
-
-            statusCode = HttpStatusCode.OK;
-            return true;
-        }
+        statusCode = HttpStatusCode.OK;
+        return true;
     }
 }

@@ -25,45 +25,43 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.IO;
 using System.Text;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public delegate string BinaryMethod(byte[] data, string path, string param);
+
+public class BinaryStreamHandler : BaseStreamHandler
 {
-    public delegate string BinaryMethod(byte[] data, string path, string param);
+    private BinaryMethod m_method;
 
-    public class BinaryStreamHandler : BaseStreamHandler
+    public BinaryStreamHandler(string httpMethod, string path, BinaryMethod binaryMethod)
+        : this(httpMethod, path, binaryMethod, null, null) {}
+
+    public BinaryStreamHandler(string httpMethod, string path, BinaryMethod binaryMethod, string name, string description)
+        : base(httpMethod, path, name, description)
     {
-        private BinaryMethod m_method;
+        m_method = binaryMethod;
+    }
 
-        public BinaryStreamHandler(string httpMethod, string path, BinaryMethod binaryMethod)
-            : this(httpMethod, path, binaryMethod, null, null) {}
-
-        public BinaryStreamHandler(string httpMethod, string path, BinaryMethod binaryMethod, string name, string description)
-            : base(httpMethod, path, name, description)
+    protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        byte[] data;
+        if (request is MemoryStream)
+            data = ((MemoryStream)request).ToArray();
+        else
         {
-            m_method = binaryMethod;
-        }
-
-        protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            byte[] data;
-            if (request is MemoryStream)
-                data = ((MemoryStream)request).ToArray();
-            else
+            request.Seek(0, SeekOrigin.Begin);
+            using (MemoryStream ms = new MemoryStream((int)request.Length))
             {
-                request.Seek(0, SeekOrigin.Begin);
-                using (MemoryStream ms = new MemoryStream((int)request.Length))
-                {
-                    request.CopyTo(ms);
-                    data = ms.ToArray();
-                }
+                request.CopyTo(ms);
+                data = ms.ToArray();
             }
-            request.Dispose();
-
-            string param = GetParam(path);
-            string responseString = m_method(data, path, param);
-            return Encoding.UTF8.GetBytes(responseString);
         }
+        request.Dispose();
+
+        string param = GetParam(path);
+        string responseString = m_method(data, path, param);
+        return Encoding.UTF8.GetBytes(responseString);
     }
 }

@@ -25,88 +25,84 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 
-namespace OpenSim.Framework.Console
+namespace OpenSim.Framework.Console;
+
+/// <summary>
+/// Used to generated a formatted table for the console.
+/// </summary>
+/// <remarks>
+/// Currently subject to change.  If you use this, be prepared to change your code when this class changes.
+/// </remarks>
+public class ConsoleDisplayList
 {
     /// <summary>
-    /// Used to generated a formatted table for the console.
+    /// The default divider between key and value for a list item.
     /// </summary>
-    /// <remarks>
-    /// Currently subject to change.  If you use this, be prepared to change your code when this class changes.
-    /// </remarks>
-    public class ConsoleDisplayList
+    public const string DefaultKeyValueDivider = " : ";
+
+    /// <summary>
+    /// The divider used between key and value for a list item.
+    /// </summary>
+    public string KeyValueDivider { get; set; }
+
+    /// <summary>
+    /// Table rows
+    /// </summary>
+    public List<KeyValuePair<string, string>> Rows { get; private set; }
+
+    /// <summary>
+    /// Number of spaces to indent the list.
+    /// </summary>
+    public int Indent { get; set; }
+
+    public ConsoleDisplayList()
     {
-        /// <summary>
-        /// The default divider between key and value for a list item.
-        /// </summary>
-        public const string DefaultKeyValueDivider = " : ";
+        Rows = new List<KeyValuePair<string, string>>();
+        KeyValueDivider = DefaultKeyValueDivider;
+    }
 
-        /// <summary>
-        /// The divider used between key and value for a list item.
-        /// </summary>
-        public string KeyValueDivider { get; set; }
+    public override string ToString()
+    {
+        StringBuilder sb = new StringBuilder();
+        AddToStringBuilder(sb);
+        return sb.ToString();
+    }
 
-        /// <summary>
-        /// Table rows
-        /// </summary>
-        public List<KeyValuePair<string, string>> Rows { get; private set; }
-
-        /// <summary>
-        /// Number of spaces to indent the list.
-        /// </summary>
-        public int Indent { get; set; }
-
-        public ConsoleDisplayList()
-        {
-            Rows = new List<KeyValuePair<string, string>>();
-            KeyValueDivider = DefaultKeyValueDivider;
-        }
-
-        public override string ToString()
-        {
-            StringBuilder sb = new StringBuilder();
-            AddToStringBuilder(sb);
-            return sb.ToString();
-        }
-
-        public void AddToStringBuilder(StringBuilder sb)
-        {
-            string formatString = GetFormatString();
+    public void AddToStringBuilder(StringBuilder sb)
+    {
+        string formatString = GetFormatString();
 //            System.Console.WriteLine("FORMAT STRING [{0}]", formatString);
 
-            // rows
-            foreach (KeyValuePair<string, string> row in Rows)
-                sb.AppendFormat(formatString, row.Key, row.Value);
-        }
+        // rows
+        foreach (KeyValuePair<string, string> row in Rows)
+            sb.AppendFormat(formatString, row.Key, row.Value);
+    }
 
-        /// <summary>
-        /// Gets the format string for the table.
-        /// </summary>
-        private string GetFormatString()
-        {
-            StringBuilder formatSb = new StringBuilder();
+    /// <summary>
+    /// Gets the format string for the table.
+    /// </summary>
+    private string GetFormatString()
+    {
+        StringBuilder formatSb = new StringBuilder();
 
-            int longestKey = -1;
+        int longestKey = -1;
 
-            foreach (KeyValuePair<string, string> row in Rows)
-                if (row.Key.Length > longestKey)
-                    longestKey = row.Key.Length;
+        foreach (KeyValuePair<string, string> row in Rows)
+            if (row.Key.Length > longestKey)
+                longestKey = row.Key.Length;
 
-            formatSb.Append(' ', Indent);
+        formatSb.Append(' ', Indent);
 
-            // Can only do left formatting for now
-            formatSb.AppendFormat("{{0,-{0}}}{1}{{1}}\n", longestKey, KeyValueDivider);
+        // Can only do left formatting for now
+        formatSb.AppendFormat("{{0,-{0}}}{1}{{1}}\n", longestKey, KeyValueDivider);
 
-            return formatSb.ToString();
-        }
+        return formatSb.ToString();
+    }
 
-        public void AddRow(object key, object value)
-        {
-            Rows.Add(new KeyValuePair<string, string>(key.ToString(), value.ToString()));
-        }
+    public void AddRow(object key, object value)
+    {
+        Rows.Add(new KeyValuePair<string, string>(key.ToString(), value.ToString()));
     }
 }

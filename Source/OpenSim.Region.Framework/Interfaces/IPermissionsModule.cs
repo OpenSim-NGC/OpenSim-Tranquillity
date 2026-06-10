@@ -28,27 +28,26 @@
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+/// <value>
+/// Which set of permissions a user has.
+/// </value>
+public enum PermissionClass
 {
-    /// <value>
-    /// Which set of permissions a user has.
-    /// </value>
-    public enum PermissionClass
-    {
-        Owner,
-        Group,
-        Everyone
-    };
+    Owner,
+    Group,
+    Everyone
+};
 
-    public interface IPermissionsModule
-    {
+public interface IPermissionsModule
+{
 
-        /// <summary>
-        /// Returns the type of permissions that the user has over an object.
-        /// </summary>
-        /// <param name="user">The user</param>
-        /// <param name="obj">The object</param>
-        /// <returns>The type of permissions the user has over the object</returns>
-        PermissionClass GetPermissionClass(UUID user, SceneObjectPart obj);
-    }
+    /// <summary>
+    /// Returns the type of permissions that the user has over an object.
+    /// </summary>
+    /// <param name="user">The user</param>
+    /// <param name="obj">The object</param>
+    /// <returns>The type of permissions the user has over the object</returns>
+    PermissionClass GetPermissionClass(UUID user, SceneObjectPart obj);
 }

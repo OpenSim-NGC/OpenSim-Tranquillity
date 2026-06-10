@@ -25,63 +25,57 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Data;
 using OpenMetaverse;
-using OpenSim.Framework;
 using System.Data.SQLite;
 
-namespace OpenSim.Data.SQLite
+namespace OpenSim.Data.SQLite;
+
+public class SQLiteUserAccountData : SQLiteGenericTableHandler<UserAccountData>, IUserAccountData
 {
-    public class SQLiteUserAccountData : SQLiteGenericTableHandler<UserAccountData>, IUserAccountData
+    public SQLiteUserAccountData(string connectionString, string realm)
+            : base(connectionString, realm, "UserAccount")
     {
-        public SQLiteUserAccountData(string connectionString, string realm)
-                : base(connectionString, realm, "UserAccount")
+    }
+
+    public UserAccountData[] GetUsers(UUID scopeID, string query)
+    {
+        string[] words = query.Split();
+
+        for (int i = 0 ; i < words.Length ; i++)
         {
-        }
-
-        public UserAccountData[] GetUsers(UUID scopeID, string query)
-        {
-            string[] words = query.Split();
-
-            for (int i = 0 ; i < words.Length ; i++)
+            if (words[i].Length < 3)
             {
-                if (words[i].Length < 3)
-                {
-                    if (i != words.Length - 1)
-                        Array.Copy(words, i + 1, words, i, words.Length - i - 1);
-                    Array.Resize(ref words, words.Length - 1);
-                }
-            }
-
-            if (words.Length == 0)
-                return new UserAccountData[0];
-
-            if (words.Length > 2)
-                return new UserAccountData[0];
-
-            using (SQLiteCommand cmd = new SQLiteCommand())
-            {
-                if (words.Length == 1)
-                {
-                    cmd.CommandText = String.Format("select * from {0} where (ScopeID='{1}' or ScopeID='00000000-0000-0000-0000-000000000000') and (FirstName like '{2}%' or LastName like '{2}%')",
-                        m_Realm, scopeID.ToString(), words[0]);
-                }
-                else
-                {
-                    cmd.CommandText = String.Format("select * from {0} where (ScopeID='{1}' or ScopeID='00000000-0000-0000-0000-000000000000') and (FirstName like '{2}%' or LastName like '{3}%')",
-                        m_Realm, scopeID.ToString(), words[0], words[1]);
-                }
-
-                return DoQuery(cmd);
+                if (i != words.Length - 1)
+                    Array.Copy(words, i + 1, words, i, words.Length - i - 1);
+                Array.Resize(ref words, words.Length - 1);
             }
         }
 
-        public UserAccountData[] GetUsersWhere(UUID scopeID, string where)
+        if (words.Length == 0)
+            return new UserAccountData[0];
+
+        if (words.Length > 2)
+            return new UserAccountData[0];
+
+        using (SQLiteCommand cmd = new SQLiteCommand())
         {
-            return null;
+            if (words.Length == 1)
+            {
+                cmd.CommandText = String.Format("select * from {0} where (ScopeID='{1}' or ScopeID='00000000-0000-0000-0000-000000000000') and (FirstName like '{2}%' or LastName like '{2}%')",
+                    m_Realm, scopeID.ToString(), words[0]);
+            }
+            else
+            {
+                cmd.CommandText = String.Format("select * from {0} where (ScopeID='{1}' or ScopeID='00000000-0000-0000-0000-000000000000') and (FirstName like '{2}%' or LastName like '{3}%')",
+                    m_Realm, scopeID.ToString(), words[0], words[1]);
+            }
+
+            return DoQuery(cmd);
         }
+    }
+
+    public UserAccountData[] GetUsersWhere(UUID scopeID, string where)
+    {
+        return null;
     }
 }

@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using Nini.Config;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
@@ -33,35 +32,34 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Server.Handlers.Authentication
+namespace OpenSim.Server.Handlers.Authentication;
+
+public class AuthenticationServiceConnector : ServiceConnector
 {
-    public class AuthenticationServiceConnector : ServiceConnector
+    private IAuthenticationService m_AuthenticationService;
+    private string m_ConfigName = "AuthenticationService";
+
+    public AuthenticationServiceConnector(IConfigSource config, IHttpServer server, string configName) :
+            base(config, server, configName)
     {
-        private IAuthenticationService m_AuthenticationService;
-        private string m_ConfigName = "AuthenticationService";
+        if (configName != String.Empty)
+            m_ConfigName = configName;
 
-        public AuthenticationServiceConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
-        {
-            if (configName != String.Empty)
-                m_ConfigName = configName;
+        IConfig serverConfig = config.Configs[m_ConfigName];
+        if (serverConfig == null)
+            throw new Exception(String.Format("No section '{0}' in config file", m_ConfigName));
 
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section '{0}' in config file", m_ConfigName));
+        string authenticationService = serverConfig.GetString("LocalServiceModule",
+                String.Empty);
 
-            string authenticationService = serverConfig.GetString("LocalServiceModule",
-                    String.Empty);
+        if (authenticationService.Length == 0)
+            throw new Exception("No AuthenticationService in config file");
 
-            if (authenticationService.Length == 0)
-                throw new Exception("No AuthenticationService in config file");
+        Object[] args = new Object[] { config };
+        m_AuthenticationService = ServerUtils.LoadPlugin<IAuthenticationService>(authenticationService, args);
 
-            Object[] args = new Object[] { config };
-            m_AuthenticationService = ServerUtils.LoadPlugin<IAuthenticationService>(authenticationService, args);
+        IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
 
-            IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
-
-            server.AddStreamHandler(new AuthenticationServerPostHandler(m_AuthenticationService, serverConfig, auth));
-        }
+        server.AddStreamHandler(new AuthenticationServerPostHandler(m_AuthenticationService, serverConfig, auth));
     }
 }

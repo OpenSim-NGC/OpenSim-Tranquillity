@@ -27,84 +27,80 @@
 
 using OpenMetaverse;
 using OpenSim.Framework;
-using System;
-using System.Collections.Generic;
 using OpenSim.Services.Interfaces;
 using OpenSim.Data;
 using Nini.Config;
-using log4net;
 using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 
-namespace OpenSim.Services.Friends
+namespace OpenSim.Services.Friends;
+
+public class FriendsService : FriendsServiceBase, IFriendsService
 {
-    public class FriendsService : FriendsServiceBase, IFriendsService
+    public FriendsService(IConfigSource config) : base(config)
     {
-        public FriendsService(IConfigSource config) : base(config)
-        {
-        }
-
-        public virtual FriendInfo[] GetFriends(UUID PrincipalID)
-        {
-            FriendsData[] data = m_Database.GetFriends(PrincipalID);
-            List<FriendInfo> info = new List<FriendInfo>();
-
-            foreach (FriendsData d in data)
-            {
-                FriendInfo i = new FriendInfo();
-
-                i.PrincipalID = new UUID(d.PrincipalID);
-                i.Friend = d.Friend;
-                i.MyFlags = Convert.ToInt32(d.Data["Flags"]);
-                i.TheirFlags = Convert.ToInt32(d.Data["TheirFlags"]);
-
-                info.Add(i);
-            }
-
-            return info.ToArray();
-        }
-
-        public virtual FriendInfo[] GetFriends(string PrincipalID)
-        {
-            FriendsData[] data = m_Database.GetFriends(PrincipalID);
-            List<FriendInfo> info = new List<FriendInfo>();
-
-            foreach (FriendsData d in data)
-            {
-                FriendInfo i = new FriendInfo();
-
-                if (!Util.ParseUniversalUserIdentifier(i.Friend, out UUID friendID))
-                    continue; // junk entry
-                i.Friend = d.Friend;
-                i.MyFlags = Convert.ToInt32(d.Data["Flags"]);
-                i.TheirFlags = Convert.ToInt32(d.Data["TheirFlags"]);
-
-                info.Add(i);
-            }
-
-            return info.ToArray();
-        }
-
-        public virtual bool StoreFriend(string PrincipalID, string Friend, int flags)
-        {
-            FriendsData d = new FriendsData();
-
-            d.PrincipalID = PrincipalID;
-            d.Friend = Friend;
-            d.Data = new Dictionary<string, string>();
-            d.Data["Flags"] = flags.ToString();
-
-            return m_Database.Store(d);
-        }
-
-        public bool Delete(string principalID, string friend)
-        {
-            return m_Database.Delete(principalID, friend);
-        }
-
-        public virtual bool Delete(UUID PrincipalID, string Friend)
-        {
-            return m_Database.Delete(PrincipalID, Friend);
-        }
-
     }
+
+    public virtual FriendInfo[] GetFriends(UUID PrincipalID)
+    {
+        FriendsData[] data = m_Database.GetFriends(PrincipalID);
+        List<FriendInfo> info = new List<FriendInfo>();
+
+        foreach (FriendsData d in data)
+        {
+            FriendInfo i = new FriendInfo();
+
+            i.PrincipalID = new UUID(d.PrincipalID);
+            i.Friend = d.Friend;
+            i.MyFlags = Convert.ToInt32(d.Data["Flags"]);
+            i.TheirFlags = Convert.ToInt32(d.Data["TheirFlags"]);
+
+            info.Add(i);
+        }
+
+        return info.ToArray();
+    }
+
+    public virtual FriendInfo[] GetFriends(string PrincipalID)
+    {
+        FriendsData[] data = m_Database.GetFriends(PrincipalID);
+        List<FriendInfo> info = new List<FriendInfo>();
+
+        foreach (FriendsData d in data)
+        {
+            FriendInfo i = new FriendInfo();
+
+            if (!Util.ParseUniversalUserIdentifier(i.Friend, out UUID friendID))
+                continue; // junk entry
+            i.Friend = d.Friend;
+            i.MyFlags = Convert.ToInt32(d.Data["Flags"]);
+            i.TheirFlags = Convert.ToInt32(d.Data["TheirFlags"]);
+
+            info.Add(i);
+        }
+
+        return info.ToArray();
+    }
+
+    public virtual bool StoreFriend(string PrincipalID, string Friend, int flags)
+    {
+        FriendsData d = new FriendsData();
+
+        d.PrincipalID = PrincipalID;
+        d.Friend = Friend;
+        d.Data = new Dictionary<string, string>();
+        d.Data["Flags"] = flags.ToString();
+
+        return m_Database.Store(d);
+    }
+
+    public bool Delete(string principalID, string friend)
+    {
+        return m_Database.Delete(principalID, friend);
+    }
+
+    public virtual bool Delete(UUID PrincipalID, string Friend)
+    {
+        return m_Database.Delete(PrincipalID, Friend);
+    }
+
 }

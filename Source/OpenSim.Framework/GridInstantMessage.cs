@@ -25,91 +25,89 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+[Serializable]
+public class GridInstantMessage
 {
-    [Serializable]
-    public class GridInstantMessage
+    public Guid fromAgentID;
+    public string fromAgentName;
+    public Guid toAgentID;
+    public byte dialog;
+    public bool fromGroup;
+    public string message;
+    public Guid imSessionID;
+    public byte offline;
+    public Vector3 Position;
+    public byte[] binaryBucket;
+
+    public uint ParentEstateID;
+    public Guid RegionID;
+    public uint timestamp;
+
+    public GridInstantMessage()
     {
-        public Guid fromAgentID;
-        public string fromAgentName;
-        public Guid toAgentID;
-        public byte dialog;
-        public bool fromGroup;
-        public string message;
-        public Guid imSessionID;
-        public byte offline;
-        public Vector3 Position;
-        public byte[] binaryBucket;
+        binaryBucket = Array.Empty<byte>();
+    }
 
-        public uint ParentEstateID;
-        public Guid RegionID;
-        public uint timestamp;
+    public GridInstantMessage(GridInstantMessage im, bool addTimestamp)
+    {
+        fromAgentID = im.fromAgentID;
+        fromAgentName = im.fromAgentName;
+        toAgentID = im.toAgentID;
+        dialog = im.dialog;
+        fromGroup = im.fromGroup;
+        message = im.message;
+        imSessionID = im.imSessionID;
+        offline = im.offline;
+        Position = im.Position;
+        binaryBucket = im.binaryBucket;
+        RegionID = im.RegionID;
+        ParentEstateID = im.ParentEstateID;
 
-        public GridInstantMessage()
+        if (addTimestamp)
+            timestamp = (uint)Util.UnixTimeSinceEpoch();
+    }
+
+    public GridInstantMessage(IScene scene, UUID _fromAgentID,
+            string _fromAgentName, UUID _toAgentID,
+            byte _dialog, bool _fromGroup, string _message,
+            UUID _imSessionID, bool _offline, Vector3 _position,
+            byte[] _binaryBucket, bool addTimestamp)
+    {
+        fromAgentID = _fromAgentID.Guid;
+        fromAgentName = _fromAgentName;
+        toAgentID = _toAgentID.Guid;
+        dialog = _dialog;
+        fromGroup = _fromGroup;
+        message = _message;
+        imSessionID = _imSessionID.Guid;
+
+        if (_offline)
+            offline = 1;
+        else
+            offline = 0;
+        Position = _position;
+        binaryBucket = _binaryBucket;
+
+        if (scene != null)
         {
-            binaryBucket = Array.Empty<byte>();
+            ParentEstateID = scene.RegionInfo.EstateSettings.ParentEstateID;
+            RegionID = scene.RegionInfo.RegionSettings.RegionUUID.Guid;
         }
 
-        public GridInstantMessage(GridInstantMessage im, bool addTimestamp)
-        {
-            fromAgentID = im.fromAgentID;
-            fromAgentName = im.fromAgentName;
-            toAgentID = im.toAgentID;
-            dialog = im.dialog;
-            fromGroup = im.fromGroup;
-            message = im.message;
-            imSessionID = im.imSessionID;
-            offline = im.offline;
-            Position = im.Position;
-            binaryBucket = im.binaryBucket;
-            RegionID = im.RegionID;
-            ParentEstateID = im.ParentEstateID;
+        if (addTimestamp)
+            timestamp = (uint)Util.UnixTimeSinceEpoch();
+    }
 
-            if (addTimestamp)
-                timestamp = (uint)Util.UnixTimeSinceEpoch();
-        }
-
-        public GridInstantMessage(IScene scene, UUID _fromAgentID,
-                string _fromAgentName, UUID _toAgentID,
-                byte _dialog, bool _fromGroup, string _message,
-                UUID _imSessionID, bool _offline, Vector3 _position,
-                byte[] _binaryBucket, bool addTimestamp)
-        {
-            fromAgentID = _fromAgentID.Guid;
-            fromAgentName = _fromAgentName;
-            toAgentID = _toAgentID.Guid;
-            dialog = _dialog;
-            fromGroup = _fromGroup;
-            message = _message;
-            imSessionID = _imSessionID.Guid;
-
-            if (_offline)
-                offline = 1;
-            else
-                offline = 0;
-            Position = _position;
-            binaryBucket = _binaryBucket;
-
-            if (scene != null)
-            {
-                ParentEstateID = scene.RegionInfo.EstateSettings.ParentEstateID;
-                RegionID = scene.RegionInfo.RegionSettings.RegionUUID.Guid;
-            }
-
-            if (addTimestamp)
-                timestamp = (uint)Util.UnixTimeSinceEpoch();
-        }
-
-        public GridInstantMessage(IScene scene, UUID _fromAgentID,
-                string _fromAgentName, UUID _toAgentID, byte _dialog,
-                string _message, bool _offline,
-                Vector3 _position) : this(scene, _fromAgentID, _fromAgentName,
-                _toAgentID, _dialog, false, _message,
-                _fromAgentID ^ _toAgentID, _offline, _position, Array.Empty<byte>(), true)
-        {
-        }
+    public GridInstantMessage(IScene scene, UUID _fromAgentID,
+            string _fromAgentName, UUID _toAgentID, byte _dialog,
+            string _message, bool _offline,
+            Vector3 _position) : this(scene, _fromAgentID, _fromAgentName,
+            _toAgentID, _dialog, false, _message,
+            _fromAgentID ^ _toAgentID, _offline, _position, Array.Empty<byte>(), true)
+    {
     }
 }

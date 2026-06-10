@@ -27,16 +27,15 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework.Capabilities
+namespace OpenSim.Framework.Capabilities;
+
+[OSDMap]
+public class LLSDInventoryFolder
 {
-    [OSDMap]
-    public class LLSDInventoryFolder
-    {
-        public UUID folder_id;
-        public UUID parent_id;
-        public string name;
-        public int type;
-        public int preferred_type;
-        public int version;
-    }
+    public UUID folder_id;
+    public UUID parent_id;
+    public string name;
+    public int type;
+    public int preferred_type;
+    public int version;
 }

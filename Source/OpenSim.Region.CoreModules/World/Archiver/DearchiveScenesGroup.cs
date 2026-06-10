@@ -32,224 +32,223 @@ using System.Reflection;
 using OpenSim.Framework.Serialization;
 using SkiaSharp;
 
-namespace OpenSim.Region.CoreModules.World.Archiver
+namespace OpenSim.Region.CoreModules.World.Archiver;
+
+/// <summary>
+/// The regions included in an OAR file.
+/// </summary>
+public class DearchiveScenesInfo
 {
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
     /// <summary>
-    /// The regions included in an OAR file.
+    /// One region in the archive.
     /// </summary>
-    public class DearchiveScenesInfo
+    public class RegionInfo
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        /// <summary>
+        /// The subdirectory in which the region is stored.
+        /// </summary>
+        public string Directory { get; set; }
 
         /// <summary>
-        /// One region in the archive.
+        /// The region's coordinates (relative to the South-West corner of the block).
         /// </summary>
-        public class RegionInfo
+        public SKPoint Location { get; set; }
+
+        /// <summary>
+        /// The UUID of the original scene from which this archived region was saved.
+        /// </summary>
+        public string OriginalID { get; set; }
+
+        /// <summary>
+        /// The scene in the current simulator into which this region is loaded.
+        /// If null then the region doesn't have a corresponding scene, and it won't be loaded.
+        /// </summary>
+        public Scene Scene { get; set; }
+
+        /// <summary>
+        /// The size of the region being loaded.
+        /// </summary>
+        public Vector3 RegionSize { get; set; }
+
+        public RegionInfo()
         {
-            /// <summary>
-            /// The subdirectory in which the region is stored.
-            /// </summary>
-            public string Directory { get; set; }
+            RegionSize = new Vector3(256f,256f,float.MaxValue);
+        }
+    }
 
-            /// <summary>
-            /// The region's coordinates (relative to the South-West corner of the block).
-            /// </summary>
-            public SKPoint Location { get; set; }
+    /// <summary>
+    /// Whether this archive uses the multi-region format.
+    /// </summary>
+    public Boolean MultiRegionFormat { get; set; }
 
-            /// <summary>
-            /// The UUID of the original scene from which this archived region was saved.
-            /// </summary>
-            public string OriginalID { get; set; }
+    /// <summary>
+    /// Maps (Region directory -> region)
+    /// </summary>
+    protected Dictionary<string, RegionInfo> m_directory2region = new Dictionary<string, RegionInfo>();
 
-            /// <summary>
-            /// The scene in the current simulator into which this region is loaded.
-            /// If null then the region doesn't have a corresponding scene, and it won't be loaded.
-            /// </summary>
-            public Scene Scene { get; set; }
+    /// <summary>
+    /// Maps (UUID of the scene in the simulator where the region will be loaded -> region)
+    /// </summary>
+    protected Dictionary<UUID, RegionInfo> m_newId2region = new Dictionary<UUID, RegionInfo>();
 
-            /// <summary>
-            /// The size of the region being loaded.
-            /// </summary>
-            public Vector3 RegionSize { get; set; }
+    public int LoadedCreationDateTime { get; set; }
+    public string DefaultOriginalID { get; set; }
 
-            public RegionInfo()
+    // These variables are used while reading the archive control file
+    protected int? m_curY = null;
+    protected int? m_curX = null;
+    protected RegionInfo m_curRegion;
+
+
+    public DearchiveScenesInfo()
+    {
+        MultiRegionFormat = false;
+    }
+
+
+    // The following methods are used while reading the archive control file
+
+    public void StartRow()
+    {
+        m_curY = (m_curY == null) ? 0 : m_curY + 1;
+        m_curX = null;
+    }
+
+    public void StartRegion()
+    {
+        m_curX = (m_curX == null) ? 0 : m_curX + 1;
+       // Note: this doesn't mean we have a real region in this location; this could just be a "hole"
+    }
+
+    public void SetRegionOriginalID(string id)
+    {
+        m_curRegion = new RegionInfo();
+        int x = (int)((m_curX == null) ? 0 : m_curX);
+        int y = (int)((m_curY == null) ? 0 : m_curY);
+
+        m_curRegion.Location = new SKPoint(x, y);
+        m_curRegion.OriginalID = id;
+        // 'curRegion' will be saved in 'm_directory2region' when SetRegionDir() is called
+    }
+
+    public void SetRegionDirectory(string directory)
+    {
+        if(m_curRegion != null)
+        {
+            m_curRegion.Directory = directory;
+            m_directory2region[directory] = m_curRegion;
+        }
+    }
+
+    public void SetRegionSize(Vector3 size)
+    {
+        if(m_curRegion != null)
+            m_curRegion.RegionSize = size;
+    }
+
+    /// <summary>
+    /// Sets all the scenes present in the simulator.
+    /// </summary>
+    /// <remarks>
+    /// This method matches regions in the archive to scenes in the simulator according to
+    /// their relative position. We only load regions if there's an existing Scene in the
+    /// grid location where the region should be loaded.
+    /// </remarks>
+    /// <param name="rootScene">The scene where the Load OAR operation was run</param>
+    /// <param name="simulatorScenes">All the scenes in the simulator</param>
+    public void SetSimulatorScenes(Scene rootScene, ArchiveScenesGroup simulatorScenes)
+    {
+        foreach (RegionInfo archivedRegion in m_directory2region.Values)
+        {
+            SKPoint location = new SKPoint((int)rootScene.RegionInfo.RegionLocX,
+                        (int)rootScene.RegionInfo.RegionLocY);
+
+            location = location + archivedRegion.Location;
+
+            Scene scene;
+            if (simulatorScenes.TryGetScene(location, out scene))
             {
-                RegionSize = new Vector3(256f,256f,float.MaxValue);
-            }
-        }
-
-        /// <summary>
-        /// Whether this archive uses the multi-region format.
-        /// </summary>
-        public Boolean MultiRegionFormat { get; set; }
-
-        /// <summary>
-        /// Maps (Region directory -> region)
-        /// </summary>
-        protected Dictionary<string, RegionInfo> m_directory2region = new Dictionary<string, RegionInfo>();
-
-        /// <summary>
-        /// Maps (UUID of the scene in the simulator where the region will be loaded -> region)
-        /// </summary>
-        protected Dictionary<UUID, RegionInfo> m_newId2region = new Dictionary<UUID, RegionInfo>();
-
-        public int LoadedCreationDateTime { get; set; }
-        public string DefaultOriginalID { get; set; }
-
-        // These variables are used while reading the archive control file
-        protected int? m_curY = null;
-        protected int? m_curX = null;
-        protected RegionInfo m_curRegion;
-
-
-        public DearchiveScenesInfo()
-        {
-            MultiRegionFormat = false;
-        }
-
-
-        // The following methods are used while reading the archive control file
-
-        public void StartRow()
-        {
-            m_curY = (m_curY == null) ? 0 : m_curY + 1;
-            m_curX = null;
-        }
-
-        public void StartRegion()
-        {
-            m_curX = (m_curX == null) ? 0 : m_curX + 1;
-           // Note: this doesn't mean we have a real region in this location; this could just be a "hole"
-        }
-
-        public void SetRegionOriginalID(string id)
-        {
-            m_curRegion = new RegionInfo();
-            int x = (int)((m_curX == null) ? 0 : m_curX);
-            int y = (int)((m_curY == null) ? 0 : m_curY);
-
-            m_curRegion.Location = new SKPoint(x, y);
-            m_curRegion.OriginalID = id;
-            // 'curRegion' will be saved in 'm_directory2region' when SetRegionDir() is called
-        }
-
-        public void SetRegionDirectory(string directory)
-        {
-            if(m_curRegion != null)
-            {
-                m_curRegion.Directory = directory;
-                m_directory2region[directory] = m_curRegion;
-            }
-        }
-
-        public void SetRegionSize(Vector3 size)
-        {
-            if(m_curRegion != null)
-                m_curRegion.RegionSize = size;
-        }
-
-        /// <summary>
-        /// Sets all the scenes present in the simulator.
-        /// </summary>
-        /// <remarks>
-        /// This method matches regions in the archive to scenes in the simulator according to
-        /// their relative position. We only load regions if there's an existing Scene in the
-        /// grid location where the region should be loaded.
-        /// </remarks>
-        /// <param name="rootScene">The scene where the Load OAR operation was run</param>
-        /// <param name="simulatorScenes">All the scenes in the simulator</param>
-        public void SetSimulatorScenes(Scene rootScene, ArchiveScenesGroup simulatorScenes)
-        {
-            foreach (RegionInfo archivedRegion in m_directory2region.Values)
-            {
-                SKPoint location = new SKPoint((int)rootScene.RegionInfo.RegionLocX,
-                            (int)rootScene.RegionInfo.RegionLocY);
-
-                location = location + archivedRegion.Location;
-
-                Scene scene;
-                if (simulatorScenes.TryGetScene(location, out scene))
-                {
-                    archivedRegion.Scene = scene;
-                    m_newId2region[scene.RegionInfo.RegionID] = archivedRegion;
-                }
-                else
-                {
-                    m_log.WarnFormat("[ARCHIVER]: Not loading archived region {0} because there's no existing region at location {1},{2}",
-                        archivedRegion.Directory, location.X, location.Y);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Returns the archived region according to the path of a file in the archive.
-        /// Also, converts the full path into a path that is relative to the region's directory.
-        /// </summary>
-        /// <param name="fullPath">The path of a file in the archive</param>
-        /// <param name="scene">The corresponding Scene, or null if none</param>
-        /// <param name="relativePath">The path relative to the region's directory. (Or the original
-        /// path, if this file doesn't belong to a region.)</param>
-        /// <returns>True: use this file; False: skip it</returns>
-        public bool GetRegionFromPath(string fullPath, out Scene scene, out string relativePath)
-        {
-            scene = null;
-            relativePath = fullPath;
-
-            if (!MultiRegionFormat)
-            {
-                if (m_newId2region.Count > 0)
-                    scene = m_newId2region.First().Value.Scene;
-                return true;
-            }
-
-            if (!fullPath.StartsWith(ArchiveConstants.REGIONS_PATH))
-                return true;    // this file doesn't belong to a region
-
-            string[] parts = fullPath.Split(new Char[] { '/' }, 3);
-            if (parts.Length != 3)
-                return false;
-            string regionDirectory = parts[1];
-            relativePath = parts[2];
-
-            RegionInfo region;
-            if (m_directory2region.TryGetValue(regionDirectory, out region))
-            {
-                scene = region.Scene;
-                return (scene != null);
+                archivedRegion.Scene = scene;
+                m_newId2region[scene.RegionInfo.RegionID] = archivedRegion;
             }
             else
             {
-                return false;
+                m_log.WarnFormat("[ARCHIVER]: Not loading archived region {0} because there's no existing region at location {1},{2}",
+                    archivedRegion.Directory, location.X, location.Y);
             }
         }
+    }
 
-        /// <summary>
-        /// Returns the original UUID of a region (from the simulator where the OAR was saved),
-        /// given the UUID of the scene it was loaded into in the current simulator.
-        /// </summary>
-        /// <param name="newID"></param>
-        /// <returns></returns>
-        public string GetOriginalRegionID(UUID newID)
+    /// <summary>
+    /// Returns the archived region according to the path of a file in the archive.
+    /// Also, converts the full path into a path that is relative to the region's directory.
+    /// </summary>
+    /// <param name="fullPath">The path of a file in the archive</param>
+    /// <param name="scene">The corresponding Scene, or null if none</param>
+    /// <param name="relativePath">The path relative to the region's directory. (Or the original
+    /// path, if this file doesn't belong to a region.)</param>
+    /// <returns>True: use this file; False: skip it</returns>
+    public bool GetRegionFromPath(string fullPath, out Scene scene, out string relativePath)
+    {
+        scene = null;
+        relativePath = fullPath;
+
+        if (!MultiRegionFormat)
         {
-            RegionInfo region;
-            if (m_newId2region.TryGetValue(newID, out region))
-                return region.OriginalID;
-            else
-                return DefaultOriginalID;
+            if (m_newId2region.Count > 0)
+                scene = m_newId2region.First().Value.Scene;
+            return true;
         }
 
-        /// <summary>
-        /// Returns the scenes that have been (or will be) loaded.
-        /// </summary>
-        /// <returns></returns>
-        public List<UUID> GetLoadedScenes()
-        {
-            return m_newId2region.Keys.ToList();
-        }
+        if (!fullPath.StartsWith(ArchiveConstants.REGIONS_PATH))
+            return true;    // this file doesn't belong to a region
 
-        public int GetScenesCount()
+        string[] parts = fullPath.Split(new Char[] { '/' }, 3);
+        if (parts.Length != 3)
+            return false;
+        string regionDirectory = parts[1];
+        relativePath = parts[2];
+
+        RegionInfo region;
+        if (m_directory2region.TryGetValue(regionDirectory, out region))
         {
-            return m_directory2region.Count;
+            scene = region.Scene;
+            return (scene != null);
         }
+        else
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Returns the original UUID of a region (from the simulator where the OAR was saved),
+    /// given the UUID of the scene it was loaded into in the current simulator.
+    /// </summary>
+    /// <param name="newID"></param>
+    /// <returns></returns>
+    public string GetOriginalRegionID(UUID newID)
+    {
+        RegionInfo region;
+        if (m_newId2region.TryGetValue(newID, out region))
+            return region.OriginalID;
+        else
+            return DefaultOriginalID;
+    }
+
+    /// <summary>
+    /// Returns the scenes that have been (or will be) loaded.
+    /// </summary>
+    /// <returns></returns>
+    public List<UUID> GetLoadedScenes()
+    {
+        return m_newId2region.Keys.ToList();
+    }
+
+    public int GetScenesCount()
+    {
+        return m_directory2region.Count;
     }
 }

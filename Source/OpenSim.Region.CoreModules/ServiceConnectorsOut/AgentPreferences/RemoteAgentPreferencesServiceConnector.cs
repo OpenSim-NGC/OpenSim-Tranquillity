@@ -35,75 +35,74 @@ using OpenSim.Services.Connectors;
 using log4net;
 using Nini.Config;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences;
+
+public class RemoteAgentPreferencesServicesConnector : AgentPreferencesServicesConnector,
+        ISharedRegionModule, IAgentPreferencesService
 {
-    public class RemoteAgentPreferencesServicesConnector : AgentPreferencesServicesConnector,
-            ISharedRegionModule, IAgentPreferencesService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private bool m_Enabled = false;
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        private bool m_Enabled = false;
+    public string Name
+    {
+        get { return "RemoteAgentPreferencesServicesConnector"; }
+    }
 
-        public Type ReplaceableInterface
+    public new void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "RemoteAgentPreferencesServicesConnector"; }
-        }
-
-        public new void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("AgentPreferencesServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("AgentPreferencesServices", "");
-                if (name == Name)
+                IConfig userConfig = source.Configs["AgentPreferencesService"];
+                if (userConfig == null)
                 {
-                    IConfig userConfig = source.Configs["AgentPreferencesService"];
-                    if (userConfig == null)
-                    {
-                        m_log.Error("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    m_Enabled = true;
-
-                    base.Initialise(source);
-
-                    m_log.Info("[AGENT PREFERENCES CONNECTOR]: Remote agent preferences enabled");
+                    m_log.Error("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
+                    return;
                 }
+
+                m_Enabled = true;
+
+                base.Initialise(source);
+
+                m_log.Info("[AGENT PREFERENCES CONNECTOR]: Remote agent preferences enabled");
             }
         }
+    }
 
-        public void PostInitialise()
-        {
-            /* no op */
-        }
+    public void PostInitialise()
+    {
+        /* no op */
+    }
 
-        public void Close()
-        {
-            /* no op */
-        }
+    public void Close()
+    {
+        /* no op */
+    }
 
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
 
-            scene.RegisterModuleInterface<IAgentPreferencesService>(this);
-        }
+        scene.RegisterModuleInterface<IAgentPreferencesService>(this);
+    }
 
-        public void RemoveRegion(Scene scene)
-        {
-            /* no op */
-        }
+    public void RemoveRegion(Scene scene)
+    {
+        /* no op */
+    }
 
-        public void RegionLoaded(Scene scene)
-        {
-            /* no op */
-        }
+    public void RegionLoaded(Scene scene)
+    {
+        /* no op */
     }
 }

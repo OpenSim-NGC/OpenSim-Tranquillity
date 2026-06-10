@@ -25,102 +25,98 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
-using System.Reflection;
 using System.Xml;
-using log4net;
 using OpenMetaverse;
 
-namespace OpenSim.Region.Framework.Scenes.Animation
+namespace OpenSim.Region.Framework.Scenes.Animation;
+
+public class DefaultAvatarAnimations
 {
-    public class DefaultAvatarAnimations
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public static readonly string DefaultAnimationsPath = "data/avataranimations.xml";
+    public static readonly string DefaultAnimationsPath = "data/avataranimations.xml";
 
-        public static Dictionary<string, UUID> AnimsUUIDbyName = new Dictionary<string, UUID>();
-        public static Dictionary<UUID, string> AnimsNamesbyUUID = new Dictionary<UUID, string>();
-        public static Dictionary<UUID, string> AnimStateNames = new Dictionary<UUID, string>();
+    public static Dictionary<string, UUID> AnimsUUIDbyName = new Dictionary<string, UUID>();
+    public static Dictionary<UUID, string> AnimsNamesbyUUID = new Dictionary<UUID, string>();
+    public static Dictionary<UUID, string> AnimStateNames = new Dictionary<UUID, string>();
 
-        static DefaultAvatarAnimations()
-        {
-            LoadAnimations(DefaultAnimationsPath);
-        }
+    static DefaultAvatarAnimations()
+    {
+        LoadAnimations(DefaultAnimationsPath);
+    }
 
-        /// <summary>
-        /// Load the default SL avatar animations.
-        /// </summary>
-        /// <returns></returns>
-        private static void LoadAnimations(string path)
-        {
+    /// <summary>
+    /// Load the default SL avatar animations.
+    /// </summary>
+    /// <returns></returns>
+    private static void LoadAnimations(string path)
+    {
 //            Dictionary<string, UUID> animations = new Dictionary<string, UUID>();
 
-            using (XmlTextReader reader = new XmlTextReader(path))
-            {
-                reader.DtdProcessing = DtdProcessing.Ignore;
-                XmlDocument doc = new XmlDocument();
-                doc.Load(reader);
+        using (XmlTextReader reader = new XmlTextReader(path))
+        {
+            reader.DtdProcessing = DtdProcessing.Ignore;
+            XmlDocument doc = new XmlDocument();
+            doc.Load(reader);
 //                if (doc.DocumentElement != null)
 //                {
-                    foreach (XmlNode nod in doc.DocumentElement.ChildNodes)
+                foreach (XmlNode nod in doc.DocumentElement.ChildNodes)
+                {
+                    if (nod.Attributes["name"] != null)
                     {
-                        if (nod.Attributes["name"] != null)
-                        {
-                            string name = nod.Attributes["name"].Value;
-                            UUID id = (UUID)nod.InnerText;
-                            string animState = (string)nod.Attributes["state"].Value;
+                        string name = nod.Attributes["name"].Value;
+                        UUID id = (UUID)nod.InnerText;
+                        string animState = (string)nod.Attributes["state"].Value;
 
-                            AnimsUUIDbyName.Add(name, id);
-                            AnimsNamesbyUUID.Add(id, name);
-                            if (animState != "")
-                                AnimStateNames.Add(id, animState);
+                        AnimsUUIDbyName.Add(name, id);
+                        AnimsNamesbyUUID.Add(id, name);
+                        if (animState != "")
+                            AnimStateNames.Add(id, animState);
 
 //                            m_log.DebugFormat("[AVATAR ANIMATIONS]: Loaded {0} {1} {2}", id, name, animState);
-                        }
                     }
+                }
 //                }
-            }
-
-//            return animations;
         }
 
-        /// <summary>
-        /// Get the default avatar animation with the given name.
-        /// </summary>
-        /// <param name="name"></param>
-        /// <returns></returns>
-        public static UUID GetDefaultAnimation(string name)
-        {
+//            return animations;
+    }
+
+    /// <summary>
+    /// Get the default avatar animation with the given name.
+    /// </summary>
+    /// <param name="name"></param>
+    /// <returns></returns>
+    public static UUID GetDefaultAnimation(string name)
+    {
 //            m_log.DebugFormat(
 //                "[AVATAR ANIMATIONS]: Looking for default avatar animation with name {0}", name);
-            UUID id;
-            if (AnimsUUIDbyName.TryGetValue(name.ToUpper(), out id))
-            {
+        UUID id;
+        if (AnimsUUIDbyName.TryGetValue(name.ToUpper(), out id))
+        {
 //                m_log.DebugFormat(
 //                    "[AVATAR ANIMATIONS]: Found {0} {1} in GetDefaultAvatarAnimation()", AnimsUUID[name], name);
 
-                return id;
-            }
-            if(UUID.TryParse(name, out id))
-            {
-                if(AnimsNamesbyUUID.ContainsKey(id))
-                    return id;
-            }
-
-            return UUID.Zero;
+            return id;
         }
-
-        /// <summary>
-        /// Get the name of the animation given a UUID. If there is no matching animation
-        ///    return the UUID as a string.
-        /// </summary>
-        public static string GetDefaultAnimationName(UUID uuid)
+        if(UUID.TryParse(name, out id))
         {
-            if(AnimsNamesbyUUID.TryGetValue(uuid, out string ret))
-                return ret;
-            else
-                return uuid.ToString();
+            if(AnimsNamesbyUUID.ContainsKey(id))
+                return id;
         }
+
+        return UUID.Zero;
+    }
+
+    /// <summary>
+    /// Get the name of the animation given a UUID. If there is no matching animation
+    ///    return the UUID as a string.
+    /// </summary>
+    public static string GetDefaultAnimationName(UUID uuid)
+    {
+        if(AnimsNamesbyUUID.TryGetValue(uuid, out string ret))
+            return ret;
+        else
+            return uuid.ToString();
     }
 }

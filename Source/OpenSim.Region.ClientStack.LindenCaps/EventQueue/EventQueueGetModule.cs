@@ -38,495 +38,494 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
-namespace OpenSim.Region.ClientStack.LindenCaps
+namespace OpenSim.Region.ClientStack.LindenCaps;
+
+public struct QueueItem
 {
-    public struct QueueItem
+    public int id;
+    public OSDMap body;
+}
+
+public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
+{
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly string LogHeader = "[EVENT QUEUE GET MODULE]";
+
+    private const int KEEPALIVE = 60; // this could be larger now, but viewers expect it on opensim
+    // we need to go back to close before viwers, or we may lose data
+    private const int VIEWERKEEPALIVE = (KEEPALIVE - 2) * 1000; // do it shorter
+
+    /// <value>
+    /// Debug level.
+    /// </value>
+    public int DebugLevel { get; set; }
+
+    protected Scene m_scene;
+
+    private readonly Dictionary<UUID, int> m_ids = new();
+
+    private readonly Dictionary<UUID, Queue<byte[]>> queues = new();
+    private readonly Dictionary<UUID, UUID> m_AvatarQueueUUIDMapping = new();
+
+    #region INonSharedRegionModule methods
+    public virtual void Initialise(IConfigSource config)
     {
-        public int id;
-        public OSDMap body;
     }
 
-    public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
+    public void AddRegion(Scene scene)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private static readonly string LogHeader = "[EVENT QUEUE GET MODULE]";
+        m_scene = scene;
+        scene.RegisterModuleInterface<IEventQueue>(this);
 
-        private const int KEEPALIVE = 60; // this could be larger now, but viewers expect it on opensim
-        // we need to go back to close before viwers, or we may lose data
-        private const int VIEWERKEEPALIVE = (KEEPALIVE - 2) * 1000; // do it shorter
+        scene.EventManager.OnClientClosed += ClientClosed;
+        scene.EventManager.OnRegisterCaps += OnRegisterCaps;
 
-        /// <value>
-        /// Debug level.
-        /// </value>
-        public int DebugLevel { get; set; }
+        MainConsole.Instance.Commands.AddCommand(
+            "Debug",
+            false,
+            "debug eq",
+            "debug eq [0|1|2]",
+            "Turn on event queue debugging\n"
+                + "  <= 0 - turns off all event queue logging\n"
+                + "  >= 1 - turns on event queue setup and outgoing event logging\n"
+                + "  >= 2 - turns on poll notification",
+            HandleDebugEq);
 
-        protected Scene m_scene;
+        MainConsole.Instance.Commands.AddCommand(
+            "Debug",
+            false,
+            "show eq",
+            "show eq",
+            "Show contents of event queues for logged in avatars.  Used for debugging.",
+            HandleShowEq);
+    }
 
-        private readonly Dictionary<UUID, int> m_ids = new();
+    public void RemoveRegion(Scene scene)
+    {
+        if (m_scene != scene)
+            return;
 
-        private readonly Dictionary<UUID, Queue<byte[]>> queues = new();
-        private readonly Dictionary<UUID, UUID> m_AvatarQueueUUIDMapping = new();
+        scene.EventManager.OnClientClosed -= ClientClosed;
+        scene.EventManager.OnRegisterCaps -= OnRegisterCaps;
 
-        #region INonSharedRegionModule methods
-        public virtual void Initialise(IConfigSource config)
+        scene.UnregisterModuleInterface<IEventQueue>(this);
+        m_scene = null;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public virtual void Close()
+    {
+    }
+
+    public virtual string Name
+    {
+        get { return "EventQueueGetModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    #endregion
+
+    protected void HandleDebugEq(string module, string[] args)
+    {
+
+        if (!(args.Length == 3 && int.TryParse(args[2], out int debugLevel)))
         {
+            MainConsole.Instance.Output("Usage: debug eq [0|1|2]");
         }
-
-        public void AddRegion(Scene scene)
+        else
         {
-            m_scene = scene;
-            scene.RegisterModuleInterface<IEventQueue>(this);
-
-            scene.EventManager.OnClientClosed += ClientClosed;
-            scene.EventManager.OnRegisterCaps += OnRegisterCaps;
-
-            MainConsole.Instance.Commands.AddCommand(
-                "Debug",
-                false,
-                "debug eq",
-                "debug eq [0|1|2]",
-                "Turn on event queue debugging\n"
-                    + "  <= 0 - turns off all event queue logging\n"
-                    + "  >= 1 - turns on event queue setup and outgoing event logging\n"
-                    + "  >= 2 - turns on poll notification",
-                HandleDebugEq);
-
-            MainConsole.Instance.Commands.AddCommand(
-                "Debug",
-                false,
-                "show eq",
-                "show eq",
-                "Show contents of event queues for logged in avatars.  Used for debugging.",
-                HandleShowEq);
+            DebugLevel = debugLevel;
+            MainConsole.Instance.Output($"Set event queue debug level to {DebugLevel} in {m_scene.RegionInfo.RegionName}");
         }
+    }
 
-        public void RemoveRegion(Scene scene)
+    protected void HandleShowEq(string module, string[] args)
+    {
+        MainConsole.Instance.Output($"Events in Scene {m_scene.Name} agents queues :");
+
+        lock (queues)
         {
-            if (m_scene != scene)
-                return;
-
-            scene.EventManager.OnClientClosed -= ClientClosed;
-            scene.EventManager.OnRegisterCaps -= OnRegisterCaps;
-
-            scene.UnregisterModuleInterface<IEventQueue>(this);
-            m_scene = null;
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        public virtual void Close()
-        {
-        }
-
-        public virtual string Name
-        {
-            get { return "EventQueueGetModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        #endregion
-
-        protected void HandleDebugEq(string module, string[] args)
-        {
-
-            if (!(args.Length == 3 && int.TryParse(args[2], out int debugLevel)))
+            foreach (KeyValuePair<UUID, Queue<byte[]>> kvp in queues)
             {
-                MainConsole.Instance.Output("Usage: debug eq [0|1|2]");
+                MainConsole.Instance.Output($"    {kvp.Key}  {kvp.Value.Count}");
+            }
+        }
+    }
+
+    /// <summary>
+    ///  Always returns a valid queue
+    /// </summary>
+    /// <param name="agentId"></param>
+    /// <returns></returns>
+    private Queue<byte[]> TryGetQueue(UUID agentId)
+    {
+        lock (queues)
+        {
+            if (queues.TryGetValue(agentId, out Queue<byte[]> queue))
+                return queue;
+
+            if (DebugLevel > 0)
+                m_log.DebugFormat(
+                   "[EVENTQUEUE]: Adding new queue for agent {0} in region {1}",
+                   agentId, m_scene.RegionInfo.RegionName);
+
+            queue = new Queue<byte[]>();
+            queues[agentId] = queue;
+
+            return queue;
+        }
+    }
+
+    /// <summary>
+
+    /// May return a null queue
+    /// </summary>
+    /// <param name="agentId"></param>
+    /// <returns></returns>
+    private Queue<byte[]> GetQueue(UUID agentId)
+    {
+        lock (queues)
+        {
+            return queues.TryGetValue(agentId, out Queue<byte[]> queue) ? queue : null;
+        }
+    }
+
+    #region IEventQueue Members
+    //legacy 
+    public bool Enqueue(OSD data, UUID avatarID)
+    {
+        //m_log.DebugFormat("[EVENTQUEUE]: Enqueuing event for {0} in region {1}", avatarID, m_scene.RegionInfo.RegionName);
+        try
+        {
+            Queue<byte[]> queue = GetQueue(avatarID);
+            if (queue != null)
+            {
+                byte[] evData = Util.UTF8NBGetbytes(OSDParser.SerializeLLSDInnerXmlString(data));
+                lock (queue)
+                    queue.Enqueue(evData);
             }
             else
             {
-                DebugLevel = debugLevel;
-                MainConsole.Instance.Output($"Set event queue debug level to {DebugLevel} in {m_scene.RegionInfo.RegionName}");
+                m_log.Warn($"[EVENTQUEUE]: (Enqueue) No queue found for agent {avatarID} in region {m_scene.Name}");
             }
         }
-
-        protected void HandleShowEq(string module, string[] args)
+        catch (NullReferenceException e)
         {
-            MainConsole.Instance.Output($"Events in Scene {m_scene.Name} agents queues :");
+            m_log.Error($"[EVENTQUEUE] Caught exception: {e.Message}");
+            return false;
+        }
+        return true;
+    }
 
-            lock (queues)
+    public bool Enqueue(byte[] evData, UUID avatarID)
+    {
+        //m_log.DebugFormat("[EVENTQUEUE]: Enqueuing event for {0} in region {1}", avatarID, m_scene.RegionInfo.RegionName);
+        try
+        {
+            Queue<byte[]> queue = GetQueue(avatarID);
+            if (queue != null)
             {
-                foreach (KeyValuePair<UUID, Queue<byte[]>> kvp in queues)
-                {
-                    MainConsole.Instance.Output($"    {kvp.Key}  {kvp.Value.Count}");
-                }
+                lock (queue)
+                    queue.Enqueue(evData);
+            }
+            else
+            {
+                m_log.WarnFormat(
+                        "[EVENTQUEUE]: (Enqueue) No queue found for agent {0} in region {1}",
+                        avatarID, m_scene.Name);
             }
         }
-
-        /// <summary>
-        ///  Always returns a valid queue
-        /// </summary>
-        /// <param name="agentId"></param>
-        /// <returns></returns>
-        private Queue<byte[]> TryGetQueue(UUID agentId)
+        catch (NullReferenceException e)
         {
-            lock (queues)
+            m_log.Error("[EVENTQUEUE] Caught exception: " + e);
+            return false;
+        }
+        return true;
+    }
+
+    public bool Enqueue(osUTF8 o, UUID avatarID)
+    {
+        //m_log.DebugFormat("[EVENTQUEUE]: Enqueuing event for {0} in region {1}", avatarID, m_scene.RegionInfo.RegionName);
+        try
+        {
+            Queue<byte[]> queue = GetQueue(avatarID);
+            if (queue != null)
             {
-                if (queues.TryGetValue(agentId, out Queue<byte[]> queue))
-                    return queue;
+                lock (queue)
+                    queue.Enqueue(o.ToArray());
+            }
+            else
+            {
+                m_log.WarnFormat(
+                        "[EVENTQUEUE]: (Enqueue) No queue found for agent {0} in region {1}",
+                        avatarID, m_scene.Name);
+            }
+        }
+        catch (NullReferenceException e)
+        {
+            m_log.Error("[EVENTQUEUE] Caught exception: " + e);
+            return false;
+        }
+        return true;
+    }
 
-                if (DebugLevel > 0)
-                    m_log.DebugFormat(
-                       "[EVENTQUEUE]: Adding new queue for agent {0} in region {1}",
-                       agentId, m_scene.RegionInfo.RegionName);
+    #endregion
 
+    private void ClientClosed(UUID agentID, Scene scene)
+    {
+        //m_log.DebugFormat("[EVENTQUEUE]: Closed client {0} in region {1}", agentID, m_scene.RegionInfo.RegionName);
+
+        lock (queues)
+        {
+            queues.Remove(agentID);
+
+            lock (m_AvatarQueueUUIDMapping)
+                m_AvatarQueueUUIDMapping.Remove(agentID);
+
+            lock (m_ids)
+                m_ids.Remove(agentID);
+        }
+
+        // m_log.DebugFormat("[EVENTQUEUE]: Deleted queues for {0} in region {1}", agentID, m_scene.RegionInfo.RegionName);
+
+    }
+
+    /// <summary>
+    /// Generate an Event Queue Get handler path for the given eqg uuid.
+    /// </summary>
+    /// <param name='eqgUuid'></param>
+    private static string GenerateEqgCapPath(UUID eqgUuid)
+    {
+        return $"/CE/{eqgUuid}";
+    }
+
+    public void OnRegisterCaps(UUID agentID, Caps caps)
+    {
+        // Register an event queue for the client
+
+        if (DebugLevel > 0)
+            m_log.Debug(
+                $"[EVENTQUEUE]: OnRegisterCaps: agentID {agentID} caps {caps} region {m_scene.Name}");
+
+        UUID eventQueueGetUUID;
+        lock (queues)
+        {
+            queues.TryGetValue(agentID, out Queue<byte[]> queue);
+
+            if (queue == null)
+            {
                 queue = new Queue<byte[]>();
-                queues[agentId] = queue;
-
-                return queue;
-            }
-        }
-
-        /// <summary>
-
-        /// May return a null queue
-        /// </summary>
-        /// <param name="agentId"></param>
-        /// <returns></returns>
-        private Queue<byte[]> GetQueue(UUID agentId)
-        {
-            lock (queues)
-            {
-                return queues.TryGetValue(agentId, out Queue<byte[]> queue) ? queue : null;
-            }
-        }
-
-        #region IEventQueue Members
-        //legacy 
-        public bool Enqueue(OSD data, UUID avatarID)
-        {
-            //m_log.DebugFormat("[EVENTQUEUE]: Enqueuing event for {0} in region {1}", avatarID, m_scene.RegionInfo.RegionName);
-            try
-            {
-                Queue<byte[]> queue = GetQueue(avatarID);
-                if (queue != null)
-                {
-                    byte[] evData = Util.UTF8NBGetbytes(OSDParser.SerializeLLSDInnerXmlString(data));
-                    lock (queue)
-                        queue.Enqueue(evData);
-                }
-                else
-                {
-                    m_log.Warn($"[EVENTQUEUE]: (Enqueue) No queue found for agent {avatarID} in region {m_scene.Name}");
-                }
-            }
-            catch (NullReferenceException e)
-            {
-                m_log.Error($"[EVENTQUEUE] Caught exception: {e.Message}");
-                return false;
-            }
-            return true;
-        }
-
-        public bool Enqueue(byte[] evData, UUID avatarID)
-        {
-            //m_log.DebugFormat("[EVENTQUEUE]: Enqueuing event for {0} in region {1}", avatarID, m_scene.RegionInfo.RegionName);
-            try
-            {
-                Queue<byte[]> queue = GetQueue(avatarID);
-                if (queue != null)
-                {
-                    lock (queue)
-                        queue.Enqueue(evData);
-                }
-                else
-                {
-                    m_log.WarnFormat(
-                            "[EVENTQUEUE]: (Enqueue) No queue found for agent {0} in region {1}",
-                            avatarID, m_scene.Name);
-                }
-            }
-            catch (NullReferenceException e)
-            {
-                m_log.Error("[EVENTQUEUE] Caught exception: " + e);
-                return false;
-            }
-            return true;
-        }
-
-        public bool Enqueue(osUTF8 o, UUID avatarID)
-        {
-            //m_log.DebugFormat("[EVENTQUEUE]: Enqueuing event for {0} in region {1}", avatarID, m_scene.RegionInfo.RegionName);
-            try
-            {
-                Queue<byte[]> queue = GetQueue(avatarID);
-                if (queue != null)
-                {
-                    lock (queue)
-                        queue.Enqueue(o.ToArray());
-                }
-                else
-                {
-                    m_log.WarnFormat(
-                            "[EVENTQUEUE]: (Enqueue) No queue found for agent {0} in region {1}",
-                            avatarID, m_scene.Name);
-                }
-            }
-            catch (NullReferenceException e)
-            {
-                m_log.Error("[EVENTQUEUE] Caught exception: " + e);
-                return false;
-            }
-            return true;
-        }
-
-        #endregion
-
-        private void ClientClosed(UUID agentID, Scene scene)
-        {
-            //m_log.DebugFormat("[EVENTQUEUE]: Closed client {0} in region {1}", agentID, m_scene.RegionInfo.RegionName);
-
-            lock (queues)
-            {
-                queues.Remove(agentID);
+                queues[agentID] = queue;
 
                 lock (m_AvatarQueueUUIDMapping)
-                    m_AvatarQueueUUIDMapping.Remove(agentID);
-
-                lock (m_ids)
-                    m_ids.Remove(agentID);
-            }
-
-            // m_log.DebugFormat("[EVENTQUEUE]: Deleted queues for {0} in region {1}", agentID, m_scene.RegionInfo.RegionName);
-
-        }
-
-        /// <summary>
-        /// Generate an Event Queue Get handler path for the given eqg uuid.
-        /// </summary>
-        /// <param name='eqgUuid'></param>
-        private static string GenerateEqgCapPath(UUID eqgUuid)
-        {
-            return $"/CE/{eqgUuid}";
-        }
-
-        public void OnRegisterCaps(UUID agentID, Caps caps)
-        {
-            // Register an event queue for the client
-
-            if (DebugLevel > 0)
-                m_log.Debug(
-                    $"[EVENTQUEUE]: OnRegisterCaps: agentID {agentID} caps {caps} region {m_scene.Name}");
-
-            UUID eventQueueGetUUID;
-            lock (queues)
-            {
-                queues.TryGetValue(agentID, out Queue<byte[]> queue);
-
-                if (queue == null)
                 {
-                    queue = new Queue<byte[]>();
-                    queues[agentID] = queue;
+                    eventQueueGetUUID = UUID.Random();
+                    m_AvatarQueueUUIDMapping[agentID] = eventQueueGetUUID;
+                    lock (m_ids)
+                    {
+                        if (m_ids.ContainsKey(agentID))
+                            m_ids[agentID]++;
+                        else
+                        {
+                            m_ids[agentID] = Random.Shared.Next(30000000);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                queue.Enqueue(null);
 
-                    lock (m_AvatarQueueUUIDMapping)
+                // reuse or not to reuse
+                lock (m_AvatarQueueUUIDMapping)
+                {
+                    // Its reuse caps path not queues those are been reused already
+                    if (m_AvatarQueueUUIDMapping.TryGetValue(agentID, out eventQueueGetUUID))
+                    {
+                        m_log.DebugFormat("[EVENTQUEUE]: Found Existing UUID!");
+                        lock (m_ids)
+                        {
+                            // change to negative numbers so they are changed at end of sending first marker
+                            // old data on a queue may be sent on a response for a new caps
+                            // but at least will be sent with coerent IDs
+                            if (m_ids.TryGetValue(agentID, out int previd))
+                                m_ids[agentID] = -previd;
+                            else
+                            {
+                                m_ids[agentID] = -Random.Shared.Next(30000000);
+                            }
+                        }
+                    }
+                    else
                     {
                         eventQueueGetUUID = UUID.Random();
                         m_AvatarQueueUUIDMapping[agentID] = eventQueueGetUUID;
                         lock (m_ids)
                         {
-                            if (m_ids.ContainsKey(agentID))
-                                m_ids[agentID]++;
+                            if (m_ids.TryGetValue(agentID, out int previd))
+                                m_ids[agentID] = ++previd;
                             else
                             {
-                                m_ids[agentID] = Random.Shared.Next(30000000);
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    queue.Enqueue(null);
-
-                    // reuse or not to reuse
-                    lock (m_AvatarQueueUUIDMapping)
-                    {
-                        // Its reuse caps path not queues those are been reused already
-                        if (m_AvatarQueueUUIDMapping.TryGetValue(agentID, out eventQueueGetUUID))
-                        {
-                            m_log.DebugFormat("[EVENTQUEUE]: Found Existing UUID!");
-                            lock (m_ids)
-                            {
-                                // change to negative numbers so they are changed at end of sending first marker
-                                // old data on a queue may be sent on a response for a new caps
-                                // but at least will be sent with coerent IDs
-                                if (m_ids.TryGetValue(agentID, out int previd))
-                                    m_ids[agentID] = -previd;
-                                else
-                                {
-                                    m_ids[agentID] = -Random.Shared.Next(30000000);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            eventQueueGetUUID = UUID.Random();
-                            m_AvatarQueueUUIDMapping[agentID] = eventQueueGetUUID;
-                            lock (m_ids)
-                            {
-                                if (m_ids.TryGetValue(agentID, out int previd))
-                                    m_ids[agentID] = ++previd;
-                                else
-                                {
-                                    m_ids.Add(agentID, Random.Shared.Next(30000000));
-                                }
+                                m_ids.Add(agentID, Random.Shared.Next(30000000));
                             }
                         }
                     }
                 }
             }
-
-            caps.RegisterPollHandler(
-                "EventQueueGet",
-                    new PollServiceEventArgs(null, GenerateEqgCapPath(eventQueueGetUUID), HasEvents, GetEvents, NoEvents, Drop, agentID, VIEWERKEEPALIVE));
         }
 
-        public bool HasEvents(UUID _, UUID agentID)
+        caps.RegisterPollHandler(
+            "EventQueueGet",
+                new PollServiceEventArgs(null, GenerateEqgCapPath(eventQueueGetUUID), HasEvents, GetEvents, NoEvents, Drop, agentID, VIEWERKEEPALIVE));
+    }
+
+    public bool HasEvents(UUID _, UUID agentID)
+    {
+        Queue<byte[]> queue = GetQueue(agentID);
+        if (queue != null)
         {
-            Queue<byte[]> queue = GetQueue(agentID);
-            if (queue != null)
-            {
-                lock (queue)
-                {
-                    //m_log.WarnFormat("POLLED FOR EVENTS BY {0} in {1} -- {2}", agentID, m_scene.RegionInfo.RegionName, queue.Count);
-                    return queue.Count > 0;
-                }
-            }
-            //m_log.WarnFormat("POLLED FOR EVENTS BY {0} unknown agent", agentID);
-            return true;
-        }
-
-        /// <summary>
-        /// Logs a debug line for an outbound event queue message if appropriate.
-        /// </summary>
-        /// <param name='element'>Element containing message</param>
-        private void LogOutboundDebugMessage(OSD element, UUID agentId)
-        {
-            if (element is OSDMap ev)
-            {
-                m_log.Debug($"Eq OUT {ev["message"],-30} to {m_scene.GetScenePresence(agentId).Name,-20} {m_scene.Name,-20}");
-            }
-        }
-
-        public void Drop(UUID requestID, UUID pAgentId)
-        {
-            // do nothing, in last case http server will do it
-        }
-
-        private static readonly byte[] EventHeader = osUTF8.GetASCIIBytes("<llsd><map><key>events</key><array>");
-
-        public Hashtable GetEvents(UUID requestID, UUID pAgentId)
-        {
-            if (DebugLevel >= 2)
-                m_log.Warn($"POLLED FOR EQ MESSAGES BY {pAgentId} in {m_scene.Name}");
-
-            Queue<byte[]> queue = GetQueue(pAgentId);
-            if (queue is null)
-                return NoAgent();
-
-            byte[] element = null;
-            List<byte[]> elements;
-
-            int totalSize = 0;
-            int thisID = 0;
-            bool negativeID = false;
-
             lock (queue)
             {
-                if (queue.Count == 0)
-                    return NoEvents(requestID, pAgentId);
-
-                lock (m_ids)
-                    thisID = m_ids[pAgentId];
-
-                if (thisID < 0)
-                {
-                    negativeID = true;
-                    thisID = -thisID;
-                }
-
-                elements = new List<byte[]>(queue.Count + 2) {EventHeader};
-
-                while (queue.Count > 0)
-                {
-                    element = queue.Dequeue();
-                    // add elements until a marker is found
-                    // so they get into a response
-                    if (element is null)
-                        break;
-
-                    if (DebugLevel > 0)
-                        LogOutboundDebugMessage(element, pAgentId);
-
-                    elements.Add(element);
-                    totalSize += element.Length;
-                }
+                //m_log.WarnFormat("POLLED FOR EVENTS BY {0} in {1} -- {2}", agentID, m_scene.RegionInfo.RegionName, queue.Count);
+                return queue.Count > 0;
             }
+        }
+        //m_log.WarnFormat("POLLED FOR EVENTS BY {0} unknown agent", agentID);
+        return true;
+    }
 
-            lock (m_ids)
-            {
-                if (element is null && negativeID)
-                {
-                    m_ids[pAgentId] = Random.Shared.Next(30000000);
-                }
-                else
-                    m_ids[pAgentId] = thisID + 1;
-            }
+    /// <summary>
+    /// Logs a debug line for an outbound event queue message if appropriate.
+    /// </summary>
+    /// <param name='element'>Element containing message</param>
+    private void LogOutboundDebugMessage(OSD element, UUID agentId)
+    {
+        if (element is OSDMap ev)
+        {
+            m_log.Debug($"Eq OUT {ev["message"],-30} to {m_scene.GetScenePresence(agentId).Name,-20} {m_scene.Name,-20}");
+        }
+    }
 
-            if (totalSize == 0)
+    public void Drop(UUID requestID, UUID pAgentId)
+    {
+        // do nothing, in last case http server will do it
+    }
+
+    private static readonly byte[] EventHeader = osUTF8.GetASCIIBytes("<llsd><map><key>events</key><array>");
+
+    public Hashtable GetEvents(UUID requestID, UUID pAgentId)
+    {
+        if (DebugLevel >= 2)
+            m_log.Warn($"POLLED FOR EQ MESSAGES BY {pAgentId} in {m_scene.Name}");
+
+        Queue<byte[]> queue = GetQueue(pAgentId);
+        if (queue is null)
+            return NoAgent();
+
+        byte[] element = null;
+        List<byte[]> elements;
+
+        int totalSize = 0;
+        int thisID = 0;
+        bool negativeID = false;
+
+        lock (queue)
+        {
+            if (queue.Count == 0)
                 return NoEvents(requestID, pAgentId);
 
-            totalSize += EventHeader.Length;
+            lock (m_ids)
+                thisID = m_ids[pAgentId];
 
-            osUTF8 sb = OSUTF8Cached.Acquire();
-            LLSDxmlEncode2.AddEndArray(sb); // events array
-                LLSDxmlEncode2.AddElem("id", thisID, sb);
-            LLSDxmlEncode2.AddEndMap(sb);
-            element = LLSDxmlEncode2.EndToBytes(sb);
-            elements.Add(element);
-            totalSize += element.Length;
-
-            Hashtable responsedata = new()
+            if (thisID < 0)
             {
-                ["int_response_code"] = 200,
-                ["content_type"] = "application/xml"
-            };
-
-            //temporary
-            byte[] finalData = new byte[totalSize];
-            int dst = 0;
-            for(int i = 0; i < elements.Count; ++i)
-            {
-                byte[] src = elements[i];
-                Array.Copy(src, 0, finalData, dst, src.Length);
-                dst += src.Length;
+                negativeID = true;
+                thisID = -thisID;
             }
 
-            responsedata["bin_response_data"] = finalData;
-            responsedata["keepaliveTimeout"] = KEEPALIVE;
+            elements = new List<byte[]>(queue.Count + 2) {EventHeader};
 
-            return responsedata;
-        }
-
-        public Hashtable NoEvents(UUID _, UUID agentID)
-        {
-            return new Hashtable()
+            while (queue.Count > 0)
             {
-                ["int_response_code"] = GetQueue(agentID) == null ? (int)HttpStatusCode.NotFound : (int)HttpStatusCode.BadGateway
-            };
+                element = queue.Dequeue();
+                // add elements until a marker is found
+                // so they get into a response
+                if (element is null)
+                    break;
+
+                if (DebugLevel > 0)
+                    LogOutboundDebugMessage(element, pAgentId);
+
+                elements.Add(element);
+                totalSize += element.Length;
+            }
         }
 
-        public static Hashtable NoAgent()
+        lock (m_ids)
         {
-            return new Hashtable()
+            if (element is null && negativeID)
             {
-                ["int_response_code"] = (int)HttpStatusCode.NotFound
-            };
+                m_ids[pAgentId] = Random.Shared.Next(30000000);
+            }
+            else
+                m_ids[pAgentId] = thisID + 1;
         }
+
+        if (totalSize == 0)
+            return NoEvents(requestID, pAgentId);
+
+        totalSize += EventHeader.Length;
+
+        osUTF8 sb = OSUTF8Cached.Acquire();
+        LLSDxmlEncode2.AddEndArray(sb); // events array
+            LLSDxmlEncode2.AddElem("id", thisID, sb);
+        LLSDxmlEncode2.AddEndMap(sb);
+        element = LLSDxmlEncode2.EndToBytes(sb);
+        elements.Add(element);
+        totalSize += element.Length;
+
+        Hashtable responsedata = new()
+        {
+            ["int_response_code"] = 200,
+            ["content_type"] = "application/xml"
+        };
+
+        //temporary
+        byte[] finalData = new byte[totalSize];
+        int dst = 0;
+        for(int i = 0; i < elements.Count; ++i)
+        {
+            byte[] src = elements[i];
+            Array.Copy(src, 0, finalData, dst, src.Length);
+            dst += src.Length;
+        }
+
+        responsedata["bin_response_data"] = finalData;
+        responsedata["keepaliveTimeout"] = KEEPALIVE;
+
+        return responsedata;
+    }
+
+    public Hashtable NoEvents(UUID _, UUID agentID)
+    {
+        return new Hashtable()
+        {
+            ["int_response_code"] = GetQueue(agentID) == null ? (int)HttpStatusCode.NotFound : (int)HttpStatusCode.BadGateway
+        };
+    }
+
+    public static Hashtable NoAgent()
+    {
+        return new Hashtable()
+        {
+            ["int_response_code"] = (int)HttpStatusCode.NotFound
+        };
     }
 }

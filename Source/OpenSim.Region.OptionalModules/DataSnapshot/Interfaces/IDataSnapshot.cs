@@ -27,10 +27,9 @@
 
 using System.Xml;
 
-namespace OpenSim.Region.DataSnapshot.Interfaces
+namespace OpenSim.Region.DataSnapshot.Interfaces;
+
+public interface IDataSnapshot
 {
-    public interface IDataSnapshot
-    {
-        XmlDocument GetSnapshot(string regionName);
-    }
+    XmlDocument GetSnapshot(string regionName);
 }

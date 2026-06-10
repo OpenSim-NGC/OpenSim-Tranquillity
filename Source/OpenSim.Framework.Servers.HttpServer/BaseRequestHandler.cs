@@ -25,75 +25,71 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using OpenSim.Framework.Monitoring;
+namespace OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Framework.Servers.HttpServer
+public abstract class BaseRequestHandler
 {
-    public abstract class BaseRequestHandler
+    public int RequestsReceived { get; protected set; }
+
+    public int RequestsHandled { get; protected set; }
+
+    public virtual string ContentType
     {
-        public int RequestsReceived { get; protected set; }
+        get { return "application/xml"; }
+    }
 
-        public int RequestsHandled { get; protected set; }
+    private readonly string m_httpMethod;
 
-        public virtual string ContentType
+    public virtual string HttpMethod
+    {
+        get { return m_httpMethod; }
+    }
+
+    private readonly string m_path;
+
+    public string Name { get; private set; }
+
+    public string Description { get; private set; }
+
+    protected BaseRequestHandler(string httpMethod, string path) : this(httpMethod, path, null, null) {}
+
+    protected BaseRequestHandler(string httpMethod, string path, string name, string description)
+    {
+        Name = name;
+        Description = description;
+        m_httpMethod = httpMethod;
+        m_path = path;
+    }
+
+    public virtual string Path
+    {
+        get { return m_path; }
+    }
+
+    public string GetParam(string path)
+    {
+        if (CheckParam(path))
         {
-            get { return "application/xml"; }
+            return path.Substring(m_path.Length);
         }
 
-        private readonly string m_httpMethod;
+        return String.Empty;
+    }
 
-        public virtual string HttpMethod
+    protected bool CheckParam(string path)
+    {
+        if (String.IsNullOrEmpty(path))
         {
-            get { return m_httpMethod; }
+            return false;
         }
 
-        private readonly string m_path;
+        return path.StartsWith(Path);
+    }
 
-        public string Name { get; private set; }
+    public string[] SplitParams(string path)
+    {
+        string param = GetParam(path);
 
-        public string Description { get; private set; }
-
-        protected BaseRequestHandler(string httpMethod, string path) : this(httpMethod, path, null, null) {}
-
-        protected BaseRequestHandler(string httpMethod, string path, string name, string description)
-        {
-            Name = name;
-            Description = description;
-            m_httpMethod = httpMethod;
-            m_path = path;
-        }
-
-        public virtual string Path
-        {
-            get { return m_path; }
-        }
-
-        public string GetParam(string path)
-        {
-            if (CheckParam(path))
-            {
-                return path.Substring(m_path.Length);
-            }
-
-            return String.Empty;
-        }
-
-        protected bool CheckParam(string path)
-        {
-            if (String.IsNullOrEmpty(path))
-            {
-                return false;
-            }
-
-            return path.StartsWith(Path);
-        }
-
-        public string[] SplitParams(string path)
-        {
-            string param = GetParam(path);
-
-            return param.Split(new char[] { '/', '?', '&' }, StringSplitOptions.RemoveEmptyEntries);
-        }
+        return param.Split(new char[] { '/', '?', '&' }, StringSplitOptions.RemoveEmptyEntries);
     }
 }

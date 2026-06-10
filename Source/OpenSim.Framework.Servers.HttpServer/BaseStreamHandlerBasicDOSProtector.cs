@@ -25,84 +25,80 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
+namespace OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Framework.Servers.HttpServer
+/// <summary>
+/// BaseStreamHandlerBasicDOSProtector Base streamed request handler.
+/// </summary>
+/// <remarks>
+/// Inheriting classes should override ProcessRequest() rather than Handle()
+/// </remarks>
+public abstract class BaseStreamHandlerBasicDOSProtector : BaseRequestHandler, IStreamedRequestHandler
 {
-    /// <summary>
-    /// BaseStreamHandlerBasicDOSProtector Base streamed request handler.
-    /// </summary>
-    /// <remarks>
-    /// Inheriting classes should override ProcessRequest() rather than Handle()
-    /// </remarks>
-    public abstract class BaseStreamHandlerBasicDOSProtector : BaseRequestHandler, IStreamedRequestHandler
+
+    private readonly BasicDosProtectorOptions _options;
+    private readonly BasicDOSProtector _dosProtector;
+
+    protected BaseStreamHandlerBasicDOSProtector(string httpMethod, string path, BasicDosProtectorOptions options) : this(httpMethod, path, null, null, options) {}
+
+    protected BaseStreamHandlerBasicDOSProtector(string httpMethod, string path, string name, string description, BasicDosProtectorOptions options)
+        : base(httpMethod, path, name, description)
     {
+        _options = options;
+        _dosProtector = new BasicDOSProtector(_options);
+    }
 
-        private readonly BasicDosProtectorOptions _options;
-        private readonly BasicDOSProtector _dosProtector;
+    public virtual byte[] Handle(
+        string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        byte[] result;
+        RequestsReceived++;
+        string clientstring = GetClientString(httpRequest);
+        string endpoint = GetRemoteAddr(httpRequest);
+        if (_dosProtector.Process(clientstring, endpoint))
+            result = ProcessRequest(path, request, httpRequest, httpResponse);
+        else
+            result = ThrottledRequest(path, request, httpRequest, httpResponse);
+        if (_options.MaxConcurrentSessions > 0)
+            _dosProtector.ProcessEnd(clientstring, endpoint);
 
-        protected BaseStreamHandlerBasicDOSProtector(string httpMethod, string path, BasicDosProtectorOptions options) : this(httpMethod, path, null, null, options) {}
+        RequestsHandled++;
 
-        protected BaseStreamHandlerBasicDOSProtector(string httpMethod, string path, string name, string description, BasicDosProtectorOptions options)
-            : base(httpMethod, path, name, description)
-        {
-            _options = options;
-            _dosProtector = new BasicDOSProtector(_options);
-        }
+        return result;
+    }
 
-        public virtual byte[] Handle(
-            string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            byte[] result;
-            RequestsReceived++;
-            string clientstring = GetClientString(httpRequest);
-            string endpoint = GetRemoteAddr(httpRequest);
-            if (_dosProtector.Process(clientstring, endpoint))
-                result = ProcessRequest(path, request, httpRequest, httpResponse);
-            else
-                result = ThrottledRequest(path, request, httpRequest, httpResponse);
-            if (_options.MaxConcurrentSessions > 0)
-                _dosProtector.ProcessEnd(clientstring, endpoint);
+    protected virtual byte[] ProcessRequest(
+        string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        return null;
+    }
 
-            RequestsHandled++;
-
-            return result;
-        }
-
-        protected virtual byte[] ProcessRequest(
-            string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            return null;
-        }
-
-        protected virtual byte[] ThrottledRequest(
-            string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            return Array.Empty<byte>();
-        }
+    protected virtual byte[] ThrottledRequest(
+        string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        return Array.Empty<byte>();
+    }
 
 
-        private string GetRemoteAddr(IOSHttpRequest httpRequest)
-        {
-            string remoteaddr = string.Empty;
-            if (httpRequest.Headers["remote_addr"] != null)
-                remoteaddr = httpRequest.Headers["remote_addr"];
+    private string GetRemoteAddr(IOSHttpRequest httpRequest)
+    {
+        string remoteaddr = string.Empty;
+        if (httpRequest.Headers["remote_addr"] != null)
+            remoteaddr = httpRequest.Headers["remote_addr"];
 
-            return remoteaddr;
-        }
+        return remoteaddr;
+    }
 
-        private string GetClientString(IOSHttpRequest httpRequest)
-        {
-            string clientstring = string.Empty;
+    private string GetClientString(IOSHttpRequest httpRequest)
+    {
+        string clientstring = string.Empty;
 
-            if (_options.AllowXForwardedFor && httpRequest.Headers["x-forwarded-for"] != null)
-                clientstring = httpRequest.Headers["x-forwarded-for"];
-            else
-                clientstring = GetRemoteAddr(httpRequest);
+        if (_options.AllowXForwardedFor && httpRequest.Headers["x-forwarded-for"] != null)
+            clientstring = httpRequest.Headers["x-forwarded-for"];
+        else
+            clientstring = GetRemoteAddr(httpRequest);
 
-            return clientstring;
+        return clientstring;
 
-        }
     }
 }

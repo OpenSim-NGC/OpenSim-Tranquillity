@@ -35,150 +35,149 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList;
+
+public class LocalMuteListServicesConnector : ISharedRegionModule, IMuteListService
 {
-    public class LocalMuteListServicesConnector : ISharedRegionModule, IMuteListService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private List<Scene> m_Scenes = new List<Scene>();
+    protected IMuteListService m_service = null;
+
+    private bool m_Enabled = false;
+
+     #region ISharedRegionModule
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
-
-        private List<Scene> m_Scenes = new List<Scene>();
-        protected IMuteListService m_service = null;
-
-        private bool m_Enabled = false;
-
-         #region ISharedRegionModule
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "LocalMuteListServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            // only active for core mute lists module
-            IConfig moduleConfig = source.Configs["Messaging"];
-            if (moduleConfig == null)
-                return;
-
-            if (moduleConfig.GetString("MuteListModule", "None") != "MuteListModule")
-                return;
-
-            moduleConfig = source.Configs["Modules"];
-
-            if (moduleConfig == null)
-                return;
-
-            string name = moduleConfig.GetString("MuteListService", "");
-            if(name != Name)
-                return;
-
-            IConfig userConfig = source.Configs["MuteListService"];
-            if (userConfig == null)
-            {
-                m_log.Error("[MuteList LOCALCONNECTOR]: MuteListService missing from configuration");
-                return;
-            }
-
-            string serviceDll = userConfig.GetString("LocalServiceModule",
-                    String.Empty);
-
-            if (serviceDll.Length == 0)
-            {
-                m_log.Error("[MuteList LOCALCONNECTOR]: No LocalServiceModule named in section MuteListService");
-                return;
-            }
-
-            Object[] args = new Object[] { source };
-            try
-            {
-                m_service = ServerUtils.LoadPlugin<IMuteListService>(serviceDll, args);
-            }
-            catch
-            {
-                m_log.Error("[MuteList LOCALCONNECTOR]: Failed to load mute service");
-                return;
-            }
-
-            if (m_service == null)
-            {
-                m_log.Error("[MuteList LOCALCONNECTOR]: Can't load MuteList service");
-                return;
-            }
-
-            m_Enabled = true;
-            m_log.Info("[MuteList LOCALCONNECTOR]: enabled");
-        }
-
-        public void Close()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            lock(m_Scenes)
-            {
-                m_Scenes.Add(scene);
-                scene.RegisterModuleInterface<IMuteListService>(this);
-            }
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            lock(m_Scenes)
-            {
-                if (m_Scenes.Contains(scene))
-                {
-                    m_Scenes.Remove(scene);
-                    scene.UnregisterModuleInterface<IMuteListService>(this);
-                }
-            }
-        }
-
-        #endregion ISharedRegionModule
-
-        #region IMuteListService
-        public Byte[] MuteListRequest(UUID agentID, uint crc)
-        {
-            if (!m_Enabled)
-                return null;
-            return m_service.MuteListRequest(agentID, crc);
-        }
-
-        public bool UpdateMute(MuteData mute)
-        {
-            if (!m_Enabled)
-                return false;
-            return m_service.UpdateMute(mute);
-        }
-
-        public bool RemoveMute(UUID agentID, UUID muteID, string muteName)
-        {
-            if (!m_Enabled)
-                return false;
-            return m_service.RemoveMute(agentID, muteID, muteName);
-        }
-
-        #endregion IMuteListService
+        get { return null; }
     }
+
+    public string Name
+    {
+        get { return "LocalMuteListServicesConnector"; }
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        // only active for core mute lists module
+        IConfig moduleConfig = source.Configs["Messaging"];
+        if (moduleConfig == null)
+            return;
+
+        if (moduleConfig.GetString("MuteListModule", "None") != "MuteListModule")
+            return;
+
+        moduleConfig = source.Configs["Modules"];
+
+        if (moduleConfig == null)
+            return;
+
+        string name = moduleConfig.GetString("MuteListService", "");
+        if(name != Name)
+            return;
+
+        IConfig userConfig = source.Configs["MuteListService"];
+        if (userConfig == null)
+        {
+            m_log.Error("[MuteList LOCALCONNECTOR]: MuteListService missing from configuration");
+            return;
+        }
+
+        string serviceDll = userConfig.GetString("LocalServiceModule",
+                String.Empty);
+
+        if (serviceDll.Length == 0)
+        {
+            m_log.Error("[MuteList LOCALCONNECTOR]: No LocalServiceModule named in section MuteListService");
+            return;
+        }
+
+        Object[] args = new Object[] { source };
+        try
+        {
+            m_service = ServerUtils.LoadPlugin<IMuteListService>(serviceDll, args);
+        }
+        catch
+        {
+            m_log.Error("[MuteList LOCALCONNECTOR]: Failed to load mute service");
+            return;
+        }
+
+        if (m_service == null)
+        {
+            m_log.Error("[MuteList LOCALCONNECTOR]: Can't load MuteList service");
+            return;
+        }
+
+        m_Enabled = true;
+        m_log.Info("[MuteList LOCALCONNECTOR]: enabled");
+    }
+
+    public void Close()
+    {
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        lock(m_Scenes)
+        {
+            m_Scenes.Add(scene);
+            scene.RegisterModuleInterface<IMuteListService>(this);
+        }
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        lock(m_Scenes)
+        {
+            if (m_Scenes.Contains(scene))
+            {
+                m_Scenes.Remove(scene);
+                scene.UnregisterModuleInterface<IMuteListService>(this);
+            }
+        }
+    }
+
+    #endregion ISharedRegionModule
+
+    #region IMuteListService
+    public Byte[] MuteListRequest(UUID agentID, uint crc)
+    {
+        if (!m_Enabled)
+            return null;
+        return m_service.MuteListRequest(agentID, crc);
+    }
+
+    public bool UpdateMute(MuteData mute)
+    {
+        if (!m_Enabled)
+            return false;
+        return m_service.UpdateMute(mute);
+    }
+
+    public bool RemoveMute(UUID agentID, UUID muteID, string muteName)
+    {
+        if (!m_Enabled)
+            return false;
+        return m_service.RemoveMute(agentID, muteID, muteName);
+    }
+
+    #endregion IMuteListService
 }

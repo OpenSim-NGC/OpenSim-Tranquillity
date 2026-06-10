@@ -37,223 +37,221 @@ using Nini.Config;
 
 using DirFindFlags = OpenMetaverse.DirectoryManager.DirFindFlags;
 
-namespace OpenSim.Region.CoreModules.Framework.Search
+namespace OpenSim.Region.CoreModules.Framework.Search;
+
+public class BasicSearchModule : ISharedRegionModule
 {
-    public class BasicSearchModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected bool m_Enabled;
+    protected List<Scene> m_Scenes = new List<Scene>();
+
+    private IGroupsModule m_GroupsService = null;
+
+    private ExpiringCache<string, List<UserAccount>> queryPeopleCache = new ExpiringCache<string, List<UserAccount>>();
+    private ExpiringCache<string, List<DirGroupsReplyData>> queryGroupCache = new ExpiringCache<string, List<DirGroupsReplyData>>();
+
+    #region ISharedRegionModule
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        protected bool m_Enabled;
-        protected List<Scene> m_Scenes = new List<Scene>();
-
-        private IGroupsModule m_GroupsService = null;
-
-        private ExpiringCache<string, List<UserAccount>> queryPeopleCache = new ExpiringCache<string, List<UserAccount>>();
-        private ExpiringCache<string, List<DirGroupsReplyData>> queryGroupCache = new ExpiringCache<string, List<DirGroupsReplyData>>();
-
-        #region ISharedRegionModule
-
-        public void Initialise(IConfigSource config)
+        string umanmod = config.Configs["Modules"].GetString("SearchModule", Name);
+        if (umanmod == Name)
         {
-            string umanmod = config.Configs["Modules"].GetString("SearchModule", Name);
-            if (umanmod == Name)
+            m_Enabled = true;
+            m_log.DebugFormat("[BASIC SEARCH MODULE]: {0} is enabled", Name);
+        }
+    }
+
+    public bool IsSharedModule
+    {
+        get { return true; }
+    }
+
+    public virtual string Name
+    {
+        get { return "BasicSearchModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (m_Enabled)
+        {
+            m_Scenes.Add(scene);
+
+            scene.EventManager.OnMakeRootAgent += new Action<ScenePresence>(EventManager_OnMakeRootAgent);
+            scene.EventManager.OnMakeChildAgent += new EventManager.OnMakeChildAgentDelegate(EventManager_OnMakeChildAgent);
+        }
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (m_Enabled)
+        {
+            m_Scenes.Remove(scene);
+
+            scene.EventManager.OnMakeRootAgent -= new Action<ScenePresence>(EventManager_OnMakeRootAgent);
+            scene.EventManager.OnMakeChildAgent -= new EventManager.OnMakeChildAgentDelegate(EventManager_OnMakeChildAgent);
+        }
+    }
+
+    public void RegionLoaded(Scene s)
+    {
+        if (!m_Enabled)
+            return;
+
+        if (m_GroupsService == null)
+        {
+            m_GroupsService = s.RequestModuleInterface<IGroupsModule>();
+
+            // No Groups Service Connector, then group search won't work...
+            if (m_GroupsService == null)
+                m_log.Warn("[BASIC SEARCH MODULE]: Could not get IGroupsModule");
+        }
+    }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+        m_Scenes.Clear();
+    }
+
+    #endregion ISharedRegionModule
+
+
+    #region Event Handlers
+
+    void EventManager_OnMakeRootAgent(ScenePresence sp)
+    {
+        sp.ControllingClient.OnDirFindQuery += OnDirFindQuery;
+    }
+
+    void EventManager_OnMakeChildAgent(ScenePresence sp)
+    {
+        sp.ControllingClient.OnDirFindQuery -= OnDirFindQuery;
+    }
+
+    void OnDirFindQuery(IClientAPI remoteClient, UUID queryID, string queryText, uint queryFlags, int queryStart)
+    {
+        if (!string.IsNullOrEmpty(queryText))
+        {
+            queryText = queryText.Trim();
+            queryText = queryText.ToLowerInvariant();
+        }
+
+        if (((DirFindFlags)queryFlags & DirFindFlags.People) == DirFindFlags.People)
+        {
+            if (string.IsNullOrEmpty(queryText))
+                remoteClient.SendDirPeopleReply(queryID, new DirPeopleReplyData[0]);
+
+            List<UserAccount> accounts;
+            if (!queryPeopleCache.TryGetValue(queryText, out accounts))
+                accounts = m_Scenes[0].UserAccountService.GetUserAccounts(m_Scenes[0].RegionInfo.ScopeID, queryText);
+
+            queryPeopleCache.AddOrUpdate(queryText, accounts, 30.0);
+
+            if (accounts.Count == 0)
             {
-                m_Enabled = true;
-                m_log.DebugFormat("[BASIC SEARCH MODULE]: {0} is enabled", Name);
-            }
-        }
-
-        public bool IsSharedModule
-        {
-            get { return true; }
-        }
-
-        public virtual string Name
-        {
-            get { return "BasicSearchModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (m_Enabled)
-            {
-                m_Scenes.Add(scene);
-
-                scene.EventManager.OnMakeRootAgent += new Action<ScenePresence>(EventManager_OnMakeRootAgent);
-                scene.EventManager.OnMakeChildAgent += new EventManager.OnMakeChildAgentDelegate(EventManager_OnMakeChildAgent);
-            }
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (m_Enabled)
-            {
-                m_Scenes.Remove(scene);
-
-                scene.EventManager.OnMakeRootAgent -= new Action<ScenePresence>(EventManager_OnMakeRootAgent);
-                scene.EventManager.OnMakeChildAgent -= new EventManager.OnMakeChildAgentDelegate(EventManager_OnMakeChildAgent);
-            }
-        }
-
-        public void RegionLoaded(Scene s)
-        {
-            if (!m_Enabled)
+                remoteClient.SendDirPeopleReply(queryID, new DirPeopleReplyData[0]);
                 return;
+            }
 
+            DirPeopleReplyData[] hits = new DirPeopleReplyData[accounts.Count];
+            int count = 0;
+            foreach (UserAccount acc in accounts)
+            {
+                DirPeopleReplyData d = new DirPeopleReplyData();
+                d.agentID = acc.PrincipalID;
+                d.firstName = acc.FirstName;
+                d.lastName = acc.LastName;
+                d.online = false;
+
+                hits[count++] = d;
+            }
+
+            // viewers don't sent sorting, so results they show are a nice mess
+            if ((queryStart > 0) && (queryStart < count))
+            {
+                int len = count - queryStart;
+                if (len > 101) // a viewer page is 100
+                    len = 101;
+                DirPeopleReplyData[] tmp = new DirPeopleReplyData[len];
+                Array.Copy(hits, queryStart, tmp, 0, len);
+                hits = tmp;
+            }
+            else if (count > 101)
+            {
+                DirPeopleReplyData[] tmp = new DirPeopleReplyData[101];
+                Array.Copy(hits, 0, tmp, 0, 101);
+                hits = tmp;
+            }
+            // TODO: This currently ignores pretty much all the query flags including Mature and sort order
+            remoteClient.SendDirPeopleReply(queryID, hits);
+        }
+        else if (((DirFindFlags)queryFlags & DirFindFlags.Groups) == DirFindFlags.Groups)
+        {
             if (m_GroupsService == null)
             {
-                m_GroupsService = s.RequestModuleInterface<IGroupsModule>();
-
-                // No Groups Service Connector, then group search won't work...
-                if (m_GroupsService == null)
-                    m_log.Warn("[BASIC SEARCH MODULE]: Could not get IGroupsModule");
+                m_log.Warn("[BASIC SEARCH MODULE]: Groups service is not available. Unable to search groups.");
+                remoteClient.SendAlertMessage("Groups search is not enabled");
+                return;
             }
-        }
 
-        public void PostInitialise()
-        {
-        }
+            if (string.IsNullOrEmpty(queryText))
+                remoteClient.SendDirGroupsReply(queryID, new DirGroupsReplyData[0]);
 
-        public void Close()
-        {
-            m_Scenes.Clear();
-        }
+            List<DirGroupsReplyData> answer;
+            if (!queryGroupCache.TryGetValue(queryText, out answer))
+                answer = m_GroupsService.FindGroups(remoteClient, queryText);
 
-        #endregion ISharedRegionModule
+            queryGroupCache.AddOrUpdate(queryText, answer, 30.0);
 
-
-        #region Event Handlers
-
-        void EventManager_OnMakeRootAgent(ScenePresence sp)
-        {
-            sp.ControllingClient.OnDirFindQuery += OnDirFindQuery;
-        }
-
-        void EventManager_OnMakeChildAgent(ScenePresence sp)
-        {
-            sp.ControllingClient.OnDirFindQuery -= OnDirFindQuery;
-        }
-
-        void OnDirFindQuery(IClientAPI remoteClient, UUID queryID, string queryText, uint queryFlags, int queryStart)
-        {
-            if (!string.IsNullOrEmpty(queryText))
+            if(answer.Count == 0)
             {
-                queryText = queryText.Trim();
-                queryText = queryText.ToLowerInvariant();
+                remoteClient.SendDirGroupsReply(queryID, new DirGroupsReplyData[0]);
+                return;
             }
 
-            if (((DirFindFlags)queryFlags & DirFindFlags.People) == DirFindFlags.People)
+            // filter out groups
+            DirGroupsReplyData[] result = new DirGroupsReplyData[answer.Count];
+            int count = 0;
+            foreach(DirGroupsReplyData dgrd in answer)
             {
-                if (string.IsNullOrEmpty(queryText))
-                    remoteClient.SendDirPeopleReply(queryID, new DirPeopleReplyData[0]);
-
-                List<UserAccount> accounts;
-                if (!queryPeopleCache.TryGetValue(queryText, out accounts))
-                    accounts = m_Scenes[0].UserAccountService.GetUserAccounts(m_Scenes[0].RegionInfo.ScopeID, queryText);
-
-                queryPeopleCache.AddOrUpdate(queryText, accounts, 30.0);
-
-                if (accounts.Count == 0)
-                {
-                    remoteClient.SendDirPeopleReply(queryID, new DirPeopleReplyData[0]);
-                    return;
-                }
-
-                DirPeopleReplyData[] hits = new DirPeopleReplyData[accounts.Count];
-                int count = 0;
-                foreach (UserAccount acc in accounts)
-                {
-                    DirPeopleReplyData d = new DirPeopleReplyData();
-                    d.agentID = acc.PrincipalID;
-                    d.firstName = acc.FirstName;
-                    d.lastName = acc.LastName;
-                    d.online = false;
-
-                    hits[count++] = d;
-                }
-
-                // viewers don't sent sorting, so results they show are a nice mess
-                if ((queryStart > 0) && (queryStart < count))
-                {
-                    int len = count - queryStart;
-                    if (len > 101) // a viewer page is 100
-                        len = 101;
-                    DirPeopleReplyData[] tmp = new DirPeopleReplyData[len];
-                    Array.Copy(hits, queryStart, tmp, 0, len);
-                    hits = tmp;
-                }
-                else if (count > 101)
-                {
-                    DirPeopleReplyData[] tmp = new DirPeopleReplyData[101];
-                    Array.Copy(hits, 0, tmp, 0, 101);
-                    hits = tmp;
-                }
-                // TODO: This currently ignores pretty much all the query flags including Mature and sort order
-                remoteClient.SendDirPeopleReply(queryID, hits);
+                if(dgrd.members > 0)
+                    result[count++] = dgrd;
             }
-            else if (((DirFindFlags)queryFlags & DirFindFlags.Groups) == DirFindFlags.Groups)
+            answer = null;
+
+            // viewers don't sent sorting, so results they show are a nice mess
+            if ((queryStart > 0) && (queryStart < count))
             {
-                if (m_GroupsService == null)
-                {
-                    m_log.Warn("[BASIC SEARCH MODULE]: Groups service is not available. Unable to search groups.");
-                    remoteClient.SendAlertMessage("Groups search is not enabled");
-                    return;
-                }
-
-                if (string.IsNullOrEmpty(queryText))
-                    remoteClient.SendDirGroupsReply(queryID, new DirGroupsReplyData[0]);
-
-                List<DirGroupsReplyData> answer;
-                if (!queryGroupCache.TryGetValue(queryText, out answer))
-                    answer = m_GroupsService.FindGroups(remoteClient, queryText);
-
-                queryGroupCache.AddOrUpdate(queryText, answer, 30.0);
-
-                if(answer.Count == 0)
-                {
-                    remoteClient.SendDirGroupsReply(queryID, new DirGroupsReplyData[0]);
-                    return;
-                }
-
-                // filter out groups
-                DirGroupsReplyData[] result = new DirGroupsReplyData[answer.Count];
-                int count = 0;
-                foreach(DirGroupsReplyData dgrd in answer)
-                {
-                    if(dgrd.members > 0)
-                        result[count++] = dgrd;
-                }
-                answer = null;
-
-                // viewers don't sent sorting, so results they show are a nice mess
-                if ((queryStart > 0) && (queryStart < count))
-                {
-                    int len = count - queryStart;
-                    if (len > 101) // a viewer page is 100
-                        len = 101;
-                    DirGroupsReplyData[] tmp = new DirGroupsReplyData[len];
-                    Array.Copy(result, queryStart, tmp, 0, len);
-                    result = tmp;
-                }
-                else if (count > 101)
-                {
-                    DirGroupsReplyData[] tmp = new DirGroupsReplyData[101];
-                    Array.Copy(result, 0, tmp, 0, 101);
-                    result = tmp;
-                }
-
-                // TODO: This currently ignores pretty much all the query flags including Mature and sort order
-                remoteClient.SendDirGroupsReply(queryID, result);
+                int len = count - queryStart;
+                if (len > 101) // a viewer page is 100
+                    len = 101;
+                DirGroupsReplyData[] tmp = new DirGroupsReplyData[len];
+                Array.Copy(result, queryStart, tmp, 0, len);
+                result = tmp;
             }
+            else if (count > 101)
+            {
+                DirGroupsReplyData[] tmp = new DirGroupsReplyData[101];
+                Array.Copy(result, 0, tmp, 0, 101);
+                result = tmp;
+            }
+
+            // TODO: This currently ignores pretty much all the query flags including Mature and sort order
+            remoteClient.SendDirGroupsReply(queryID, result);
         }
-
-        #endregion Event Handlers
-
     }
+
+    #endregion Event Handlers
 
 }

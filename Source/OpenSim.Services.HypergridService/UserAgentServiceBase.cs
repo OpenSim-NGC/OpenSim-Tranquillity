@@ -25,57 +25,55 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using Nini.Config;
 using OpenSim.Data;
 using OpenSim.Services.Base;
 
-namespace OpenSim.Services.HypergridService
+namespace OpenSim.Services.HypergridService;
+
+public class UserAgentServiceBase : ServiceBase
 {
-    public class UserAgentServiceBase : ServiceBase
+    protected IHGTravelingData m_Database = null;
+
+    public UserAgentServiceBase(IConfigSource config)
+        : base(config)
     {
-        protected IHGTravelingData m_Database = null;
+        string dllName = string.Empty;
+        string connString = string.Empty;
+        string realm = "hg_traveling_data";
 
-        public UserAgentServiceBase(IConfigSource config)
-            : base(config)
+        //
+        // Try reading the [DatabaseService] section, if it exists
+        //
+        IConfig dbConfig = config.Configs["DatabaseService"];
+        if (dbConfig is not null)
         {
-            string dllName = string.Empty;
-            string connString = string.Empty;
-            string realm = "hg_traveling_data";
-
-            //
-            // Try reading the [DatabaseService] section, if it exists
-            //
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig is not null)
-            {
-                if (dllName.Length == 0)
-                    dllName = dbConfig.GetString("StorageProvider", string.Empty);
-                if (connString.Length == 0)
-                    connString = dbConfig.GetString("ConnectionString", string.Empty);
-            }
-
-            //
-            // [UserAgentService] section overrides [DatabaseService], if it exists
-            //
-            IConfig gridConfig = config.Configs["UserAgentService"];
-            if (gridConfig is not null)
-            {
-                dllName = gridConfig.GetString("StorageProvider", dllName);
-                connString = gridConfig.GetString("ConnectionString", connString);
-                realm = gridConfig.GetString("Realm", realm);
-            }
-
-            //
-            // We tried, but this doesn't exist. We can't proceed.
-            //
-            if (string.IsNullOrEmpty(dllName))
-                throw new Exception("No StorageProvider configured");
-
-            m_Database = LoadPlugin<IHGTravelingData>(dllName, new Object[] { connString, realm });
-            if (m_Database is null)
-                throw new Exception("Could not find a storage interface in the given module");
-
+            if (dllName.Length == 0)
+                dllName = dbConfig.GetString("StorageProvider", string.Empty);
+            if (connString.Length == 0)
+                connString = dbConfig.GetString("ConnectionString", string.Empty);
         }
+
+        //
+        // [UserAgentService] section overrides [DatabaseService], if it exists
+        //
+        IConfig gridConfig = config.Configs["UserAgentService"];
+        if (gridConfig is not null)
+        {
+            dllName = gridConfig.GetString("StorageProvider", dllName);
+            connString = gridConfig.GetString("ConnectionString", connString);
+            realm = gridConfig.GetString("Realm", realm);
+        }
+
+        //
+        // We tried, but this doesn't exist. We can't proceed.
+        //
+        if (string.IsNullOrEmpty(dllName))
+            throw new Exception("No StorageProvider configured");
+
+        m_Database = LoadPlugin<IHGTravelingData>(dllName, new Object[] { connString, realm });
+        if (m_Database is null)
+            throw new Exception("Could not find a storage interface in the given module");
+
     }
 }

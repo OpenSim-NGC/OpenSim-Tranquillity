@@ -25,50 +25,47 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.IO;
 using OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Framework.Capabilities
+namespace OpenSim.Framework.Capabilities;
+
+public class LLSDStreamhandler<TRequest, TResponse> : BaseStreamHandler
+    where TRequest : new()
 {
-    public class LLSDStreamhandler<TRequest, TResponse> : BaseStreamHandler
-        where TRequest : new()
+    private LLSDMethod<TRequest, TResponse> m_method;
+
+    public LLSDStreamhandler(string httpMethod, string path, LLSDMethod<TRequest, TResponse> method)
+        : this(httpMethod, path, method, null, null) {}
+
+    public LLSDStreamhandler(
+        string httpMethod, string path, LLSDMethod<TRequest, TResponse> method, string name, string description)
+        : base(httpMethod, path, name, description)
     {
-        private LLSDMethod<TRequest, TResponse> m_method;
+        m_method = method;
+    }
 
-        public LLSDStreamhandler(string httpMethod, string path, LLSDMethod<TRequest, TResponse> method)
-            : this(httpMethod, path, method, null, null) {}
+    protected override byte[] ProcessRequest(string path, Stream request,
+                                  IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        //Encoding encoding = Util.UTF8;
+        //StreamReader streamReader = new StreamReader(request, false);
 
-        public LLSDStreamhandler(
-            string httpMethod, string path, LLSDMethod<TRequest, TResponse> method, string name, string description)
-            : base(httpMethod, path, name, description)
-        {
-            m_method = method;
-        }
+        //string requestBody = streamReader.ReadToEnd();
+        //streamReader.Close();
 
-        protected override byte[] ProcessRequest(string path, Stream request,
-                                      IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            //Encoding encoding = Util.UTF8;
-            //StreamReader streamReader = new StreamReader(request, false);
+        // OpenMetaverse.StructuredData.OSDMap hash = (OpenMetaverse.StructuredData.OSDMap)
+        //    OpenMetaverse.StructuredData.LLSDParser.DeserializeXml(new XmlTextReader(request));
 
-            //string requestBody = streamReader.ReadToEnd();
-            //streamReader.Close();
+        Hashtable hash = (Hashtable) LLSD.LLSDDeserialize(request);
+        if(hash == null)
+            return Array.Empty<byte>();
 
-            // OpenMetaverse.StructuredData.OSDMap hash = (OpenMetaverse.StructuredData.OSDMap)
-            //    OpenMetaverse.StructuredData.LLSDParser.DeserializeXml(new XmlTextReader(request));
+        TRequest llsdRequest = new TRequest();
+        LLSDHelpers.DeserialiseOSDMap(hash, llsdRequest);
 
-            Hashtable hash = (Hashtable) LLSD.LLSDDeserialize(request);
-            if(hash == null)
-                return Array.Empty<byte>();
+        TResponse response = m_method(llsdRequest);
 
-            TRequest llsdRequest = new TRequest();
-            LLSDHelpers.DeserialiseOSDMap(hash, llsdRequest);
-
-            TResponse response = m_method(llsdRequest);
-
-            return Util.UTF8NoBomEncoding.GetBytes(LLSDHelpers.SerialiseLLSDReply(response));
-        }
+        return Util.UTF8NoBomEncoding.GetBytes(LLSDHelpers.SerialiseLLSDReply(response));
     }
 }

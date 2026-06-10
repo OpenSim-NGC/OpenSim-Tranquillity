@@ -28,28 +28,27 @@
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-namespace osWebRtcVoice
+namespace osWebRtcVoice;
+
+/// <summary>
+/// This is the interface for the voice service. It is used to connect
+/// the user to the voice server and to handle the capability messages
+/// from the viewer.
+/// </summary>
+public interface IWebRtcVoiceService
 {
-    /// <summary>
-    /// This is the interface for the voice service. It is used to connect
-    /// the user to the voice server and to handle the capability messages
-    /// from the viewer.
-    /// </summary>
-    public interface IWebRtcVoiceService
-    {
-        // The user is requesting a voice connection. The message contains the offer
-        //     from the user and we must return the answer.
-        // If there are problems, the returned map will contain an error message.
+    // The user is requesting a voice connection. The message contains the offer
+    //     from the user and we must return the answer.
+    // If there are problems, the returned map will contain an error message.
 
-        // Initial calls to the voice server to get the user connected
-        public OSDMap ProvisionVoiceAccountRequest(OSDMap pRequest, UUID pUserID, UUID pScene);
-        public OSDMap VoiceSignalingRequest(OSDMap pRequest, UUID pUserID, UUID pScene);
+    // Initial calls to the voice server to get the user connected
+    public OSDMap ProvisionVoiceAccountRequest(OSDMap pRequest, UUID pUserID, UUID pScene);
+    public OSDMap VoiceSignalingRequest(OSDMap pRequest, UUID pUserID, UUID pScene);
 
-        // Once connection state is looked up, the viewer session is passed in
-        public OSDMap ProvisionVoiceAccountRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pScene);
-        public OSDMap VoiceSignalingRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pScene);
+    // Once connection state is looked up, the viewer session is passed in
+    public OSDMap ProvisionVoiceAccountRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pScene);
+    public OSDMap VoiceSignalingRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pScene);
 
-        // Create a viewer session with all the variables needed for the underlying implementation
-        public IVoiceViewerSession CreateViewerSession(OSDMap pRequest, UUID pUserID, UUID pScene);
-    }
+    // Create a viewer session with all the variables needed for the underlying implementation
+    public IVoiceViewerSession CreateViewerSession(OSDMap pRequest, UUID pUserID, UUID pScene);
 }

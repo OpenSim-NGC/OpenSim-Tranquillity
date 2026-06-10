@@ -25,10 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Net;
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Framework.Servers.HttpServer
-{
-    public delegate bool JsonRPCMethod(OSDMap jsonRpcRequest, ref JsonRpcResponse response);
-}
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public delegate bool JsonRPCMethod(OSDMap jsonRpcRequest, ref JsonRpcResponse response);

@@ -25,17 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
 using log4net;
-using System;
 using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
@@ -43,258 +35,257 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
 using OpenMetaverse;
 
-namespace OpenSim.Server.Handlers.Presence
+namespace OpenSim.Server.Handlers.Presence;
+
+public class PresenceServerPostHandler : BaseStreamHandler
 {
-    public class PresenceServerPostHandler : BaseStreamHandler
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IPresenceService m_PresenceService;
+
+    public PresenceServerPostHandler(IPresenceService service, IServiceAuth auth) :
+            base("POST", "/presence", auth)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_PresenceService = service;
+    }
 
-        private IPresenceService m_PresenceService;
+    protected override byte[] ProcessRequest(string path, Stream requestData,
+            IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        StreamReader sr = new StreamReader(requestData);
+        string body = sr.ReadToEnd();
+        sr.Close();
+        body = body.Trim();
 
-        public PresenceServerPostHandler(IPresenceService service, IServiceAuth auth) :
-                base("POST", "/presence", auth)
+        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        string method = string.Empty;
+        try
         {
-            m_PresenceService = service;
-        }
+            Dictionary<string, object> request = ServerUtils.ParseQueryString(body);
 
-        protected override byte[] ProcessRequest(string path, Stream requestData,
-                IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            StreamReader sr = new StreamReader(requestData);
-            string body = sr.ReadToEnd();
-            sr.Close();
-            body = body.Trim();
+            if (!request.TryGetValue("METHOD", out object tmpobj) || tmpobj is not string)
+                return FailureResult();
 
-            //m_log.DebugFormat("[XXX]: query String: {0}", body);
-            string method = string.Empty;
-            try
+            method = (string)tmpobj;
+            switch (method)
             {
-                Dictionary<string, object> request = ServerUtils.ParseQueryString(body);
+                case "login":
+                    {
+                        //return LoginAgent(request); this is ilegal
+                        if (request.TryGetValue("UserID", out object uo) && uo is string user)
+                            m_log.Debug($"[PRESENCE HANDLER]: ilegal login try from {httpRequest.RemoteIPEndPoint} for userID {user}");
+                        else
+                            m_log.Debug($"[PRESENCE HANDLER]: ilegal login try from {httpRequest.RemoteIPEndPoint} for unkown user");
 
-                if (!request.TryGetValue("METHOD", out object tmpobj) || tmpobj is not string)
-                    return FailureResult();
-
-                method = (string)tmpobj;
-                switch (method)
-                {
-                    case "login":
-                        {
-                            //return LoginAgent(request); this is ilegal
-                            if (request.TryGetValue("UserID", out object uo) && uo is string user)
-                                m_log.Debug($"[PRESENCE HANDLER]: ilegal login try from {httpRequest.RemoteIPEndPoint} for userID {user}");
-                            else
-                                m_log.Debug($"[PRESENCE HANDLER]: ilegal login try from {httpRequest.RemoteIPEndPoint} for unkown user");
-
-                            return FailureResult();
-                        }
-                    case "logout":
-                        return LogoutAgent(request);
-                    case "logoutregion":
-                        return LogoutRegionAgents(request);
-                    case "report":
-                        return Report(request);
-                    case "getagent":
-                        return GetAgent(request);
-                    case "getagents":
-                        return GetAgents(request);
-                }
-                m_log.Debug($"[PRESENCE HANDLER]: unknown method request: {method}");
+                        return FailureResult();
+                    }
+                case "logout":
+                    return LogoutAgent(request);
+                case "logoutregion":
+                    return LogoutRegionAgents(request);
+                case "report":
+                    return Report(request);
+                case "getagent":
+                    return GetAgent(request);
+                case "getagents":
+                    return GetAgents(request);
             }
-            catch (Exception e)
-            {
-                m_log.Debug($"[PRESENCE HANDLER]: Exception in method {method}: {e.Message}");
-            }
-
-            return FailureResult();
-
+            m_log.Debug($"[PRESENCE HANDLER]: unknown method request: {method}");
         }
-
-        byte[] LoginAgent(Dictionary<string, object> request)
+        catch (Exception e)
         {
-            string user = String.Empty;
-            UUID session = UUID.Zero;
-            UUID ssession = UUID.Zero;
-
-            if (!request.ContainsKey("UserID") || !request.ContainsKey("SessionID"))
-                return FailureResult();
-
-            user = request["UserID"].ToString();
-
-            if (!UUID.TryParse(request["SessionID"].ToString(), out session))
-                return FailureResult();
-
-            if (request.ContainsKey("SecureSessionID"))
-                // If it's malformed, we go on with a Zero on it
-                UUID.TryParse(request["SecureSessionID"].ToString(), out ssession);
-
-            if (m_PresenceService.LoginAgent(user, session, ssession))
-                return SuccessResult();
-
-            return FailureResult();
+            m_log.Debug($"[PRESENCE HANDLER]: Exception in method {method}: {e.Message}");
         }
 
-        byte[] LogoutAgent(Dictionary<string, object> request)
-        {
-            UUID session = UUID.Zero;
-
-            if (!request.ContainsKey("SessionID"))
-                return FailureResult();
-
-            if (!UUID.TryParse(request["SessionID"].ToString(), out session))
-                return FailureResult();
-
-            if (m_PresenceService.LogoutAgent(session))
-                return SuccessResult();
-
-            return FailureResult();
-        }
-
-        byte[] LogoutRegionAgents(Dictionary<string, object> request)
-        {
-            UUID region = UUID.Zero;
-
-            if (!request.ContainsKey("RegionID"))
-                return FailureResult();
-
-            if (!UUID.TryParse(request["RegionID"].ToString(), out region))
-                return FailureResult();
-
-            if (m_PresenceService.LogoutRegionAgents(region))
-                return SuccessResult();
-
-            return FailureResult();
-        }
-
-        byte[] Report(Dictionary<string, object> request)
-        {
-            UUID session = UUID.Zero;
-            UUID region = UUID.Zero;
-
-            if (!request.ContainsKey("SessionID") || !request.ContainsKey("RegionID"))
-                return FailureResult();
-
-            if (!UUID.TryParse(request["SessionID"].ToString(), out session))
-                return FailureResult();
-
-            if (!UUID.TryParse(request["RegionID"].ToString(), out region))
-                return FailureResult();
-
-            if (m_PresenceService.ReportAgent(session, region))
-            {
-                return SuccessResult();
-            }
-
-            return FailureResult();
-        }
-
-        byte[] GetAgent(Dictionary<string, object> request)
-        {
-            UUID session = UUID.Zero;
-
-            if (!request.ContainsKey("SessionID"))
-                return FailureResult();
-
-            if (!UUID.TryParse(request["SessionID"].ToString(), out session))
-                return FailureResult();
-
-            PresenceInfo pinfo = m_PresenceService.GetAgent(session);
-
-            Dictionary<string, object> result = new Dictionary<string, object>();
-            if (pinfo == null)
-                result["result"] = "null";
-            else
-                result["result"] = pinfo.ToKeyValuePairs();
-
-            string xmlString = ServerUtils.BuildXmlResponse(result);
-
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
-            return Util.UTF8NoBomEncoding.GetBytes(xmlString);
-        }
-
-        byte[] GetAgents(Dictionary<string, object> request)
-        {
-
-            string[] userIDs;
-
-            if (!request.ContainsKey("uuids"))
-            {
-                m_log.DebugFormat("[PRESENCE HANDLER]: GetAgents called without required uuids argument");
-                return FailureResult();
-            }
-
-            if (!(request["uuids"] is List<string>))
-            {
-                m_log.DebugFormat("[PRESENCE HANDLER]: GetAgents input argument was of unexpected type {0}", request["uuids"].GetType().ToString());
-                return FailureResult();
-            }
-
-            userIDs = ((List<string>)request["uuids"]).ToArray();
-
-            PresenceInfo[] pinfos = m_PresenceService.GetAgents(userIDs);
-
-            Dictionary<string, object> result = new Dictionary<string, object>();
-            if ((pinfos == null) || ((pinfos != null) && (pinfos.Length == 0)))
-                result["result"] = "null";
-            else
-            {
-                int i = 0;
-                foreach (PresenceInfo pinfo in pinfos)
-                {
-                    Dictionary<string, object> rinfoDict = pinfo.ToKeyValuePairs();
-                    result["presence" + i] = rinfoDict;
-                    i++;
-                }
-            }
-
-            string xmlString = ServerUtils.BuildXmlResponse(result);
-
-            //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
-            return Util.UTF8NoBomEncoding.GetBytes(xmlString);
-        }
-
-        private byte[] SuccessResult()
-        {
-            XmlDocument doc = new XmlDocument();
-
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
-
-            doc.AppendChild(xmlnode);
-
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
-
-            doc.AppendChild(rootElement);
-
-            XmlElement result = doc.CreateElement("", "result", "");
-            result.AppendChild(doc.CreateTextNode("Success"));
-
-            rootElement.AppendChild(result);
-
-            return Util.DocToBytes(doc);
-        }
-
-        private byte[] FailureResult()
-        {
-            XmlDocument doc = new XmlDocument();
-
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
-
-            doc.AppendChild(xmlnode);
-
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
-
-            doc.AppendChild(rootElement);
-
-            XmlElement result = doc.CreateElement("", "result", "");
-            result.AppendChild(doc.CreateTextNode("Failure"));
-
-            rootElement.AppendChild(result);
-
-            return Util.DocToBytes(doc);
-        }
+        return FailureResult();
 
     }
+
+    byte[] LoginAgent(Dictionary<string, object> request)
+    {
+        string user = String.Empty;
+        UUID session = UUID.Zero;
+        UUID ssession = UUID.Zero;
+
+        if (!request.ContainsKey("UserID") || !request.ContainsKey("SessionID"))
+            return FailureResult();
+
+        user = request["UserID"].ToString();
+
+        if (!UUID.TryParse(request["SessionID"].ToString(), out session))
+            return FailureResult();
+
+        if (request.ContainsKey("SecureSessionID"))
+            // If it's malformed, we go on with a Zero on it
+            UUID.TryParse(request["SecureSessionID"].ToString(), out ssession);
+
+        if (m_PresenceService.LoginAgent(user, session, ssession))
+            return SuccessResult();
+
+        return FailureResult();
+    }
+
+    byte[] LogoutAgent(Dictionary<string, object> request)
+    {
+        UUID session = UUID.Zero;
+
+        if (!request.ContainsKey("SessionID"))
+            return FailureResult();
+
+        if (!UUID.TryParse(request["SessionID"].ToString(), out session))
+            return FailureResult();
+
+        if (m_PresenceService.LogoutAgent(session))
+            return SuccessResult();
+
+        return FailureResult();
+    }
+
+    byte[] LogoutRegionAgents(Dictionary<string, object> request)
+    {
+        UUID region = UUID.Zero;
+
+        if (!request.ContainsKey("RegionID"))
+            return FailureResult();
+
+        if (!UUID.TryParse(request["RegionID"].ToString(), out region))
+            return FailureResult();
+
+        if (m_PresenceService.LogoutRegionAgents(region))
+            return SuccessResult();
+
+        return FailureResult();
+    }
+
+    byte[] Report(Dictionary<string, object> request)
+    {
+        UUID session = UUID.Zero;
+        UUID region = UUID.Zero;
+
+        if (!request.ContainsKey("SessionID") || !request.ContainsKey("RegionID"))
+            return FailureResult();
+
+        if (!UUID.TryParse(request["SessionID"].ToString(), out session))
+            return FailureResult();
+
+        if (!UUID.TryParse(request["RegionID"].ToString(), out region))
+            return FailureResult();
+
+        if (m_PresenceService.ReportAgent(session, region))
+        {
+            return SuccessResult();
+        }
+
+        return FailureResult();
+    }
+
+    byte[] GetAgent(Dictionary<string, object> request)
+    {
+        UUID session = UUID.Zero;
+
+        if (!request.ContainsKey("SessionID"))
+            return FailureResult();
+
+        if (!UUID.TryParse(request["SessionID"].ToString(), out session))
+            return FailureResult();
+
+        PresenceInfo pinfo = m_PresenceService.GetAgent(session);
+
+        Dictionary<string, object> result = new Dictionary<string, object>();
+        if (pinfo == null)
+            result["result"] = "null";
+        else
+            result["result"] = pinfo.ToKeyValuePairs();
+
+        string xmlString = ServerUtils.BuildXmlResponse(result);
+
+        //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+        return Util.UTF8NoBomEncoding.GetBytes(xmlString);
+    }
+
+    byte[] GetAgents(Dictionary<string, object> request)
+    {
+
+        string[] userIDs;
+
+        if (!request.ContainsKey("uuids"))
+        {
+            m_log.DebugFormat("[PRESENCE HANDLER]: GetAgents called without required uuids argument");
+            return FailureResult();
+        }
+
+        if (!(request["uuids"] is List<string>))
+        {
+            m_log.DebugFormat("[PRESENCE HANDLER]: GetAgents input argument was of unexpected type {0}", request["uuids"].GetType().ToString());
+            return FailureResult();
+        }
+
+        userIDs = ((List<string>)request["uuids"]).ToArray();
+
+        PresenceInfo[] pinfos = m_PresenceService.GetAgents(userIDs);
+
+        Dictionary<string, object> result = new Dictionary<string, object>();
+        if ((pinfos == null) || ((pinfos != null) && (pinfos.Length == 0)))
+            result["result"] = "null";
+        else
+        {
+            int i = 0;
+            foreach (PresenceInfo pinfo in pinfos)
+            {
+                Dictionary<string, object> rinfoDict = pinfo.ToKeyValuePairs();
+                result["presence" + i] = rinfoDict;
+                i++;
+            }
+        }
+
+        string xmlString = ServerUtils.BuildXmlResponse(result);
+
+        //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+        return Util.UTF8NoBomEncoding.GetBytes(xmlString);
+    }
+
+    private byte[] SuccessResult()
+    {
+        XmlDocument doc = new XmlDocument();
+
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
+                "", "");
+
+        doc.AppendChild(xmlnode);
+
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse",
+                "");
+
+        doc.AppendChild(rootElement);
+
+        XmlElement result = doc.CreateElement("", "result", "");
+        result.AppendChild(doc.CreateTextNode("Success"));
+
+        rootElement.AppendChild(result);
+
+        return Util.DocToBytes(doc);
+    }
+
+    private byte[] FailureResult()
+    {
+        XmlDocument doc = new XmlDocument();
+
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
+                "", "");
+
+        doc.AppendChild(xmlnode);
+
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse",
+                "");
+
+        doc.AppendChild(rootElement);
+
+        XmlElement result = doc.CreateElement("", "result", "");
+        result.AppendChild(doc.CreateTextNode("Failure"));
+
+        rootElement.AppendChild(result);
+
+        return Util.DocToBytes(doc);
+    }
+
 }

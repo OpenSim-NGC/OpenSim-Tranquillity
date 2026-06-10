@@ -25,26 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
-using OpenSim.Data;
 using OpenMetaverse;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+public class OfflineIMData
 {
-    public class OfflineIMData
-    {
-        public UUID PrincipalID;
-        public UUID FromID;
-        public Dictionary<string, string> Data;
-    }
+    public UUID PrincipalID;
+    public UUID FromID;
+    public Dictionary<string, string> Data;
+}
 
 
-    public interface IOfflineIMData
-    {
-        OfflineIMData[] Get(string field, string val);
-        long GetCount(string field, string key);
-        bool Store(OfflineIMData data);
-        bool Delete(string field, string val);
-        void DeleteOld();
-    }
+public interface IOfflineIMData
+{
+    OfflineIMData[] Get(string field, string val);
+    long GetCount(string field, string key);
+    bool Store(OfflineIMData data);
+    bool Delete(string field, string val);
+    void DeleteOld();
 }

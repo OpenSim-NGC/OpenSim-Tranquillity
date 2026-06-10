@@ -25,291 +25,285 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Text;
 using OSHttpServer;
-using log4net;
 
 using System.Runtime.CompilerServices;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public class OSHttpRequest : IOSHttpRequest
 {
-    public class OSHttpRequest : IOSHttpRequest
+    //private static readonly ILog _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected readonly IHttpRequest m_request = null;
+
+    public string[] AcceptTypes
     {
-        //private static readonly ILog _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.AcceptTypes; }
+    }
 
-        protected readonly IHttpRequest m_request = null;
+    public Encoding ContentEncoding
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_contentEncoding; }
+    }
+    private Encoding m_contentEncoding;
 
-        public string[] AcceptTypes
+    public long ContentLength
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.ContentLength; }
+    }
+
+    public long ContentLength64
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.ContentLength; }
+    }
+
+    public string ContentType
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_contentType; }
+    }
+    private string m_contentType;
+
+    public bool HasEntityBody
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.ContentLength != 0; }
+    }
+
+    public NameValueCollection Headers
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.Headers; }
+    }
+
+    public string HttpMethod
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.Method; }
+    }
+
+    public Stream InputStream
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.Body; }
+    }
+
+    public bool IsSecured
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.Context.IsSecured; }
+    }
+
+    public bool KeepAlive
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return ConnectionType.KeepAlive == m_request.Connection; }
+    }
+
+    public NameValueCollection QueryString
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.QueryString;}
+    }
+
+    private Hashtable m_queryAsHashtable = null;
+    public Hashtable Query
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.AcceptTypes; }
+            if (m_queryAsHashtable == null)
+                BuildQueryHashtable();
+            return m_queryAsHashtable;
         }
+    }
 
-        public Encoding ContentEncoding
+    //faster than Query
+    private Dictionary<string, string> _queryAsDictionay = null;
+    public Dictionary<string,string> QueryAsDictionary
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_contentEncoding; }
+            if (_queryAsDictionay == null)
+                BuildQueryDictionary();
+            return _queryAsDictionay;
         }
-        private Encoding m_contentEncoding;
+    }
 
-        public long ContentLength
+    private HashSet<string> m_queryFlags = null;
+    public HashSet<string> QueryFlags
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.ContentLength; }
+            if (m_queryFlags == null)
+                BuildQueryDictionary();
+            return m_queryFlags;
         }
+    }
+/// <value>
+/// POST request values, if applicable
+/// </value>
+//        public Hashtable Form { get; private set; }
 
-        public long ContentLength64
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.ContentLength; }
-        }
+    public string RawUrl
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.Uri.AbsolutePath; }
+    }
 
-        public string ContentType
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_contentType; }
-        }
-        private string m_contentType;
+    public IPEndPoint RemoteIPEndPoint
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.RemoteIPEndPoint; }
+    }
 
-        public bool HasEntityBody
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.ContentLength != 0; }
-        }
+    public IPEndPoint LocalIPEndPoint
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.LocalIPEndPoint; }
+    }
 
-        public NameValueCollection Headers
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.Headers; }
-        }
+    public Uri Url
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.Uri; }
+    }
 
-        public string HttpMethod
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.Method; }
-        }
+    public string UriPath
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.UriPath; }
+    }
 
-        public Stream InputStream
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.Body; }
-        }
+    public string UserAgent
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_userAgent; }
+    }
+    private string m_userAgent;
 
-        public bool IsSecured
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.Context.IsSecured; }
-        }
+    public double ArrivalTS
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.ArrivalTS;}
+    }
 
-        public bool KeepAlive
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return ConnectionType.KeepAlive == m_request.Connection; }
-        }
+    internal IHttpRequest IHttpRequest
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request; }
+    }
 
-        public NameValueCollection QueryString
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.QueryString;}
-        }
+    internal IHttpClientContext IHttpClientContext
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_request.Context; }
+    }
 
-        private Hashtable m_queryAsHashtable = null;
-        public Hashtable Query
+    /// <summary>
+    /// Internal whiteboard for handlers to store temporary stuff
+    /// into.
+    /// </summary>
+    internal Dictionary<string, object> Whiteboard
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return _whiteboard; }
+    }
+    private Dictionary<string, object> _whiteboard = new Dictionary<string, object>();
+
+    public OSHttpRequest() {}
+
+    public OSHttpRequest(IHttpRequest req)
+    {
+        m_request = req;
+
+        if (null != req.Headers["content-encoding"])
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
+            try
             {
-                if (m_queryAsHashtable == null)
-                    BuildQueryHashtable();
-                return m_queryAsHashtable;
+                m_contentEncoding = Encoding.GetEncoding(m_request.Headers["content-encoding"]);
+            }
+            catch
+            {
+                // ignore
             }
         }
 
-        //faster than Query
-        private Dictionary<string, string> _queryAsDictionay = null;
-        public Dictionary<string,string> QueryAsDictionary
+        if (null != req.Headers["content-type"])
+            m_contentType = m_request.Headers["content-type"];
+        if (null != req.Headers["user-agent"])
+            m_userAgent = req.Headers["user-agent"];
+
+        //Form = new Hashtable();
+        //foreach (HttpInputItem item in req.Form)
+        //{
+        //    _log.DebugFormat("[OSHttpRequest]: Got form item {0}={1}", item.Name, item.Value);
+        //   Form.Add(item.Name, item.Value);
+        //}
+    }
+
+    private void BuildQueryDictionary()
+    {
+        NameValueCollection q = m_request.QueryString;
+        _queryAsDictionay = new Dictionary<string, string>();
+        m_queryFlags = new HashSet<string>();
+        for(int i = 0; i < q.Count; ++i)
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
+            try
             {
-                if (_queryAsDictionay == null)
-                    BuildQueryDictionary();
-                return _queryAsDictionay;
+                var name = q.GetKey(i);
+                if(!string.IsNullOrEmpty(name))
+                    _queryAsDictionay[name] = q[i];
+                else
+                    m_queryFlags.Add(q[i]);
             }
+            catch {}
         }
+    }
 
-        private HashSet<string> m_queryFlags = null;
-        public HashSet<string> QueryFlags
+    private void BuildQueryHashtable()
+    {
+        NameValueCollection q = m_request.QueryString;
+        m_queryAsHashtable = new Hashtable();
+        m_queryFlags = new HashSet<string>();
+        for (int i = 0; i < q.Count; ++i)
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
+            try
             {
-                if (m_queryFlags == null)
-                    BuildQueryDictionary();
-                return m_queryFlags;
+                var name = q.GetKey(i);
+                if (!string.IsNullOrEmpty(name))
+                    m_queryAsHashtable[name] = q[i];
+                else
+                    m_queryFlags.Add(q[i]);
             }
+            catch { }
         }
-    /// <value>
-    /// POST request values, if applicable
-    /// </value>
-    //        public Hashtable Form { get; private set; }
+    }
 
-        public string RawUrl
+    public override string ToString()
+    {
+        StringBuilder me = new StringBuilder();
+        me.Append($"OSHttpRequest: {HttpMethod} {RawUrl}\n");
+        foreach (string k in Headers.AllKeys)
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.Uri.AbsolutePath; }
+            me.Append($"    {k}: {Headers[k]}\n");
         }
-
-        public IPEndPoint RemoteIPEndPoint
+        if (null != RemoteIPEndPoint)
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.RemoteIPEndPoint; }
+            me.Append($"    IP: {RemoteIPEndPoint}\n");
         }
 
-        public IPEndPoint LocalIPEndPoint
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.LocalIPEndPoint; }
-        }
-
-        public Uri Url
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.Uri; }
-        }
-
-        public string UriPath
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.UriPath; }
-        }
-
-        public string UserAgent
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_userAgent; }
-        }
-        private string m_userAgent;
-
-        public double ArrivalTS
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.ArrivalTS;}
-        }
-
-        internal IHttpRequest IHttpRequest
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request; }
-        }
-
-        internal IHttpClientContext IHttpClientContext
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return m_request.Context; }
-        }
-
-        /// <summary>
-        /// Internal whiteboard for handlers to store temporary stuff
-        /// into.
-        /// </summary>
-        internal Dictionary<string, object> Whiteboard
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return _whiteboard; }
-        }
-        private Dictionary<string, object> _whiteboard = new Dictionary<string, object>();
-
-        public OSHttpRequest() {}
-
-        public OSHttpRequest(IHttpRequest req)
-        {
-            m_request = req;
-
-            if (null != req.Headers["content-encoding"])
-            {
-                try
-                {
-                    m_contentEncoding = Encoding.GetEncoding(m_request.Headers["content-encoding"]);
-                }
-                catch
-                {
-                    // ignore
-                }
-            }
-
-            if (null != req.Headers["content-type"])
-                m_contentType = m_request.Headers["content-type"];
-            if (null != req.Headers["user-agent"])
-                m_userAgent = req.Headers["user-agent"];
-
-            //Form = new Hashtable();
-            //foreach (HttpInputItem item in req.Form)
-            //{
-            //    _log.DebugFormat("[OSHttpRequest]: Got form item {0}={1}", item.Name, item.Value);
-            //   Form.Add(item.Name, item.Value);
-            //}
-        }
-
-        private void BuildQueryDictionary()
-        {
-            NameValueCollection q = m_request.QueryString;
-            _queryAsDictionay = new Dictionary<string, string>();
-            m_queryFlags = new HashSet<string>();
-            for(int i = 0; i < q.Count; ++i)
-            {
-                try
-                {
-                    var name = q.GetKey(i);
-                    if(!string.IsNullOrEmpty(name))
-                        _queryAsDictionay[name] = q[i];
-                    else
-                        m_queryFlags.Add(q[i]);
-                }
-                catch {}
-            }
-        }
-
-        private void BuildQueryHashtable()
-        {
-            NameValueCollection q = m_request.QueryString;
-            m_queryAsHashtable = new Hashtable();
-            m_queryFlags = new HashSet<string>();
-            for (int i = 0; i < q.Count; ++i)
-            {
-                try
-                {
-                    var name = q.GetKey(i);
-                    if (!string.IsNullOrEmpty(name))
-                        m_queryAsHashtable[name] = q[i];
-                    else
-                        m_queryFlags.Add(q[i]);
-                }
-                catch { }
-            }
-        }
-
-        public override string ToString()
-        {
-            StringBuilder me = new StringBuilder();
-            me.Append($"OSHttpRequest: {HttpMethod} {RawUrl}\n");
-            foreach (string k in Headers.AllKeys)
-            {
-                me.Append($"    {k}: {Headers[k]}\n");
-            }
-            if (null != RemoteIPEndPoint)
-            {
-                me.Append($"    IP: {RemoteIPEndPoint}\n");
-            }
-
-            return me.ToString();
-        }
+        return me.ToString();
     }
 }

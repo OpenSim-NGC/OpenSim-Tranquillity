@@ -25,32 +25,26 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using OpenMetaverse;
-using OpenSim.Framework;
+namespace OpenSim.Data;
 
-namespace OpenSim.Data
+// This MUST be a ref type!
+public class GridUserData
 {
-    // This MUST be a ref type!
-    public class GridUserData
-    {
-        public string UserID;
-        public Dictionary<string, string> Data;
+    public string UserID;
+    public Dictionary<string, string> Data;
 
-        public GridUserData()
-        {
-            Data = new Dictionary<string, string>();
-        }
-    }
-
-    /// <summary>
-    /// An interface for connecting to the user grid datastore
-    /// </summary>
-    public interface IGridUserData
+    public GridUserData()
     {
-        GridUserData Get(string userID);
-        GridUserData[] GetAll(string query);
-        bool Store(GridUserData data);
+        Data = new Dictionary<string, string>();
     }
+}
+
+/// <summary>
+/// An interface for connecting to the user grid datastore
+/// </summary>
+public interface IGridUserData
+{
+    GridUserData Get(string userID);
+    GridUserData[] GetAll(string query);
+    bool Store(GridUserData data);
 }

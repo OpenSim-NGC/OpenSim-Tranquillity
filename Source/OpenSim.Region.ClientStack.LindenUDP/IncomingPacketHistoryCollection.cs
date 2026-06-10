@@ -25,46 +25,45 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Region.ClientStack.LindenUDP
+namespace OpenSim.Region.ClientStack.LindenUDP;
+
+/// <summary>
+/// A circular buffer and hashset for tracking incoming packet sequence
+/// numbers
+/// </summary>
+public sealed class IncomingPacketHistoryCollection
 {
-    /// <summary>
-    /// A circular buffer and hashset for tracking incoming packet sequence
-    /// numbers
-    /// </summary>
-    public sealed class IncomingPacketHistoryCollection
+    private readonly uint[] m_items;
+    private HashSet<uint> m_hashSet;
+    private int m_first;
+    private int m_next;
+    private int m_capacity;
+
+    public IncomingPacketHistoryCollection(int capacity)
     {
-        private readonly uint[] m_items;
-        private HashSet<uint> m_hashSet;
-        private int m_first;
-        private int m_next;
-        private int m_capacity;
+        this.m_capacity = capacity;
+        m_items = new uint[capacity];
+        m_hashSet = new HashSet<uint>();
+    }
 
-        public IncomingPacketHistoryCollection(int capacity)
+    public bool TryEnqueue(uint ack)
+    {
+        lock (m_hashSet)
         {
-            this.m_capacity = capacity;
-            m_items = new uint[capacity];
-            m_hashSet = new HashSet<uint>();
-        }
-
-        public bool TryEnqueue(uint ack)
-        {
-            lock (m_hashSet)
+            if (m_hashSet.Add(ack))
             {
-                if (m_hashSet.Add(ack))
+                m_items[m_next] = ack;
+                m_next = (m_next + 1) % m_capacity;
+                if (m_next == m_first)
                 {
-                    m_items[m_next] = ack;
-                    m_next = (m_next + 1) % m_capacity;
-                    if (m_next == m_first)
-                    {
-                        m_hashSet.Remove(m_items[m_first]);
-                        m_first = (m_first + 1) % m_capacity;
-                    }
-
-                    return true;
+                    m_hashSet.Remove(m_items[m_first]);
+                    m_first = (m_first + 1) % m_capacity;
                 }
-            }
 
-            return false;
+                return true;
+            }
         }
+
+        return false;
     }
 }

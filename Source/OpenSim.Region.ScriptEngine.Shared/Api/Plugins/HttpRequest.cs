@@ -25,62 +25,58 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.CoreModules.Scripting.HttpRequest;
-using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Interfaces;
-using OpenSim.Region.ScriptEngine.Shared.Api;
 
-namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
+namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
+
+public class HttpRequest
 {
-    public class HttpRequest
+    public AsyncCommandManager m_CmdManager;
+
+    public HttpRequest(AsyncCommandManager CmdManager)
     {
-        public AsyncCommandManager m_CmdManager;
+        m_CmdManager = CmdManager;
+    }
 
-        public HttpRequest(AsyncCommandManager CmdManager)
+    public void CheckHttpRequests()
+    {
+        if (m_CmdManager.m_ScriptEngine.World == null)
+            return;
+
+        IHttpRequestModule iHttpReq = m_CmdManager.m_ScriptEngine.World.RequestModuleInterface<IHttpRequestModule>();
+        if(iHttpReq == null)
+            return;
+
+        HttpRequestClass httpInfo = (HttpRequestClass)iHttpReq.GetNextCompletedRequest();
+        while (httpInfo != null)
         {
-            m_CmdManager = CmdManager;
-        }
+            //m_log.Debug("[AsyncLSL]:" + httpInfo.response_body + httpInfo.status);
 
-        public void CheckHttpRequests()
-        {
-            if (m_CmdManager.m_ScriptEngine.World == null)
-                return;
+            // Deliver data to prim's remote_data handler
+            //
+            // TODO: Returning null for metadata, since the lsl function
+            // only returns the byte for HTTP_BODY_TRUNCATED, which is not
+            // implemented here yet anyway.  Should be fixed if/when maxsize
+            // is supported
 
-            IHttpRequestModule iHttpReq = m_CmdManager.m_ScriptEngine.World.RequestModuleInterface<IHttpRequestModule>();
-            if(iHttpReq == null)
-                return;
-
-            HttpRequestClass httpInfo = (HttpRequestClass)iHttpReq.GetNextCompletedRequest();
-            while (httpInfo != null)
+            object[] resobj = new object[]
             {
-                //m_log.Debug("[AsyncLSL]:" + httpInfo.response_body + httpInfo.status);
+                new LSL_Types.LSLString(httpInfo.ReqID.ToString()),
+                new LSL_Types.LSLInteger(httpInfo.Status),
+                new LSL_Types.list(),
+                new LSL_Types.LSLString(httpInfo.ResponseBody)
+            };
 
-                // Deliver data to prim's remote_data handler
-                //
-                // TODO: Returning null for metadata, since the lsl function
-                // only returns the byte for HTTP_BODY_TRUNCATED, which is not
-                // implemented here yet anyway.  Should be fixed if/when maxsize
-                // is supported
-
-                object[] resobj = new object[]
-                {
-                    new LSL_Types.LSLString(httpInfo.ReqID.ToString()),
-                    new LSL_Types.LSLInteger(httpInfo.Status),
-                    new LSL_Types.list(),
-                    new LSL_Types.LSLString(httpInfo.ResponseBody)
-                };
-
-                foreach (IScriptEngine e in m_CmdManager.ScriptEngines)
-                {
-                    if (e.PostObjectEvent(httpInfo.LocalID,
-                            new EventParams("http_response",
-                            resobj, new DetectParams[0])))
-                        break;
-                }
-                httpInfo = (HttpRequestClass)iHttpReq.GetNextCompletedRequest();
+            foreach (IScriptEngine e in m_CmdManager.ScriptEngines)
+            {
+                if (e.PostObjectEvent(httpInfo.LocalID,
+                        new EventParams("http_response",
+                        resobj, new DetectParams[0])))
+                    break;
             }
+            httpInfo = (HttpRequestClass)iHttpReq.GetNextCompletedRequest();
         }
     }
 }

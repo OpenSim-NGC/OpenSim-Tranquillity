@@ -25,16 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Framework.Capabilities
-{
-    [LLSDType("MAP")]
-    public class LLSDCapEvent
-    {
-        public int id = 0;
-        public OSDArray events = new OSDArray();
+namespace OpenSim.Framework.Capabilities;
 
-        public LLSDCapEvent()
-        {
-        }
+[LLSDType("MAP")]
+public class LLSDCapEvent
+{
+    public int id = 0;
+    public OSDArray events = new OSDArray();
+
+    public LLSDCapEvent()
+    {
     }
 }

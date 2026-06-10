@@ -25,15 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
 using log4net;
-using System;
 using System.Reflection;
-using System.IO;
 using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
 using System.Xml.Serialization;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
@@ -41,62 +35,61 @@ using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Server.Handlers.Asset
+namespace OpenSim.Server.Handlers.Asset;
+
+public class AssetServerPostHandler : BaseStreamHandler
 {
-    public class AssetServerPostHandler : BaseStreamHandler
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IAssetService m_AssetService;
+
+    public AssetServerPostHandler(IAssetService service) :
+            base("POST", "/assets")
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_AssetService = service;
+    }
 
-        private IAssetService m_AssetService;
+    public AssetServerPostHandler(IAssetService service, IServiceAuth auth) :
+        base("POST", "/assets", auth)
+    {
+        m_AssetService = service;
+    }
 
-        public AssetServerPostHandler(IAssetService service) :
-                base("POST", "/assets")
+    protected override byte[] ProcessRequest(string path, Stream request,
+            IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        AssetBase asset;
+        XmlSerializer xs = new XmlSerializer(typeof(AssetBase));
+
+        try
         {
-            m_AssetService = service;
+            asset = (AssetBase)xs.Deserialize(request);
+        }
+        catch (Exception)
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+            return null;
         }
 
-        public AssetServerPostHandler(IAssetService service, IServiceAuth auth) :
-            base("POST", "/assets", auth)
+        m_log.Info($"[AssetServerPost]: From {httpRequest.RemoteIPEndPoint} Asset {asset.ID}: " +
+            $"Name = {asset.Metadata.Name},Type = {(OpenMetaverse.AssetType)asset.Metadata.Type}, " +
+            $"CreatorID = {asset.Metadata.CreatorID}, Description = {asset.Metadata.Description}");
+
+        string[] p = SplitParams(path);
+        if (p.Length > 0)
         {
-            m_AssetService = service;
+            string id = p[0];
+            bool result = m_AssetService.UpdateContent(id, asset.Data);
+
+            xs = new XmlSerializer(typeof(bool));
+            return ServerUtils.SerializeResult(xs, result);
         }
-
-        protected override byte[] ProcessRequest(string path, Stream request,
-                IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        else
         {
-            AssetBase asset;
-            XmlSerializer xs = new XmlSerializer(typeof(AssetBase));
+            string id = m_AssetService.Store(asset);
 
-            try
-            {
-                asset = (AssetBase)xs.Deserialize(request);
-            }
-            catch (Exception)
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
-                return null;
-            }
-
-            m_log.Info($"[AssetServerPost]: From {httpRequest.RemoteIPEndPoint} Asset {asset.ID}: " +
-                $"Name = {asset.Metadata.Name},Type = {(OpenMetaverse.AssetType)asset.Metadata.Type}, " +
-                $"CreatorID = {asset.Metadata.CreatorID}, Description = {asset.Metadata.Description}");
-
-            string[] p = SplitParams(path);
-            if (p.Length > 0)
-            {
-                string id = p[0];
-                bool result = m_AssetService.UpdateContent(id, asset.Data);
-
-                xs = new XmlSerializer(typeof(bool));
-                return ServerUtils.SerializeResult(xs, result);
-            }
-            else
-            {
-                string id = m_AssetService.Store(asset);
-
-                xs = new XmlSerializer(typeof(string));
-                return ServerUtils.SerializeResult(xs, id);
-            }
+            xs = new XmlSerializer(typeof(string));
+            return ServerUtils.SerializeResult(xs, id);
         }
     }
 }

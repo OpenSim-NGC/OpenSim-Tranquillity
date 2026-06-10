@@ -1,33 +1,31 @@
-﻿using System;
-using OpenSim.Framework;
+﻿using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 
 using Nini.Config;
 
-namespace OpenSim.Services.Connectors
+namespace OpenSim.Services.Connectors;
+
+public class BaseServiceConnector
 {
-    public class BaseServiceConnector
+    protected IServiceAuth m_Auth;
+
+    public BaseServiceConnector() { }
+
+    public BaseServiceConnector(IConfigSource config, string section)
     {
-        protected IServiceAuth m_Auth;
+        Initialise(config, section);
+    }
 
-        public BaseServiceConnector() { }
+    public void Initialise(IConfigSource config, string section)
+    {
+        string authType = Util.GetConfigVarFromSections<string>(config, "AuthType", new string[] { "Network", section }, "None");
 
-        public BaseServiceConnector(IConfigSource config, string section)
+        switch (authType)
         {
-            Initialise(config, section);
+            case "BasicHttpAuthentication":
+                m_Auth = new BasicHttpAuthentication(config, section);
+                break;
         }
 
-        public void Initialise(IConfigSource config, string section)
-        {
-            string authType = Util.GetConfigVarFromSections<string>(config, "AuthType", new string[] { "Network", section }, "None");
-
-            switch (authType)
-            {
-                case "BasicHttpAuthentication":
-                    m_Auth = new BasicHttpAuthentication(config, section);
-                    break;
-            }
-
-        }
     }
 }

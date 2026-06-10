@@ -39,263 +39,262 @@ using log4net;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
-namespace OpenSim.Region.OptionalModules.ViewerSupport
+namespace OpenSim.Region.OptionalModules.ViewerSupport;
+
+public class DynamicMenuModule : INonSharedRegionModule, IDynamicMenuModule
 {
-    public class DynamicMenuModule : INonSharedRegionModule, IDynamicMenuModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private bool m_Enabled = false;
+    private class MenuItemData
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        public string Title;
+        public UUID AgentID;
+        public InsertLocation Location;
+        public UserMode Mode;
+        public CustomMenuHandler Handler;
+    }
 
-        private bool m_Enabled = false;
-        private class MenuItemData
+    private Dictionary<UUID, List<MenuItemData>> m_menuItems =
+            new Dictionary<UUID, List<MenuItemData>>();
+
+    private Scene m_scene;
+
+    public string Name
+    {
+        get { return "DynamicMenuModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void Initialise(IConfigSource config)
+    {
+        IConfig moduleConfig = config.Configs["DynamicMenuModule"];
+        if (moduleConfig != null)
         {
-            public string Title;
-            public UUID AgentID;
-            public InsertLocation Location;
-            public UserMode Mode;
-            public CustomMenuHandler Handler;
+            m_Enabled = moduleConfig.GetBoolean("enabled", false);
         }
+    }
 
-        private Dictionary<UUID, List<MenuItemData>> m_menuItems =
-                new Dictionary<UUID, List<MenuItemData>>();
+    public void Close()
+    {
+    }
 
-        private Scene m_scene;
-
-        public string Name
+    public void AddRegion(Scene scene)
+    {
+        if (m_Enabled)
         {
-            get { return "DynamicMenuModule"; }
+            m_scene = scene;
+            scene.EventManager.OnRegisterCaps += OnRegisterCaps;
+            m_scene.RegisterModuleInterface<IDynamicMenuModule>(this);
         }
+    }
 
-        public Type ReplaceableInterface
+    public void RegionLoaded(Scene scene)
+    {
+        if (m_Enabled)
         {
-            get { return null; }
+            ISimulatorFeaturesModule featuresModule = m_scene.RequestModuleInterface<ISimulatorFeaturesModule>();
+            if (featuresModule != null)
+                featuresModule.OnSimulatorFeaturesRequest += OnSimulatorFeaturesRequest;
         }
+    }
 
-        public void Initialise(IConfigSource config)
+    public void RemoveRegion(Scene scene)
+    {
+    }
+
+    private void OnSimulatorFeaturesRequest(UUID agentID, ref OSDMap features)
+    {
+        OSD menus = new OSDMap();
+        if (features.ContainsKey("menus"))
+            menus = features["menus"];
+
+        OSDMap agent = new OSDMap();
+        OSDMap world = new OSDMap();
+        OSDMap tools = new OSDMap();
+        OSDMap advanced = new OSDMap();
+        OSDMap admin = new OSDMap();
+        if (((OSDMap)menus).ContainsKey("agent"))
+            agent = (OSDMap)((OSDMap)menus)["agent"];
+        if (((OSDMap)menus).ContainsKey("world"))
+            world = (OSDMap)((OSDMap)menus)["world"];
+        if (((OSDMap)menus).ContainsKey("tools"))
+            tools = (OSDMap)((OSDMap)menus)["tools"];
+        if (((OSDMap)menus).ContainsKey("advanced"))
+            advanced = (OSDMap)((OSDMap)menus)["advanced"];
+        if (((OSDMap)menus).ContainsKey("admin"))
+            admin = (OSDMap)((OSDMap)menus)["admin"];
+
+        if (m_menuItems.ContainsKey(UUID.Zero))
         {
-            IConfig moduleConfig = config.Configs["DynamicMenuModule"];
-            if (moduleConfig != null)
+            foreach (MenuItemData d in m_menuItems[UUID.Zero])
             {
-                m_Enabled = moduleConfig.GetBoolean("enabled", false);
-            }
-        }
-
-        public void Close()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (m_Enabled)
-            {
-                m_scene = scene;
-                scene.EventManager.OnRegisterCaps += OnRegisterCaps;
-                m_scene.RegisterModuleInterface<IDynamicMenuModule>(this);
-            }
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (m_Enabled)
-            {
-                ISimulatorFeaturesModule featuresModule = m_scene.RequestModuleInterface<ISimulatorFeaturesModule>();
-                if (featuresModule != null)
-                    featuresModule.OnSimulatorFeaturesRequest += OnSimulatorFeaturesRequest;
-            }
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-        }
-
-        private void OnSimulatorFeaturesRequest(UUID agentID, ref OSDMap features)
-        {
-            OSD menus = new OSDMap();
-            if (features.ContainsKey("menus"))
-                menus = features["menus"];
-
-            OSDMap agent = new OSDMap();
-            OSDMap world = new OSDMap();
-            OSDMap tools = new OSDMap();
-            OSDMap advanced = new OSDMap();
-            OSDMap admin = new OSDMap();
-            if (((OSDMap)menus).ContainsKey("agent"))
-                agent = (OSDMap)((OSDMap)menus)["agent"];
-            if (((OSDMap)menus).ContainsKey("world"))
-                world = (OSDMap)((OSDMap)menus)["world"];
-            if (((OSDMap)menus).ContainsKey("tools"))
-                tools = (OSDMap)((OSDMap)menus)["tools"];
-            if (((OSDMap)menus).ContainsKey("advanced"))
-                advanced = (OSDMap)((OSDMap)menus)["advanced"];
-            if (((OSDMap)menus).ContainsKey("admin"))
-                admin = (OSDMap)((OSDMap)menus)["admin"];
-
-            if (m_menuItems.ContainsKey(UUID.Zero))
-            {
-                foreach (MenuItemData d in m_menuItems[UUID.Zero])
+                if (!m_scene.Permissions.IsGod(agentID))
                 {
-                    if (!m_scene.Permissions.IsGod(agentID))
-                    {
-                        if (d.Mode == UserMode.RegionManager && (!m_scene.Permissions.IsAdministrator(agentID)))
-                            continue;
-                    }
-
-                    OSDMap loc = null;
-                    switch (d.Location)
-                    {
-                    case InsertLocation.Agent:
-                        loc = agent;
-                        break;
-                    case InsertLocation.World:
-                        loc = world;
-                        break;
-                    case InsertLocation.Tools:
-                        loc = tools;
-                        break;
-                    case InsertLocation.Advanced:
-                        loc = advanced;
-                        break;
-                    case InsertLocation.Admin:
-                        loc = admin;
-                        break;
-                    }
-
-                    if (loc == null)
+                    if (d.Mode == UserMode.RegionManager && (!m_scene.Permissions.IsAdministrator(agentID)))
                         continue;
-
-                    loc[d.Title] = OSD.FromString(d.Title);
                 }
-            }
 
-            if (m_menuItems.ContainsKey(agentID))
-            {
-                foreach (MenuItemData d in m_menuItems[agentID])
+                OSDMap loc = null;
+                switch (d.Location)
                 {
-                    if (d.Mode == UserMode.God && (!m_scene.Permissions.IsGod(agentID)))
-                        continue;
-
-                    OSDMap loc = null;
-                    switch (d.Location)
-                    {
-                    case InsertLocation.Agent:
-                        loc = agent;
-                        break;
-                    case InsertLocation.World:
-                        loc = world;
-                        break;
-                    case InsertLocation.Tools:
-                        loc = tools;
-                        break;
-                    case InsertLocation.Advanced:
-                        loc = advanced;
-                        break;
-                    case InsertLocation.Admin:
-                        loc = admin;
-                        break;
-                    }
-
-                    if (loc == null)
-                        continue;
-
-                    loc[d.Title] = OSD.FromString(d.Title);
+                case InsertLocation.Agent:
+                    loc = agent;
+                    break;
+                case InsertLocation.World:
+                    loc = world;
+                    break;
+                case InsertLocation.Tools:
+                    loc = tools;
+                    break;
+                case InsertLocation.Advanced:
+                    loc = advanced;
+                    break;
+                case InsertLocation.Admin:
+                    loc = admin;
+                    break;
                 }
-            }
 
+                if (loc == null)
+                    continue;
 
-            ((OSDMap)menus)["agent"] = agent;
-            ((OSDMap)menus)["world"] = world;
-            ((OSDMap)menus)["tools"] = tools;
-            ((OSDMap)menus)["advanced"] = advanced;
-            ((OSDMap)menus)["admin"] = admin;
-
-            features["menus"] = menus;
-        }
-
-        private void OnRegisterCaps(UUID agentID, Caps caps)
-        {
-            caps.RegisterSimpleHandler("CustomMenuAction", new MenuActionHandler("/" + UUID.Random(), "CustomMenuAction", agentID, this, m_scene));
-        }
-
-        internal void HandleMenuSelection(string action, UUID agentID, List<uint> selection)
-        {
-            if (m_menuItems.ContainsKey(agentID))
-            {
-                foreach (MenuItemData d in m_menuItems[agentID])
-                {
-                    if (d.Title == action)
-                        d.Handler(action, agentID, selection);
-                }
-            }
-
-            if (m_menuItems.ContainsKey(UUID.Zero))
-            {
-                foreach (MenuItemData d in m_menuItems[UUID.Zero])
-                {
-                    if (d.Title == action)
-                        d.Handler(action, agentID, selection);
-                }
+                loc[d.Title] = OSD.FromString(d.Title);
             }
         }
 
-        public void AddMenuItem(string title, InsertLocation location, UserMode mode, CustomMenuHandler handler)
+        if (m_menuItems.ContainsKey(agentID))
         {
-            AddMenuItem(UUID.Zero, title, location, mode, handler);
-        }
-
-        public void AddMenuItem(UUID agentID, string title, InsertLocation location, UserMode mode, CustomMenuHandler handler)
-        {
-            if (!m_menuItems.ContainsKey(agentID))
-                m_menuItems[agentID] = new List<MenuItemData>();
-
-            m_menuItems[agentID].Add(new MenuItemData() { Title = title, AgentID = agentID, Location = location, Mode = mode, Handler = handler });
-        }
-
-        public void RemoveMenuItem(string action)
-        {
-            foreach (KeyValuePair<UUID,List< MenuItemData>> kvp in m_menuItems)
+            foreach (MenuItemData d in m_menuItems[agentID])
             {
-                List<MenuItemData> pendingDeletes = new List<MenuItemData>();
-                foreach (MenuItemData d in kvp.Value)
+                if (d.Mode == UserMode.God && (!m_scene.Permissions.IsGod(agentID)))
+                    continue;
+
+                OSDMap loc = null;
+                switch (d.Location)
                 {
-                    if (d.Title == action)
-                        pendingDeletes.Add(d);
+                case InsertLocation.Agent:
+                    loc = agent;
+                    break;
+                case InsertLocation.World:
+                    loc = world;
+                    break;
+                case InsertLocation.Tools:
+                    loc = tools;
+                    break;
+                case InsertLocation.Advanced:
+                    loc = advanced;
+                    break;
+                case InsertLocation.Admin:
+                    loc = admin;
+                    break;
                 }
 
-                foreach (MenuItemData d in pendingDeletes)
-                    kvp.Value.Remove(d);
+                if (loc == null)
+                    continue;
+
+                loc[d.Title] = OSD.FromString(d.Title);
+            }
+        }
+
+
+        ((OSDMap)menus)["agent"] = agent;
+        ((OSDMap)menus)["world"] = world;
+        ((OSDMap)menus)["tools"] = tools;
+        ((OSDMap)menus)["advanced"] = advanced;
+        ((OSDMap)menus)["admin"] = admin;
+
+        features["menus"] = menus;
+    }
+
+    private void OnRegisterCaps(UUID agentID, Caps caps)
+    {
+        caps.RegisterSimpleHandler("CustomMenuAction", new MenuActionHandler("/" + UUID.Random(), "CustomMenuAction", agentID, this, m_scene));
+    }
+
+    internal void HandleMenuSelection(string action, UUID agentID, List<uint> selection)
+    {
+        if (m_menuItems.ContainsKey(agentID))
+        {
+            foreach (MenuItemData d in m_menuItems[agentID])
+            {
+                if (d.Title == action)
+                    d.Handler(action, agentID, selection);
+            }
+        }
+
+        if (m_menuItems.ContainsKey(UUID.Zero))
+        {
+            foreach (MenuItemData d in m_menuItems[UUID.Zero])
+            {
+                if (d.Title == action)
+                    d.Handler(action, agentID, selection);
             }
         }
     }
 
-    public class MenuActionHandler : SimpleOSDMapHandler
+    public void AddMenuItem(string title, InsertLocation location, UserMode mode, CustomMenuHandler handler)
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        AddMenuItem(UUID.Zero, title, location, mode, handler);
+    }
 
-        private UUID m_agentID;
-        private Scene m_scene;
-        private DynamicMenuModule m_module;
+    public void AddMenuItem(UUID agentID, string title, InsertLocation location, UserMode mode, CustomMenuHandler handler)
+    {
+        if (!m_menuItems.ContainsKey(agentID))
+            m_menuItems[agentID] = new List<MenuItemData>();
 
-        public MenuActionHandler(string path, string name, UUID agentID, DynamicMenuModule module, Scene scene)
-                :base("POST", path)
+        m_menuItems[agentID].Add(new MenuItemData() { Title = title, AgentID = agentID, Location = location, Mode = mode, Handler = handler });
+    }
+
+    public void RemoveMenuItem(string action)
+    {
+        foreach (KeyValuePair<UUID,List< MenuItemData>> kvp in m_menuItems)
         {
-            m_agentID = agentID;
-            m_scene = scene;
-            m_module = module;
+            List<MenuItemData> pendingDeletes = new List<MenuItemData>();
+            foreach (MenuItemData d in kvp.Value)
+            {
+                if (d.Title == action)
+                    pendingDeletes.Add(d);
+            }
+
+            foreach (MenuItemData d in pendingDeletes)
+                kvp.Value.Remove(d);
         }
+    }
+}
 
-        protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap osd)
-        {
-            string action = osd["action"].AsString();
-            OSDArray selection = (OSDArray)osd["selection"];
-            List<uint> sel = new List<uint>();
-            for (int i = 0 ; i < selection.Count ; i++)
-                sel.Add(selection[i].AsUInteger());
+public class MenuActionHandler : SimpleOSDMapHandler
+{
+    private static readonly ILog m_log =
+        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-            Util.FireAndForget(
-                x => { m_module.HandleMenuSelection(action, m_agentID, sel); }, null, "DynamicMenuModule.HandleMenuSelection");
+    private UUID m_agentID;
+    private Scene m_scene;
+    private DynamicMenuModule m_module;
 
-            httpResponse.StatusCode = (int)HttpStatusCode.OK;
-            //httpResponse.RawBuffer = Util.UTF8NBGetbytes("<llsd></llsd>");
-        }
+    public MenuActionHandler(string path, string name, UUID agentID, DynamicMenuModule module, Scene scene)
+            :base("POST", path)
+    {
+        m_agentID = agentID;
+        m_scene = scene;
+        m_module = module;
+    }
+
+    protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap osd)
+    {
+        string action = osd["action"].AsString();
+        OSDArray selection = (OSDArray)osd["selection"];
+        List<uint> sel = new List<uint>();
+        for (int i = 0 ; i < selection.Count ; i++)
+            sel.Add(selection[i].AsUInteger());
+
+        Util.FireAndForget(
+            x => { m_module.HandleMenuSelection(action, m_agentID, sel); }, null, "DynamicMenuModule.HandleMenuSelection");
+
+        httpResponse.StatusCode = (int)HttpStatusCode.OK;
+        //httpResponse.RawBuffer = Util.UTF8NBGetbytes("<llsd></llsd>");
     }
 }

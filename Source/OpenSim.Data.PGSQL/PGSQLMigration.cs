@@ -26,76 +26,73 @@
  */
 
 using Npgsql;
-using System;
-using System.Data;
 using System.Data.Common;
 using System.Reflection;
 
-namespace OpenSim.Data.PGSQL
+namespace OpenSim.Data.PGSQL;
+
+public class PGSQLMigration : Migration
 {
-    public class PGSQLMigration : Migration
+    public PGSQLMigration(NpgsqlConnection conn, Assembly assem, string type)
+        : base(conn, assem, type)
     {
-        public PGSQLMigration(NpgsqlConnection conn, Assembly assem, string type)
-            : base(conn, assem, type)
-        {
-        }
+    }
 
-        public PGSQLMigration(NpgsqlConnection conn, Assembly assem, string subtype, string type)
-            : base(conn, assem, subtype, type)
-        {
-        }
+    public PGSQLMigration(NpgsqlConnection conn, Assembly assem, string subtype, string type)
+        : base(conn, assem, subtype, type)
+    {
+    }
 
-        protected override int FindVersion(DbConnection conn, string type)
-        {
-            int version = 0;
-            NpgsqlConnection lcConn = (NpgsqlConnection)conn;
+    protected override int FindVersion(DbConnection conn, string type)
+    {
+        int version = 0;
+        NpgsqlConnection lcConn = (NpgsqlConnection)conn;
 
-            using (NpgsqlCommand cmd = lcConn.CreateCommand())
+        using (NpgsqlCommand cmd = lcConn.CreateCommand())
+        {
+            try
             {
-                try
+                cmd.CommandText = "select version from migrations where name = '" + type + "' " +
+                                  " order by version desc limit 1"; //Must be
+                using (NpgsqlDataReader reader = cmd.ExecuteReader())
                 {
-                    cmd.CommandText = "select version from migrations where name = '" + type + "' " +
-                                      " order by version desc limit 1"; //Must be
-                    using (NpgsqlDataReader reader = cmd.ExecuteReader())
+                    if (reader.Read())
                     {
-                        if (reader.Read())
-                        {
-                            version = Convert.ToInt32(reader["version"]);
-                        }
-                        reader.Close();
+                        version = Convert.ToInt32(reader["version"]);
                     }
-                }
-                catch
-                {
-                    // Return -1 to indicate table does not exist
-                    return -1;
+                    reader.Close();
                 }
             }
-            return version;
+            catch
+            {
+                // Return -1 to indicate table does not exist
+                return -1;
+            }
+        }
+        return version;
+    }
+
+    protected override void ExecuteScript(DbConnection conn, string[] script)
+    {
+        if (!(conn is NpgsqlConnection))
+        {
+            base.ExecuteScript(conn, script);
+            return;
         }
 
-        protected override void ExecuteScript(DbConnection conn, string[] script)
+        foreach (string sql in script)
         {
-            if (!(conn is NpgsqlConnection))
+            try
             {
-                base.ExecuteScript(conn, script);
-                return;
+                using (NpgsqlCommand cmd = new NpgsqlCommand(sql, (NpgsqlConnection)conn))
+                {
+                    cmd.ExecuteNonQuery();
+                }
             }
-
-            foreach (string sql in script)
+            catch (Exception)
             {
-                try
-                {
-                    using (NpgsqlCommand cmd = new NpgsqlCommand(sql, (NpgsqlConnection)conn))
-                    {
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-                catch (Exception)
-                {
-                    throw new Exception(sql);
+                throw new Exception(sql);
 
-                }
             }
         }
     }

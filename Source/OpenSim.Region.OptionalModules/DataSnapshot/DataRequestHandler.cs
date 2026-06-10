@@ -36,80 +36,79 @@ using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.DataSnapshot
+namespace OpenSim.Region.DataSnapshot;
+
+public class DataRequestHandler
 {
-    public class DataRequestHandler
-    {
 //        private Scene m_scene = null;
-        private DataSnapshotManager m_externalData = null;
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private ExpiringCache<string, int> throotleGen = new ExpiringCache<string, int>();
+    private DataSnapshotManager m_externalData = null;
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private ExpiringCache<string, int> throotleGen = new ExpiringCache<string, int>();
 
-        public DataRequestHandler(Scene scene, DataSnapshotManager externalData)
-        {
+    public DataRequestHandler(Scene scene, DataSnapshotManager externalData)
+    {
 //            m_scene = scene;
-            m_externalData = externalData;
+        m_externalData = externalData;
 
-            //Register HTTP handler
-            MainServer.UnSecureInstance.AddGloblaMethodHandler("collector", OnGetSnapshot);
-            // Register validation callback handler
-            MainServer.UnSecureInstance.AddGloblaMethodHandler("validate", OnValidate);
+        //Register HTTP handler
+        MainServer.Instance.DefaultServer.AddGlobalMethodHandler("collector", OnGetSnapshot);
+        // Register validation callback handler
+        MainServer.Instance.DefaultServer.AddGlobalMethodHandler("validate", OnValidate);
 
-            m_log.Info("[DATASNAPSHOT]: Set up snapshot service");
-        }
+        m_log.Info("[DATASNAPSHOT]: Set up snapshot service");
+    }
 
-        public void OnGetSnapshot(IOSHttpRequest req, IOSHttpResponse resp)
+    public void OnGetSnapshot(IOSHttpRequest req, IOSHttpResponse resp)
+    {
+        string reqtag;
+        if(req.QueryAsDictionary.TryGetValue("region", out string snapObj) && !string.IsNullOrWhiteSpace(snapObj))
+            reqtag = snapObj + req.RemoteIPEndPoint.Address.ToString();
+        else
+            reqtag = req.RemoteIPEndPoint.Address.ToString();
+
+        if (!string.IsNullOrWhiteSpace(reqtag))
         {
-            string reqtag;
-            if(req.QueryAsDictionary.TryGetValue("region", out string snapObj) && !string.IsNullOrWhiteSpace(snapObj))
-                reqtag = snapObj + req.RemoteIPEndPoint.Address.ToString();
-            else
-                reqtag = req.RemoteIPEndPoint.Address.ToString();
-
-            if (!string.IsNullOrWhiteSpace(reqtag))
-            {
-                if(throotleGen.Contains(reqtag))
-                {
-                    resp.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
-                    resp.StatusDescription = "Please try again later";
-                    resp.ContentType = "text/plain";
-                    m_log.Debug("[DATASNAPSHOT] Collection request spam. reply try later");
-                    return;
-                }
-
-                throotleGen.AddOrUpdate(reqtag, 0, 60);
-            }
-
-            if(string.IsNullOrWhiteSpace(snapObj))
-                m_log.DebugFormat("[DATASNAPSHOT] Received collection request for all");
-            else
-               m_log.DebugFormat("[DATASNAPSHOT] Received collection request for {0}", snapObj);
-
-            XmlDocument response = m_externalData.GetSnapshot(snapObj);
-            if(response == null)
+            if(throotleGen.Contains(reqtag))
             {
                 resp.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+                resp.StatusDescription = "Please try again later";
                 resp.ContentType = "text/plain";
                 m_log.Debug("[DATASNAPSHOT] Collection request spam. reply try later");
                 return;
             }
 
-            resp.RawBuffer = Util.UTF8NBGetbytes(response.OuterXml);
-            resp.ContentType = "text/xml";
-            resp.StatusCode = (int)HttpStatusCode.OK;
+            throotleGen.AddOrUpdate(reqtag, 0, 60);
         }
 
-        public void OnValidate(IOSHttpRequest req, IOSHttpResponse resp)
-        {
-            m_log.Debug("[DATASNAPSHOT] Received validation request");
-            resp.ContentType = "text/xml";
-            resp.StatusCode = (int)HttpStatusCode.Forbidden;
+        if(string.IsNullOrWhiteSpace(snapObj))
+            m_log.DebugFormat("[DATASNAPSHOT] Received collection request for all");
+        else
+           m_log.DebugFormat("[DATASNAPSHOT] Received collection request for {0}", snapObj);
 
-            if(req.QueryAsDictionary.TryGetValue("secret", out string secret))
-            {
-                if (secret == m_externalData.Secret.ToString())
-                    resp.StatusCode = (int)HttpStatusCode.OK;
-            }
+        XmlDocument response = m_externalData.GetSnapshot(snapObj);
+        if(response == null)
+        {
+            resp.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+            resp.ContentType = "text/plain";
+            m_log.Debug("[DATASNAPSHOT] Collection request spam. reply try later");
+            return;
+        }
+
+        resp.RawBuffer = Util.UTF8NBGetbytes(response.OuterXml);
+        resp.ContentType = "text/xml";
+        resp.StatusCode = (int)HttpStatusCode.OK;
+    }
+
+    public void OnValidate(IOSHttpRequest req, IOSHttpResponse resp)
+    {
+        m_log.Debug("[DATASNAPSHOT] Received validation request");
+        resp.ContentType = "text/xml";
+        resp.StatusCode = (int)HttpStatusCode.Forbidden;
+
+        if(req.QueryAsDictionary.TryGetValue("secret", out string secret))
+        {
+            if (secret == m_externalData.Secret.ToString())
+                resp.StatusCode = (int)HttpStatusCode.OK;
         }
     }
 }

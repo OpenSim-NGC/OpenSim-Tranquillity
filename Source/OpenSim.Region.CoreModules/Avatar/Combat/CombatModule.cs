@@ -30,123 +30,122 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.Avatar.Combat.CombatModule
+namespace OpenSim.Region.CoreModules.Avatar.Combat.CombatModule;
+
+public class CombatModule : ISharedRegionModule
 {
-    public class CombatModule : ISharedRegionModule
+    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    /// <summary>
+    /// Region UUIDS indexed by AgentID
+    /// </summary>
+    //private Dictionary<UUID, UUID> m_rootAgents = new Dictionary<UUID, UUID>();
+
+    /// <summary>
+    /// Startup
+    /// </summary>
+    /// <param name="scene"></param>
+    /// <param name="config"></param>
+    public void Initialise(IConfigSource config)
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        /// <summary>
-        /// Region UUIDS indexed by AgentID
-        /// </summary>
-        //private Dictionary<UUID, UUID> m_rootAgents = new Dictionary<UUID, UUID>();
+    public void AddRegion(Scene scene)
+    {
+        scene.EventManager.OnAvatarKilled += KillAvatar;
+    }
 
-        /// <summary>
-        /// Startup
-        /// </summary>
-        /// <param name="scene"></param>
-        /// <param name="config"></param>
-        public void Initialise(IConfigSource config)
+    public void RemoveRegion(Scene scene)
+    {
+        scene.EventManager.OnAvatarKilled -= KillAvatar;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public string Name
+    {
+        get { return "CombatModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    private void KillAvatar(uint killerObjectLocalID, ScenePresence deadAvatar)
+    {
+        string deadAvatarMessage;
+        ScenePresence killingAvatar = null;
+
+        // check to see if it is an NPC and just remove it
+        if(deadAvatar.IsNPC)
         {
+            INPCModule NPCmodule = deadAvatar.Scene.RequestModuleInterface<INPCModule>();
+            if (NPCmodule != null)
+                NPCmodule.DeleteNPC(deadAvatar.UUID, deadAvatar.Scene);
+            return;
         }
 
-        public void AddRegion(Scene scene)
+        if (killerObjectLocalID == 0)
+            deadAvatarMessage = "You committed suicide!";
+        else
         {
-            scene.EventManager.OnAvatarKilled += KillAvatar;
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            scene.EventManager.OnAvatarKilled -= KillAvatar;
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-        }
-
-        public string Name
-        {
-            get { return "CombatModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        private void KillAvatar(uint killerObjectLocalID, ScenePresence deadAvatar)
-        {
-            string deadAvatarMessage;
-            ScenePresence killingAvatar = null;
-
-            // check to see if it is an NPC and just remove it
-            if(deadAvatar.IsNPC)
+            // Try to get the avatar responsible for the killing
+            killingAvatar = deadAvatar.Scene.GetScenePresence(killerObjectLocalID);
+            if (killingAvatar == null)
             {
-                INPCModule NPCmodule = deadAvatar.Scene.RequestModuleInterface<INPCModule>();
-                if (NPCmodule != null)
-                    NPCmodule.DeleteNPC(deadAvatar.UUID, deadAvatar.Scene);
-                return;
-            }
-
-            if (killerObjectLocalID == 0)
-                deadAvatarMessage = "You committed suicide!";
-            else
-            {
-                // Try to get the avatar responsible for the killing
-                killingAvatar = deadAvatar.Scene.GetScenePresence(killerObjectLocalID);
-                if (killingAvatar == null)
+                // Try to get the object which was responsible for the killing
+                SceneObjectPart part = deadAvatar.Scene.GetSceneObjectPart(killerObjectLocalID);
+                if (part == null)
                 {
-                    // Try to get the object which was responsible for the killing
-                    SceneObjectPart part = deadAvatar.Scene.GetSceneObjectPart(killerObjectLocalID);
-                    if (part == null)
-                    {
-                        // Cause of death: Unknown
-                        deadAvatarMessage = "You died!";
-                    }
-                    else
-                    {
-                        // Try to find the avatar wielding the killing object
-                        killingAvatar = deadAvatar.Scene.GetScenePresence(part.OwnerID);
-                        if (killingAvatar == null)
-                        {
-                            IUserManagement userManager = deadAvatar.Scene.RequestModuleInterface<IUserManagement>();
-                            string userName = "Unkown User";
-                            if (userManager != null)
-                                userName = userManager.GetUserName(part.OwnerID);
-                            deadAvatarMessage = String.Format("You impaled yourself on {0} owned by {1}!", part.Name, userName);
-                        }
-                        else
-                        {
-                            //                            killingAvatarMessage = String.Format("You fragged {0}!", deadAvatar.Name);
-                            deadAvatarMessage = String.Format("You got killed by {0}!", killingAvatar.Name);
-                        }
-                    }
+                    // Cause of death: Unknown
+                    deadAvatarMessage = "You died!";
                 }
                 else
                 {
-//                    killingAvatarMessage = String.Format("You fragged {0}!", deadAvatar.Name);
-                    deadAvatarMessage = String.Format("You got killed by {0}!", killingAvatar.Name);
+                    // Try to find the avatar wielding the killing object
+                    killingAvatar = deadAvatar.Scene.GetScenePresence(part.OwnerID);
+                    if (killingAvatar == null)
+                    {
+                        IUserManagement userManager = deadAvatar.Scene.RequestModuleInterface<IUserManagement>();
+                        string userName = "Unkown User";
+                        if (userManager != null)
+                            userName = userManager.GetUserName(part.OwnerID);
+                        deadAvatarMessage = String.Format("You impaled yourself on {0} owned by {1}!", part.Name, userName);
+                    }
+                    else
+                    {
+                        //                            killingAvatarMessage = String.Format("You fragged {0}!", deadAvatar.Name);
+                        deadAvatarMessage = String.Format("You got killed by {0}!", killingAvatar.Name);
+                    }
                 }
             }
-            try
+            else
             {
-                deadAvatar.ControllingClient.SendAgentAlertMessage(deadAvatarMessage, true);
-                if (killingAvatar != null)
-                    killingAvatar.ControllingClient.SendAlertMessage("You fragged " + deadAvatar.Firstname + " " + deadAvatar.Lastname);
+//                    killingAvatarMessage = String.Format("You fragged {0}!", deadAvatar.Name);
+                deadAvatarMessage = String.Format("You got killed by {0}!", killingAvatar.Name);
             }
-            catch (InvalidOperationException)
-            { }
-
-            deadAvatar.setHealthWithUpdate(100.0f);
-            deadAvatar.Scene.TeleportClientHome(deadAvatar.UUID, deadAvatar.ControllingClient);
         }
+        try
+        {
+            deadAvatar.ControllingClient.SendAgentAlertMessage(deadAvatarMessage, true);
+            if (killingAvatar != null)
+                killingAvatar.ControllingClient.SendAlertMessage("You fragged " + deadAvatar.Firstname + " " + deadAvatar.Lastname);
+        }
+        catch (InvalidOperationException)
+        { }
+
+        deadAvatar.setHealthWithUpdate(100.0f);
+        deadAvatar.Scene.TeleportClientHome(deadAvatar.UUID, deadAvatar.ControllingClient);
     }
 }

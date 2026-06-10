@@ -28,7 +28,6 @@
 using System.Net;
 using Nwc.XmlRpc;
 
-namespace OpenSim.Framework.Servers.HttpServer
-{
-    public delegate XmlRpcResponse XmlRpcMethod(XmlRpcRequest request, IPEndPoint client);
-}
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public delegate XmlRpcResponse XmlRpcMethod(XmlRpcRequest request, IPEndPoint client);

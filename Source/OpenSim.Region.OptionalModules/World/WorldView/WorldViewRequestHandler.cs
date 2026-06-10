@@ -31,109 +31,108 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 using log4net;
 
-namespace OpenSim.Region.OptionalModules.World.WorldView
+namespace OpenSim.Region.OptionalModules.World.WorldView;
+
+public class WorldViewRequestHandler : BaseStreamHandler
 {
-    public class WorldViewRequestHandler : BaseStreamHandler
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected WorldViewModule m_WorldViewModule;
+    protected Object m_RequestLock = new Object();
+
+    public WorldViewRequestHandler(WorldViewModule fmodule, string rid)
+            : base("GET", "/worldview/" + rid)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_WorldViewModule = fmodule;
+    }
 
-        protected WorldViewModule m_WorldViewModule;
-        protected Object m_RequestLock = new Object();
-
-        public WorldViewRequestHandler(WorldViewModule fmodule, string rid)
-                : base("GET", "/worldview/" + rid)
-        {
-            m_WorldViewModule = fmodule;
-        }
-
-        protected override byte[] ProcessRequest(string path, Stream requestData,
-                IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            httpResponse.ContentType = "image/jpeg";
+    protected override byte[] ProcessRequest(string path, Stream requestData,
+            IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        httpResponse.ContentType = "image/jpeg";
 
 //            StreamReader sr = new StreamReader(requestData);
 //            string body = sr.ReadToEnd();
 //            sr.Close();
 //            body = body.Trim();
 
-            try
+        try
+        {
+            lock (m_RequestLock)
             {
-                lock (m_RequestLock)
-                {
-                    Dictionary<string, object> request =
-                            new Dictionary<string, object>();
-                    foreach (string name in httpRequest.QueryString)
-                        request[name] = httpRequest.QueryString[name];
+                Dictionary<string, object> request =
+                        new Dictionary<string, object>();
+                foreach (string name in httpRequest.QueryString)
+                    request[name] = httpRequest.QueryString[name];
 
-                    return SendWorldView(request);
-                }
+                return SendWorldView(request);
             }
-            catch (Exception e)
-            {
-                m_log.Debug("[WORLDVIEW]: Exception: " + e.ToString());
-            }
+        }
+        catch (Exception e)
+        {
+            m_log.Debug("[WORLDVIEW]: Exception: " + e.ToString());
+        }
 
+        return Array.Empty<byte>();
+    }
+
+    public Byte[] SendWorldView(Dictionary<string, object> request)
+    {
+        float posX;
+        float posY;
+        float posZ;
+        float rotX;
+        float rotY;
+        float rotZ;
+        float fov;
+        int width;
+        int height;
+        bool usetex;
+
+        if (!request.ContainsKey("posX"))
+            return Array.Empty<byte>();
+        if (!request.ContainsKey("posY"))
+            return Array.Empty<byte>();
+        if (!request.ContainsKey("posZ"))
+            return Array.Empty<byte>();
+        if (!request.ContainsKey("rotX"))
+            return Array.Empty<byte>();
+        if (!request.ContainsKey("rotY"))
+            return Array.Empty<byte>();
+        if (!request.ContainsKey("rotZ"))
+            return Array.Empty<byte>();
+        if (!request.ContainsKey("fov"))
+            return Array.Empty<byte>();
+        if (!request.ContainsKey("width"))
+            return Array.Empty<byte>();
+        if (!request.ContainsKey("height"))
+            return Array.Empty<byte>();
+        if (!request.ContainsKey("usetex"))
+            return Array.Empty<byte>();
+
+        try
+        {
+            posX = Convert.ToSingle(request["posX"]);
+            posY = Convert.ToSingle(request["posY"]);
+            posZ = Convert.ToSingle(request["posZ"]);
+            rotX = Convert.ToSingle(request["rotX"]);
+            rotY = Convert.ToSingle(request["rotY"]);
+            rotZ = Convert.ToSingle(request["rotZ"]);
+            fov = Convert.ToSingle(request["fov"]);
+            width = Convert.ToInt32(request["width"]);
+            height = Convert.ToInt32(request["height"]);
+            usetex = Convert.ToBoolean(request["usetex"]);
+        }
+        catch
+        {
             return Array.Empty<byte>();
         }
 
-        public Byte[] SendWorldView(Dictionary<string, object> request)
-        {
-            float posX;
-            float posY;
-            float posZ;
-            float rotX;
-            float rotY;
-            float rotZ;
-            float fov;
-            int width;
-            int height;
-            bool usetex;
+        Vector3 pos = new Vector3(posX, posY, posZ);
+        Vector3 rot = new Vector3(rotX, rotY, rotZ);
 
-            if (!request.ContainsKey("posX"))
-                return Array.Empty<byte>();
-            if (!request.ContainsKey("posY"))
-                return Array.Empty<byte>();
-            if (!request.ContainsKey("posZ"))
-                return Array.Empty<byte>();
-            if (!request.ContainsKey("rotX"))
-                return Array.Empty<byte>();
-            if (!request.ContainsKey("rotY"))
-                return Array.Empty<byte>();
-            if (!request.ContainsKey("rotZ"))
-                return Array.Empty<byte>();
-            if (!request.ContainsKey("fov"))
-                return Array.Empty<byte>();
-            if (!request.ContainsKey("width"))
-                return Array.Empty<byte>();
-            if (!request.ContainsKey("height"))
-                return Array.Empty<byte>();
-            if (!request.ContainsKey("usetex"))
-                return Array.Empty<byte>();
-
-            try
-            {
-                posX = Convert.ToSingle(request["posX"]);
-                posY = Convert.ToSingle(request["posY"]);
-                posZ = Convert.ToSingle(request["posZ"]);
-                rotX = Convert.ToSingle(request["rotX"]);
-                rotY = Convert.ToSingle(request["rotY"]);
-                rotZ = Convert.ToSingle(request["rotZ"]);
-                fov = Convert.ToSingle(request["fov"]);
-                width = Convert.ToInt32(request["width"]);
-                height = Convert.ToInt32(request["height"]);
-                usetex = Convert.ToBoolean(request["usetex"]);
-            }
-            catch
-            {
-                return Array.Empty<byte>();
-            }
-
-            Vector3 pos = new Vector3(posX, posY, posZ);
-            Vector3 rot = new Vector3(rotX, rotY, rotZ);
-
-            return m_WorldViewModule.GenerateWorldView(pos, rot, fov, width,
-                    height, usetex);
-        }
+        return m_WorldViewModule.GenerateWorldView(pos, rot, fov, width,
+                height, usetex);
     }
 }
 

@@ -38,179 +38,178 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Profile
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Profile;
+
+public class LocalUserProfilesServicesConnector : ISharedRegionModule
 {
-    public class LocalUserProfilesServicesConnector : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private Dictionary<UUID, Scene> regions = new Dictionary<UUID, Scene>();
+
+    public IUserProfilesService ServiceModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get; private set;
+    }
 
-        private Dictionary<UUID, Scene> regions = new Dictionary<UUID, Scene>();
+     public bool Enabled
+    {
+        get; private set;
+    }
 
-        public IUserProfilesService ServiceModule
+    public string Name
+    {
+        get
         {
-            get; private set;
+            return "LocalUserProfilesServicesConnector";
         }
+    }
 
-         public bool Enabled
+    public string ConfigName
+    {
+        get; private set;
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public LocalUserProfilesServicesConnector()
+    {
+        //m_log.Debug("[LOCAL USERPROFILES SERVICE CONNECTOR]: LocalUserProfileServicesConnector no params");
+    }
+
+    public LocalUserProfilesServicesConnector(IConfigSource source)
+    {
+        //m_log.Debug("[LOCAL USERPROFILES SERVICE CONNECTOR]: LocalUserProfileServicesConnector instantiated directly.");
+        InitialiseService(source);
+    }
+
+    public void InitialiseService(IConfigSource source)
+    {
+        ConfigName = "UserProfilesService";
+
+        // Instantiate the request handler
+        IHttpServer Server = MainServer.Instance.DefaultServer;
+
+        IConfig config = source.Configs[ConfigName];
+        if (config == null)
         {
-            get; private set;
-        }
-
-        public string Name
-        {
-            get
-            {
-                return "LocalUserProfilesServicesConnector";
-            }
-        }
-
-        public string ConfigName
-        {
-            get; private set;
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public LocalUserProfilesServicesConnector()
-        {
-            //m_log.Debug("[LOCAL USERPROFILES SERVICE CONNECTOR]: LocalUserProfileServicesConnector no params");
-        }
-
-        public LocalUserProfilesServicesConnector(IConfigSource source)
-        {
-            //m_log.Debug("[LOCAL USERPROFILES SERVICE CONNECTOR]: LocalUserProfileServicesConnector instantiated directly.");
-            InitialiseService(source);
-        }
-
-        public void InitialiseService(IConfigSource source)
-        {
-            ConfigName = "UserProfilesService";
-
-            // Instantiate the request handler
-            IHttpServer Server = MainServer.Instance;
-
-            IConfig config = source.Configs[ConfigName];
-            if (config == null)
-            {
-                //m_log.Error("[LOCAL USERPROFILES SERVICE CONNECTOR]: UserProfilesService missing from OpenSim.ini");
-                return;
-            }
-
-            if(!config.GetBoolean("Enabled",false))
-            {
-                Enabled = false;
-                return;
-            }
-
-            Enabled = true;
-
-            string serviceDll = config.GetString("LocalServiceModule", String.Empty);
-
-            if (serviceDll.Length == 0)
-            {
-                m_log.Error("[LOCAL USERPROFILES SERVICE CONNECTOR]: No LocalServiceModule named in section UserProfilesService");
-                return;
-            }
-
-            Object[] args = new Object[] { source, ConfigName };
-            ServiceModule = ServerUtils.LoadPlugin<IUserProfilesService>(serviceDll, args);
-
-            if (ServiceModule == null)
-            {
-                m_log.Error("[LOCAL USERPROFILES SERVICE CONNECTOR]: Can't load user profiles service");
-                return;
-            }
-
-            Enabled = true;
-
-            JsonRpcProfileHandlers handler = new JsonRpcProfileHandlers(ServiceModule);
-
-            Server.AddJsonRPCHandler("avatarclassifiedsrequest", handler.AvatarClassifiedsRequest);
-            Server.AddJsonRPCHandler("classified_update", handler.ClassifiedUpdate);
-            Server.AddJsonRPCHandler("classifieds_info_query", handler.ClassifiedInfoRequest);
-            Server.AddJsonRPCHandler("classified_delete", handler.ClassifiedDelete);
-            Server.AddJsonRPCHandler("avatarpicksrequest", handler.AvatarPicksRequest);
-            Server.AddJsonRPCHandler("pickinforequest", handler.PickInfoRequest);
-            Server.AddJsonRPCHandler("picks_update", handler.PicksUpdate);
-            Server.AddJsonRPCHandler("picks_delete", handler.PicksDelete);
-            Server.AddJsonRPCHandler("avatarnotesrequest", handler.AvatarNotesRequest);
-            Server.AddJsonRPCHandler("avatar_notes_update", handler.NotesUpdate);
-            Server.AddJsonRPCHandler("avatar_properties_request", handler.AvatarPropertiesRequest);
-            Server.AddJsonRPCHandler("avatar_properties_update", handler.AvatarPropertiesUpdate);
-            Server.AddJsonRPCHandler("avatar_interests_update", handler.AvatarInterestsUpdate);
-            Server.AddJsonRPCHandler("user_preferences_update", handler.UserPreferenecesUpdate);
-            Server.AddJsonRPCHandler("user_preferences_request", handler.UserPreferencesRequest);
-            Server.AddJsonRPCHandler("image_assets_request", handler.AvatarImageAssetsRequest);
-            Server.AddJsonRPCHandler("user_data_request", handler.RequestUserAppData);
-            Server.AddJsonRPCHandler("user_data_update", handler.UpdateUserAppData);
-
-        }
-
-        #region ISharedRegionModule implementation
-
-        public void PostInitialise()
-        {
-            if(!Enabled)
-                return;
-        }
-
-        #endregion
-
-        #region IRegionModuleBase implementation
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
-            {
-                string name = moduleConfig.GetString("UserProfilesServices", "");
-                if (name == Name)
-                {
-                    InitialiseService(source);
-                    m_log.Info("[LOCAL USERPROFILES SERVICE CONNECTOR]: Local user profiles connector enabled");
-                }
-            }
-        }
-
-        public void Close()
-        {
+            //m_log.Error("[LOCAL USERPROFILES SERVICE CONNECTOR]: UserProfilesService missing from OpenSim.ini");
             return;
         }
 
-        public void AddRegion(Scene scene)
+        if(!config.GetBoolean("Enabled",false))
         {
-            if (!Enabled)
-                return;
-
-            lock (regions)
-            {
-                if (regions.ContainsKey(scene.RegionInfo.RegionID))
-                    m_log.ErrorFormat("[LOCAL USERPROFILES SERVICE CONNECTOR]: simulator seems to have more than one region with the same UUID. Please correct this!");
-                else
-                    regions.Add(scene.RegionInfo.RegionID, scene);
-            }
+            Enabled = false;
+            return;
         }
 
-        public void RemoveRegion(Scene scene)
-        {
-            if (!Enabled)
-                return;
+        Enabled = true;
 
-            lock (regions)
-            {
-                if (regions.ContainsKey(scene.RegionInfo.RegionID))
-                    regions.Remove(scene.RegionInfo.RegionID);
-            }
+        string serviceDll = config.GetString("LocalServiceModule", String.Empty);
+
+        if (serviceDll.Length == 0)
+        {
+            m_log.Error("[LOCAL USERPROFILES SERVICE CONNECTOR]: No LocalServiceModule named in section UserProfilesService");
+            return;
         }
 
-        public void RegionLoaded(Scene scene)
+        Object[] args = new Object[] { source, ConfigName };
+        ServiceModule = ServerUtils.LoadPlugin<IUserProfilesService>(serviceDll, args);
+
+        if (ServiceModule == null)
         {
-            if (!Enabled)
-                return;
+            m_log.Error("[LOCAL USERPROFILES SERVICE CONNECTOR]: Can't load user profiles service");
+            return;
         }
-        #endregion
+
+        Enabled = true;
+
+        JsonRpcProfileHandlers handler = new JsonRpcProfileHandlers(ServiceModule);
+
+        Server.AddJsonRPCHandler("avatarclassifiedsrequest", handler.AvatarClassifiedsRequest);
+        Server.AddJsonRPCHandler("classified_update", handler.ClassifiedUpdate);
+        Server.AddJsonRPCHandler("classifieds_info_query", handler.ClassifiedInfoRequest);
+        Server.AddJsonRPCHandler("classified_delete", handler.ClassifiedDelete);
+        Server.AddJsonRPCHandler("avatarpicksrequest", handler.AvatarPicksRequest);
+        Server.AddJsonRPCHandler("pickinforequest", handler.PickInfoRequest);
+        Server.AddJsonRPCHandler("picks_update", handler.PicksUpdate);
+        Server.AddJsonRPCHandler("picks_delete", handler.PicksDelete);
+        Server.AddJsonRPCHandler("avatarnotesrequest", handler.AvatarNotesRequest);
+        Server.AddJsonRPCHandler("avatar_notes_update", handler.NotesUpdate);
+        Server.AddJsonRPCHandler("avatar_properties_request", handler.AvatarPropertiesRequest);
+        Server.AddJsonRPCHandler("avatar_properties_update", handler.AvatarPropertiesUpdate);
+        Server.AddJsonRPCHandler("avatar_interests_update", handler.AvatarInterestsUpdate);
+        Server.AddJsonRPCHandler("user_preferences_update", handler.UserPreferenecesUpdate);
+        Server.AddJsonRPCHandler("user_preferences_request", handler.UserPreferencesRequest);
+        Server.AddJsonRPCHandler("image_assets_request", handler.AvatarImageAssetsRequest);
+        Server.AddJsonRPCHandler("user_data_request", handler.RequestUserAppData);
+        Server.AddJsonRPCHandler("user_data_update", handler.UpdateUserAppData);
+
     }
+
+    #region ISharedRegionModule implementation
+
+    public void PostInitialise()
+    {
+        if(!Enabled)
+            return;
+    }
+
+    #endregion
+
+    #region IRegionModuleBase implementation
+
+    public void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
+        {
+            string name = moduleConfig.GetString("UserProfilesServices", "");
+            if (name == Name)
+            {
+                InitialiseService(source);
+                m_log.Info("[LOCAL USERPROFILES SERVICE CONNECTOR]: Local user profiles connector enabled");
+            }
+        }
+    }
+
+    public void Close()
+    {
+        return;
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!Enabled)
+            return;
+
+        lock (regions)
+        {
+            if (regions.ContainsKey(scene.RegionInfo.RegionID))
+                m_log.ErrorFormat("[LOCAL USERPROFILES SERVICE CONNECTOR]: simulator seems to have more than one region with the same UUID. Please correct this!");
+            else
+                regions.Add(scene.RegionInfo.RegionID, scene);
+        }
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!Enabled)
+            return;
+
+        lock (regions)
+        {
+            if (regions.ContainsKey(scene.RegionInfo.RegionID))
+                regions.Remove(scene.RegionInfo.RegionID);
+        }
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!Enabled)
+            return;
+    }
+    #endregion
 }

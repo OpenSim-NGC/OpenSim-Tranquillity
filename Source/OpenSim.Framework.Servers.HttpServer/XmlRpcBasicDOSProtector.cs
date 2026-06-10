@@ -27,65 +27,61 @@
 
 using System.Net;
 using Nwc.XmlRpc;
-using OpenSim.Framework;
 
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public class XmlRpcBasicDOSProtector
 {
-    public class XmlRpcBasicDOSProtector
+    private readonly XmlRpcMethod _normalMethod;
+    private readonly XmlRpcMethod _throttledMethod;
+
+    private readonly BasicDosProtectorOptions _options;
+    private readonly BasicDOSProtector _dosProtector;
+
+    public XmlRpcBasicDOSProtector(XmlRpcMethod normalMethod, XmlRpcMethod throttledMethod,BasicDosProtectorOptions options)
     {
-        private readonly XmlRpcMethod _normalMethod;
-        private readonly XmlRpcMethod _throttledMethod;
+        _normalMethod = normalMethod;
+        _throttledMethod = throttledMethod;
 
-        private readonly BasicDosProtectorOptions _options;
-        private readonly BasicDOSProtector _dosProtector;
-
-        public XmlRpcBasicDOSProtector(XmlRpcMethod normalMethod, XmlRpcMethod throttledMethod,BasicDosProtectorOptions options)
-        {
-            _normalMethod = normalMethod;
-            _throttledMethod = throttledMethod;
-
-            _options = options;
-            _dosProtector = new BasicDOSProtector(_options);
-
-        }
-        public XmlRpcResponse Process(XmlRpcRequest request, IPEndPoint client)
-        {
-
-            XmlRpcResponse resp = null;
-            string clientstring = GetClientString(request, client);
-            string endpoint = GetEndPoint(request, client);
-            if (_dosProtector.Process(clientstring, endpoint))
-                resp = _normalMethod(request, client);
-            else
-                resp = _throttledMethod(request, client);
-            if (_options.MaxConcurrentSessions > 0)
-                _dosProtector.ProcessEnd(clientstring, endpoint);
-            return resp;
-        }
-
-        private string GetClientString(XmlRpcRequest request, IPEndPoint client)
-        {
-            string clientstring;
-            if (_options.AllowXForwardedFor && request.Params.Count > 3)
-            {
-                object headerstr = request.Params[3];
-                if (headerstr != null && !string.IsNullOrEmpty(headerstr.ToString()))
-                    clientstring = request.Params[3].ToString();
-                else
-                    clientstring = client.Address.ToString();
-            }
-            else
-                clientstring = client.Address.ToString();
-            return clientstring;
-        }
-
-        private string GetEndPoint(XmlRpcRequest request, IPEndPoint client)
-        {
-             return client.Address.ToString();
-        }
+        _options = options;
+        _dosProtector = new BasicDOSProtector(_options);
 
     }
+    public XmlRpcResponse Process(XmlRpcRequest request, IPEndPoint client)
+    {
 
+        XmlRpcResponse resp = null;
+        string clientstring = GetClientString(request, client);
+        string endpoint = GetEndPoint(request, client);
+        if (_dosProtector.Process(clientstring, endpoint))
+            resp = _normalMethod(request, client);
+        else
+            resp = _throttledMethod(request, client);
+        if (_options.MaxConcurrentSessions > 0)
+            _dosProtector.ProcessEnd(clientstring, endpoint);
+        return resp;
+    }
+
+    private string GetClientString(XmlRpcRequest request, IPEndPoint client)
+    {
+        string clientstring;
+        if (_options.AllowXForwardedFor && request.Params.Count > 3)
+        {
+            object headerstr = request.Params[3];
+            if (headerstr != null && !string.IsNullOrEmpty(headerstr.ToString()))
+                clientstring = request.Params[3].ToString();
+            else
+                clientstring = client.Address.ToString();
+        }
+        else
+            clientstring = client.Address.ToString();
+        return clientstring;
+    }
+
+    private string GetEndPoint(XmlRpcRequest request, IPEndPoint client)
+    {
+         return client.Address.ToString();
+    }
 
 }

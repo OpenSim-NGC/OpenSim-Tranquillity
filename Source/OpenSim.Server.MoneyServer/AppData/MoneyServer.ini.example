@@ -24,6 +24,11 @@ MaxConnection = 20
 ; Port No. of this Server
 ServerPort = 8008
 
+; ASP.NET Core XML-RPC endpoint (side-by-side with ServerPort)
+; If AspNetUrls is set, it overrides AspNetPort.
+AspNetPort = 8009
+AspNetUrls = ""
+
 ;
 ; If the user is not found in database,he/she will be created with the default balance.
 DefaultBalance = 1000

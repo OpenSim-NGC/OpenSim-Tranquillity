@@ -25,28 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Text.RegularExpressions;
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+public abstract class AssetDataBase : IAssetDataPlugin
 {
-    public abstract class AssetDataBase : IAssetDataPlugin
-    {
-        public abstract AssetBase GetAsset(UUID uuid);
-        public abstract bool StoreAsset(AssetBase asset);
-        public abstract bool[] AssetsExist(UUID[] uuids);
+    public abstract AssetBase GetAsset(UUID uuid);
+    public abstract bool StoreAsset(AssetBase asset);
+    public abstract bool[] AssetsExist(UUID[] uuids);
 
-        public abstract List<AssetMetadata> FetchAssetMetadataSet(int start, int count);
+    public abstract List<AssetMetadata> FetchAssetMetadataSet(int start, int count);
 
-        public abstract string Version { get; }
-        public abstract string Name { get; }
-        public abstract void Initialise(string connect);
-        public abstract void Initialise();
-        public abstract void Dispose();
-        public abstract bool Delete(string id);
-    }
+    public abstract string Version { get; }
+    public abstract string Name { get; }
+    public abstract void Initialise(string connect);
+    public abstract void Initialise();
+    public abstract void Dispose();
+    public abstract bool Delete(string id);
 }

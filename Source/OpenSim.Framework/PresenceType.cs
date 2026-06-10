@@ -24,16 +24,13 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+/// <summary>
+/// Indicate the type of ScenePresence.
+/// </summary>
+public enum PresenceType
 {
-    /// <summary>
-    /// Indicate the type of ScenePresence.
-    /// </summary>
-    public enum PresenceType
-    {
-        User,
-        Npc
-    }
+    User,
+    Npc
 }

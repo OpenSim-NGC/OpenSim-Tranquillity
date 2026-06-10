@@ -25,22 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Text;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
-{
-    public class CachedTextureRequestArg
-    {
-        public int BakedTextureIndex;
-        public UUID WearableHashID;
-    }
+namespace OpenSim.Framework;
 
-    public class CachedTextureResponseArg
-    {
-        public int BakedTextureIndex;
-        public UUID BakedTextureID;
-        public String HostName;
-    }
+public class CachedTextureRequestArg
+{
+    public int BakedTextureIndex;
+    public UUID WearableHashID;
+}
+
+public class CachedTextureResponseArg
+{
+    public int BakedTextureIndex;
+    public UUID BakedTextureID;
+    public String HostName;
 }

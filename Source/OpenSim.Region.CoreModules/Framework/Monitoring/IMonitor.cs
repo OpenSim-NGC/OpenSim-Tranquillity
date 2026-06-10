@@ -25,35 +25,34 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Region.CoreModules.Framework.Monitoring
+namespace OpenSim.Region.CoreModules.Framework.Monitoring;
+
+interface IMonitor
 {
-    interface IMonitor
-    {
-        /// <summary>
-        /// Name of the monitor.
-        /// </summary>
-        /// <remarks>
-        /// This is the name used in XML.
-        /// </remarks>
-        /// <returns></returns>
-        string GetName();
+    /// <summary>
+    /// Name of the monitor.
+    /// </summary>
+    /// <remarks>
+    /// This is the name used in XML.
+    /// </remarks>
+    /// <returns></returns>
+    string GetName();
 
-        /// <summary>
-        /// Value of this monitor
-        /// </summary>
-        /// <returns></returns>
-        double GetValue();
+    /// <summary>
+    /// Value of this monitor
+    /// </summary>
+    /// <returns></returns>
+    double GetValue();
 
-        /// <summary>
-        /// Human-readable name of the monitor
-        /// </summary>
-        /// <returns></returns>
-        string GetFriendlyName();
+    /// <summary>
+    /// Human-readable name of the monitor
+    /// </summary>
+    /// <returns></returns>
+    string GetFriendlyName();
 
-        /// <summary>
-        /// Human readable value.
-        /// </summary>
-        /// <returns></returns>
-        string GetFriendlyValue();
-    }
+    /// <summary>
+    /// Human readable value.
+    /// </summary>
+    /// <returns></returns>
+    string GetFriendlyValue();
 }

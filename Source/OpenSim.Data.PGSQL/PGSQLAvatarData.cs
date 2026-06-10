@@ -25,48 +25,40 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Threading;
-using log4net;
 using OpenMetaverse;
-using OpenSim.Framework;
 using Npgsql;
-using NpgsqlTypes;
 
 
-namespace OpenSim.Data.PGSQL
+namespace OpenSim.Data.PGSQL;
+
+/// <summary>
+/// A PGSQL Interface for Avatar Storage
+/// </summary>
+public class PGSQLAvatarData : PGSQLGenericTableHandler<AvatarBaseData>,
+        IAvatarData
 {
-    /// <summary>
-    /// A PGSQL Interface for Avatar Storage
-    /// </summary>
-    public class PGSQLAvatarData : PGSQLGenericTableHandler<AvatarBaseData>,
-            IAvatarData
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public PGSQLAvatarData(string connectionString, string realm) :
-                base(connectionString, realm, "Avatar")
+    public PGSQLAvatarData(string connectionString, string realm) :
+            base(connectionString, realm, "Avatar")
+    {
+    }
+
+    public bool Delete(UUID principalID, string name)
+    {
+        using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
+        using (NpgsqlCommand cmd = new NpgsqlCommand())
         {
-        }
 
-        public bool Delete(UUID principalID, string name)
-        {
-            using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
-            using (NpgsqlCommand cmd = new NpgsqlCommand())
-            {
+            cmd.CommandText = String.Format("DELETE FROM {0} where \"PrincipalID\" = :PrincipalID and \"Name\" = :Name", m_Realm);
+            cmd.Parameters.Add(m_database.CreateParameter("PrincipalID", principalID));
+            cmd.Parameters.Add(m_database.CreateParameter("Name", name));
+            cmd.Connection = conn;
+            conn.Open();
+            if (cmd.ExecuteNonQuery() > 0)
+                return true;
 
-                cmd.CommandText = String.Format("DELETE FROM {0} where \"PrincipalID\" = :PrincipalID and \"Name\" = :Name", m_Realm);
-                cmd.Parameters.Add(m_database.CreateParameter("PrincipalID", principalID));
-                cmd.Parameters.Add(m_database.CreateParameter("Name", name));
-                cmd.Connection = conn;
-                conn.Open();
-                if (cmd.ExecuteNonQuery() > 0)
-                    return true;
-
-                return false;
-            }
+            return false;
         }
     }
 }

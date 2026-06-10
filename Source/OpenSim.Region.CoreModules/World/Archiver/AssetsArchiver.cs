@@ -30,46 +30,46 @@ using log4net;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization;
 
-namespace OpenSim.Region.CoreModules.World.Archiver
+namespace OpenSim.Region.CoreModules.World.Archiver;
+
+/// <summary>
+/// Archives assets
+/// </summary>
+public class AssetsArchiver
 {
-    /// <summary>
-    /// Archives assets
-    /// </summary>
-    public class AssetsArchiver
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    /// <value>
+    /// Post a message to the log every x assets as a progress bar
+    /// </value>
+    protected static int LOG_ASSET_LOAD_NOTIFICATION_INTERVAL = 100;
+
+    /// <value>
+    /// Keep a count of the number of assets written so that we can provide status updates
+    /// </value>
+    protected int m_assetsWritten;
+
+    protected TarArchiveWriter m_archiveWriter;
+
+    public AssetsArchiver(TarArchiveWriter archiveWriter)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_archiveWriter = archiveWriter;
+    }
 
-        /// <value>
-        /// Post a message to the log every x assets as a progress bar
-        /// </value>
-        protected static int LOG_ASSET_LOAD_NOTIFICATION_INTERVAL = 100;
+    /// <summary>
+    /// Archive the assets given to this archiver to the given archive.
+    /// </summary>
+    /// <param name="archive"></param>
+    public void WriteAsset(AssetBase asset)
+    {
+        //WriteMetadata(archive);
+        WriteData(asset);
+    }
 
-        /// <value>
-        /// Keep a count of the number of assets written so that we can provide status updates
-        /// </value>
-        protected int m_assetsWritten;
-
-        protected TarArchiveWriter m_archiveWriter;
-
-        public AssetsArchiver(TarArchiveWriter archiveWriter)
-        {
-            m_archiveWriter = archiveWriter;
-        }
-
-        /// <summary>
-        /// Archive the assets given to this archiver to the given archive.
-        /// </summary>
-        /// <param name="archive"></param>
-        public void WriteAsset(AssetBase asset)
-        {
-            //WriteMetadata(archive);
-            WriteData(asset);
-        }
-
-        /// <summary>
-        /// Write an assets metadata file to the given archive
-        /// </summary>
-        /// <param name="archive"></param>
+    /// <summary>
+    /// Write an assets metadata file to the given archive
+    /// </summary>
+    /// <param name="archive"></param>
 //        protected void WriteMetadata(TarArchiveWriter archive)
 //        {
 //            StringWriter sw = new StringWriter();
@@ -112,30 +112,29 @@ namespace OpenSim.Region.CoreModules.World.Archiver
 //            archive.WriteFile("assets.xml", sw.ToString());
 //        }
 
-        /// <summary>
-        /// Write asset data files to the given archive
-        /// </summary>
-        /// <param name="asset"></param>
-        protected void WriteData(AssetBase asset)
+    /// <summary>
+    /// Write asset data files to the given archive
+    /// </summary>
+    /// <param name="asset"></param>
+    protected void WriteData(AssetBase asset)
+    {
+        // It appears that gtar, at least, doesn't need the intermediate directory entries in the tar
+        //archive.AddDir("assets");
+
+        if (ArchiveConstants.ASSET_TYPE_TO_EXTENSION.TryGetValue(asset.Type, out string extension))
         {
-            // It appears that gtar, at least, doesn't need the intermediate directory entries in the tar
-            //archive.AddDir("assets");
-
-            if (ArchiveConstants.ASSET_TYPE_TO_EXTENSION.TryGetValue(asset.Type, out string extension))
-            {
-                m_archiveWriter.WriteFile($"{ArchiveConstants.ASSETS_PATH}{asset.FullID}{extension}", asset.Data);
-            }
-            else
-            {
-                m_log.Error(
-                    $"[ARCHIVER]: Unrecognized asset type {asset.Type} with uuid {asset.ID}. This asset will be saved but may not load");
-                m_archiveWriter.WriteFile($"{ArchiveConstants.ASSETS_PATH}{asset.FullID}", asset.Data);
-            }
-
-            m_assetsWritten++;
-
-            if (m_assetsWritten % LOG_ASSET_LOAD_NOTIFICATION_INTERVAL == 0)
-                m_log.Info($"[ARCHIVER]: Added {m_assetsWritten} assets to archive");
+            m_archiveWriter.WriteFile($"{ArchiveConstants.ASSETS_PATH}{asset.FullID}{extension}", asset.Data);
         }
+        else
+        {
+            m_log.Error(
+                $"[ARCHIVER]: Unrecognized asset type {asset.Type} with uuid {asset.ID}. This asset will be saved but may not load");
+            m_archiveWriter.WriteFile($"{ArchiveConstants.ASSETS_PATH}{asset.FullID}", asset.Data);
+        }
+
+        m_assetsWritten++;
+
+        if (m_assetsWritten % LOG_ASSET_LOAD_NOTIFICATION_INTERVAL == 0)
+            m_log.Info($"[ARCHIVER]: Added {m_assetsWritten} assets to archive");
     }
 }

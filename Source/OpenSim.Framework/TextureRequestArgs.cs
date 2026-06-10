@@ -25,70 +25,68 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class TextureRequestArgs : EventArgs
 {
-    public class TextureRequestArgs : EventArgs
+    private sbyte m_discardLevel;
+    private uint m_packetNumber;
+    private float m_priority;
+    private int m_requestType;
+    private uint m_requestsequence;
+    protected UUID m_requestedAssetID;
+
+    public float Priority
     {
-        private sbyte m_discardLevel;
-        private uint m_packetNumber;
-        private float m_priority;
-        private int m_requestType;
-        private uint m_requestsequence;
-        protected UUID m_requestedAssetID;
+        get { return m_priority; }
+        set { m_priority = value; }
+    }
 
-        public float Priority
-        {
-            get { return m_priority; }
-            set { m_priority = value; }
-        }
+    /// <summary>
+    ///
+    /// </summary>
+    public uint PacketNumber
+    {
+        get { return m_packetNumber; }
+        set { m_packetNumber = value; }
+    }
 
-        /// <summary>
-        ///
-        /// </summary>
-        public uint PacketNumber
-        {
-            get { return m_packetNumber; }
-            set { m_packetNumber = value; }
-        }
+    public uint requestSequence
+    {
+        get { return m_requestsequence; }
+        set { m_requestsequence = value; }
+    }
 
-        public uint requestSequence
-        {
-            get { return m_requestsequence; }
-            set { m_requestsequence = value; }
-        }
+    /// <summary>
+    ///
+    /// </summary>
+    public sbyte DiscardLevel
+    {
+        get { return m_discardLevel; }
+        set { m_discardLevel = value; }
+    }
 
-        /// <summary>
-        ///
-        /// </summary>
-        public sbyte DiscardLevel
-        {
-            get { return m_discardLevel; }
-            set { m_discardLevel = value; }
-        }
+    /// <summary>
+    ///
+    /// </summary>
+    public UUID RequestedAssetID
+    {
+        get { return m_requestedAssetID; }
+        set { m_requestedAssetID = value; }
+    }
 
-        /// <summary>
-        ///
-        /// </summary>
-        public UUID RequestedAssetID
-        {
-            get { return m_requestedAssetID; }
-            set { m_requestedAssetID = value; }
-        }
+    public int RequestType
+    {
+        get { return m_requestType; }
+        set { m_requestType = value; }
+    }
 
-        public int RequestType
-        {
-            get { return m_requestType; }
-            set { m_requestType = value; }
-        }
-
-        public override string ToString()
-        {
-            return String.Format("DiscardLevel: {0}, Priority: {1}, PacketNumber: {2}, AssetId:{3}, RequestType:{4}",
-                                 m_discardLevel,
-                                 m_priority, m_packetNumber, m_requestedAssetID, m_requestType);
-        }
+    public override string ToString()
+    {
+        return String.Format("DiscardLevel: {0}, Priority: {1}, PacketNumber: {2}, AssetId:{3}, RequestType:{4}",
+                             m_discardLevel,
+                             m_priority, m_packetNumber, m_requestedAssetID, m_requestType);
     }
 }

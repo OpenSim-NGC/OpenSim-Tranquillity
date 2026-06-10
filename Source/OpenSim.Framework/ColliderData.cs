@@ -25,30 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class DetectedObject
 {
-    public class DetectedObject
-    {
-        public DetectedObject() { }
-        public UUID groupUUID = UUID.Zero;
-        public UUID ownerUUID = UUID.Zero;
-        public UUID keyUUID = UUID.Zero;
-        public Vector3 posVector = Vector3.Zero;
-        public Quaternion rotQuat = Quaternion.Identity;
-        public Vector3 velVector = Vector3.Zero;
-        public string nameStr = String.Empty;
-        public int colliderType = 0;
-        public int linkNumber;
-    }
+    public DetectedObject() { }
+    public UUID groupUUID = UUID.Zero;
+    public UUID ownerUUID = UUID.Zero;
+    public UUID keyUUID = UUID.Zero;
+    public Vector3 posVector = Vector3.Zero;
+    public Quaternion rotQuat = Quaternion.Identity;
+    public Vector3 velVector = Vector3.Zero;
+    public string nameStr = String.Empty;
+    public int colliderType = 0;
+    public int linkNumber;
+}
 
-    public class ColliderArgs : EventArgs
-    {
-        public ColliderArgs() { }
-        public List<DetectedObject> Colliders = new List<DetectedObject>();
+public class ColliderArgs : EventArgs
+{
+    public ColliderArgs() { }
+    public List<DetectedObject> Colliders = new List<DetectedObject>();
 
-    }
 }

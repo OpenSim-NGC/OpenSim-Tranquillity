@@ -25,62 +25,59 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Net;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+/// <summary>
+/// Makes an asynchronous REST request which doesn't require us to do anything with the response.
+/// </summary>
+public class RestObjectPoster
 {
-    /// <summary>
-    /// Makes an asynchronous REST request which doesn't require us to do anything with the response.
-    /// </summary>
-    public class RestObjectPoster
+    public static void BeginPostObject<TRequest>(string requestUrl, TRequest obj)
     {
-        public static void BeginPostObject<TRequest>(string requestUrl, TRequest obj)
+        BeginPostObject("POST", requestUrl, obj);
+    }
+
+    public static void BeginPostObject<TRequest>(string verb, string requestUrl, TRequest obj)
+    {
+        Type type = typeof (TRequest);
+
+        WebRequest request = WebRequest.Create(requestUrl);
+        request.Method = verb;
+        request.ContentType = "text/xml";
+
+        using (MemoryStream buffer = new MemoryStream())
         {
-            BeginPostObject("POST", requestUrl, obj);
-        }
+            XmlWriterSettings settings = new XmlWriterSettings();
+            settings.Encoding = Encoding.UTF8;
 
-        public static void BeginPostObject<TRequest>(string verb, string requestUrl, TRequest obj)
-        {
-            Type type = typeof (TRequest);
-
-            WebRequest request = WebRequest.Create(requestUrl);
-            request.Method = verb;
-            request.ContentType = "text/xml";
-
-            using (MemoryStream buffer = new MemoryStream())
+            using (XmlWriter writer = XmlWriter.Create(buffer, settings))
             {
-                XmlWriterSettings settings = new XmlWriterSettings();
-                settings.Encoding = Encoding.UTF8;
-
-                using (XmlWriter writer = XmlWriter.Create(buffer, settings))
-                {
-                    XmlSerializer serializer = new XmlSerializer(type);
-                    serializer.Serialize(writer, obj);
-                    writer.Flush();
-                }
-
-                int length = (int)buffer.Length;
-                request.ContentLength = length;
-
-                using (Stream requestStream = request.GetRequestStream())
-                    requestStream.Write(buffer.ToArray(), 0, length);
+                XmlSerializer serializer = new XmlSerializer(type);
+                serializer.Serialize(writer, obj);
+                writer.Flush();
             }
 
-            // IAsyncResult result = request.BeginGetResponse(AsyncCallback, request);
-            request.BeginGetResponse(AsyncCallback, request);
+            int length = (int)buffer.Length;
+            request.ContentLength = length;
+
+            using (Stream requestStream = request.GetRequestStream())
+                requestStream.Write(buffer.ToArray(), 0, length);
         }
 
-        private static void AsyncCallback(IAsyncResult result)
+        // IAsyncResult result = request.BeginGetResponse(AsyncCallback, request);
+        request.BeginGetResponse(AsyncCallback, request);
+    }
+
+    private static void AsyncCallback(IAsyncResult result)
+    {
+        WebRequest request = (WebRequest) result.AsyncState;
+        using (WebResponse resp = request.EndGetResponse(result))
         {
-            WebRequest request = (WebRequest) result.AsyncState;
-            using (WebResponse resp = request.EndGetResponse(result))
-            {
-            }
         }
     }
 }

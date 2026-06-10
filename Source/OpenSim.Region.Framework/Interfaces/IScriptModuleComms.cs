@@ -25,124 +25,121 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
-using System.Collections.Generic;
 using OpenMetaverse;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public delegate void ScriptCommand(UUID script, string id, string module, string command, string k);
+
+/// <summary>
+/// Interface for communication between OpenSim modules and in-world scripts
+/// </summary>
+///
+/// See OpenSim.Region.ScriptEngine.Shared.Api.MOD_Api.modSendCommand() for information on receiving messages
+/// from scripts in OpenSim modules.
+public interface IScriptModuleComms
 {
-    public delegate void ScriptCommand(UUID script, string id, string module, string command, string k);
+    /// <summary>
+    /// Modules can subscribe to this event to receive command invocations from in-world scripts
+    /// </summary>
+    event ScriptCommand OnScriptCommand;
 
     /// <summary>
-    /// Interface for communication between OpenSim modules and in-world scripts
+    /// Register an instance method as a script call by method name
     /// </summary>
-    ///
-    /// See OpenSim.Region.ScriptEngine.Shared.Api.MOD_Api.modSendCommand() for information on receiving messages
-    /// from scripts in OpenSim modules.
-    public interface IScriptModuleComms
-    {
-        /// <summary>
-        /// Modules can subscribe to this event to receive command invocations from in-world scripts
-        /// </summary>
-        event ScriptCommand OnScriptCommand;
+    /// <param name="target"></param>
+    /// <param name="method"></param>
+    void RegisterScriptInvocation(object target, string method);
 
-        /// <summary>
-        /// Register an instance method as a script call by method name
-        /// </summary>
-        /// <param name="target"></param>
-        /// <param name="method"></param>
-        void RegisterScriptInvocation(object target, string method);
+    /// <summary>
+    /// Register a static or instance method as a script call by method info
+    /// </summary>
+    /// <param name="target">If target is a Type object, will assume method is static.</param>
+    /// <param name="method"></param>
+    void RegisterScriptInvocation(object target, MethodInfo method);
 
-        /// <summary>
-        /// Register a static or instance method as a script call by method info
-        /// </summary>
-        /// <param name="target">If target is a Type object, will assume method is static.</param>
-        /// <param name="method"></param>
-        void RegisterScriptInvocation(object target, MethodInfo method);
+    /// <summary>
+    /// Register one or more instance methods as script calls by method name
+    /// </summary>
+    /// <param name="target"></param>
+    /// <param name="methods"></param>
+    void RegisterScriptInvocation(object target, string[] methods);
 
-        /// <summary>
-        /// Register one or more instance methods as script calls by method name
-        /// </summary>
-        /// <param name="target"></param>
-        /// <param name="methods"></param>
-        void RegisterScriptInvocation(object target, string[] methods);
+    /// <summary>
+    /// Register one or more static methods as script calls by method name
+    /// </summary>
+    /// <param name="target"></param>
+    /// <param name="methods"></param>
+    void RegisterScriptInvocation(Type target, string[] methods);
 
-        /// <summary>
-        /// Register one or more static methods as script calls by method name
-        /// </summary>
-        /// <param name="target"></param>
-        /// <param name="methods"></param>
-        void RegisterScriptInvocation(Type target, string[] methods);
+    /// <summary>
+    /// Automatically register script invocations by checking for methods
+    /// with <see cref="ScriptInvocationAttribute"/>. Should only check
+    /// public methods.
+    /// </summary>
+    /// <param name="target"></param>
+    void RegisterScriptInvocations(IRegionModuleBase target);
 
-        /// <summary>
-        /// Automatically register script invocations by checking for methods
-        /// with <see cref="ScriptInvocationAttribute"/>. Should only check
-        /// public methods.
-        /// </summary>
-        /// <param name="target"></param>
-        void RegisterScriptInvocations(IRegionModuleBase target);
+    /// <summary>
+    /// Returns an array of all registered script calls
+    /// </summary>
+    /// <returns></returns>
+    Delegate[] GetScriptInvocationList();
 
-        /// <summary>
-        /// Returns an array of all registered script calls
-        /// </summary>
-        /// <returns></returns>
-        Delegate[] GetScriptInvocationList();
+    Delegate LookupScriptInvocation(string fname);
+    string LookupModInvocation(string fname);
+    Type[] LookupTypeSignature(string fname);
+    Type LookupReturnType(string fname);
 
-        Delegate LookupScriptInvocation(string fname);
-        string LookupModInvocation(string fname);
-        Type[] LookupTypeSignature(string fname);
-        Type LookupReturnType(string fname);
+    object InvokeOperation(UUID hostId, UUID scriptId, string fname, params object[] parms);
 
-        object InvokeOperation(UUID hostId, UUID scriptId, string fname, params object[] parms);
+    /// <summary>
+    /// Send a link_message event to an in-world script
+    /// </summary>
+    /// <param name="scriptId"></param>
+    /// <param name="code"></param>
+    /// <param name="text"></param>
+    /// <param name="key"></param>
+    void DispatchReply(UUID scriptId, int code, string text, string key);
 
-        /// <summary>
-        /// Send a link_message event to an in-world script
-        /// </summary>
-        /// <param name="scriptId"></param>
-        /// <param name="code"></param>
-        /// <param name="text"></param>
-        /// <param name="key"></param>
-        void DispatchReply(UUID scriptId, int code, string text, string key);
+    /// <summary>
+    /// Operation to for a region module to register a constant to be used
+    /// by the script engine
+    /// </summary>
+    /// <param name="cname">
+    /// The name of the constant. LSL convention is for constant names to
+    /// be uppercase.
+    /// </param>
+    /// <param name="value">
+    /// The value of the constant. Should be of a type that can be
+    /// converted to one of <see cref="OpenSim.Region.ScriptEngine.Shared.LSL_Types"/>
+    /// </param>
+    void RegisterConstant(string cname, object value);
 
-        /// <summary>
-        /// Operation to for a region module to register a constant to be used
-        /// by the script engine
-        /// </summary>
-        /// <param name="cname">
-        /// The name of the constant. LSL convention is for constant names to
-        /// be uppercase.
-        /// </param>
-        /// <param name="value">
-        /// The value of the constant. Should be of a type that can be
-        /// converted to one of <see cref="OpenSim.Region.ScriptEngine.Shared.LSL_Types"/>
-        /// </param>
-        void RegisterConstant(string cname, object value);
+    /// <summary>
+    /// Automatically register all constants on a region module by
+    /// checking for fields with <see cref="ScriptConstantAttribute"/>.
+    /// </summary>
+    /// <param name="target"></param>
+    void RegisterConstants(IRegionModuleBase target);
 
-        /// <summary>
-        /// Automatically register all constants on a region module by
-        /// checking for fields with <see cref="ScriptConstantAttribute"/>.
-        /// </summary>
-        /// <param name="target"></param>
-        void RegisterConstants(IRegionModuleBase target);
+    /// <summary>
+    /// Operation to check for a registered constant
+    /// </summary>
+    /// <param name="cname">Name of constant</param>
+    /// <returns>Value of constant or null if none found.</returns>
+    object LookupModConstant(string cname);
+    Dictionary<string, object> GetConstants();
 
-        /// <summary>
-        /// Operation to check for a registered constant
-        /// </summary>
-        /// <param name="cname">Name of constant</param>
-        /// <returns>Value of constant or null if none found.</returns>
-        object LookupModConstant(string cname);
-        Dictionary<string, object> GetConstants();
-
-        // For use ONLY by the script API
-        void RaiseEvent(UUID script, string id, string module, string command, string key);
-    }
-
-    [AttributeUsage(AttributeTargets.Method)]
-    public class ScriptInvocationAttribute : Attribute
-    { }
-
-    [AttributeUsage(AttributeTargets.Field)]
-    public class ScriptConstantAttribute : Attribute
-    { }
+    // For use ONLY by the script API
+    void RaiseEvent(UUID script, string id, string module, string command, string key);
 }
+
+[AttributeUsage(AttributeTargets.Method)]
+public class ScriptInvocationAttribute : Attribute
+{ }
+
+[AttributeUsage(AttributeTargets.Field)]
+public class ScriptConstantAttribute : Attribute
+{ }

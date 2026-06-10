@@ -25,17 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
 using log4net;
-using System;
 using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
@@ -43,198 +35,197 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
-namespace OpenSim.Server.Handlers.GridUser
+namespace OpenSim.Server.Handlers.GridUser;
+
+public class MuteListServerPostHandler : BaseStreamHandler
 {
-    public class MuteListServerPostHandler : BaseStreamHandler
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IMuteListService m_service;
+
+    public MuteListServerPostHandler(IMuteListService service, IServiceAuth auth) :
+            base("POST", "/mutelist", auth)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_service = service;
+    }
 
-        private IMuteListService m_service;
+    protected override byte[] ProcessRequest(string path, Stream requestData,
+            IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        string body;
+        using(StreamReader sr = new StreamReader(requestData))
+            body = sr.ReadToEnd();
+        body = body.Trim();
 
-        public MuteListServerPostHandler(IMuteListService service, IServiceAuth auth) :
-                base("POST", "/mutelist", auth)
+        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        string method = string.Empty;
+
+        try
         {
-            m_service = service;
+            Dictionary<string, object> request =
+                    ServerUtils.ParseQueryString(body);
+
+            if (!request.ContainsKey("METHOD"))
+                return FailureResult();
+
+            method = request["METHOD"].ToString();
+
+            switch (method)
+            {
+                case "get":
+                    return getmutes(request);
+                case "update":
+                    return updatemute(request);
+                case "delete":
+                    return deletemute(request);
+            }
+            m_log.DebugFormat("[MUTELIST HANDLER]: unknown method request: {0}", method);
+        }
+        catch (Exception e)
+        {
+            m_log.DebugFormat("[MUTELIST HANDLER]: Exception in method {0}: {1}", method, e);
         }
 
-        protected override byte[] ProcessRequest(string path, Stream requestData,
-                IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            string body;
-            using(StreamReader sr = new StreamReader(requestData))
-                body = sr.ReadToEnd();
-            body = body.Trim();
+        return FailureResult();
+    }
 
-            //m_log.DebugFormat("[XXX]: query String: {0}", body);
-            string method = string.Empty;
-
-            try
-            {
-                Dictionary<string, object> request =
-                        ServerUtils.ParseQueryString(body);
-
-                if (!request.ContainsKey("METHOD"))
-                    return FailureResult();
-
-                method = request["METHOD"].ToString();
-
-                switch (method)
-                {
-                    case "get":
-                        return getmutes(request);
-                    case "update":
-                        return updatemute(request);
-                    case "delete":
-                        return deletemute(request);
-                }
-                m_log.DebugFormat("[MUTELIST HANDLER]: unknown method request: {0}", method);
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[MUTELIST HANDLER]: Exception in method {0}: {1}", method, e);
-            }
-
+    byte[] getmutes(Dictionary<string, object> request)
+    {
+        if(!request.ContainsKey("agentid") || !request.ContainsKey("mutecrc"))
             return FailureResult();
-        }
 
-        byte[] getmutes(Dictionary<string, object> request)
+        UUID agentID;
+        if(!UUID.TryParse(request["agentid"].ToString(), out agentID))
+            return FailureResult();
+
+        uint mutecrc;
+        if(!UInt32.TryParse(request["mutecrc"].ToString(), out mutecrc))
+                return FailureResult();
+
+        byte[] data = m_service.MuteListRequest(agentID, mutecrc);
+
+        Dictionary<string, object> result = new Dictionary<string, object>();
+        result["result"] = Convert.ToBase64String(data);
+
+        string xmlString = ServerUtils.BuildXmlResponse(result);
+
+        //m_log.DebugFormat("[GRID USER HANDLER]: resp string: {0}", xmlString);
+        return Util.UTF8NoBomEncoding.GetBytes(xmlString);
+    }
+
+    byte[] updatemute(Dictionary<string, object> request)
+    {
+        if(!request.ContainsKey("agentid") || !request.ContainsKey("muteid"))
+            return FailureResult();
+
+        MuteData mute = new MuteData();
+
+        if( !UUID.TryParse(request["agentid"].ToString(), out mute.AgentID))
+            return FailureResult();
+
+        if(!UUID.TryParse(request["muteid"].ToString(), out mute.MuteID))
+            return FailureResult();
+
+        if(request.ContainsKey("mutename"))
         {
-            if(!request.ContainsKey("agentid") || !request.ContainsKey("mutecrc"))
-                return FailureResult();
-
-            UUID agentID;
-            if(!UUID.TryParse(request["agentid"].ToString(), out agentID))
-                return FailureResult();
-
-            uint mutecrc;
-            if(!UInt32.TryParse(request["mutecrc"].ToString(), out mutecrc))
-                    return FailureResult();
-
-            byte[] data = m_service.MuteListRequest(agentID, mutecrc);
-
-            Dictionary<string, object> result = new Dictionary<string, object>();
-            result["result"] = Convert.ToBase64String(data);
-
-            string xmlString = ServerUtils.BuildXmlResponse(result);
-
-            //m_log.DebugFormat("[GRID USER HANDLER]: resp string: {0}", xmlString);
-            return Util.UTF8NoBomEncoding.GetBytes(xmlString);
+            mute.MuteName = request["mutename"].ToString();
         }
+        else
+           mute.MuteName = String.Empty;
 
-        byte[] updatemute(Dictionary<string, object> request)
+        if(request.ContainsKey("mutetype"))
         {
-            if(!request.ContainsKey("agentid") || !request.ContainsKey("muteid"))
+            if(!Int32.TryParse(request["mutetype"].ToString(), out mute.MuteType))
                 return FailureResult();
-
-            MuteData mute = new MuteData();
-
-            if( !UUID.TryParse(request["agentid"].ToString(), out mute.AgentID))
-                return FailureResult();
-
-            if(!UUID.TryParse(request["muteid"].ToString(), out mute.MuteID))
-                return FailureResult();
-
-            if(request.ContainsKey("mutename"))
-            {
-                mute.MuteName = request["mutename"].ToString();
-            }
-            else
-               mute.MuteName = String.Empty;
-
-            if(request.ContainsKey("mutetype"))
-            {
-                if(!Int32.TryParse(request["mutetype"].ToString(), out mute.MuteType))
-                    return FailureResult();
-            }
-            else
-               mute.MuteType = 0;
-
-            if(request.ContainsKey("muteflags"))
-            {
-                if(!Int32.TryParse(request["muteflags"].ToString(), out mute.MuteFlags))
-                    return FailureResult();
-            }
-            else
-                mute.MuteFlags = 0;
-
-            if(request.ContainsKey("mutestamp"))
-            {
-                if(!Int32.TryParse(request["mutestamp"].ToString(), out mute.Stamp))
-                    return FailureResult();
-            }
-            else
-                mute.Stamp = Util.UnixTimeSinceEpoch();
-
-            return m_service.UpdateMute(mute) ? SuccessResult() : FailureResult();
         }
+        else
+           mute.MuteType = 0;
 
-        byte[] deletemute(Dictionary<string, object> request)
+        if(request.ContainsKey("muteflags"))
         {
-            if(!request.ContainsKey("agentid") || !request.ContainsKey("muteid"))
+            if(!Int32.TryParse(request["muteflags"].ToString(), out mute.MuteFlags))
                 return FailureResult();
-
-            UUID agentID;
-            if( !UUID.TryParse(request["agentid"].ToString(), out agentID))
-                return FailureResult();
-
-            UUID muteID;
-            if(!UUID.TryParse(request["muteid"].ToString(), out muteID))
-                return FailureResult();
-
-            string muteName;
-            if(request.ContainsKey("mutename"))
-            {
-                muteName = request["mutename"].ToString();
-
-            }
-            else
-               muteName = String.Empty;
-
-            return m_service.RemoveMute(agentID, muteID, muteName) ? SuccessResult() : FailureResult();
         }
+        else
+            mute.MuteFlags = 0;
 
-        private byte[] SuccessResult()
+        if(request.ContainsKey("mutestamp"))
         {
-            XmlDocument doc = new XmlDocument();
-
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
-
-            doc.AppendChild(xmlnode);
-
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
-
-            doc.AppendChild(rootElement);
-
-            XmlElement result = doc.CreateElement("", "result", "");
-            result.AppendChild(doc.CreateTextNode("Success"));
-
-            rootElement.AppendChild(result);
-
-            return Util.DocToBytes(doc);
+            if(!Int32.TryParse(request["mutestamp"].ToString(), out mute.Stamp))
+                return FailureResult();
         }
+        else
+            mute.Stamp = Util.UnixTimeSinceEpoch();
 
-        private byte[] FailureResult()
+        return m_service.UpdateMute(mute) ? SuccessResult() : FailureResult();
+    }
+
+    byte[] deletemute(Dictionary<string, object> request)
+    {
+        if(!request.ContainsKey("agentid") || !request.ContainsKey("muteid"))
+            return FailureResult();
+
+        UUID agentID;
+        if( !UUID.TryParse(request["agentid"].ToString(), out agentID))
+            return FailureResult();
+
+        UUID muteID;
+        if(!UUID.TryParse(request["muteid"].ToString(), out muteID))
+            return FailureResult();
+
+        string muteName;
+        if(request.ContainsKey("mutename"))
         {
-            XmlDocument doc = new XmlDocument();
+            muteName = request["mutename"].ToString();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
-
-            doc.AppendChild(xmlnode);
-
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
-
-            doc.AppendChild(rootElement);
-
-            XmlElement result = doc.CreateElement("", "result", "");
-            result.AppendChild(doc.CreateTextNode("Failure"));
-
-            rootElement.AppendChild(result);
-
-            return Util.DocToBytes(doc);
         }
+        else
+           muteName = String.Empty;
+
+        return m_service.RemoveMute(agentID, muteID, muteName) ? SuccessResult() : FailureResult();
+    }
+
+    private byte[] SuccessResult()
+    {
+        XmlDocument doc = new XmlDocument();
+
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
+                "", "");
+
+        doc.AppendChild(xmlnode);
+
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse",
+                "");
+
+        doc.AppendChild(rootElement);
+
+        XmlElement result = doc.CreateElement("", "result", "");
+        result.AppendChild(doc.CreateTextNode("Success"));
+
+        rootElement.AppendChild(result);
+
+        return Util.DocToBytes(doc);
+    }
+
+    private byte[] FailureResult()
+    {
+        XmlDocument doc = new XmlDocument();
+
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
+                "", "");
+
+        doc.AppendChild(xmlnode);
+
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse",
+                "");
+
+        doc.AppendChild(rootElement);
+
+        XmlElement result = doc.CreateElement("", "result", "");
+        result.AppendChild(doc.CreateTextNode("Failure"));
+
+        rootElement.AppendChild(result);
+
+        return Util.DocToBytes(doc);
     }
 }

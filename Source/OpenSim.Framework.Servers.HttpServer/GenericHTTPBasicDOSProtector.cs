@@ -27,93 +27,92 @@
 
 using System.Collections;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public class GenericHTTPDOSProtector
 {
-    public class GenericHTTPDOSProtector
+    private readonly GenericHTTPMethod _normalMethod;
+    private readonly GenericHTTPMethod _throttledMethod;
+
+    private readonly BasicDosProtectorOptions _options;
+    private readonly BasicDOSProtector _dosProtector;
+
+    public GenericHTTPDOSProtector(GenericHTTPMethod normalMethod, GenericHTTPMethod throttledMethod, BasicDosProtectorOptions options)
     {
-        private readonly GenericHTTPMethod _normalMethod;
-        private readonly GenericHTTPMethod _throttledMethod;
+        _normalMethod = normalMethod;
+        _throttledMethod = throttledMethod;
 
-        private readonly BasicDosProtectorOptions _options;
-        private readonly BasicDOSProtector _dosProtector;
+        _options = options;
+        _dosProtector = new BasicDOSProtector(_options);
+    }
+    public Hashtable Process(Hashtable request)
+    {
+        Hashtable process = null;
+        string clientstring= GetClientString(request);
+        string endpoint = GetRemoteAddr(request);
+        if (_dosProtector.Process(clientstring, endpoint))
+            process =  _normalMethod(request);
+        else
+            process = _throttledMethod(request);
 
-        public GenericHTTPDOSProtector(GenericHTTPMethod normalMethod, GenericHTTPMethod throttledMethod, BasicDosProtectorOptions options)
-        {
-            _normalMethod = normalMethod;
-            _throttledMethod = throttledMethod;
+        if (_options.MaxConcurrentSessions>0)
+            _dosProtector.ProcessEnd(clientstring, endpoint);
 
-            _options = options;
-            _dosProtector = new BasicDOSProtector(_options);
-        }
-        public Hashtable Process(Hashtable request)
-        {
-            Hashtable process = null;
-            string clientstring= GetClientString(request);
-            string endpoint = GetRemoteAddr(request);
-            if (_dosProtector.Process(clientstring, endpoint))
-                process =  _normalMethod(request);
-            else
-                process = _throttledMethod(request);
+        return process;
+    }
 
-            if (_options.MaxConcurrentSessions>0)
-                _dosProtector.ProcessEnd(clientstring, endpoint);
-
-            return process;
-        }
-
-        private string GetRemoteAddr(Hashtable request)
-        {
-            string remoteaddr = "";
-            if (!request.ContainsKey("headers"))
-                return remoteaddr;
-            Hashtable requestinfo = (Hashtable)request["headers"];
-            if (!requestinfo.ContainsKey("remote_addr"))
-                return remoteaddr;
-            object remote_addrobj = requestinfo["remote_addr"];
-            if (remote_addrobj != null)
-            {
-                if (!string.IsNullOrEmpty(remote_addrobj.ToString()))
-                {
-                    remoteaddr = remote_addrobj.ToString();
-                }
-
-            }
+    private string GetRemoteAddr(Hashtable request)
+    {
+        string remoteaddr = "";
+        if (!request.ContainsKey("headers"))
             return remoteaddr;
-        }
-
-        private string GetClientString(Hashtable request)
+        Hashtable requestinfo = (Hashtable)request["headers"];
+        if (!requestinfo.ContainsKey("remote_addr"))
+            return remoteaddr;
+        object remote_addrobj = requestinfo["remote_addr"];
+        if (remote_addrobj != null)
         {
-            string clientstring = "";
-            if (!request.ContainsKey("headers"))
-                return clientstring;
-
-            Hashtable requestinfo = (Hashtable)request["headers"];
-            if (_options.AllowXForwardedFor && requestinfo.ContainsKey("x-forwarded-for"))
+            if (!string.IsNullOrEmpty(remote_addrobj.ToString()))
             {
-                object str = requestinfo["x-forwarded-for"];
-                if (str != null)
-                {
-                    if (!string.IsNullOrEmpty(str.ToString()))
-                    {
-                        return str.ToString();
-                    }
-                }
-            }
-            if (!requestinfo.ContainsKey("remote_addr"))
-                return clientstring;
-
-            object remote_addrobj = requestinfo["remote_addr"];
-            if (remote_addrobj != null)
-            {
-                if (!string.IsNullOrEmpty(remote_addrobj.ToString()))
-                {
-                    clientstring = remote_addrobj.ToString();
-                }
+                remoteaddr = remote_addrobj.ToString();
             }
 
+        }
+        return remoteaddr;
+    }
+
+    private string GetClientString(Hashtable request)
+    {
+        string clientstring = "";
+        if (!request.ContainsKey("headers"))
             return clientstring;
 
+        Hashtable requestinfo = (Hashtable)request["headers"];
+        if (_options.AllowXForwardedFor && requestinfo.ContainsKey("x-forwarded-for"))
+        {
+            object str = requestinfo["x-forwarded-for"];
+            if (str != null)
+            {
+                if (!string.IsNullOrEmpty(str.ToString()))
+                {
+                    return str.ToString();
+                }
+            }
+        }
+        if (!requestinfo.ContainsKey("remote_addr"))
+            return clientstring;
+
+        object remote_addrobj = requestinfo["remote_addr"];
+        if (remote_addrobj != null)
+        {
+            if (!string.IsNullOrEmpty(remote_addrobj.ToString()))
+            {
+                clientstring = remote_addrobj.ToString();
+            }
         }
 
+        return clientstring;
+
     }
+
 }

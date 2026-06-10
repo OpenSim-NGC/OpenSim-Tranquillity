@@ -37,207 +37,206 @@ using OpenSim.Region.Framework.Scenes;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 
-namespace OpenSim.Region.ClientStack.LindenCaps
+namespace OpenSim.Region.ClientStack.LindenCaps;
+
+public class EstateAccessCapModule : INonSharedRegionModule
 {
-    public class EstateAccessCapModule : INonSharedRegionModule
+    // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private Scene m_scene;
+    private bool m_Enabled = false;
+    private string m_capUrl;
+    //IEstateModule m_EstateModule;
+
+    #region INonSharedRegionModule Members
+
+    public void Initialise(IConfigSource pSource)
     {
-        // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        IConfig config = pSource.Configs["ClientStack.LindenCaps"];
+        if (config == null)
+            return;
 
-        private Scene m_scene;
-        private bool m_Enabled = false;
-        private string m_capUrl;
-        //IEstateModule m_EstateModule;
-
-        #region INonSharedRegionModule Members
-
-        public void Initialise(IConfigSource pSource)
+        m_capUrl = config.GetString("Cap_EstateAccess", string.Empty);
+        // enable when configured (non-empty and not explicitly false/0)
+        if (!String.IsNullOrEmpty(m_capUrl) &&
+            !m_capUrl.Equals("false", StringComparison.OrdinalIgnoreCase) &&
+            m_capUrl != "0")
         {
-            IConfig config = pSource.Configs["ClientStack.LindenCaps"];
-            if (config == null)
-                return;
+            m_Enabled = true;
+        }
+    }
 
-            m_capUrl = config.GetString("Cap_EstateAccess", string.Empty);
-            // enable when configured (non-empty and not explicitly false/0)
-            if (!String.IsNullOrEmpty(m_capUrl) &&
-                !m_capUrl.Equals("false", StringComparison.OrdinalIgnoreCase) &&
-                m_capUrl != "0")
-            {
-                m_Enabled = true;
-            }
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_scene = scene;
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        if (m_scene == scene)
+        {
+            m_scene.EventManager.OnRegisterCaps -= RegisterCaps;
+            m_scene = null;
+        }
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        if (scene.RegionInfo == null || scene.RegionInfo.EstateSettings == null)
+        {
+            m_Enabled = false;
+            return;
         }
 
-        public void AddRegion(Scene scene)
+        IEstateModule m_EstateModule = scene.RequestModuleInterface<IEstateModule>();
+        if(m_EstateModule == null)
         {
-            if (!m_Enabled)
-                return;
-
-            m_scene = scene;
+            m_Enabled = false;
+            return;
         }
 
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
+        scene.EventManager.OnRegisterCaps += RegisterCaps;
+    }
 
-            if (m_scene == scene)
+    public void Close()
+    {
+    }
+
+    public string Name
+    {
+        get { return "EstateAccessCapModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    #endregion
+
+    public void RegisterCaps(UUID agentID, Caps caps)
+    {
+        caps.RegisterSimpleHandler("EstateAccess",
+            new SimpleStreamHandler("/" + UUID.Random(),
+            delegate(IOSHttpRequest request, IOSHttpResponse response)
             {
-                m_scene.EventManager.OnRegisterCaps -= RegisterCaps;
-                m_scene = null;
-            }
+                ProcessRequest(request, response, agentID);
+            }));
+    }
+
+    public void ProcessRequest(IOSHttpRequest request, IOSHttpResponse response, UUID AgentId)
+    {
+        if(request.HttpMethod != "GET")
+        {
+            response.StatusCode = (int)HttpStatusCode.NotFound;
+            return;
         }
 
-        public void RegionLoaded(Scene scene)
+        if (!m_scene.TryGetScenePresence(AgentId, out ScenePresence _) || m_scene.RegionInfo == null || m_scene.RegionInfo.EstateSettings == null)
         {
-            if (!m_Enabled)
-                return;
-
-            if (scene.RegionInfo == null || scene.RegionInfo.EstateSettings == null)
-            {
-                m_Enabled = false;
-                return;
-            }
-
-            IEstateModule m_EstateModule = scene.RequestModuleInterface<IEstateModule>();
-            if(m_EstateModule == null)
-            {
-                m_Enabled = false;
-                return;
-            }
-
-            scene.EventManager.OnRegisterCaps += RegisterCaps;
+            response.StatusCode = (int)HttpStatusCode.Gone;
+            return;
         }
 
-        public void Close()
+        if (!m_scene.Permissions.CanIssueEstateCommand(AgentId, false))
         {
+            response.StatusCode = (int)HttpStatusCode.Unauthorized;
+            return;
         }
 
-        public string Name
+        EstateSettings regionSettings = m_scene.RegionInfo.EstateSettings;
+        UUID[] managers = regionSettings.EstateManagers;
+        UUID[] allowed = regionSettings.EstateAccess;
+        UUID[] groups = regionSettings.EstateGroups;
+        EstateBan[] EstateBans = regionSettings.EstateBans;
+
+        osUTF8 sb = LLSDxmlEncode2.Start();
+        LLSDxmlEncode2.AddMap(sb);
+
+        if (allowed != null && allowed.Length > 0)
         {
-            get { return "EstateAccessCapModule"; }
+            LLSDxmlEncode2.AddArray("AllowedAgents", sb);
+            for (int i = 0; i < allowed.Length; ++i)
+            {
+                UUID id = allowed[i];
+                if (id.IsZero())
+                    continue;
+                LLSDxmlEncode2.AddMap(sb);
+                    LLSDxmlEncode2.AddElem("id", id, sb);
+                LLSDxmlEncode2.AddEndMap(sb);
+            }
+            LLSDxmlEncode2.AddEndArray(sb);
         }
+        else
+            LLSDxmlEncode2.AddEmptyArray("AllowedAgents", sb);
 
-        public Type ReplaceableInterface
+        if (groups != null && groups.Length > 0)
         {
-            get { return null; }
+            LLSDxmlEncode2.AddArray("AllowedGroups", sb);
+            for (int i = 0; i < groups.Length; ++i)
+            {
+                UUID id = groups[i];
+                if (id.IsZero())
+                    continue;
+                LLSDxmlEncode2.AddMap(sb);
+                    LLSDxmlEncode2.AddElem("id", id, sb);
+                LLSDxmlEncode2.AddEndMap(sb);
+            }
+            LLSDxmlEncode2.AddEndArray(sb);
         }
+        else
+            LLSDxmlEncode2.AddEmptyArray("AllowedGroups", sb);
 
-        #endregion
-
-        public void RegisterCaps(UUID agentID, Caps caps)
+        if (EstateBans != null && EstateBans.Length > 0)
         {
-            caps.RegisterSimpleHandler("EstateAccess",
-                new SimpleStreamHandler("/" + UUID.Random(),
-                delegate(IOSHttpRequest request, IOSHttpResponse response)
-                {
-                    ProcessRequest(request, response, agentID);
-                }));
+            LLSDxmlEncode2.AddArray("BannedAgents", sb);
+            for (int i = 0; i < EstateBans.Length; ++i)
+            {
+                EstateBan ban = EstateBans[i];
+                UUID id = ban.BannedUserID;
+                if (id.IsZero())
+                    continue;
+                LLSDxmlEncode2.AddMap(sb);
+                    LLSDxmlEncode2.AddElem("id", id, sb);
+                    LLSDxmlEncode2.AddElem("banning_id", ban.BanningUserID, sb);
+                    LLSDxmlEncode2.AddElem("last_login_date", "na", sb); // We will not have this. This information is far at grid
+                    if (ban.BanTime == 0)
+                        LLSDxmlEncode2.AddElem("ban_date", "0000-00-00 00:00", sb);
+                    else
+                        LLSDxmlEncode2.AddElem("ban_date", (Util.ToDateTime(ban.BanTime)).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), sb);
+                LLSDxmlEncode2.AddEndMap(sb);
+            }
+            LLSDxmlEncode2.AddEndArray(sb);
         }
+        else
+            LLSDxmlEncode2.AddEmptyArray("BannedAgents", sb);
 
-        public void ProcessRequest(IOSHttpRequest request, IOSHttpResponse response, UUID AgentId)
+        if (managers != null && managers.Length > 0)
         {
-            if(request.HttpMethod != "GET")
+            LLSDxmlEncode2.AddArray("Managers", sb);
+            for (int i = 0; i < managers.Length; ++i)
             {
-                response.StatusCode = (int)HttpStatusCode.NotFound;
-                return;
+                LLSDxmlEncode2.AddMap(sb);
+                    LLSDxmlEncode2.AddElem("agent_id", managers[i], sb);
+                LLSDxmlEncode2.AddEndMap(sb);
             }
-
-            if (!m_scene.TryGetScenePresence(AgentId, out ScenePresence _) || m_scene.RegionInfo == null || m_scene.RegionInfo.EstateSettings == null)
-            {
-                response.StatusCode = (int)HttpStatusCode.Gone;
-                return;
-            }
-
-            if (!m_scene.Permissions.CanIssueEstateCommand(AgentId, false))
-            {
-                response.StatusCode = (int)HttpStatusCode.Unauthorized;
-                return;
-            }
-
-            EstateSettings regionSettings = m_scene.RegionInfo.EstateSettings;
-            UUID[] managers = regionSettings.EstateManagers;
-            UUID[] allowed = regionSettings.EstateAccess;
-            UUID[] groups = regionSettings.EstateGroups;
-            EstateBan[] EstateBans = regionSettings.EstateBans;
-
-            osUTF8 sb = LLSDxmlEncode2.Start();
-            LLSDxmlEncode2.AddMap(sb);
-
-            if (allowed != null && allowed.Length > 0)
-            {
-                LLSDxmlEncode2.AddArray("AllowedAgents", sb);
-                for (int i = 0; i < allowed.Length; ++i)
-                {
-                    UUID id = allowed[i];
-                    if (id.IsZero())
-                        continue;
-                    LLSDxmlEncode2.AddMap(sb);
-                        LLSDxmlEncode2.AddElem("id", id, sb);
-                    LLSDxmlEncode2.AddEndMap(sb);
-                }
-                LLSDxmlEncode2.AddEndArray(sb);
-            }
-            else
-                LLSDxmlEncode2.AddEmptyArray("AllowedAgents", sb);
-
-            if (groups != null && groups.Length > 0)
-            {
-                LLSDxmlEncode2.AddArray("AllowedGroups", sb);
-                for (int i = 0; i < groups.Length; ++i)
-                {
-                    UUID id = groups[i];
-                    if (id.IsZero())
-                        continue;
-                    LLSDxmlEncode2.AddMap(sb);
-                        LLSDxmlEncode2.AddElem("id", id, sb);
-                    LLSDxmlEncode2.AddEndMap(sb);
-                }
-                LLSDxmlEncode2.AddEndArray(sb);
-            }
-            else
-                LLSDxmlEncode2.AddEmptyArray("AllowedGroups", sb);
-
-            if (EstateBans != null && EstateBans.Length > 0)
-            {
-                LLSDxmlEncode2.AddArray("BannedAgents", sb);
-                for (int i = 0; i < EstateBans.Length; ++i)
-                {
-                    EstateBan ban = EstateBans[i];
-                    UUID id = ban.BannedUserID;
-                    if (id.IsZero())
-                        continue;
-                    LLSDxmlEncode2.AddMap(sb);
-                        LLSDxmlEncode2.AddElem("id", id, sb);
-                        LLSDxmlEncode2.AddElem("banning_id", ban.BanningUserID, sb);
-                        LLSDxmlEncode2.AddElem("last_login_date", "na", sb); // We will not have this. This information is far at grid
-                        if (ban.BanTime == 0)
-                            LLSDxmlEncode2.AddElem("ban_date", "0000-00-00 00:00", sb);
-                        else
-                            LLSDxmlEncode2.AddElem("ban_date", (Util.ToDateTime(ban.BanTime)).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), sb);
-                    LLSDxmlEncode2.AddEndMap(sb);
-                }
-                LLSDxmlEncode2.AddEndArray(sb);
-            }
-            else
-                LLSDxmlEncode2.AddEmptyArray("BannedAgents", sb);
-
-            if (managers != null && managers.Length > 0)
-            {
-                LLSDxmlEncode2.AddArray("Managers", sb);
-                for (int i = 0; i < managers.Length; ++i)
-                {
-                    LLSDxmlEncode2.AddMap(sb);
-                        LLSDxmlEncode2.AddElem("agent_id", managers[i], sb);
-                    LLSDxmlEncode2.AddEndMap(sb);
-                }
-                LLSDxmlEncode2.AddEndArray(sb);
-            }
-            else
-                LLSDxmlEncode2.AddEmptyArray("Managers", sb);
-
-            LLSDxmlEncode2.AddEndMap(sb);
-
-            response.RawBuffer = LLSDxmlEncode2.EndToBytes(sb);
-            response.StatusCode = (int)HttpStatusCode.OK;
+            LLSDxmlEncode2.AddEndArray(sb);
         }
+        else
+            LLSDxmlEncode2.AddEmptyArray("Managers", sb);
+
+        LLSDxmlEncode2.AddEndMap(sb);
+
+        response.RawBuffer = LLSDxmlEncode2.EndToBytes(sb);
+        response.StatusCode = (int)HttpStatusCode.OK;
     }
 }

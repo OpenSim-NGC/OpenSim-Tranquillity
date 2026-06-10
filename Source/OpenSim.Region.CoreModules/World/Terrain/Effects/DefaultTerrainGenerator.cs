@@ -27,33 +27,32 @@
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.Effects
+namespace OpenSim.Region.CoreModules.World.Terrain.Effects;
+
+public class DefaultTerrainGenerator : ITerrainEffect
 {
-    public class DefaultTerrainGenerator : ITerrainEffect
+    #region ITerrainEffect Members
+
+    public void RunEffect(ITerrainChannel map)
     {
-        #region ITerrainEffect Members
+        int x, y;
+        int cx = map.Width / 2;
+        int cy = map.Height / 2;
+        float h;
+        float b;
 
-        public void RunEffect(ITerrainChannel map)
+        for (x = 0; x < map.Width; x++)
         {
-            int x, y;
-            int cx = map.Width / 2;
-            int cy = map.Height / 2;
-            float h;
-            float b;
-
-            for (x = 0; x < map.Width; x++)
+            for (y = 0; y < map.Height; y++)
             {
-                for (y = 0; y < map.Height; y++)
-                {
-                    h = 25 * TerrainUtil.SphericalFactor(x - cx, y - cy, 50);
-                    b = 10 * TerrainUtil.SphericalFactor(x - cx, y - cy, 100);
-                    if (h < b)
-                        h = b;
-                    map[x, y] = h;
-                }
+                h = 25 * TerrainUtil.SphericalFactor(x - cx, y - cy, 50);
+                b = 10 * TerrainUtil.SphericalFactor(x - cx, y - cy, 100);
+                if (h < b)
+                    h = b;
+                map[x, y] = h;
             }
         }
-
-        #endregion
     }
+
+    #endregion
 }

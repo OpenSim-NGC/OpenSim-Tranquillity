@@ -27,54 +27,53 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public enum ObjectChangeType : uint
 {
-    public enum ObjectChangeType : uint
-    {
-        // bits definitions
-        Position = 0x01,
-        Rotation = 0x02,
-        Scale   = 0x04,
-        Group = 0x08,
-        UniformScale = 0x10,
+    // bits definitions
+    Position = 0x01,
+    Rotation = 0x02,
+    Scale   = 0x04,
+    Group = 0x08,
+    UniformScale = 0x10,
 
-        // macros from above
-        // single prim
-        primP = 0x01,
-        primR = 0x02,
-        primPR = 0x03,
-        primS = 0x04,
-        primPS = 0x05,
-        primRS = 0x06,
-        primPSR = 0x07,
+    // macros from above
+    // single prim
+    primP = 0x01,
+    primR = 0x02,
+    primPR = 0x03,
+    primS = 0x04,
+    primPS = 0x05,
+    primRS = 0x06,
+    primPSR = 0x07,
 
-        primUS = 0x14,
-        primPUS = 0x15,
-        primRUS = 0x16,
-        primPUSR = 0x17,
+    primUS = 0x14,
+    primPUS = 0x15,
+    primRUS = 0x16,
+    primPUSR = 0x17,
 
-        // group
-        groupP = 0x09,
-        groupR = 0x0A,
-        groupPR = 0x0B,
-        groupS = 0x0C,
-        groupPS = 0x0D,
-        groupRS = 0x0E,
-        groupPSR = 0x0F,
+    // group
+    groupP = 0x09,
+    groupR = 0x0A,
+    groupPR = 0x0B,
+    groupS = 0x0C,
+    groupPS = 0x0D,
+    groupRS = 0x0E,
+    groupPSR = 0x0F,
 
-        groupUS = 0x1C,
-        groupPUS = 0x1D,
-        groupRUS = 0x1E,
-        groupPUSR = 0x1F,
+    groupUS = 0x1C,
+    groupPUS = 0x1D,
+    groupRUS = 0x1E,
+    groupPUSR = 0x1F,
 
-        PRSmask = 0x07
-    }
+    PRSmask = 0x07
+}
 
-    public struct ObjectChangeData
-    {
-        public Quaternion rotation;
-        public Vector3 position;
-        public Vector3 scale;
-        public ObjectChangeType change;
-    }
+public struct ObjectChangeData
+{
+    public Quaternion rotation;
+    public Vector3 position;
+    public Vector3 scale;
+    public ObjectChangeType change;
 }

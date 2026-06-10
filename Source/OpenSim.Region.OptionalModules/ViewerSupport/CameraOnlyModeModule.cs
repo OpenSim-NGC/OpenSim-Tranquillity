@@ -37,121 +37,119 @@ using log4net;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 using TeleportFlags = OpenSim.Framework.Constants.TeleportFlags;
 
-namespace OpenSim.Region.OptionalModules.ViewerSupport
+namespace OpenSim.Region.OptionalModules.ViewerSupport;
+
+public class CameraOnlyModeModule : INonSharedRegionModule
 {
-    public class CameraOnlyModeModule : INonSharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private Scene m_scene;
+    private SimulatorFeaturesHelper m_Helper;
+    private bool m_Enabled;
+    private int m_UserLevel;
+
+    public string Name
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return "CameraOnlyModeModule"; }
+    }
 
-        private Scene m_scene;
-        private SimulatorFeaturesHelper m_Helper;
-        private bool m_Enabled;
-        private int m_UserLevel;
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
 
-        public string Name
+    public void Initialise(IConfigSource config)
+    {
+        IConfig moduleConfig = config.Configs["CameraOnlyModeModule"];
+        if (moduleConfig != null)
         {
-            get { return "CameraOnlyModeModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public void Initialise(IConfigSource config)
-        {
-            IConfig moduleConfig = config.Configs["CameraOnlyModeModule"];
-            if (moduleConfig != null)
-            {
-                m_Enabled = moduleConfig.GetBoolean("enabled", false);
-                if (m_Enabled)
-                {
-                    m_UserLevel = moduleConfig.GetInt("UserLevel", 0);
-                    m_log.Info("[CAMERA-ONLY MODE]: CameraOnlyModeModule enabled");
-                }
-
-            }
-        }
-
-        public void Close()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
+            m_Enabled = moduleConfig.GetBoolean("enabled", false);
             if (m_Enabled)
             {
-                m_scene = scene;
-                //m_scene.EventManager.OnMakeRootAgent += (OnMakeRootAgent);
+                m_UserLevel = moduleConfig.GetInt("UserLevel", 0);
+                m_log.Info("[CAMERA-ONLY MODE]: CameraOnlyModeModule enabled");
             }
+
         }
+    }
 
-        //private void OnMakeRootAgent(ScenePresence obj)
-        //{
-        //    throw new NotImplementedException();
-        //}
+    public void Close()
+    {
+    }
 
-        public void RegionLoaded(Scene scene)
+    public void AddRegion(Scene scene)
+    {
+        if (m_Enabled)
         {
-            if (m_Enabled)
-            {
-                m_Helper = new SimulatorFeaturesHelper(scene);
+            m_scene = scene;
+            //m_scene.EventManager.OnMakeRootAgent += (OnMakeRootAgent);
+        }
+    }
 
-                ISimulatorFeaturesModule featuresModule = m_scene.RequestModuleInterface<ISimulatorFeaturesModule>();
-                if (featuresModule != null)
-                    featuresModule.OnSimulatorFeaturesRequest += OnSimulatorFeaturesRequest;
+    //private void OnMakeRootAgent(ScenePresence obj)
+    //{
+    //    throw new NotImplementedException();
+    //}
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (m_Enabled)
+        {
+            m_Helper = new SimulatorFeaturesHelper(scene);
+
+            ISimulatorFeaturesModule featuresModule = m_scene.RequestModuleInterface<ISimulatorFeaturesModule>();
+            if (featuresModule != null)
+                featuresModule.OnSimulatorFeaturesRequest += OnSimulatorFeaturesRequest;
+        }
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+    }
+
+    private void OnSimulatorFeaturesRequest(UUID agentID, ref OSDMap features)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_log.DebugFormat("[CAMERA-ONLY MODE]: OnSimulatorFeaturesRequest in {0}", m_scene.RegionInfo.RegionName);
+        if (m_Helper.UserLevel(agentID) <= m_UserLevel)
+        {
+            if (!features.TryGetValue("OpenSimExtras", out OSD extrasMap))
+            {
+                extrasMap = new OSDMap();
+                features["OpenSimExtras"] = extrasMap;
             }
+
+            ((OSDMap)extrasMap)["camera-only-mode"] = OSDMap.FromString("true");
+            m_log.DebugFormat("[CAMERA-ONLY MODE]: Sent in {0}", m_scene.RegionInfo.RegionName);
         }
+        else
+            m_log.DebugFormat("[CAMERA-ONLY MODE]: NOT Sending camera-only-mode in {0}", m_scene.RegionInfo.RegionName);
+    }
 
-        public void RemoveRegion(Scene scene)
+    private void DetachAttachments(UUID agentID)
+    {
+        ScenePresence sp = m_scene.GetScenePresence(agentID);
+        if ((sp.TeleportFlags & TeleportFlags.ViaLogin) != 0)
+            // Wait a little, cos there's weird stuff going on at  login related to
+            // the Current Outfit Folder
+            Thread.Sleep(8000);
+
+        if (sp != null && m_scene.AttachmentsModule != null)
         {
-        }
-
-        private void OnSimulatorFeaturesRequest(UUID agentID, ref OSDMap features)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_log.DebugFormat("[CAMERA-ONLY MODE]: OnSimulatorFeaturesRequest in {0}", m_scene.RegionInfo.RegionName);
-            if (m_Helper.UserLevel(agentID) <= m_UserLevel)
+            List<SceneObjectGroup> attachs = sp.GetAttachments();
+            if (attachs != null && attachs.Count > 0)
             {
-                if (!features.TryGetValue("OpenSimExtras", out OSD extrasMap))
+                foreach (SceneObjectGroup sog in attachs)
                 {
-                    extrasMap = new OSDMap();
-                    features["OpenSimExtras"] = extrasMap;
-                }
+                    m_log.DebugFormat("[CAMERA-ONLY MODE]: Forcibly detaching attach {0} from {1} in {2}",
+                        sog.Name, sp.Name, m_scene.RegionInfo.RegionName);
 
-                ((OSDMap)extrasMap)["camera-only-mode"] = OSDMap.FromString("true");
-                m_log.DebugFormat("[CAMERA-ONLY MODE]: Sent in {0}", m_scene.RegionInfo.RegionName);
-            }
-            else
-                m_log.DebugFormat("[CAMERA-ONLY MODE]: NOT Sending camera-only-mode in {0}", m_scene.RegionInfo.RegionName);
-        }
-
-        private void DetachAttachments(UUID agentID)
-        {
-            ScenePresence sp = m_scene.GetScenePresence(agentID);
-            if ((sp.TeleportFlags & TeleportFlags.ViaLogin) != 0)
-                // Wait a little, cos there's weird stuff going on at  login related to
-                // the Current Outfit Folder
-                Thread.Sleep(8000);
-
-            if (sp != null && m_scene.AttachmentsModule != null)
-            {
-                List<SceneObjectGroup> attachs = sp.GetAttachments();
-                if (attachs != null && attachs.Count > 0)
-                {
-                    foreach (SceneObjectGroup sog in attachs)
-                    {
-                        m_log.DebugFormat("[CAMERA-ONLY MODE]: Forcibly detaching attach {0} from {1} in {2}",
-                            sog.Name, sp.Name, m_scene.RegionInfo.RegionName);
-
-                        m_scene.AttachmentsModule.DetachSingleAttachmentToInv(sp, sog);
-                    }
+                    m_scene.AttachmentsModule.DetachSingleAttachmentToInv(sp, sog);
                 }
             }
         }
-
     }
 
 }

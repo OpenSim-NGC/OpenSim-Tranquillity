@@ -36,151 +36,150 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
 
-namespace OpenSim.Region.CoreModules.World.Land
+namespace OpenSim.Region.CoreModules.World.Land;
+
+public class HGWorldMapModule : WorldMapModule
 {
-    public class HGWorldMapModule : WorldMapModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    // Remember the map area that each client has been exposed to in this region
+    private Dictionary<UUID, List<MapBlockData>> m_SeenMapBlocks = new Dictionary<UUID, List<MapBlockData>>();
+
+    private string m_MapImageServerURL = string.Empty;
+
+    private IUserManagement m_UserManagement;
+
+    #region INonSharedRegionModule Members
+
+    public override void Initialise(IConfigSource source)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        // Remember the map area that each client has been exposed to in this region
-        private Dictionary<UUID, List<MapBlockData>> m_SeenMapBlocks = new Dictionary<UUID, List<MapBlockData>>();
-
-        private string m_MapImageServerURL = string.Empty;
-
-        private IUserManagement m_UserManagement;
-
-        #region INonSharedRegionModule Members
-
-        public override void Initialise(IConfigSource source)
+        string[] configSections = new string[] { "Map", "Startup" };
+        if (Util.GetConfigVarFromSections<string>(
+            source, "WorldMapModule", configSections, "WorldMap") == "HGWorldMap")
         {
-            string[] configSections = new string[] { "Map", "Startup" };
-            if (Util.GetConfigVarFromSections<string>(
-                source, "WorldMapModule", configSections, "WorldMap") == "HGWorldMap")
+            m_Enabled = true;
+
+            m_MapImageServerURL = Util.GetConfigVarFromSections<string>(source, "MapTileURL", new string[] {"LoginService", "HGWorldMap", "SimulatorFeatures"});
+
+            if (!string.IsNullOrEmpty(m_MapImageServerURL))
             {
-                m_Enabled = true;
+                m_MapImageServerURL = m_MapImageServerURL.Trim();
+                if (!m_MapImageServerURL.EndsWith("/"))
+                    m_MapImageServerURL = m_MapImageServerURL + "/";
+            }
 
-                m_MapImageServerURL = Util.GetConfigVarFromSections<string>(source, "MapTileURL", new string[] {"LoginService", "HGWorldMap", "SimulatorFeatures"});
+            expireBlackListTime = (int)Util.GetConfigVarFromSections<int>(source, "BlacklistTimeout", configSections, 10 * 60);
+            expireBlackListTime *= 1000;
+            m_exportPrintScale =
+                Util.GetConfigVarFromSections<bool>(source, "ExportMapAddScale", configSections, m_exportPrintScale);
+            m_exportPrintRegionName =
+                Util.GetConfigVarFromSections<bool>(source, "ExportMapAddRegionName", configSections, m_exportPrintRegionName);
+            m_localV1MapAssets =
+                Util.GetConfigVarFromSections<bool>(source, "LocalV1MapAssets", configSections, m_localV1MapAssets);
+        }
+    }
 
-                if (!string.IsNullOrEmpty(m_MapImageServerURL))
+    public override void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        base.AddRegion(scene);
+
+        scene.EventManager.OnClientClosed += EventManager_OnClientClosed;
+    }
+
+    public override void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        base.RegionLoaded(scene);
+        ISimulatorFeaturesModule featuresModule = m_scene.RequestModuleInterface<ISimulatorFeaturesModule>();
+
+        if (featuresModule != null)
+            featuresModule.OnSimulatorFeaturesRequest += OnSimulatorFeaturesRequest;
+
+        m_UserManagement = m_scene.RequestModuleInterface<IUserManagement>();
+
+    }
+
+    public override void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        base.RemoveRegion(scene);
+
+        scene.EventManager.OnClientClosed -= EventManager_OnClientClosed;
+    }
+
+    public override string Name
+    {
+        get { return "HGWorldMap"; }
+    }
+
+    #endregion
+
+    void EventManager_OnClientClosed(UUID clientID, Scene scene)
+    {
+        ScenePresence sp = scene.GetScenePresence(clientID);
+        if (sp != null)
+        {
+            if (m_SeenMapBlocks.ContainsKey(clientID))
+            {
+                List<MapBlockData> mapBlocks = m_SeenMapBlocks[clientID];
+                foreach (MapBlockData b in mapBlocks)
                 {
-                    m_MapImageServerURL = m_MapImageServerURL.Trim();
-                    if (!m_MapImageServerURL.EndsWith("/"))
-                        m_MapImageServerURL = m_MapImageServerURL + "/";
+                    b.Name = string.Empty;
+                    // Set 'simulator is offline'. We need this because the viewer ignores SimAccess.Unknown (255)
+                    b.Access = (byte)SimAccess.Down;
                 }
 
-                expireBlackListTime = (int)Util.GetConfigVarFromSections<int>(source, "BlacklistTimeout", configSections, 10 * 60);
-                expireBlackListTime *= 1000;
-                m_exportPrintScale =
-                    Util.GetConfigVarFromSections<bool>(source, "ExportMapAddScale", configSections, m_exportPrintScale);
-                m_exportPrintRegionName =
-                    Util.GetConfigVarFromSections<bool>(source, "ExportMapAddRegionName", configSections, m_exportPrintRegionName);
-                m_localV1MapAssets =
-                    Util.GetConfigVarFromSections<bool>(source, "LocalV1MapAssets", configSections, m_localV1MapAssets);
+                m_log.DebugFormat("[HG MAP]: Resetting {0} blocks", mapBlocks.Count);
+                sp.ControllingClient.SendMapBlock(mapBlocks, 0);
+                m_SeenMapBlocks.Remove(clientID);
             }
         }
+    }
 
-        public override void AddRegion(Scene scene)
+    protected override List<MapBlockData> GetAndSendBlocksInternal(IClientAPI remoteClient, int minX, int minY, int maxX, int maxY, uint flag)
+    {
+        List<MapBlockData>  mapBlocks = base.GetAndSendBlocksInternal(remoteClient, minX, minY, maxX, maxY, flag);
+        if(mapBlocks.Count > 0)
         {
-            if (!m_Enabled)
-                return;
-
-            base.AddRegion(scene);
-
-            scene.EventManager.OnClientClosed += EventManager_OnClientClosed;
-        }
-
-        public override void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            base.RegionLoaded(scene);
-            ISimulatorFeaturesModule featuresModule = m_scene.RequestModuleInterface<ISimulatorFeaturesModule>();
-
-            if (featuresModule != null)
-                featuresModule.OnSimulatorFeaturesRequest += OnSimulatorFeaturesRequest;
-
-            m_UserManagement = m_scene.RequestModuleInterface<IUserManagement>();
-
-        }
-
-        public override void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            base.RemoveRegion(scene);
-
-            scene.EventManager.OnClientClosed -= EventManager_OnClientClosed;
-        }
-
-        public override string Name
-        {
-            get { return "HGWorldMap"; }
-        }
-
-        #endregion
-
-        void EventManager_OnClientClosed(UUID clientID, Scene scene)
-        {
-            ScenePresence sp = scene.GetScenePresence(clientID);
-            if (sp != null)
+            lock (m_SeenMapBlocks)
             {
-                if (m_SeenMapBlocks.ContainsKey(clientID))
+                if (!m_SeenMapBlocks.ContainsKey(remoteClient.AgentId))
                 {
-                    List<MapBlockData> mapBlocks = m_SeenMapBlocks[clientID];
+                    m_SeenMapBlocks.Add(remoteClient.AgentId, mapBlocks);
+                }
+                else
+                {
+                    List<MapBlockData> seen = m_SeenMapBlocks[remoteClient.AgentId];
+                    List<MapBlockData> newBlocks = new List<MapBlockData>();
                     foreach (MapBlockData b in mapBlocks)
-                    {
-                        b.Name = string.Empty;
-                        // Set 'simulator is offline'. We need this because the viewer ignores SimAccess.Unknown (255)
-                        b.Access = (byte)SimAccess.Down;
-                    }
-
-                    m_log.DebugFormat("[HG MAP]: Resetting {0} blocks", mapBlocks.Count);
-                    sp.ControllingClient.SendMapBlock(mapBlocks, 0);
-                    m_SeenMapBlocks.Remove(clientID);
+                        if (seen.Find(delegate(MapBlockData bdata) { return bdata.X == b.X && bdata.Y == b.Y; }) == null)
+                            newBlocks.Add(b);
+                    seen.AddRange(newBlocks);
                 }
             }
         }
+        return mapBlocks;
+    }
 
-        protected override List<MapBlockData> GetAndSendBlocksInternal(IClientAPI remoteClient, int minX, int minY, int maxX, int maxY, uint flag)
+    private void OnSimulatorFeaturesRequest(UUID agentID, ref OSDMap features)
+    {
+        if (m_UserManagement != null && !string.IsNullOrEmpty(m_MapImageServerURL) && !m_UserManagement.IsLocalGridUser(agentID))
         {
-            List<MapBlockData>  mapBlocks = base.GetAndSendBlocksInternal(remoteClient, minX, minY, maxX, maxY, flag);
-            if(mapBlocks.Count > 0)
+            if (!features.TryGetValue("OpenSimExtras", out OSD extras))
             {
-                lock (m_SeenMapBlocks)
-                {
-                    if (!m_SeenMapBlocks.ContainsKey(remoteClient.AgentId))
-                    {
-                        m_SeenMapBlocks.Add(remoteClient.AgentId, mapBlocks);
-                    }
-                    else
-                    {
-                        List<MapBlockData> seen = m_SeenMapBlocks[remoteClient.AgentId];
-                        List<MapBlockData> newBlocks = new List<MapBlockData>();
-                        foreach (MapBlockData b in mapBlocks)
-                            if (seen.Find(delegate(MapBlockData bdata) { return bdata.X == b.X && bdata.Y == b.Y; }) == null)
-                                newBlocks.Add(b);
-                        seen.AddRange(newBlocks);
-                    }
-                }
+                extras = new OSDMap();
+                features["OpenSimExtras"] = extras;
             }
-            return mapBlocks;
-        }
 
-        private void OnSimulatorFeaturesRequest(UUID agentID, ref OSDMap features)
-        {
-            if (m_UserManagement != null && !string.IsNullOrEmpty(m_MapImageServerURL) && !m_UserManagement.IsLocalGridUser(agentID))
-            {
-                if (!features.TryGetValue("OpenSimExtras", out OSD extras))
-                {
-                    extras = new OSDMap();
-                    features["OpenSimExtras"] = extras;
-                }
+            ((OSDMap)extras)["map-server-url"] = m_MapImageServerURL;
 
-                ((OSDMap)extras)["map-server-url"] = m_MapImageServerURL;
-
-            }
         }
     }
 }

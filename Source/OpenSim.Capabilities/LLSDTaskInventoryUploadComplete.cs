@@ -27,29 +27,28 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework.Capabilities
+namespace OpenSim.Framework.Capabilities;
+
+[OSDMap]
+public class LLSDTaskInventoryUploadComplete
 {
-    [OSDMap]
-    public class LLSDTaskInventoryUploadComplete
-    {
-        /// <summary>
-        /// The task inventory item that was updated
-        /// </summary>
-        public UUID item_id;
+    /// <summary>
+    /// The task inventory item that was updated
+    /// </summary>
+    public UUID item_id;
 
-        /// <summary>
-        /// The task that was updated
-        /// </summary>
-        public UUID task_id;
+    /// <summary>
+    /// The task that was updated
+    /// </summary>
+    public UUID task_id;
 
-        /// <summary>
-        /// State of the upload.  So far have only even seen this set to "complete"
-        /// </summary>
-        public string state;
+    /// <summary>
+    /// State of the upload.  So far have only even seen this set to "complete"
+    /// </summary>
+    public string state;
 
-        /// <summary>
-        /// What experience key should be used with this script
-        /// </summary>
-        public UUID experience = UUID.Zero;
-    }
+    /// <summary>
+    /// What experience key should be used with this script
+    /// </summary>
+    public UUID experience = UUID.Zero;
 }

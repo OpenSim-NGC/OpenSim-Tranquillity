@@ -27,11 +27,10 @@
 
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain
+namespace OpenSim.Region.CoreModules.World.Terrain;
+
+public interface ITerrainFloodEffect
 {
-    public interface ITerrainFloodEffect
-    {
-        void FloodEffect(ITerrainChannel map, Boolean[,] fillArea, float height, float strength,
-            int startX, int endX, int startY, int endY);
-    }
+    void FloodEffect(ITerrainChannel map, Boolean[,] fillArea, float height, float strength,
+        int startX, int endX, int startY, int endY);
 }

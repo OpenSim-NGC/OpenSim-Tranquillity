@@ -25,117 +25,114 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface ISimulationDataService
 {
-    public interface ISimulationDataService
-    {
-        /// <summary>
-        /// Stores all object's details apart from inventory
-        /// </summary>
-        /// <param name="obj"></param>
-        /// <param name="regionUUID"></param>
-        void StoreObject(SceneObjectGroup obj, UUID regionUUID);
+    /// <summary>
+    /// Stores all object's details apart from inventory
+    /// </summary>
+    /// <param name="obj"></param>
+    /// <param name="regionUUID"></param>
+    void StoreObject(SceneObjectGroup obj, UUID regionUUID);
 
-        /// <summary>
-        /// Entirely removes the object, including inventory
-        /// </summary>
-        /// <param name="uuid"></param>
-        /// <param name="regionUUID"></param>
-        /// <returns></returns>
-        void RemoveObject(UUID uuid, UUID regionUUID);
+    /// <summary>
+    /// Entirely removes the object, including inventory
+    /// </summary>
+    /// <param name="uuid"></param>
+    /// <param name="regionUUID"></param>
+    /// <returns></returns>
+    void RemoveObject(UUID uuid, UUID regionUUID);
 
-        /// <summary>
-        /// Store a prim's inventory
-        /// </summary>
-        /// <returns></returns>
-        void StorePrimInventory(UUID primID, ICollection<TaskInventoryItem> items);
+    /// <summary>
+    /// Store a prim's inventory
+    /// </summary>
+    /// <returns></returns>
+    void StorePrimInventory(UUID primID, ICollection<TaskInventoryItem> items);
 
-        /// <summary>
-        /// Load persisted objects from region storage.
-        /// </summary>
-        /// <param name="regionUUID">the Region UUID</param>
-        /// <returns>List of loaded groups</returns>
-        List<SceneObjectGroup> LoadObjects(UUID regionUUID);
+    /// <summary>
+    /// Load persisted objects from region storage.
+    /// </summary>
+    /// <param name="regionUUID">the Region UUID</param>
+    /// <returns>List of loaded groups</returns>
+    List<SceneObjectGroup> LoadObjects(UUID regionUUID);
 
-        /// <summary>
-        /// Store terrain in region storage
-        /// </summary>
-        /// <param name="ter">HeightField data</param>
-        /// <param name="regionID">region UUID</param>
-        void StoreTerrain(TerrainData terrain, UUID regionID);
+    /// <summary>
+    /// Store terrain in region storage
+    /// </summary>
+    /// <param name="ter">HeightField data</param>
+    /// <param name="regionID">region UUID</param>
+    void StoreTerrain(TerrainData terrain, UUID regionID);
 
-        /// <summary>
-        /// Store baked terrain in region storage
-        /// </summary>
-        /// <param name="ter">HeightField data</param>
-        /// <param name="regionID">region UUID</param>
-        void StoreBakedTerrain(TerrainData terrain, UUID regionID);
+    /// <summary>
+    /// Store baked terrain in region storage
+    /// </summary>
+    /// <param name="ter">HeightField data</param>
+    /// <param name="regionID">region UUID</param>
+    void StoreBakedTerrain(TerrainData terrain, UUID regionID);
 
-        // Legacy version kept for downward compabibility
-        void StoreTerrain(double[,] terrain, UUID regionID);
+    // Legacy version kept for downward compabibility
+    void StoreTerrain(double[,] terrain, UUID regionID);
 
-        /// <summary>
-        /// Load the latest terrain revision from region storage
-        /// </summary>
-        /// <param name="regionID">the region UUID</param>
-        /// <param name="sizeX">the X dimension of the region being filled</param>
-        /// <param name="sizeY">the Y dimension of the region being filled</param>
-        /// <param name="sizeZ">the Z dimension of the region being filled</param>
-        /// <returns>Heightfield data</returns>
-        TerrainData LoadTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ);
-        TerrainData LoadBakedTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ);
+    /// <summary>
+    /// Load the latest terrain revision from region storage
+    /// </summary>
+    /// <param name="regionID">the region UUID</param>
+    /// <param name="sizeX">the X dimension of the region being filled</param>
+    /// <param name="sizeY">the Y dimension of the region being filled</param>
+    /// <param name="sizeZ">the Z dimension of the region being filled</param>
+    /// <returns>Heightfield data</returns>
+    TerrainData LoadTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ);
+    TerrainData LoadBakedTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ);
 
-        // Legacy version kept for downward compabibility
-        double[,] LoadTerrain(UUID regionID);
+    // Legacy version kept for downward compabibility
+    double[,] LoadTerrain(UUID regionID);
 
-        void StoreLandObject(ILandObject Parcel);
+    void StoreLandObject(ILandObject Parcel);
 
-        /// <summary>
-        /// <list type="bullet">
-        /// <item>delete from land where UUID=globalID</item>
-        /// <item>delete from landaccesslist where LandUUID=globalID</item>
-        /// </list>
-        /// </summary>
-        /// <param name="globalID"></param>
-        void RemoveLandObject(UUID globalID);
+    /// <summary>
+    /// <list type="bullet">
+    /// <item>delete from land where UUID=globalID</item>
+    /// <item>delete from landaccesslist where LandUUID=globalID</item>
+    /// </list>
+    /// </summary>
+    /// <param name="globalID"></param>
+    void RemoveLandObject(UUID globalID);
 
-        List<LandData> LoadLandObjects(UUID regionUUID);
+    List<LandData> LoadLandObjects(UUID regionUUID);
 
-        void StoreRegionSettings(RegionSettings rs);
-        RegionSettings LoadRegionSettings(UUID regionUUID);
+    void StoreRegionSettings(RegionSettings rs);
+    RegionSettings LoadRegionSettings(UUID regionUUID);
 
-        /// <summary>
-        /// Load Environment settings from region storage
-        /// </summary>
-        /// <param name="regionUUID">the region UUID</param>
-        /// <returns>LLSD string for viewer</returns>
-        string LoadRegionEnvironmentSettings(UUID regionUUID);
+    /// <summary>
+    /// Load Environment settings from region storage
+    /// </summary>
+    /// <param name="regionUUID">the region UUID</param>
+    /// <returns>LLSD string for viewer</returns>
+    string LoadRegionEnvironmentSettings(UUID regionUUID);
 
-        /// <summary>
-        /// Store Environment settings into region storage
-        /// </summary>
-        /// <param name="regionUUID">the region UUID</param>
-        /// <param name="settings">LLSD string from viewer</param>
-        void StoreRegionEnvironmentSettings(UUID regionUUID, string settings);
+    /// <summary>
+    /// Store Environment settings into region storage
+    /// </summary>
+    /// <param name="regionUUID">the region UUID</param>
+    /// <param name="settings">LLSD string from viewer</param>
+    void StoreRegionEnvironmentSettings(UUID regionUUID, string settings);
 
-        /// <summary>
-        /// Delete Environment settings from region storage
-        /// </summary>
-        /// <param name="regionUUID">the region UUID</param>
-        void RemoveRegionEnvironmentSettings(UUID regionUUID);
+    /// <summary>
+    /// Delete Environment settings from region storage
+    /// </summary>
+    /// <param name="regionUUID">the region UUID</param>
+    void RemoveRegionEnvironmentSettings(UUID regionUUID);
 
-        UUID[] GetObjectIDs(UUID regionID);
+    UUID[] GetObjectIDs(UUID regionID);
 
-        void SaveExtra(UUID regionID, string name, string value);
+    void SaveExtra(UUID regionID, string name, string value);
 
-        void RemoveExtra(UUID regionID, string name);
+    void RemoveExtra(UUID regionID, string name);
 
-        Dictionary<string, string> GetExtra(UUID regionID);
-    }
+    Dictionary<string, string> GetExtra(UUID regionID);
 }

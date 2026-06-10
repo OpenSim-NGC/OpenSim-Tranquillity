@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Net;
 using Nini.Config;
 using OpenMetaverse;
@@ -34,62 +33,61 @@ using OpenSim.Framework;
 using OpenSim.Region.ClientStack.LindenUDP;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+/// <summary>
+/// This class adds full UDP client classes and associated scene presence to scene.
+/// </summary>
+/// <remarks>
+/// This is used for testing client stack code.  For testing other code, use SceneHelper methods instead since
+/// they operate without the burden of setting up UDP structures which should be unnecessary for testing scene
+/// code.
+/// </remarks>
+public static class ClientStackHelpers
 {
-    /// <summary>
-    /// This class adds full UDP client classes and associated scene presence to scene.
-    /// </summary>
-    /// <remarks>
-    /// This is used for testing client stack code.  For testing other code, use SceneHelper methods instead since
-    /// they operate without the burden of setting up UDP structures which should be unnecessary for testing scene
-    /// code.
-    /// </remarks>
-    public static class ClientStackHelpers
+    public static ScenePresence AddChildClient(
+        Scene scene, LLUDPServer udpServer, UUID agentId, UUID sessionId, uint circuitCode)
     {
-        public static ScenePresence AddChildClient(
-            Scene scene, LLUDPServer udpServer, UUID agentId, UUID sessionId, uint circuitCode)
-        {
-            IPEndPoint testEp = new IPEndPoint(IPAddress.Loopback, 999);
+        IPEndPoint testEp = new IPEndPoint(IPAddress.Loopback, 999);
 
-            UseCircuitCodePacket uccp = new UseCircuitCodePacket();
+        UseCircuitCodePacket uccp = new UseCircuitCodePacket();
 
-            UseCircuitCodePacket.CircuitCodeBlock uccpCcBlock
-                = new UseCircuitCodePacket.CircuitCodeBlock();
-            uccpCcBlock.Code = circuitCode;
-            uccpCcBlock.ID = agentId;
-            uccpCcBlock.SessionID = sessionId;
-            uccp.CircuitCode = uccpCcBlock;
+        UseCircuitCodePacket.CircuitCodeBlock uccpCcBlock
+            = new UseCircuitCodePacket.CircuitCodeBlock();
+        uccpCcBlock.Code = circuitCode;
+        uccpCcBlock.ID = agentId;
+        uccpCcBlock.SessionID = sessionId;
+        uccp.CircuitCode = uccpCcBlock;
 
-            byte[] uccpBytes = uccp.ToBytes();
-            UDPPacketBuffer upb = new UDPPacketBuffer(testEp, uccpBytes.Length);
-            upb.DataLength = uccpBytes.Length;  // God knows why this isn't set by the constructor.
-            Buffer.BlockCopy(uccpBytes, 0, upb.Data, 0, uccpBytes.Length);
+        byte[] uccpBytes = uccp.ToBytes();
+        UDPPacketBuffer upb = new UDPPacketBuffer(testEp, uccpBytes.Length);
+        upb.DataLength = uccpBytes.Length;  // God knows why this isn't set by the constructor.
+        Buffer.BlockCopy(uccpBytes, 0, upb.Data, 0, uccpBytes.Length);
 
-            AgentCircuitData acd = new AgentCircuitData();
-            acd.AgentID = agentId;
-            acd.SessionID = sessionId;
+        AgentCircuitData acd = new AgentCircuitData();
+        acd.AgentID = agentId;
+        acd.SessionID = sessionId;
 
-            scene.AuthenticateHandler.AddNewCircuit(circuitCode, acd);
+        scene.AuthenticateHandler.AddNewCircuit(circuitCode, acd);
 
-            udpServer.PacketReceived(upb);
+        udpServer.PacketReceived(upb);
 
-            return scene.GetScenePresence(agentId);
-        }
+        return scene.GetScenePresence(agentId);
+    }
 
-        public static TestLLUDPServer AddUdpServer(Scene scene)
-        {
-            return AddUdpServer(scene, new IniConfigSource());
-        }
+    public static TestLLUDPServer AddUdpServer(Scene scene)
+    {
+        return AddUdpServer(scene, new IniConfigSource());
+    }
 
-        public static TestLLUDPServer AddUdpServer(Scene scene, IniConfigSource configSource)
-        {
-            uint port = 0;
-            AgentCircuitManager acm = scene.AuthenticateHandler;
+    public static TestLLUDPServer AddUdpServer(Scene scene, IniConfigSource configSource)
+    {
+        uint port = 0;
+        AgentCircuitManager acm = scene.AuthenticateHandler;
 
-            TestLLUDPServer udpServer = new TestLLUDPServer(IPAddress.Any, port, 0, configSource, acm);
-            udpServer.AddScene(scene);
+        TestLLUDPServer udpServer = new TestLLUDPServer(IPAddress.Any, port, 0, configSource, acm);
+        udpServer.AddScene(scene);
 
-            return udpServer;
-        }
+        return udpServer;
     }
 }

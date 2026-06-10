@@ -25,13 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
 using System.Reflection;
 using System.Net;
-using System.Text;
-
-using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
@@ -43,120 +38,119 @@ using OpenMetaverse.StructuredData;
 using log4net;
 
 
-namespace OpenSim.Server.Handlers.Neighbour
+namespace OpenSim.Server.Handlers.Neighbour;
+
+public class NeighbourSimpleHandler : SimpleStreamHandler
 {
-    public class NeighbourSimpleHandler : SimpleStreamHandler
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private INeighbourService m_NeighbourService;
+    private IAuthenticationService m_AuthenticationService;
+
+    public NeighbourSimpleHandler(INeighbourService service, IAuthenticationService authentication) :
+            base("/region")
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private INeighbourService m_NeighbourService;
-        private IAuthenticationService m_AuthenticationService;
+        m_NeighbourService = service;
+        m_AuthenticationService = authentication;
+    }
 
-        public NeighbourSimpleHandler(INeighbourService service, IAuthenticationService authentication) :
-                base("/region")
+    protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        httpResponse.KeepAlive = false;
+
+        if (m_NeighbourService == null)
         {
-            m_NeighbourService = service;
-            m_AuthenticationService = authentication;
+            httpResponse.StatusCode = (int)HttpStatusCode.InternalServerError;
+            return;
         }
 
-        protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        switch (httpRequest.HttpMethod)
         {
-            httpResponse.KeepAlive = false;
-
-            if (m_NeighbourService == null)
+            case "POST":
             {
-                httpResponse.StatusCode = (int)HttpStatusCode.InternalServerError;
+                OSDMap args = RestHandlerUtils.DeserializeOSMap(httpRequest);
+                if (args == null)
+                {
+                    httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                    httpResponse.RawBuffer = Util.UTF8.GetBytes("false");
+                    return;
+                }
+
+                if (!RestHandlerUtils.GetParams(httpRequest.UriPath, out UUID regionID, out ulong regionHandle, out string action)
+                    || regionID.IsZero())
+                {
+                    m_log.InfoFormat("[RegionPostHandler]: Invalid parameters for neighbour message {0}", httpRequest.UriPath);
+                    httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                    return;
+                }
+                ProcessPostRequest(args, httpRequest, httpResponse, regionID);
+                break;
+            }
+            case "GET":
+            case "PUT":
+            case "DELETE":
+                httpResponse.StatusCode = (int)HttpStatusCode.NotImplemented;
+                return;
+            default:
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.MethodNotAllowed;
                 return;
             }
-
-            switch (httpRequest.HttpMethod)
-            {
-                case "POST":
-                {
-                    OSDMap args = RestHandlerUtils.DeserializeOSMap(httpRequest);
-                    if (args == null)
-                    {
-                        httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
-                        httpResponse.RawBuffer = Util.UTF8.GetBytes("false");
-                        return;
-                    }
-
-                    if (!RestHandlerUtils.GetParams(httpRequest.UriPath, out UUID regionID, out ulong regionHandle, out string action)
-                        || regionID.IsZero())
-                    {
-                        m_log.InfoFormat("[RegionPostHandler]: Invalid parameters for neighbour message {0}", httpRequest.UriPath);
-                        httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
-                        return;
-                    }
-                    ProcessPostRequest(args, httpRequest, httpResponse, regionID);
-                    break;
-                }
-                case "GET":
-                case "PUT":
-                case "DELETE":
-                    httpResponse.StatusCode = (int)HttpStatusCode.NotImplemented;
-                    return;
-                default:
-                {
-                    httpResponse.StatusCode = (int)HttpStatusCode.MethodNotAllowed;
-                    return;
-                }
-            }
         }
+    }
 
-        // TODO: unused: private bool m_AllowForeignGuests;
-        protected void ProcessPostRequest(OSDMap args, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID regionID)
+    // TODO: unused: private bool m_AllowForeignGuests;
+    protected void ProcessPostRequest(OSDMap args, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID regionID)
+    {
+        if (m_AuthenticationService != null)
         {
-            if (m_AuthenticationService != null)
+            // Authentication
+            string authority = string.Empty;
+            string authToken = string.Empty;
+            if (!RestHandlerUtils.GetAuthentication(httpRequest, out authority, out authToken))
             {
-                // Authentication
-                string authority = string.Empty;
-                string authToken = string.Empty;
-                if (!RestHandlerUtils.GetAuthentication(httpRequest, out authority, out authToken))
-                {
-                    m_log.InfoFormat("[RegionPostHandler]: Authentication failed for neighbour message");
-                    httpResponse.StatusCode = (int)HttpStatusCode.Unauthorized;
-                    return;
-                }
-                // TODO: Rethink this
-                //if (!m_AuthenticationService.VerifyKey(regionID, authToken))
-                //{
-                //    m_log.InfoFormat("[RegionPostHandler]: Authentication failed for neighbour message {0}", path);
-                //    httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
-                //    return result;
-                //}
-                m_log.DebugFormat("[RegionPostHandler]: Authentication succeeded for {0}", regionID);
-            }
-
-            // retrieve the regionhandle
-            ulong regionhandle = 0;
-            if (args["destination_handle"] != null)
-                UInt64.TryParse(args["destination_handle"].AsString(), out regionhandle);
-
-            RegionInfo aRegion = new RegionInfo();
-            try
-            {
-                aRegion.UnpackRegionInfoData(args);
-            }
-            catch (Exception ex)
-            {
-                m_log.InfoFormat("[RegionPostHandler]: exception on unpacking region info {0}", ex.Message);
-                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                m_log.InfoFormat("[RegionPostHandler]: Authentication failed for neighbour message");
+                httpResponse.StatusCode = (int)HttpStatusCode.Unauthorized;
                 return;
             }
-
-            // Finally!
-            GridRegion thisRegion = m_NeighbourService.HelloNeighbour(regionhandle, aRegion);
-
-            OSDMap resp = new OSDMap(1);
-
-            if (thisRegion != null)
-                resp["success"] = OSD.FromBoolean(true);
-            else
-                resp["success"] = OSD.FromBoolean(false);
-
-            httpResponse.RawBuffer = Util.UTF8.GetBytes(OSDParser.SerializeJsonString(resp));
-            httpResponse.StatusCode = (int)HttpStatusCode.OK;
+            // TODO: Rethink this
+            //if (!m_AuthenticationService.VerifyKey(regionID, authToken))
+            //{
+            //    m_log.InfoFormat("[RegionPostHandler]: Authentication failed for neighbour message {0}", path);
+            //    httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
+            //    return result;
+            //}
+            m_log.DebugFormat("[RegionPostHandler]: Authentication succeeded for {0}", regionID);
         }
+
+        // retrieve the regionhandle
+        ulong regionhandle = 0;
+        if (args["destination_handle"] != null)
+            UInt64.TryParse(args["destination_handle"].AsString(), out regionhandle);
+
+        RegionInfo aRegion = new RegionInfo();
+        try
+        {
+            aRegion.UnpackRegionInfoData(args);
+        }
+        catch (Exception ex)
+        {
+            m_log.InfoFormat("[RegionPostHandler]: exception on unpacking region info {0}", ex.Message);
+            httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+            return;
+        }
+
+        // Finally!
+        GridRegion thisRegion = m_NeighbourService.HelloNeighbour(regionhandle, aRegion);
+
+        OSDMap resp = new OSDMap(1);
+
+        if (thisRegion != null)
+            resp["success"] = OSD.FromBoolean(true);
+        else
+            resp["success"] = OSD.FromBoolean(false);
+
+        httpResponse.RawBuffer = Util.UTF8.GetBytes(OSDParser.SerializeJsonString(resp));
+        httpResponse.StatusCode = (int)HttpStatusCode.OK;
     }
 }
 

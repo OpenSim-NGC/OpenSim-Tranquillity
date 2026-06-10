@@ -25,139 +25,133 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Threading;
 using System.Reflection;
 using OpenSim.Framework;
-using OpenSim.Framework.Console;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using log4net;
 using Nini.Config;
 
-namespace OpenSim.Server.Base
+namespace OpenSim.Server.Base;
+
+public class HttpServerBase : ServicesServerBase
 {
-    public class HttpServerBase : ServicesServerBase
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private uint m_consolePort;
+
+    // Handle all the automagical stuff
+    //
+    public HttpServerBase(string prompt, string[] args) : base(prompt, args)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        private uint m_consolePort;
+    protected override void ReadConfig()
+    {
+        IConfig networkConfig = Config.Configs["Network"];
 
-        // Handle all the automagical stuff
-        //
-        public HttpServerBase(string prompt, string[] args) : base(prompt, args)
+        if (networkConfig == null)
         {
+            System.Console.WriteLine("ERROR: Section [Network] not found, server can't start");
+            Environment.Exit(1);
         }
 
-        protected override void ReadConfig()
+        uint port = (uint)networkConfig.GetInt("port", 0);
+
+        if (port == 0)
         {
-            IConfig networkConfig = Config.Configs["Network"];
+            System.Console.WriteLine("ERROR: No 'port' entry found in [Network].  Server can't start");
+            Environment.Exit(1);
+        }
 
-            if (networkConfig == null)
+        bool ssl_main = networkConfig.GetBoolean("https_main",false);
+        bool ssl_listener = networkConfig.GetBoolean("https_listener",false);
+        bool ssl_external = networkConfig.GetBoolean("https_external",false);
+
+        m_consolePort = (uint)networkConfig.GetInt("ConsolePort", 0);
+
+        BaseHttpServer httpServer = null;
+
+        //
+        // This is where to make the servers:
+        //
+        //
+        // Make the base server according to the port, etc.
+        // ADD: Possibility to make main server ssl
+        // Then, check for https settings and ADD a server to
+        // m_Servers
+        //
+        if (!ssl_main)
+        {
+            httpServer = new BaseHttpServer(port);
+        }
+        else
+        {
+            string cert_path = networkConfig.GetString("cert_path", string.Empty);
+            if (cert_path.Length == 0)
             {
-                System.Console.WriteLine("ERROR: Section [Network] not found, server can't start");
+                System.Console.WriteLine("ERROR: Path to X509 certificate is missing, server can't start.");
                 Environment.Exit(1);
             }
 
-            uint port = (uint)networkConfig.GetInt("port", 0);
-
-            if (port == 0)
+            string cert_pass = networkConfig.GetString("cert_pass", string.Empty);
+            if (cert_pass.Length == 0)
             {
-                System.Console.WriteLine("ERROR: No 'port' entry found in [Network].  Server can't start");
+                System.Console.WriteLine("ERROR: Password for X509 certificate is missing, server can't start.");
                 Environment.Exit(1);
             }
 
-            bool ssl_main = networkConfig.GetBoolean("https_main",false);
-            bool ssl_listener = networkConfig.GetBoolean("https_listener",false);
-            bool ssl_external = networkConfig.GetBoolean("https_external",false);
+            httpServer = new BaseHttpServer(port, ssl_main, cert_path, cert_pass);
+        }
 
-            m_consolePort = (uint)networkConfig.GetInt("ConsolePort", 0);
+        MainServer.Instance.AddHttpServer(httpServer);
 
-            BaseHttpServer httpServer = null;
+        // If https_listener = true, then add an ssl listener on the https_port...
+        if (ssl_listener == true)
+        {
+            uint https_port = (uint)networkConfig.GetInt("https_port", 0);
 
-            //
-            // This is where to make the servers:
-            //
-            //
-            // Make the base server according to the port, etc.
-            // ADD: Possibility to make main server ssl
-            // Then, check for https settings and ADD a server to
-            // m_Servers
-            //
-            if (!ssl_main)
+            m_log.WarnFormat("[SSL]: External flag is {0}", ssl_external);
+            if (!ssl_external)
             {
-                httpServer = new BaseHttpServer(port);
+                string cert_path = networkConfig.GetString("cert_path", string.Empty);
+                if ( cert_path.Length == 0 )
+                {
+                    System.Console.WriteLine("Path to X509 certificate is missing, server can't start.");
+                    //Thread.CurrentThread.Abort();
+                }
+                string cert_pass = networkConfig.GetString("cert_pass", string.Empty);
+                if ( cert_pass.Length == 0 )
+                {
+                    System.Console.WriteLine("Password for X509 certificate is missing, server can't start.");
+                    //Thread.CurrentThread.Abort();
+                }
+
+                MainServer.Instance.AddHttpServer(new BaseHttpServer(https_port, ssl_listener, cert_path, cert_pass));
             }
             else
             {
-                string cert_path = networkConfig.GetString("cert_path", string.Empty);
-                if (cert_path.Length == 0)
-                {
-                    System.Console.WriteLine("ERROR: Path to X509 certificate is missing, server can't start.");
-                    Environment.Exit(1);
-                }
-
-                string cert_pass = networkConfig.GetString("cert_pass", string.Empty);
-                if (cert_pass.Length == 0)
-                {
-                    System.Console.WriteLine("ERROR: Password for X509 certificate is missing, server can't start.");
-                    Environment.Exit(1);
-                }
-
-                httpServer = new BaseHttpServer(port, ssl_main, cert_path, cert_pass);
-            }
-
-            MainServer.AddHttpServer(httpServer);
-            MainServer.Instance = httpServer;
-
-            // If https_listener = true, then add an ssl listener on the https_port...
-            if (ssl_listener == true)
-            {
-                uint https_port = (uint)networkConfig.GetInt("https_port", 0);
-
-                m_log.WarnFormat("[SSL]: External flag is {0}", ssl_external);
-                if (!ssl_external)
-                {
-                    string cert_path = networkConfig.GetString("cert_path", string.Empty);
-                    if ( cert_path.Length == 0 )
-                    {
-                        System.Console.WriteLine("Path to X509 certificate is missing, server can't start.");
-                        //Thread.CurrentThread.Abort();
-                    }
-                    string cert_pass = networkConfig.GetString("cert_pass", string.Empty);
-                    if ( cert_pass.Length == 0 )
-                    {
-                        System.Console.WriteLine("Password for X509 certificate is missing, server can't start.");
-                        //Thread.CurrentThread.Abort();
-                    }
-
-                    MainServer.AddHttpServer(new BaseHttpServer(https_port, ssl_listener, cert_path, cert_pass));
-                }
-                else
-                {
-                    m_log.WarnFormat("[SSL]: SSL port is active but no SSL is used because external SSL was requested.");
-                    MainServer.AddHttpServer(new BaseHttpServer(https_port));
-                }
+                m_log.WarnFormat("[SSL]: SSL port is active but no SSL is used because external SSL was requested.");
+                MainServer.Instance.AddHttpServer(new BaseHttpServer(https_port));
             }
         }
+    }
 
-        protected override void Initialise()
+    protected override void Initialise()
+    {
+        foreach (BaseHttpServer s in MainServer.Instance.Servers.Values)
+            s.Start();
+
+        MainServer.Instance.RegisterHttpConsoleCommands(MainConsole.Instance);
+
+        MethodInfo mi = m_console.GetType().GetMethod("SetServer", BindingFlags.Public | BindingFlags.Instance, null, new Type[] { typeof(BaseHttpServer) }, null);
+
+        if (mi != null)
         {
-            foreach (BaseHttpServer s in MainServer.Servers.Values)
-                s.Start();
-
-            MainServer.RegisterHttpConsoleCommands(MainConsole.Instance);
-
-            MethodInfo mi = m_console.GetType().GetMethod("SetServer", BindingFlags.Public | BindingFlags.Instance, null, new Type[] { typeof(BaseHttpServer) }, null);
-
-            if (mi != null)
-            {
-                if (m_consolePort == 0)
-                    mi.Invoke(MainConsole.Instance, new object[] { MainServer.Instance });
-                else
-                    mi.Invoke(MainConsole.Instance, new object[] { MainServer.GetHttpServer(m_consolePort) });
-            }
+            if (m_consolePort == 0)
+                mi.Invoke(MainConsole.Instance, new object[] { MainServer.Instance.DefaultServer });
+            else
+                mi.Invoke(MainConsole.Instance, new object[] { MainServer.Instance.GetHttpServer(m_consolePort) });
         }
     }
 }

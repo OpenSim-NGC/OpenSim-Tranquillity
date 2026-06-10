@@ -25,50 +25,48 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using MySqlConnector;
 using OpenMetaverse;
 
-namespace OpenSim.Data.MySQL
+namespace OpenSim.Data.MySQL;
+
+/// <summary>
+/// A MySQL Interface for user grid data
+/// </summary>
+public class MySQLHGTravelData : MySQLGenericTableHandler<HGTravelingData>, IHGTravelingData
 {
-    /// <summary>
-    /// A MySQL Interface for user grid data
-    /// </summary>
-    public class MySQLHGTravelData : MySQLGenericTableHandler<HGTravelingData>, IHGTravelingData
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public MySQLHGTravelData(string connectionString, string realm) : base(connectionString, realm, "HGTravelStore") { }
+    public MySQLHGTravelData(string connectionString, string realm) : base(connectionString, realm, "HGTravelStore") { }
 
-        public HGTravelingData Get(UUID sessionID)
+    public HGTravelingData Get(UUID sessionID)
+    {
+        HGTravelingData[] ret = Get("SessionID", sessionID.ToString());
+
+        if (ret.Length == 0)
+            return null;
+
+        return ret[0];
+    }
+
+    public HGTravelingData[] GetSessions(UUID userID)
+    {
+        return base.Get("UserID", userID.ToString());
+    }
+
+    public bool Delete(UUID sessionID)
+    {
+        return Delete("SessionID", sessionID.ToString());
+    }
+
+    public void DeleteOld()
+    {
+        using (MySqlCommand cmd = new MySqlCommand())
         {
-            HGTravelingData[] ret = Get("SessionID", sessionID.ToString());
+            cmd.CommandText = String.Format("delete from {0} where TMStamp < NOW() - INTERVAL 2 DAY", m_Realm);
 
-            if (ret.Length == 0)
-                return null;
-
-            return ret[0];
+            ExecuteNonQuery(cmd);
         }
 
-        public HGTravelingData[] GetSessions(UUID userID)
-        {
-            return base.Get("UserID", userID.ToString());
-        }
-
-        public bool Delete(UUID sessionID)
-        {
-            return Delete("SessionID", sessionID.ToString());
-        }
-
-        public void DeleteOld()
-        {
-            using (MySqlCommand cmd = new MySqlCommand())
-            {
-                cmd.CommandText = String.Format("delete from {0} where TMStamp < NOW() - INTERVAL 2 DAY", m_Realm);
-
-                ExecuteNonQuery(cmd);
-            }
-
-        }
     }
 }

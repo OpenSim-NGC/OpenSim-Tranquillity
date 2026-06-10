@@ -35,144 +35,143 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication;
+
+public class LocalAuthenticationServicesConnector : ISharedRegionModule, IAuthenticationService
 {
-    public class LocalAuthenticationServicesConnector : ISharedRegionModule, IAuthenticationService
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IAuthenticationService m_AuthenticationService;
+
+    private bool m_Enabled = false;
+
+    #region ISharedRegionModule
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        private IAuthenticationService m_AuthenticationService;
+    public string Name
+    {
+        get { return "LocalAuthenticationServicesConnector"; }
+    }
 
-        private bool m_Enabled = false;
-
-        #region ISharedRegionModule
-
-        public Type ReplaceableInterface
+    public void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "LocalAuthenticationServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("AuthenticationServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("AuthenticationServices", "");
-                if (name == Name)
+                IConfig userConfig = source.Configs["AuthenticationService"];
+                if (userConfig == null)
                 {
-                    IConfig userConfig = source.Configs["AuthenticationService"];
-                    if (userConfig == null)
-                    {
-                        m_log.Error("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
-                        return;
-                    }
-
-                    string serviceDll = userConfig.GetString("LocalServiceModule",
-                            String.Empty);
-
-                    if (serviceDll.Length == 0)
-                    {
-                        m_log.Error("[AUTH CONNECTOR]: No LocalServiceModule named in section AuthenticationService");
-                        return;
-                    }
-
-                    Object[] args = new Object[] { source };
-                    m_AuthenticationService =
-                            ServerUtils.LoadPlugin<IAuthenticationService>(serviceDll,
-                            args);
-
-                    if (m_AuthenticationService == null)
-                    {
-                        m_log.Error("[AUTH CONNECTOR]: Can't load Authentication service");
-                        return;
-                    }
-                    m_Enabled = true;
-                    m_log.Info("[AUTH CONNECTOR]: Local Authentication connector enabled");
+                    m_log.Error("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
+                    return;
                 }
+
+                string serviceDll = userConfig.GetString("LocalServiceModule",
+                        String.Empty);
+
+                if (serviceDll.Length == 0)
+                {
+                    m_log.Error("[AUTH CONNECTOR]: No LocalServiceModule named in section AuthenticationService");
+                    return;
+                }
+
+                Object[] args = new Object[] { source };
+                m_AuthenticationService =
+                        ServerUtils.LoadPlugin<IAuthenticationService>(serviceDll,
+                        args);
+
+                if (m_AuthenticationService == null)
+                {
+                    m_log.Error("[AUTH CONNECTOR]: Can't load Authentication service");
+                    return;
+                }
+                m_Enabled = true;
+                m_log.Info("[AUTH CONNECTOR]: Local Authentication connector enabled");
             }
         }
-
-        public void PostInitialise()
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void Close()
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            scene.RegisterModuleInterface<IAuthenticationService>(m_AuthenticationService);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-        }
-
-        #endregion
-
-        #region IAuthenticationService
-
-        public string Authenticate(UUID principalID, string password, int lifetime, out UUID realID)
-        {
-            // Not implemented at the regions
-            realID = UUID.Zero;
-            return string.Empty;
-        }
-
-        public string Authenticate(UUID principalID, string password, int lifetime)
-        {
-            // Not implemented at the regions
-            return string.Empty;
-        }
-
-        public bool Verify(UUID principalID, string token, int lifetime)
-        {
-            return m_AuthenticationService.Verify(principalID, token, lifetime);
-        }
-
-        public bool Release(UUID principalID, string token)
-        {
-            return m_AuthenticationService.Release(principalID, token);
-        }
-
-        public bool SetPassword(UUID principalID, string passwd)
-        {
-            return m_AuthenticationService.SetPassword(principalID, passwd);
-        }
-
-        public AuthInfo GetAuthInfo(UUID principalID)
-        {
-            return m_AuthenticationService.GetAuthInfo(principalID);
-        }
-
-        public bool SetAuthInfo(AuthInfo info)
-        {
-            return m_AuthenticationService.SetAuthInfo(info);
-        }
-
-        #endregion
     }
+
+    public void PostInitialise()
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void Close()
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        scene.RegisterModuleInterface<IAuthenticationService>(m_AuthenticationService);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+    }
+
+    #endregion
+
+    #region IAuthenticationService
+
+    public string Authenticate(UUID principalID, string password, int lifetime, out UUID realID)
+    {
+        // Not implemented at the regions
+        realID = UUID.Zero;
+        return string.Empty;
+    }
+
+    public string Authenticate(UUID principalID, string password, int lifetime)
+    {
+        // Not implemented at the regions
+        return string.Empty;
+    }
+
+    public bool Verify(UUID principalID, string token, int lifetime)
+    {
+        return m_AuthenticationService.Verify(principalID, token, lifetime);
+    }
+
+    public bool Release(UUID principalID, string token)
+    {
+        return m_AuthenticationService.Release(principalID, token);
+    }
+
+    public bool SetPassword(UUID principalID, string passwd)
+    {
+        return m_AuthenticationService.SetPassword(principalID, passwd);
+    }
+
+    public AuthInfo GetAuthInfo(UUID principalID)
+    {
+        return m_AuthenticationService.GetAuthInfo(principalID);
+    }
+
+    public bool SetAuthInfo(AuthInfo info)
+    {
+        return m_AuthenticationService.SetAuthInfo(info);
+    }
+
+    #endregion
 }

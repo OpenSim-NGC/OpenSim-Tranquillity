@@ -25,24 +25,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
+namespace OpenSim.Framework.Console;
 
-namespace OpenSim.Framework.Console
+/// <summary>
+/// This will be a set of typical column sizes to allow greater consistency between console commands.
+/// </summary>
+public static class ConsoleDisplayUtil
 {
-    /// <summary>
-    /// This will be a set of typical column sizes to allow greater consistency between console commands.
-    /// </summary>
-    public static class ConsoleDisplayUtil
-    {
-        public const int CoordTupleSize = 11;
-        public const int PortSize = 5;
+    public const int CoordTupleSize = 11;
+    public const int PortSize = 5;
 
-        public const int EstateNameSize = 20;
-        public const int ParcelNameSize = 40;
-        public const int RegionNameSize = 20;
-        public const int UserNameSize = 35;
+    public const int EstateNameSize = 20;
+    public const int ParcelNameSize = 40;
+    public const int RegionNameSize = 20;
+    public const int UserNameSize = 35;
 
-        public const int UuidSize = 36;
-        public const int VectorSize = 15;
-    }
+    public const int UuidSize = 36;
+    public const int VectorSize = 15;
 }

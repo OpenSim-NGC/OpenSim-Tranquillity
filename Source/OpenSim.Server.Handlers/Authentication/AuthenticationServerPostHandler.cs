@@ -27,15 +27,8 @@
 
 using Nini.Config;
 using log4net;
-using System;
 using System.Reflection;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
-using System.Collections.Generic;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
@@ -43,276 +36,275 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
-namespace OpenSim.Server.Handlers.Authentication
+namespace OpenSim.Server.Handlers.Authentication;
+
+public class AuthenticationServerPostHandler : BaseStreamHandler
 {
-    public class AuthenticationServerPostHandler : BaseStreamHandler
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IAuthenticationService m_AuthenticationService;
+
+    private bool m_AllowGetAuthInfo = false;
+    private bool m_AllowSetAuthInfo = false;
+    private bool m_AllowSetPassword = false;
+
+    public AuthenticationServerPostHandler(IAuthenticationService service) :
+            this(service, null, null) {}
+
+    public AuthenticationServerPostHandler(IAuthenticationService service, IConfig config, IServiceAuth auth) :
+            base("POST", "/auth", auth)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_AuthenticationService = service;
 
-        private IAuthenticationService m_AuthenticationService;
-
-        private bool m_AllowGetAuthInfo = false;
-        private bool m_AllowSetAuthInfo = false;
-        private bool m_AllowSetPassword = false;
-
-        public AuthenticationServerPostHandler(IAuthenticationService service) :
-                this(service, null, null) {}
-
-        public AuthenticationServerPostHandler(IAuthenticationService service, IConfig config, IServiceAuth auth) :
-                base("POST", "/auth", auth)
+        if (config != null)
         {
-            m_AuthenticationService = service;
-
-            if (config != null)
-            {
-                m_AllowGetAuthInfo = config.GetBoolean("AllowGetAuthInfo", m_AllowGetAuthInfo);
-                m_AllowSetAuthInfo = config.GetBoolean("AllowSetAuthInfo", m_AllowSetAuthInfo);
-                m_AllowSetPassword = config.GetBoolean("AllowSetPassword", m_AllowSetPassword);
-            }
+            m_AllowGetAuthInfo = config.GetBoolean("AllowGetAuthInfo", m_AllowGetAuthInfo);
+            m_AllowSetAuthInfo = config.GetBoolean("AllowSetAuthInfo", m_AllowSetAuthInfo);
+            m_AllowSetPassword = config.GetBoolean("AllowSetPassword", m_AllowSetPassword);
         }
+    }
 
-        protected override byte[] ProcessRequest(string path, Stream request,
-                IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
+    protected override byte[] ProcessRequest(string path, Stream request,
+            IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
 //            m_log.Error("[XXX]: Authenticating...");
-            string[] p = SplitParams(path);
+        string[] p = SplitParams(path);
 
-            if (p.Length > 0)
+        if (p.Length > 0)
+        {
+            switch (p[0])
             {
-                switch (p[0])
-                {
-                case "plain":
-                    string body;
-                    using(StreamReader sr = new StreamReader(request))
-                        body = sr.ReadToEnd();
-                    return DoPlainMethods(body);
+            case "plain":
+                string body;
+                using(StreamReader sr = new StreamReader(request))
+                    body = sr.ReadToEnd();
+                return DoPlainMethods(body);
 
-                case "crypt":
-                    byte[] buffer = new byte[request.Length];
-                    long length = request.Length;
-                    if (length > 16384)
-                        length = 16384;
-                    request.Read(buffer, 0, (int)length);
+            case "crypt":
+                byte[] buffer = new byte[request.Length];
+                long length = request.Length;
+                if (length > 16384)
+                    length = 16384;
+                request.Read(buffer, 0, (int)length);
 
-                    return DoEncryptedMethods(buffer);
-                }
+                return DoEncryptedMethods(buffer);
             }
-            return Array.Empty<byte>();
+        }
+        return Array.Empty<byte>();
+    }
+
+    private byte[] DoPlainMethods(string body)
+    {
+        Dictionary<string, object> request =
+                ServerUtils.ParseQueryString(body);
+
+        int lifetime = 30;
+
+        if (request.ContainsKey("LIFETIME"))
+        {
+            lifetime = Convert.ToInt32(request["LIFETIME"].ToString());
+            if (lifetime > 30)
+                lifetime = 30;
         }
 
-        private byte[] DoPlainMethods(string body)
+        if (!request.ContainsKey("METHOD"))
+            return FailureResult();
+        if (!request.ContainsKey("PRINCIPAL"))
+            return FailureResult();
+
+        string method = request["METHOD"].ToString();
+
+        UUID principalID;
+        string token;
+
+        if (!UUID.TryParse(request["PRINCIPAL"].ToString(), out principalID))
+            return FailureResult();
+
+        switch (method)
         {
-            Dictionary<string, object> request =
-                    ServerUtils.ParseQueryString(body);
-
-            int lifetime = 30;
-
-            if (request.ContainsKey("LIFETIME"))
-            {
-                lifetime = Convert.ToInt32(request["LIFETIME"].ToString());
-                if (lifetime > 30)
-                    lifetime = 30;
-            }
-
-            if (!request.ContainsKey("METHOD"))
-                return FailureResult();
-            if (!request.ContainsKey("PRINCIPAL"))
-                return FailureResult();
-
-            string method = request["METHOD"].ToString();
-
-            UUID principalID;
-            string token;
-
-            if (!UUID.TryParse(request["PRINCIPAL"].ToString(), out principalID))
-                return FailureResult();
-
-            switch (method)
-            {
-                case "authenticate":
-                    if (!request.ContainsKey("PASSWORD"))
-                        return FailureResult();
-
-                    token = m_AuthenticationService.Authenticate(principalID, request["PASSWORD"].ToString(), lifetime);
-
-                    if (token != String.Empty)
-                        return SuccessResult(token);
+            case "authenticate":
+                if (!request.ContainsKey("PASSWORD"))
                     return FailureResult();
 
-                case "setpassword":
-                    if (!m_AllowSetPassword)
-                        return FailureResult();
+                token = m_AuthenticationService.Authenticate(principalID, request["PASSWORD"].ToString(), lifetime);
 
-                    if (!request.ContainsKey("PASSWORD"))
-                        return FailureResult();
+                if (token != String.Empty)
+                    return SuccessResult(token);
+                return FailureResult();
 
-                    if (m_AuthenticationService.SetPassword(principalID, request["PASSWORD"].ToString()))
-                        return SuccessResult();
-                    else
-                        return FailureResult();
-
-                case "verify":
-                    if (!request.ContainsKey("TOKEN"))
-                        return FailureResult();
-
-                    if (m_AuthenticationService.Verify(principalID, request["TOKEN"].ToString(), lifetime))
-                        return SuccessResult();
-
+            case "setpassword":
+                if (!m_AllowSetPassword)
                     return FailureResult();
 
-                case "release":
-                    if (!request.ContainsKey("TOKEN"))
-                        return FailureResult();
-
-                    if (m_AuthenticationService.Release(principalID, request["TOKEN"].ToString()))
-                        return SuccessResult();
-
+                if (!request.ContainsKey("PASSWORD"))
                     return FailureResult();
 
-                case "getauthinfo":
-                    if (m_AllowGetAuthInfo)
-                        return GetAuthInfo(principalID);
+                if (m_AuthenticationService.SetPassword(principalID, request["PASSWORD"].ToString()))
+                    return SuccessResult();
+                else
+                    return FailureResult();
 
-                    break;
+            case "verify":
+                if (!request.ContainsKey("TOKEN"))
+                    return FailureResult();
 
-                case "setauthinfo":
-                    if (m_AllowSetAuthInfo)
-                        return SetAuthInfo(principalID, request);
+                if (m_AuthenticationService.Verify(principalID, request["TOKEN"].ToString(), lifetime))
+                    return SuccessResult();
 
-                    break;
-            }
+                return FailureResult();
+
+            case "release":
+                if (!request.ContainsKey("TOKEN"))
+                    return FailureResult();
+
+                if (m_AuthenticationService.Release(principalID, request["TOKEN"].ToString()))
+                    return SuccessResult();
+
+                return FailureResult();
+
+            case "getauthinfo":
+                if (m_AllowGetAuthInfo)
+                    return GetAuthInfo(principalID);
+
+                break;
+
+            case "setauthinfo":
+                if (m_AllowSetAuthInfo)
+                    return SetAuthInfo(principalID, request);
+
+                break;
+        }
+
+        return FailureResult();
+    }
+
+    private byte[] DoEncryptedMethods(byte[] ciphertext)
+    {
+        return Array.Empty<byte>();
+    }
+
+    private byte[] SuccessResult()
+    {
+        XmlDocument doc = new XmlDocument();
+
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
+                "", "");
+
+        doc.AppendChild(xmlnode);
+
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse",
+                "");
+
+        doc.AppendChild(rootElement);
+
+        XmlElement result = doc.CreateElement("", "Result", "");
+        result.AppendChild(doc.CreateTextNode("Success"));
+
+        rootElement.AppendChild(result);
+
+        return Util.DocToBytes(doc);
+    }
+
+    byte[] GetAuthInfo(UUID principalID)
+    {
+        AuthInfo info = m_AuthenticationService.GetAuthInfo(principalID);
+
+        if (info != null)
+        {
+            Dictionary<string, object> result = new Dictionary<string, object>();
+            result["result"] = info.ToKeyValuePairs();
+
+            return ResultToBytes(result);
+        }
+        else
+        {
+            return FailureResult();
+        }
+    }
+
+    byte[] SetAuthInfo(UUID principalID, Dictionary<string, object> request)
+    {
+        AuthInfo existingInfo = m_AuthenticationService.GetAuthInfo(principalID);
+
+        if (existingInfo == null)
+            return FailureResult();
+
+        if (request.ContainsKey("AccountType"))
+            existingInfo.AccountType = request["AccountType"].ToString();
+
+        if (request.ContainsKey("PasswordHash"))
+            existingInfo.PasswordHash = request["PasswordHash"].ToString();
+
+        if (request.ContainsKey("PasswordSalt"))
+            existingInfo.PasswordSalt = request["PasswordSalt"].ToString();
+
+        if (request.ContainsKey("WebLoginKey"))
+            existingInfo.WebLoginKey = request["WebLoginKey"].ToString();
+
+        if (!m_AuthenticationService.SetAuthInfo(existingInfo))
+        {
+            m_log.ErrorFormat(
+                "[AUTHENTICATION SERVER POST HANDLER]: Authentication info store failed for account {0} {1} {2}",
+                existingInfo.PrincipalID);
 
             return FailureResult();
         }
 
-        private byte[] DoEncryptedMethods(byte[] ciphertext)
-        {
-            return Array.Empty<byte>();
-        }
+        return SuccessResult();
+    }
 
-        private byte[] SuccessResult()
-        {
-            XmlDocument doc = new XmlDocument();
+    private byte[] FailureResult()
+    {
+        XmlDocument doc = new XmlDocument();
 
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
+                "", "");
 
-            doc.AppendChild(xmlnode);
+        doc.AppendChild(xmlnode);
 
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse",
+                "");
 
-            doc.AppendChild(rootElement);
+        doc.AppendChild(rootElement);
 
-            XmlElement result = doc.CreateElement("", "Result", "");
-            result.AppendChild(doc.CreateTextNode("Success"));
+        XmlElement result = doc.CreateElement("", "Result", "");
+        result.AppendChild(doc.CreateTextNode("Failure"));
 
-            rootElement.AppendChild(result);
+        rootElement.AppendChild(result);
 
-            return Util.DocToBytes(doc);
-        }
+        return Util.DocToBytes(doc);
+    }
 
-        byte[] GetAuthInfo(UUID principalID)
-        {
-            AuthInfo info = m_AuthenticationService.GetAuthInfo(principalID);
+    private byte[] SuccessResult(string token)
+    {
+        XmlDocument doc = new XmlDocument();
 
-            if (info != null)
-            {
-                Dictionary<string, object> result = new Dictionary<string, object>();
-                result["result"] = info.ToKeyValuePairs();
+        XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
+                "", "");
 
-                return ResultToBytes(result);
-            }
-            else
-            {
-                return FailureResult();
-            }
-        }
+        doc.AppendChild(xmlnode);
 
-        byte[] SetAuthInfo(UUID principalID, Dictionary<string, object> request)
-        {
-            AuthInfo existingInfo = m_AuthenticationService.GetAuthInfo(principalID);
+        XmlElement rootElement = doc.CreateElement("", "ServerResponse",
+                "");
 
-            if (existingInfo == null)
-                return FailureResult();
+        doc.AppendChild(rootElement);
 
-            if (request.ContainsKey("AccountType"))
-                existingInfo.AccountType = request["AccountType"].ToString();
+        XmlElement result = doc.CreateElement("", "Result", "");
+        result.AppendChild(doc.CreateTextNode("Success"));
 
-            if (request.ContainsKey("PasswordHash"))
-                existingInfo.PasswordHash = request["PasswordHash"].ToString();
+        rootElement.AppendChild(result);
 
-            if (request.ContainsKey("PasswordSalt"))
-                existingInfo.PasswordSalt = request["PasswordSalt"].ToString();
+        XmlElement t = doc.CreateElement("", "Token", "");
+        t.AppendChild(doc.CreateTextNode(token));
 
-            if (request.ContainsKey("WebLoginKey"))
-                existingInfo.WebLoginKey = request["WebLoginKey"].ToString();
+        rootElement.AppendChild(t);
 
-            if (!m_AuthenticationService.SetAuthInfo(existingInfo))
-            {
-                m_log.ErrorFormat(
-                    "[AUTHENTICATION SERVER POST HANDLER]: Authentication info store failed for account {0} {1} {2}",
-                    existingInfo.PrincipalID);
+        return Util.DocToBytes(doc);
+    }
 
-                return FailureResult();
-            }
-
-            return SuccessResult();
-        }
-
-        private byte[] FailureResult()
-        {
-            XmlDocument doc = new XmlDocument();
-
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
-
-            doc.AppendChild(xmlnode);
-
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
-
-            doc.AppendChild(rootElement);
-
-            XmlElement result = doc.CreateElement("", "Result", "");
-            result.AppendChild(doc.CreateTextNode("Failure"));
-
-            rootElement.AppendChild(result);
-
-            return Util.DocToBytes(doc);
-        }
-
-        private byte[] SuccessResult(string token)
-        {
-            XmlDocument doc = new XmlDocument();
-
-            XmlNode xmlnode = doc.CreateNode(XmlNodeType.XmlDeclaration,
-                    "", "");
-
-            doc.AppendChild(xmlnode);
-
-            XmlElement rootElement = doc.CreateElement("", "ServerResponse",
-                    "");
-
-            doc.AppendChild(rootElement);
-
-            XmlElement result = doc.CreateElement("", "Result", "");
-            result.AppendChild(doc.CreateTextNode("Success"));
-
-            rootElement.AppendChild(result);
-
-            XmlElement t = doc.CreateElement("", "Token", "");
-            t.AppendChild(doc.CreateTextNode(token));
-
-            rootElement.AppendChild(t);
-
-            return Util.DocToBytes(doc);
-        }
-
-        private byte[] ResultToBytes(Dictionary<string, object> result)
-        {
-            string xmlString = ServerUtils.BuildXmlResponse(result);
-            return Util.UTF8NoBomEncoding.GetBytes(xmlString);
-        }
+    private byte[] ResultToBytes(Dictionary<string, object> result)
+    {
+        string xmlString = ServerUtils.BuildXmlResponse(result);
+        return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 }

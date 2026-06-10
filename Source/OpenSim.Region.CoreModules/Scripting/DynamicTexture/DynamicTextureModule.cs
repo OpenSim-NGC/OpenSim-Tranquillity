@@ -34,638 +34,637 @@ using OpenSim.Region.Framework.Scenes;
 using log4net;
 using System.Reflection;
 
-namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture
+namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture;
+
+public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
 {
-    public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private const int ALL_SIDES = -1;
+    private const int ALL_SIDES = -1;
 
-        public const int DISP_EXPIRE = 1;
-        public const int DISP_TEMP   = 2;
+    public const int DISP_EXPIRE = 1;
+    public const int DISP_TEMP   = 2;
 
-        /// <summary>
-        /// If true then where possible dynamic textures are reused.
-        /// </summary>
-        public bool ReuseTextures { get; set; }
+    /// <summary>
+    /// If true then where possible dynamic textures are reused.
+    /// </summary>
+    public bool ReuseTextures { get; set; }
 
-        /// <summary>
-        /// If false, then textures which have a low data size are not reused when ReuseTextures = true.
-        /// </summary>
-        /// <remarks>
-        /// LL viewers 3.3.4 and before appear to not fully render textures pulled from the viewer cache if those
-        /// textures have a relatively high pixel surface but a small data size.  Typically, this appears to happen
-        /// if the data size is smaller than the viewer's discard level 2 size estimate.  So if this is setting is
-        /// false, textures smaller than the calculation in IsSizeReuseable are always regenerated rather than reused
-        /// to work around this problem.</remarks>
-        public bool ReuseLowDataTextures { get; set; }
+    /// <summary>
+    /// If false, then textures which have a low data size are not reused when ReuseTextures = true.
+    /// </summary>
+    /// <remarks>
+    /// LL viewers 3.3.4 and before appear to not fully render textures pulled from the viewer cache if those
+    /// textures have a relatively high pixel surface but a small data size.  Typically, this appears to happen
+    /// if the data size is smaller than the viewer's discard level 2 size estimate.  So if this is setting is
+    /// false, textures smaller than the calculation in IsSizeReuseable are always regenerated rather than reused
+    /// to work around this problem.</remarks>
+    public bool ReuseLowDataTextures { get; set; }
 
-        private Dictionary<UUID, Scene> RegisteredScenes = new Dictionary<UUID, Scene>();
+    private Dictionary<UUID, Scene> RegisteredScenes = new Dictionary<UUID, Scene>();
 
-        private Dictionary<string, IDynamicTextureRender> RenderPlugins =
-            new Dictionary<string, IDynamicTextureRender>();
+    private Dictionary<string, IDynamicTextureRender> RenderPlugins =
+        new Dictionary<string, IDynamicTextureRender>();
 
-        private Dictionary<UUID, DynamicTextureUpdater> Updaters = new Dictionary<UUID, DynamicTextureUpdater>();
+    private Dictionary<UUID, DynamicTextureUpdater> Updaters = new Dictionary<UUID, DynamicTextureUpdater>();
 
-        /// <summary>
-        /// Record dynamic textures that we can reuse for a given data and parameter combination rather than
-        /// regenerate.
-        /// </summary>
-        /// <remarks>
-        /// Key is string.Format("{0}{1}", data
-        /// </remarks>
-        private Cache m_reuseableDynamicTextures;
+    /// <summary>
+    /// Record dynamic textures that we can reuse for a given data and parameter combination rather than
+    /// regenerate.
+    /// </summary>
+    /// <remarks>
+    /// Key is string.Format("{0}{1}", data
+    /// </remarks>
+    private Cache m_reuseableDynamicTextures;
 
-        /// <summary>
-        /// This constructor is only here because of the Unit Tests...
-        /// Don't use it.
-        /// </summary>
-        public DynamicTextureModule()
+    /// <summary>
+    /// This constructor is only here because of the Unit Tests...
+    /// Don't use it.
+    /// </summary>
+    public DynamicTextureModule()
+    {
+        m_reuseableDynamicTextures = new Cache(CacheMedium.Memory, CacheStrategy.Conservative);
+        m_reuseableDynamicTextures.DefaultTTL = new TimeSpan(24, 0, 0);
+    }
+
+    #region IDynamicTextureManager Members
+
+    public void RegisterRender(string handleType, IDynamicTextureRender render)
+    {
+        if (!RenderPlugins.ContainsKey(handleType))
         {
-            m_reuseableDynamicTextures = new Cache(CacheMedium.Memory, CacheStrategy.Conservative);
-            m_reuseableDynamicTextures.DefaultTTL = new TimeSpan(24, 0, 0);
+            RenderPlugins.Add(handleType, render);
         }
+    }
 
-        #region IDynamicTextureManager Members
+    /// <summary>
+    /// Called by code which actually renders the dynamic texture to supply texture data.
+    /// </summary>
+    /// <param name="updaterId"></param>
+    /// <param name="texture"></param>
+    public void ReturnData(UUID updaterId, IDynamicTexture texture)
+    {
+        DynamicTextureUpdater updater = null;
 
-        public void RegisterRender(string handleType, IDynamicTextureRender render)
+        lock (Updaters)
         {
-            if (!RenderPlugins.ContainsKey(handleType))
+            if (Updaters.ContainsKey(updaterId))
             {
-                RenderPlugins.Add(handleType, render);
+                updater = Updaters[updaterId];
             }
         }
 
-        /// <summary>
-        /// Called by code which actually renders the dynamic texture to supply texture data.
-        /// </summary>
-        /// <param name="updaterId"></param>
-        /// <param name="texture"></param>
-        public void ReturnData(UUID updaterId, IDynamicTexture texture)
+        if (updater != null)
         {
-            DynamicTextureUpdater updater = null;
+            if (RegisteredScenes.ContainsKey(updater.SimUUID))
+            {
+                Scene scene = RegisteredScenes[updater.SimUUID];
+                UUID newTextureID = updater.DataReceived(texture.Data, scene);
+
+                if (ReuseTextures
+                    && !updater.BlendWithOldTexture
+                    && texture.IsReuseable
+                    && (ReuseLowDataTextures || IsDataSizeReuseable(texture)))
+                {
+                    m_reuseableDynamicTextures.Store(
+                        GenerateReusableTextureKey(texture.InputCommands, texture.InputParams), newTextureID);
+                }
+                updater.newTextureID = newTextureID;
+            }
 
             lock (Updaters)
             {
-                if (Updaters.ContainsKey(updaterId))
-                {
-                    updater = Updaters[updaterId];
-                }
-            }
-
-            if (updater != null)
-            {
-                if (RegisteredScenes.ContainsKey(updater.SimUUID))
-                {
-                    Scene scene = RegisteredScenes[updater.SimUUID];
-                    UUID newTextureID = updater.DataReceived(texture.Data, scene);
-
-                    if (ReuseTextures
-                        && !updater.BlendWithOldTexture
-                        && texture.IsReuseable
-                        && (ReuseLowDataTextures || IsDataSizeReuseable(texture)))
-                    {
-                        m_reuseableDynamicTextures.Store(
-                            GenerateReusableTextureKey(texture.InputCommands, texture.InputParams), newTextureID);
-                    }
-                    updater.newTextureID = newTextureID;
-                }
-
-                lock (Updaters)
-                {
-                    if (Updaters.ContainsKey(updater.UpdaterID))
-                        Updaters.Remove(updater.UpdaterID);
-                }
+                if (Updaters.ContainsKey(updater.UpdaterID))
+                    Updaters.Remove(updater.UpdaterID);
             }
         }
+    }
 
-        /// <summary>
-        /// Determines whether the texture is reuseable based on its data size.
-        /// </summary>
-        /// <remarks>
-        /// This is a workaround for a viewer bug where very small data size textures relative to their pixel size
-        /// are not redisplayed properly when pulled from cache.  The calculation here is based on the typical discard
-        /// level of 2, a 'rate' of 0.125 and 4 components (which makes for a factor of 0.5).
-        /// </remarks>
-        /// <returns></returns>
-        private bool IsDataSizeReuseable(IDynamicTexture texture)
-        {
+    /// <summary>
+    /// Determines whether the texture is reuseable based on its data size.
+    /// </summary>
+    /// <remarks>
+    /// This is a workaround for a viewer bug where very small data size textures relative to their pixel size
+    /// are not redisplayed properly when pulled from cache.  The calculation here is based on the typical discard
+    /// level of 2, a 'rate' of 0.125 and 4 components (which makes for a factor of 0.5).
+    /// </remarks>
+    /// <returns></returns>
+    private bool IsDataSizeReuseable(IDynamicTexture texture)
+    {
 //            Console.WriteLine("{0} {1}", texture.Size.Width, texture.Size.Height);
-            int discardLevel2DataThreshold = (int)Math.Ceiling((texture.Size.Width >> 2) * (texture.Size.Height >> 2) * 0.5);
+        int discardLevel2DataThreshold = (int)Math.Ceiling((texture.Size.Width >> 2) * (texture.Size.Height >> 2) * 0.5);
 
 //            m_log.DebugFormat(
 //                "[DYNAMIC TEXTURE MODULE]: Discard level 2 threshold {0}, texture data length {1}",
 //                discardLevel2DataThreshold, texture.Data.Length);
 
-            return discardLevel2DataThreshold < texture.Data.Length;
-        }
+        return discardLevel2DataThreshold < texture.Data.Length;
+    }
 
-        public UUID AddDynamicTextureURL(UUID simID, UUID primID, string contentType, string url,
-                                         string extraParams)
+    public UUID AddDynamicTextureURL(UUID simID, UUID primID, string contentType, string url,
+                                     string extraParams)
+    {
+        return AddDynamicTextureURL(simID, primID, contentType, url, extraParams, false, 255);
+    }
+
+    public UUID AddDynamicTextureURL(UUID simID, UUID primID, string contentType, string url,
+                                     string extraParams, bool SetBlending, byte AlphaValue)
+    {
+        return AddDynamicTextureURL(simID, primID, contentType, url, extraParams, SetBlending,
+                                     (DISP_TEMP|DISP_EXPIRE), AlphaValue, ALL_SIDES);
+    }
+
+    public UUID AddDynamicTextureURL(UUID simID, UUID primID, string contentType, string url,
+                                     string extraParams, bool SetBlending,
+                                     int disp, byte AlphaValue, int face)
+    {
+        if (RenderPlugins.ContainsKey(contentType))
         {
-            return AddDynamicTextureURL(simID, primID, contentType, url, extraParams, false, 255);
-        }
-
-        public UUID AddDynamicTextureURL(UUID simID, UUID primID, string contentType, string url,
-                                         string extraParams, bool SetBlending, byte AlphaValue)
-        {
-            return AddDynamicTextureURL(simID, primID, contentType, url, extraParams, SetBlending,
-                                         (DISP_TEMP|DISP_EXPIRE), AlphaValue, ALL_SIDES);
-        }
-
-        public UUID AddDynamicTextureURL(UUID simID, UUID primID, string contentType, string url,
-                                         string extraParams, bool SetBlending,
-                                         int disp, byte AlphaValue, int face)
-        {
-            if (RenderPlugins.ContainsKey(contentType))
-            {
-                DynamicTextureUpdater updater = new DynamicTextureUpdater();
-                updater.SimUUID = simID;
-                updater.PrimID = primID;
-                updater.ContentType = contentType;
-                updater.Url = url;
-                updater.UpdaterID = UUID.Random();
-                updater.Params = extraParams;
-                updater.BlendWithOldTexture = SetBlending;
-                updater.FrontAlpha = AlphaValue;
-                updater.Face = face;
-                updater.Disp = disp;
-
-                lock (Updaters)
-                {
-                    if (!Updaters.ContainsKey(updater.UpdaterID))
-                    {
-                        Updaters.Add(updater.UpdaterID, updater);
-                    }
-                }
-
-                RenderPlugins[contentType].AsyncConvertUrl(updater.UpdaterID, url, extraParams);
-                return updater.newTextureID;
-            }
-            return UUID.Zero;
-        }
-
-        public UUID AddDynamicTextureData(UUID simID, UUID primID, string contentType, string data,
-                                          string extraParams)
-        {
-            return AddDynamicTextureData(simID, primID, contentType, data, extraParams, false,
-                                            (DISP_TEMP|DISP_EXPIRE), 255, ALL_SIDES);
-        }
-
-        public UUID AddDynamicTextureData(UUID simID, UUID primID, string contentType, string data,
-                                          string extraParams, bool SetBlending, byte AlphaValue)
-        {
-            return AddDynamicTextureData(simID, primID, contentType, data, extraParams, SetBlending,
-                                          (DISP_TEMP|DISP_EXPIRE), AlphaValue, ALL_SIDES);
-        }
-
-        public UUID AddDynamicTextureData(UUID simID, UUID primID, string contentType, string data,
-                                          string extraParams, bool SetBlending, int disp, byte AlphaValue, int face)
-        {
-            if (!RenderPlugins.ContainsKey(contentType))
-                return UUID.Zero;
-
-            Scene scene;
-            RegisteredScenes.TryGetValue(simID, out scene);
-
-            if (scene == null)
-                return UUID.Zero;
-
-            SceneObjectPart part = scene.GetSceneObjectPart(primID);
-
-            if (part == null)
-                return UUID.Zero;
-
-            // If we want to reuse dynamic textures then we have to ignore any request from the caller to expire
-            // them.
-            if (ReuseTextures)
-                disp = disp & ~DISP_EXPIRE;
-
             DynamicTextureUpdater updater = new DynamicTextureUpdater();
             updater.SimUUID = simID;
             updater.PrimID = primID;
             updater.ContentType = contentType;
-            updater.BodyData = data;
+            updater.Url = url;
             updater.UpdaterID = UUID.Random();
             updater.Params = extraParams;
             updater.BlendWithOldTexture = SetBlending;
             updater.FrontAlpha = AlphaValue;
             updater.Face = face;
-            updater.Url = "Local image";
             updater.Disp = disp;
 
-            object objReusableTextureUUID = null;
-
-            if (ReuseTextures && !updater.BlendWithOldTexture)
+            lock (Updaters)
             {
-                string reuseableTextureKey = GenerateReusableTextureKey(data, extraParams);
-                objReusableTextureUUID = m_reuseableDynamicTextures.Get(reuseableTextureKey);
-
-                if (objReusableTextureUUID != null)
+                if (!Updaters.ContainsKey(updater.UpdaterID))
                 {
-                    // If something else has removed this temporary asset from the cache, detect and invalidate
-                    // our cached uuid.
-                    if (scene.AssetService.GetMetadata(objReusableTextureUUID.ToString()) == null)
-                    {
-                        m_reuseableDynamicTextures.Invalidate(reuseableTextureKey);
-                        objReusableTextureUUID = null;
-                    }
+                    Updaters.Add(updater.UpdaterID, updater);
                 }
             }
 
-            // We cannot reuse a dynamic texture if the data is going to be blended with something already there.
-            if (objReusableTextureUUID == null)
+            RenderPlugins[contentType].AsyncConvertUrl(updater.UpdaterID, url, extraParams);
+            return updater.newTextureID;
+        }
+        return UUID.Zero;
+    }
+
+    public UUID AddDynamicTextureData(UUID simID, UUID primID, string contentType, string data,
+                                      string extraParams)
+    {
+        return AddDynamicTextureData(simID, primID, contentType, data, extraParams, false,
+                                        (DISP_TEMP|DISP_EXPIRE), 255, ALL_SIDES);
+    }
+
+    public UUID AddDynamicTextureData(UUID simID, UUID primID, string contentType, string data,
+                                      string extraParams, bool SetBlending, byte AlphaValue)
+    {
+        return AddDynamicTextureData(simID, primID, contentType, data, extraParams, SetBlending,
+                                      (DISP_TEMP|DISP_EXPIRE), AlphaValue, ALL_SIDES);
+    }
+
+    public UUID AddDynamicTextureData(UUID simID, UUID primID, string contentType, string data,
+                                      string extraParams, bool SetBlending, int disp, byte AlphaValue, int face)
+    {
+        if (!RenderPlugins.ContainsKey(contentType))
+            return UUID.Zero;
+
+        Scene scene;
+        RegisteredScenes.TryGetValue(simID, out scene);
+
+        if (scene == null)
+            return UUID.Zero;
+
+        SceneObjectPart part = scene.GetSceneObjectPart(primID);
+
+        if (part == null)
+            return UUID.Zero;
+
+        // If we want to reuse dynamic textures then we have to ignore any request from the caller to expire
+        // them.
+        if (ReuseTextures)
+            disp = disp & ~DISP_EXPIRE;
+
+        DynamicTextureUpdater updater = new DynamicTextureUpdater();
+        updater.SimUUID = simID;
+        updater.PrimID = primID;
+        updater.ContentType = contentType;
+        updater.BodyData = data;
+        updater.UpdaterID = UUID.Random();
+        updater.Params = extraParams;
+        updater.BlendWithOldTexture = SetBlending;
+        updater.FrontAlpha = AlphaValue;
+        updater.Face = face;
+        updater.Url = "Local image";
+        updater.Disp = disp;
+
+        object objReusableTextureUUID = null;
+
+        if (ReuseTextures && !updater.BlendWithOldTexture)
+        {
+            string reuseableTextureKey = GenerateReusableTextureKey(data, extraParams);
+            objReusableTextureUUID = m_reuseableDynamicTextures.Get(reuseableTextureKey);
+
+            if (objReusableTextureUUID != null)
             {
-                lock (Updaters)
+                // If something else has removed this temporary asset from the cache, detect and invalidate
+                // our cached uuid.
+                if (scene.AssetService.GetMetadata(objReusableTextureUUID.ToString()) == null)
                 {
-                    if (!Updaters.ContainsKey(updater.UpdaterID))
-                    {
-                        Updaters.Add(updater.UpdaterID, updater);
-                    }
+                    m_reuseableDynamicTextures.Invalidate(reuseableTextureKey);
+                    objReusableTextureUUID = null;
                 }
+            }
+        }
+
+        // We cannot reuse a dynamic texture if the data is going to be blended with something already there.
+        if (objReusableTextureUUID == null)
+        {
+            lock (Updaters)
+            {
+                if (!Updaters.ContainsKey(updater.UpdaterID))
+                {
+                    Updaters.Add(updater.UpdaterID, updater);
+                }
+            }
 
 //                m_log.DebugFormat(
 //                    "[DYNAMIC TEXTURE MODULE]: Requesting generation of new dynamic texture for {0} in {1}",
 //                    part.Name, part.ParentGroup.Scene.Name);
 
-                RenderPlugins[contentType].AsyncConvertData(updater.UpdaterID, data, extraParams);
-            }
-            else
-            {
+            RenderPlugins[contentType].AsyncConvertData(updater.UpdaterID, data, extraParams);
+        }
+        else
+        {
 //                m_log.DebugFormat(
 //                    "[DYNAMIC TEXTURE MODULE]: Reusing cached texture {0} for {1} in {2}",
 //                    objReusableTextureUUID, part.Name, part.ParentGroup.Scene.Name);
 
-                // No need to add to updaters as the texture is always the same.  Not that this functionality
-                // apppears to be implemented anyway.
-                updater.UpdatePart(part, (UUID)objReusableTextureUUID);
-            }
-
-            return updater.newTextureID;
+            // No need to add to updaters as the texture is always the same.  Not that this functionality
+            // apppears to be implemented anyway.
+            updater.UpdatePart(part, (UUID)objReusableTextureUUID);
         }
 
-        private string GenerateReusableTextureKey(string data, string extraParams)
-        {
-            return string.Format("{0}{1}", data, extraParams);
-        }
+        return updater.newTextureID;
+    }
 
-        public void GetDrawStringSize(string contentType, string text, string fontName, int fontSize,
-                                      out double xSize, out double ySize)
+    private string GenerateReusableTextureKey(string data, string extraParams)
+    {
+        return string.Format("{0}{1}", data, extraParams);
+    }
+
+    public void GetDrawStringSize(string contentType, string text, string fontName, int fontSize,
+                                  out double xSize, out double ySize)
+    {
+        xSize = 0;
+        ySize = 0;
+        if (RenderPlugins.ContainsKey(contentType))
         {
-            xSize = 0;
-            ySize = 0;
-            if (RenderPlugins.ContainsKey(contentType))
+            RenderPlugins[contentType].GetDrawStringSize(text, fontName, fontSize, out xSize, out ySize);
+        }
+    }
+
+    #endregion
+
+    #region ISharedRegionModule Members
+
+    public void Initialise(IConfigSource config)
+    {
+        IConfig texturesConfig = config.Configs["Textures"];
+        if (texturesConfig != null)
+        {
+            ReuseTextures = texturesConfig.GetBoolean("ReuseDynamicTextures", false);
+            ReuseLowDataTextures = texturesConfig.GetBoolean("ReuseDynamicLowDataTextures", false);
+
+            if (ReuseTextures)
             {
-                RenderPlugins[contentType].GetDrawStringSize(text, fontName, fontSize, out xSize, out ySize);
+                m_reuseableDynamicTextures = new Cache(CacheMedium.Memory, CacheStrategy.Conservative);
+                m_reuseableDynamicTextures.DefaultTTL = new TimeSpan(24, 0, 0);
             }
         }
+    }
 
-        #endregion
+    public void PostInitialise()
+    {
+    }
 
-        #region ISharedRegionModule Members
-
-        public void Initialise(IConfigSource config)
+    public void AddRegion(Scene scene)
+    {
+        if (!RegisteredScenes.ContainsKey(scene.RegionInfo.RegionID))
         {
-            IConfig texturesConfig = config.Configs["Textures"];
-            if (texturesConfig != null)
-            {
-                ReuseTextures = texturesConfig.GetBoolean("ReuseDynamicTextures", false);
-                ReuseLowDataTextures = texturesConfig.GetBoolean("ReuseDynamicLowDataTextures", false);
+            RegisteredScenes.Add(scene.RegionInfo.RegionID, scene);
+            scene.RegisterModuleInterface<IDynamicTextureManager>(this);
+        }
+    }
 
-                if (ReuseTextures)
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (RegisteredScenes.ContainsKey(scene.RegionInfo.RegionID))
+            RegisteredScenes.Remove(scene.RegionInfo.RegionID);
+    }
+
+    public void Close()
+    {
+    }
+
+    public string Name
+    {
+        get { return "DynamicTextureModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    #endregion
+
+    #region Nested type: DynamicTextureUpdater
+
+    public class DynamicTextureUpdater
+    {
+        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+        public bool BlendWithOldTexture = false;
+        public string BodyData;
+        public string ContentType;
+        public byte FrontAlpha = 255;
+        public string Params;
+        public UUID PrimID;
+        public UUID SimUUID;
+        public UUID UpdaterID;
+        public int Face;
+        public int Disp;
+        public string Url;
+        public UUID newTextureID;
+
+        public DynamicTextureUpdater()
+        {
+            BodyData = null;
+        }
+
+        /// <summary>
+        /// Update the given part with the new texture.
+        /// </summary>
+        /// <returns>
+        /// The old texture UUID.
+        /// </returns>
+        public UUID UpdatePart(SceneObjectPart part, UUID textureID)
+        {
+            UUID oldID;
+
+            if( Face == -9999)
+                return UUID.Zero;
+
+            lock (part)
+            {
+                // mostly keep the values from before
+                Primitive.TextureEntry tmptex = part.Shape.Textures;
+
+                // FIXME: Need to return the appropriate ID if only a single face is replaced.
+                oldID = tmptex.DefaultTexture.TextureID;
+
+                // not using parts number of faces because that fails on old meshs
+                if (Face == ALL_SIDES)
                 {
-                    m_reuseableDynamicTextures = new Cache(CacheMedium.Memory, CacheStrategy.Conservative);
-                    m_reuseableDynamicTextures.DefaultTTL = new TimeSpan(24, 0, 0);
-                }
-            }
-        }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!RegisteredScenes.ContainsKey(scene.RegionInfo.RegionID))
-            {
-                RegisteredScenes.Add(scene.RegionInfo.RegionID, scene);
-                scene.RegisterModuleInterface<IDynamicTextureManager>(this);
-            }
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (RegisteredScenes.ContainsKey(scene.RegionInfo.RegionID))
-                RegisteredScenes.Remove(scene.RegionInfo.RegionID);
-        }
-
-        public void Close()
-        {
-        }
-
-        public string Name
-        {
-            get { return "DynamicTextureModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        #endregion
-
-        #region Nested type: DynamicTextureUpdater
-
-        public class DynamicTextureUpdater
-        {
-            private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-            public bool BlendWithOldTexture = false;
-            public string BodyData;
-            public string ContentType;
-            public byte FrontAlpha = 255;
-            public string Params;
-            public UUID PrimID;
-            public UUID SimUUID;
-            public UUID UpdaterID;
-            public int Face;
-            public int Disp;
-            public string Url;
-            public UUID newTextureID;
-
-            public DynamicTextureUpdater()
-            {
-                BodyData = null;
-            }
-
-            /// <summary>
-            /// Update the given part with the new texture.
-            /// </summary>
-            /// <returns>
-            /// The old texture UUID.
-            /// </returns>
-            public UUID UpdatePart(SceneObjectPart part, UUID textureID)
-            {
-                UUID oldID;
-
-                if( Face == -9999)
-                    return UUID.Zero;
-
-                lock (part)
-                {
-                    // mostly keep the values from before
-                    Primitive.TextureEntry tmptex = part.Shape.Textures;
-
-                    // FIXME: Need to return the appropriate ID if only a single face is replaced.
                     oldID = tmptex.DefaultTexture.TextureID;
-
-                    // not using parts number of faces because that fails on old meshs
-                    if (Face == ALL_SIDES)
+                    tmptex.DefaultTexture.TextureID = textureID;
+                    for(int i = 0; i < tmptex.FaceTextures.Length; i++)
                     {
-                        oldID = tmptex.DefaultTexture.TextureID;
+                        if(tmptex.FaceTextures[i] != null)
+                            tmptex.FaceTextures[i].TextureID = textureID;
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        Primitive.TextureEntryFace texface = tmptex.CreateFace((uint)Face);
+                        oldID = texface.TextureID;
+                        texface.TextureID = textureID;
+                        tmptex.FaceTextures[Face] = texface;
+                    }
+                    catch (Exception)
+                    {
                         tmptex.DefaultTexture.TextureID = textureID;
-                        for(int i = 0; i < tmptex.FaceTextures.Length; i++)
-                        {
-                            if(tmptex.FaceTextures[i] != null)
-                                tmptex.FaceTextures[i].TextureID = textureID;
-                        }
                     }
-                    else
-                    {
-                        try
-                        {
-                            Primitive.TextureEntryFace texface = tmptex.CreateFace((uint)Face);
-                            oldID = texface.TextureID;
-                            texface.TextureID = textureID;
-                            tmptex.FaceTextures[Face] = texface;
-                        }
-                        catch (Exception)
-                        {
-                            tmptex.DefaultTexture.TextureID = textureID;
-                        }
-                    }
-
-                    part.UpdateTextureEntry(tmptex);
                 }
 
-                return oldID;
+                part.UpdateTextureEntry(tmptex);
             }
 
-            /// <summary>
-            /// Called once new texture data has been received for this updater.
-            /// </summary>
-            /// <param name="data"></param>
-            /// <param name="scene"></param>
-            /// <param name="isReuseable">True if the data given is reuseable.</param>
-            /// <returns>The asset UUID given to the incoming data.</returns>
-            public UUID DataReceived(byte[] data, Scene scene)
+            return oldID;
+        }
+
+        /// <summary>
+        /// Called once new texture data has been received for this updater.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="scene"></param>
+        /// <param name="isReuseable">True if the data given is reuseable.</param>
+        /// <returns>The asset UUID given to the incoming data.</returns>
+        public UUID DataReceived(byte[] data, Scene scene)
+        {
+            // this are local assets and will not work without cache
+            IAssetCache iac = scene.RequestModuleInterface<IAssetCache>();
+            if (iac == null)
+                return UUID.Zero;
+
+            SceneObjectPart part = scene.GetSceneObjectPart(PrimID);
+
+            if (part == null || data == null || data.Length <= 1)
             {
-                // this are local assets and will not work without cache
-                IAssetCache iac = scene.RequestModuleInterface<IAssetCache>();
-                if (iac == null)
-                    return UUID.Zero;
+                string msg = string.Format("DynamicTextureModule: Error preparing image using URL {0}", Url);
+                scene.SimChat(Utils.StringToBytes(msg), ChatTypeEnum.Say,
+                              0, part.ParentGroup.RootPart.AbsolutePosition, part.Name, part.UUID, false);
 
-                SceneObjectPart part = scene.GetSceneObjectPart(PrimID);
+                return UUID.Zero;
+            }
 
-                if (part == null || data == null || data.Length <= 1)
+            byte[] assetData = null;
+            AssetBase oldAsset = null;
+
+            if (BlendWithOldTexture)
+            {
+                Primitive.TextureEntryFace curFace;
+                if(Face == ALL_SIDES)
+                    curFace = part.Shape.Textures.DefaultTexture;
+                else
                 {
-                    string msg = string.Format("DynamicTextureModule: Error preparing image using URL {0}", Url);
-                    scene.SimChat(Utils.StringToBytes(msg), ChatTypeEnum.Say,
-                                  0, part.ParentGroup.RootPart.AbsolutePosition, part.Name, part.UUID, false);
-
-                    return UUID.Zero;
-                }
-
-                byte[] assetData = null;
-                AssetBase oldAsset = null;
-
-                if (BlendWithOldTexture)
-                {
-                    Primitive.TextureEntryFace curFace;
-                    if(Face == ALL_SIDES)
-                        curFace = part.Shape.Textures.DefaultTexture;
-                    else
+                    try
                     {
-                        try
-                        {
-                            curFace = part.Shape.Textures.GetFace((uint)Face);
-                        }
-                        catch
-                        {
-                            curFace = null;
-                        }
+                        curFace = part.Shape.Textures.GetFace((uint)Face);
                     }
-                    if (curFace != null)
+                    catch
                     {
-                        oldAsset = scene.AssetService.Get(curFace.TextureID.ToString());
-
-                        if (oldAsset != null)
-                            assetData = BlendTextures(data, oldAsset.Data, FrontAlpha);
+                        curFace = null;
                     }
                 }
-                else if(FrontAlpha < 255)
-                    assetData = BlendTextures(data, null, FrontAlpha);
-
-
-                if (assetData == null)
+                if (curFace != null)
                 {
-                    assetData = new byte[data.Length];
-                    Array.Copy(data, assetData, data.Length);
-                }
+                    oldAsset = scene.AssetService.Get(curFace.TextureID.ToString());
 
-                // Create a new asset for user
-                AssetBase asset = new AssetBase(
-                        UUID.Random(), "DynamicImage" + Util.RandomClass.Next(1, 10000), (sbyte)AssetType.Texture,
-                        part.OwnerID.ToString());
-                asset.Data = assetData;
-                asset.Description = string.Format("URL image : {0}", Url);
-                if (asset.Description.Length > 128)
-                    asset.Description = asset.Description.Substring(0, 128);
-                asset.Local = true;     // dynamic images aren't saved in the assets server
-                asset.Temporary = ((Disp & DISP_TEMP) != 0);
-
-                iac.Cache(asset);
-
-                UUID oldID = UpdatePart(part, asset.FullID);
-
-                if ((Disp & DISP_EXPIRE) != 0 && oldID.IsNotZero() )
-                {
-                    oldAsset ??= scene.AssetService.Get(oldID.ToString());
                     if (oldAsset != null)
-                    {
-                        if (oldAsset.Temporary)
-                            iac.Expire(oldID.ToString());
-                    }
+                        assetData = BlendTextures(data, oldAsset.Data, FrontAlpha);
                 }
+            }
+            else if(FrontAlpha < 255)
+                assetData = BlendTextures(data, null, FrontAlpha);
 
-                return asset.FullID;
+
+            if (assetData == null)
+            {
+                assetData = new byte[data.Length];
+                Array.Copy(data, assetData, data.Length);
             }
 
-            private byte[] BlendTextures(byte[] frontImage, byte[] backImage, byte newAlpha)
+            // Create a new asset for user
+            AssetBase asset = new AssetBase(
+                    UUID.Random(), "DynamicImage" + Util.RandomClass.Next(1, 10000), (sbyte)AssetType.Texture,
+                    part.OwnerID.ToString());
+            asset.Data = assetData;
+            asset.Description = string.Format("URL image : {0}", Url);
+            if (asset.Description.Length > 128)
+                asset.Description = asset.Description.Substring(0, 128);
+            asset.Local = true;     // dynamic images aren't saved in the assets server
+            asset.Temporary = ((Disp & DISP_TEMP) != 0);
+
+            iac.Cache(asset);
+
+            UUID oldID = UpdatePart(part, asset.FullID);
+
+            if ((Disp & DISP_EXPIRE) != 0 && oldID.IsNotZero() )
             {
-                // Decode front image using SkiaSharp
-                SKBitmap image1 = SKBitmap.Decode(frontImage);
-                if (image1 == null)
-                    return null;
-
-                if(backImage == null)
+                oldAsset ??= scene.AssetService.Get(oldID.ToString());
+                if (oldAsset != null)
                 {
-                    SKBitmap resultBmp = SetAlpha(image1, newAlpha);
-                    byte[] result = Array.Empty<byte>();
-
-                    try
-                    {
-                        using (var encoded = resultBmp.Encode(SKEncodedImageFormat.Jpeg, 100))
-                        {
-                            result = encoded.ToArray();
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        m_log.ErrorFormat(
-                        "[DYNAMICTEXTUREMODULE]: SkiaSharp Encode Failed.  Exception {0}{1}",
-                            e.Message, e.StackTrace);
-                    }
-                    image1.Dispose();
-                    resultBmp?.Dispose();
-                    return result;
-                }
-
-                // Decode back image using SkiaSharp
-                SKBitmap image2 = SKBitmap.Decode(backImage);
-                if (image2 == null)
-                {
-                    image1.Dispose();
-                    return null;
-                }
-
-                using(SKBitmap joint = MergeBitMaps(image1, image2, newAlpha))
-                {
-                    image1.Dispose();
-                    image2.Dispose();
-
-                    byte[] result = Array.Empty<byte>();
-
-                    try
-                    {
-                        using (var encoded = joint.Encode(SKEncodedImageFormat.Jpeg, 100))
-                        {
-                            result = encoded.ToArray();
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        m_log.ErrorFormat(
-                        "[DYNAMICTEXTUREMODULE]: SkiaSharp Encode Failed.  Exception {0}{1}",
-                            e.Message, e.StackTrace);
-                    }
-
-                    return result;
+                    if (oldAsset.Temporary)
+                        iac.Expire(oldID.ToString());
                 }
             }
 
-            public SKBitmap MergeBitMaps(SKBitmap front, SKBitmap back, byte alpha)
+            return asset.FullID;
+        }
+
+        private byte[] BlendTextures(byte[] frontImage, byte[] backImage, byte newAlpha)
+        {
+            // Decode front image using SkiaSharp
+            SKBitmap image1 = SKBitmap.Decode(frontImage);
+            if (image1 == null)
+                return null;
+
+            if(backImage == null)
             {
-                int Width = back.Width;
-                int Height = back.Height;
+                SKBitmap resultBmp = SetAlpha(image1, newAlpha);
+                byte[] result = Array.Empty<byte>();
 
-                // Create result bitmap with alpha channel
-                SKBitmap joint = new SKBitmap(Width, Height, SKColorType.Rgba8888, SKAlphaType.Premul);
+                try
+                {
+                    using (var encoded = resultBmp.Encode(SKEncodedImageFormat.Jpeg, 100))
+                    {
+                        result = encoded.ToArray();
+                    }
+                }
+                catch (Exception e)
+                {
+                    m_log.ErrorFormat(
+                    "[DYNAMICTEXTUREMODULE]: SkiaSharp Encode Failed.  Exception {0}{1}",
+                        e.Message, e.StackTrace);
+                }
+                image1.Dispose();
+                resultBmp?.Dispose();
+                return result;
+            }
 
+            // Decode back image using SkiaSharp
+            SKBitmap image2 = SKBitmap.Decode(backImage);
+            if (image2 == null)
+            {
+                image1.Dispose();
+                return null;
+            }
+
+            using(SKBitmap joint = MergeBitMaps(image1, image2, newAlpha))
+            {
+                image1.Dispose();
+                image2.Dispose();
+
+                byte[] result = Array.Empty<byte>();
+
+                try
+                {
+                    using (var encoded = joint.Encode(SKEncodedImageFormat.Jpeg, 100))
+                    {
+                        result = encoded.ToArray();
+                    }
+                }
+                catch (Exception e)
+                {
+                    m_log.ErrorFormat(
+                    "[DYNAMICTEXTUREMODULE]: SkiaSharp Encode Failed.  Exception {0}{1}",
+                        e.Message, e.StackTrace);
+                }
+
+                return result;
+            }
+        }
+
+        public SKBitmap MergeBitMaps(SKBitmap front, SKBitmap back, byte alpha)
+        {
+            int Width = back.Width;
+            int Height = back.Height;
+
+            // Create result bitmap with alpha channel
+            SKBitmap joint = new SKBitmap(Width, Height, SKColorType.Rgba8888, SKAlphaType.Premul);
+
+            using (var canvas = new SKCanvas(joint))
+            {
+                // Draw background
+                canvas.DrawBitmap(back, 0, 0);
+
+                // Draw foreground with alpha blending
+                if (alpha >= 255)
+                {
+                    canvas.DrawBitmap(front, 0, 0);
+                }
+                else if (alpha > 0)
+                {
+                    using (var paint = new SKPaint())
+                    {
+                        paint.Color = new SKColor(255, 255, 255, alpha);
+                        paint.BlendMode = SKBlendMode.SrcOver;
+                        canvas.DrawBitmap(front, 0, 0, paint);
+                    }
+                }
+            }
+
+            return joint;
+        }
+
+        private SKBitmap SetAlpha(SKBitmap b, byte alpha)
+        {
+            int Width = b.Width;
+            int Height = b.Height;
+            SKBitmap joint = new SKBitmap(Width, Height, SKColorType.Rgba8888, SKAlphaType.Premul);
+            
+            if(alpha > 0)
+            {
                 using (var canvas = new SKCanvas(joint))
                 {
-                    // Draw background
-                    canvas.DrawBitmap(back, 0, 0);
-
-                    // Draw foreground with alpha blending
-                    if (alpha >= 255)
+                    using (var paint = new SKPaint())
                     {
-                        canvas.DrawBitmap(front, 0, 0);
-                    }
-                    else if (alpha > 0)
-                    {
-                        using (var paint = new SKPaint())
-                        {
-                            paint.Color = new SKColor(255, 255, 255, alpha);
-                            paint.BlendMode = SKBlendMode.SrcOver;
-                            canvas.DrawBitmap(front, 0, 0, paint);
-                        }
+                        paint.Color = new SKColor(255, 255, 255, alpha);
+                        paint.BlendMode = SKBlendMode.SrcOver;
+                        canvas.DrawBitmap(b, 0, 0, paint);
                     }
                 }
-
-                return joint;
             }
-
-            private SKBitmap SetAlpha(SKBitmap b, byte alpha)
-            {
-                int Width = b.Width;
-                int Height = b.Height;
-                SKBitmap joint = new SKBitmap(Width, Height, SKColorType.Rgba8888, SKAlphaType.Premul);
-                
-                if(alpha > 0)
-                {
-                    using (var canvas = new SKCanvas(joint))
-                    {
-                        using (var paint = new SKPaint())
-                        {
-                            paint.Color = new SKColor(255, 255, 255, alpha);
-                            paint.BlendMode = SKBlendMode.SrcOver;
-                            canvas.DrawBitmap(b, 0, 0, paint);
-                        }
-                    }
-                }
-                
-                b.Dispose();
-                return joint;
-            }
+            
+            b.Dispose();
+            return joint;
         }
-
-        #endregion
     }
+
+    #endregion
 }

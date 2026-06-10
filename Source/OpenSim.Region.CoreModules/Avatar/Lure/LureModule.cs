@@ -33,182 +33,181 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.Avatar.Lure
+namespace OpenSim.Region.CoreModules.Avatar.Lure;
+
+public class LureModule : ISharedRegionModule
 {
-    public class LureModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private readonly List<Scene> m_scenes = [];
+
+    private IMessageTransferModule m_TransferModule = null;
+    private bool m_Enabled = false;
+
+    public void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private readonly List<Scene> m_scenes = [];
-
-        private IMessageTransferModule m_TransferModule = null;
-        private bool m_Enabled = false;
-
-        public void Initialise(IConfigSource config)
+        if (config.Configs["Messaging"] != null)
         {
-            if (config.Configs["Messaging"] != null)
+            if (config.Configs["Messaging"].GetString("LureModule", "LureModule") == Name)
             {
-                if (config.Configs["Messaging"].GetString("LureModule", "LureModule") == Name)
-                {
-                    m_Enabled = true;
-                    m_log.DebugFormat("[LURE MODULE]: {0} enabled", Name);
-                }
+                m_Enabled = true;
+                m_log.DebugFormat("[LURE MODULE]: {0} enabled", Name);
             }
         }
+    }
 
-        public void AddRegion(Scene scene)
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        lock (m_scenes)
         {
-            if (!m_Enabled)
-                return;
-
-            lock (m_scenes)
-            {
-                m_scenes.Add(scene);
-                scene.EventManager.OnNewClient += OnNewClient;
-                scene.EventManager.OnIncomingInstantMessage +=
-                        OnGridInstantMessage;
-            }
+            m_scenes.Add(scene);
+            scene.EventManager.OnNewClient += OnNewClient;
+            scene.EventManager.OnIncomingInstantMessage +=
+                    OnGridInstantMessage;
         }
+    }
 
-        public void RegionLoaded(Scene scene)
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        if (m_TransferModule == null)
         {
-            if (!m_Enabled)
-                return;
+            m_TransferModule =
+                scene.RequestModuleInterface<IMessageTransferModule>();
 
             if (m_TransferModule == null)
             {
-                m_TransferModule =
-                    scene.RequestModuleInterface<IMessageTransferModule>();
+                m_log.Error("[INSTANT MESSAGE]: No message transfer module, "+
+                "lures will not work!");
 
-                if (m_TransferModule == null)
-                {
-                    m_log.Error("[INSTANT MESSAGE]: No message transfer module, "+
-                    "lures will not work!");
-
-                    m_Enabled = false;
-                    m_scenes.Clear();
-                    scene.EventManager.OnNewClient -= OnNewClient;
-                    scene.EventManager.OnIncomingInstantMessage -= OnGridInstantMessage;
-                }
-            }
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
-
-            lock (m_scenes)
-            {
-                m_scenes.Remove(scene);
+                m_Enabled = false;
+                m_scenes.Clear();
                 scene.EventManager.OnNewClient -= OnNewClient;
                 scene.EventManager.OnIncomingInstantMessage -= OnGridInstantMessage;
             }
         }
+    }
 
-        void OnNewClient(IClientAPI client)
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
+
+        lock (m_scenes)
         {
-            client.OnInstantMessage += OnInstantMessage;
-            client.OnStartLure += OnStartLure;
-            client.OnTeleportLureRequest += OnTeleportLureRequest;
+            m_scenes.Remove(scene);
+            scene.EventManager.OnNewClient -= OnNewClient;
+            scene.EventManager.OnIncomingInstantMessage -= OnGridInstantMessage;
         }
+    }
 
-        public void PostInitialise()
+    void OnNewClient(IClientAPI client)
+    {
+        client.OnInstantMessage += OnInstantMessage;
+        client.OnStartLure += OnStartLure;
+        client.OnTeleportLureRequest += OnTeleportLureRequest;
+    }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public string Name
+    {
+        get { return "LureModule"; }
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void OnInstantMessage(IClientAPI client, GridInstantMessage im)
+    {
+        if (im.dialog == (byte)InstantMessageDialog.RequestLure)
         {
-        }
-
-        public void Close()
-        {
-        }
-
-        public string Name
-        {
-            get { return "LureModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public void OnInstantMessage(IClientAPI client, GridInstantMessage im)
-        {
-            if (im.dialog == (byte)InstantMessageDialog.RequestLure)
-            {
-                if (m_TransferModule != null)
-                    m_TransferModule.SendInstantMessage(im, delegate (bool success) { });
-            }
-        }
-
-        public void OnStartLure(byte lureType, string message, UUID targetid, IClientAPI client)
-        {
-            if (client.Scene is not Scene)
-                return;
-
-            Scene scene = (Scene)(client.Scene);
-            ScenePresence presence = scene.GetScenePresence(client.AgentId);
-
-            // Round up Z co-ordinate rather than round-down by casting.  This stops tall avatars from being given
-            // a teleport Z co-ordinate by short avatars that drops them through or embeds them in thin floors on
-            // arrival.
-            //
-            // Ideally we would give the exact float position adjusting for the relative height of the two avatars
-            // but it looks like a float component isn't possible with a parcel ID.
-            UUID dest = Util.BuildFakeParcelID(
-                    scene.RegionInfo.RegionHandle,
-                    (uint)presence.AbsolutePosition.X,
-                    (uint)presence.AbsolutePosition.Y,
-                    (uint)presence.AbsolutePosition.Z + 2);
-
-            m_log.Debug($"[LURE MODULE]: TP invite with message {message}, type {lureType}");
-
-            GridInstantMessage m;
-
-            if (scene.Permissions.IsAdministrator(client.AgentId) && presence.IsViewerUIGod && (!scene.Permissions.IsAdministrator(targetid)))
-            {
-                m = new GridInstantMessage(scene, client.AgentId,
-                        client.FirstName+" "+client.LastName, targetid,
-                        (byte)InstantMessageDialog.GodLikeRequestTeleport, false,
-                        message, dest, false, presence.AbsolutePosition,
-                        Array.Empty<byte>(), true);
-            }
-            else
-            {
-                m = new GridInstantMessage(scene, client.AgentId,
-                        client.FirstName+" "+client.LastName, targetid,
-                        (byte)InstantMessageDialog.RequestTeleport, false,
-                        message, dest, false, presence.AbsolutePosition,
-                        Array.Empty<byte>(), true);
-            }
-
             if (m_TransferModule != null)
-            {
-                m_TransferModule.SendInstantMessage(m,
-                    delegate(bool success) { });
-            }
+                m_TransferModule.SendInstantMessage(im, delegate (bool success) { });
         }
+    }
 
-        public void OnTeleportLureRequest(UUID lureID, uint teleportFlags, IClientAPI client)
+    public void OnStartLure(byte lureType, string message, UUID targetid, IClientAPI client)
+    {
+        if (client.Scene is not Scene)
+            return;
+
+        Scene scene = (Scene)(client.Scene);
+        ScenePresence presence = scene.GetScenePresence(client.AgentId);
+
+        // Round up Z co-ordinate rather than round-down by casting.  This stops tall avatars from being given
+        // a teleport Z co-ordinate by short avatars that drops them through or embeds them in thin floors on
+        // arrival.
+        //
+        // Ideally we would give the exact float position adjusting for the relative height of the two avatars
+        // but it looks like a float component isn't possible with a parcel ID.
+        UUID dest = Util.BuildFakeParcelID(
+                scene.RegionInfo.RegionHandle,
+                (uint)presence.AbsolutePosition.X,
+                (uint)presence.AbsolutePosition.Y,
+                (uint)presence.AbsolutePosition.Z + 2);
+
+        m_log.Debug($"[LURE MODULE]: TP invite with message {message}, type {lureType}");
+
+        GridInstantMessage m;
+
+        if (scene.Permissions.IsAdministrator(client.AgentId) && presence.IsViewerUIGod && (!scene.Permissions.IsAdministrator(targetid)))
         {
-            if (client.Scene is not Scene scene)
-                return;
-
-            Util.ParseFakeParcelID(lureID, out ulong handle, out uint x, out uint y, out uint z);
-
-            Vector3 position = new(x , y , z);
-            scene.RequestTeleportLocation(client, handle, position, Vector3.Zero, teleportFlags);
+            m = new GridInstantMessage(scene, client.AgentId,
+                    client.FirstName+" "+client.LastName, targetid,
+                    (byte)InstantMessageDialog.GodLikeRequestTeleport, false,
+                    message, dest, false, presence.AbsolutePosition,
+                    Array.Empty<byte>(), true);
         }
-
-        private void OnGridInstantMessage(GridInstantMessage msg)
+        else
         {
-            // Forward remote teleport requests
-            //
-            if (msg.dialog != (byte)InstantMessageDialog.RequestTeleport &&
-                msg.dialog != (byte)InstantMessageDialog.GodLikeRequestTeleport &&
-                msg.dialog != (byte)InstantMessageDialog.RequestLure)
-                return;
-
-            m_TransferModule?.SendInstantMessage(msg, delegate(bool success) { });
+            m = new GridInstantMessage(scene, client.AgentId,
+                    client.FirstName+" "+client.LastName, targetid,
+                    (byte)InstantMessageDialog.RequestTeleport, false,
+                    message, dest, false, presence.AbsolutePosition,
+                    Array.Empty<byte>(), true);
         }
+
+        if (m_TransferModule != null)
+        {
+            m_TransferModule.SendInstantMessage(m,
+                delegate(bool success) { });
+        }
+    }
+
+    public void OnTeleportLureRequest(UUID lureID, uint teleportFlags, IClientAPI client)
+    {
+        if (client.Scene is not Scene scene)
+            return;
+
+        Util.ParseFakeParcelID(lureID, out ulong handle, out uint x, out uint y, out uint z);
+
+        Vector3 position = new(x , y , z);
+        scene.RequestTeleportLocation(client, handle, position, Vector3.Zero, teleportFlags);
+    }
+
+    private void OnGridInstantMessage(GridInstantMessage msg)
+    {
+        // Forward remote teleport requests
+        //
+        if (msg.dialog != (byte)InstantMessageDialog.RequestTeleport &&
+            msg.dialog != (byte)InstantMessageDialog.GodLikeRequestTeleport &&
+            msg.dialog != (byte)InstantMessageDialog.RequestLure)
+            return;
+
+        m_TransferModule?.SendInstantMessage(msg, delegate(bool success) { });
     }
 }

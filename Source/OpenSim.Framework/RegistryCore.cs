@@ -25,55 +25,50 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+public class RegistryCore : IRegistryCore
 {
-    public class RegistryCore : IRegistryCore
+    protected Dictionary<Type, object> m_moduleInterfaces = new Dictionary<Type, object>();
+
+    /// <summary>
+    /// Register an Module interface.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="iface"></param>
+    public void RegisterInterface<T>(T iface)
     {
-        protected Dictionary<Type, object> m_moduleInterfaces = new Dictionary<Type, object>();
-
-        /// <summary>
-        /// Register an Module interface.
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="iface"></param>
-        public void RegisterInterface<T>(T iface)
+        lock (m_moduleInterfaces)
         {
-            lock (m_moduleInterfaces)
+            if (!m_moduleInterfaces.ContainsKey(typeof(T)))
             {
-                if (!m_moduleInterfaces.ContainsKey(typeof(T)))
-                {
-                    m_moduleInterfaces.Add(typeof(T), iface);
-                }
+                m_moduleInterfaces.Add(typeof(T), iface);
             }
         }
+    }
 
-        public bool TryGet<T>(out T iface)
+    public bool TryGet<T>(out T iface)
+    {
+        if (m_moduleInterfaces.TryGetValue(typeof(T), out object o))
         {
-            if (m_moduleInterfaces.TryGetValue(typeof(T), out object o))
-            {
-                iface = (T)o;
-                return true;
-            }
-            iface = default(T);
-            return false;
+            iface = (T)o;
+            return true;
         }
+        iface = default(T);
+        return false;
+    }
 
-        public T Get<T>()
-        {
-            return (T)m_moduleInterfaces[typeof(T)];
-        }
+    public T Get<T>()
+    {
+        return (T)m_moduleInterfaces[typeof(T)];
+    }
 
-        public void StackModuleInterface<M>(M mod)
-        {
-        }
+    public void StackModuleInterface<M>(M mod)
+    {
+    }
 
-        public T[] RequestModuleInterfaces<T>()
-        {
-            return new T[] { default(T) };
-        }
+    public T[] RequestModuleInterfaces<T>()
+    {
+        return new T[] { default(T) };
     }
 }

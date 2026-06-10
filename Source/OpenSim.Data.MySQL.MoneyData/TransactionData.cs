@@ -27,207 +27,206 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Data.MySQL.MoneyData
+namespace OpenSim.Data.MySQL.MoneyData;
+
+public class TransactionData
 {
-    public class TransactionData
+    UUID m_uuid;
+    string m_sender = string.Empty;
+    string m_receiver = string.Empty;
+    int m_amount;
+    int m_senderBalance;
+    int m_receiverBalance;
+    int m_type;
+    int m_time;
+    int m_status;
+    string m_objectID = UUID.Zero.ToString();
+    //      string m_objectID     = "00000000-0000-0000-0000-000000000000";
+    string m_objectName = string.Empty;
+    string m_regionHandle = string.Empty;
+    string m_regionUUID = string.Empty;
+    string m_secureCode = string.Empty;
+    string m_commonName = string.Empty;
+    string m_description = string.Empty;
+
+    /*
+            public TransactionData(string uuid, string sender, string receiver,
+                int amount, int time, int status, string description)
+            {
+                this.m_uuid = uuid;
+                this.m_sender = sender;
+                this.m_receiver = receiver;
+                this.m_amount = amount;
+            }
+    */
+
+    public UUID TransUUID
     {
-        UUID m_uuid;
-        string m_sender = string.Empty;
-        string m_receiver = string.Empty;
-        int m_amount;
-        int m_senderBalance;
-        int m_receiverBalance;
-        int m_type;
-        int m_time;
-        int m_status;
-        string m_objectID = UUID.Zero.ToString();
-        //      string m_objectID     = "00000000-0000-0000-0000-000000000000";
-        string m_objectName = string.Empty;
-        string m_regionHandle = string.Empty;
-        string m_regionUUID = string.Empty;
-        string m_secureCode = string.Empty;
-        string m_commonName = string.Empty;
-        string m_description = string.Empty;
-
-        /*
-                public TransactionData(string uuid, string sender, string receiver,
-                    int amount, int time, int status, string description)
-                {
-                    this.m_uuid = uuid;
-                    this.m_sender = sender;
-                    this.m_receiver = receiver;
-                    this.m_amount = amount;
-                }
-        */
-
-        public UUID TransUUID
-        {
-            get { return m_uuid; }
-            set { m_uuid = value; }
-        }
-
-        public string Sender
-        {
-            get { return m_sender; }
-            set { m_sender = value; }
-        }
-
-        public string Receiver
-        {
-            get { return m_receiver; }
-            set { m_receiver = value; }
-        }
-
-        public int Amount
-        {
-            get { return m_amount; }
-            set { m_amount = value; }
-        }
-
-        public int SenderBalance
-        {
-            get { return m_senderBalance; }
-            set { m_senderBalance = value; }
-        }
-
-        public int ReceiverBalance
-        {
-            get { return m_receiverBalance; }
-            set { m_receiverBalance = value; }
-        }
-
-        public int Type
-        {
-            get { return m_type; }
-            set { m_type = value; }
-        }
-
-        public int Time
-        {
-            get { return m_time; }
-            set { m_time = value; }
-        }
-
-        public int Status
-        {
-            get { return m_status; }
-            set { m_status = value; }
-        }
-
-        public string Description
-        {
-            get { return m_description; }
-            set { m_description = value; }
-        }
-
-        public string ObjectUUID
-        {
-            get { return m_objectID; }
-            set { m_objectID = value; }
-        }
-
-        public string ObjectName
-        {
-            get { return m_objectName; }
-            set { m_objectName = value; }
-        }
-
-        public string RegionHandle
-        {
-            get { return m_regionHandle; }
-            set { m_regionHandle = value; }
-        }
-
-        public string RegionUUID
-        {
-            get { return m_regionUUID; }
-            set { m_regionUUID = value; }
-        }
-
-        public string SecureCode
-        {
-            get { return m_secureCode; }
-            set { m_secureCode = value; }
-        }
-
-        public string CommonName
-        {
-            get { return m_commonName; }
-            set { m_commonName = value; }
-        }
+        get { return m_uuid; }
+        set { m_uuid = value; }
     }
 
-
-    public enum Status
+    public string Sender
     {
-        SUCCESS_STATUS = 0,
-        PENDING_STATUS = 1,
-        FAILED_STATUS = 2,
-        ERROR_STATUS = 9
+        get { return m_sender; }
+        set { m_sender = value; }
     }
 
-
-    public enum AvatarType
+    public string Receiver
     {
-        LOCAL_AVATAR = 0,
-        HG_AVATAR = 1,
-        NPC_AVATAR = 2,
-        GUEST_AVATAR = 3,
-        FOREIGN_AVATAR = 8,
-        UNKNOWN_AVATAR = 9
+        get { return m_receiver; }
+        set { m_receiver = value; }
     }
 
-
-    public class UserInfo
+    public int Amount
     {
-        string m_userID = string.Empty;
-        string m_simIP = string.Empty;
-        string m_avatarName = string.Empty;
-        string m_passwordHash = string.Empty;
-        int m_avatarType = (int)AvatarType.LOCAL_AVATAR;
-        int m_avatarClass = (int)AvatarType.LOCAL_AVATAR;
-        string m_serverURL = string.Empty;
+        get { return m_amount; }
+        set { m_amount = value; }
+    }
 
-        public string UserID
-        {
-            get { return m_userID; }
-            set { m_userID = value; }
-        }
+    public int SenderBalance
+    {
+        get { return m_senderBalance; }
+        set { m_senderBalance = value; }
+    }
 
-        public string SimIP
-        {
-            get { return m_simIP; }
-            set { m_simIP = value; }
-        }
+    public int ReceiverBalance
+    {
+        get { return m_receiverBalance; }
+        set { m_receiverBalance = value; }
+    }
 
-        public string Avatar
-        {
-            get { return m_avatarName; }
-            set { m_avatarName = value; }
-        }
+    public int Type
+    {
+        get { return m_type; }
+        set { m_type = value; }
+    }
 
-        public string PswHash
-        {
-            get { return m_passwordHash; }
-            set { m_passwordHash = value; }
-        }
+    public int Time
+    {
+        get { return m_time; }
+        set { m_time = value; }
+    }
 
-        public int Type
-        {
-            get { return m_avatarType; }
-            set { m_avatarType = value; }
-        }
+    public int Status
+    {
+        get { return m_status; }
+        set { m_status = value; }
+    }
 
-        public int Class
-        {
-            get { return m_avatarClass; }
-            set { m_avatarClass = value; }
-        }
+    public string Description
+    {
+        get { return m_description; }
+        set { m_description = value; }
+    }
 
-        public string ServerURL
-        {
-            get { return m_serverURL; }
-            set { m_serverURL = value; }
-        }
+    public string ObjectUUID
+    {
+        get { return m_objectID; }
+        set { m_objectID = value; }
+    }
+
+    public string ObjectName
+    {
+        get { return m_objectName; }
+        set { m_objectName = value; }
+    }
+
+    public string RegionHandle
+    {
+        get { return m_regionHandle; }
+        set { m_regionHandle = value; }
+    }
+
+    public string RegionUUID
+    {
+        get { return m_regionUUID; }
+        set { m_regionUUID = value; }
+    }
+
+    public string SecureCode
+    {
+        get { return m_secureCode; }
+        set { m_secureCode = value; }
+    }
+
+    public string CommonName
+    {
+        get { return m_commonName; }
+        set { m_commonName = value; }
+    }
+}
+
+
+public enum Status
+{
+    SUCCESS_STATUS = 0,
+    PENDING_STATUS = 1,
+    FAILED_STATUS = 2,
+    ERROR_STATUS = 9
+}
+
+
+public enum AvatarType
+{
+    LOCAL_AVATAR = 0,
+    HG_AVATAR = 1,
+    NPC_AVATAR = 2,
+    GUEST_AVATAR = 3,
+    FOREIGN_AVATAR = 8,
+    UNKNOWN_AVATAR = 9
+}
+
+
+public class UserInfo
+{
+    string m_userID = string.Empty;
+    string m_simIP = string.Empty;
+    string m_avatarName = string.Empty;
+    string m_passwordHash = string.Empty;
+    int m_avatarType = (int)AvatarType.LOCAL_AVATAR;
+    int m_avatarClass = (int)AvatarType.LOCAL_AVATAR;
+    string m_serverURL = string.Empty;
+
+    public string UserID
+    {
+        get { return m_userID; }
+        set { m_userID = value; }
+    }
+
+    public string SimIP
+    {
+        get { return m_simIP; }
+        set { m_simIP = value; }
+    }
+
+    public string Avatar
+    {
+        get { return m_avatarName; }
+        set { m_avatarName = value; }
+    }
+
+    public string PswHash
+    {
+        get { return m_passwordHash; }
+        set { m_passwordHash = value; }
+    }
+
+    public int Type
+    {
+        get { return m_avatarType; }
+        set { m_avatarType = value; }
+    }
+
+    public int Class
+    {
+        get { return m_avatarClass; }
+        set { m_avatarClass = value; }
+    }
+
+    public string ServerURL
+    {
+        get { return m_serverURL; }
+        set { m_serverURL = value; }
     }
 }

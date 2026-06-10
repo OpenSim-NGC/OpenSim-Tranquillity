@@ -25,26 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenMetaverse;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+public enum PhysShapeType : byte
 {
-    public enum PhysShapeType : byte
-    {
-        prim = 0,
-        none = 1,
-        convex = 2,
+    prim = 0,
+    none = 1,
+    convex = 2,
 
-        invalid = 255 // use to mark invalid data in ExtraPhysicsData
-    }
+    invalid = 255 // use to mark invalid data in ExtraPhysicsData
+}
 
-    public struct ExtraPhysicsData
-    {
-        public float Density;
-        public float GravitationModifier;
-        public float Friction;
-        public float Bounce;
-        public PhysShapeType PhysShapeType;
+public struct ExtraPhysicsData
+{
+    public float Density;
+    public float GravitationModifier;
+    public float Friction;
+    public float Bounce;
+    public PhysShapeType PhysShapeType;
 
-    }
 }

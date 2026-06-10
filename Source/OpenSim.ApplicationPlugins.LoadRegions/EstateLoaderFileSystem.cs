@@ -32,137 +32,136 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.ApplicationPlugins.LoadRegions
+namespace OpenSim.ApplicationPlugins.LoadRegions;
+
+public class EstateLoaderFileSystem : IEstateLoader
 {
-    public class EstateLoaderFileSystem : IEstateLoader
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IConfigSource m_configSource;
+
+    private IOpenSimBase m_application;
+
+    public EstateLoaderFileSystem(IOpenSimBase openSim)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_application = openSim;
+    }
 
-        private IConfigSource m_configSource;
+    public void SetIniConfigSource(IConfigSource configSource)
+    {
+        m_configSource = configSource;
+    }
 
-        private IOpenSimBase m_application;
+    public void LoadEstates()
+    {
+        string estateConfigPath = Path.Combine(Util.configDir(), "Estates");
 
-        public EstateLoaderFileSystem(IOpenSimBase openSim)
+        IConfig startupConfig = m_configSource.Configs["Startup"];
+        if(startupConfig == null)
+            return;
+
+        estateConfigPath = startupConfig.GetString("regionload_estatesdir", estateConfigPath).Trim();
+        if(string.IsNullOrWhiteSpace(estateConfigPath))
+            return;
+
+        if (!Directory.Exists(estateConfigPath))
+            return; // if nothing there, don't bother
+
+        string[] iniFiles;
+        try
         {
-            m_application = openSim;
+            iniFiles = Directory.GetFiles(estateConfigPath, "*.ini");
+        }
+        catch
+        {
+            m_log.Error("[ESTATE LOADER FILE SYSTEM]: could not open " + estateConfigPath);
+            return;
         }
 
-        public void SetIniConfigSource(IConfigSource configSource)
+        // No Estate.ini Found
+        if (iniFiles == null || iniFiles.Length == 0)
+            return;
+
+        m_log.InfoFormat("[ESTATE LOADER FILE SYSTEM]: Loading estate config files from {0}", estateConfigPath);
+
+        List<int> existingEstates;
+
+        List<int> existingEstateIDs = m_application.EstateDataService.GetEstatesAll();
+
+        foreach (string file in iniFiles)
         {
-            m_configSource = configSource;
-        }
+            m_log.InfoFormat("[ESTATE LOADER FILE SYSTEM]: Loading config file {0}", file);
 
-        public void LoadEstates()
-        {
-            string estateConfigPath = Path.Combine(Util.configDir(), "Estates");
-
-            IConfig startupConfig = m_configSource.Configs["Startup"];
-            if(startupConfig == null)
-                return;
-
-            estateConfigPath = startupConfig.GetString("regionload_estatesdir", estateConfigPath).Trim();
-            if(string.IsNullOrWhiteSpace(estateConfigPath))
-                return;
-
-            if (!Directory.Exists(estateConfigPath))
-                return; // if nothing there, don't bother
-
-            string[] iniFiles;
+            IConfigSource source = null;
             try
             {
-                iniFiles = Directory.GetFiles(estateConfigPath, "*.ini");
+                source = new IniConfigSource(file);
             }
             catch
             {
-                m_log.Error("[ESTATE LOADER FILE SYSTEM]: could not open " + estateConfigPath);
-                return;
+                m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: failed to parse file {0}", file);
             }
 
-            // No Estate.ini Found
-            if (iniFiles == null || iniFiles.Length == 0)
-                return;
+            if(source == null)
+                continue;
 
-            m_log.InfoFormat("[ESTATE LOADER FILE SYSTEM]: Loading estate config files from {0}", estateConfigPath);
-
-            List<int> existingEstates;
-
-            List<int> existingEstateIDs = m_application.EstateDataService.GetEstatesAll();
-
-            foreach (string file in iniFiles)
+            foreach (IConfig config in source.Configs)
             {
-                m_log.InfoFormat("[ESTATE LOADER FILE SYSTEM]: Loading config file {0}", file);
-
-                IConfigSource source = null;
-                try
-                {
-                    source = new IniConfigSource(file);
-                }
-                catch
-                {
-                    m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: failed to parse file {0}", file);
-                }
-
-                if(source == null)
+                // Read Estate Config From Source File
+                string estateName = config.Name;
+                if (string.IsNullOrWhiteSpace(estateName))
                     continue;
 
-                foreach (IConfig config in source.Configs)
+                if (estateName.Length > 64) // need check this and if utf8 is valid
                 {
-                    // Read Estate Config From Source File
-                    string estateName = config.Name;
-                    if (string.IsNullOrWhiteSpace(estateName))
-                        continue;
-
-                    if (estateName.Length > 64) // need check this and if utf8 is valid
-                    {
-                        m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: Estate name {0} is too large, ignoring", estateName);
-                        continue;
-                    }
-
-                    string ownerString = config.GetString("Owner", string.Empty);
-                    if (string.IsNullOrWhiteSpace(ownerString))
-                        continue;
-
-                    if (!UUID.TryParse(ownerString, out UUID estateOwner) || estateOwner.IsZero())
-                        continue;
-
-                    // Check If Estate Exists (Skip If So)
-                    existingEstates = m_application.EstateDataService.GetEstates(estateName);
-
-                    if (existingEstates.Count > 0)
-                        continue;
-
-                    //### Should check Estate Owner ID but no Scene object available at this point
-
-                    // Does Config Specify EstateID (0 Defaults To AutoIncrement)
-                    int EstateID = config.GetInt("EstateID", 0);
-
-                    if (EstateID > 0)
-                    {
-                        if (EstateID < 100)
-                        {
-                            // EstateID Cannot be less than 100
-                            m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: Estate name {0} specified estateID that is less that 100, ignoring", estateName);
-                            continue;
-                        }
-                        else if(existingEstateIDs.Contains(EstateID))
-                        {
-                            // Specified EstateID Exists
-                            m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: Estate name {0} specified estateID that is already in use, ignoring", estateName);
-                            continue;
-                        }
-                    }
-
-                    // Create a new estate with the name provided
-                    EstateSettings estateSettings = m_application.EstateDataService.CreateNewEstate(EstateID);
-
-                    estateSettings.EstateName = estateName;
-                    estateSettings.EstateOwner = estateOwner;
-
-                    // Persistence does not seem to effect the need to save a new estate
-                    m_application.EstateDataService.StoreEstateSettings(estateSettings);
-
-                    m_log.InfoFormat("[ESTATE LOADER FILE SYSTEM]: Loaded config for estate {0}", estateName);
+                    m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: Estate name {0} is too large, ignoring", estateName);
+                    continue;
                 }
+
+                string ownerString = config.GetString("Owner", string.Empty);
+                if (string.IsNullOrWhiteSpace(ownerString))
+                    continue;
+
+                if (!UUID.TryParse(ownerString, out UUID estateOwner) || estateOwner.IsZero())
+                    continue;
+
+                // Check If Estate Exists (Skip If So)
+                existingEstates = m_application.EstateDataService.GetEstates(estateName);
+
+                if (existingEstates.Count > 0)
+                    continue;
+
+                //### Should check Estate Owner ID but no Scene object available at this point
+
+                // Does Config Specify EstateID (0 Defaults To AutoIncrement)
+                int EstateID = config.GetInt("EstateID", 0);
+
+                if (EstateID > 0)
+                {
+                    if (EstateID < 100)
+                    {
+                        // EstateID Cannot be less than 100
+                        m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: Estate name {0} specified estateID that is less that 100, ignoring", estateName);
+                        continue;
+                    }
+                    else if(existingEstateIDs.Contains(EstateID))
+                    {
+                        // Specified EstateID Exists
+                        m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: Estate name {0} specified estateID that is already in use, ignoring", estateName);
+                        continue;
+                    }
+                }
+
+                // Create a new estate with the name provided
+                EstateSettings estateSettings = m_application.EstateDataService.CreateNewEstate(EstateID);
+
+                estateSettings.EstateName = estateName;
+                estateSettings.EstateOwner = estateOwner;
+
+                // Persistence does not seem to effect the need to save a new estate
+                m_application.EstateDataService.StoreEstateSettings(estateSettings);
+
+                m_log.InfoFormat("[ESTATE LOADER FILE SYSTEM]: Loaded config for estate {0}", estateName);
             }
         }
     }

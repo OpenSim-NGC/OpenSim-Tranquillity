@@ -29,111 +29,110 @@ using System.Net;
 using OpenSim.Framework.ServiceAuth;
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+/// <summary>
+/// simple OSD streamed request handler.
+/// for well defined simple uri paths, single http method and a OSDMap encoded body
+/// </summary>
+/// <remarks>
+/// Inheriting classes should override ProcessRequest() rather than Handle()
+/// </remarks>
+public class SimpleOSDMapHandler : SimpleBaseRequestHandler, ISimpleStreamHandler
 {
-    /// <summary>
-    /// simple OSD streamed request handler.
-    /// for well defined simple uri paths, single http method and a OSDMap encoded body
-    /// </summary>
-    /// <remarks>
-    /// Inheriting classes should override ProcessRequest() rather than Handle()
-    /// </remarks>
-    public class SimpleOSDMapHandler : SimpleBaseRequestHandler, ISimpleStreamHandler
+    protected string m_httMethod;
+    protected IServiceAuth m_Auth;
+    protected SimpleOSDMapMethod m_processRequest;
+
+    public SimpleOSDMapHandler(string httpmethod, string path) : base(path)
     {
-        protected string m_httMethod;
-        protected IServiceAuth m_Auth;
-        protected SimpleOSDMapMethod m_processRequest;
+        m_httMethod = httpmethod.ToUpper();
+    }
+    public SimpleOSDMapHandler(string httpmethod, string path, string name) : base(path, name)
+    {
+        m_httMethod = httpmethod.ToUpper();
+    }
+    public SimpleOSDMapHandler(string httpmethod, string path, SimpleOSDMapMethod processRequest) : base(path)
+    {
+        m_httMethod = httpmethod.ToUpper();
+        m_processRequest = processRequest;
+    }
+    public SimpleOSDMapHandler(string httpmethod, string path, SimpleOSDMapMethod processRequest, string name) : base(path, name)
+    {
+        m_httMethod = httpmethod.ToUpper();
+        m_processRequest = processRequest;
+    }
 
-        public SimpleOSDMapHandler(string httpmethod, string path) : base(path)
+    public SimpleOSDMapHandler(string httpmethod, string path, IServiceAuth auth) : base(path)
+    {
+        m_httMethod = httpmethod.ToUpper();
+        m_Auth = auth;
+    }
+
+    public SimpleOSDMapHandler(string httpmethod, string path, IServiceAuth auth, SimpleOSDMapMethod processRequest)
+        : base(path)
+    {
+        m_httMethod = httpmethod.ToUpper();
+        m_Auth = auth;
+        m_processRequest = processRequest;
+    }
+
+    public SimpleOSDMapHandler(string httpmethod, string path, IServiceAuth auth, SimpleOSDMapMethod processRequest, string name)
+        : base(path, name)
+    {
+        m_httMethod = httpmethod.ToUpper();
+        m_Auth = auth;
+        m_processRequest = processRequest;
+    }
+
+    public virtual void Handle(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        RequestsReceived++;
+        if(httpRequest.HttpMethod != m_httMethod)
         {
-            m_httMethod = httpmethod.ToUpper();
+            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+            return;
         }
-        public SimpleOSDMapHandler(string httpmethod, string path, string name) : base(path, name)
+        OSDMap args;
+        try
         {
-            m_httMethod = httpmethod.ToUpper();
+            args = (OSDMap)OSDParser.Deserialize(httpRequest.InputStream);
         }
-        public SimpleOSDMapHandler(string httpmethod, string path, SimpleOSDMapMethod processRequest) : base(path)
+        catch
         {
-            m_httMethod = httpmethod.ToUpper();
-            m_processRequest = processRequest;
+            httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+            return;
         }
-        public SimpleOSDMapHandler(string httpmethod, string path, SimpleOSDMapMethod processRequest, string name) : base(path, name)
+        if (args == null)
         {
-            m_httMethod = httpmethod.ToUpper();
-            m_processRequest = processRequest;
+            httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+            return;
         }
 
-        public SimpleOSDMapHandler(string httpmethod, string path, IServiceAuth auth) : base(path)
+        if (m_Auth != null)
         {
-            m_httMethod = httpmethod.ToUpper();
-            m_Auth = auth;
-        }
-
-        public SimpleOSDMapHandler(string httpmethod, string path, IServiceAuth auth, SimpleOSDMapMethod processRequest)
-            : base(path)
-        {
-            m_httMethod = httpmethod.ToUpper();
-            m_Auth = auth;
-            m_processRequest = processRequest;
-        }
-
-        public SimpleOSDMapHandler(string httpmethod, string path, IServiceAuth auth, SimpleOSDMapMethod processRequest, string name)
-            : base(path, name)
-        {
-            m_httMethod = httpmethod.ToUpper();
-            m_Auth = auth;
-            m_processRequest = processRequest;
-        }
-
-        public virtual void Handle(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            RequestsReceived++;
-            if(httpRequest.HttpMethod != m_httMethod)
+            if (!m_Auth.Authenticate(httpRequest.Headers, httpResponse.AddHeader, out HttpStatusCode statusCode))
             {
-                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+                httpResponse.StatusCode = (int)statusCode;
                 return;
             }
-            OSDMap args;
-            try
-            {
-                args = (OSDMap)OSDParser.Deserialize(httpRequest.InputStream);
-            }
-            catch
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
-                return;
-            }
-            if (args == null)
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
-                return;
-            }
-
-            if (m_Auth != null)
-            {
-                if (!m_Auth.Authenticate(httpRequest.Headers, httpResponse.AddHeader, out HttpStatusCode statusCode))
-                {
-                    httpResponse.StatusCode = (int)statusCode;
-                    return;
-                }
-            }
-            try
-            {
-                if(m_processRequest != null)
-                    m_processRequest(httpRequest, httpResponse, args);
-                else
-                    ProcessRequest(httpRequest, httpResponse, args);
-            }
-            catch
-            {
-                httpResponse.StatusCode = (int)HttpStatusCode.InternalServerError;
-            }
-
-            RequestsHandled++;
         }
-
-        protected virtual void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap args)
+        try
         {
+            if(m_processRequest != null)
+                m_processRequest(httpRequest, httpResponse, args);
+            else
+                ProcessRequest(httpRequest, httpResponse, args);
         }
+        catch
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.InternalServerError;
+        }
+
+        RequestsHandled++;
+    }
+
+    protected virtual void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap args)
+    {
     }
 }

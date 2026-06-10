@@ -35,114 +35,112 @@ using log4net;
 
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
-namespace OpenSim.Region.OptionalModules.ViewerSupport
+namespace OpenSim.Region.OptionalModules.ViewerSupport;
+
+public class SpecialUIModule : INonSharedRegionModule
 {
-    public class SpecialUIModule : INonSharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private const string VIEWER_SUPPORT_DIR = "ViewerSupport";
+
+    private Scene m_scene;
+    private SimulatorFeaturesHelper m_Helper;
+    private bool m_Enabled = false;
+    private int m_UserLevel;
+
+    public string Name
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return "SpecialUIModule"; }
+    }
 
-        private const string VIEWER_SUPPORT_DIR = "ViewerSupport";
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
 
-        private Scene m_scene;
-        private SimulatorFeaturesHelper m_Helper;
-        private bool m_Enabled = false;
-        private int m_UserLevel;
-
-        public string Name
+    public void Initialise(IConfigSource config)
+    {
+        IConfig moduleConfig = config.Configs["SpecialUIModule"];
+        if (moduleConfig != null)
         {
-            get { return "SpecialUIModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public void Initialise(IConfigSource config)
-        {
-            IConfig moduleConfig = config.Configs["SpecialUIModule"];
-            if (moduleConfig != null)
-            {
-                m_Enabled = moduleConfig.GetBoolean("enabled", false);
-                if (m_Enabled)
-                {
-                    m_UserLevel = moduleConfig.GetInt("UserLevel", 0);
-                    m_log.Info("[SPECIAL UI]: SpecialUIModule enabled");
-                }
-
-            }
-        }
-
-        public void Close()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
+            m_Enabled = moduleConfig.GetBoolean("enabled", false);
             if (m_Enabled)
             {
-                m_scene = scene;
+                m_UserLevel = moduleConfig.GetInt("UserLevel", 0);
+                m_log.Info("[SPECIAL UI]: SpecialUIModule enabled");
             }
-        }
 
-        public void RegionLoaded(Scene scene)
+        }
+    }
+
+    public void Close()
+    {
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (m_Enabled)
         {
-            if (m_Enabled)
+            m_scene = scene;
+        }
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (m_Enabled)
+        {
+            m_Helper = new SimulatorFeaturesHelper(scene);
+
+            ISimulatorFeaturesModule featuresModule = m_scene.RequestModuleInterface<ISimulatorFeaturesModule>();
+            if (featuresModule != null)
+                featuresModule.OnSimulatorFeaturesRequest += OnSimulatorFeaturesRequest;
+        }
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+    }
+
+    private void OnSimulatorFeaturesRequest(UUID agentID, ref OSDMap features)
+    {
+        m_log.DebugFormat("[SPECIAL UI]: OnSimulatorFeaturesRequest in {0}", m_scene.RegionInfo.RegionName);
+        if (m_Helper.UserLevel(agentID) <= m_UserLevel)
+        {
+            OSD extrasMap;
+            OSDMap specialUI = new OSDMap();
+            using (StreamReader s = new StreamReader(Path.Combine(VIEWER_SUPPORT_DIR, "panel_toolbar.xml")))
             {
-                m_Helper = new SimulatorFeaturesHelper(scene);
+                if (!features.TryGetValue("OpenSimExtras", out extrasMap))
+                {
+                    extrasMap = new OSDMap();
+                    features["OpenSimExtras"] = extrasMap;
+                }
 
-                ISimulatorFeaturesModule featuresModule = m_scene.RequestModuleInterface<ISimulatorFeaturesModule>();
-                if (featuresModule != null)
-                    featuresModule.OnSimulatorFeaturesRequest += OnSimulatorFeaturesRequest;
+                specialUI["toolbar"] = OSDMap.FromString(s.ReadToEnd());
+                ((OSDMap)extrasMap)["special-ui"] = specialUI;
             }
-        }
+            m_log.DebugFormat("[SPECIAL UI]: Sending panel_toolbar.xml in {0}", m_scene.RegionInfo.RegionName);
 
-        public void RemoveRegion(Scene scene)
-        {
-        }
-
-        private void OnSimulatorFeaturesRequest(UUID agentID, ref OSDMap features)
-        {
-            m_log.DebugFormat("[SPECIAL UI]: OnSimulatorFeaturesRequest in {0}", m_scene.RegionInfo.RegionName);
-            if (m_Helper.UserLevel(agentID) <= m_UserLevel)
+            if (Directory.Exists(Path.Combine(VIEWER_SUPPORT_DIR, "Floaters")))
             {
-                OSD extrasMap;
-                OSDMap specialUI = new OSDMap();
-                using (StreamReader s = new StreamReader(Path.Combine(VIEWER_SUPPORT_DIR, "panel_toolbar.xml")))
+                OSDMap floaters = new OSDMap();
+                uint n = 0;
+                foreach (String name in Directory.GetFiles(Path.Combine(VIEWER_SUPPORT_DIR, "Floaters"), "*.xml"))
                 {
-                    if (!features.TryGetValue("OpenSimExtras", out extrasMap))
+                    using (StreamReader s = new StreamReader(name))
                     {
-                        extrasMap = new OSDMap();
-                        features["OpenSimExtras"] = extrasMap;
+                        string simple_name = Path.GetFileNameWithoutExtension(name);
+                        OSDMap floater = new OSDMap();
+                        floaters[simple_name] = OSDMap.FromString(s.ReadToEnd());
+                        n++;
                     }
-
-                    specialUI["toolbar"] = OSDMap.FromString(s.ReadToEnd());
-                    ((OSDMap)extrasMap)["special-ui"] = specialUI;
                 }
-                m_log.DebugFormat("[SPECIAL UI]: Sending panel_toolbar.xml in {0}", m_scene.RegionInfo.RegionName);
-
-                if (Directory.Exists(Path.Combine(VIEWER_SUPPORT_DIR, "Floaters")))
-                {
-                    OSDMap floaters = new OSDMap();
-                    uint n = 0;
-                    foreach (String name in Directory.GetFiles(Path.Combine(VIEWER_SUPPORT_DIR, "Floaters"), "*.xml"))
-                    {
-                        using (StreamReader s = new StreamReader(name))
-                        {
-                            string simple_name = Path.GetFileNameWithoutExtension(name);
-                            OSDMap floater = new OSDMap();
-                            floaters[simple_name] = OSDMap.FromString(s.ReadToEnd());
-                            n++;
-                        }
-                    }
-                    specialUI["floaters"] = floaters;
-                    m_log.DebugFormat("[SPECIAL UI]: Sending {0} floaters", n);
-                }
+                specialUI["floaters"] = floaters;
+                m_log.DebugFormat("[SPECIAL UI]: Sending {0} floaters", n);
             }
-            else
-                m_log.DebugFormat("[SPECIAL UI]: NOT Sending panel_toolbar.xml in {0}", m_scene.RegionInfo.RegionName);
-
         }
+        else
+            m_log.DebugFormat("[SPECIAL UI]: NOT Sending panel_toolbar.xml in {0}", m_scene.RegionInfo.RegionName);
 
     }
 

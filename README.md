@@ -22,6 +22,11 @@ For build instructions, see Docs/BUILDING.md.
 For testing workflows (including YEngine state-load telemetry configuration and commands),
 see Docs/TESTING.txt.
 
+# Plugin Development
+
+For plugin authoring and registration steps in the DotNetCorePlugins model,
+see Docs/PLUGIN_DEVELOPMENT.md.
+
 # Running Tranquillity on Windows
 
 You will need dotnet 8.0 runtime (https://dotnet.microsoft.com/en-us/download/dotnet/8.0)

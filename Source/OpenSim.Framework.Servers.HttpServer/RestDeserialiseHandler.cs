@@ -25,47 +25,45 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.IO;
 using System.Xml;
 using System.Xml.Serialization;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public delegate TResponse RestDeserialiseMethod<TRequest, TResponse>(TRequest request);
+
+public class RestDeserialiseHandler<TRequest, TResponse> : BaseOutputStreamHandler, IStreamHandler
+    where TRequest : new()
 {
-    public delegate TResponse RestDeserialiseMethod<TRequest, TResponse>(TRequest request);
+    private RestDeserialiseMethod<TRequest, TResponse> m_method;
 
-    public class RestDeserialiseHandler<TRequest, TResponse> : BaseOutputStreamHandler, IStreamHandler
-        where TRequest : new()
+    public RestDeserialiseHandler(string httpMethod, string path, RestDeserialiseMethod<TRequest, TResponse> method)
+        : this(httpMethod, path, method, null, null) {}
+
+    public RestDeserialiseHandler(
+        string httpMethod, string path, RestDeserialiseMethod<TRequest, TResponse> method, string name, string description)
+        : base(httpMethod, path, name, description)
     {
-        private RestDeserialiseMethod<TRequest, TResponse> m_method;
+        m_method = method;
+    }
 
-        public RestDeserialiseHandler(string httpMethod, string path, RestDeserialiseMethod<TRequest, TResponse> method)
-            : this(httpMethod, path, method, null, null) {}
-
-        public RestDeserialiseHandler(
-            string httpMethod, string path, RestDeserialiseMethod<TRequest, TResponse> method, string name, string description)
-            : base(httpMethod, path, name, description)
+    protected override void ProcessRequest(string path, Stream request, Stream responseStream,
+                       IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        TRequest deserial;
+        using (XmlTextReader xmlReader = new XmlTextReader(request))
         {
-            m_method = method;
+            xmlReader.DtdProcessing = DtdProcessing.Ignore;
+            XmlSerializer deserializer = new XmlSerializer(typeof (TRequest));
+            deserial = (TRequest) deserializer.Deserialize(xmlReader);
         }
 
-        protected override void ProcessRequest(string path, Stream request, Stream responseStream,
-                           IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        TResponse response = m_method(deserial);
+
+        using (XmlWriter xmlWriter = XmlTextWriter.Create(responseStream))
         {
-            TRequest deserial;
-            using (XmlTextReader xmlReader = new XmlTextReader(request))
-            {
-                xmlReader.DtdProcessing = DtdProcessing.Ignore;
-                XmlSerializer deserializer = new XmlSerializer(typeof (TRequest));
-                deserial = (TRequest) deserializer.Deserialize(xmlReader);
-            }
-
-            TResponse response = m_method(deserial);
-
-            using (XmlWriter xmlWriter = XmlTextWriter.Create(responseStream))
-            {
-                XmlSerializer serializer = new XmlSerializer(typeof (TResponse));
-                serializer.Serialize(xmlWriter, response);
-            }
+            XmlSerializer serializer = new XmlSerializer(typeof (TResponse));
+            serializer.Serialize(xmlWriter, response);
         }
     }
 }

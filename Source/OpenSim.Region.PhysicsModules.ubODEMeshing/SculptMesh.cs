@@ -29,184 +29,183 @@ using SkiaSharp;
 
 using OpenMetaverse;
 
-namespace PrimMesher
+namespace PrimMesher;
+
+public class SculptMesh
 {
-    public class SculptMesh
+    public List<Vector3> coords;
+    public List<Face> faces;
+
+    public enum SculptType { sphere = 1, torus = 2, plane = 3, cylinder = 4 };
+
+
+    public SculptMesh(SKBitmap sculptBitmap, SculptType sculptType, int lod, bool mirror, bool invert)
     {
-        public List<Vector3> coords;
-        public List<Face> faces;
+        if (mirror)
+            invert = !invert;
 
-        public enum SculptType { sphere = 1, torus = 2, plane = 3, cylinder = 4 };
+        // Use the shared SculptMap implementation (Meshing/SculptMap.cs)
+        SculptMap smap = new SculptMap(sculptBitmap, lod);
 
+        List<List<Vector3>> rows = smap.ToRows(mirror);
 
-        public SculptMesh(SKBitmap sculptBitmap, SculptType sculptType, int lod, bool mirror, bool invert)
+        _SculptMesh(rows, sculptType, invert);
+    }
+
+    private void _SculptMesh(List<List<Vector3>> rows, SculptType sculptType, bool invert)
+    {
+        coords = new List<Vector3>();
+        faces = new List<Face>();
+
+        sculptType = (SculptType)(((int)sculptType) & 0x07);
+
+        int width = rows[0].Count;
+
+        int p1, p2, p3, p4;
+
+        int imageX, imageY;
+
+        if (sculptType != SculptType.plane)
         {
-            if (mirror)
-                invert = !invert;
+            if (rows.Count % 2 == 0)
+            {
+                for (int rowNdx = 0; rowNdx < rows.Count; rowNdx++)
+                    rows[rowNdx].Add(rows[rowNdx][0]);
+            }
+            else
+            {
+                int lastIndex = rows[0].Count - 1;
 
-            // Use the shared SculptMap implementation (Meshing/SculptMap.cs)
-            SculptMap smap = new SculptMap(sculptBitmap, lod);
-
-            List<List<Vector3>> rows = smap.ToRows(mirror);
-
-            _SculptMesh(rows, sculptType, invert);
+                for (int i = 0; i < rows.Count; i++)
+                    rows[i][0] = rows[i][lastIndex];
+            }
         }
 
-        private void _SculptMesh(List<List<Vector3>> rows, SculptType sculptType, bool invert)
+        Vector3 topPole = rows[0][width / 2];
+        Vector3 bottomPole = rows[rows.Count - 1][width / 2];
+
+        if (sculptType == SculptType.sphere)
         {
-            coords = new List<Vector3>();
-            faces = new List<Face>();
-
-            sculptType = (SculptType)(((int)sculptType) & 0x07);
-
-            int width = rows[0].Count;
-
-            int p1, p2, p3, p4;
-
-            int imageX, imageY;
-
-            if (sculptType != SculptType.plane)
+            if (rows.Count % 2 == 0)
             {
-                if (rows.Count % 2 == 0)
-                {
-                    for (int rowNdx = 0; rowNdx < rows.Count; rowNdx++)
-                        rows[rowNdx].Add(rows[rowNdx][0]);
-                }
-                else
-                {
-                    int lastIndex = rows[0].Count - 1;
+                int count = rows[0].Count;
+                List<Vector3> topPoleRow = new List<Vector3>(count);
+                List<Vector3> bottomPoleRow = new List<Vector3>(count);
 
-                    for (int i = 0; i < rows.Count; i++)
-                        rows[i][0] = rows[i][lastIndex];
+                for (int i = 0; i < count; i++)
+                {
+                    topPoleRow.Add(topPole);
+                    bottomPoleRow.Add(bottomPole);
                 }
+                rows.Insert(0, topPoleRow);
+                rows.Add(bottomPoleRow);
             }
-
-            Vector3 topPole = rows[0][width / 2];
-            Vector3 bottomPole = rows[rows.Count - 1][width / 2];
-
-            if (sculptType == SculptType.sphere)
+            else
             {
-                if (rows.Count % 2 == 0)
+                int count = rows[0].Count;
+
+                List<Vector3> topPoleRow = rows[0];
+                List<Vector3> bottomPoleRow = rows[rows.Count - 1];
+
+                for (int i = 0; i < count; i++)
                 {
-                    int count = rows[0].Count;
-                    List<Vector3> topPoleRow = new List<Vector3>(count);
-                    List<Vector3> bottomPoleRow = new List<Vector3>(count);
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        topPoleRow.Add(topPole);
-                        bottomPoleRow.Add(bottomPole);
-                    }
-                    rows.Insert(0, topPoleRow);
-                    rows.Add(bottomPoleRow);
-                }
-                else
-                {
-                    int count = rows[0].Count;
-
-                    List<Vector3> topPoleRow = rows[0];
-                    List<Vector3> bottomPoleRow = rows[rows.Count - 1];
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        topPoleRow[i] = topPole;
-                        bottomPoleRow[i] = bottomPole;
-                    }
-                }
-            }
-
-            if (sculptType == SculptType.torus)
-                rows.Add(rows[0]);
-
-            int coordsDown = rows.Count;
-            int coordsAcross = rows[0].Count;
-
-            float widthUnit = 1.0f / (coordsAcross - 1);
-            float heightUnit = 1.0f / (coordsDown - 1);
-
-            for (imageY = 0; imageY < coordsDown; imageY++)
-            {
-                int rowOffset = imageY * coordsAcross;
-
-                for (imageX = 0; imageX < coordsAcross; imageX++)
-                {
-                    /*
-                    *   p1-----p2
-                    *   | \ f2 |
-                    *   |   \  |
-                    *   | f1  \|
-                    *   p3-----p4
-                    */
-
-                    p4 = rowOffset + imageX;
-                    p3 = p4 - 1;
-
-                    p2 = p4 - coordsAcross;
-                    p1 = p3 - coordsAcross;
-
-                    this.coords.Add(rows[imageY][imageX]);
-
-                    if (imageY > 0 && imageX > 0)
-                    {
-                        Face f1, f2;
-
-                            if (invert)
-                            {
-                                f1 = new Face(p1, p4, p3);
-                                f2 = new Face(p1, p2, p4);
-                            }
-                            else
-                            {
-                                f1 = new Face(p1, p3, p4);
-                                f2 = new Face(p1, p4, p2);
-                            }
-
-                        faces.Add(f1);
-                        faces.Add(f2);
-                    }
+                    topPoleRow[i] = topPole;
+                    bottomPoleRow[i] = bottomPole;
                 }
             }
         }
 
-        /// <summary>
-        /// Duplicates a SculptMesh object. All object properties are copied by value, including lists.
-        /// </summary>
-        /// <returns></returns>
-        public SculptMesh Copy()
-        {
-            return new SculptMesh(this);
-        }
+        if (sculptType == SculptType.torus)
+            rows.Add(rows[0]);
 
-        public SculptMesh(SculptMesh sm)
-        {
-            coords = new List<Vector3>(sm.coords);
-            faces = new List<Face>(sm.faces);
-        }
+        int coordsDown = rows.Count;
+        int coordsAcross = rows[0].Count;
 
-        public void Scale(float x, float y, float z)
-        {
-            int i;
-            int numVerts = this.coords.Count;
+        float widthUnit = 1.0f / (coordsAcross - 1);
+        float heightUnit = 1.0f / (coordsDown - 1);
 
-            Vector3 m = new Vector3(x, y, z);
-            for (i = 0; i < numVerts; i++)
-                this.coords[i] *= m;
-        }
-
-        public void DumpRaw(String path, String name, String title)
+        for (imageY = 0; imageY < coordsDown; imageY++)
         {
-            if (path == null)
-                return;
-            String fileName = name + "_" + title + ".raw";
-            String completePath = System.IO.Path.Combine(path, fileName);
-            using(StreamWriter sw = new StreamWriter(completePath))
+            int rowOffset = imageY * coordsAcross;
+
+            for (imageX = 0; imageX < coordsAcross; imageX++)
             {
-                for (int i = 0; i < faces.Count; i++)
+                /*
+                *   p1-----p2
+                *   | \ f2 |
+                *   |   \  |
+                *   | f1  \|
+                *   p3-----p4
+                */
+
+                p4 = rowOffset + imageX;
+                p3 = p4 - 1;
+
+                p2 = p4 - coordsAcross;
+                p1 = p3 - coordsAcross;
+
+                this.coords.Add(rows[imageY][imageX]);
+
+                if (imageY > 0 && imageX > 0)
                 {
-                    sw.Write(coords[faces[i].v1].ToString());
-                    sw.Write(coords[faces[i].v2].ToString());
-                    sw.WriteLine(coords[faces[i].v3].ToString());
+                    Face f1, f2;
+
+                        if (invert)
+                        {
+                            f1 = new Face(p1, p4, p3);
+                            f2 = new Face(p1, p2, p4);
+                        }
+                        else
+                        {
+                            f1 = new Face(p1, p3, p4);
+                            f2 = new Face(p1, p4, p2);
+                        }
+
+                    faces.Add(f1);
+                    faces.Add(f2);
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Duplicates a SculptMesh object. All object properties are copied by value, including lists.
+    /// </summary>
+    /// <returns></returns>
+    public SculptMesh Copy()
+    {
+        return new SculptMesh(this);
+    }
+
+    public SculptMesh(SculptMesh sm)
+    {
+        coords = new List<Vector3>(sm.coords);
+        faces = new List<Face>(sm.faces);
+    }
+
+    public void Scale(float x, float y, float z)
+    {
+        int i;
+        int numVerts = this.coords.Count;
+
+        Vector3 m = new Vector3(x, y, z);
+        for (i = 0; i < numVerts; i++)
+            this.coords[i] *= m;
+    }
+
+    public void DumpRaw(String path, String name, String title)
+    {
+        if (path == null)
+            return;
+        String fileName = name + "_" + title + ".raw";
+        String completePath = System.IO.Path.Combine(path, fileName);
+        using(StreamWriter sw = new StreamWriter(completePath))
+        {
+            for (int i = 0; i < faces.Count; i++)
+            {
+                sw.Write(coords[faces[i].v1].ToString());
+                sw.Write(coords[faces[i].v2].ToString());
+                sw.WriteLine(coords[faces[i].v3].ToString());
             }
         }
     }

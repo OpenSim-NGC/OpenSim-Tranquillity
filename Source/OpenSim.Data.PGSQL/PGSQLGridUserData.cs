@@ -25,44 +25,34 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Reflection;
-using System.Threading;
-using log4net;
-using OpenMetaverse;
-using OpenSim.Framework;
+namespace OpenSim.Data.PGSQL;
 
-namespace OpenSim.Data.PGSQL
+/// <summary>
+/// A PGSQL Interface for Avatar Storage
+/// </summary>
+public class PGSQLGridUserData : PGSQLGenericTableHandler<GridUserData>,
+        IGridUserData
 {
-    /// <summary>
-    /// A PGSQL Interface for Avatar Storage
-    /// </summary>
-    public class PGSQLGridUserData : PGSQLGenericTableHandler<GridUserData>,
-            IGridUserData
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public PGSQLGridUserData(string connectionString, string realm) :
-            base(connectionString, realm, "GridUserStore")
-        {
-        }
-
-        public new GridUserData Get(string userID)
-        {
-            GridUserData[] ret = Get("UserID", userID);
-
-            if (ret.Length == 0)
-                return null;
-
-            return ret[0];
-        }
-
-        public GridUserData[] GetAll(string userID)
-        {
-            return base.Get(String.Format("\"UserID\" LIKE '{0}%'", userID));
-        }
-
+    public PGSQLGridUserData(string connectionString, string realm) :
+        base(connectionString, realm, "GridUserStore")
+    {
     }
+
+    public new GridUserData Get(string userID)
+    {
+        GridUserData[] ret = Get("UserID", userID);
+
+        if (ret.Length == 0)
+            return null;
+
+        return ret[0];
+    }
+
+    public GridUserData[] GetAll(string userID)
+    {
+        return base.Get(String.Format("\"UserID\" LIKE '{0}%'", userID));
+    }
+
 }

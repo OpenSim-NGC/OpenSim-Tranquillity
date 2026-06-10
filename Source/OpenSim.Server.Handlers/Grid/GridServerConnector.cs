@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using Nini.Config;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
@@ -33,32 +32,31 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Server.Handlers.Grid
+namespace OpenSim.Server.Handlers.Grid;
+
+public class GridServiceConnector : ServiceConnector
 {
-    public class GridServiceConnector : ServiceConnector
+    private IGridService m_GridService;
+    private string m_ConfigName = "GridService";
+
+    public GridServiceConnector(IConfigSource config, IHttpServer server, string configName) :
+            base(config, server, configName)
     {
-        private IGridService m_GridService;
-        private string m_ConfigName = "GridService";
+        IConfig serverConfig = config.Configs[m_ConfigName];
+        if (serverConfig == null)
+            throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
 
-        public GridServiceConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
-        {
-            IConfig serverConfig = config.Configs[m_ConfigName];
-            if (serverConfig == null)
-                throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
+        string gridService = serverConfig.GetString("LocalServiceModule",
+                String.Empty);
 
-            string gridService = serverConfig.GetString("LocalServiceModule",
-                    String.Empty);
+        if (gridService.Length == 0)
+            throw new Exception("No LocalServiceModule in config file");
 
-            if (gridService.Length == 0)
-                throw new Exception("No LocalServiceModule in config file");
+        Object[] args = new Object[] { config };
+        m_GridService = ServerUtils.LoadPlugin<IGridService>(gridService, args);
 
-            Object[] args = new Object[] { config };
-            m_GridService = ServerUtils.LoadPlugin<IGridService>(gridService, args);
+        IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
 
-            IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
-
-            server.AddStreamHandler(new GridServerPostHandler(m_GridService, auth));
-        }
+        server.AddStreamHandler(new GridServerPostHandler(m_GridService, auth));
     }
 }

@@ -25,19 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using OpenMetaverse;
-using OpenSim.Framework;
-using OpenSim.Region.Framework.Scenes;
+namespace OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.Framework.Interfaces
+public interface ISceneCommandsModule
 {
-    public interface ISceneCommandsModule
-    {
-        /// <summary>
-        /// Sets the scene debug options.
-        /// </summary>
-        void SetSceneDebugOptions(Dictionary<string, string> options);
-    }
+    /// <summary>
+    /// Sets the scene debug options.
+    /// </summary>
+    void SetSceneDebugOptions(Dictionary<string, string> options);
 }

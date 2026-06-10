@@ -25,17 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenSim.Framework;
 using OpenMetaverse;
 
-namespace OpenSim.Services.Interfaces
+namespace OpenSim.Services.Interfaces;
+
+public interface  IMuteListService
 {
-    public interface  IMuteListService
-    {
-        Byte[] MuteListRequest(UUID agent, uint crc);
-        bool UpdateMute(MuteData mute);
-        bool RemoveMute(UUID agentID, UUID muteID, string muteName);
-    }
+    Byte[] MuteListRequest(UUID agent, uint crc);
+    bool UpdateMute(MuteData mute);
+    bool RemoveMute(UUID agentID, UUID muteID, string muteName);
 }

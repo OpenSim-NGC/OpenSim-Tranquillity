@@ -3,6 +3,8 @@ opensim-ngc-0.9.2.2.8451
 
 Changes:
 
+- plugin discovery now always uses DotNetCorePlugins; remove any legacy `PluginDiscovery` or `OPENSIM_PLUGIN_DISCOVERY` settings from local configuration and startup scripts
+
 - try to improve profiles online indication. This ofc just fais on HG
 - update api version and script syntax
 - add llGetInventoryAcquireTime 

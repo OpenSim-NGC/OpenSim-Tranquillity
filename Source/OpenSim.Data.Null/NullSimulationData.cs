@@ -25,177 +25,175 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Data.Null
+namespace OpenSim.Data.Null;
+
+/// <summary>
+/// NULL DataStore, do not store anything
+/// </summary>
+public class NullSimulationData : ISimulationDataStore
 {
-    /// <summary>
-    /// NULL DataStore, do not store anything
-    /// </summary>
-    public class NullSimulationData : ISimulationDataStore
+    public NullSimulationData()
     {
-        public NullSimulationData()
+    }
+
+    public NullSimulationData(string connectionString)
+    {
+        Initialise(connectionString);
+    }
+
+    public void Initialise(string dbfile)
+    {
+        return;
+    }
+
+    public void Dispose()
+    {
+    }
+
+    public void StoreRegionSettings(RegionSettings rs)
+    {
+    }
+
+    public RegionLightShareData LoadRegionWindlightSettings(UUID regionUUID)
+    {
+        //This connector doesn't support the windlight module yet
+        //Return default LL windlight settings
+        return new RegionLightShareData();
+    }
+
+    public void RemoveRegionWindlightSettings(UUID regionID)
+    {
+    }
+
+    public void StoreRegionWindlightSettings(RegionLightShareData wl)
+    {
+        //This connector doesn't support the windlight module yet
+    }
+
+    #region Environment Settings
+
+    private Dictionary<UUID, string> EnvironmentSettings = new Dictionary<UUID, string>();
+
+    public string LoadRegionEnvironmentSettings(UUID regionUUID)
+    {
+        lock (EnvironmentSettings)
+            return EnvironmentSettings.TryGetValue(regionUUID, out string es) ? es : string.Empty;
+    }
+
+    public void StoreRegionEnvironmentSettings(UUID regionUUID, string settings)
+    {
+        lock (EnvironmentSettings)
         {
+            EnvironmentSettings[regionUUID] = settings;
         }
+    }
 
-        public NullSimulationData(string connectionString)
+    public void RemoveRegionEnvironmentSettings(UUID regionUUID)
+    {
+        lock (EnvironmentSettings)
         {
-            Initialise(connectionString);
+            EnvironmentSettings.Remove(regionUUID);
         }
+    }
+    #endregion
 
-        public void Initialise(string dbfile)
-        {
-            return;
-        }
+    public RegionSettings LoadRegionSettings(UUID regionUUID)
+    {
+        RegionSettings rs = new RegionSettings();
+        rs.RegionUUID = regionUUID;
+        return rs;
+    }
 
-        public void Dispose()
-        {
-        }
+    public void StoreObject(SceneObjectGroup obj, UUID regionUUID)
+    {
+    }
 
-        public void StoreRegionSettings(RegionSettings rs)
-        {
-        }
+    public void RemoveObject(UUID obj, UUID regionUUID)
+    {
+    }
 
-        public RegionLightShareData LoadRegionWindlightSettings(UUID regionUUID)
-        {
-            //This connector doesn't support the windlight module yet
-            //Return default LL windlight settings
-            return new RegionLightShareData();
-        }
+    public void StorePrimInventory(UUID primID, ICollection<TaskInventoryItem> items)
+    {
+    }
 
-        public void RemoveRegionWindlightSettings(UUID regionID)
-        {
-        }
+    public List<SceneObjectGroup> LoadObjects(UUID regionUUID)
+    {
+        return new List<SceneObjectGroup>();
+    }
 
-        public void StoreRegionWindlightSettings(RegionLightShareData wl)
-        {
-            //This connector doesn't support the windlight module yet
-        }
+    Dictionary<UUID, TerrainData> m_terrains = new Dictionary<UUID, TerrainData>();
+    Dictionary<UUID, TerrainData> m_bakedterrains = new Dictionary<UUID, TerrainData>();
+    public void StoreTerrain(TerrainData ter, UUID regionID)
+    {
+        m_terrains[regionID] = ter;
+    }
 
-        #region Environment Settings
+    public void StoreBakedTerrain(TerrainData ter, UUID regionID)
+    {
+        m_bakedterrains[regionID] = ter;
+    }
 
-        private Dictionary<UUID, string> EnvironmentSettings = new Dictionary<UUID, string>();
+    // Legacy. Just don't do this.
+    public void StoreTerrain(double[,] ter, UUID regionID)
+    {
+        TerrainData terrData = new TerrainData(ter);
+        StoreTerrain(terrData, regionID);
+    }
 
-        public string LoadRegionEnvironmentSettings(UUID regionUUID)
-        {
-            lock (EnvironmentSettings)
-                return EnvironmentSettings.TryGetValue(regionUUID, out string es) ? es : string.Empty;
-        }
+    // Legacy. Just don't do this.
+    // Returns 'null' if region not found
+    public double[,] LoadTerrain(UUID regionID)
+    {
+        return m_terrains.TryGetValue(regionID, out TerrainData terrData) ? terrData.GetDoubles() : null;
+    }
 
-        public void StoreRegionEnvironmentSettings(UUID regionUUID, string settings)
-        {
-            lock (EnvironmentSettings)
-            {
-                EnvironmentSettings[regionUUID] = settings;
-            }
-        }
+    public TerrainData LoadTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ)
+    {
+        return m_terrains.TryGetValue(regionID, out TerrainData terrData) ? terrData : null;
+    }
 
-        public void RemoveRegionEnvironmentSettings(UUID regionUUID)
-        {
-            lock (EnvironmentSettings)
-            {
-                EnvironmentSettings.Remove(regionUUID);
-            }
-        }
-        #endregion
+    public TerrainData LoadBakedTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ)
+    {
+        return m_bakedterrains.TryGetValue(regionID, out TerrainData terrData) ? terrData : null;
+    }
 
-        public RegionSettings LoadRegionSettings(UUID regionUUID)
-        {
-            RegionSettings rs = new RegionSettings();
-            rs.RegionUUID = regionUUID;
-            return rs;
-        }
+    public void RemoveLandObject(UUID globalID)
+    {
+    }
 
-        public void StoreObject(SceneObjectGroup obj, UUID regionUUID)
-        {
-        }
+    public void StoreLandObject(ILandObject land)
+    {
+    }
 
-        public void RemoveObject(UUID obj, UUID regionUUID)
-        {
-        }
+    public List<LandData> LoadLandObjects(UUID regionUUID)
+    {
+        return new List<LandData>();
+    }
 
-        public void StorePrimInventory(UUID primID, ICollection<TaskInventoryItem> items)
-        {
-        }
+    public void Shutdown()
+    {
+    }
 
-        public List<SceneObjectGroup> LoadObjects(UUID regionUUID)
-        {
-            return new List<SceneObjectGroup>();
-        }
+    public UUID[] GetObjectIDs(UUID regionID)
+    {
+        return new UUID[0];
+    }
 
-        Dictionary<UUID, TerrainData> m_terrains = new Dictionary<UUID, TerrainData>();
-        Dictionary<UUID, TerrainData> m_bakedterrains = new Dictionary<UUID, TerrainData>();
-        public void StoreTerrain(TerrainData ter, UUID regionID)
-        {
-            m_terrains[regionID] = ter;
-        }
+    public void SaveExtra(UUID regionID, string name, string value)
+    {
+    }
 
-        public void StoreBakedTerrain(TerrainData ter, UUID regionID)
-        {
-            m_bakedterrains[regionID] = ter;
-        }
+    public void RemoveExtra(UUID regionID, string name)
+    {
+    }
 
-        // Legacy. Just don't do this.
-        public void StoreTerrain(double[,] ter, UUID regionID)
-        {
-            TerrainData terrData = new TerrainData(ter);
-            StoreTerrain(terrData, regionID);
-        }
-
-        // Legacy. Just don't do this.
-        // Returns 'null' if region not found
-        public double[,] LoadTerrain(UUID regionID)
-        {
-            return m_terrains.TryGetValue(regionID, out TerrainData terrData) ? terrData.GetDoubles() : null;
-        }
-
-        public TerrainData LoadTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ)
-        {
-            return m_terrains.TryGetValue(regionID, out TerrainData terrData) ? terrData : null;
-        }
-
-        public TerrainData LoadBakedTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ)
-        {
-            return m_bakedterrains.TryGetValue(regionID, out TerrainData terrData) ? terrData : null;
-        }
-
-        public void RemoveLandObject(UUID globalID)
-        {
-        }
-
-        public void StoreLandObject(ILandObject land)
-        {
-        }
-
-        public List<LandData> LoadLandObjects(UUID regionUUID)
-        {
-            return new List<LandData>();
-        }
-
-        public void Shutdown()
-        {
-        }
-
-        public UUID[] GetObjectIDs(UUID regionID)
-        {
-            return new UUID[0];
-        }
-
-        public void SaveExtra(UUID regionID, string name, string value)
-        {
-        }
-
-        public void RemoveExtra(UUID regionID, string name)
-        {
-        }
-
-        public Dictionary<string, string> GetExtra(UUID regionID)
-        {
-            return null;
-        }
+    public Dictionary<string, string> GetExtra(UUID regionID)
+    {
+        return null;
     }
 }

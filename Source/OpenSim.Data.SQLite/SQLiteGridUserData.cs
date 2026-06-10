@@ -25,41 +25,31 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Reflection;
-using System.Threading;
-using log4net;
-using OpenMetaverse;
-using OpenSim.Framework;
+namespace OpenSim.Data.SQLite;
 
-namespace OpenSim.Data.SQLite
+/// <summary>
+/// A SQL Interface for user grid data
+/// </summary>
+public class SQLiteGridUserData : SQLiteGenericTableHandler<GridUserData>, IGridUserData
 {
-    /// <summary>
-    /// A SQL Interface for user grid data
-    /// </summary>
-    public class SQLiteGridUserData : SQLiteGenericTableHandler<GridUserData>, IGridUserData
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public SQLiteGridUserData(string connectionString, string realm)
-            : base(connectionString, realm, "GridUserStore") {}
+    public SQLiteGridUserData(string connectionString, string realm)
+        : base(connectionString, realm, "GridUserStore") {}
 
-        public new GridUserData Get(string userID)
-        {
-            GridUserData[] ret = Get("UserID", userID);
+    public new GridUserData Get(string userID)
+    {
+        GridUserData[] ret = Get("UserID", userID);
 
-            if (ret.Length == 0)
-                return null;
+        if (ret.Length == 0)
+            return null;
 
-            return ret[0];
-        }
-
-        public GridUserData[] GetAll(string userID)
-        {
-            return base.Get(String.Format("UserID LIKE '{0}%'", userID));
-        }
-
+        return ret[0];
     }
+
+    public GridUserData[] GetAll(string userID)
+    {
+        return base.Get(String.Format("UserID LIKE '{0}%'", userID));
+    }
+
 }

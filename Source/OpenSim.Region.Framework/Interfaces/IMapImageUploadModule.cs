@@ -25,19 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenMetaverse;
 using OpenSim.Framework;
 using SkiaSharp;
 
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IMapImageUploadModule
 {
-    public interface IMapImageUploadModule
-    {
-        /// <summary>
-        /// Upload a new maptile
-        /// </summary>
-        void UploadMapTile(IScene scene);
-        void UploadMapTile(IScene scene, SKBitmap mapTile);
-    }
+    /// <summary>
+    /// Upload a new maptile
+    /// </summary>
+    void UploadMapTile(IScene scene);
+    void UploadMapTile(IScene scene, SKBitmap mapTile);
 }

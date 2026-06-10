@@ -25,42 +25,39 @@
  * THE SOFTWARE.
  */
 
-using System;
+namespace OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet;
 
-namespace OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet
+public class int4
 {
-    public class int4
+    public int x;
+    public int y;
+    public int z;
+    public int w;
+
+    public int4()
     {
-        public int x;
-        public int y;
-        public int z;
-        public int w;
+    }
 
-        public int4()
-        {
-        }
+    public int4(int _x, int _y, int _z, int _w)
+    {
+        x = _x;
+        y = _y;
+        z = _z;
+        w = _w;
+    }
 
-        public int4(int _x, int _y, int _z, int _w)
+    public int this[int i]
+    {
+        get
         {
-            x = _x;
-            y = _y;
-            z = _z;
-            w = _w;
-        }
-
-        public int this[int i]
-        {
-            get
+            switch (i)
             {
-                switch (i)
-                {
-                    case 0: return x;
-                    case 1: return y;
-                    case 2: return z;
-                    case 3: return w;
-                }
-                throw new ArgumentOutOfRangeException();
+                case 0: return x;
+                case 1: return y;
+                case 2: return z;
+                case 3: return w;
             }
+            throw new ArgumentOutOfRangeException();
         }
     }
 }

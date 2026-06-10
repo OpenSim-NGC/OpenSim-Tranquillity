@@ -25,92 +25,88 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 using log4net;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public static class PermissionsUtil
 {
-    public static class PermissionsUtil
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    /// <summary>
+    /// Logs permissions flags. Useful when debugging permission problems.
+    /// </summary>
+    /// <param name="message"></param>
+    public static void LogPermissions(String name, String message, uint basePerm, uint curPerm, uint nextPerm)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_log.DebugFormat("Permissions of \"{0}\" at \"{1}\": Base {2} ({3:X4}), Current {4} ({5:X4}), NextOwner {6} ({7:X4})",
+            name, message,
+            PermissionsToString(basePerm), basePerm, PermissionsToString(curPerm), curPerm, PermissionsToString(nextPerm), nextPerm);
+    }
 
-        /// <summary>
-        /// Logs permissions flags. Useful when debugging permission problems.
-        /// </summary>
-        /// <param name="message"></param>
-        public static void LogPermissions(String name, String message, uint basePerm, uint curPerm, uint nextPerm)
-        {
-            m_log.DebugFormat("Permissions of \"{0}\" at \"{1}\": Base {2} ({3:X4}), Current {4} ({5:X4}), NextOwner {6} ({7:X4})",
-                name, message,
-                PermissionsToString(basePerm), basePerm, PermissionsToString(curPerm), curPerm, PermissionsToString(nextPerm), nextPerm);
-        }
+    /// <summary>
+    /// Converts a permissions bit-mask to a string (e.g., "MCT").
+    /// </summary>
+    private static string PermissionsToString(uint perms)
+    {
+        string str = "";
+        if ((perms & (int)PermissionMask.Modify) != 0)
+            str += "M";
+        if ((perms & (int)PermissionMask.Copy) != 0)
+            str += "C";
+        if ((perms & (int)PermissionMask.Transfer) != 0)
+            str += "T";
+        if ((perms & (int)PermissionMask.Export) != 0)
+            str += "X";
+        if (str.Length == 0)
+            str = ".";
+        return str;
+    }
 
-        /// <summary>
-        /// Converts a permissions bit-mask to a string (e.g., "MCT").
-        /// </summary>
-        private static string PermissionsToString(uint perms)
-        {
-            string str = "";
-            if ((perms & (int)PermissionMask.Modify) != 0)
-                str += "M";
-            if ((perms & (int)PermissionMask.Copy) != 0)
-                str += "C";
-            if ((perms & (int)PermissionMask.Transfer) != 0)
-                str += "T";
-            if ((perms & (int)PermissionMask.Export) != 0)
-                str += "X";
-            if (str.Length == 0)
-                str = ".";
-            return str;
-        }
+    public static void ApplyFoldedPermissions(uint foldedSourcePerms, ref uint targetPerms)
+    {
+        uint folded = foldedSourcePerms & (uint)PermissionMask.FoldedMask;
+        if(folded == 0 || folded == (uint)PermissionMask.FoldedMask) // invalid we need to ignore, or nothing to do
+            return; 
 
-        public static void ApplyFoldedPermissions(uint foldedSourcePerms, ref uint targetPerms)
-        {
-            uint folded = foldedSourcePerms & (uint)PermissionMask.FoldedMask;
-            if(folded == 0 || folded == (uint)PermissionMask.FoldedMask) // invalid we need to ignore, or nothing to do
-                return; 
+        folded <<= (int)PermissionMask.FoldingShift;
+        folded |= ~(uint)PermissionMask.UnfoldedMask;
 
-            folded <<= (int)PermissionMask.FoldingShift;
-            folded |= ~(uint)PermissionMask.UnfoldedMask;
+        uint tmp = targetPerms;
+        tmp &= folded;
+        targetPerms = tmp;
+    }
 
-            uint tmp = targetPerms;
-            tmp &= folded;
-            targetPerms = tmp;
-        }
+    // do not touch MOD
+    public static void ApplyNoModFoldedPermissions(uint foldedSourcePerms, ref uint target)
+    {
+        uint folded = foldedSourcePerms & (uint)PermissionMask.FoldedMask;
+        if(folded == 0 || folded == (uint)PermissionMask.FoldedMask) // invalid we need to ignore, or nothing to do
+            return; 
 
-        // do not touch MOD
-        public static void ApplyNoModFoldedPermissions(uint foldedSourcePerms, ref uint target)
-        {
-            uint folded = foldedSourcePerms & (uint)PermissionMask.FoldedMask;
-            if(folded == 0 || folded == (uint)PermissionMask.FoldedMask) // invalid we need to ignore, or nothing to do
-                return; 
+        folded <<= (int)PermissionMask.FoldingShift;
+        folded |= (~(uint)PermissionMask.UnfoldedMask | (uint)PermissionMask.Modify);
 
-            folded <<= (int)PermissionMask.FoldingShift;
-            folded |= (~(uint)PermissionMask.UnfoldedMask | (uint)PermissionMask.Modify);
+        uint tmp = target;
+        tmp &= folded;
+        target = tmp;
+    }
 
-            uint tmp = target;
-            tmp &= folded;
-            target = tmp;
-        }
+    public static uint FixAndFoldPermissions(uint perms)
+    {
+        uint tmp = perms;
 
-        public static uint FixAndFoldPermissions(uint perms)
-        {
-            uint tmp = perms;
+        // C & T rule
+        if((tmp & (uint)(PermissionMask.Copy | PermissionMask.Transfer)) == 0)
+            tmp |= (uint)PermissionMask.Transfer;
 
-            // C & T rule
-            if((tmp & (uint)(PermissionMask.Copy | PermissionMask.Transfer)) == 0)
-                tmp |= (uint)PermissionMask.Transfer;
+        // unlock
+        tmp |= (uint)PermissionMask.Move;
 
-            // unlock
-            tmp |= (uint)PermissionMask.Move;
+        tmp &= ~(uint)PermissionMask.FoldedMask;
+        tmp |= ((tmp >> (int)PermissionMask.FoldingShift) & (uint)PermissionMask.FoldedMask);
 
-            tmp &= ~(uint)PermissionMask.FoldedMask;
-            tmp |= ((tmp >> (int)PermissionMask.FoldingShift) & (uint)PermissionMask.FoldedMask);
-
-            return tmp;
-        }
+        return tmp;
     }
 }

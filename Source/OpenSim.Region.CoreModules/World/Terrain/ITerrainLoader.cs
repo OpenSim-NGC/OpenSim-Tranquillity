@@ -27,57 +27,56 @@
 
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain
+namespace OpenSim.Region.CoreModules.World.Terrain;
+
+public interface ITerrainLoader
 {
-    public interface ITerrainLoader
-    {
-        // Returns true if that extension can be used for terrain save-tile
-        // (Look into each file in Region.CoreModules.World.Terrain.FileLoaders)
-        bool SupportsTileSave();
-        bool SupportsExtendedTileSave();
+    // Returns true if that extension can be used for terrain save-tile
+    // (Look into each file in Region.CoreModules.World.Terrain.FileLoaders)
+    bool SupportsTileSave();
+    bool SupportsExtendedTileSave();
 
-        string FileExtension { get; }
-        int SupportedHeight { get; }
-        ITerrainChannel LoadFile(string filename);
-        ITerrainChannel LoadFile(string filename, int fileStartX, int fileStartY, int fileWidth, int fileHeight, int sectionWidth, int sectionHeight);
-        ITerrainChannel LoadStream(Stream stream);
-        void SaveFile(string filename, ITerrainChannel map);
-        void SaveStream(Stream stream, ITerrainChannel map);
+    string FileExtension { get; }
+    int SupportedHeight { get; }
+    ITerrainChannel LoadFile(string filename);
+    ITerrainChannel LoadFile(string filename, int fileStartX, int fileStartY, int fileWidth, int fileHeight, int sectionWidth, int sectionHeight);
+    ITerrainChannel LoadStream(Stream stream);
+    void SaveFile(string filename, ITerrainChannel map);
+    void SaveStream(Stream stream, ITerrainChannel map);
 
-        /// <summary>
-        /// Save a number of map tiles to a single big image file.
-        /// </summary>
-        /// <remarks>
-        /// If the image file already exists then the tiles saved will replace those already in the file - other tiles
-        /// will be untouched.
-        /// </remarks>
-        /// <param name="filename">The terrain file to save</param>
-        /// <param name="offsetX">The map x co-ordinate at which to begin the save.</param>
-        /// <param name="offsetY">The may y co-ordinate at which to begin the save.</param>
-        /// <param name="fileWidth">The number of tiles to save along the X axis.</param>
-        /// <param name="fileHeight">The number of tiles to save along the Y axis.</param>
-        /// <param name="regionSizeX">The width of a map tile.</param>
-        /// <param name="regionSizeY">The height of a map tile.</param>
-        void SaveFile(ITerrainChannel map, string filename, int offsetX, int offsetY, int fileWidth, int fileHeight, int regionSizeX, int regionSizeY);
-       
-        /// <summary>
-        /// Save all or part of region to larger or smaller file
-        /// </summary>
-        /// <remarks>
-        /// If the image file already exists then the tiles saved will replace those already in the file - other tiles
-        /// will be untouched.
-        /// </remarks>
-        /// <param name="filename">The terrain file to save</param>
-        /// <param name="fileWidth">Width of the file to save to, overwritten by existing file</param>
-        /// <param name="fileHeight">Height of the file to save to, overwritten by existing file</param>
-        /// <param name="startX">Start point in meters on x axis on existing terrain map</param>
-        /// <param name="startY">Start point in meters on y axis on existing terrain map</param>
-        /// <param name="stopX">End point in meters on x axis on existing terrain map</param>
-        /// <param name="stopY">End point in meters on y axis on existing terrain map</param>
-        /// <param name="offsetX">Offset start point in meters on x axis to write to file</param>
-        /// <param name="offsetY">Offset start point in meters on y axis to write to file</param>
-        void SaveFile(ITerrainChannel map, string filename, int fileWidth, int fileHeight, int startX, int startY, int stopX, int stopY, int offsetX, int offsetY);
+    /// <summary>
+    /// Save a number of map tiles to a single big image file.
+    /// </summary>
+    /// <remarks>
+    /// If the image file already exists then the tiles saved will replace those already in the file - other tiles
+    /// will be untouched.
+    /// </remarks>
+    /// <param name="filename">The terrain file to save</param>
+    /// <param name="offsetX">The map x co-ordinate at which to begin the save.</param>
+    /// <param name="offsetY">The may y co-ordinate at which to begin the save.</param>
+    /// <param name="fileWidth">The number of tiles to save along the X axis.</param>
+    /// <param name="fileHeight">The number of tiles to save along the Y axis.</param>
+    /// <param name="regionSizeX">The width of a map tile.</param>
+    /// <param name="regionSizeY">The height of a map tile.</param>
+    void SaveFile(ITerrainChannel map, string filename, int offsetX, int offsetY, int fileWidth, int fileHeight, int regionSizeX, int regionSizeY);
+   
+    /// <summary>
+    /// Save all or part of region to larger or smaller file
+    /// </summary>
+    /// <remarks>
+    /// If the image file already exists then the tiles saved will replace those already in the file - other tiles
+    /// will be untouched.
+    /// </remarks>
+    /// <param name="filename">The terrain file to save</param>
+    /// <param name="fileWidth">Width of the file to save to, overwritten by existing file</param>
+    /// <param name="fileHeight">Height of the file to save to, overwritten by existing file</param>
+    /// <param name="startX">Start point in meters on x axis on existing terrain map</param>
+    /// <param name="startY">Start point in meters on y axis on existing terrain map</param>
+    /// <param name="stopX">End point in meters on x axis on existing terrain map</param>
+    /// <param name="stopY">End point in meters on y axis on existing terrain map</param>
+    /// <param name="offsetX">Offset start point in meters on x axis to write to file</param>
+    /// <param name="offsetY">Offset start point in meters on y axis to write to file</param>
+    void SaveFile(ITerrainChannel map, string filename, int fileWidth, int fileHeight, int startX, int startY, int stopX, int stopY, int offsetX, int offsetY);
 
 
-    }
 }

@@ -32,174 +32,173 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
+namespace OpenSim.Region.CoreModules.Avatar.InstantMessage;
+
+public class InstantMessageModule : ISharedRegionModule
 {
-    public class InstantMessageModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    /// <value>
+    /// Is this module enabled?
+    /// </value>
+    protected bool m_enabled = false;
+
+    protected readonly List<Scene> m_scenes = new List<Scene>();
+
+    #region Region Module interface
+
+    protected IMessageTransferModule m_TransferModule = null;
+
+    public virtual void Initialise(IConfigSource config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
-
-        /// <value>
-        /// Is this module enabled?
-        /// </value>
-        protected bool m_enabled = false;
-
-        protected readonly List<Scene> m_scenes = new List<Scene>();
-
-        #region Region Module interface
-
-        protected IMessageTransferModule m_TransferModule = null;
-
-        public virtual void Initialise(IConfigSource config)
+        if (config.Configs["Messaging"] != null)
         {
-            if (config.Configs["Messaging"] != null)
-            {
-                if (config.Configs["Messaging"].GetString(
-                        "InstantMessageModule", "InstantMessageModule") !=
-                        "InstantMessageModule")
-                    return;
-            }
-
-            m_enabled = true;
+            if (config.Configs["Messaging"].GetString(
+                    "InstantMessageModule", "InstantMessageModule") !=
+                    "InstantMessageModule")
+                return;
         }
 
-        public virtual void AddRegion(Scene scene)
-        {
-            if (!m_enabled)
-                return;
+        m_enabled = true;
+    }
 
-            lock (m_scenes)
-                m_scenes.Add(scene);
-        }
+    public virtual void AddRegion(Scene scene)
+    {
+        if (!m_enabled)
+            return;
 
-        public virtual void RegionLoaded(Scene scene)
+        lock (m_scenes)
+            m_scenes.Add(scene);
+    }
+
+    public virtual void RegionLoaded(Scene scene)
+    {
+        if (!m_enabled)
+            return;
+
+        if (m_TransferModule == null)
         {
-            if (!m_enabled)
-                return;
+            m_TransferModule = scene.RequestModuleInterface<IMessageTransferModule>();
 
             if (m_TransferModule == null)
             {
-                m_TransferModule = scene.RequestModuleInterface<IMessageTransferModule>();
+                m_log.Error("[INSTANT MESSAGE]: No message transfer module, IM will not work!");
+                scene.EventManager.OnNewClient -= OnClientConnect;
+                scene.EventManager.OnIncomingInstantMessage -= OnGridInstantMessage;
 
-                if (m_TransferModule == null)
-                {
-                    m_log.Error("[INSTANT MESSAGE]: No message transfer module, IM will not work!");
-                    scene.EventManager.OnNewClient -= OnClientConnect;
-                    scene.EventManager.OnIncomingInstantMessage -= OnGridInstantMessage;
-
-                    m_scenes.Clear();
-                    m_enabled = false;
-                }
-            }
-            scene.EventManager.OnNewClient += OnClientConnect;
-            scene.EventManager.OnIncomingInstantMessage += OnGridInstantMessage;
-        }
-
-        public virtual void RemoveRegion(Scene scene)
-        {
-            if (!m_enabled)
-                return;
-
-            lock (m_scenes)
-            {
-                m_scenes.Remove(scene);
+                m_scenes.Clear();
+                m_enabled = false;
             }
         }
+        scene.EventManager.OnNewClient += OnClientConnect;
+        scene.EventManager.OnIncomingInstantMessage += OnGridInstantMessage;
+    }
 
-        protected virtual void OnClientConnect(IClientAPI client)
+    public virtual void RemoveRegion(Scene scene)
+    {
+        if (!m_enabled)
+            return;
+
+        lock (m_scenes)
         {
-            client.OnInstantMessage += OnInstantMessage;
+            m_scenes.Remove(scene);
         }
+    }
 
-        public virtual void PostInitialise()
-        {
-        }
+    protected virtual void OnClientConnect(IClientAPI client)
+    {
+        client.OnInstantMessage += OnInstantMessage;
+    }
 
-        public virtual void Close()
-        {
-        }
+    public virtual void PostInitialise()
+    {
+    }
 
-        public virtual string Name
-        {
-            get { return "InstantMessageModule"; }
-        }
+    public virtual void Close()
+    {
+    }
 
-        public virtual Type ReplaceableInterface
-        {
-            get { return null; }
-        }
+    public virtual string Name
+    {
+        get { return "InstantMessageModule"; }
+    }
 
-        #endregion
+    public virtual Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    #endregion
 /*
-        public virtual void OnViewerInstantMessage(IClientAPI client, GridInstantMessage im)
-        {
-            im.fromAgentName = client.FirstName + " " + client.LastName;
-            OnInstantMessage(client, im);
-        }
+    public virtual void OnViewerInstantMessage(IClientAPI client, GridInstantMessage im)
+    {
+        im.fromAgentName = client.FirstName + " " + client.LastName;
+        OnInstantMessage(client, im);
+    }
 */
-        public virtual void OnInstantMessage(IClientAPI client, GridInstantMessage im)
+    public virtual void OnInstantMessage(IClientAPI client, GridInstantMessage im)
+    {
+        if (m_TransferModule == null)
+            return;
+
+        switch(im.dialog)
         {
-            if (m_TransferModule == null)
+            case (byte)InstantMessageDialog.MessageFromAgent:
+            case (byte)InstantMessageDialog.StartTyping:
+            case (byte)InstantMessageDialog.StopTyping:
+            case (byte)InstantMessageDialog.BusyAutoResponse:
+            case (byte)InstantMessageDialog.MessageFromObject:
+                break;
+            default:
                 return;
+        }
 
-            switch(im.dialog)
+        if (client != null)
+            im.offline = 0;
+
+        //if (im.offline == 0)
+        if(im.timestamp == 0)
+            im.timestamp = (uint)Util.UnixTimeSinceEpoch();
+
+        m_TransferModule.SendInstantMessage(im,
+            delegate(bool success)
             {
-                case (byte)InstantMessageDialog.MessageFromAgent:
-                case (byte)InstantMessageDialog.StartTyping:
-                case (byte)InstantMessageDialog.StopTyping:
-                case (byte)InstantMessageDialog.BusyAutoResponse:
-                case (byte)InstantMessageDialog.MessageFromObject:
-                    break;
-                default:
+                if(success || client == null)
                     return;
-            }
 
-            if (client != null)
-                im.offline = 0;
-
-            //if (im.offline == 0)
-            if(im.timestamp == 0)
-                im.timestamp = (uint)Util.UnixTimeSinceEpoch();
-
-            m_TransferModule.SendInstantMessage(im,
-                delegate(bool success)
+                switch (im.dialog)
                 {
-                    if(success || client == null)
+                    case (byte)InstantMessageDialog.StartTyping:
+                    case (byte)InstantMessageDialog.StopTyping:
+                    case (byte)InstantMessageDialog.MessageFromObject:
                         return;
-
-                    switch (im.dialog)
-                    {
-                        case (byte)InstantMessageDialog.StartTyping:
-                        case (byte)InstantMessageDialog.StopTyping:
-                        case (byte)InstantMessageDialog.MessageFromObject:
-                            return;
-                        default:
-                            break;
-                    }
-
-                    client.SendInstantMessage(new GridInstantMessage(                              
-                            null, new UUID(im.fromAgentID), "System",
-                            new UUID(im.toAgentID),
-                            (byte)InstantMessageDialog.BusyAutoResponse,
-                            "Unable to send instant message. User is not logged in.",
-                            false, new Vector3())
-                        );
+                    default:
+                        break;
                 }
-            );
-        }
 
-        /// <summary>
-        ///
-        /// </summary>
-        /// <param name="msg"></param>
-        protected virtual void OnGridInstantMessage(GridInstantMessage msg)
-        {
-            // Just call the Text IM handler above
-            // This event won't be raised unless we have that agent,
-            // so we can depend on the above not trying to send
-            // via grid again
-            //
-            OnInstantMessage(null, msg);
-        }
+                client.SendInstantMessage(new GridInstantMessage(                              
+                        null, new UUID(im.fromAgentID), "System",
+                        new UUID(im.toAgentID),
+                        (byte)InstantMessageDialog.BusyAutoResponse,
+                        "Unable to send instant message. User is not logged in.",
+                        false, new Vector3())
+                    );
+            }
+        );
+    }
+
+    /// <summary>
+    ///
+    /// </summary>
+    /// <param name="msg"></param>
+    protected virtual void OnGridInstantMessage(GridInstantMessage msg)
+    {
+        // Just call the Text IM handler above
+        // This event won't be raised unless we have that agent,
+        // so we can depend on the above not trying to send
+        // via grid again
+        //
+        OnInstantMessage(null, msg);
     }
 }

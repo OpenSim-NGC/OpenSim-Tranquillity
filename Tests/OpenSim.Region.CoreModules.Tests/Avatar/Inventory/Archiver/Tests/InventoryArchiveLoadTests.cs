@@ -27,7 +27,6 @@
 
 using OpenMetaverse;
 using Xunit;
-using Nini.Config;
 
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.Serialiser;
@@ -35,81 +34,81 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
+namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests;
+
+public class InventoryArchiveLoadTests : InventoryArchiveTestCase
 {
-    public class InventoryArchiveLoadTests : InventoryArchiveTestCase
+    protected TestScene m_scene = null!;
+    protected InventoryArchiverModule m_archiverModule = null!;
+
+    public override void SetUp()
     {
-        protected TestScene m_scene = null!;
-        protected InventoryArchiverModule m_archiverModule = null!;
+        base.SetUp();
 
-        public override void SetUp()
-        {
-            base.SetUp();
+        SerialiserModule serialiserModule = new SerialiserModule();
+        m_archiverModule = new InventoryArchiverModule();
 
-            SerialiserModule serialiserModule = new SerialiserModule();
-            m_archiverModule = new InventoryArchiverModule();
+        m_scene = new SceneHelpers().SetupScene();
+        SceneHelpers.SetupSceneModules(m_scene, serialiserModule, m_archiverModule);
+    }
 
-            m_scene = new SceneHelpers().SetupScene();
-            SceneHelpers.SetupSceneModules(m_scene, serialiserModule, m_archiverModule);
-        }
-
-        [Fact]
-        public void TestLoadCoalesecedItem()
-        {
-            TestHelpers.InMethod();
+    [Fact]
+    public void TestLoadCoalesecedItem()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            UserAccountHelpers.CreateUserWithInventory(m_scene, m_uaLL1, "password");
-            m_archiverModule.DearchiveInventory(UUID.Random(), m_uaLL1.FirstName, m_uaLL1.LastName, "/", "password", m_iarStream);
+        UserAccountHelpers.CreateUserWithInventory(m_scene, m_uaLL1, "password");
+        m_archiverModule.DearchiveInventory(UUID.Random(), m_uaLL1.FirstName, m_uaLL1.LastName, "/", "password", m_iarStream);
 
-            InventoryItemBase coaItem
-                = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaLL1.PrincipalID, m_coaItemName);
+        InventoryItemBase coaItem
+            = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaLL1.PrincipalID, m_coaItemName);
 
-            Assert.NotNull(coaItem);
+        Assert.NotNull(coaItem);
 
-            string assetXml = AssetHelpers.ReadAssetAsString(m_scene.AssetService, coaItem.AssetID);
+        string assetXml = AssetHelpers.ReadAssetAsString(m_scene.AssetService, coaItem.AssetID);
 
-            CoalescedSceneObjects coa;
-            bool readResult = CoalescedSceneObjectsSerializer.TryFromXml(assetXml, out coa);
+        CoalescedSceneObjects coa;
+        bool readResult = CoalescedSceneObjectsSerializer.TryFromXml(assetXml, out coa);
 
-            Assert.True(readResult);
-            Assert.NotNull(coa);
+        Assert.True(readResult);
+        Assert.NotNull(coa);
 
-            List<SceneObjectGroup> coaObjects = coa.Objects;
-            Assert.Single(coaObjects);
-            Assert.Equal(1, coaObjects[0].PrimCount);
+        List<SceneObjectGroup> coaObjects = coa.Objects;
+        Assert.Single(coaObjects);
+        Assert.Equal(1, coaObjects[0].PrimCount);
 
-            Assert.NotNull(coaObjects[0]);
-            Assert.Single(coaObjects[0].Parts);
-        }
+        Assert.NotNull(coaObjects[0]);
+        Assert.Single(coaObjects[0].Parts);
+    }
 
-        /// <summary>
-        /// Test case where a creator account exists for the creator UUID embedded in item metadata and serialized
-        /// objects.
-        /// </summary>
-        [Fact]
-        public void TestLoadIarCreatorAccountPresent()
-        {
-            TestHelpers.InMethod();
+    /// <summary>
+    /// Test case where a creator account exists for the creator UUID embedded in item metadata and serialized
+    /// objects.
+    /// </summary>
+    [Fact]
+    public void TestLoadIarCreatorAccountPresent()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            UserAccountHelpers.CreateUserWithInventory(m_scene, m_uaLL1, "meowfood");
+        UserAccountHelpers.CreateUserWithInventory(m_scene, m_uaLL1, "meowfood");
 
-            m_archiverModule.DearchiveInventory(UUID.Random(), m_uaLL1.FirstName, m_uaLL1.LastName, "/", "meowfood", m_iarStream);
-            InventoryItemBase foundItem1
-                = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaLL1.PrincipalID, m_item1Name);
+        m_archiverModule.DearchiveInventory(UUID.Random(), m_uaLL1.FirstName, m_uaLL1.LastName, "/", "meowfood", m_iarStream);
+        InventoryItemBase foundItem1
+            = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaLL1.PrincipalID, m_item1Name);
 
-            Assert.NotNull(foundItem1);
-            Assert.Equal(m_uaLL1.Name, foundItem1.CreatorId);
-            Assert.Equal(m_uaLL1.PrincipalID, foundItem1.CreatorIdAsUuid);
-            Assert.Equal(m_uaLL1.PrincipalID, foundItem1.Owner);
+        Assert.NotNull(foundItem1);
+        Assert.Equal(m_uaLL1.Name, foundItem1.CreatorId);
+        Assert.Equal(m_uaLL1.PrincipalID, foundItem1.CreatorIdAsUuid);
+        Assert.Equal(m_uaLL1.PrincipalID, foundItem1.Owner);
 
-            AssetBase asset1 = m_scene.AssetService.Get(foundItem1.AssetID.ToString());
-            string xmlData = Utils.BytesToString(asset1.Data);
-            SceneObjectGroup sog1 = SceneObjectSerializer.FromOriginalXmlFormat(xmlData);
+        AssetBase asset1 = m_scene.AssetService.Get(foundItem1.AssetID.ToString());
+        string xmlData = Utils.BytesToString(asset1.Data);
+        SceneObjectGroup sog1 = SceneObjectSerializer.FromOriginalXmlFormat(xmlData);
 
-            Assert.Equal(m_uaLL1.PrincipalID, sog1.OwnerID);
-        }
+        Assert.Equal(m_uaLL1.PrincipalID, sog1.OwnerID);
+    }
 
 //        /// <summary>
 //        /// Test loading a V0.1 OpenSim Inventory Archive (subject to change since there is no fixed format yet) where
@@ -143,31 +142,30 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
 //            Assert.Equal(,);
 //        }
 
-        /// <summary>
-        /// Test loading a V0.1 OpenSim Inventory Archive (subject to change since there is no fixed format yet) where
-        /// the creator or an account with the creator's name does not exist within the system.
-        /// </summary>
-        [Fact]
-        public void TestLoadIarV0_1AbsentCreator()
-        {
-            TestHelpers.InMethod();
+    /// <summary>
+    /// Test loading a V0.1 OpenSim Inventory Archive (subject to change since there is no fixed format yet) where
+    /// the creator or an account with the creator's name does not exist within the system.
+    /// </summary>
+    [Fact]
+    public void TestLoadIarV0_1AbsentCreator()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            UserAccountHelpers.CreateUserWithInventory(m_scene, m_uaMT, "password");
-            m_archiverModule.DearchiveInventory(UUID.Random(), m_uaMT.FirstName, m_uaMT.LastName, "/", "password", m_iarStream);
+        UserAccountHelpers.CreateUserWithInventory(m_scene, m_uaMT, "password");
+        m_archiverModule.DearchiveInventory(UUID.Random(), m_uaMT.FirstName, m_uaMT.LastName, "/", "password", m_iarStream);
 
-            InventoryItemBase foundItem1
-                = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaMT.PrincipalID, m_item1Name);
+        InventoryItemBase foundItem1
+            = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaMT.PrincipalID, m_item1Name);
 
-            Assert.NotNull(foundItem1);
-            Assert.Equal(m_uaMT.Name, foundItem1.CreatorId);
-            Assert.Equal(m_uaMT.PrincipalID, foundItem1.CreatorIdAsUuid);
+        Assert.NotNull(foundItem1);
+        Assert.Equal(m_uaMT.Name, foundItem1.CreatorId);
+        Assert.Equal(m_uaMT.PrincipalID, foundItem1.CreatorIdAsUuid);
 
-            AssetBase asset1 = m_scene.AssetService.Get(foundItem1.AssetID.ToString());
-            string xmlData = Utils.BytesToString(asset1.Data);
-            SceneObjectGroup sog1 = SceneObjectSerializer.FromOriginalXmlFormat(xmlData);
+        AssetBase asset1 = m_scene.AssetService.Get(foundItem1.AssetID.ToString());
+        string xmlData = Utils.BytesToString(asset1.Data);
+        SceneObjectGroup sog1 = SceneObjectSerializer.FromOriginalXmlFormat(xmlData);
 
-            Assert.Equal(m_uaMT.PrincipalID, sog1.OwnerID);
-        }
+        Assert.Equal(m_uaMT.PrincipalID, sog1.OwnerID);
     }
 }

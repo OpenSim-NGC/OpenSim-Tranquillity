@@ -1,7 +1,5 @@
-using System;
+namespace Warp3D;
 
-namespace Warp3D
-{
 	/// <summary>
 	/// Summary description for warp_ObjectFactory.
 	/// </summary>
@@ -14,10 +12,10 @@ namespace Warp3D
 		{
 			warp_Object newObject = new warp_Object();
 
-            newObject.addVertex( new warp_Vertex( -size, 0f, size, 0, 0 ) );
-            newObject.addVertex( new warp_Vertex( size, 0f, size, 1f, 0 ) );
-            newObject.addVertex( new warp_Vertex( size, 0f, -size, 1f, 1f ) );
-            newObject.addVertex( new warp_Vertex( -size, 0f, -size, 0, 1f ) );
+        newObject.addVertex( new warp_Vertex( -size, 0f, size, 0, 0 ) );
+        newObject.addVertex( new warp_Vertex( size, 0f, size, 1f, 0 ) );
+        newObject.addVertex( new warp_Vertex( size, 0f, -size, 1f, 1f ) );
+        newObject.addVertex( new warp_Vertex( -size, 0f, -size, 0, 1f ) );
 
 			newObject.addTriangle(0, 3, 2);
 			newObject.addTriangle(0, 2, 1);
@@ -306,4 +304,3 @@ namespace Warp3D
 			return newObject;
 		}
 	}
-}

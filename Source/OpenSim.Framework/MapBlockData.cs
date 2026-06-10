@@ -25,42 +25,40 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class MapBlockData
 {
-    public class MapBlockData
+    public byte Access;
+    public byte Agents;
+    public UUID MapImageId;
+    public String Name;
+    public uint RegionFlags;
+    public byte WaterHeight;
+    public ushort X;
+    public ushort Y;
+    public ushort SizeX;
+    public ushort SizeY;
+
+    public MapBlockData()
     {
-        public byte Access;
-        public byte Agents;
-        public UUID MapImageId;
-        public String Name;
-        public uint RegionFlags;
-        public byte WaterHeight;
-        public ushort X;
-        public ushort Y;
-        public ushort SizeX;
-        public ushort SizeY;
+    }
 
-        public MapBlockData()
-        {
-        }
-
-        public OSDMap ToOSD()
-        {
-            OSDMap map = new OSDMap();
-            map["X"] = X;
-            map["Y"] = Y;
-            map["SizeX"] = SizeX;
-            map["SizeY"] = SizeY;
-            map["Name"] = Name;
-            map["Access"] = Access;
-            map["RegionFlags"] = RegionFlags;
-            map["WaterHeight"] = WaterHeight;
-            map["MapImageID"] = MapImageId;
-            return map;
-        }
+    public OSDMap ToOSD()
+    {
+        OSDMap map = new OSDMap();
+        map["X"] = X;
+        map["Y"] = Y;
+        map["SizeX"] = SizeX;
+        map["SizeY"] = SizeY;
+        map["Name"] = Name;
+        map["Access"] = Access;
+        map["RegionFlags"] = RegionFlags;
+        map["WaterHeight"] = WaterHeight;
+        map["MapImageID"] = MapImageId;
+        return map;
     }
 }

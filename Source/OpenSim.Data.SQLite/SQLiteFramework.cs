@@ -25,58 +25,53 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Data;
 using OpenMetaverse;
-using OpenSim.Framework;
 using System.Data.SQLite;
 
-namespace OpenSim.Data.SQLite
+namespace OpenSim.Data.SQLite;
+
+/// <summary>
+/// A database interface class to a user profile storage system
+/// </summary>
+public class SQLiteFramework
 {
-    /// <summary>
-    /// A database interface class to a user profile storage system
-    /// </summary>
-    public class SQLiteFramework
+    protected object m_lockObject = new Object();
+
+    protected SQLiteFramework(string connectionString)
     {
-        protected object m_lockObject = new Object();
+        DllmapConfigHelper.RegisterAssembly(typeof(SQLiteConnection).Assembly);
+    }
 
-        protected SQLiteFramework(string connectionString)
+    //////////////////////////////////////////////////////////////
+    //
+    // All non queries are funneled through one connection
+    // to increase performance a little
+    //
+    protected int ExecuteNonQuery(SQLiteCommand cmd, SQLiteConnection connection)
+    {
+        lock (connection)
         {
-            DllmapConfigHelper.RegisterAssembly(typeof(SQLiteConnection).Assembly);
+            cmd.Connection = connection;
+            //Console.WriteLine("XXX " + cmd.CommandText);
+
+            return cmd.ExecuteNonQuery();
         }
+    }
 
-        //////////////////////////////////////////////////////////////
-        //
-        // All non queries are funneled through one connection
-        // to increase performance a little
-        //
-        protected int ExecuteNonQuery(SQLiteCommand cmd, SQLiteConnection connection)
+    protected IDataReader ExecuteReader(SQLiteCommand cmd, SQLiteConnection connection)
+    {
+        lock (connection)
         {
-            lock (connection)
-            {
-                cmd.Connection = connection;
-                //Console.WriteLine("XXX " + cmd.CommandText);
+            //SQLiteConnection newConnection =
+            //        (SQLiteConnection)((ICloneable)connection).Clone();
+            //newConnection.Open();
 
-                return cmd.ExecuteNonQuery();
-            }
-        }
+            //cmd.Connection = newConnection;
+            cmd.Connection = connection;
+            //Console.WriteLine("XXX " + cmd.CommandText);
 
-        protected IDataReader ExecuteReader(SQLiteCommand cmd, SQLiteConnection connection)
-        {
-            lock (connection)
-            {
-                //SQLiteConnection newConnection =
-                //        (SQLiteConnection)((ICloneable)connection).Clone();
-                //newConnection.Open();
-
-                //cmd.Connection = newConnection;
-                cmd.Connection = connection;
-                //Console.WriteLine("XXX " + cmd.CommandText);
-
-                return cmd.ExecuteReader();
-            }
+            return cmd.ExecuteReader();
         }
     }
 }

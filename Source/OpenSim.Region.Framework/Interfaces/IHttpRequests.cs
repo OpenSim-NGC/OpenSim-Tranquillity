@@ -25,65 +25,62 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 
-namespace OpenSim.Region.Framework.Interfaces
-{
-    public enum HttpRequestConstants
-    {
-        HTTP_METHOD = 0,
-        HTTP_MIMETYPE = 1,
-        HTTP_BODY_MAXLENGTH = 2,
-        HTTP_VERIFY_CERT = 3,
-        HTTP_VERBOSE_THROTTLE = 4,
-        HTTP_CUSTOM_HEADER = 5,
-        HTTP_PRAGMA_NO_CACHE = 6
-    }
+namespace OpenSim.Region.Framework.Interfaces;
 
+public enum HttpRequestConstants
+{
+    HTTP_METHOD = 0,
+    HTTP_MIMETYPE = 1,
+    HTTP_BODY_MAXLENGTH = 2,
+    HTTP_VERIFY_CERT = 3,
+    HTTP_VERBOSE_THROTTLE = 4,
+    HTTP_CUSTOM_HEADER = 5,
+    HTTP_PRAGMA_NO_CACHE = 6
+}
+
+/// <summary>
+/// The initial status of the request before it is placed on the wire.
+/// </summary>
+/// <remarks>
+/// The request may still fail later on, in which case the normal HTTP status is set.
+/// </remarks>
+[Flags]
+public enum HttpInitialRequestStatus
+{
+    OK = 1,
+    DISALLOWED_BY_FILTER = 2
+}
+
+public interface IHttpRequestModule
+{
+    UUID MakeHttpRequest(string url, string parameters, string body);
     /// <summary>
-    /// The initial status of the request before it is placed on the wire.
+    /// Starts the http request.
     /// </summary>
     /// <remarks>
-    /// The request may still fail later on, in which case the normal HTTP status is set.
+    /// This is carried out asynchronously unless it fails initial checks.  Results are fetched by the script engine
+    /// HTTP requests module to be distributed back to scripts via a script event.
     /// </remarks>
-    [Flags]
-    public enum HttpInitialRequestStatus
-    {
-        OK = 1,
-        DISALLOWED_BY_FILTER = 2
-    }
+    /// <returns>The ID of the request.  If the requested could not be performed then this is UUID.Zero</returns>
+    /// <param name="localID">Local ID of the object containing the script making the request.</param>
+    /// <param name="itemID">Item ID of the script making the request.</param>
+    /// <param name="url">Url to request.</param>
+    /// <param name="parameters">LSL parameters for the request.</param>
+    /// <param name="headers">Extra headers for the request.</param>
+    /// <param name="body">Body of the request.</param>
+    /// </param>
 
-    public interface IHttpRequestModule
-    {
-        UUID MakeHttpRequest(string url, string parameters, string body);
-        /// <summary>
-        /// Starts the http request.
-        /// </summary>
-        /// <remarks>
-        /// This is carried out asynchronously unless it fails initial checks.  Results are fetched by the script engine
-        /// HTTP requests module to be distributed back to scripts via a script event.
-        /// </remarks>
-        /// <returns>The ID of the request.  If the requested could not be performed then this is UUID.Zero</returns>
-        /// <param name="localID">Local ID of the object containing the script making the request.</param>
-        /// <param name="itemID">Item ID of the script making the request.</param>
-        /// <param name="url">Url to request.</param>
-        /// <param name="parameters">LSL parameters for the request.</param>
-        /// <param name="headers">Extra headers for the request.</param>
-        /// <param name="body">Body of the request.</param>
-        /// </param>
+    UUID StartHttpRequest(uint localID, UUID itemID, string url, List<string> parameters, Dictionary<string, string> headers, string body);
 
-        UUID StartHttpRequest(uint localID, UUID itemID, string url, List<string> parameters, Dictionary<string, string> headers, string body);
-
-        /// <summary>
-        /// Stop and remove all http requests for the given script.
-        /// </summary>
-        /// <param name='id'></param>
-        void StopHttpRequest(uint m_localID, UUID m_itemID);
-        IServiceRequest GetNextCompletedRequest();
-        void RemoveCompletedRequest(UUID id);
-        bool CheckThrottle(uint localID, UUID onerID);
-        bool CheckAllowed(Uri url);
-    }
+    /// <summary>
+    /// Stop and remove all http requests for the given script.
+    /// </summary>
+    /// <param name='id'></param>
+    void StopHttpRequest(uint m_localID, UUID m_itemID);
+    IServiceRequest GetNextCompletedRequest();
+    void RemoveCompletedRequest(UUID id);
+    bool CheckThrottle(uint localID, UUID onerID);
+    bool CheckAllowed(Uri url);
 }

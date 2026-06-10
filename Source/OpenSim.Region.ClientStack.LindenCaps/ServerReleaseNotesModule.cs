@@ -36,91 +36,90 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
-namespace OpenSim.Region.ClientStack.LindenCaps
+namespace OpenSim.Region.ClientStack.LindenCaps;
+
+class ServerReleaseNotesModule : ISharedRegionModule
 {
-    class ServerReleaseNotesModule : ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private bool m_enabled;
+    private string m_ServerReleaseNotesURL;
+
+    public string Name { get { return "ServerReleaseNotesModule"; } }
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        private bool m_enabled;
-        private string m_ServerReleaseNotesURL;
+    public void Initialise(IConfigSource source)
+    {
+        m_enabled = false; // whatever
+        IConfig config = source.Configs["ClientStack.LindenCaps"];
+        if (config == null)
+            return;
 
-        public string Name { get { return "ServerReleaseNotesModule"; } }
-
-        public Type ReplaceableInterface
+        string capURL = config.GetString("Cap_ServerReleaseNotes", string.Empty);
+        // If capability not configured or explicitly turned off, leave disabled
+        if (string.IsNullOrEmpty(capURL) ||
+            capURL.Equals("false", StringComparison.OrdinalIgnoreCase) ||
+            capURL == "0")
         {
-            get { return null; }
+            m_log.DebugFormat("[ServerReleaseNotesModule]: Cap_ServerReleaseNotes not enabled in config");
+            return;
         }
 
-        public void Initialise(IConfigSource source)
+        config = source.Configs["ServerReleaseNotes"];
+        if (config == null)
+            return;
+
+        m_ServerReleaseNotesURL = config.GetString("ServerReleaseNotesURL", m_ServerReleaseNotesURL);
+        if (string.IsNullOrEmpty(m_ServerReleaseNotesURL))
         {
-            m_enabled = false; // whatever
-            IConfig config = source.Configs["ClientStack.LindenCaps"];
-            if (config == null)
-                return;
-
-            string capURL = config.GetString("Cap_ServerReleaseNotes", string.Empty);
-            // If capability not configured or explicitly turned off, leave disabled
-            if (string.IsNullOrEmpty(capURL) ||
-                capURL.Equals("false", StringComparison.OrdinalIgnoreCase) ||
-                capURL == "0")
-            {
-                m_log.DebugFormat("[ServerReleaseNotesModule]: Cap_ServerReleaseNotes not enabled in config");
-                return;
-            }
-
-            config = source.Configs["ServerReleaseNotes"];
-            if (config == null)
-                return;
-
-            m_ServerReleaseNotesURL = config.GetString("ServerReleaseNotesURL", m_ServerReleaseNotesURL);
-            if (string.IsNullOrEmpty(m_ServerReleaseNotesURL))
-            {
-                m_log.Error("[ServerReleaseNotesModule]: ServerReleaseNotesURL not configured. Cap disabled.");
-                return;
-            }
-
-            if (!Uri.IsWellFormedUriString(m_ServerReleaseNotesURL, UriKind.Absolute))
-            {
-                m_log.ErrorFormat("[ServerReleaseNotesModule]: Invalid ServerReleaseNotesURL '{0}'. Cap Disabled", m_ServerReleaseNotesURL);
-                return;
-            }
-
-            m_enabled = true;
-            m_log.InfoFormat("[ServerReleaseNotesModule]: Enabled. Redirecting ServerReleaseNotes cap to {0}", m_ServerReleaseNotesURL);
+            m_log.Error("[ServerReleaseNotesModule]: ServerReleaseNotesURL not configured. Cap disabled.");
+            return;
         }
 
-        public void AddRegion(Scene scene)
+        if (!Uri.IsWellFormedUriString(m_ServerReleaseNotesURL, UriKind.Absolute))
         {
-            if (!m_enabled)
-                return;
-
-            scene.EventManager.OnRegisterCaps += RegisterCaps;
+            m_log.ErrorFormat("[ServerReleaseNotesModule]: Invalid ServerReleaseNotesURL '{0}'. Cap Disabled", m_ServerReleaseNotesURL);
+            return;
         }
 
-        public void RegionLoaded(Scene scene) { }
+        m_enabled = true;
+        m_log.InfoFormat("[ServerReleaseNotesModule]: Enabled. Redirecting ServerReleaseNotes cap to {0}", m_ServerReleaseNotesURL);
+    }
 
-        public void RemoveRegion(Scene scene)
-        {
-            if (!m_enabled)
-                return;
+    public void AddRegion(Scene scene)
+    {
+        if (!m_enabled)
+            return;
 
-            scene.EventManager.OnRegisterCaps -= RegisterCaps;
-        }
+        scene.EventManager.OnRegisterCaps += RegisterCaps;
+    }
 
-        public void PostInitialise() { }
+    public void RegionLoaded(Scene scene) { }
 
-        public void Close() { }
+    public void RemoveRegion(Scene scene)
+    {
+        if (!m_enabled)
+            return;
 
-        public void RegisterCaps(UUID agentID, Caps caps)
-        {
-            string capPath = "/" + UUID.Random();
-            caps.RegisterSimpleHandler("ServerReleaseNotes", new SimpleStreamHandler(capPath, ProcessServerReleaseNotes));
-        }
+        scene.EventManager.OnRegisterCaps -= RegisterCaps;
+    }
 
-        public void ProcessServerReleaseNotes(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-        {
-            httpResponse.Redirect(m_ServerReleaseNotesURL);
-        }
+    public void PostInitialise() { }
+
+    public void Close() { }
+
+    public void RegisterCaps(UUID agentID, Caps caps)
+    {
+        string capPath = "/" + UUID.Random();
+        caps.RegisterSimpleHandler("ServerReleaseNotes", new SimpleStreamHandler(capPath, ProcessServerReleaseNotes));
+    }
+
+    public void ProcessServerReleaseNotes(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        httpResponse.Redirect(m_ServerReleaseNotesURL);
     }
 }

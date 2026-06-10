@@ -26,103 +26,101 @@
  */
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.Modifiers
+namespace OpenSim.Region.CoreModules.World.Terrain.Modifiers;
+
+public class SmoothModifier : TerrainModifier
 {
-    public class SmoothModifier : TerrainModifier
+    public SmoothModifier(ITerrainModule module) : base(module)
     {
-        public SmoothModifier(ITerrainModule module) : base(module)
+    }
+
+    public override string ModifyTerrain(ITerrainChannel map, string[] args)
+    {
+        string result;
+        if (args.Length < 3)
         {
+            result = "Usage: " + GetUsage();
         }
-
-        public override string ModifyTerrain(ITerrainChannel map, string[] args)
+        else
         {
-            string result;
-            if (args.Length < 3)
-            {
-                result = "Usage: " + GetUsage();
-            }
-            else
-            {
-                TerrainModifierData data;
-                result = this.parseParameters(args, out data);
+            TerrainModifierData data;
+            result = this.parseParameters(args, out data);
 
-                // Context-specific validation
-                if (result.Length == 0)
+            // Context-specific validation
+            if (result.Length == 0)
+            {
+                if (data.bevel == "taper")
                 {
-                    if (data.bevel == "taper")
+                    if (data.bevelevation < 0.01 || data.bevelevation > 0.99)
                     {
-                        if (data.bevelevation < 0.01 || data.bevelevation > 0.99)
-                        {
-                            result = String.Format("Taper must be 0.01 to 0.99: {0}", data.bevelevation);
-                        }
-                    }
-                    else
-                    {
-                        data.bevelevation = 2.0f / 3.0f;
-                    }
-
-                    if (data.elevation < 0.0 || data.elevation > 1.0)
-                    {
-                        result = String.Format("Smoothing strength must be 0.0 to 1.0: {0}", data.elevation);
-                    }
-
-                    if (data.shape.Length == 0)
-                    {
-                        data.shape = "rectangle";
-                        data.x0 = 0;
-                        data.y0 = 0;
-                        data.dx = map.Width;
-                        data.dy = map.Height;
+                        result = String.Format("Taper must be 0.01 to 0.99: {0}", data.bevelevation);
                     }
                 }
-
-                // if it's all good, then do the work
-                if (result.Length == 0)
+                else
                 {
-                    this.applyModification(map, data);
+                    data.bevelevation = 2.0f / 3.0f;
+                }
+
+                if (data.elevation < 0.0 || data.elevation > 1.0)
+                {
+                    result = String.Format("Smoothing strength must be 0.0 to 1.0: {0}", data.elevation);
+                }
+
+                if (data.shape.Length == 0)
+                {
+                    data.shape = "rectangle";
+                    data.x0 = 0;
+                    data.y0 = 0;
+                    data.dx = map.Width;
+                    data.dy = map.Height;
                 }
             }
 
-            return result;
-        }
-
-        public override string GetUsage()
-        {
-            string val = "smooth <strength> [ -rec=x1,y1,dx[,dy] | -ell=x0,y0,rx[,ry] ] [-taper=<fraction>]"
-                                + "\nSmooths all points within the specified range using a simple averaging algorithm.";
-            return val;
-        }
-
-        public override float operate(float[,] map, TerrainModifierData data, int x, int y)
-        {
-            float[] scale = new float[3];
-            scale[0] = data.elevation;
-            scale[1] = ((1.0f - scale[0]) * data.bevelevation) / 8.0f;
-            scale[2] = ((1.0f - scale[0]) * (1.0f - data.bevelevation)) / 16.0f;
-            int xMax = map.GetLength(0);
-            int yMax = map.GetLength(1);
-            float result;
-            if ((x == 0) || (y == 0) || (x == (xMax - 1)) || (y == (yMax - 1)))
+            // if it's all good, then do the work
+            if (result.Length == 0)
             {
-                result = map[x, y];
+                this.applyModification(map, data);
             }
-            else
+        }
+
+        return result;
+    }
+
+    public override string GetUsage()
+    {
+        string val = "smooth <strength> [ -rec=x1,y1,dx[,dy] | -ell=x0,y0,rx[,ry] ] [-taper=<fraction>]"
+                            + "\nSmooths all points within the specified range using a simple averaging algorithm.";
+        return val;
+    }
+
+    public override float operate(float[,] map, TerrainModifierData data, int x, int y)
+    {
+        float[] scale = new float[3];
+        scale[0] = data.elevation;
+        scale[1] = ((1.0f - scale[0]) * data.bevelevation) / 8.0f;
+        scale[2] = ((1.0f - scale[0]) * (1.0f - data.bevelevation)) / 16.0f;
+        int xMax = map.GetLength(0);
+        int yMax = map.GetLength(1);
+        float result;
+        if ((x == 0) || (y == 0) || (x == (xMax - 1)) || (y == (yMax - 1)))
+        {
+            result = map[x, y];
+        }
+        else
+        {
+            result = 0.0f;
+            for(int yPos = (y - 2); yPos < (y + 3); yPos++)
             {
-                result = 0.0f;
-                for(int yPos = (y - 2); yPos < (y + 3); yPos++)
+                int yVal = (yPos <= 0) ? 0 : ((yPos < yMax) ? yPos : yMax - 1);
+                for(int xPos = (x - 2); xPos < (x + 3); xPos++)
                 {
-                    int yVal = (yPos <= 0) ? 0 : ((yPos < yMax) ? yPos : yMax - 1);
-                    for(int xPos = (x - 2); xPos < (x + 3); xPos++)
-                    {
-                        int xVal = (xPos <= 0) ? 0 : ((xPos < xMax) ? xPos : xMax - 1);
-                        int dist = Math.Max(Math.Abs(x - xVal), Math.Abs(y - yVal));
-                        result += map[xVal, yVal] * scale[dist];
-                    }
+                    int xVal = (xPos <= 0) ? 0 : ((xPos < xMax) ? xPos : xMax - 1);
+                    int dist = Math.Max(Math.Abs(x - xVal), Math.Abs(y - yVal));
+                    result += map[xVal, yVal] * scale[dist];
                 }
             }
-            return result;
         }
-
+        return result;
     }
 
 }

@@ -25,22 +25,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+public class AgentPreferencesData
 {
-    public class AgentPreferencesData
-    {
-        public Dictionary<string, string> Data;
-    }
+    public Dictionary<string, string> Data;
+}
 
-    public interface IAgentPreferencesData
-    {
-        bool Store(AgentPreferencesData data);
-        AgentPreferencesData GetPrefs(UUID agentID);
-    }
+public interface IAgentPreferencesData
+{
+    bool Store(AgentPreferencesData data);
+    AgentPreferencesData GetPrefs(UUID agentID);
 }
 

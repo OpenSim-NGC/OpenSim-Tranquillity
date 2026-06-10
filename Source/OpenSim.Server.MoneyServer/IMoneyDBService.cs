@@ -26,50 +26,46 @@
  */
 
 #pragma warning disable S1128 // Unused "using" should be removed
-using System;
-using System.Collections.Generic;
-using System.Text;
 using OpenMetaverse;
 using OpenSim.Data.MySQL.MoneyData;
 #pragma warning restore S1128 // Unused "using" should be removed
 
 
-namespace OpenSim.Server.MoneyServer
+namespace OpenSim.Server.MoneyServer;
+
+/// <summary>
+/// IMoney DB Service
+/// </summary>
+public interface IMoneyDBService
 {
-    /// <summary>
-    /// IMoney DB Service
-    /// </summary>
-    public interface IMoneyDBService
-    {
-        int getBalance(string userID);
+    int getBalance(string userID);
 
-        bool withdrawMoney(UUID transactionID, string senderID, int amount);
+    bool withdrawMoney(UUID transactionID, string senderID, int amount);
 
-        bool giveMoney(UUID transactionID, string receiverID, int amount);
+    bool giveMoney(UUID transactionID, string receiverID, int amount);
 
-        bool addTransaction(TransactionData transaction);
+    bool addTransaction(TransactionData transaction);
 
-        bool addUser(string userID, int balance, int status, int type);
+    bool addUser(string userID, int balance, int status, int type);
 
-        bool updateTransactionStatus(UUID transactionID, int status, string description);
+    bool updateTransactionStatus(UUID transactionID, int status, string description);
 
-        bool SetTransExpired(int deadTime);
+    bool SetTransExpired(int deadTime);
 
-        bool ValidateTransfer(string secureCode, UUID transactionID);
+    bool ValidateTransfer(string secureCode, UUID transactionID);
 
-        TransactionData FetchTransaction(UUID transactionID);
+    TransactionData FetchTransaction(UUID transactionID);
 
-        TransactionData FetchTransaction(string userID, int startTime, int endTime, int lastIndex);
+    TransactionData FetchTransaction(string userID, int startTime, int endTime, int lastIndex);
 
-        int getTransactionNum(string userID, int startTime, int endTime);
+    int getTransactionNum(string userID, int startTime, int endTime);
 
-        bool DoTransfer(UUID transactionUUID);
+    bool DoTransfer(UUID transactionUUID);
 
-        bool DoAddMoney(UUID transactionUUID);		// Added by Fumi.Iseki
+    bool DoAddMoney(UUID transactionUUID);		// Added by Fumi.Iseki
 
-        bool TryAddUserInfo(UserInfo user);
+    bool TryAddUserInfo(UserInfo user);
 
-        UserInfo FetchUserInfo(string userID);
+    UserInfo FetchUserInfo(string userID);
 
-    }
 }

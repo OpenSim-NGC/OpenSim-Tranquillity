@@ -27,50 +27,48 @@
 
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain
+namespace OpenSim.Region.CoreModules.World.Terrain;
+
+public interface ITerrainModifier
 {
-    public interface ITerrainModifier
-    {
-        /// <summary>
-        /// Creates the feature.
-        /// </summary>
-        /// <returns>
-        /// Empty string if successful, otherwise error message.
-        /// </returns>
-        /// <param name='map'>
-        /// ITerrainChannel holding terrain data.
-        /// </param>
-        /// <param name='args'>
-        /// command-line arguments from console.
-        /// </param>
-        string ModifyTerrain(ITerrainChannel map, string[] args);
+    /// <summary>
+    /// Creates the feature.
+    /// </summary>
+    /// <returns>
+    /// Empty string if successful, otherwise error message.
+    /// </returns>
+    /// <param name='map'>
+    /// ITerrainChannel holding terrain data.
+    /// </param>
+    /// <param name='args'>
+    /// command-line arguments from console.
+    /// </param>
+    string ModifyTerrain(ITerrainChannel map, string[] args);
 
-        /// <summary>
-        /// Gets a string describing the usage.
-        /// </summary>
-        /// <returns>
-        /// A string describing parameters for creating the feature.
-        /// Format is "feature-name <arg1> <arg2> ..."
-        /// </returns>
-        string GetUsage();
+    /// <summary>
+    /// Gets a string describing the usage.
+    /// </summary>
+    /// <returns>
+    /// A string describing parameters for creating the feature.
+    /// Format is "feature-name <arg1> <arg2> ..."
+    /// </returns>
+    string GetUsage();
 
-        /// <summary>
-        /// Apply the appropriate operation on the specified map, at (x, y).
-        /// </summary>
-        /// <param name='map'>
-        /// Map.
-        /// </param>
-        /// <param name='data'>
-        /// Data.
-        /// </param>
-        /// <param name='x'>
-        /// X.
-        /// </param>
-        /// <param name='y'>
-        /// Y.
-        /// </param>
-        float operate(float[,] map, TerrainModifierData data, int x, int y);
-    }
-
+    /// <summary>
+    /// Apply the appropriate operation on the specified map, at (x, y).
+    /// </summary>
+    /// <param name='map'>
+    /// Map.
+    /// </param>
+    /// <param name='data'>
+    /// Data.
+    /// </param>
+    /// <param name='x'>
+    /// X.
+    /// </param>
+    /// <param name='y'>
+    /// Y.
+    /// </param>
+    float operate(float[,] map, TerrainModifierData data, int x, int y);
 }
 

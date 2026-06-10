@@ -27,39 +27,38 @@
 
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors
+namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors;
+
+class LastFrameTimeMonitor : IMonitor
 {
-    class LastFrameTimeMonitor : IMonitor
+    private readonly Scene m_scene;
+
+    public LastFrameTimeMonitor(Scene scene)
     {
-        private readonly Scene m_scene;
-
-        public LastFrameTimeMonitor(Scene scene)
-        {
-            m_scene = scene;
-        }
-
-        #region Implementation of IMonitor
-
-        public string GetName()
-        {
-            return "LastFrameTimeMonitor";
-        }
-
-        public double GetValue()
-        {
-            return Environment.TickCount - m_scene.MonitorLastFrameTick;
-        }
-
-        public string GetFriendlyName()
-        {
-            return "Last Completed Frame At";
-        }
-
-        public string GetFriendlyValue()
-        {
-            return (int)GetValue() + "ms ago";
-        }
-
-        #endregion
+        m_scene = scene;
     }
+
+    #region Implementation of IMonitor
+
+    public string GetName()
+    {
+        return "LastFrameTimeMonitor";
+    }
+
+    public double GetValue()
+    {
+        return Environment.TickCount - m_scene.MonitorLastFrameTick;
+    }
+
+    public string GetFriendlyName()
+    {
+        return "Last Completed Frame At";
+    }
+
+    public string GetFriendlyValue()
+    {
+        return (int)GetValue() + "ms ago";
+    }
+
+    #endregion
 }

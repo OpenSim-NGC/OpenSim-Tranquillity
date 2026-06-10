@@ -27,19 +27,18 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework.Capabilities
-{
-    [LLSDType("MAP")]
-    public class OSDMapLayer
-    {
-        public int Left = 0;
-        public int Right = 0;
-        public int Top = 0;
-        public int Bottom = 0;
-        public UUID ImageID = UUID.Zero;
+namespace OpenSim.Framework.Capabilities;
 
-        public OSDMapLayer()
-        {
-        }
+[LLSDType("MAP")]
+public class OSDMapLayer
+{
+    public int Left = 0;
+    public int Right = 0;
+    public int Top = 0;
+    public int Bottom = 0;
+    public UUID ImageID = UUID.Zero;
+
+    public OSDMapLayer()
+    {
     }
 }

@@ -25,92 +25,84 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Reflection;
-using System.Threading;
-using log4net;
 using OpenMetaverse;
-using OpenSim.Framework;
 using Npgsql;
 
-namespace OpenSim.Data.PGSQL
+namespace OpenSim.Data.PGSQL;
+
+/// <summary>
+/// A PGSQL Interface for the Presence Server
+/// </summary>
+public class PGSQLPresenceData : PGSQLGenericTableHandler<PresenceData>,
+        IPresenceData
 {
-    /// <summary>
-    /// A PGSQL Interface for the Presence Server
-    /// </summary>
-    public class PGSQLPresenceData : PGSQLGenericTableHandler<PresenceData>,
-            IPresenceData
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public PGSQLPresenceData(string connectionString, string realm) :
-                base(connectionString, realm, "Presence")
+    public PGSQLPresenceData(string connectionString, string realm) :
+            base(connectionString, realm, "Presence")
+    {
+    }
+
+    public PresenceData Get(UUID sessionID)
+    {
+        PresenceData[] ret = Get("SessionID", sessionID.ToString());
+
+        if (ret.Length == 0)
+            return null;
+
+        return ret[0];
+    }
+
+    public void LogoutRegionAgents(UUID regionID)
+    {
+        using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
+        using (NpgsqlCommand cmd = new NpgsqlCommand())
         {
+
+            cmd.CommandText = String.Format("DELETE FROM {0} WHERE \"RegionID\" = :regionID", m_Realm);
+
+            cmd.Parameters.Add(m_database.CreateParameter("RegionID", regionID));
+            cmd.Connection = conn;
+            conn.Open();
+            cmd.ExecuteNonQuery();
         }
+    }
 
-        public PresenceData Get(UUID sessionID)
+    public bool ReportAgent(UUID sessionID, UUID regionID)
+    {
+        PresenceData[] pd = Get("SessionID", sessionID.ToString());
+        if (pd.Length == 0)
+            return false;
+
+        if (regionID.IsZero())
+            return false;
+
+        using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
+        using (NpgsqlCommand cmd = new NpgsqlCommand())
         {
-            PresenceData[] ret = Get("SessionID", sessionID.ToString());
 
-            if (ret.Length == 0)
-                return null;
+            cmd.CommandText = String.Format("UPDATE {0} SET \"RegionID\" = :regionID, \"LastSeen\" = now() WHERE \"SessionID\" = :sessionID", m_Realm);
 
-            return ret[0];
-        }
-
-        public void LogoutRegionAgents(UUID regionID)
-        {
-            using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
-            using (NpgsqlCommand cmd = new NpgsqlCommand())
-            {
-
-                cmd.CommandText = String.Format("DELETE FROM {0} WHERE \"RegionID\" = :regionID", m_Realm);
-
-                cmd.Parameters.Add(m_database.CreateParameter("RegionID", regionID));
-                cmd.Connection = conn;
-                conn.Open();
-                cmd.ExecuteNonQuery();
-            }
-        }
-
-        public bool ReportAgent(UUID sessionID, UUID regionID)
-        {
-            PresenceData[] pd = Get("SessionID", sessionID.ToString());
-            if (pd.Length == 0)
+            cmd.Parameters.Add(m_database.CreateParameter("SessionID", sessionID));
+            cmd.Parameters.Add(m_database.CreateParameter("RegionID", regionID));
+            cmd.Connection = conn;
+            conn.Open();
+            if (cmd.ExecuteNonQuery() == 0)
                 return false;
-
-            if (regionID.IsZero())
-                return false;
-
-            using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
-            using (NpgsqlCommand cmd = new NpgsqlCommand())
-            {
-
-                cmd.CommandText = String.Format("UPDATE {0} SET \"RegionID\" = :regionID, \"LastSeen\" = now() WHERE \"SessionID\" = :sessionID", m_Realm);
-
-                cmd.Parameters.Add(m_database.CreateParameter("SessionID", sessionID));
-                cmd.Parameters.Add(m_database.CreateParameter("RegionID", regionID));
-                cmd.Connection = conn;
-                conn.Open();
-                if (cmd.ExecuteNonQuery() == 0)
-                    return false;
-            }
-            return true;
         }
+        return true;
+    }
 
-        public bool VerifyAgent(UUID agentId, UUID secureSessionID)
-        {
-            PresenceData[] ret = Get("SecureSessionID", secureSessionID.ToString());
+    public bool VerifyAgent(UUID agentId, UUID secureSessionID)
+    {
+        PresenceData[] ret = Get("SecureSessionID", secureSessionID.ToString());
 
-            if (ret.Length == 0)
-                return false;
+        if (ret.Length == 0)
+            return false;
 
-            if(ret[0].UserID != agentId.ToString())
-                return false;
+        if(ret[0].UserID != agentId.ToString())
+            return false;
 
-            return true;
-        }
+        return true;
     }
 }

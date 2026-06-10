@@ -25,14 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IRegionModulesController
 {
-    public interface IRegionModulesController
-    {
-        void AddRegionToModules(Scene scene);
-        void RemoveRegionFromModules (Scene scene);
-    }
+    void AddRegionToModules(Scene scene);
+    void RemoveRegionFromModules (Scene scene);
 }

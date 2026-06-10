@@ -25,99 +25,96 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+public class RegionData
 {
-    public class RegionData
-    {
-        public UUID RegionID;
-        public UUID ScopeID;
-        public string RegionName;
-
-        /// <summary>
-        /// The position in meters of this region.
-        /// </summary>
-        public int posX;
-
-        /// <summary>
-        /// The position in meters of this region.
-        /// </summary>
-        public int posY;
-
-        public int sizeX;
-        public int sizeY;
-
-        /// <summary>
-        /// Return the x-coordinate of this region in region units.
-        /// </summary>
-        public int coordX { get { return (int)Util.WorldToRegionLoc((uint)posX); } }
-
-        /// <summary>
-        /// Return the y-coordinate of this region in region units.
-        /// </summary>
-        public int coordY { get { return (int)Util.WorldToRegionLoc((uint)posY); } }
-
-        public Dictionary<string, object> Data;
-    }
+    public UUID RegionID;
+    public UUID ScopeID;
+    public string RegionName;
 
     /// <summary>
-    /// An interface for connecting to the authentication datastore
+    /// The position in meters of this region.
     /// </summary>
-    public interface IRegionData
+    public int posX;
+
+    /// <summary>
+    /// The position in meters of this region.
+    /// </summary>
+    public int posY;
+
+    public int sizeX;
+    public int sizeY;
+
+    /// <summary>
+    /// Return the x-coordinate of this region in region units.
+    /// </summary>
+    public int coordX { get { return (int)Util.WorldToRegionLoc((uint)posX); } }
+
+    /// <summary>
+    /// Return the y-coordinate of this region in region units.
+    /// </summary>
+    public int coordY { get { return (int)Util.WorldToRegionLoc((uint)posY); } }
+
+    public Dictionary<string, object> Data;
+}
+
+/// <summary>
+/// An interface for connecting to the authentication datastore
+/// </summary>
+public interface IRegionData
+{
+    RegionData Get(UUID regionID, UUID ScopeID);
+    List<RegionData> Get(string regionName, UUID ScopeID);
+    RegionData GetSpecific(string regionName, UUID ScopeID);
+
+    RegionData Get(int x, int y, UUID ScopeID);
+    List<RegionData> Get(int xStart, int yStart, int xEnd, int yEnd, UUID ScopeID);
+
+    bool Store(RegionData data);
+
+    bool SetDataItem(UUID principalID, string item, string value);
+
+    bool Delete(UUID regionID);
+
+    List<RegionData> GetDefaultRegions(UUID scopeID);
+    List<RegionData> GetDefaultHypergridRegions(UUID scopeID);
+    List<RegionData> GetFallbackRegions(UUID scopeID);
+    List<RegionData> GetHyperlinks(UUID scopeID);
+    List<RegionData> GetOnlineRegions(UUID scopeID);
+}
+
+public class RegionDataDistanceCompare : IComparer<RegionData>
+{
+    private float m_originX;
+    private float m_originY;
+
+    public RegionDataDistanceCompare(int x, int y)
     {
-        RegionData Get(UUID regionID, UUID ScopeID);
-        List<RegionData> Get(string regionName, UUID ScopeID);
-        RegionData GetSpecific(string regionName, UUID ScopeID);
-
-        RegionData Get(int x, int y, UUID ScopeID);
-        List<RegionData> Get(int xStart, int yStart, int xEnd, int yEnd, UUID ScopeID);
-
-        bool Store(RegionData data);
-
-        bool SetDataItem(UUID principalID, string item, string value);
-
-        bool Delete(UUID regionID);
-
-        List<RegionData> GetDefaultRegions(UUID scopeID);
-        List<RegionData> GetDefaultHypergridRegions(UUID scopeID);
-        List<RegionData> GetFallbackRegions(UUID scopeID);
-        List<RegionData> GetHyperlinks(UUID scopeID);
-        List<RegionData> GetOnlineRegions(UUID scopeID);
+        m_originX = x;
+        m_originY = y;
     }
 
-    public class RegionDataDistanceCompare : IComparer<RegionData>
+    public int Compare(RegionData regionA, RegionData regionB)
     {
-        private float m_originX;
-        private float m_originY;
+        float dx = regionA.posX - m_originX;
+        if (dx < 0)
+            dx += regionA.sizeX - 1;
+        float dy = regionA.posY - m_originY;
+        if (dy < 0)
+            dy += regionA.sizeY - 1;
+        float da = dx * dx + dy * dy;
 
-        public RegionDataDistanceCompare(int x, int y)
-        {
-            m_originX = x;
-            m_originY = y;
-        }
-
-        public int Compare(RegionData regionA, RegionData regionB)
-        {
-            float dx = regionA.posX - m_originX;
-            if (dx < 0)
-                dx += regionA.sizeX - 1;
-            float dy = regionA.posY - m_originY;
-            if (dy < 0)
-                dy += regionA.sizeY - 1;
-            float da = dx * dx + dy * dy;
-
-            dx = regionB.posX - m_originX;
-            if (dx < 0)
-                dx += regionB.sizeX - 1;
-            dy = regionB.posY - m_originY;
-            if (dy < 0)
-                dy += regionB.sizeY - 1;
-            float db = dx * dx + dy * dy;
-            return da.CompareTo(db);
-        }
+        dx = regionB.posX - m_originX;
+        if (dx < 0)
+            dx += regionB.sizeX - 1;
+        dy = regionB.posY - m_originY;
+        if (dy < 0)
+            dy += regionB.sizeY - 1;
+        float db = dx * dx + dy * dy;
+        return da.CompareTo(db);
     }
 }

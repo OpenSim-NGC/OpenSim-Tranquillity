@@ -25,82 +25,80 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using MySqlConnector;
 using OpenMetaverse;
 
-namespace OpenSim.Data.MySQL
+namespace OpenSim.Data.MySQL;
+
+/// <summary>
+/// A MySQL Interface for the Grid Server
+/// </summary>
+public class MySQLPresenceData : MySQLGenericTableHandler<PresenceData>,
+        IPresenceData
 {
-    /// <summary>
-    /// A MySQL Interface for the Grid Server
-    /// </summary>
-    public class MySQLPresenceData : MySQLGenericTableHandler<PresenceData>,
-            IPresenceData
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public MySQLPresenceData(string connectionString, string realm) :
-                base(connectionString, realm, "Presence")
+    public MySQLPresenceData(string connectionString, string realm) :
+            base(connectionString, realm, "Presence")
+    {
+    }
+
+    public PresenceData Get(UUID sessionID)
+    {
+        PresenceData[] ret = Get("SessionID", sessionID.ToString());
+
+        if (ret.Length == 0)
+            return null;
+
+        return ret[0];
+    }
+
+    public void LogoutRegionAgents(UUID regionID)
+    {
+        using (MySqlCommand cmd = new MySqlCommand())
         {
+            cmd.CommandText = String.Format("delete from {0} where `RegionID`=?RegionID", m_Realm);
+
+            cmd.Parameters.AddWithValue("?RegionID", regionID.ToString());
+
+            ExecuteNonQuery(cmd);
         }
+    }
 
-        public PresenceData Get(UUID sessionID)
+    public bool ReportAgent(UUID sessionID, UUID regionID)
+    {
+        PresenceData[] pd = Get("SessionID", sessionID.ToString());
+        if (pd.Length == 0)
+            return false;
+
+        if (regionID.IsZero())
+            return false;
+
+        using (MySqlCommand cmd = new MySqlCommand())
         {
-            PresenceData[] ret = Get("SessionID", sessionID.ToString());
+            cmd.CommandText = String.Format("update {0} set RegionID=?RegionID, LastSeen=NOW() where `SessionID`=?SessionID", m_Realm);
 
-            if (ret.Length == 0)
-                return null;
+            cmd.Parameters.AddWithValue("?SessionID", sessionID.ToString());
+            cmd.Parameters.AddWithValue("?RegionID", regionID.ToString());
 
-            return ret[0];
-        }
-
-        public void LogoutRegionAgents(UUID regionID)
-        {
-            using (MySqlCommand cmd = new MySqlCommand())
-            {
-                cmd.CommandText = String.Format("delete from {0} where `RegionID`=?RegionID", m_Realm);
-
-                cmd.Parameters.AddWithValue("?RegionID", regionID.ToString());
-
-                ExecuteNonQuery(cmd);
-            }
-        }
-
-        public bool ReportAgent(UUID sessionID, UUID regionID)
-        {
-            PresenceData[] pd = Get("SessionID", sessionID.ToString());
-            if (pd.Length == 0)
+            if (ExecuteNonQuery(cmd) == 0)
                 return false;
-
-            if (regionID.IsZero())
-                return false;
-
-            using (MySqlCommand cmd = new MySqlCommand())
-            {
-                cmd.CommandText = String.Format("update {0} set RegionID=?RegionID, LastSeen=NOW() where `SessionID`=?SessionID", m_Realm);
-
-                cmd.Parameters.AddWithValue("?SessionID", sessionID.ToString());
-                cmd.Parameters.AddWithValue("?RegionID", regionID.ToString());
-
-                if (ExecuteNonQuery(cmd) == 0)
-                    return false;
-            }
-
-            return true;
         }
 
-        public bool VerifyAgent(UUID agentId, UUID secureSessionID)
-        {
-            PresenceData[] ret = Get("SecureSessionID",
-                    secureSessionID.ToString());
+        return true;
+    }
 
-            if (ret.Length == 0)
-                return false;
+    public bool VerifyAgent(UUID agentId, UUID secureSessionID)
+    {
+        PresenceData[] ret = Get("SecureSessionID",
+                secureSessionID.ToString());
 
-            if(ret[0].UserID != agentId.ToString())
-                return false;
+        if (ret.Length == 0)
+            return false;
 
-            return true;
-        }
+        if(ret[0].UserID != agentId.ToString())
+            return false;
+
+        return true;
     }
 }

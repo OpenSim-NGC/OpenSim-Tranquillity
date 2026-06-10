@@ -26,27 +26,24 @@
  */
 
 using System.Collections;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IUrlModule
 {
-    public interface IUrlModule
-    {
-        string ExternalHostNameForLSL { get; }
-        UUID RequestURL(IScriptModule engine, SceneObjectPart host, UUID itemID, Hashtable options);
-        UUID RequestSecureURL(IScriptModule engine, SceneObjectPart host, UUID itemID, Hashtable options);
-        void ReleaseURL(string url);
-        void HttpResponse(UUID request, int status, string body);
-        void HttpContentType(UUID request, string type);
+    string ExternalHostNameForLSL { get; }
+    UUID RequestURL(IScriptModule engine, SceneObjectPart host, UUID itemID, Hashtable options);
+    UUID RequestSecureURL(IScriptModule engine, SceneObjectPart host, UUID itemID, Hashtable options);
+    void ReleaseURL(string url);
+    void HttpResponse(UUID request, int status, string body);
+    void HttpContentType(UUID request, string type);
 
-        string GetHttpHeader(UUID request, string header);
-        int GetFreeUrls();
+    string GetHttpHeader(UUID request, string header);
+    int GetFreeUrls();
 
-        void ScriptRemoved(UUID itemID);
-        void ObjectRemoved(UUID objectID);
-        int GetUrlCount(UUID groupID);
-    }
+    void ScriptRemoved(UUID itemID);
+    void ObjectRemoved(UUID objectID);
+    int GetUrlCount(UUID groupID);
 }

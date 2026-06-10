@@ -25,34 +25,31 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public enum InsertLocation : int
 {
-    public enum InsertLocation : int
-    {
-        Agent = 1,
-        World = 2,
-        Tools = 3,
-        Advanced = 4,
-        Admin = 5
-    }
+    Agent = 1,
+    World = 2,
+    Tools = 3,
+    Advanced = 4,
+    Admin = 5
+}
 
-    public enum UserMode : int
-    {
-        Normal = 0,
-        RegionManager = 2,
-        God = 3
-    }
+public enum UserMode : int
+{
+    Normal = 0,
+    RegionManager = 2,
+    God = 3
+}
 
-    public delegate void CustomMenuHandler(string action, UUID agentID, List<uint> selection);
+public delegate void CustomMenuHandler(string action, UUID agentID, List<uint> selection);
 
-    public interface IDynamicMenuModule
-    {
-        void AddMenuItem(UUID agentID, string title, InsertLocation location, UserMode mode, CustomMenuHandler handler);
-        void AddMenuItem(string title, InsertLocation location, UserMode mode, CustomMenuHandler handler);
-        void RemoveMenuItem(string action);
-    }
+public interface IDynamicMenuModule
+{
+    void AddMenuItem(UUID agentID, string title, InsertLocation location, UserMode mode, CustomMenuHandler handler);
+    void AddMenuItem(string title, InsertLocation location, UserMode mode, CustomMenuHandler handler);
+    void RemoveMenuItem(string action);
 }

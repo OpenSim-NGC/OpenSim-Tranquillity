@@ -25,128 +25,122 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Region.Framework;
-using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Data.Null
+namespace OpenSim.Data.Null;
+
+public class NullEstateStore : IEstateDataStore
 {
-    public class NullEstateStore : IEstateDataStore
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
 //        private string m_connectionString;
 
 //        private Dictionary<uint, EstateSettings> m_knownEstates = new Dictionary<uint, EstateSettings>();
-        private EstateSettings m_estate = null;
+    private EstateSettings m_estate = null;
 
-        private EstateSettings GetEstate()
+    private EstateSettings GetEstate()
+    {
+        if (m_estate == null)
         {
-            if (m_estate == null)
-            {
-                // This fools the initialization caller into thinking an estate was fetched (a check in OpenSimBase).
-                // The estate info is pretty empty so don't try banning anyone.
-                m_estate = new EstateSettings();
-                m_estate.EstateID = 1;
-                m_estate.OnSave += StoreEstateSettings;
-            }
-            return m_estate;
+            // This fools the initialization caller into thinking an estate was fetched (a check in OpenSimBase).
+            // The estate info is pretty empty so don't try banning anyone.
+            m_estate = new EstateSettings();
+            m_estate.EstateID = 1;
+            m_estate.OnSave += StoreEstateSettings;
         }
-
-        protected virtual Assembly Assembly
-        {
-            get { return GetType().Assembly; }
-        }
-
-        public NullEstateStore()
-        {
-        }
-
-        public NullEstateStore(string connectionString)
-        {
-            Initialise(connectionString);
-        }
-
-        public void Initialise(string connectionString)
-        {
-//            m_connectionString = connectionString;
-        }
-
-        private string[] FieldList
-        {
-            get { return new string[0]; }
-        }
-
-        public EstateSettings LoadEstateSettings(UUID regionID, bool create)
-        {
-            return GetEstate();
-        }
-
-        public void StoreEstateSettings(EstateSettings es)
-        {
-            m_estate = es;
-            return;
-        }
-
-        public EstateSettings LoadEstateSettings(int estateID)
-        {
-            return GetEstate();
-        }
-
-        public EstateSettings CreateNewEstate(int estateID)
-        {
-            return new EstateSettings();
-        }
-
-        public List<EstateSettings> LoadEstateSettingsAll()
-        {
-            List<EstateSettings> allEstateSettings = new List<EstateSettings>();
-            allEstateSettings.Add(GetEstate());
-            return allEstateSettings;
-        }
-
-        public List<int> GetEstatesAll()
-        {
-            List<int> result = new List<int>();
-            result.Add((int)GetEstate().EstateID);
-            return result;
-        }
-
-        public List<int> GetEstates(string search)
-        {
-            List<int> result = new List<int>();
-            return result;
-        }
-
-        public bool LinkRegion(UUID regionID, int estateID)
-        {
-            return false;
-        }
-
-        public List<UUID> GetRegions(int estateID)
-        {
-            List<UUID> result = new List<UUID>();
-            return result;
-        }
-
-        public bool DeleteEstate(int estateID)
-        {
-            return false;
-        }
-
-        #region IEstateDataStore Members
-
-
-        public List<int> GetEstatesByOwner(UUID ownerID)
-        {
-            return new List<int>();
-        }
-
-        #endregion
+        return m_estate;
     }
+
+    protected virtual Assembly Assembly
+    {
+        get { return GetType().Assembly; }
+    }
+
+    public NullEstateStore()
+    {
+    }
+
+    public NullEstateStore(string connectionString)
+    {
+        Initialise(connectionString);
+    }
+
+    public void Initialise(string connectionString)
+    {
+//            m_connectionString = connectionString;
+    }
+
+    private string[] FieldList
+    {
+        get { return new string[0]; }
+    }
+
+    public EstateSettings LoadEstateSettings(UUID regionID, bool create)
+    {
+        return GetEstate();
+    }
+
+    public void StoreEstateSettings(EstateSettings es)
+    {
+        m_estate = es;
+        return;
+    }
+
+    public EstateSettings LoadEstateSettings(int estateID)
+    {
+        return GetEstate();
+    }
+
+    public EstateSettings CreateNewEstate(int estateID)
+    {
+        return new EstateSettings();
+    }
+
+    public List<EstateSettings> LoadEstateSettingsAll()
+    {
+        List<EstateSettings> allEstateSettings = new List<EstateSettings>();
+        allEstateSettings.Add(GetEstate());
+        return allEstateSettings;
+    }
+
+    public List<int> GetEstatesAll()
+    {
+        List<int> result = new List<int>();
+        result.Add((int)GetEstate().EstateID);
+        return result;
+    }
+
+    public List<int> GetEstates(string search)
+    {
+        List<int> result = new List<int>();
+        return result;
+    }
+
+    public bool LinkRegion(UUID regionID, int estateID)
+    {
+        return false;
+    }
+
+    public List<UUID> GetRegions(int estateID)
+    {
+        List<UUID> result = new List<UUID>();
+        return result;
+    }
+
+    public bool DeleteEstate(int estateID)
+    {
+        return false;
+    }
+
+    #region IEstateDataStore Members
+
+
+    public List<int> GetEstatesByOwner(UUID ownerID)
+    {
+        return new List<int>();
+    }
+
+    #endregion
 }

@@ -24,18 +24,16 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Collections.Generic;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IWorldMapModule
 {
-    public interface IWorldMapModule
-    {
-        /// <summary>
-        /// Generate a map tile for the scene. a terrain texture for this scene
-        /// </summary>
-        void GenerateMaptile();
-        void MapBlockFromGridRegion(MapBlockData block, GridRegion r, uint flag);
-    }
+    /// <summary>
+    /// Generate a map tile for the scene. a terrain texture for this scene
+    /// </summary>
+    void GenerateMaptile();
+    void MapBlockFromGridRegion(MapBlockData block, GridRegion r, uint flag);
 }

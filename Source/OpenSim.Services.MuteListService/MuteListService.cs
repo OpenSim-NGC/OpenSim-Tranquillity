@@ -25,103 +25,100 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Text;
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
 using OpenSim.Services.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Data;
 using OpenSim.Framework;
 
-namespace OpenSim.Services.EstateService
+namespace OpenSim.Services.EstateService;
+
+public class MuteListService : ServiceBase, IMuteListService
 {
-    public class MuteListService : ServiceBase, IMuteListService
-    {
 //        private static readonly ILog m_log =
 //                LogManager.GetLogger(
 //                MethodBase.GetCurrentMethod().DeclaringType);
 
-        protected IMuteListData m_database;
+    protected IMuteListData m_database;
 
-        public MuteListService(IConfigSource config)
-            : base(config)
+    public MuteListService(IConfigSource config)
+        : base(config)
+    {
+        string dllName = String.Empty;
+        string connString = String.Empty;
+
+        // Try reading the [DatabaseService] section, if it exists
+        IConfig dbConfig = config.Configs["DatabaseService"];
+        if (dbConfig != null)
         {
-            string dllName = String.Empty;
-            string connString = String.Empty;
-
-            // Try reading the [DatabaseService] section, if it exists
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig != null)
-            {
-                dllName = dbConfig.GetString("StorageProvider", String.Empty);
-                connString = dbConfig.GetString("ConnectionString", String.Empty);
-                connString = dbConfig.GetString("MuteConnectionString", connString);
-            }
-
-            // Try reading the [MuteListStore] section, if it exists
-            IConfig muteConfig = config.Configs["MuteListStore"];
-            if (muteConfig != null)
-            {
-                dllName = muteConfig.GetString("StorageProvider", dllName);
-                connString = muteConfig.GetString("ConnectionString", connString);
-            }
-
-            // We tried, but this doesn't exist. We can't proceed
-            if (dllName.Length == 0)
-                throw new Exception("No StorageProvider configured");
-
-            m_database = LoadPlugin<IMuteListData>(dllName, new Object[] { connString });
-            if (m_database == null)
-                throw new Exception("Could not find a storage interface in the given module");
+            dllName = dbConfig.GetString("StorageProvider", String.Empty);
+            connString = dbConfig.GetString("ConnectionString", String.Empty);
+            connString = dbConfig.GetString("MuteConnectionString", connString);
         }
 
-        public Byte[] MuteListRequest(UUID agentID, uint crc)
+        // Try reading the [MuteListStore] section, if it exists
+        IConfig muteConfig = config.Configs["MuteListStore"];
+        if (muteConfig != null)
         {
-            if(m_database == null)
-                return null;
-
-            MuteData[] data = m_database.Get(agentID);
-            if (data == null || data.Length == 0)
-                return Array.Empty<byte>();
-
-            StringBuilder sb = new StringBuilder(16384);
-            foreach (MuteData d in data)
-                sb.AppendFormat("{0} {1} {2}|{3}\n",
-                        d.MuteType,
-                        d.MuteID.ToString(),
-                        d.MuteName,
-                        d.MuteFlags);
-
-            Byte[] filedata = Util.UTF8.GetBytes(sb.ToString());
-
-            uint dataCrc = Crc32.Compute(filedata);
-
-            if (dataCrc == crc)
-            {
-                if(crc == 0)
-                     return Array.Empty<byte>();
-
-                Byte[] ret = new Byte[1] {1};
-                return ret;
-            }
-
-            return filedata;
+            dllName = muteConfig.GetString("StorageProvider", dllName);
+            connString = muteConfig.GetString("ConnectionString", connString);
         }
 
-        public bool UpdateMute(MuteData mute)
+        // We tried, but this doesn't exist. We can't proceed
+        if (dllName.Length == 0)
+            throw new Exception("No StorageProvider configured");
+
+        m_database = LoadPlugin<IMuteListData>(dllName, new Object[] { connString });
+        if (m_database == null)
+            throw new Exception("Could not find a storage interface in the given module");
+    }
+
+    public Byte[] MuteListRequest(UUID agentID, uint crc)
+    {
+        if(m_database == null)
+            return null;
+
+        MuteData[] data = m_database.Get(agentID);
+        if (data == null || data.Length == 0)
+            return Array.Empty<byte>();
+
+        StringBuilder sb = new StringBuilder(16384);
+        foreach (MuteData d in data)
+            sb.AppendFormat("{0} {1} {2}|{3}\n",
+                    d.MuteType,
+                    d.MuteID.ToString(),
+                    d.MuteName,
+                    d.MuteFlags);
+
+        Byte[] filedata = Util.UTF8.GetBytes(sb.ToString());
+
+        uint dataCrc = Crc32.Compute(filedata);
+
+        if (dataCrc == crc)
         {
-            if(m_database == null)
-                return false;
-            return m_database.Store(mute);
+            if(crc == 0)
+                 return Array.Empty<byte>();
+
+            Byte[] ret = new Byte[1] {1};
+            return ret;
         }
 
-        public bool RemoveMute(UUID agentID, UUID muteID, string muteName)
-        {
-            if(m_database == null)
-                return false;
-            return m_database.Delete(agentID, muteID, muteName);
-        }
+        return filedata;
+    }
+
+    public bool UpdateMute(MuteData mute)
+    {
+        if(m_database == null)
+            return false;
+        return m_database.Store(mute);
+    }
+
+    public bool RemoveMute(UUID agentID, UUID muteID, string muteName)
+    {
+        if(m_database == null)
+            return false;
+        return m_database.Delete(agentID, muteID, muteName);
     }
 }

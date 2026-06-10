@@ -27,26 +27,25 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+/// <summary>
+/// Avatar returned by the Avatar Picker request
+/// </summary>
+public class AvatarPickerAvatar
 {
     /// <summary>
-    /// Avatar returned by the Avatar Picker request
+    /// Avatar's Unique ID
     /// </summary>
-    public class AvatarPickerAvatar
-    {
-        /// <summary>
-        /// Avatar's Unique ID
-        /// </summary>
-        public UUID AvatarID;
+    public UUID AvatarID;
 
-        /// <summary>
-        /// Avatar's Account first name
-        /// </summary>
-        public string firstName;
+    /// <summary>
+    /// Avatar's Account first name
+    /// </summary>
+    public string firstName;
 
-        /// <summary>
-        /// Avatar's Account last name
-        /// </summary>
-        public string lastName;
-    }
+    /// <summary>
+    /// Avatar's Account last name
+    /// </summary>
+    public string lastName;
 }

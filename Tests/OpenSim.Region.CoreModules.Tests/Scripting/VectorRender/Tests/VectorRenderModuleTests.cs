@@ -25,21 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenMetaverse;
-using Xunit;
-
-using OpenSim.Region.CoreModules.Scripting.DynamicTexture;
-using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.CoreModules.Scripting.VectorRender.Tests
+namespace OpenSim.Region.CoreModules.Scripting.VectorRender.Tests;
+
+/// <summary>
+/// Disabled pending conversion from NUnit to xUnit.
+/// This test class requires significant manual work to convert NUnit-specific patterns.
+/// </summary>
+public class VectorRenderModuleTests : OpenSimTestCase
 {
-    /// <summary>
-    /// Disabled pending conversion from NUnit to xUnit.
-    /// This test class requires significant manual work to convert NUnit-specific patterns.
-    /// </summary>
-    public class VectorRenderModuleTests : OpenSimTestCase
-    {
-        // Placeholder for disabled tests
-    }
+    // Placeholder for disabled tests
 }

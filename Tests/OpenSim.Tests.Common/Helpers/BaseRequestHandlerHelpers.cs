@@ -25,61 +25,54 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
-
-using OpenSim.Framework;
-using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+public class BaseRequestHandlerHelpers
 {
-    public class BaseRequestHandlerHelpers
+    private static string[] m_emptyStringArray = new string[] { };
+
+    public static void BaseTestGetParams(BaseRequestHandler handler, string assetsPath)
     {
-        private static string[] m_emptyStringArray = new string[] { };
+        handler.GetParam(null).Should().BeEmpty("Failed on null path.");
+        handler.GetParam("").Should().BeEmpty("Failed on empty path");
+        handler.GetParam("s").Should().BeEmpty("Failed on short URL");
+        handler.GetParam("corruptUrl").Should().BeEmpty("Failed on Corrupt URL");
+        //Assert.Equal(String.Empty, handler.GetParam(null), "Failed on null path.");
+        //Assert.Equal(String.Empty, handler.GetParam(""), "Failed on empty path.");
+        //Assert.Equal(String.Empty, handler.GetParam("s"), "Failed on short url.");
+        //Assert.Equal(String.Empty, handler.GetParam("corruptUrl"), "Failed on corruptUrl.");
 
-        public static void BaseTestGetParams(BaseRequestHandler handler, string assetsPath)
-        {
-            handler.GetParam(null).Should().BeEmpty("Failed on null path.");
-            handler.GetParam("").Should().BeEmpty("Failed on empty path");
-            handler.GetParam("s").Should().BeEmpty("Failed on short URL");
-            handler.GetParam("corruptUrl").Should().BeEmpty("Failed on Corrupt URL");
-            //Assert.Equal(String.Empty, handler.GetParam(null), "Failed on null path.");
-            //Assert.Equal(String.Empty, handler.GetParam(""), "Failed on empty path.");
-            //Assert.Equal(String.Empty, handler.GetParam("s"), "Failed on short url.");
-            //Assert.Equal(String.Empty, handler.GetParam("corruptUrl"), "Failed on corruptUrl.");
-
-            handler.GetParam(assetsPath).Should().BeEmpty("");
-            handler.GetParam(assetsPath + "/").Should().Be("/");
-            handler.GetParam(assetsPath + "/a").Should().Be("/a");
-            handler.GetParam(assetsPath + "/b/").Should().Be("/b/");
-            handler.GetParam(assetsPath + "/c/d").Should().Be("/c/d");
-            handler.GetParam(assetsPath + "/e/f/").Should().Be("/e/f/");          
-            //Assert.Equal(String.Empty, handler.GetParam(assetsPath));
-            //Assert.Equal("/", handler.GetParam(assetsPath + "/"));
-            //Assert.Equal("/a", handler.GetParam(assetsPath + "/a"));
-            //Assert.Equal("/b/", handler.GetParam(assetsPath + "/b/"));
-            //Assert.Equal("/c/d", handler.GetParam(assetsPath + "/c/d"));
-            //Assert.Equal("/e/f/", handler.GetParam(assetsPath + "/e/f/"));
-        }
-
-        public static void BaseTestSplitParams(BaseRequestHandler handler, string assetsPath)
-        {
-            // Assert.Equal(m_emptyStringArray, handler.SplitParams(null), "Failed on null.");
-            // Assert.Equal(m_emptyStringArray, handler.SplitParams(""), "Failed on empty path.");
-            // Assert.Equal(m_emptyStringArray, handler.SplitParams("corruptUrl"), "Failed on corrupt url.");
-
-            // Assert.Equal(m_emptyStringArray, handler.SplitParams(assetsPath), "Failed on empty params.");
-            // Assert.Equal(m_emptyStringArray, handler.SplitParams(assetsPath + "/"), "Failed on single slash.");
-
-            // Assert.Equal(new string[] { "a" }, handler.SplitParams(assetsPath + "/a"), "Failed on first segment.");
-            // Assert.Equal(new string[] { "b" }, handler.SplitParams(assetsPath + "/b/"), "Failed on second slash.");
-            // Assert.Equal(new string[] { "c", "d" }, handler.SplitParams(assetsPath + "/c/d"), "Failed on second segment.");
-            // Assert.Equal(new string[] { "e", "f" }, handler.SplitParams(assetsPath + "/e/f/"), "Failed on trailing slash.");
-        }
-
-        public static byte[] EmptyByteArray = new byte[] {};
-
+        handler.GetParam(assetsPath).Should().BeEmpty("");
+        handler.GetParam(assetsPath + "/").Should().Be("/");
+        handler.GetParam(assetsPath + "/a").Should().Be("/a");
+        handler.GetParam(assetsPath + "/b/").Should().Be("/b/");
+        handler.GetParam(assetsPath + "/c/d").Should().Be("/c/d");
+        handler.GetParam(assetsPath + "/e/f/").Should().Be("/e/f/");          
+        //Assert.Equal(String.Empty, handler.GetParam(assetsPath));
+        //Assert.Equal("/", handler.GetParam(assetsPath + "/"));
+        //Assert.Equal("/a", handler.GetParam(assetsPath + "/a"));
+        //Assert.Equal("/b/", handler.GetParam(assetsPath + "/b/"));
+        //Assert.Equal("/c/d", handler.GetParam(assetsPath + "/c/d"));
+        //Assert.Equal("/e/f/", handler.GetParam(assetsPath + "/e/f/"));
     }
+
+    public static void BaseTestSplitParams(BaseRequestHandler handler, string assetsPath)
+    {
+        // Assert.Equal(m_emptyStringArray, handler.SplitParams(null), "Failed on null.");
+        // Assert.Equal(m_emptyStringArray, handler.SplitParams(""), "Failed on empty path.");
+        // Assert.Equal(m_emptyStringArray, handler.SplitParams("corruptUrl"), "Failed on corrupt url.");
+
+        // Assert.Equal(m_emptyStringArray, handler.SplitParams(assetsPath), "Failed on empty params.");
+        // Assert.Equal(m_emptyStringArray, handler.SplitParams(assetsPath + "/"), "Failed on single slash.");
+
+        // Assert.Equal(new string[] { "a" }, handler.SplitParams(assetsPath + "/a"), "Failed on first segment.");
+        // Assert.Equal(new string[] { "b" }, handler.SplitParams(assetsPath + "/b/"), "Failed on second slash.");
+        // Assert.Equal(new string[] { "c", "d" }, handler.SplitParams(assetsPath + "/c/d"), "Failed on second segment.");
+        // Assert.Equal(new string[] { "e", "f" }, handler.SplitParams(assetsPath + "/e/f/"), "Failed on trailing slash.");
+    }
+
+    public static byte[] EmptyByteArray = new byte[] {};
+
 }

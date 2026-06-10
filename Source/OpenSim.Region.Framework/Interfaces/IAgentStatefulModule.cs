@@ -25,37 +25,34 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IAgentStatefulModule
 {
-    public interface IAgentStatefulModule
-    {
-        /// <summary>
-        /// Returns a list of all the formats (by UUID) that this module
-        /// can render agent state in.
-        /// </summary>
-        List<UUID> GetRenderStateFormats();
+    /// <summary>
+    /// Returns a list of all the formats (by UUID) that this module
+    /// can render agent state in.
+    /// </summary>
+    List<UUID> GetRenderStateFormats();
 
-        /// <summary>
-        /// Returns a list (by UUID) of all formats this module can decode
-        /// to populate it's internal agent-related state.
-        /// </summary>
-        List<UUID> GetAcceptStateFormats();
+    /// <summary>
+    /// Returns a list (by UUID) of all formats this module can decode
+    /// to populate it's internal agent-related state.
+    /// </summary>
+    List<UUID> GetAcceptStateFormats();
 
-        /// <summary>
-        /// Render all internally held state for the given agent in the
-        /// requested format.
-        /// </summary>
-        string RenderState(UUID agentID, UUID format);
+    /// <summary>
+    /// Render all internally held state for the given agent in the
+    /// requested format.
+    /// </summary>
+    string RenderState(UUID agentID, UUID format);
 
-        /// <summary>
-        /// Populate the internal state for the given agent from the
-        /// data argument, which is in the specified format. All prior
-        /// state relating to this agent is removed by this operation.
-        /// </summary>
-        bool ReceiveState(UUID agentID, UUID format, string data);
-    }
+    /// <summary>
+    /// Populate the internal state for the given agent from the
+    /// data argument, which is in the specified format. All prior
+    /// state relating to this agent is removed by this operation.
+    /// </summary>
+    bool ReceiveState(UUID agentID, UUID format, string data);
 }

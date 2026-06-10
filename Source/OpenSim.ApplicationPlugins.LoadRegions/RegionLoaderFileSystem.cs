@@ -30,85 +30,84 @@ using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
 
-namespace OpenSim.ApplicationPlugins.LoadRegions
+namespace OpenSim.ApplicationPlugins.LoadRegions;
+
+public class RegionLoaderFileSystem : IRegionLoader
 {
-    public class RegionLoaderFileSystem : IRegionLoader
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IConfigSource m_configSource;
+
+    public void SetIniConfigSource(IConfigSource configSource)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_configSource = configSource;
+    }
 
-        private IConfigSource m_configSource;
+    public RegionInfo[] LoadRegions()
+    {
+        string regionConfigPath = Path.Combine(Util.configDir(), "Regions");
+        bool allowRegionless = false;
 
-        public void SetIniConfigSource(IConfigSource configSource)
+        try
         {
-            m_configSource = configSource;
+            IConfig startupConfig = (IConfig)m_configSource.Configs["Startup"];
+            regionConfigPath = startupConfig.GetString("regionload_regionsdir", regionConfigPath).Trim();
+            allowRegionless = startupConfig.GetBoolean("allow_regionless", false);
+        }
+        catch (Exception)
+        {
+            // No INI setting recorded.
         }
 
-        public RegionInfo[] LoadRegions()
+        if (!Directory.Exists(regionConfigPath))
         {
-            string regionConfigPath = Path.Combine(Util.configDir(), "Regions");
-            bool allowRegionless = false;
+            Directory.CreateDirectory(regionConfigPath);
+        }
 
-            try
+        string[] configFiles = Directory.GetFiles(regionConfigPath, "*.xml");
+        string[] iniFiles = Directory.GetFiles(regionConfigPath, "*.ini");
+
+        // Create an empty Regions.ini if there are no existing config files.
+        if (!allowRegionless && configFiles.Length == 0 && iniFiles.Length == 0)
+        {
+            new RegionInfo("DEFAULT REGION CONFIG", Path.Combine(regionConfigPath, "Regions.ini"), false, m_configSource);
+            iniFiles = Directory.GetFiles(regionConfigPath, "*.ini");
+        }
+
+        m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loading config files from {0}", regionConfigPath);
+
+        List<RegionInfo> regionInfos = new List<RegionInfo>();
+
+        int i = 0;
+        foreach (string file in iniFiles)
+        {
+            m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loading config file {0}", file);
+
+            IConfigSource source = new IniConfigSource(file);
+
+            foreach (IConfig config in source.Configs)
             {
-                IConfig startupConfig = (IConfig)m_configSource.Configs["Startup"];
-                regionConfigPath = startupConfig.GetString("regionload_regionsdir", regionConfigPath).Trim();
-                allowRegionless = startupConfig.GetBoolean("allow_regionless", false);
-            }
-            catch (Exception)
-            {
-                // No INI setting recorded.
-            }
-
-            if (!Directory.Exists(regionConfigPath))
-            {
-                Directory.CreateDirectory(regionConfigPath);
-            }
-
-            string[] configFiles = Directory.GetFiles(regionConfigPath, "*.xml");
-            string[] iniFiles = Directory.GetFiles(regionConfigPath, "*.ini");
-
-            // Create an empty Regions.ini if there are no existing config files.
-            if (!allowRegionless && configFiles.Length == 0 && iniFiles.Length == 0)
-            {
-                new RegionInfo("DEFAULT REGION CONFIG", Path.Combine(regionConfigPath, "Regions.ini"), false, m_configSource);
-                iniFiles = Directory.GetFiles(regionConfigPath, "*.ini");
-            }
-
-            m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loading config files from {0}", regionConfigPath);
-
-            List<RegionInfo> regionInfos = new List<RegionInfo>();
-
-            int i = 0;
-            foreach (string file in iniFiles)
-            {
-                m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loading config file {0}", file);
-
-                IConfigSource source = new IniConfigSource(file);
-
-                foreach (IConfig config in source.Configs)
-                {
-                    RegionInfo regionInfo = new RegionInfo("REGION CONFIG #" + (i + 1), file, false, m_configSource, config.Name);
-                    regionInfos.Add(regionInfo);
-
-                    m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loaded config for region {0}", regionInfo.RegionName);
-
-                    i++;
-                }
-            }
-
-            foreach (string file in configFiles)
-            {
-                m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loading config file {0}", file);
-
-                RegionInfo regionInfo = new RegionInfo("REGION CONFIG #" + (i + 1), file, false, m_configSource);
+                RegionInfo regionInfo = new RegionInfo("REGION CONFIG #" + (i + 1), file, false, m_configSource, config.Name);
                 regionInfos.Add(regionInfo);
 
                 m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loaded config for region {0}", regionInfo.RegionName);
 
                 i++;
             }
-
-            return regionInfos.ToArray();
         }
+
+        foreach (string file in configFiles)
+        {
+            m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loading config file {0}", file);
+
+            RegionInfo regionInfo = new RegionInfo("REGION CONFIG #" + (i + 1), file, false, m_configSource);
+            regionInfos.Add(regionInfo);
+
+            m_log.InfoFormat("[REGION LOADER FILE SYSTEM]: Loaded config for region {0}", regionInfo.RegionName);
+
+            i++;
+        }
+
+        return regionInfos.ToArray();
     }
 }

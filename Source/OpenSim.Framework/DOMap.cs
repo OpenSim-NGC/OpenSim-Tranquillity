@@ -25,74 +25,62 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using System.Xml;
-using System.Xml.Schema;
-using System.Xml.Serialization;
-using OpenMetaverse;
-using OpenMetaverse.StructuredData;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+/// <summary>
+/// This class stores and retrieves dynamic objects.
+/// </summary>
+/// <remarks>
+/// Experimental - DO NOT USE.  Does not yet have namespace support.
+/// </remarks>
+public class DOMap
 {
+    private IDictionary<string, object> m_map;
+
+    public void Add(string ns, string objName, object dynObj)
+    {
+        DAMap.ValidateNamespace(ns);
+
+        lock (this)
+        {
+            if (m_map == null)
+                m_map = new Dictionary<string, object>();
+
+            m_map.Add(objName, dynObj);
+        }
+    }
+
+    public bool ContainsKey(string key)
+    {
+        return Get(key) != null;
+    }
+
     /// <summary>
-    /// This class stores and retrieves dynamic objects.
+    /// Get a dynamic object
     /// </summary>
     /// <remarks>
-    /// Experimental - DO NOT USE.  Does not yet have namespace support.
+    /// Not providing an index method so that users can't casually overwrite each other's objects.
     /// </remarks>
-    public class DOMap
+    /// <param name='key'></param>
+    public object Get(string key)
     {
-        private IDictionary<string, object> m_map;
-
-        public void Add(string ns, string objName, object dynObj)
+        lock (this)
         {
-            DAMap.ValidateNamespace(ns);
-
-            lock (this)
-            {
-                if (m_map == null)
-                    m_map = new Dictionary<string, object>();
-
-                m_map.Add(objName, dynObj);
-            }
+            if (m_map == null)
+                return null;
+            else
+                return m_map[key];
         }
+    }
 
-        public bool ContainsKey(string key)
+    public bool Remove(string key)
+    {
+        lock (this)
         {
-            return Get(key) != null;
-        }
-
-        /// <summary>
-        /// Get a dynamic object
-        /// </summary>
-        /// <remarks>
-        /// Not providing an index method so that users can't casually overwrite each other's objects.
-        /// </remarks>
-        /// <param name='key'></param>
-        public object Get(string key)
-        {
-            lock (this)
-            {
-                if (m_map == null)
-                    return null;
-                else
-                    return m_map[key];
-            }
-        }
-
-        public bool Remove(string key)
-        {
-            lock (this)
-            {
-                if (m_map == null)
-                    return false;
-                else
-                    return m_map.Remove(key);
-            }
+            if (m_map == null)
+                return false;
+            else
+                return m_map.Remove(key);
         }
     }
 }

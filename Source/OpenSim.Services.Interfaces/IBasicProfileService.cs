@@ -25,13 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenSim.Framework;
-using System.Collections.Generic;
-using OpenMetaverse;
+namespace OpenSim.Services.Interfaces;
 
-namespace OpenSim.Services.Interfaces
+public interface IBasicProfileService
 {
-    public interface IBasicProfileService
-    {
-    }
 }

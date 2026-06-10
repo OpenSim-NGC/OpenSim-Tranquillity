@@ -27,58 +27,57 @@
 
 using OpenSim.Region.Framework.Interfaces;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.FloodBrushes
+namespace OpenSim.Region.CoreModules.World.Terrain.FloodBrushes;
+
+public class SmoothArea : ITerrainFloodEffect
 {
-    public class SmoothArea : ITerrainFloodEffect
+    #region ITerrainFloodEffect Members
+
+    public void FloodEffect(ITerrainChannel map, bool[,] fillArea, float height, float strength,
+        int startX, int endX, int startY, int endY)
     {
-        #region ITerrainFloodEffect Members
+        int sx = (endX - startX + 1) / 2;
+        if (sx > 4)
+            sx = 4;
 
-        public void FloodEffect(ITerrainChannel map, bool[,] fillArea, float height, float strength,
-            int startX, int endX, int startY, int endY)
+        int sy = (endY - startY + 1) / 2;
+        if (sy > 4)
+            sy = 4;
+
+        strength *= 0.002f;
+        if(strength < 1e-4f)
+            return;
+        if(strength > 1.0f)
+            strength = 1.0f;
+
+        float OneMinusstrength = 1.0f - strength;
+        for (int x = startX, i = 0; x <= endX; x++, i++)
         {
-            int sx = (endX - startX + 1) / 2;
-            if (sx > 4)
-                sx = 4;
-
-            int sy = (endY - startY + 1) / 2;
-            if (sy > 4)
-                sy = 4;
-
-            strength *= 0.002f;
-            if(strength < 1e-4f)
-                return;
-            if(strength > 1.0f)
-                strength = 1.0f;
-
-            float OneMinusstrength = 1.0f - strength;
-            for (int x = startX, i = 0; x <= endX; x++, i++)
+            for (int y = startY, j = 0; y <= endY; y++, j++)
             {
-                for (int y = startY, j = 0; y <= endY; y++, j++)
+                if (!fillArea[x, y])
+                    continue;
+
+                float average = 0f;
+                int avgsteps = 0;
+
+                for (int n = x - sx; n <= x + sx; ++n)
                 {
-                    if (!fillArea[x, y])
-                        continue;
-
-                    float average = 0f;
-                    int avgsteps = 0;
-
-                    for (int n = x - sx; n <= x + sx; ++n)
+                    if (n >= 0 && n < map.Width)
                     {
-                        if (n >= 0 && n < map.Width)
+                        for (int l = y - sy; l <= y + sy; ++l)
                         {
-                            for (int l = y - sy; l <= y + sy; ++l)
+                            if (l >= 0 && l < map.Height)
                             {
-                                if (l >= 0 && l < map.Height)
-                                {
-                                    avgsteps++;
-                                    average += map[n, l];
-                                }
+                                avgsteps++;
+                                average += map[n, l];
                             }
                         }
                     }
-                    map[x, y] = OneMinusstrength * map[x, y] + strength * average / avgsteps;
                 }
+                map[x, y] = OneMinusstrength * map[x, y] + strength * average / avgsteps;
             }
         }
     }
-        #endregion
 }
+    #endregion

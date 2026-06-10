@@ -26,151 +26,144 @@
  */
 
 using log4net;
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
-
-using OpenSim.Framework.ServiceAuth;
 using OpenSim.Services.Interfaces;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 
-namespace OpenSim.Services.Connectors
+namespace OpenSim.Services.Connectors;
+
+public class MuteListServicesConnector : BaseServiceConnector, IMuteListService
 {
-    public class MuteListServicesConnector : BaseServiceConnector, IMuteListService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private string m_ServerURI = String.Empty;
+
+    public MuteListServicesConnector()
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        private string m_ServerURI = String.Empty;
+    public MuteListServicesConnector(string serverURI)
+    {
+        m_ServerURI = serverURI.TrimEnd('/') + "/mutelist";
+    }
 
-        public MuteListServicesConnector()
+    public MuteListServicesConnector(IConfigSource source)
+    {
+        Initialise(source);
+    }
+
+    public virtual void Initialise(IConfigSource source)
+    {
+        IConfig gridConfig = source.Configs["MuteListService"];
+        if (gridConfig == null)
         {
+            m_log.Error("[MUTELIST CONNECTOR]: MuteListService missing from configuration");
+            throw new Exception("MuteList connector init error");
         }
 
-        public MuteListServicesConnector(string serverURI)
-        {
-            m_ServerURI = serverURI.TrimEnd('/') + "/mutelist";
-        }
+        string serviceURI = gridConfig.GetString("MuteListServerURI",
+                String.Empty);
 
-        public MuteListServicesConnector(IConfigSource source)
+        if (serviceURI.Length == 0)
         {
-            Initialise(source);
+            m_log.Error("[MUTELIST CONNECTOR]: No Server URI named in section GridUserService");
+            throw new Exception("MuteList connector init error");
         }
+        m_ServerURI = serviceURI + "/mutelist";
+        base.Initialise(source, "MuteListService");
+    }
 
-        public virtual void Initialise(IConfigSource source)
+    #region IMuteListService
+    public Byte[] MuteListRequest(UUID agentID, uint crc)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["METHOD"] = "get";
+        sendData["agentid"] = agentID.ToString();
+        sendData["mutecrc"] = crc.ToString();
+
+        try
         {
-            IConfig gridConfig = source.Configs["MuteListService"];
-            if (gridConfig == null)
+            string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI,
+                                ServerUtils.BuildQueryString(sendData), m_Auth);
+            if (reply != string.Empty)
             {
-                m_log.Error("[MUTELIST CONNECTOR]: MuteListService missing from configuration");
-                throw new Exception("MuteList connector init error");
-            }
+                Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
 
-            string serviceURI = gridConfig.GetString("MuteListServerURI",
-                    String.Empty);
-
-            if (serviceURI.Length == 0)
-            {
-                m_log.Error("[MUTELIST CONNECTOR]: No Server URI named in section GridUserService");
-                throw new Exception("MuteList connector init error");
-            }
-            m_ServerURI = serviceURI + "/mutelist";
-            base.Initialise(source, "MuteListService");
-        }
-
-        #region IMuteListService
-        public Byte[] MuteListRequest(UUID agentID, uint crc)
-        {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            sendData["METHOD"] = "get";
-            sendData["agentid"] = agentID.ToString();
-            sendData["mutecrc"] = crc.ToString();
-
-            try
-            {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI,
-                                    ServerUtils.BuildQueryString(sendData), m_Auth);
-                if (reply != string.Empty)
+                if (replyData.ContainsKey("result"))
                 {
-                    Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-
-                    if (replyData.ContainsKey("result"))
-                    {
-                        string datastr = replyData["result"].ToString();
-                        if(String.IsNullOrWhiteSpace(datastr))
-                            return null;
-                        return Convert.FromBase64String(datastr);
-                    }
-                    else
-                        m_log.DebugFormat("[MUTELIST CONNECTOR]: get reply data does not contain result field");
+                    string datastr = replyData["result"].ToString();
+                    if(String.IsNullOrWhiteSpace(datastr))
+                        return null;
+                    return Convert.FromBase64String(datastr);
                 }
                 else
-                    m_log.DebugFormat("[MUTELIST CONNECTOR]: get received empty reply");
+                    m_log.DebugFormat("[MUTELIST CONNECTOR]: get reply data does not contain result field");
             }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[MUTELIST CONNECTOR]: Exception when contacting server at {0}: {1}", m_ServerURI, e.Message);
-            }
-
-            return null;
+            else
+                m_log.DebugFormat("[MUTELIST CONNECTOR]: get received empty reply");
+        }
+        catch (Exception e)
+        {
+            m_log.DebugFormat("[MUTELIST CONNECTOR]: Exception when contacting server at {0}: {1}", m_ServerURI, e.Message);
         }
 
-        public bool UpdateMute(MuteData mute)
+        return null;
+    }
+
+    public bool UpdateMute(MuteData mute)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["METHOD"] = "update";
+        sendData["agentid"] = mute.AgentID.ToString();
+        sendData["muteid"] = mute.MuteID.ToString();
+        if(mute.MuteType != 0)
+            sendData["mutetype"] = mute.MuteType.ToString();
+        if(mute.MuteFlags != 0)
+            sendData["muteflags"] = mute.MuteFlags.ToString();
+        sendData["mutestamp"] = mute.Stamp.ToString();
+        if(!String.IsNullOrEmpty(mute.MuteName))
+            sendData["mutename"] = mute.MuteName;
+
+        return doSimplePost(ServerUtils.BuildQueryString(sendData), "update");
+     }
+
+    public bool RemoveMute(UUID agentID, UUID muteID, string muteName)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["METHOD"] = "delete";
+        sendData["agentid"] = agentID.ToString();
+        sendData["muteid"] = muteID.ToString();
+        if(!String.IsNullOrEmpty(muteName))
+            sendData["mutename"] = muteName;
+
+        return doSimplePost(ServerUtils.BuildQueryString(sendData), "remove");
+    }
+
+    #endregion IMuteListService
+
+    private bool doSimplePost(string reqString, string meth)
+    {
+        try
         {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            sendData["METHOD"] = "update";
-            sendData["agentid"] = mute.AgentID.ToString();
-            sendData["muteid"] = mute.MuteID.ToString();
-            if(mute.MuteType != 0)
-                sendData["mutetype"] = mute.MuteType.ToString();
-            if(mute.MuteFlags != 0)
-                sendData["muteflags"] = mute.MuteFlags.ToString();
-            sendData["mutestamp"] = mute.Stamp.ToString();
-            if(!String.IsNullOrEmpty(mute.MuteName))
-                sendData["mutename"] = mute.MuteName;
-
-            return doSimplePost(ServerUtils.BuildQueryString(sendData), "update");
-         }
-
-        public bool RemoveMute(UUID agentID, UUID muteID, string muteName)
+            string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI, reqString, m_Auth);
+            if (reply != string.Empty)
+            {
+                int indx = reply.IndexOf("success", StringComparison.InvariantCultureIgnoreCase);
+                if (indx > 0)
+                    return true;
+                return false;
+            }
+            else
+                m_log.DebugFormat("[MUTELIST CONNECTOR]: {0} received empty reply", meth);
+        }
+        catch (Exception e)
         {
-            Dictionary<string, object> sendData = new Dictionary<string, object>();
-            sendData["METHOD"] = "delete";
-            sendData["agentid"] = agentID.ToString();
-            sendData["muteid"] = muteID.ToString();
-            if(!String.IsNullOrEmpty(muteName))
-                sendData["mutename"] = muteName;
-
-            return doSimplePost(ServerUtils.BuildQueryString(sendData), "remove");
+            m_log.DebugFormat("[MUTELIST CONNECTOR]: Exception when contacting server at {0}: {1}", m_ServerURI, e.Message);
         }
 
-        #endregion IMuteListService
-
-        private bool doSimplePost(string reqString, string meth)
-        {
-            try
-            {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI, reqString, m_Auth);
-                if (reply != string.Empty)
-                {
-                    int indx = reply.IndexOf("success", StringComparison.InvariantCultureIgnoreCase);
-                    if (indx > 0)
-                        return true;
-                    return false;
-                }
-                else
-                    m_log.DebugFormat("[MUTELIST CONNECTOR]: {0} received empty reply", meth);
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[MUTELIST CONNECTOR]: Exception when contacting server at {0}: {1}", m_ServerURI, e.Message);
-            }
-
-            return false;
-        }
+        return false;
     }
 }

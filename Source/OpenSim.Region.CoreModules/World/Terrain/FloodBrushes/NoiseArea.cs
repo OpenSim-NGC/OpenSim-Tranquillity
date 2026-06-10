@@ -28,33 +28,32 @@
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.World.Terrain.FloodBrushes
-{
-    public class NoiseArea : ITerrainFloodEffect
-    {
-        #region ITerrainFloodEffect Members
+namespace OpenSim.Region.CoreModules.World.Terrain.FloodBrushes;
 
-        public void FloodEffect(ITerrainChannel map, bool[,] fillArea, float height, float strength,
-            int startX, int endX, int startY, int endY)
+public class NoiseArea : ITerrainFloodEffect
+{
+    #region ITerrainFloodEffect Members
+
+    public void FloodEffect(ITerrainChannel map, bool[,] fillArea, float height, float strength,
+        int startX, int endX, int startY, int endY)
+    {
+        strength *= 0.08f;
+        if(strength < 1e-4f)
+            return;
+        for (int x = startX; x <= endX; x++)
         {
-            strength *= 0.08f;
-            if(strength < 1e-4f)
-                return;
-            for (int x = startX; x <= endX; x++)
+            for (int y = startY; y <= endY; y++)
             {
-                for (int y = startY; y <= endY; y++)
+                if (fillArea[x, y])
                 {
-                    if (fillArea[x, y])
-                    {
-                        float noise = (float)TerrainUtil.PerlinNoise2D((double) x / map.Width, (double) y / map.Height, 8, 1.0);
-                        map[x, y] += noise * strength;
-                        if(map[x, y] < 0)
-                            map[x, y] = 0;
-                    }
+                    float noise = (float)TerrainUtil.PerlinNoise2D((double) x / map.Width, (double) y / map.Height, 8, 1.0);
+                    map[x, y] += noise * strength;
+                    if(map[x, y] < 0)
+                        map[x, y] = 0;
                 }
             }
         }
-
-        #endregion
     }
+
+    #endregion
 }

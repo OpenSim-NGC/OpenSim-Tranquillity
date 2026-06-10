@@ -25,172 +25,165 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
-using System.Reflection;
 using OpenSim.Services.Base;
-using OpenSim.Services.Interfaces;
-using OpenSim.Data;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Services.SimulationService
+namespace OpenSim.Services.SimulationService;
+
+public class SimulationDataService : ServiceBase, ISimulationDataService
 {
-    public class SimulationDataService : ServiceBase, ISimulationDataService
-    {
 //        private static readonly ILog m_log =
 //                LogManager.GetLogger(
 //                MethodBase.GetCurrentMethod().DeclaringType);
 
-        protected ISimulationDataStore m_database;
+    protected ISimulationDataStore m_database;
 
-        public SimulationDataService(IConfigSource config)
-            : base(config)
+    public SimulationDataService(IConfigSource config)
+        : base(config)
+    {
+        string dllName = String.Empty;
+        string connString = String.Empty;
+
+        // Try reading the [DatabaseService] section, if it exists
+        IConfig dbConfig = config.Configs["DatabaseService"];
+        if (dbConfig != null)
         {
-            string dllName = String.Empty;
-            string connString = String.Empty;
-
-            // Try reading the [DatabaseService] section, if it exists
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig != null)
-            {
-                dllName = dbConfig.GetString("StorageProvider", String.Empty);
-                connString = dbConfig.GetString("ConnectionString", String.Empty);
-            }
-
-            // Try reading the [SimulationDataStore] section
-            IConfig simConfig = config.Configs["SimulationDataStore"];
-            if (simConfig != null)
-            {
-                dllName = simConfig.GetString("StorageProvider", dllName);
-                connString = simConfig.GetString("ConnectionString", connString);
-            }
-
-            // We tried, but this doesn't exist. We can't proceed
-            if (dllName.Length == 0)
-                throw new Exception("No StorageProvider configured");
-
-            m_database = LoadPlugin<ISimulationDataStore>(dllName, new Object[] { connString });
-            if (m_database == null)
-                throw new Exception("Could not find a storage interface in the given module");
+            dllName = dbConfig.GetString("StorageProvider", String.Empty);
+            connString = dbConfig.GetString("ConnectionString", String.Empty);
         }
 
-        public void StoreObject(SceneObjectGroup obj, UUID regionUUID)
+        // Try reading the [SimulationDataStore] section
+        IConfig simConfig = config.Configs["SimulationDataStore"];
+        if (simConfig != null)
         {
-            uint flags = obj.RootPart.GetEffectiveObjectFlags();
-            if ((flags & (uint)(PrimFlags.Temporary | PrimFlags.TemporaryOnRez)) != 0)
-                return;
-
-            m_database.StoreObject(obj, regionUUID);
+            dllName = simConfig.GetString("StorageProvider", dllName);
+            connString = simConfig.GetString("ConnectionString", connString);
         }
 
-        public void RemoveObject(UUID uuid, UUID regionUUID)
-        {
-            m_database.RemoveObject(uuid, regionUUID);
-        }
+        // We tried, but this doesn't exist. We can't proceed
+        if (dllName.Length == 0)
+            throw new Exception("No StorageProvider configured");
 
-        public void StorePrimInventory(UUID primID, ICollection<TaskInventoryItem> items)
-        {
-            m_database.StorePrimInventory(primID, items);
-        }
+        m_database = LoadPlugin<ISimulationDataStore>(dllName, new Object[] { connString });
+        if (m_database == null)
+            throw new Exception("Could not find a storage interface in the given module");
+    }
 
-        public List<SceneObjectGroup> LoadObjects(UUID regionUUID)
-        {
-            return m_database.LoadObjects(regionUUID);
-        }
+    public void StoreObject(SceneObjectGroup obj, UUID regionUUID)
+    {
+        uint flags = obj.RootPart.GetEffectiveObjectFlags();
+        if ((flags & (uint)(PrimFlags.Temporary | PrimFlags.TemporaryOnRez)) != 0)
+            return;
 
-        public void StoreTerrain(TerrainData terrain, UUID regionID)
-        {
-            m_database.StoreTerrain(terrain, regionID);
-        }
+        m_database.StoreObject(obj, regionUUID);
+    }
 
-        public void StoreBakedTerrain(TerrainData terrain, UUID regionID)
-        {
-            m_database.StoreBakedTerrain(terrain, regionID);
-        }
+    public void RemoveObject(UUID uuid, UUID regionUUID)
+    {
+        m_database.RemoveObject(uuid, regionUUID);
+    }
 
-        public void StoreTerrain(double[,] terrain, UUID regionID)
-        {
-            m_database.StoreTerrain(terrain, regionID);
-        }
+    public void StorePrimInventory(UUID primID, ICollection<TaskInventoryItem> items)
+    {
+        m_database.StorePrimInventory(primID, items);
+    }
 
-        public double[,] LoadTerrain(UUID regionID)
-        {
-            return m_database.LoadTerrain(regionID);
-        }
+    public List<SceneObjectGroup> LoadObjects(UUID regionUUID)
+    {
+        return m_database.LoadObjects(regionUUID);
+    }
 
-        public TerrainData LoadTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ)
-        {
-            return m_database.LoadTerrain(regionID, pSizeX, pSizeY, pSizeZ);
-        }
+    public void StoreTerrain(TerrainData terrain, UUID regionID)
+    {
+        m_database.StoreTerrain(terrain, regionID);
+    }
 
-        public TerrainData LoadBakedTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ)
-        {
-            return m_database.LoadBakedTerrain(regionID, pSizeX, pSizeY, pSizeZ);
-        }
+    public void StoreBakedTerrain(TerrainData terrain, UUID regionID)
+    {
+        m_database.StoreBakedTerrain(terrain, regionID);
+    }
 
-        public void StoreLandObject(ILandObject Parcel)
-        {
-            m_database.StoreLandObject(Parcel);
-        }
+    public void StoreTerrain(double[,] terrain, UUID regionID)
+    {
+        m_database.StoreTerrain(terrain, regionID);
+    }
 
-        public void RemoveLandObject(UUID globalID)
-        {
-            m_database.RemoveLandObject(globalID);
-        }
+    public double[,] LoadTerrain(UUID regionID)
+    {
+        return m_database.LoadTerrain(regionID);
+    }
 
-        public List<LandData> LoadLandObjects(UUID regionUUID)
-        {
-            return m_database.LoadLandObjects(regionUUID);
-        }
+    public TerrainData LoadTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ)
+    {
+        return m_database.LoadTerrain(regionID, pSizeX, pSizeY, pSizeZ);
+    }
 
-        public void StoreRegionSettings(RegionSettings rs)
-        {
-            m_database.StoreRegionSettings(rs);
-        }
+    public TerrainData LoadBakedTerrain(UUID regionID, int pSizeX, int pSizeY, int pSizeZ)
+    {
+        return m_database.LoadBakedTerrain(regionID, pSizeX, pSizeY, pSizeZ);
+    }
 
-        public RegionSettings LoadRegionSettings(UUID regionUUID)
-        {
-            return m_database.LoadRegionSettings(regionUUID);
-        }
+    public void StoreLandObject(ILandObject Parcel)
+    {
+        m_database.StoreLandObject(Parcel);
+    }
 
-        public string LoadRegionEnvironmentSettings(UUID regionUUID)
-        {
-            return m_database.LoadRegionEnvironmentSettings(regionUUID);
-        }
+    public void RemoveLandObject(UUID globalID)
+    {
+        m_database.RemoveLandObject(globalID);
+    }
 
-        public void StoreRegionEnvironmentSettings(UUID regionUUID, string settings)
-        {
-            m_database.StoreRegionEnvironmentSettings(regionUUID, settings);
-        }
+    public List<LandData> LoadLandObjects(UUID regionUUID)
+    {
+        return m_database.LoadLandObjects(regionUUID);
+    }
 
-        public void RemoveRegionEnvironmentSettings(UUID regionUUID)
-        {
-            m_database.RemoveRegionEnvironmentSettings(regionUUID);
-        }
+    public void StoreRegionSettings(RegionSettings rs)
+    {
+        m_database.StoreRegionSettings(rs);
+    }
 
-        public UUID[] GetObjectIDs(UUID regionID)
-        {
-            return m_database.GetObjectIDs(regionID);
-        }
+    public RegionSettings LoadRegionSettings(UUID regionUUID)
+    {
+        return m_database.LoadRegionSettings(regionUUID);
+    }
 
-        public void SaveExtra(UUID regionID, string name, string val)
-        {
-            m_database.SaveExtra(regionID, name, val);
-        }
+    public string LoadRegionEnvironmentSettings(UUID regionUUID)
+    {
+        return m_database.LoadRegionEnvironmentSettings(regionUUID);
+    }
 
-        public void RemoveExtra(UUID regionID, string name)
-        {
-            m_database.RemoveExtra(regionID, name);
-        }
+    public void StoreRegionEnvironmentSettings(UUID regionUUID, string settings)
+    {
+        m_database.StoreRegionEnvironmentSettings(regionUUID, settings);
+    }
 
-        public Dictionary<string, string> GetExtra(UUID regionID)
-        {
-            return m_database.GetExtra(regionID);
-        }
+    public void RemoveRegionEnvironmentSettings(UUID regionUUID)
+    {
+        m_database.RemoveRegionEnvironmentSettings(regionUUID);
+    }
+
+    public UUID[] GetObjectIDs(UUID regionID)
+    {
+        return m_database.GetObjectIDs(regionID);
+    }
+
+    public void SaveExtra(UUID regionID, string name, string val)
+    {
+        m_database.SaveExtra(regionID, name, val);
+    }
+
+    public void RemoveExtra(UUID regionID, string name)
+    {
+        m_database.RemoveExtra(regionID, name);
+    }
+
+    public Dictionary<string, string> GetExtra(UUID regionID)
+    {
+        return m_database.GetExtra(regionID);
     }
 }

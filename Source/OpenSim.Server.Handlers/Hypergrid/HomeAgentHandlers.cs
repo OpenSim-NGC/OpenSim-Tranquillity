@@ -25,112 +25,98 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.IO;
 using System.Reflection;
 using System.Net;
-using System.Text;
-
-using OpenSim.Server.Base;
-using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Framework;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Simulation;
-using Utils = OpenSim.Server.Handlers.Simulation.Utils;
-
-using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using Nini.Config;
 using log4net;
 
 
-namespace OpenSim.Server.Handlers.Hypergrid
+namespace OpenSim.Server.Handlers.Hypergrid;
+
+public class HomeAgentHandler : AgentPostHandler
 {
-    public class HomeAgentHandler : AgentPostHandler
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private IUserAgentService m_UserAgentService;
+
+    private string m_LoginServerIP;
+
+    public HomeAgentHandler(IUserAgentService userAgentService, string loginServerIP, bool proxy) :
+        base("/homeagent")
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private IUserAgentService m_UserAgentService;
+        m_UserAgentService = userAgentService;
+        m_LoginServerIP = loginServerIP;
+        m_Proxy = proxy;
+    }
 
-        private string m_LoginServerIP;
+    protected override AgentDestinationData CreateAgentDestinationData()
+    {
+        return new ExtendedAgentDestinationData();
+    }
 
-        public HomeAgentHandler(IUserAgentService userAgentService, string loginServerIP, bool proxy) :
-            base("/homeagent")
+    protected override void UnpackData(OSDMap args, AgentDestinationData d, string remoteAddress)
+    {
+        base.UnpackData(args, d, remoteAddress);
+        ExtendedAgentDestinationData data = (ExtendedAgentDestinationData)d;
+        try
         {
-            m_UserAgentService = userAgentService;
-            m_LoginServerIP = loginServerIP;
-            m_Proxy = proxy;
+            if (args.ContainsKey("gatekeeper_host") && args["gatekeeper_host"] != null)
+                data.host = args["gatekeeper_host"].AsString();
+            if (args.ContainsKey("gatekeeper_port") && args["gatekeeper_port"] != null)
+                Int32.TryParse(args["gatekeeper_port"].AsString(), out data.port);
+            if (args.ContainsKey("gatekeeper_serveruri") && args["gatekeeper_serveruri"] != null)
+                data.gatekeeperServerURI = args["gatekeeper_serveruri"];
+            if (args.ContainsKey("destination_serveruri") && args["destination_serveruri"] != null)
+                data.destinationServerURI = args["destination_serveruri"];
+
+        }
+        catch (InvalidCastException)
+        {
+            m_log.ErrorFormat("[HOME AGENT HANDLER]: Bad cast in UnpackData");
         }
 
-        protected override AgentDestinationData CreateAgentDestinationData()
-        {
-            return new ExtendedAgentDestinationData();
-        }
+        // Verify if this call came from the login server
+        if (remoteAddress == m_LoginServerIP)
+            data.fromLogin = true;
 
-        protected override void UnpackData(OSDMap args, AgentDestinationData d, string remoteAddress)
+    }
+
+    protected override GridRegion ExtractGatekeeper(AgentDestinationData d)
+    {
+        if (d is ExtendedAgentDestinationData)
         {
-            base.UnpackData(args, d, remoteAddress);
             ExtendedAgentDestinationData data = (ExtendedAgentDestinationData)d;
-            try
-            {
-                if (args.ContainsKey("gatekeeper_host") && args["gatekeeper_host"] != null)
-                    data.host = args["gatekeeper_host"].AsString();
-                if (args.ContainsKey("gatekeeper_port") && args["gatekeeper_port"] != null)
-                    Int32.TryParse(args["gatekeeper_port"].AsString(), out data.port);
-                if (args.ContainsKey("gatekeeper_serveruri") && args["gatekeeper_serveruri"] != null)
-                    data.gatekeeperServerURI = args["gatekeeper_serveruri"];
-                if (args.ContainsKey("destination_serveruri") && args["destination_serveruri"] != null)
-                    data.destinationServerURI = args["destination_serveruri"];
+            GridRegion gatekeeper = new GridRegion();
+            gatekeeper.ServerURI = data.gatekeeperServerURI;
+            gatekeeper.ExternalHostName = data.host;
+            gatekeeper.HttpPort = (uint)data.port;
+            gatekeeper.InternalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
 
-            }
-            catch (InvalidCastException)
-            {
-                m_log.ErrorFormat("[HOME AGENT HANDLER]: Bad cast in UnpackData");
-            }
-
-            // Verify if this call came from the login server
-            if (remoteAddress == m_LoginServerIP)
-                data.fromLogin = true;
-
+            return gatekeeper;
         }
+        else
+            m_log.WarnFormat("[HOME AGENT HANDLER]: Wrong data type");
 
-        protected override GridRegion ExtractGatekeeper(AgentDestinationData d)
-        {
-            if (d is ExtendedAgentDestinationData)
-            {
-                ExtendedAgentDestinationData data = (ExtendedAgentDestinationData)d;
-                GridRegion gatekeeper = new GridRegion();
-                gatekeeper.ServerURI = data.gatekeeperServerURI;
-                gatekeeper.ExternalHostName = data.host;
-                gatekeeper.HttpPort = (uint)data.port;
-                gatekeeper.InternalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), 0);
-
-                return gatekeeper;
-            }
-            else
-                m_log.WarnFormat("[HOME AGENT HANDLER]: Wrong data type");
-
-            return null;
-        }
-
-
-        protected override bool CreateAgent(GridRegion source, GridRegion gatekeeper, GridRegion destination,
-            AgentCircuitData aCircuit, uint teleportFlags, bool fromLogin, EntityTransferContext ctx, out string reason)
-        {
-            return m_UserAgentService.LoginAgentToGrid(source, aCircuit, gatekeeper, destination, fromLogin, out reason);
-        }
-
+        return null;
     }
 
-    public class ExtendedAgentDestinationData : AgentDestinationData
+
+    protected override bool CreateAgent(GridRegion source, GridRegion gatekeeper, GridRegion destination,
+        AgentCircuitData aCircuit, uint teleportFlags, bool fromLogin, EntityTransferContext ctx, out string reason)
     {
-        public string host;
-        public int port;
-        public string gatekeeperServerURI;
-        public string destinationServerURI;
-
+        return m_UserAgentService.LoginAgentToGrid(source, aCircuit, gatekeeper, destination, fromLogin, out reason);
     }
+
+}
+
+public class ExtendedAgentDestinationData : AgentDestinationData
+{
+    public string host;
+    public int port;
+    public string gatekeeperServerURI;
+    public string destinationServerURI;
 
 }

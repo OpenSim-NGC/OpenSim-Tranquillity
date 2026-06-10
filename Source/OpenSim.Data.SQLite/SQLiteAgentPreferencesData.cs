@@ -25,32 +25,25 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Data;
 using OpenMetaverse;
-using OpenSim.Framework;
-using System.Data.SQLite;
 
-namespace OpenSim.Data.SQLite
+namespace OpenSim.Data.SQLite;
+
+public class SQLiteAgentPreferencesData : SQLiteGenericTableHandler<AgentPreferencesData>, IAgentPreferencesData
 {
-    public class SQLiteAgentPreferencesData : SQLiteGenericTableHandler<AgentPreferencesData>, IAgentPreferencesData
+    public SQLiteAgentPreferencesData(string connectionString, string realm)
+        : base(connectionString, realm, "AgentPrefs")
     {
-        public SQLiteAgentPreferencesData(string connectionString, string realm)
-            : base(connectionString, realm, "AgentPrefs")
-        {
-        }
-
-        public AgentPreferencesData GetPrefs(UUID agentID)
-        {
-            AgentPreferencesData[] ret = Get("PrincipalID", agentID.ToString());
-
-            if (ret.Length == 0)
-                return null;
-
-            return ret[0];
-        }
-
     }
+
+    public AgentPreferencesData GetPrefs(UUID agentID)
+    {
+        AgentPreferencesData[] ret = Get("PrincipalID", agentID.ToString());
+
+        if (ret.Length == 0)
+            return null;
+
+        return ret[0];
+    }
+
 }

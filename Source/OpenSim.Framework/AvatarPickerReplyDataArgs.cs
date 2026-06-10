@@ -25,15 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class AvatarPickerReplyDataArgs : EventArgs
 {
-    public class AvatarPickerReplyDataArgs : EventArgs
-    {
-        public UUID AvatarID;
-        public byte[] FirstName;
-        public byte[] LastName;
-    }
+    public UUID AvatarID;
+    public byte[] FirstName;
+    public byte[] LastName;
 }

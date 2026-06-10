@@ -25,65 +25,58 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using Nini.Config;
-using OpenSim.Framework;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
-using log4net;
+namespace OpenSim.Server.Handlers.Hypergrid;
 
-namespace OpenSim.Server.Handlers.Hypergrid
+public class GatekeeperServiceInConnector : ServiceConnector
 {
-    public class GatekeeperServiceInConnector : ServiceConnector
-    {
 //        private static readonly ILog m_log =
 //                LogManager.GetLogger(
 //                MethodBase.GetCurrentMethod().DeclaringType);
 
-        private IGatekeeperService m_GatekeeperService;
-        public IGatekeeperService GateKeeper
+    private IGatekeeperService m_GatekeeperService;
+    public IGatekeeperService GateKeeper
+    {
+        get { return m_GatekeeperService; }
+    }
+
+    bool m_Proxy = false;
+
+    public GatekeeperServiceInConnector(IConfigSource config, IHttpServer server, ISimulationService simService) :
+            base(config, server, String.Empty)
+    {
+        IConfig gridConfig = config.Configs["GatekeeperService"];
+        if (gridConfig != null)
         {
-            get { return m_GatekeeperService; }
+            string serviceDll = gridConfig.GetString("LocalServiceModule", string.Empty);
+            Object[] args = new Object[] { config, simService };
+            m_GatekeeperService = ServerUtils.LoadPlugin<IGatekeeperService>(serviceDll, args);
+
         }
+        if (m_GatekeeperService == null)
+            throw new Exception("Gatekeeper server connector cannot proceed because of missing service");
 
-        bool m_Proxy = false;
+        m_Proxy = gridConfig.GetBoolean("HasProxy", false);
 
-        public GatekeeperServiceInConnector(IConfigSource config, IHttpServer server, ISimulationService simService) :
-                base(config, server, String.Empty)
-        {
-            IConfig gridConfig = config.Configs["GatekeeperService"];
-            if (gridConfig != null)
-            {
-                string serviceDll = gridConfig.GetString("LocalServiceModule", string.Empty);
-                Object[] args = new Object[] { config, simService };
-                m_GatekeeperService = ServerUtils.LoadPlugin<IGatekeeperService>(serviceDll, args);
+        HypergridHandlers hghandlers = new HypergridHandlers(m_GatekeeperService);
+        server.AddXmlRPCHandler("link_region", hghandlers.LinkRegionRequest, false);
+        server.AddXmlRPCHandler("get_region", hghandlers.GetRegion, false);
 
-            }
-            if (m_GatekeeperService == null)
-                throw new Exception("Gatekeeper server connector cannot proceed because of missing service");
+        server.AddSimpleStreamHandler(new GatekeeperAgentHandler(m_GatekeeperService, m_Proxy),true);
+    }
 
-            m_Proxy = gridConfig.GetBoolean("HasProxy", false);
+    public GatekeeperServiceInConnector(IConfigSource config, IHttpServer server, string configName)
+        : this(config, server, (ISimulationService)null)
+    {
+    }
 
-            HypergridHandlers hghandlers = new HypergridHandlers(m_GatekeeperService);
-            server.AddXmlRPCHandler("link_region", hghandlers.LinkRegionRequest, false);
-            server.AddXmlRPCHandler("get_region", hghandlers.GetRegion, false);
-
-            server.AddSimpleStreamHandler(new GatekeeperAgentHandler(m_GatekeeperService, m_Proxy),true);
-        }
-
-        public GatekeeperServiceInConnector(IConfigSource config, IHttpServer server, string configName)
-            : this(config, server, (ISimulationService)null)
-        {
-        }
-
-        public GatekeeperServiceInConnector(IConfigSource config, IHttpServer server)
-            : this(config, server, String.Empty)
-        {
-        }
+    public GatekeeperServiceInConnector(IConfigSource config, IHttpServer server)
+        : this(config, server, String.Empty)
+    {
     }
 }

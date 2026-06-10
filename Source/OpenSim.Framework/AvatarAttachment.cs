@@ -25,61 +25,59 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class AvatarAttachment
 {
-    public class AvatarAttachment
+    public int AttachPoint;
+    public UUID ItemID;
+    public UUID AssetID;
+
+    public AvatarAttachment(AvatarAttachment attach)
     {
-        public int AttachPoint;
-        public UUID ItemID;
-        public UUID AssetID;
+        AttachPoint = attach.AttachPoint;
+        ItemID = attach.ItemID;
+        AssetID = attach.AssetID;
+    }
 
-        public AvatarAttachment(AvatarAttachment attach)
-        {
-            AttachPoint = attach.AttachPoint;
-            ItemID = attach.ItemID;
-            AssetID = attach.AssetID;
-        }
+    public AvatarAttachment(int point, UUID item, UUID asset)
+    {
+        AttachPoint = point;
+        ItemID = item;
+        AssetID = asset;
+    }
 
-        public AvatarAttachment(int point, UUID item, UUID asset)
-        {
-            AttachPoint = point;
-            ItemID = item;
-            AssetID = asset;
-        }
+    public AvatarAttachment(OSDMap args)
+    {
+        Unpack(args);
+    }
 
-        public AvatarAttachment(OSDMap args)
-        {
-            Unpack(args);
-        }
+    public OSDMap Pack()
+    {
+        OSDMap attachdata = new OSDMap();
+        attachdata["point"] = OSD.FromInteger(AttachPoint);
+        attachdata["item"] = OSD.FromUUID(ItemID);
+        attachdata["asset"] = OSD.FromUUID(AssetID);
 
-        public OSDMap Pack()
-        {
-            OSDMap attachdata = new OSDMap();
-            attachdata["point"] = OSD.FromInteger(AttachPoint);
-            attachdata["item"] = OSD.FromUUID(ItemID);
-            attachdata["asset"] = OSD.FromUUID(AssetID);
+        return attachdata;
+    }
 
-            return attachdata;
-        }
+    public void Unpack(OSDMap args)
+    {
+        OSD tmpOSD;
+        if (args.TryGetValue("point", out tmpOSD))
+            AttachPoint = tmpOSD.AsInteger();
+        if (args.TryGetValue("item", out tmpOSD))
+            ItemID = tmpOSD.AsUUID();
+        else
+            ItemID = UUID.Zero;
 
-        public void Unpack(OSDMap args)
-        {
-            OSD tmpOSD;
-            if (args.TryGetValue("point", out tmpOSD))
-                AttachPoint = tmpOSD.AsInteger();
-            if (args.TryGetValue("item", out tmpOSD))
-                ItemID = tmpOSD.AsUUID();
-            else
-                ItemID = UUID.Zero;
-
-            if (args.TryGetValue("asset", out tmpOSD))
-                AssetID = tmpOSD.AsUUID();
-            else
-                AssetID = UUID.Zero;
-        }
+        if (args.TryGetValue("asset", out tmpOSD))
+            AssetID = tmpOSD.AsUUID();
+        else
+            AssetID = UUID.Zero;
     }
 }

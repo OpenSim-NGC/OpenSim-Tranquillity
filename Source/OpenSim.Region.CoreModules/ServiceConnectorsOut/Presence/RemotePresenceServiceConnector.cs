@@ -31,38 +31,37 @@ using OpenSim.Services.Connectors;
 using log4net;
 using Nini.Config;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence;
+
+public class RemotePresenceServicesConnector : BasePresenceServiceConnector, ISharedRegionModule
 {
-    public class RemotePresenceServicesConnector : BasePresenceServiceConnector, ISharedRegionModule
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    #region ISharedRegionModule
+
+    public string Name
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return "RemotePresenceServicesConnector"; }
+    }
 
-        #region ISharedRegionModule
-
-        public string Name
+    public void Initialise(IConfigSource source)
+    {
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return "RemotePresenceServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("PresenceServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("PresenceServices", "");
-                if (name == Name)
-                {
-                    m_PresenceService = new PresenceServicesConnector(source);
+                m_PresenceService = new PresenceServicesConnector(source);
 
-                    m_Enabled = true;
+                m_Enabled = true;
 
-                    m_PresenceDetector = new PresenceDetector(this);
+                m_PresenceDetector = new PresenceDetector(this);
 
-                    m_log.Info("[REMOTE PRESENCE CONNECTOR]: Remote presence enabled");
-                }
+                m_log.Info("[REMOTE PRESENCE CONNECTOR]: Remote presence enabled");
             }
         }
-
-        #endregion
     }
+
+    #endregion
 }

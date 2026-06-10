@@ -25,13 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Framework.Capabilities
+namespace OpenSim.Framework.Capabilities;
+
+[LLSDType("MAP")]
+public class LLSDEmpty
 {
-    [LLSDType("MAP")]
-    public class LLSDEmpty
+    public LLSDEmpty()
     {
-        public LLSDEmpty()
-        {
-        }
     }
 }

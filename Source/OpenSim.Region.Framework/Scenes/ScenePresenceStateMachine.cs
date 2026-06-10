@@ -25,89 +25,86 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
+namespace OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Scenes
+/// <summary>
+/// The possible states that a scene presence can be in.  This is currently orthagonal to whether a scene presence
+/// is root or child.
+/// </summary>
+/// <remarks>
+/// This is a state machine.
+///
+/// [Entry]               => Running
+/// Running               => PreRemove, Removing
+/// PreRemove             => Running, Removing
+/// Removing              => Removed
+///
+/// All other methods should only see the scene presence in running state - this is the normal operational state
+/// Removed state occurs when the presence has been removed.  This is the end state with no exit.
+/// </remarks>
+public enum ScenePresenceState
 {
-    /// <summary>
-    /// The possible states that a scene presence can be in.  This is currently orthagonal to whether a scene presence
-    /// is root or child.
-    /// </summary>
-    /// <remarks>
-    /// This is a state machine.
-    ///
-    /// [Entry]               => Running
-    /// Running               => PreRemove, Removing
-    /// PreRemove             => Running, Removing
-    /// Removing              => Removed
-    ///
-    /// All other methods should only see the scene presence in running state - this is the normal operational state
-    /// Removed state occurs when the presence has been removed.  This is the end state with no exit.
-    /// </remarks>
-    public enum ScenePresenceState
+    Running,                // Normal operation state.  The scene presence is available.
+    PreRemove,              // The presence is due to be removed but can still be returning to running.
+    Removing,               // The presence is in the process of being removed from the scene via Scene.RemoveClient.
+    Removed,                // The presence has been removed from the scene and is effectively dead.
+                            // There is no exit from this state.
+}
+
+internal class ScenePresenceStateMachine
+{
+    private ScenePresence m_sp;
+    private ScenePresenceState m_state;
+
+    internal ScenePresenceStateMachine(ScenePresence sp)
     {
-        Running,                // Normal operation state.  The scene presence is available.
-        PreRemove,              // The presence is due to be removed but can still be returning to running.
-        Removing,               // The presence is in the process of being removed from the scene via Scene.RemoveClient.
-        Removed,                // The presence has been removed from the scene and is effectively dead.
-                                // There is no exit from this state.
+        m_sp = sp;
+        m_state = ScenePresenceState.Running;
     }
 
-    internal class ScenePresenceStateMachine
+    internal ScenePresenceState GetState()
     {
-        private ScenePresence m_sp;
-        private ScenePresenceState m_state;
+        return m_state;
+    }
 
-        internal ScenePresenceStateMachine(ScenePresence sp)
+    /// <summary>
+    /// Updates the state of an agent that is already in transit.
+    /// </summary>
+    /// <param name='id'></param>
+    /// <param name='newState'></param>
+    /// <returns></returns>
+    /// <exception cref='Exception'>Illegal transitions will throw an Exception</exception>
+    internal void SetState(ScenePresenceState newState)
+    {
+        bool transitionOkay = false;
+
+        lock (this)
         {
-            m_sp = sp;
-            m_state = ScenePresenceState.Running;
+            if (newState == m_state)
+                return;
+            else if (newState == ScenePresenceState.Running && m_state == ScenePresenceState.PreRemove)
+                transitionOkay = true;
+            else if (newState == ScenePresenceState.PreRemove && m_state == ScenePresenceState.Running)
+                transitionOkay = true;
+            else if (newState == ScenePresenceState.Removing)
+            {
+                if (m_state == ScenePresenceState.Running || m_state == ScenePresenceState.PreRemove)
+                    transitionOkay = true;
+            }
+            else if (newState == ScenePresenceState.Removed && m_state == ScenePresenceState.Removing)
+                transitionOkay = true;
         }
 
-        internal ScenePresenceState GetState()
+        if (!transitionOkay)
         {
-            return m_state;
+            throw new Exception(
+                string.Format(
+                    "Scene presence {0} is not allowed to move from state {1} to new state {2} in {3}",
+                    m_sp.Name, m_state, newState, m_sp.Scene.Name));
         }
-
-        /// <summary>
-        /// Updates the state of an agent that is already in transit.
-        /// </summary>
-        /// <param name='id'></param>
-        /// <param name='newState'></param>
-        /// <returns></returns>
-        /// <exception cref='Exception'>Illegal transitions will throw an Exception</exception>
-        internal void SetState(ScenePresenceState newState)
+        else
         {
-            bool transitionOkay = false;
-
-            lock (this)
-            {
-                if (newState == m_state)
-                    return;
-                else if (newState == ScenePresenceState.Running && m_state == ScenePresenceState.PreRemove)
-                    transitionOkay = true;
-                else if (newState == ScenePresenceState.PreRemove && m_state == ScenePresenceState.Running)
-                    transitionOkay = true;
-                else if (newState == ScenePresenceState.Removing)
-                {
-                    if (m_state == ScenePresenceState.Running || m_state == ScenePresenceState.PreRemove)
-                        transitionOkay = true;
-                }
-                else if (newState == ScenePresenceState.Removed && m_state == ScenePresenceState.Removing)
-                    transitionOkay = true;
-            }
-
-            if (!transitionOkay)
-            {
-                throw new Exception(
-                    string.Format(
-                        "Scene presence {0} is not allowed to move from state {1} to new state {2} in {3}",
-                        m_sp.Name, m_state, newState, m_sp.Scene.Name));
-            }
-            else
-            {
-                m_state = newState;
-            }
+            m_state = newState;
         }
     }
 }

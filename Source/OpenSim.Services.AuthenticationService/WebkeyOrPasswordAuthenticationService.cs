@@ -25,81 +25,75 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Services.Interfaces;
 using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Data;
-using OpenSim.Framework;
-using OpenSim.Framework.Console;
-using OpenSim.Server.Base;
 
-namespace OpenSim.Services.AuthenticationService
+namespace OpenSim.Services.AuthenticationService;
+
+public class WebkeyOrPasswordAuthenticationService : AuthenticationServiceBase, IAuthenticationService
 {
-    public class WebkeyOrPasswordAuthenticationService : AuthenticationServiceBase, IAuthenticationService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private Dictionary<string, IAuthenticationService> m_svcChecks
+        = new Dictionary<string, IAuthenticationService>();
+
+    public WebkeyOrPasswordAuthenticationService(IConfigSource config)
+        : base(config)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        m_svcChecks["web_login_key"] = new WebkeyAuthenticationService(config);
+        m_svcChecks["password"]      = new PasswordAuthenticationService(config);
+    }
 
-        private Dictionary<string, IAuthenticationService> m_svcChecks
-            = new Dictionary<string, IAuthenticationService>();
+    public string Authenticate(UUID principalID, string password, int lifetime)
+    {
+        UUID realID;
 
-        public WebkeyOrPasswordAuthenticationService(IConfigSource config)
-            : base(config)
+        return Authenticate(principalID, password, lifetime, out realID);
+    }
+
+    public string Authenticate(UUID principalID, string password, int lifetime, out UUID realID)
+    {
+        AuthenticationData data = m_Database.Get(principalID);
+        string result = String.Empty;
+        realID = UUID.Zero;
+        if (data != null && data.Data != null)
         {
-            m_svcChecks["web_login_key"] = new WebkeyAuthenticationService(config);
-            m_svcChecks["password"]      = new PasswordAuthenticationService(config);
-        }
-
-        public string Authenticate(UUID principalID, string password, int lifetime)
-        {
-            UUID realID;
-
-            return Authenticate(principalID, password, lifetime, out realID);
-        }
-
-        public string Authenticate(UUID principalID, string password, int lifetime, out UUID realID)
-        {
-            AuthenticationData data = m_Database.Get(principalID);
-            string result = String.Empty;
-            realID = UUID.Zero;
-            if (data != null && data.Data != null)
+            if (data.Data.ContainsKey("webLoginKey"))
             {
-                if (data.Data.ContainsKey("webLoginKey"))
-                {
-                    m_log.DebugFormat("[AUTH SERVICE]: Attempting web key authentication for PrincipalID {0}", principalID);
-                    result = m_svcChecks["web_login_key"].Authenticate(principalID, password, lifetime, out realID);
-                    if (result.Length == 0)
-                    {
-                        m_log.DebugFormat("[AUTH SERVICE]: Web Login failed for PrincipalID {0}", principalID);
-                    }
-                }
-                if (result.Length == 0 && data.Data.ContainsKey("passwordHash") && data.Data.ContainsKey("passwordSalt"))
-                {
-                    m_log.DebugFormat("[AUTH SERVICE]: Attempting password authentication for PrincipalID {0}", principalID);
-                    result = m_svcChecks["password"].Authenticate(principalID, password, lifetime, out realID);
-                    if (result.Length == 0)
-                    {
-                        m_log.DebugFormat("[AUTH SERVICE]: Password login failed for PrincipalID {0}", principalID);
-                    }
-                }
-
-
-
+                m_log.DebugFormat("[AUTH SERVICE]: Attempting web key authentication for PrincipalID {0}", principalID);
+                result = m_svcChecks["web_login_key"].Authenticate(principalID, password, lifetime, out realID);
                 if (result.Length == 0)
                 {
-                    m_log.DebugFormat("[AUTH SERVICE]: Both password and webLoginKey-based authentication failed for PrincipalID {0}", principalID);
+                    m_log.DebugFormat("[AUTH SERVICE]: Web Login failed for PrincipalID {0}", principalID);
                 }
             }
-            else
+            if (result.Length == 0 && data.Data.ContainsKey("passwordHash") && data.Data.ContainsKey("passwordSalt"))
             {
-                m_log.DebugFormat("[AUTH SERVICE]: PrincipalID {0} or its data not found", principalID);
+                m_log.DebugFormat("[AUTH SERVICE]: Attempting password authentication for PrincipalID {0}", principalID);
+                result = m_svcChecks["password"].Authenticate(principalID, password, lifetime, out realID);
+                if (result.Length == 0)
+                {
+                    m_log.DebugFormat("[AUTH SERVICE]: Password login failed for PrincipalID {0}", principalID);
+                }
             }
 
 
-            return result;
+
+            if (result.Length == 0)
+            {
+                m_log.DebugFormat("[AUTH SERVICE]: Both password and webLoginKey-based authentication failed for PrincipalID {0}", principalID);
+            }
         }
+        else
+        {
+            m_log.DebugFormat("[AUTH SERVICE]: PrincipalID {0} or its data not found", principalID);
+        }
+
+
+        return result;
     }
 }

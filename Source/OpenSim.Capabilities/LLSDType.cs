@@ -25,31 +25,28 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
+namespace OpenSim.Framework.Capabilities;
 
-namespace OpenSim.Framework.Capabilities
+[AttributeUsage(AttributeTargets.Class)]
+public class LLSDType : Attribute
 {
-    [AttributeUsage(AttributeTargets.Class)]
-    public class LLSDType : Attribute
+    protected string myType;
+
+    public LLSDType(string type)
     {
-        protected string myType;
-
-        public LLSDType(string type)
-        {
-            myType = type;
-        }
-
-        public string ObjectType
-        {
-            get { return myType; }
-        }
+        myType = type;
     }
 
-    [AttributeUsage(AttributeTargets.Class)]
-    public class OSDMap : LLSDType
+    public string ObjectType
     {
-        public OSDMap() : base("MAP")
-        {
-        }
+        get { return myType; }
+    }
+}
+
+[AttributeUsage(AttributeTargets.Class)]
+public class OSDMap : LLSDType
+{
+    public OSDMap() : base("MAP")
+    {
     }
 }

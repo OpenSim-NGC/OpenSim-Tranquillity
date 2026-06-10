@@ -25,67 +25,61 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Runtime.Serialization;
-using System.Security.Permissions;
 using OpenMetaverse;
-using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Scenes.Types
+namespace OpenSim.Region.Framework.Scenes.Types;
+
+public class UpdateQueue
 {
-    public class UpdateQueue
+    private Queue<SceneObjectPart> m_queue;
+
+    private Dictionary<UUID, bool> m_ids;
+
+    private object m_syncObject = new object();
+
+    public int Count
     {
-        private Queue<SceneObjectPart> m_queue;
+        get { return m_queue.Count; }
+    }
 
-        private Dictionary<UUID, bool> m_ids;
+    public UpdateQueue()
+    {
+        m_queue = new Queue<SceneObjectPart>();
+        m_ids = new Dictionary<UUID, bool>();
+    }
 
-        private object m_syncObject = new object();
-
-        public int Count
+    public void Clear()
+    {
+        lock (m_syncObject)
         {
-            get { return m_queue.Count; }
+            m_ids.Clear();
+            m_queue.Clear();
         }
+    }
 
-        public UpdateQueue()
+    public void Enqueue(SceneObjectPart part)
+    {
+        lock (m_syncObject)
         {
-            m_queue = new Queue<SceneObjectPart>();
-            m_ids = new Dictionary<UUID, bool>();
+            if (!m_ids.ContainsKey(part.UUID)) {
+                m_ids.Add(part.UUID, true);
+                m_queue.Enqueue(part);
+            }
         }
+    }
 
-        public void Clear()
+    public SceneObjectPart Dequeue()
+    {
+        SceneObjectPart part = null;
+        lock (m_syncObject)
         {
-            lock (m_syncObject)
+            if (m_queue.Count > 0)
             {
-                m_ids.Clear();
-                m_queue.Clear();
+                part = m_queue.Dequeue();
+                m_ids.Remove(part.UUID);
             }
         }
 
-        public void Enqueue(SceneObjectPart part)
-        {
-            lock (m_syncObject)
-            {
-                if (!m_ids.ContainsKey(part.UUID)) {
-                    m_ids.Add(part.UUID, true);
-                    m_queue.Enqueue(part);
-                }
-            }
-        }
-
-        public SceneObjectPart Dequeue()
-        {
-            SceneObjectPart part = null;
-            lock (m_syncObject)
-            {
-                if (m_queue.Count > 0)
-                {
-                    part = m_queue.Dequeue();
-                    m_ids.Remove(part.UUID);
-                }
-            }
-
-            return part;
-        }
+        return part;
     }
 }

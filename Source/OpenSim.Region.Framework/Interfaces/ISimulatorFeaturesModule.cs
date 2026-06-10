@@ -25,26 +25,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-namespace OpenSim.Region.Framework.Interfaces
-{
-    public delegate void SimulatorFeaturesRequestDelegate(UUID agentID, ref OSDMap features);
+namespace OpenSim.Region.Framework.Interfaces;
 
-    /// <summary>
-    /// Add remove or retrieve Simulator Features that will be given to a viewer via the SimulatorFeatures capability.
-    /// </summary>
-    public interface ISimulatorFeaturesModule
-    {
-        event SimulatorFeaturesRequestDelegate OnSimulatorFeaturesRequest;
-        void AddFeature(string name, OSD value);
-        void AddOpenSimExtraFeature(string name, OSD value);
-        bool RemoveFeature(string name);
-        bool TryGetFeature(string name, out OSD value);
-        bool TryGetOpenSimExtraFeature(string name, out OSD value);
-        bool OpenSimExtraFeatureContains(string name);
-        OSDMap GetFeatures();
-    }
+public delegate void SimulatorFeaturesRequestDelegate(UUID agentID, ref OSDMap features);
+
+/// <summary>
+/// Add remove or retrieve Simulator Features that will be given to a viewer via the SimulatorFeatures capability.
+/// </summary>
+public interface ISimulatorFeaturesModule
+{
+    event SimulatorFeaturesRequestDelegate OnSimulatorFeaturesRequest;
+    void AddFeature(string name, OSD value);
+    void AddOpenSimExtraFeature(string name, OSD value);
+    bool RemoveFeature(string name);
+    bool TryGetFeature(string name, out OSD value);
+    bool TryGetOpenSimExtraFeature(string name, out OSD value);
+    bool OpenSimExtraFeatureContains(string name);
+    OSDMap GetFeatures();
 }

@@ -25,116 +25,114 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface ISoundModule
 {
-    public interface ISoundModule
-    {
-        /// <summary>
-        /// Maximum distance between a sound source and a recipient.
-        /// </summary>
-        float MaxDistance { get; }
+    /// <summary>
+    /// Maximum distance between a sound source and a recipient.
+    /// </summary>
+    float MaxDistance { get; }
 
-        /// <summary>
-        /// Play a sound from an object.
-        /// </summary>
-        /// <param name="soundID">Sound asset ID</param>
-        /// <param name="ownerID">Sound source owner</param>
-        /// <param name="objectID">Sound source ID</param>
-        /// <param name="gain">Sound volume</param>
-        /// <param name="position">Sound source position</param>
-        /// <param name="flags">Sound flags</param>
-        /// </param>
-        void PlayAttachedSound(UUID soundID, UUID ownerID, UUID objectID,
-                double gain, Vector3 position, byte flags);
+    /// <summary>
+    /// Play a sound from an object.
+    /// </summary>
+    /// <param name="soundID">Sound asset ID</param>
+    /// <param name="ownerID">Sound source owner</param>
+    /// <param name="objectID">Sound source ID</param>
+    /// <param name="gain">Sound volume</param>
+    /// <param name="position">Sound source position</param>
+    /// <param name="flags">Sound flags</param>
+    /// </param>
+    void PlayAttachedSound(UUID soundID, UUID ownerID, UUID objectID,
+            double gain, Vector3 position, byte flags);
 
-        /// <summary>
-        /// Trigger a sound in the scene.
-        /// </summary>
-        /// <param name="soundId">Sound asset ID</param>
-        /// <param name="ownerID">Sound source owner</param>
-        /// <param name="objectID">Sound source ID</param>
-        /// <param name="parentID">Sound source parent.</param>
-        /// <param name="gain">Sound volume</param>
-        /// <param name="position">Sound source position</param>
-        /// <param name="handle"></param>
-        /// <param name="radius">
-        /// Radius used to affect gain over distance.
-        /// </param>
-        void TriggerSound(
-                UUID soundId, UUID ownerID, UUID objectID, UUID parentID,
-                double gain, Vector3 position, UInt64 handle);
+    /// <summary>
+    /// Trigger a sound in the scene.
+    /// </summary>
+    /// <param name="soundId">Sound asset ID</param>
+    /// <param name="ownerID">Sound source owner</param>
+    /// <param name="objectID">Sound source ID</param>
+    /// <param name="parentID">Sound source parent.</param>
+    /// <param name="gain">Sound volume</param>
+    /// <param name="position">Sound source position</param>
+    /// <param name="handle"></param>
+    /// <param name="radius">
+    /// Radius used to affect gain over distance.
+    /// </param>
+    void TriggerSound(
+            UUID soundId, UUID ownerID, UUID objectID, UUID parentID,
+            double gain, Vector3 position, UInt64 handle);
 
-        void TriggerCollisionSound(
-                        UUID soundId, UUID ownerID, UUID objectID, UUID parentID,
-                        double gain, Vector3 position, UInt64 handle);
-        /// <summary>
-        /// Stop sounds eminating from an object.
-        /// </summary>
-        /// <param name="objectID">Sound source ID</param>
-        void StopSound(UUID objectID);
-        void StopSound(SceneObjectPart sop);
+    void TriggerCollisionSound(
+                    UUID soundId, UUID ownerID, UUID objectID, UUID parentID,
+                    double gain, Vector3 position, UInt64 handle);
+    /// <summary>
+    /// Stop sounds eminating from an object.
+    /// </summary>
+    /// <param name="objectID">Sound source ID</param>
+    void StopSound(UUID objectID);
+    void StopSound(SceneObjectPart sop);
 
-        /// <summary>
-        /// Preload sound to viewers within range.
-        /// </summary>
-        /// <param name="objectID">Sound source ID</param>
-        /// <param name="soundID">Sound asset ID</param>
-        /// </param>
-        void PreloadSound(UUID objectID, UUID soundID);
-        void PreloadSound(SceneObjectPart sop, UUID soundID);
+    /// <summary>
+    /// Preload sound to viewers within range.
+    /// </summary>
+    /// <param name="objectID">Sound source ID</param>
+    /// <param name="soundID">Sound asset ID</param>
+    /// </param>
+    void PreloadSound(UUID objectID, UUID soundID);
+    void PreloadSound(SceneObjectPart sop, UUID soundID);
 
-        /// <summary>
-        /// Loop specified sound at specified volume with specified radius,
-        /// optionally declaring object as new sync master.
-        /// </summary>
-        /// <param name="objectID">Sound source ID</param>
-        /// <param name="soundID">Sound asset ID</param>
-        /// <param name="gain">Sound volume</param>
-        /// <param name="isMaster">Set object to sync master if true</param>
-        void LoopSound(UUID objectID, UUID soundID, double gain,
-                bool isMaster, bool isSlave);
-
-        void LoopSound(SceneObjectPart sop, UUID soundID, double gain,
+    /// <summary>
+    /// Loop specified sound at specified volume with specified radius,
+    /// optionally declaring object as new sync master.
+    /// </summary>
+    /// <param name="objectID">Sound source ID</param>
+    /// <param name="soundID">Sound asset ID</param>
+    /// <param name="gain">Sound volume</param>
+    /// <param name="isMaster">Set object to sync master if true</param>
+    void LoopSound(UUID objectID, UUID soundID, double gain,
             bool isMaster, bool isSlave);
 
-        /// <summary>
-        /// Trigger or play an attached sound in this part's inventory.
-        /// </summary>
-        /// <param name="objectID">Sound source ID</param>
-        /// <param name="sound">Sound asset ID</param>
-        /// <param name="volume">Sound volume</param>
-        /// <param name="triggered">Triggered or not.</param>
-        /// <param name="useMaster">Play using sound master</param>
-        /// <param name="isMaster">Play as sound master</param>
-        void SendSound(UUID objectID, UUID sound, double volume,
-                bool triggered, byte flags, bool useMaster,
-                bool isMaster);
+    void LoopSound(SceneObjectPart sop, UUID soundID, double gain,
+        bool isMaster, bool isSlave);
 
-        void SendSound(SceneObjectPart sop, UUID sound, double volume,
-                bool triggered, byte flags, bool useMaster,
-                bool isMaster);
+    /// <summary>
+    /// Trigger or play an attached sound in this part's inventory.
+    /// </summary>
+    /// <param name="objectID">Sound source ID</param>
+    /// <param name="sound">Sound asset ID</param>
+    /// <param name="volume">Sound volume</param>
+    /// <param name="triggered">Triggered or not.</param>
+    /// <param name="useMaster">Play using sound master</param>
+    /// <param name="isMaster">Play as sound master</param>
+    void SendSound(UUID objectID, UUID sound, double volume,
+            bool triggered, byte flags, bool useMaster,
+            bool isMaster);
 
-        /// <summary>
-        /// Trigger a sound to be played to all agents within an axis-aligned
-        /// bounding box.
-        /// </summary>
-        /// <param name="objectID">Sound source ID</param>
-        /// <param name="sound">Sound asset ID</param>
-        /// <param name="volume">Sound volume</param>
-        /// <param name="min">AABB bottom south-west corner</param>
-        /// <param name="max">AABB top north-east corner</param>
-        void TriggerSoundLimited(UUID objectID, UUID sound, double volume,
-                Vector3 min, Vector3 max);
+    void SendSound(SceneObjectPart sop, UUID sound, double volume,
+            bool triggered, byte flags, bool useMaster,
+            bool isMaster);
 
-        /// <summary>
-        /// Set whether sounds on the given prim should be queued.
-        /// </summary>
-        /// <param name='objectID'></param>
-        /// <param name='shouldQueue'></param>
-        void SetSoundQueueing(UUID objectID, bool shouldQueue);
-    }
+    /// <summary>
+    /// Trigger a sound to be played to all agents within an axis-aligned
+    /// bounding box.
+    /// </summary>
+    /// <param name="objectID">Sound source ID</param>
+    /// <param name="sound">Sound asset ID</param>
+    /// <param name="volume">Sound volume</param>
+    /// <param name="min">AABB bottom south-west corner</param>
+    /// <param name="max">AABB top north-east corner</param>
+    void TriggerSoundLimited(UUID objectID, UUID sound, double volume,
+            Vector3 min, Vector3 max);
+
+    /// <summary>
+    /// Set whether sounds on the given prim should be queued.
+    /// </summary>
+    /// <param name='objectID'></param>
+    /// <param name='shouldQueue'></param>
+    void SetSoundQueueing(UUID objectID, bool shouldQueue);
 }

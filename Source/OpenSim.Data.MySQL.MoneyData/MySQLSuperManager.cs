@@ -24,28 +24,25 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using System.Threading;
+namespace OpenSim.Data.MySQL.MoneyData;
 
-namespace OpenSim.Data.MySQL.MoneyData
+// This bit of code is from OpenSim.Data.MySQLSuperManager
+public class MySQLSuperManager
 {
-    // This bit of code is from OpenSim.Data.MySQLSuperManager
-    public class MySQLSuperManager
+    public bool Locked;
+    private readonly Mutex m_lock = new Mutex(false);
+    public MySQLMoneyManager Manager;
+    public string Running;
+
+    public void GetLock()
     {
-        public bool Locked;
-        private readonly Mutex m_lock = new Mutex(false);
-        public MySQLMoneyManager Manager;
-        public string Running;
+        Locked = true;
+        m_lock.WaitOne();
+    }
 
-        public void GetLock()
-        {
-            Locked = true;
-            m_lock.WaitOne();
-        }
-
-        public void Release()
-        {
-            m_lock.ReleaseMutex();
-            Locked = false;
-        }
+    public void Release()
+    {
+        m_lock.ReleaseMutex();
+        Locked = false;
     }
 }

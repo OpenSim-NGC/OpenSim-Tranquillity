@@ -25,47 +25,45 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
-using Caps=OpenSim.Framework.Capabilities.Caps;
+using Caps = OpenSim.Framework.Capabilities.Caps;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface ICapabilitiesModule
 {
-    public interface ICapabilitiesModule
-    {
-        /// <summary>
-        /// Add a caps handler for the given agent.  If the CAPS handler already exists for this agent,
-        /// then it is replaced by a new CAPS handler.
-        /// </summary>
-        /// <param name="agentId"></param>
-        /// <param name="capsObjectPath"></param>
-        void CreateCaps(UUID agentId, uint circuitCode);
+    /// <summary>
+    /// Add a caps handler for the given agent.  If the CAPS handler already exists for this agent,
+    /// then it is replaced by a new CAPS handler.
+    /// </summary>
+    /// <param name="agentId"></param>
+    /// <param name="capsObjectPath"></param>
+    void CreateCaps(UUID agentId, uint circuitCode);
 
-        /// <summary>
-        /// Remove the caps handler for a given agent.
-        /// </summary>
-        /// <param name="agentId"></param>
-        void RemoveCaps(UUID agentId, uint circuitCode);
+    /// <summary>
+    /// Remove the caps handler for a given agent.
+    /// </summary>
+    /// <param name="agentId"></param>
+    void RemoveCaps(UUID agentId, uint circuitCode);
 
-        /// <summary>
-        /// Will return null if the agent doesn't have a caps handler registered
-        /// </summary>
-        /// <param name="agentId"></param>
-        Caps GetCapsForUser(uint circuitCode);
+    /// <summary>
+    /// Will return null if the agent doesn't have a caps handler registered
+    /// </summary>
+    /// <param name="agentId"></param>
+    Caps GetCapsForUser(uint circuitCode);
 
-        void SetAgentCapsSeeds(AgentCircuitData agent);
+    void SetAgentCapsSeeds(AgentCircuitData agent);
 
-        Dictionary<ulong, string> GetChildrenSeeds(UUID agentID);
+    Dictionary<ulong, string> GetChildrenSeeds(UUID agentID);
 
-        string GetChildSeed(UUID agentID, ulong handle);
+    string GetChildSeed(UUID agentID, ulong handle);
 
-        void SetChildrenSeed(UUID agentID, Dictionary<ulong, string> seeds);
+    void SetChildrenSeed(UUID agentID, Dictionary<ulong, string> seeds);
 
-        void DropChildSeed(UUID agentID, ulong handle);
+    void DropChildSeed(UUID agentID, ulong handle);
 
-        string GetCapsPath(UUID agentId);
+    string GetCapsPath(UUID agentId);
 
-        void ActivateCaps(uint circuitCode);
-    }
+    void ActivateCaps(uint circuitCode);
 }

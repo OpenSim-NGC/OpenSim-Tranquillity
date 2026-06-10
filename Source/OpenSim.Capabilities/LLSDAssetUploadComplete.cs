@@ -25,28 +25,26 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 
-namespace OpenSim.Framework.Capabilities
+namespace OpenSim.Framework.Capabilities;
+
+
+[LLSDType("MAP")]
+public class LLSDAssetUploadComplete
 {
-
-    [LLSDType("MAP")]
-    public class LLSDAssetUploadComplete
-    {
-        public string new_asset = String.Empty;
-        public UUID new_inventory_item = UUID.Zero;
+    public string new_asset = String.Empty;
+    public UUID new_inventory_item = UUID.Zero;
 //        public UUID new_texture_folder_id = UUID.Zero;
-        public string state = String.Empty;
-        public LLSDAssetUploadError error = null;
-        //public bool success = false;
-        public int new_next_owner_mask = 0;
-        public int new_group_mask = 0;
-        public int new_everyone_mask = 0;
-        public int inventory_item_flags = 0;
+    public string state = String.Empty;
+    public LLSDAssetUploadError error = null;
+    //public bool success = false;
+    public int new_next_owner_mask = 0;
+    public int new_group_mask = 0;
+    public int new_everyone_mask = 0;
+    public int inventory_item_flags = 0;
 
-        public LLSDAssetUploadComplete()
-        {
-        }
+    public LLSDAssetUploadComplete()
+    {
     }
 }

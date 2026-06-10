@@ -29,25 +29,24 @@ using OpenSim.Region.CoreModules.World.Terrain;
 using OpenSim.Region.CoreModules.World.Terrain.FileLoaders;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.CoreModules.World.Serialiser
+namespace OpenSim.Region.CoreModules.World.Serialiser;
+
+internal class SerialiseTerrain : IFileSerialiser
 {
-    internal class SerialiseTerrain : IFileSerialiser
+    #region IFileSerialiser Members
+
+    public string WriteToFile(Scene scene, string dir)
     {
-        #region IFileSerialiser Members
+        ITerrainLoader fileSystemExporter = new RAW32();
+        string targetFileName = Path.Combine(dir, "heightmap.r32");
 
-        public string WriteToFile(Scene scene, string dir)
+        lock (scene.Heightmap)
         {
-            ITerrainLoader fileSystemExporter = new RAW32();
-            string targetFileName = Path.Combine(dir, "heightmap.r32");
-
-            lock (scene.Heightmap)
-            {
-                fileSystemExporter.SaveFile(targetFileName, scene.Heightmap);
-            }
-
-            return "heightmap.r32";
+            fileSystemExporter.SaveFile(targetFileName, scene.Heightmap);
         }
 
-        #endregion
+        return "heightmap.r32";
     }
+
+    #endregion
 }

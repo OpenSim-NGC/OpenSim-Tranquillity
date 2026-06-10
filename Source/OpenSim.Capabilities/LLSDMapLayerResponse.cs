@@ -25,16 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Framework.Capabilities
-{
-    [LLSDType("MAP")]
-    public class LLSDMapLayerResponse
-    {
-        public LLSDMapRequest AgentData = new LLSDMapRequest();
-        public OSDArray LayerData = new OSDArray();
+namespace OpenSim.Framework.Capabilities;
 
-        public LLSDMapLayerResponse()
-        {
-        }
+[LLSDType("MAP")]
+public class LLSDMapLayerResponse
+{
+    public LLSDMapRequest AgentData = new LLSDMapRequest();
+    public OSDArray LayerData = new OSDArray();
+
+    public LLSDMapLayerResponse()
+    {
     }
 }

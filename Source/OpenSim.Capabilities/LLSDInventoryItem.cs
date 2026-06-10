@@ -27,79 +27,78 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework.Capabilities
+namespace OpenSim.Framework.Capabilities;
+
+[OSDMap]
+public class LLSDInventoryItem
 {
-    [OSDMap]
-    public class LLSDInventoryItem
-    {
-        public UUID parent_id;
+    public UUID parent_id;
 
-        public UUID asset_id;
-        public UUID item_id;
-        public LLSDPermissions permissions;
-        public int type;
-        public int inv_type;
-        public int flags;
+    public UUID asset_id;
+    public UUID item_id;
+    public LLSDPermissions permissions;
+    public int type;
+    public int inv_type;
+    public int flags;
 
-        public LLSDSaleInfo sale_info;
-        public string name;
-        public string desc;
-        public int created_at;
-    }
+    public LLSDSaleInfo sale_info;
+    public string name;
+    public string desc;
+    public int created_at;
+}
 
-    [OSDMap]
-    public class LLSDPermissions
-    {
-        public UUID creator_id;
-        public UUID owner_id;
-        public UUID group_id;
-        public int base_mask;
-        public int owner_mask;
-        public int group_mask;
-        public int everyone_mask;
-        public int next_owner_mask;
-        public bool is_owner_group;
-    }
+[OSDMap]
+public class LLSDPermissions
+{
+    public UUID creator_id;
+    public UUID owner_id;
+    public UUID group_id;
+    public int base_mask;
+    public int owner_mask;
+    public int group_mask;
+    public int everyone_mask;
+    public int next_owner_mask;
+    public bool is_owner_group;
+}
 
-    [OSDMap]
-    public class LLSDSaleInfo
-    {
-        public int sale_price;
-        public int sale_type;
-    }
+[OSDMap]
+public class LLSDSaleInfo
+{
+    public int sale_price;
+    public int sale_type;
+}
 
-    [OSDMap]
-    public class LLSDInventoryDescendents
-    {
-        public OSDArray folders = new OSDArray();
-    }
+[OSDMap]
+public class LLSDInventoryDescendents
+{
+    public OSDArray folders = new OSDArray();
+}
 
-    [OSDMap]
-    public class LLSDFetchInventoryDescendents
-    {
-        public UUID folder_id;
-        public UUID owner_id;
-        public int sort_order;
-        public bool fetch_folders;
-        public bool fetch_items;
-    }
+[OSDMap]
+public class LLSDFetchInventoryDescendents
+{
+    public UUID folder_id;
+    public UUID owner_id;
+    public int sort_order;
+    public bool fetch_folders;
+    public bool fetch_items;
+}
 
-    [OSDMap]
-    public class LLSDInventoryFolderContents
-    {
-        public UUID agent_id;
-        public int descendents;
-        public UUID folder_id;
-        public OSDArray categories = new OSDArray();
-        public OSDArray items = new OSDArray();
-        public UUID owner_id;
-        public int version;
-    }
+[OSDMap]
+public class LLSDInventoryFolderContents
+{
+    public UUID agent_id;
+    public int descendents;
+    public UUID folder_id;
+    public OSDArray categories = new OSDArray();
+    public OSDArray items = new OSDArray();
+    public UUID owner_id;
+    public int version;
+}
 
-    [OSDMap]
-    public class LLSDFetchInventory
-    {
-        public UUID agent_id;
-        public OSDArray items = new OSDArray();
-    }
+[OSDMap]
+public class LLSDFetchInventory
+{
+    public UUID agent_id;
+    public OSDArray items = new OSDArray();
 }

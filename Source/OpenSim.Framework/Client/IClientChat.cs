@@ -27,14 +27,13 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework.Client
-{
-    public interface IClientChat
-    {
-        event ChatMessage OnChatFromClient;
+namespace OpenSim.Framework.Client;
 
-        void SendChatMessage(
-            string message, byte type, Vector3 fromPos, string fromName, UUID fromAgentID, UUID ownerID, byte source,
-            byte audible);
-    }
+public interface IClientChat
+{
+    event ChatMessage OnChatFromClient;
+
+    void SendChatMessage(
+        string message, byte type, Vector3 fromPos, string fromName, UUID fromAgentID, UUID ownerID, byte source,
+        byte audible);
 }

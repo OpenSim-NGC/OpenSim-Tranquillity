@@ -25,58 +25,50 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Reflection;
-using System.Threading;
-using log4net;
 using OpenMetaverse;
-using OpenSim.Framework;
 using System.Data.SQLite;
 
-namespace OpenSim.Data.SQLite
+namespace OpenSim.Data.SQLite;
+
+/// <summary>
+/// A SQL Interface for user grid data
+/// </summary>
+public class SQLiteHGTravelData : SQLiteGenericTableHandler<HGTravelingData>, IHGTravelingData
 {
-    /// <summary>
-    /// A SQL Interface for user grid data
-    /// </summary>
-    public class SQLiteHGTravelData : SQLiteGenericTableHandler<HGTravelingData>, IHGTravelingData
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public SQLiteHGTravelData(string connectionString, string realm)
-            : base(connectionString, realm, "HGTravelStore") {}
+    public SQLiteHGTravelData(string connectionString, string realm)
+        : base(connectionString, realm, "HGTravelStore") {}
 
-        public HGTravelingData Get(UUID sessionID)
+    public HGTravelingData Get(UUID sessionID)
+    {
+        HGTravelingData[] ret = Get("SessionID", sessionID.ToString());
+
+        if (ret.Length == 0)
+            return null;
+
+        return ret[0];
+    }
+
+    public HGTravelingData[] GetSessions(UUID userID)
+    {
+        return base.Get("UserID", userID.ToString());
+    }
+
+    public bool Delete(UUID sessionID)
+    {
+        return Delete("SessionID", sessionID.ToString());
+    }
+
+    public void DeleteOld()
+    {
+        using (SQLiteCommand cmd = new SQLiteCommand())
         {
-            HGTravelingData[] ret = Get("SessionID", sessionID.ToString());
+            cmd.CommandText = String.Format("delete from {0} where TMStamp < datetime('now', '-2 day') ", m_Realm);
 
-            if (ret.Length == 0)
-                return null;
-
-            return ret[0];
-        }
-
-        public HGTravelingData[] GetSessions(UUID userID)
-        {
-            return base.Get("UserID", userID.ToString());
-        }
-
-        public bool Delete(UUID sessionID)
-        {
-            return Delete("SessionID", sessionID.ToString());
-        }
-
-        public void DeleteOld()
-        {
-            using (SQLiteCommand cmd = new SQLiteCommand())
-            {
-                cmd.CommandText = String.Format("delete from {0} where TMStamp < datetime('now', '-2 day') ", m_Realm);
-
-                DoQuery(cmd);
-            }
-
+            DoQuery(cmd);
         }
 
     }
+
 }

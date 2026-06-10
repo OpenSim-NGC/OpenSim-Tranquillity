@@ -25,20 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public enum ChatTypeEnum
 {
-    public enum ChatTypeEnum
-    {
-        Whisper = 0,
-        Say = 1,
-        Shout = 2,
-        // 3 is an obsolete version of Say
-        StartTyping = 4,
-        StopTyping = 5,
-        DebugChannel = 6,
-        Region = 7,
-        Owner = 8,
-        Direct = 9, //llRegionSayTo
-        Broadcast = 0xFF
-    }
+    Whisper = 0,
+    Say = 1,
+    Shout = 2,
+    // 3 is an obsolete version of Say
+    StartTyping = 4,
+    StopTyping = 5,
+    DebugChannel = 6,
+    Region = 7,
+    Owner = 8,
+    Direct = 9, //llRegionSayTo
+    Broadcast = 0xFF
 }

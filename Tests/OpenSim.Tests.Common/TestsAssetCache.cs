@@ -32,111 +32,110 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+public class TestsAssetCache : ISharedRegionModule, IAssetCache
 {
-    public class TestsAssetCache : ISharedRegionModule, IAssetCache
+    private bool m_Enabled;
+    public MemoryCache m_Cache;
+
+    public string Name
     {
-        private bool m_Enabled;
-        public MemoryCache m_Cache;
-
-        public string Name
-        {
-            get { return "TestsAssetCache"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            m_Cache = MemoryCache.Default;
-            m_Enabled = true;
-        }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (m_Enabled)
-                scene.RegisterModuleInterface<IAssetCache>(this);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-        }
-
-        ////////////////////////////////////////////////////////////
-        // IAssetCache
-        //
-        public bool Check(string id)
-        {
-            // XXX This is probably not an efficient implementation.
-            AssetBase asset;
-            if (!Get(id, out asset))
-                return false;
-            return asset != null;
-        }
-
-        public void Cache(AssetBase asset, bool replace = true)
-        {
-            if (asset != null)
-            {
-                //CacheItemPolicy policy = new CacheItemPolicy();
-                //m_Cache.Set(asset.ID, asset, policy);
-            }
-        }
-
-        public void CacheNegative(string id)
-        {
-            // We don't do negative caching
-        }
-
-        public bool Get(string id, out AssetBase asset)
-        {
-            //asset = (AssetBase)m_Cache.Get(id);
-            asset = null;
-            return true;
-        }
-
-        public bool GetFromMemory(string id, out AssetBase asset)
-        {
-            //asset = (AssetBase)m_Cache.Get(id);
-            asset = null;
-            return true;
-        }
-
-        public AssetBase GetCached(string id)
-        {
-            //return (AssetBase)m_Cache.Get(id);
-            return null;
-        }
-
-        public void Expire(string id)
-        {
-            //m_Cache.Remove(id);
-        }
-
-        public void Clear()
-        {
-        }
-
-        /*
-        public bool UpdateContent(string id, byte[] data)
-        {
-            return false;
-        }
-        */
+        get { return "TestsAssetCache"; }
     }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        m_Cache = MemoryCache.Default;
+        m_Enabled = true;
+    }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (m_Enabled)
+            scene.RegisterModuleInterface<IAssetCache>(this);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+    }
+
+    ////////////////////////////////////////////////////////////
+    // IAssetCache
+    //
+    public bool Check(string id)
+    {
+        // XXX This is probably not an efficient implementation.
+        AssetBase asset;
+        if (!Get(id, out asset))
+            return false;
+        return asset != null;
+    }
+
+    public void Cache(AssetBase asset, bool replace = true)
+    {
+        if (asset != null)
+        {
+            //CacheItemPolicy policy = new CacheItemPolicy();
+            //m_Cache.Set(asset.ID, asset, policy);
+        }
+    }
+
+    public void CacheNegative(string id)
+    {
+        // We don't do negative caching
+    }
+
+    public bool Get(string id, out AssetBase asset)
+    {
+        //asset = (AssetBase)m_Cache.Get(id);
+        asset = null;
+        return true;
+    }
+
+    public bool GetFromMemory(string id, out AssetBase asset)
+    {
+        //asset = (AssetBase)m_Cache.Get(id);
+        asset = null;
+        return true;
+    }
+
+    public AssetBase GetCached(string id)
+    {
+        //return (AssetBase)m_Cache.Get(id);
+        return null;
+    }
+
+    public void Expire(string id)
+    {
+        //m_Cache.Remove(id);
+    }
+
+    public void Clear()
+    {
+    }
+
+    /*
+    public bool UpdateContent(string id, byte[] data)
+    {
+        return false;
+    }
+    */
 }

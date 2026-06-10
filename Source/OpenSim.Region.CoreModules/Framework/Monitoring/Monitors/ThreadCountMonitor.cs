@@ -26,32 +26,31 @@
  */
 
 
-namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors
+namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors;
+
+class ThreadCountMonitor : IMonitor
 {
-    class ThreadCountMonitor : IMonitor
+    #region Implementation of IMonitor
+
+    public string GetName()
     {
-        #region Implementation of IMonitor
-
-        public string GetName()
-        {
-            return "ThreadCountMonitor";
-        }
-
-        public double GetValue()
-        {
-            return System.Diagnostics.Process.GetCurrentProcess().Threads.Count;
-        }
-
-        public string GetFriendlyName()
-        {
-            return "Total Threads";
-        }
-
-        public string GetFriendlyValue()
-        {
-            return (int)GetValue() + " Thread(s) (Global)";
-        }
-
-        #endregion
+        return "ThreadCountMonitor";
     }
+
+    public double GetValue()
+    {
+        return System.Diagnostics.Process.GetCurrentProcess().Threads.Count;
+    }
+
+    public string GetFriendlyName()
+    {
+        return "Total Threads";
+    }
+
+    public string GetFriendlyValue()
+    {
+        return (int)GetValue() + " Thread(s) (Global)";
+    }
+
+    #endregion
 }

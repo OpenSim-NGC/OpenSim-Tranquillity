@@ -27,11 +27,10 @@
 
 using Nini.Config;
 
-namespace OpenSim.ApplicationPlugins.LoadRegions
+namespace OpenSim.ApplicationPlugins.LoadRegions;
+
+public interface IEstateLoader
 {
-    public interface IEstateLoader
-    {
-        void SetIniConfigSource(IConfigSource configSource);
-        void LoadEstates();
-    }
+    void SetIniConfigSource(IConfigSource configSource);
+    void LoadEstates();
 }

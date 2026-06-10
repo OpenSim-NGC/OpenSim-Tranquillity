@@ -25,41 +25,34 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using log4net;
-using OpenMetaverse;
 using Nini.Config;
-using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
-namespace OpenSim.Server.Handlers.Grid
+namespace OpenSim.Server.Handlers.Grid;
+
+public class GridInfoServerInConnector : ServiceConnector
 {
-    public class GridInfoServerInConnector : ServiceConnector
-    {
 //        private string m_ConfigName = "GridInfoService";
 
-        public GridInfoServerInConnector(IConfigSource config, IHttpServer server, string configName) :
-            base(config, server, configName)
+    public GridInfoServerInConnector(IConfigSource config, IHttpServer server, string configName) :
+        base(config, server, configName)
+    {
+        GridInfoHandlers handlers = new GridInfoHandlers(config);
+
+        IConfig gridCfg = config.Configs["GridInfoService"];
+
+        bool stats_disabled = gridCfg.GetBoolean("DisableStatsEndpoint", false);
+
+        server.AddSimpleStreamHandler(new SimpleStreamHandler("/get_grid_info",
+                                                           handlers.RestGetGridInfoMethod));
+        server.AddSimpleStreamHandler(new SimpleStreamHandler("/json_grid_info",
+                                                      handlers.JsonGetGridInfoMethod));
+        server.AddXmlRPCHandler("get_grid_info", handlers.XmlRpcGridInfoMethod, false);
+
+        if (!stats_disabled)
         {
-            GridInfoHandlers handlers = new GridInfoHandlers(config);
-
-            IConfig gridCfg = config.Configs["GridInfoService"];
-
-            bool stats_disabled = gridCfg.GetBoolean("DisableStatsEndpoint", false);
-
-            server.AddSimpleStreamHandler(new SimpleStreamHandler("/get_grid_info",
-                                                               handlers.RestGetGridInfoMethod));
-            server.AddSimpleStreamHandler(new SimpleStreamHandler("/json_grid_info",
-                                                          handlers.JsonGetGridInfoMethod));
-            server.AddXmlRPCHandler("get_grid_info", handlers.XmlRpcGridInfoMethod, false);
-
-            if (!stats_disabled)
-            {
-                server.AddSimpleStreamHandler(new SimpleStreamHandler("/get_grid_stats", handlers.RestGridStatsHandler));
-            }
+            server.AddSimpleStreamHandler(new SimpleStreamHandler("/get_grid_stats", handlers.RestGridStatsHandler));
         }
     }
 }

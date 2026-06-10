@@ -36,235 +36,234 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Simulation;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation;
+
+public class RemoteSimulationConnectorModule : ISharedRegionModule, ISimulationService
 {
-    public class RemoteSimulationConnectorModule : ISharedRegionModule, ISimulationService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private bool initialized = false;
+    protected bool m_enabled = false;
+    protected Scene m_aScene;
+    // RemoteSimulationConnector does not care about local regions; it delegates that to the Local module
+    protected LocalSimulationConnectorModule m_localBackend;
+    protected SimulationServiceConnector m_remoteConnector;
+
+    protected bool m_safemode;
+
+    #region Region Module interface
+
+    public virtual void Initialise(IConfigSource configSource)
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private bool initialized = false;
-        protected bool m_enabled = false;
-        protected Scene m_aScene;
-        // RemoteSimulationConnector does not care about local regions; it delegates that to the Local module
-        protected LocalSimulationConnectorModule m_localBackend;
-        protected SimulationServiceConnector m_remoteConnector;
-
-        protected bool m_safemode;
-
-        #region Region Module interface
-
-        public virtual void Initialise(IConfigSource configSource)
+        IConfig moduleConfig = configSource.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            IConfig moduleConfig = configSource.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("SimulationServices", "");
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("SimulationServices", "");
-                if (name == Name)
-                {
-                    m_localBackend = new LocalSimulationConnectorModule();
+                m_localBackend = new LocalSimulationConnectorModule();
 
-                    m_localBackend.InitialiseService(configSource);
+                m_localBackend.InitialiseService(configSource);
 
-                    m_remoteConnector = new SimulationServiceConnector();
+                m_remoteConnector = new SimulationServiceConnector();
 
-                    m_enabled = true;
+                m_enabled = true;
 
-                    m_log.Info("[REMOTE SIMULATION CONNECTOR]: Remote simulation enabled.");
-                }
+                m_log.Info("[REMOTE SIMULATION CONNECTOR]: Remote simulation enabled.");
             }
         }
-
-        public virtual void PostInitialise()
-        {
-        }
-
-        public virtual void Close()
-        {
-        }
-
-        public void AddRegion(Scene scene)
-        {
-            if (!m_enabled)
-                return;
-
-            if (!initialized)
-            {
-                InitOnce(scene);
-                initialized = true;
-            }
-            InitEach(scene);
-        }
-
-        public void RemoveRegion(Scene scene)
-        {
-            if (m_enabled)
-            {
-                m_localBackend.RemoveScene(scene);
-                scene.UnregisterModuleInterface<ISimulationService>(this);
-            }
-        }
-
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_enabled)
-                return;
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public virtual string Name
-        {
-            get { return "RemoteSimulationConnectorModule"; }
-        }
-
-        protected virtual void InitEach(Scene scene)
-        {
-            m_localBackend.Init(scene);
-            scene.RegisterModuleInterface<ISimulationService>(this);
-        }
-
-        protected virtual void InitOnce(Scene scene)
-        {
-            m_aScene = scene;
-            //m_regionClient = new RegionToRegionClient(m_aScene, m_hyperlinkService);
-        }
-
-        #endregion
-
-        #region ISimulationService
-
-        public IScene GetScene(UUID regionId)
-        {
-            return m_localBackend.GetScene(regionId);
-        }
-
-        public ISimulationService GetInnerService()
-        {
-            return m_localBackend;
-        }
-
-        /**
-         * Agent-related communications
-         */
-
-        public bool CreateAgent(GridRegion source, GridRegion destination, AgentCircuitData aCircuit, uint teleportFlags, EntityTransferContext ctx, out string reason)
-        {
-            if (destination == null)
-            {
-                reason = "Given destination was null";
-                m_log.DebugFormat("[REMOTE SIMULATION CONNECTOR]: CreateAgent was given a null destination");
-                return false;
-            }
-
-            // Try local first
-            if (m_localBackend.CreateAgent(source, destination, aCircuit, teleportFlags, ctx, out reason))
-                return true;
-
-            // else do the remote thing
-            if (!m_localBackend.IsLocalRegion(destination.RegionID))
-            {
-                return m_remoteConnector.CreateAgent(source, destination, aCircuit, teleportFlags, ctx, out reason);
-            }
-            return false;
-        }
-
-        public bool UpdateAgent(GridRegion destination, AgentData cAgentData, EntityTransferContext ctx)
-        {
-            if (destination == null)
-                return false;
-
-            // Try local first
-            if (m_localBackend.IsLocalRegion(destination.RegionID))
-                return m_localBackend.UpdateAgent(destination, cAgentData, ctx);
-
-            return m_remoteConnector.UpdateAgent(destination, cAgentData, ctx);
-        }
-
-        public bool UpdateAgent(GridRegion destination, AgentPosition cAgentData)
-        {
-            if (destination == null)
-                return false;
-
-            // Try local first
-            if (m_localBackend.IsLocalRegion(destination.RegionID))
-                return m_localBackend.UpdateAgent(destination, cAgentData);
-
-            return m_remoteConnector.UpdateAgent(destination, cAgentData);
-        }
-
-        public bool QueryAccess(GridRegion destination, UUID agentID, string agentHomeURI, bool viaTeleport, Vector3 position, List<UUID> features, EntityTransferContext ctx, out string reason)
-        {
-            reason = "Communications failure";
-
-            if (destination == null)
-                return false;
-
-            // Try local first
-            if (m_localBackend.QueryAccess(destination, agentID, agentHomeURI, viaTeleport, position, features, ctx, out reason))
-                return true;
-
-            // else do the remote thing
-            if (!m_localBackend.IsLocalRegion(destination.RegionID))
-                return m_remoteConnector.QueryAccess(destination, agentID, agentHomeURI, viaTeleport, position, features, ctx, out reason);
-
-            return false;
-        }
-
-        public bool ReleaseAgent(UUID origin, UUID id, string uri)
-        {
-            // Try local first
-            if (m_localBackend.ReleaseAgent(origin, id, uri))
-                return true;
-
-            // else do the remote thing
-            if (!m_localBackend.IsLocalRegion(origin))
-                return m_remoteConnector.ReleaseAgent(origin, id, uri);
-
-            return false;
-        }
-
-        public bool CloseAgent(GridRegion destination, UUID id, string auth_token)
-        {
-            if (destination == null)
-                return false;
-
-            // Try local first
-            if (m_localBackend.CloseAgent(destination, id, auth_token))
-                return true;
-
-            // else do the remote thing
-            if (!m_localBackend.IsLocalRegion(destination.RegionID))
-                return m_remoteConnector.CloseAgent(destination, id, auth_token);
-
-            return false;
-        }
-
-        /**
-         * Object-related communications
-         */
-
-        public bool CreateObject(GridRegion destination, Vector3 newPosition, ISceneObject sog, bool isLocalCall)
-        {
-            if (destination == null)
-                return false;
-
-            // Try local first
-            if (m_localBackend.CreateObject(destination, newPosition, sog, isLocalCall))
-            {
-                //m_log.Debug("[REST COMMS]: LocalBackEnd SendCreateObject succeeded");
-                return true;
-            }
-
-            // else do the remote thing
-            if (!m_localBackend.IsLocalRegion(destination.RegionID))
-                return m_remoteConnector.CreateObject(destination, newPosition, sog, isLocalCall);
-
-            return false;
-        }
-
-        #endregion
     }
+
+    public virtual void PostInitialise()
+    {
+    }
+
+    public virtual void Close()
+    {
+    }
+
+    public void AddRegion(Scene scene)
+    {
+        if (!m_enabled)
+            return;
+
+        if (!initialized)
+        {
+            InitOnce(scene);
+            initialized = true;
+        }
+        InitEach(scene);
+    }
+
+    public void RemoveRegion(Scene scene)
+    {
+        if (m_enabled)
+        {
+            m_localBackend.RemoveScene(scene);
+            scene.UnregisterModuleInterface<ISimulationService>(this);
+        }
+    }
+
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_enabled)
+            return;
+    }
+
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    public virtual string Name
+    {
+        get { return "RemoteSimulationConnectorModule"; }
+    }
+
+    protected virtual void InitEach(Scene scene)
+    {
+        m_localBackend.Init(scene);
+        scene.RegisterModuleInterface<ISimulationService>(this);
+    }
+
+    protected virtual void InitOnce(Scene scene)
+    {
+        m_aScene = scene;
+        //m_regionClient = new RegionToRegionClient(m_aScene, m_hyperlinkService);
+    }
+
+    #endregion
+
+    #region ISimulationService
+
+    public IScene GetScene(UUID regionId)
+    {
+        return m_localBackend.GetScene(regionId);
+    }
+
+    public ISimulationService GetInnerService()
+    {
+        return m_localBackend;
+    }
+
+    /**
+     * Agent-related communications
+     */
+
+    public bool CreateAgent(GridRegion source, GridRegion destination, AgentCircuitData aCircuit, uint teleportFlags, EntityTransferContext ctx, out string reason)
+    {
+        if (destination == null)
+        {
+            reason = "Given destination was null";
+            m_log.DebugFormat("[REMOTE SIMULATION CONNECTOR]: CreateAgent was given a null destination");
+            return false;
+        }
+
+        // Try local first
+        if (m_localBackend.CreateAgent(source, destination, aCircuit, teleportFlags, ctx, out reason))
+            return true;
+
+        // else do the remote thing
+        if (!m_localBackend.IsLocalRegion(destination.RegionID))
+        {
+            return m_remoteConnector.CreateAgent(source, destination, aCircuit, teleportFlags, ctx, out reason);
+        }
+        return false;
+    }
+
+    public bool UpdateAgent(GridRegion destination, AgentData cAgentData, EntityTransferContext ctx)
+    {
+        if (destination == null)
+            return false;
+
+        // Try local first
+        if (m_localBackend.IsLocalRegion(destination.RegionID))
+            return m_localBackend.UpdateAgent(destination, cAgentData, ctx);
+
+        return m_remoteConnector.UpdateAgent(destination, cAgentData, ctx);
+    }
+
+    public bool UpdateAgent(GridRegion destination, AgentPosition cAgentData)
+    {
+        if (destination == null)
+            return false;
+
+        // Try local first
+        if (m_localBackend.IsLocalRegion(destination.RegionID))
+            return m_localBackend.UpdateAgent(destination, cAgentData);
+
+        return m_remoteConnector.UpdateAgent(destination, cAgentData);
+    }
+
+    public bool QueryAccess(GridRegion destination, UUID agentID, string agentHomeURI, bool viaTeleport, Vector3 position, List<UUID> features, EntityTransferContext ctx, out string reason)
+    {
+        reason = "Communications failure";
+
+        if (destination == null)
+            return false;
+
+        // Try local first
+        if (m_localBackend.QueryAccess(destination, agentID, agentHomeURI, viaTeleport, position, features, ctx, out reason))
+            return true;
+
+        // else do the remote thing
+        if (!m_localBackend.IsLocalRegion(destination.RegionID))
+            return m_remoteConnector.QueryAccess(destination, agentID, agentHomeURI, viaTeleport, position, features, ctx, out reason);
+
+        return false;
+    }
+
+    public bool ReleaseAgent(UUID origin, UUID id, string uri)
+    {
+        // Try local first
+        if (m_localBackend.ReleaseAgent(origin, id, uri))
+            return true;
+
+        // else do the remote thing
+        if (!m_localBackend.IsLocalRegion(origin))
+            return m_remoteConnector.ReleaseAgent(origin, id, uri);
+
+        return false;
+    }
+
+    public bool CloseAgent(GridRegion destination, UUID id, string auth_token)
+    {
+        if (destination == null)
+            return false;
+
+        // Try local first
+        if (m_localBackend.CloseAgent(destination, id, auth_token))
+            return true;
+
+        // else do the remote thing
+        if (!m_localBackend.IsLocalRegion(destination.RegionID))
+            return m_remoteConnector.CloseAgent(destination, id, auth_token);
+
+        return false;
+    }
+
+    /**
+     * Object-related communications
+     */
+
+    public bool CreateObject(GridRegion destination, Vector3 newPosition, ISceneObject sog, bool isLocalCall)
+    {
+        if (destination == null)
+            return false;
+
+        // Try local first
+        if (m_localBackend.CreateObject(destination, newPosition, sog, isLocalCall))
+        {
+            //m_log.Debug("[REST COMMS]: LocalBackEnd SendCreateObject succeeded");
+            return true;
+        }
+
+        // else do the remote thing
+        if (!m_localBackend.IsLocalRegion(destination.RegionID))
+            return m_remoteConnector.CreateObject(destination, newPosition, sog, isLocalCall);
+
+        return false;
+    }
+
+    #endregion
 }

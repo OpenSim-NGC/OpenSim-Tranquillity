@@ -27,13 +27,12 @@
 
 using System.Collections;
 
-namespace OpenSim.Region.UserStatistics
+namespace OpenSim.Region.UserStatistics;
+
+public interface IStatsController
 {
-    public interface IStatsController
-    {
-        string ReportName { get; }
-        Hashtable ProcessModel(Hashtable pParams);
-        string RenderView(Hashtable pModelResult);
-        string RenderJson(Hashtable pModelResult);
-    }
+    string ReportName { get; }
+    Hashtable ProcessModel(Hashtable pParams);
+    string RenderView(Hashtable pModelResult);
+    string RenderJson(Hashtable pModelResult);
 }

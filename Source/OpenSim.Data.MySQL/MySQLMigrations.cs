@@ -26,69 +26,67 @@
  */
 
 using MySqlConnector;
-using System;
 using System.Data.Common;
 using System.Reflection;
 
-namespace OpenSim.Data.MySQL
+namespace OpenSim.Data.MySQL;
+
+/// <summary>This is a MySQL-customized migration processor.  The only difference is in how
+/// it executes SQL scripts (using MySqlScript instead of MyCommand)
+///
+/// </summary>
+public class MySqlMigration : Migration
 {
-    /// <summary>This is a MySQL-customized migration processor.  The only difference is in how
-    /// it executes SQL scripts (using MySqlScript instead of MyCommand)
-    ///
-    /// </summary>
-    public class MySqlMigration : Migration
+    public MySqlMigration()
+        : base()
     {
-        public MySqlMigration()
-            : base()
-        {
-        }
+    }
 
-        public MySqlMigration(DbConnection conn, Assembly assem, string subtype, string type) :
-            base(conn, assem, subtype, type)
-        {
-        }
+    public MySqlMigration(DbConnection conn, Assembly assem, string subtype, string type) :
+        base(conn, assem, subtype, type)
+    {
+    }
 
-        public MySqlMigration(DbConnection conn, Assembly assem, string type) :
-            base(conn, assem, type)
-        {
-        }
+    public MySqlMigration(DbConnection conn, Assembly assem, string type) :
+        base(conn, assem, type)
+    {
+    }
 
-        protected override void ExecuteScript(DbConnection conn, string[] script)
+    protected override void ExecuteScript(DbConnection conn, string[] script)
+    {
+        if (!(conn is MySqlConnection))
         {
-            if (!(conn is MySqlConnection))
+            base.ExecuteScript(conn, script);
+            return;
+        }
+        foreach (string sql in script)
+        {
+            try
             {
-                base.ExecuteScript(conn, script);
-                return;
-            }
-            foreach (string sql in script)
-            {
-                try
+                using (MySqlCommand cmd = new MySqlCommand(sql, (MySqlConnection)conn))
                 {
-                    using (MySqlCommand cmd = new MySqlCommand(sql, (MySqlConnection)conn))
-                    {
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-                catch (Exception)
-                {
-                    throw new Exception(sql);
-
+                    cmd.ExecuteNonQuery();
                 }
             }
+            catch (Exception)
+            {
+                throw new Exception(sql);
 
-            // XXX Was
-            //MySqlScript scr = new MySqlScript((MySqlConnection)conn);
-            //{
-            //    foreach (string sql in script)
-            //    {
-            //        scr.Query = sql;
-            //        scr.Error += delegate(object sender, MySqlScriptErrorEventArgs args)
-            //        {
-            //            throw new Exception(sql);
-            //        };
-            //        scr.Execute();
-            //    }
-            //}
+            }
         }
+
+        // XXX Was
+        //MySqlScript scr = new MySqlScript((MySqlConnection)conn);
+        //{
+        //    foreach (string sql in script)
+        //    {
+        //        scr.Query = sql;
+        //        scr.Error += delegate(object sender, MySqlScriptErrorEventArgs args)
+        //        {
+        //            throw new Exception(sql);
+        //        };
+        //        scr.Execute();
+        //    }
+        //}
     }
 }

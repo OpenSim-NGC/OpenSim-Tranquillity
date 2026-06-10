@@ -1,14 +1,12 @@
-﻿using System;
-using OpenMetaverse;
+﻿using OpenMetaverse;
 
-namespace OSHttpServer.Parser
+namespace OSHttpServer.Parser;
+
+/// <summary>
+/// Event arguments used when a new header have been parsed.
+/// </summary>
+public class HeaderEventArgs : EventArgs
 {
-    /// <summary>
-    /// Event arguments used when a new header have been parsed.
-    /// </summary>
-    public class HeaderEventArgs : EventArgs
-    {
-        public osUTF8Slice Name;
-        public osUTF8Slice Value;
-    }
+    public osUTF8Slice Name;
+    public osUTF8Slice Value;
 }

@@ -27,17 +27,16 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class FriendListItem
 {
-    public class FriendListItem
-    {
-        public UUID Friend;
-        public UUID FriendListOwner;
+    public UUID Friend;
+    public UUID FriendListOwner;
 
-        // These are what the list owner gives the friend permission to do
-        public uint FriendListOwnerPerms;
+    // These are what the list owner gives the friend permission to do
+    public uint FriendListOwnerPerms;
 
-        // These are what the friend gives the listowner permission to do
-        public uint FriendPerms;
-    }
+    // These are what the friend gives the listowner permission to do
+    public uint FriendPerms;
 }

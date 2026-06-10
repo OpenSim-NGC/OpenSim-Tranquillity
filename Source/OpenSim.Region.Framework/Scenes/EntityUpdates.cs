@@ -25,211 +25,208 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.Framework.Scenes
+namespace OpenSim.Region.Framework.Scenes;
+
+/// <summary>
+/// Specifies the fields that have been changed when sending a prim or
+/// avatar update
+/// </summary>
+[Flags]
+public enum ObjectPropertyUpdateFlags : byte
 {
-    /// <summary>
-    /// Specifies the fields that have been changed when sending a prim or
-    /// avatar update
-    /// </summary>
-    [Flags]
-    public enum ObjectPropertyUpdateFlags : byte
-    {
-        None = 0,
-        Family = 1,
-        Object = 2,
+    None = 0,
+    Family = 1,
+    Object = 2,
 
-        NoFamily = unchecked((byte)~Family),
-        NoObject = unchecked((byte)~Object)
+    NoFamily = unchecked((byte)~Family),
+    NoObject = unchecked((byte)~Object)
+}
+
+public class EntityUpdate
+{
+    // for priority queue
+    public int PriorityQueue;
+    public int PriorityQueueIndex;
+    public ulong EntryOrder;
+
+    private ISceneEntity m_entity;
+    private PrimUpdateFlags m_flags;
+    public ObjectPropertyUpdateFlags m_propsFlags;
+
+    public ObjectPropertyUpdateFlags PropsFlags
+    {
+        get
+        {
+            return m_propsFlags;
+        }
+        set
+        {
+            m_propsFlags = value;
+        }
     }
 
-    public class EntityUpdate
+    public ISceneEntity Entity
     {
-        // for priority queue
-        public int PriorityQueue;
-        public int PriorityQueueIndex;
-        public ulong EntryOrder;
-
-        private ISceneEntity m_entity;
-        private PrimUpdateFlags m_flags;
-        public ObjectPropertyUpdateFlags m_propsFlags;
-
-        public ObjectPropertyUpdateFlags PropsFlags
+        get
         {
-            get
-            {
-                return m_propsFlags;
-            }
-            set
-            {
-                m_propsFlags = value;
-            }
+            return m_entity;
         }
-
-        public ISceneEntity Entity
+        internal set
         {
-            get
-            {
-                return m_entity;
-            }
-            internal set
-            {
-                m_entity = value;
-            }
+            m_entity = value;
         }
+    }
 
-        public PrimUpdateFlags Flags
+    public PrimUpdateFlags Flags
+    {
+        get { return m_flags; }
+        set { m_flags = value; }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    public void Update(int pqueue, ulong entry)
+    {
+        if ((m_flags & PrimUpdateFlags.CancelKill) != 0)
         {
-            get { return m_flags; }
-            set { m_flags = value; }
-        }
-
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void Update(int pqueue, ulong entry)
-        {
-            if ((m_flags & PrimUpdateFlags.CancelKill) != 0)
-            {
-                if ((m_flags & PrimUpdateFlags.UpdateProbe) != 0)
-                    m_flags = PrimUpdateFlags.UpdateProbe;
-                else
-                    m_flags = PrimUpdateFlags.FullUpdatewithAnim;
-            }
-
-            PriorityQueue = pqueue;
-            EntryOrder = entry;
-        }
-
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void UpdateFromNew(EntityUpdate newupdate, int pqueue)
-        {
-            m_propsFlags |= newupdate.PropsFlags;
-            PrimUpdateFlags newFlags = newupdate.Flags;
-
-            if ((newFlags & PrimUpdateFlags.UpdateProbe) != 0)
-                m_flags &= ~PrimUpdateFlags.UpdateProbe;
-
-            if ((newFlags & PrimUpdateFlags.CancelKill) != 0)
-            {
-                if ((newFlags & PrimUpdateFlags.UpdateProbe) != 0)
-                    m_flags = PrimUpdateFlags.UpdateProbe;
-                else
-                    m_flags = PrimUpdateFlags.FullUpdatewithAnim;
-            }
+            if ((m_flags & PrimUpdateFlags.UpdateProbe) != 0)
+                m_flags = PrimUpdateFlags.UpdateProbe;
             else
-                m_flags |= newFlags;
-
-            PriorityQueue = pqueue;
+                m_flags = PrimUpdateFlags.FullUpdatewithAnim;
         }
 
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void Free()
-        {
-            m_entity = null;
-            PriorityQueueIndex = -1;
-            EntityUpdatesPool.Free(this);
-        }
-
-        public EntityUpdate(ISceneEntity entity, PrimUpdateFlags flags)
-        {
-            m_entity = entity;
-            m_flags = flags;
-        }
-
-        public EntityUpdate(ISceneEntity entity, PrimUpdateFlags flags, bool sendfam, bool sendobj)
-        {
-            m_entity = entity;
-            m_flags = flags;
-
-            if (sendfam)
-                m_propsFlags |= ObjectPropertyUpdateFlags.Family;
-
-            if (sendobj)
-                m_propsFlags |= ObjectPropertyUpdateFlags.Object;
-        }
-
-        public override string ToString()
-        {
-            return String.Format("[{0},{1},{2}]", PriorityQueue, EntryOrder, m_entity.LocalId);
-        }
+        PriorityQueue = pqueue;
+        EntryOrder = entry;
     }
 
-    public static class EntityUpdatesPool
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    public void UpdateFromNew(EntityUpdate newupdate, int pqueue)
     {
-        const int MAXSIZE = 32768;
-        const int PREALLOC = 16384;
-        private static readonly EntityUpdate[] m_pool = new EntityUpdate[MAXSIZE];
-        private static readonly object m_poollock = new object();
-        private static int m_poolPtr;
-        //private static int m_min = int.MaxValue;
-        //private static int m_max = int.MinValue;
+        m_propsFlags |= newupdate.PropsFlags;
+        PrimUpdateFlags newFlags = newupdate.Flags;
 
-        static EntityUpdatesPool()
+        if ((newFlags & PrimUpdateFlags.UpdateProbe) != 0)
+            m_flags &= ~PrimUpdateFlags.UpdateProbe;
+
+        if ((newFlags & PrimUpdateFlags.CancelKill) != 0)
         {
-            for(int i = 0; i < PREALLOC; ++i)
-                m_pool[i] = new EntityUpdate(null, 0);
-            m_poolPtr = PREALLOC - 1;
+            if ((newFlags & PrimUpdateFlags.UpdateProbe) != 0)
+                m_flags = PrimUpdateFlags.UpdateProbe;
+            else
+                m_flags = PrimUpdateFlags.FullUpdatewithAnim;
         }
+        else
+            m_flags |= newFlags;
 
-        public static EntityUpdate Get(ISceneEntity entity, PrimUpdateFlags flags)
+        PriorityQueue = pqueue;
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    public void Free()
+    {
+        m_entity = null;
+        PriorityQueueIndex = -1;
+        EntityUpdatesPool.Free(this);
+    }
+
+    public EntityUpdate(ISceneEntity entity, PrimUpdateFlags flags)
+    {
+        m_entity = entity;
+        m_flags = flags;
+    }
+
+    public EntityUpdate(ISceneEntity entity, PrimUpdateFlags flags, bool sendfam, bool sendobj)
+    {
+        m_entity = entity;
+        m_flags = flags;
+
+        if (sendfam)
+            m_propsFlags |= ObjectPropertyUpdateFlags.Family;
+
+        if (sendobj)
+            m_propsFlags |= ObjectPropertyUpdateFlags.Object;
+    }
+
+    public override string ToString()
+    {
+        return String.Format("[{0},{1},{2}]", PriorityQueue, EntryOrder, m_entity.LocalId);
+    }
+}
+
+public static class EntityUpdatesPool
+{
+    const int MAXSIZE = 32768;
+    const int PREALLOC = 16384;
+    private static readonly EntityUpdate[] m_pool = new EntityUpdate[MAXSIZE];
+    private static readonly object m_poollock = new object();
+    private static int m_poolPtr;
+    //private static int m_min = int.MaxValue;
+    //private static int m_max = int.MinValue;
+
+    static EntityUpdatesPool()
+    {
+        for(int i = 0; i < PREALLOC; ++i)
+            m_pool[i] = new EntityUpdate(null, 0);
+        m_poolPtr = PREALLOC - 1;
+    }
+
+    public static EntityUpdate Get(ISceneEntity entity, PrimUpdateFlags flags)
+    {
+        lock (m_poollock)
         {
-            lock (m_poollock)
+            if (m_poolPtr >= 0)
             {
-                if (m_poolPtr >= 0)
-                {
-                    EntityUpdate eu = m_pool[m_poolPtr];
-                    m_pool[m_poolPtr] = null;
-                    m_poolPtr--;
-                    //if (m_min > m_poolPtr)
-                    //    m_min = m_poolPtr;
-                    eu.Entity = entity;
-                    eu.Flags = flags;
-                    return eu;
-                }
+                EntityUpdate eu = m_pool[m_poolPtr];
+                m_pool[m_poolPtr] = null;
+                m_poolPtr--;
+                //if (m_min > m_poolPtr)
+                //    m_min = m_poolPtr;
+                eu.Entity = entity;
+                eu.Flags = flags;
+                return eu;
             }
-            return new EntityUpdate(entity, flags);
         }
+        return new EntityUpdate(entity, flags);
+    }
 
-        public static EntityUpdate Get(ISceneEntity entity, PrimUpdateFlags flags, bool sendfam, bool sendobj)
+    public static EntityUpdate Get(ISceneEntity entity, PrimUpdateFlags flags, bool sendfam, bool sendobj)
+    {
+        lock (m_poollock)
         {
-            lock (m_poollock)
+            if (m_poolPtr >= 0)
             {
-                if (m_poolPtr >= 0)
-                {
-                    EntityUpdate eu = m_pool[m_poolPtr];
-                    m_pool[m_poolPtr] = null;
-                    m_poolPtr--;
-                    //if (m_min > m_poolPtr)
-                    //    m_min = m_poolPtr;
-                    eu.Entity = entity;
-                    eu.Flags = flags;
-                    ObjectPropertyUpdateFlags tmp = 0;
-                    if (sendfam)
-                        tmp |= ObjectPropertyUpdateFlags.Family;
+                EntityUpdate eu = m_pool[m_poolPtr];
+                m_pool[m_poolPtr] = null;
+                m_poolPtr--;
+                //if (m_min > m_poolPtr)
+                //    m_min = m_poolPtr;
+                eu.Entity = entity;
+                eu.Flags = flags;
+                ObjectPropertyUpdateFlags tmp = 0;
+                if (sendfam)
+                    tmp |= ObjectPropertyUpdateFlags.Family;
 
-                    if (sendobj)
-                        tmp |= ObjectPropertyUpdateFlags.Object;
+                if (sendobj)
+                    tmp |= ObjectPropertyUpdateFlags.Object;
 
-                    eu.PropsFlags = tmp;
-                    return eu;
-                }
+                eu.PropsFlags = tmp;
+                return eu;
             }
-            return new EntityUpdate(entity, flags, sendfam, sendobj);
         }
+        return new EntityUpdate(entity, flags, sendfam, sendobj);
+    }
 
-        public static void Free(EntityUpdate eu)
+    public static void Free(EntityUpdate eu)
+    {
+        lock (m_poollock)
         {
-            lock (m_poollock)
+            if (m_poolPtr < MAXSIZE - 1)
             {
-                if (m_poolPtr < MAXSIZE - 1)
-                {
-                    m_poolPtr++;
-                    //if (m_max < m_poolPtr)
-                    //    m_max = m_poolPtr;
-                    m_pool[m_poolPtr] = eu;
-                }
+                m_poolPtr++;
+                //if (m_max < m_poolPtr)
+                //    m_max = m_poolPtr;
+                m_pool[m_poolPtr] = eu;
             }
         }
     }

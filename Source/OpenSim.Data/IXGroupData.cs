@@ -25,94 +25,90 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
-using OpenSim.Framework;
 
-namespace OpenSim.Data
+namespace OpenSim.Data;
+
+public class XGroup
 {
-    public class XGroup
+    public UUID groupID;
+    public UUID ownerRoleID;
+    public string name;
+    public string charter;
+    public bool showInList;
+    public UUID insigniaID;
+    public int membershipFee;
+    public bool openEnrollment;
+    public bool allowPublish;
+    public bool maturePublish;
+    public UUID founderID;
+    public ulong everyonePowers;
+    public ulong ownersPowers;
+
+    public Dictionary<UUID, XGroupMember> members = new Dictionary<UUID, XGroupMember>();
+    public Dictionary<UUID, XGroupNotice> notices = new Dictionary<UUID, XGroupNotice>();
+
+    public XGroup Clone()
     {
-        public UUID groupID;
-        public UUID ownerRoleID;
-        public string name;
-        public string charter;
-        public bool showInList;
-        public UUID insigniaID;
-        public int membershipFee;
-        public bool openEnrollment;
-        public bool allowPublish;
-        public bool maturePublish;
-        public UUID founderID;
-        public ulong everyonePowers;
-        public ulong ownersPowers;
+        XGroup clone = (XGroup)MemberwiseClone();
+        clone.members = new Dictionary<UUID, XGroupMember>();
+        clone.notices = new Dictionary<UUID, XGroupNotice>();
 
-        public Dictionary<UUID, XGroupMember> members = new Dictionary<UUID, XGroupMember>();
-        public Dictionary<UUID, XGroupNotice> notices = new Dictionary<UUID, XGroupNotice>();
+        foreach (KeyValuePair<UUID, XGroupMember> kvp in members)
+            clone.members[kvp.Key] = kvp.Value.Clone();
 
-        public XGroup Clone()
-        {
-            XGroup clone = (XGroup)MemberwiseClone();
-            clone.members = new Dictionary<UUID, XGroupMember>();
-            clone.notices = new Dictionary<UUID, XGroupNotice>();
+        foreach (KeyValuePair<UUID, XGroupNotice> kvp in notices)
+            clone.notices[kvp.Key] = kvp.Value.Clone();
 
-            foreach (KeyValuePair<UUID, XGroupMember> kvp in members)
-                clone.members[kvp.Key] = kvp.Value.Clone();
-
-            foreach (KeyValuePair<UUID, XGroupNotice> kvp in notices)
-                clone.notices[kvp.Key] = kvp.Value.Clone();
-
-            return clone;
-        }
+        return clone;
     }
+}
 
-    public class XGroupMember
+public class XGroupMember
+{
+    public UUID agentID;
+    public UUID groupID;
+    public UUID roleID;
+    public bool acceptNotices = true;
+    public bool listInProfile = true;
+
+    public XGroupMember Clone()
     {
-        public UUID agentID;
-        public UUID groupID;
-        public UUID roleID;
-        public bool acceptNotices = true;
-        public bool listInProfile = true;
-
-        public XGroupMember Clone()
-        {
-            return (XGroupMember)MemberwiseClone();
-        }
+        return (XGroupMember)MemberwiseClone();
     }
+}
 
-    public class XGroupNotice
+public class XGroupNotice
+{
+    public UUID groupID;
+    public UUID noticeID;
+    public uint timestamp;
+    public string fromName;
+    public string subject;
+    public string message;
+    public byte[] binaryBucket;
+    public bool hasAttachment;
+    public int assetType;
+
+    public XGroupNotice Clone()
     {
-        public UUID groupID;
-        public UUID noticeID;
-        public uint timestamp;
-        public string fromName;
-        public string subject;
-        public string message;
-        public byte[] binaryBucket;
-        public bool hasAttachment;
-        public int assetType;
+        XGroupNotice clone = (XGroupNotice)MemberwiseClone();
+        clone.binaryBucket = (byte[])binaryBucket.Clone();
 
-        public XGroupNotice Clone()
-        {
-            XGroupNotice clone = (XGroupNotice)MemberwiseClone();
-            clone.binaryBucket = (byte[])binaryBucket.Clone();
-
-            return clone;
-        }
+        return clone;
     }
+}
 
-    /// <summary>
-    /// Early stub interface for groups data, not final.
-    /// </summary>
-    /// <remarks>
-    /// Currently in-use only for regression test purposes.
-    /// </remarks>
-    public interface IXGroupData
-    {
-        bool StoreGroup(XGroup group);
-        XGroup GetGroup(UUID groupID);
-        Dictionary<UUID, XGroup> GetGroups();
-        bool DeleteGroup(UUID groupID);
-    }
+/// <summary>
+/// Early stub interface for groups data, not final.
+/// </summary>
+/// <remarks>
+/// Currently in-use only for regression test purposes.
+/// </remarks>
+public interface IXGroupData
+{
+    bool StoreGroup(XGroup group);
+    XGroup GetGroup(UUID groupID);
+    Dictionary<UUID, XGroup> GetGroups();
+    bool DeleteGroup(UUID groupID);
 }

@@ -25,32 +25,31 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors
+namespace OpenSim.Region.CoreModules.Framework.Monitoring.Monitors;
+
+class PWSMemoryMonitor : IMonitor
 {
-    class PWSMemoryMonitor : IMonitor
+    #region Implementation of IMonitor
+
+    public string GetName()
     {
-        #region Implementation of IMonitor
-
-        public string GetName()
-        {
-            return "PWSMemoryMonitor";
-        }
-
-        public double GetValue()
-        {
-            return System.Diagnostics.Process.GetCurrentProcess().PrivateMemorySize64;
-        }
-
-        public string GetFriendlyName()
-        {
-            return "Private Working Set Memory";
-        }
-
-        public string GetFriendlyValue()
-        {
-            return (int)(GetValue() / (1024 * 1024)) + "MB (Global)";
-        }
-
-        #endregion
+        return "PWSMemoryMonitor";
     }
+
+    public double GetValue()
+    {
+        return System.Diagnostics.Process.GetCurrentProcess().PrivateMemorySize64;
+    }
+
+    public string GetFriendlyName()
+    {
+        return "Private Working Set Memory";
+    }
+
+    public string GetFriendlyValue()
+    {
+        return (int)(GetValue() / (1024 * 1024)) + "MB (Global)";
+    }
+
+    #endregion
 }

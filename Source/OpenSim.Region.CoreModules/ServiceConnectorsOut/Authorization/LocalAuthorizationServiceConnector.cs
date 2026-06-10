@@ -32,86 +32,85 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization;
+
+public class LocalAuthorizationServicesConnector : INonSharedRegionModule, IAuthorizationService
 {
-    public class LocalAuthorizationServicesConnector : INonSharedRegionModule, IAuthorizationService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IAuthorizationService m_AuthorizationService;
+    private Scene m_Scene;
+    private IConfig m_AuthorizationConfig;
+
+    private bool m_Enabled = false;
+
+    public Type ReplaceableInterface
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        get { return null; }
+    }
 
-        private IAuthorizationService m_AuthorizationService;
-        private Scene m_Scene;
-        private IConfig m_AuthorizationConfig;
+    public string Name
+    {
+        get { return "LocalAuthorizationServicesConnector"; }
+    }
 
-        private bool m_Enabled = false;
+    public void Initialise(IConfigSource source)
+    {
+        m_log.Info("[AUTHORIZATION CONNECTOR]: Initialise");
 
-        public Type ReplaceableInterface
+        IConfig moduleConfig = source.Configs["Modules"];
+        if (moduleConfig != null)
         {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "LocalAuthorizationServicesConnector"; }
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            m_log.Info("[AUTHORIZATION CONNECTOR]: Initialise");
-
-            IConfig moduleConfig = source.Configs["Modules"];
-            if (moduleConfig != null)
+            string name = moduleConfig.GetString("AuthorizationServices", string.Empty);
+            if (name == Name)
             {
-                string name = moduleConfig.GetString("AuthorizationServices", string.Empty);
-                if (name == Name)
-                {
-                    m_Enabled = true;
-                    m_AuthorizationConfig = source.Configs["AuthorizationService"];
-                    m_log.Info("[AUTHORIZATION CONNECTOR]: Local authorization connector enabled");
-                }
+                m_Enabled = true;
+                m_AuthorizationConfig = source.Configs["AuthorizationService"];
+                m_log.Info("[AUTHORIZATION CONNECTOR]: Local authorization connector enabled");
             }
         }
+    }
 
-        public void PostInitialise()
-        {
-        }
+    public void PostInitialise()
+    {
+    }
 
-        public void Close()
-        {
-        }
+    public void Close()
+    {
+    }
 
-        public void AddRegion(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
+    public void AddRegion(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
 
-            scene.RegisterModuleInterface<IAuthorizationService>(this);
-            m_Scene = scene;
-        }
+        scene.RegisterModuleInterface<IAuthorizationService>(this);
+        m_Scene = scene;
+    }
 
-        public void RemoveRegion(Scene scene)
-        {
-        }
+    public void RemoveRegion(Scene scene)
+    {
+    }
 
-        public void RegionLoaded(Scene scene)
-        {
-            if (!m_Enabled)
-                return;
+    public void RegionLoaded(Scene scene)
+    {
+        if (!m_Enabled)
+            return;
 
-            m_AuthorizationService = new AuthorizationService(m_AuthorizationConfig, scene);
+        m_AuthorizationService = new AuthorizationService(m_AuthorizationConfig, scene);
 
-            m_log.InfoFormat(
-                "[AUTHORIZATION CONNECTOR]: Enabled local authorization for region {0}",
-                scene.RegionInfo.RegionName);
-        }
+        m_log.InfoFormat(
+            "[AUTHORIZATION CONNECTOR]: Enabled local authorization for region {0}",
+            scene.RegionInfo.RegionName);
+    }
 
-        public bool IsAuthorizedForRegion(
-            string userID, string firstName, string lastName, string regionID, out string message)
-        {
-            message = "";
-            if (!m_Enabled)
-                return true;
+    public bool IsAuthorizedForRegion(
+        string userID, string firstName, string lastName, string regionID, out string message)
+    {
+        message = "";
+        if (!m_Enabled)
+            return true;
 
-            return m_AuthorizationService.IsAuthorizedForRegion(userID, firstName, lastName, regionID, out message);
-        }
+        return m_AuthorizationService.IsAuthorizedForRegion(userID, firstName, lastName, regionID, out message);
     }
 }

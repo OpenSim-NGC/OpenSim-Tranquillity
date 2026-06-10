@@ -39,284 +39,283 @@ using OpenSim.Services.Interfaces;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OpenSim.Capabilities.Handlers;
 
-namespace OpenSim.Region.ClientStack.LindenCaps
+namespace OpenSim.Region.ClientStack.LindenCaps;
+
+/// <summary>
+/// This module implements both WebFetchInventoryDescendents and FetchInventoryDescendents2 capabilities.
+/// </summary>
+public class FetchLibDescModule : INonSharedRegionModule
 {
-    /// <summary>
-    /// This module implements both WebFetchInventoryDescendents and FetchInventoryDescendents2 capabilities.
-    /// </summary>
-    public class FetchLibDescModule : INonSharedRegionModule
+    class APollRequest
     {
-        class APollRequest
+        public PollServiceInventoryEventArgs thepoll;
+        public UUID reqID;
+        public OSHttpRequest request;
+    }
+
+    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    /// <summary>
+    /// Control whether requests will be processed asynchronously.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to true.  Can currently not be changed once a region has been added to the module.
+    /// </remarks>
+    public bool ProcessQueuedRequestsAsync { get; private set; }
+
+    /// <summary>
+    /// Number of inventory requests processed by this module.
+    /// </summary>
+    /// <remarks>
+    /// It's the PollServiceRequestManager that actually sends completed requests back to the requester.
+    /// </remarks>
+    public static int ProcessedRequestsCount { get; set; }
+
+    public Scene Scene { get; private set; }
+
+    private ILibraryService m_LibraryService;
+
+    private bool m_Enabled;
+    private ExpiringKey<UUID> m_badRequests;
+
+    private string m_fetchLibDescendents2Url;
+
+    private static FetchLibDescHandler m_FetchHandler;
+
+    private static ObjectJobEngine m_workerpool = null;
+
+    #region ISharedRegionModule Members
+
+    public FetchLibDescModule() : this(true) {}
+
+    public FetchLibDescModule(bool processQueuedResultsAsync)
+    {
+        ProcessQueuedRequestsAsync = processQueuedResultsAsync;
+    }
+
+    public void Initialise(IConfigSource source)
+    {
+        IConfig config = source.Configs["ClientStack.LindenCaps"];
+        if (config == null)
+            return;
+
+        m_fetchLibDescendents2Url = config.GetString("Cap_FetchLibDescendents2", string.Empty);
+        m_Enabled = m_fetchLibDescendents2Url.Length > 0;
+    }
+
+    public void AddRegion(Scene s)
+    {
+        if (!m_Enabled)
+            return;
+
+        Scene = s;
+    }
+
+    public void RemoveRegion(Scene s)
+    {
+        if (!m_Enabled)
+            return;
+
+        Scene.EventManager.OnRegisterCaps -= RegisterCaps;
+        Scene = null;
+    }
+
+    public void RegionLoaded(Scene s)
+    {
+        if (!m_Enabled)
+            return;
+
+        m_LibraryService = Scene.LibraryService;
+
+        // We'll reuse the same handler for all requests.
+        m_FetchHandler = new FetchLibDescHandler(m_LibraryService, Scene);
+
+        Scene.EventManager.OnRegisterCaps += RegisterCaps;
+
+        if(m_badRequests == null)
+            m_badRequests = new ExpiringKey<UUID>(30000);
+
+        if (ProcessQueuedRequestsAsync && m_workerpool == null)
+            m_workerpool = new ObjectJobEngine(DoInventoryRequests, "LibInventoryWorker", 2000, 2);
+    }
+
+    public void PostInitialise()
+    {
+    }
+
+    public void Close()
+    {
+        if (!m_Enabled)
+            return;
+
+        if (ProcessQueuedRequestsAsync)
         {
-            public PollServiceInventoryEventArgs thepoll;
-            public UUID reqID;
-            public OSHttpRequest request;
-        }
-
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        /// <summary>
-        /// Control whether requests will be processed asynchronously.
-        /// </summary>
-        /// <remarks>
-        /// Defaults to true.  Can currently not be changed once a region has been added to the module.
-        /// </remarks>
-        public bool ProcessQueuedRequestsAsync { get; private set; }
-
-        /// <summary>
-        /// Number of inventory requests processed by this module.
-        /// </summary>
-        /// <remarks>
-        /// It's the PollServiceRequestManager that actually sends completed requests back to the requester.
-        /// </remarks>
-        public static int ProcessedRequestsCount { get; set; }
-
-        public Scene Scene { get; private set; }
-
-        private ILibraryService m_LibraryService;
-
-        private bool m_Enabled;
-        private ExpiringKey<UUID> m_badRequests;
-
-        private string m_fetchLibDescendents2Url;
-
-        private static FetchLibDescHandler m_FetchHandler;
-
-        private static ObjectJobEngine m_workerpool = null;
-
-        #region ISharedRegionModule Members
-
-        public FetchLibDescModule() : this(true) {}
-
-        public FetchLibDescModule(bool processQueuedResultsAsync)
-        {
-            ProcessQueuedRequestsAsync = processQueuedResultsAsync;
-        }
-
-        public void Initialise(IConfigSource source)
-        {
-            IConfig config = source.Configs["ClientStack.LindenCaps"];
-            if (config == null)
-                return;
-
-            m_fetchLibDescendents2Url = config.GetString("Cap_FetchLibDescendents2", string.Empty);
-            m_Enabled = m_fetchLibDescendents2Url.Length > 0;
-        }
-
-        public void AddRegion(Scene s)
-        {
-            if (!m_Enabled)
-                return;
-
-            Scene = s;
-        }
-
-        public void RemoveRegion(Scene s)
-        {
-            if (!m_Enabled)
-                return;
-
-            Scene.EventManager.OnRegisterCaps -= RegisterCaps;
-            Scene = null;
-        }
-
-        public void RegionLoaded(Scene s)
-        {
-            if (!m_Enabled)
-                return;
-
-            m_LibraryService = Scene.LibraryService;
-
-            // We'll reuse the same handler for all requests.
-            m_FetchHandler = new FetchLibDescHandler(m_LibraryService, Scene);
-
-            Scene.EventManager.OnRegisterCaps += RegisterCaps;
-
-            if(m_badRequests == null)
-                m_badRequests = new ExpiringKey<UUID>(30000);
-
-            if (ProcessQueuedRequestsAsync && m_workerpool == null)
-                m_workerpool = new ObjectJobEngine(DoInventoryRequests, "LibInventoryWorker", 2000, 2);
-        }
-
-        public void PostInitialise()
-        {
-        }
-
-        public void Close()
-        {
-            if (!m_Enabled)
-                return;
-
-            if (ProcessQueuedRequestsAsync)
+            if (m_workerpool != null)
             {
-                if (m_workerpool != null)
-                {
-                    m_workerpool.Dispose();
-                    m_workerpool = null;
-                    m_badRequests.Dispose();
-                    m_badRequests = null;
-                }
+                m_workerpool.Dispose();
+                m_workerpool = null;
+                m_badRequests.Dispose();
+                m_badRequests = null;
             }
-            //m_queue.Dispose();
         }
+        //m_queue.Dispose();
+    }
 
-        public string Name { get { return "FetchLibDescModule"; } }
+    public string Name { get { return "FetchLibDescModule"; } }
 
-        public Type ReplaceableInterface
+    public Type ReplaceableInterface
+    {
+        get { return null; }
+    }
+
+    #endregion
+
+    private class PollServiceInventoryEventArgs : PollServiceEventArgs
+    {
+        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+        private Dictionary<UUID, Hashtable> responses = new Dictionary<UUID, Hashtable>();
+        private HashSet<UUID> dropedResponses = new HashSet<UUID>();
+
+        private FetchLibDescModule m_module;
+
+        public PollServiceInventoryEventArgs(FetchLibDescModule module, string url, UUID pId) :
+            base(null, url, null, null, null, null, pId, int.MaxValue)
         {
-            get { return null; }
-        }
+            m_module = module;
 
-        #endregion
-
-        private class PollServiceInventoryEventArgs : PollServiceEventArgs
-        {
-            private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-            private Dictionary<UUID, Hashtable> responses = new Dictionary<UUID, Hashtable>();
-            private HashSet<UUID> dropedResponses = new HashSet<UUID>();
-
-            private FetchLibDescModule m_module;
-
-            public PollServiceInventoryEventArgs(FetchLibDescModule module, string url, UUID pId) :
-                base(null, url, null, null, null, null, pId, int.MaxValue)
+            HasEvents = delegate (UUID requestID, UUID _)
             {
-                m_module = module;
+                lock (responses)
+                    return responses.ContainsKey(requestID);
+            };
 
-                HasEvents = delegate (UUID requestID, UUID _)
-                {
-                    lock (responses)
-                        return responses.ContainsKey(requestID);
-                };
-
-                Drop = delegate (UUID requestID, UUID _)
-                {
-                    lock (responses)
-                    {
-                        responses.Remove(requestID);
-                        lock(dropedResponses)
-                            dropedResponses.Add(requestID);
-                    }
-                };
-
-                GetEvents = delegate (UUID requestID, UUID _)
-                {
-                    lock (responses)
-                    {
-                        try
-                        {
-                            return responses[requestID];
-                        }
-                        finally
-                        {
-                            responses.Remove(requestID);
-                        }
-                    }
-                };
-
-                Request = delegate(UUID requestID, OSHttpRequest request)
-                {
-                    APollRequest reqinfo = new APollRequest();
-                    reqinfo.thepoll = this;
-                    reqinfo.reqID = requestID;
-                    reqinfo.request = request;
-                    m_workerpool.Enqueue(reqinfo);
-                    return null;
-                };
-
-                NoEvents = delegate (UUID _, UUID _)
-                {
-                    Hashtable response = new Hashtable();
-                    response["int_response_code"] = 500;
-                    response["str_response_string"] = "Script timeout";
-                    response["content_type"] = "text/plain";
-                    response["keepalive"] = false;
-
-                    return response;
-                };
-            }
-
-            public void Process(APollRequest requestinfo)
+            Drop = delegate (UUID requestID, UUID _)
             {
-                if(m_module == null || m_module.Scene == null || m_module.Scene.ShuttingDown)
-                    return;
-
-                UUID requestID = requestinfo.reqID;
-
-                lock(responses)
-                {
-                    lock(dropedResponses)
-                    {
-                        if(dropedResponses.Contains(requestID))
-                        {
-                            dropedResponses.Remove(requestID);
-                            return;
-                        }
-                    }
-                }
-
-                OSHttpResponse osresponse = new OSHttpResponse(requestinfo.request);
-                m_FetchHandler.FetchRequest(requestinfo.request, osresponse, m_module.m_badRequests, requestinfo.thepoll.Id);
-                requestinfo.request.InputStream.Dispose();
-
                 lock (responses)
                 {
+                    responses.Remove(requestID);
                     lock(dropedResponses)
-                    {
-                        if(dropedResponses.Contains(requestID))
-                        {
-                            dropedResponses.Remove(requestID);
-                            ProcessedRequestsCount++;
-                            return;
-                        }
-                    }
-
-                    Hashtable response = new Hashtable();
-                    response["h"] = osresponse;
-                    responses[requestID] = response;
+                        dropedResponses.Add(requestID);
                 }
-                ProcessedRequestsCount++;
-            }
-        }
+            };
 
-        private void RegisterCaps(UUID agentID, Caps caps)
-        {
-            RegisterFetchLibDescendentsCap(agentID, caps, "FetchLibDescendents2", m_fetchLibDescendents2Url);
-        }
-
-        private void RegisterFetchLibDescendentsCap(UUID agentID, Caps caps, string capName, string url)
-        {
-            string capUrl;
-
-            // handled by the simulator
-            if (url == "localhost")
+            GetEvents = delegate (UUID requestID, UUID _)
             {
-                capUrl = "/" + UUID.Random();
+                lock (responses)
+                {
+                    try
+                    {
+                        return responses[requestID];
+                    }
+                    finally
+                    {
+                        responses.Remove(requestID);
+                    }
+                }
+            };
 
-                // Register this as a poll service
-                PollServiceInventoryEventArgs args = new PollServiceInventoryEventArgs(this, capUrl, agentID);
-                //args.Type = PollServiceEventArgs.EventType.Inventory;
+            Request = delegate(UUID requestID, OSHttpRequest request)
+            {
+                APollRequest reqinfo = new APollRequest();
+                reqinfo.thepoll = this;
+                reqinfo.reqID = requestID;
+                reqinfo.request = request;
+                m_workerpool.Enqueue(reqinfo);
+                return null;
+            };
 
-                caps.RegisterPollHandler(capName, args);
+            NoEvents = delegate (UUID _, UUID _)
+            {
+                Hashtable response = new Hashtable();
+                response["int_response_code"] = 500;
+                response["str_response_string"] = "Script timeout";
+                response["content_type"] = "text/plain";
+                response["keepalive"] = false;
+
+                return response;
+            };
+        }
+
+        public void Process(APollRequest requestinfo)
+        {
+            if(m_module == null || m_module.Scene == null || m_module.Scene.ShuttingDown)
+                return;
+
+            UUID requestID = requestinfo.reqID;
+
+            lock(responses)
+            {
+                lock(dropedResponses)
+                {
+                    if(dropedResponses.Contains(requestID))
+                    {
+                        dropedResponses.Remove(requestID);
+                        return;
+                    }
+                }
             }
-            // external handler
+
+            OSHttpResponse osresponse = new OSHttpResponse(requestinfo.request);
+            m_FetchHandler.FetchRequest(requestinfo.request, osresponse, m_module.m_badRequests, requestinfo.thepoll.Id);
+            requestinfo.request.InputStream.Dispose();
+
+            lock (responses)
+            {
+                lock(dropedResponses)
+                {
+                    if(dropedResponses.Contains(requestID))
+                    {
+                        dropedResponses.Remove(requestID);
+                        ProcessedRequestsCount++;
+                        return;
+                    }
+                }
+
+                Hashtable response = new Hashtable();
+                response["h"] = osresponse;
+                responses[requestID] = response;
+            }
+            ProcessedRequestsCount++;
+        }
+    }
+
+    private void RegisterCaps(UUID agentID, Caps caps)
+    {
+        RegisterFetchLibDescendentsCap(agentID, caps, "FetchLibDescendents2", m_fetchLibDescendents2Url);
+    }
+
+    private void RegisterFetchLibDescendentsCap(UUID agentID, Caps caps, string capName, string url)
+    {
+        string capUrl;
+
+        // handled by the simulator
+        if (url == "localhost")
+        {
+            capUrl = "/" + UUID.Random();
+
+            // Register this as a poll service
+            PollServiceInventoryEventArgs args = new PollServiceInventoryEventArgs(this, capUrl, agentID);
+            //args.Type = PollServiceEventArgs.EventType.Inventory;
+
+            caps.RegisterPollHandler(capName, args);
+        }
+        // external handler
+        else
+        {
+            capUrl = url;
+            IExternalCapsModule handler = Scene.RequestModuleInterface<IExternalCapsModule>();
+            if (handler != null)
+                handler.RegisterExternalUserCapsHandler(agentID, caps, capName, capUrl);
             else
-            {
-                capUrl = url;
-                IExternalCapsModule handler = Scene.RequestModuleInterface<IExternalCapsModule>();
-                if (handler != null)
-                    handler.RegisterExternalUserCapsHandler(agentID, caps, capName, capUrl);
-                else
-                    caps.RegisterHandler(capName, capUrl);
-            }
+                caps.RegisterHandler(capName, capUrl);
         }
+    }
 
-        private static void DoInventoryRequests(object o)
-        {
-            APollRequest poolreq = o as APollRequest;
-            if (poolreq != null && poolreq.thepoll != null)
-                poolreq.thepoll.Process(poolreq);
-        }
+    private static void DoInventoryRequests(object o)
+    {
+        APollRequest poolreq = o as APollRequest;
+        if (poolreq != null && poolreq.thepoll != null)
+            poolreq.thepoll.Process(poolreq);
     }
 }

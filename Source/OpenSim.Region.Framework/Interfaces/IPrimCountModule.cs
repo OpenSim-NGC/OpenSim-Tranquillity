@@ -28,14 +28,13 @@
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.Framework.Interfaces
-{
-    public interface IPrimCountModule
-    {
-        void TaintPrimCount(ILandObject land);
-        void TaintPrimCount(int x, int y);
-        void TaintPrimCount();
+namespace OpenSim.Region.Framework.Interfaces;
 
-        IPrimCounts GetPrimCounts(UUID parcelID);
-    }
+public interface IPrimCountModule
+{
+    void TaintPrimCount(ILandObject land);
+    void TaintPrimCount(int x, int y);
+    void TaintPrimCount();
+
+    IPrimCounts GetPrimCounts(UUID parcelID);
 }

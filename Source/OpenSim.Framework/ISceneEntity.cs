@@ -27,14 +27,13 @@
 
 using OpenMetaverse;
 
-namespace OpenSim.Framework
-{
-    public interface ISceneEntity
-    {
-        string Name { get; set; }
-        UUID UUID { get; }
-        uint LocalId { get; }
+namespace OpenSim.Framework;
 
-        Vector3 AbsolutePosition { get; }
-    }
+public interface ISceneEntity
+{
+    string Name { get; set; }
+    UUID UUID { get; }
+    uint LocalId { get; }
+
+    Vector3 AbsolutePosition { get; }
 }

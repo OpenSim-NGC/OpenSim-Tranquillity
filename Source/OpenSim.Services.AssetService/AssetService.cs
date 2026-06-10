@@ -25,190 +25,185 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 using Nini.Config;
 using log4net;
 using OpenSim.Framework;
-using OpenSim.Data;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
-namespace OpenSim.Services.AssetService
+namespace OpenSim.Services.AssetService;
+
+public class AssetService : AssetServiceBase, IAssetService
 {
-    public class AssetService : AssetServiceBase, IAssetService
+    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    protected static AssetService m_RootInstance;
+
+    public AssetService(IConfigSource config)
+        : this(config, "AssetService")
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        protected static AssetService m_RootInstance;
-
-        public AssetService(IConfigSource config)
-            : this(config, "AssetService")
+    public AssetService(IConfigSource config, string configName) : base(config, configName)
+    {
+        if (m_RootInstance == null)
         {
-        }
+            m_RootInstance = this;
 
-        public AssetService(IConfigSource config, string configName) : base(config, configName)
-        {
-            if (m_RootInstance == null)
+            if (m_AssetLoader != null)
             {
-                m_RootInstance = this;
+                IConfig assetConfig = config.Configs[m_ConfigName];
+                if (assetConfig == null)
+                    throw new Exception("No " + m_ConfigName + " configuration");
 
-                if (m_AssetLoader != null)
+                string loaderArgs = assetConfig.GetString("AssetLoaderArgs",
+                        String.Empty);
+
+                bool assetLoaderEnabled = assetConfig.GetBoolean("AssetLoaderEnabled", true);
+
+                if (assetLoaderEnabled)
                 {
-                    IConfig assetConfig = config.Configs[m_ConfigName];
-                    if (assetConfig == null)
-                        throw new Exception("No " + m_ConfigName + " configuration");
+                    m_log.DebugFormat("[ASSET SERVICE]: Loading default asset set from {0}", loaderArgs);
 
-                    string loaderArgs = assetConfig.GetString("AssetLoaderArgs",
-                            String.Empty);
-
-                    bool assetLoaderEnabled = assetConfig.GetBoolean("AssetLoaderEnabled", true);
-
-                    if (assetLoaderEnabled)
-                    {
-                        m_log.DebugFormat("[ASSET SERVICE]: Loading default asset set from {0}", loaderArgs);
-
-                        m_AssetLoader.ForEachDefaultXmlAsset(
-                            loaderArgs,
-                            delegate(AssetBase a)
-                            {
-                                AssetBase existingAsset = Get(a.ID);
+                    m_AssetLoader.ForEachDefaultXmlAsset(
+                        loaderArgs,
+                        delegate(AssetBase a)
+                        {
+                            AssetBase existingAsset = Get(a.ID);
 //                                AssetMetadata existingMetadata = GetMetadata(a.ID);
 
-                                if (existingAsset == null || Util.SHA1Hash(existingAsset.Data) != Util.SHA1Hash(a.Data))
-                                {
+                            if (existingAsset == null || Util.SHA1Hash(existingAsset.Data) != Util.SHA1Hash(a.Data))
+                            {
 //                                    m_log.DebugFormat("[ASSET]: Storing {0} {1}", a.Name, a.ID);
-                                    m_Database.StoreAsset(a);
-                                }
-                            });
-                    }
-
-                    m_log.Debug("[ASSET SERVICE]: Local asset service enabled");
+                                m_Database.StoreAsset(a);
+                            }
+                        });
                 }
+
+                m_log.Debug("[ASSET SERVICE]: Local asset service enabled");
             }
         }
+    }
 
-        public virtual AssetBase Get(string id)
-        {
+    public virtual AssetBase Get(string id)
+    {
 //            m_log.DebugFormat("[ASSET SERVICE]: Get asset for {0}", id);
 
-            UUID assetID;
+        UUID assetID;
 
-            if (!UUID.TryParse(id, out assetID))
-            {
-                m_log.WarnFormat("[ASSET SERVICE]: Could not parse requested asset id {0}", id);
-                return null;
-            }
-
-            try
-            {
-                return m_Database.GetAsset(assetID);
-            }
-            catch (Exception e)
-            {
-                m_log.ErrorFormat("[ASSET SERVICE]: Exception getting asset {0} {1}", assetID, e);
-                return null;
-            }
-        }
-
-        public AssetBase Get(string id, string ForeignAssetService, bool dummy)
+        if (!UUID.TryParse(id, out assetID))
         {
+            m_log.WarnFormat("[ASSET SERVICE]: Could not parse requested asset id {0}", id);
             return null;
         }
 
-        public virtual AssetBase GetCached(string id)
+        try
         {
-            return Get(id);
+            return m_Database.GetAsset(assetID);
         }
-
-        public virtual AssetMetadata GetMetadata(string id)
+        catch (Exception e)
         {
+            m_log.ErrorFormat("[ASSET SERVICE]: Exception getting asset {0} {1}", assetID, e);
+            return null;
+        }
+    }
+
+    public AssetBase Get(string id, string ForeignAssetService, bool dummy)
+    {
+        return null;
+    }
+
+    public virtual AssetBase GetCached(string id)
+    {
+        return Get(id);
+    }
+
+    public virtual AssetMetadata GetMetadata(string id)
+    {
 //            m_log.DebugFormat("[ASSET SERVICE]: Get asset metadata for {0}", id);
 
-            AssetBase asset = Get(id);
+        AssetBase asset = Get(id);
 
-            if (asset != null)
-                return asset.Metadata;
-            else
-                return null;
-        }
+        if (asset != null)
+            return asset.Metadata;
+        else
+            return null;
+    }
 
-        public virtual byte[] GetData(string id)
-        {
+    public virtual byte[] GetData(string id)
+    {
 //            m_log.DebugFormat("[ASSET SERVICE]: Get asset data for {0}", id);
 
-            AssetBase asset = Get(id);
+        AssetBase asset = Get(id);
 
-            if (asset != null)
-                return asset.Data;
-            else
-                return null;
-        }
+        if (asset != null)
+            return asset.Data;
+        else
+            return null;
+    }
 
-        public virtual bool Get(string id, Object sender, AssetRetrieved handler)
+    public virtual bool Get(string id, Object sender, AssetRetrieved handler)
+    {
+        //m_log.DebugFormat("[AssetService]: Get asset async {0}", id);
+
+        handler(id, sender, Get(id));
+
+        return true;
+    }
+
+    public virtual bool[] AssetsExist(string[] ids)
+    {
+        try
         {
-            //m_log.DebugFormat("[AssetService]: Get asset async {0}", id);
-
-            handler(id, sender, Get(id));
-
-            return true;
+            UUID[] uuid = Array.ConvertAll(ids, id => UUID.Parse(id));
+            return m_Database.AssetsExist(uuid);
         }
-
-        public virtual bool[] AssetsExist(string[] ids)
+        catch (Exception e)
         {
-            try
-            {
-                UUID[] uuid = Array.ConvertAll(ids, id => UUID.Parse(id));
-                return m_Database.AssetsExist(uuid);
-            }
-            catch (Exception e)
-            {
-                m_log.Error("[ASSET SERVICE]: Exception getting assets ", e);
-                return new bool[ids.Length];
-            }
+            m_log.Error("[ASSET SERVICE]: Exception getting assets ", e);
+            return new bool[ids.Length];
         }
+    }
 
-        public virtual string Store(AssetBase asset)
+    public virtual string Store(AssetBase asset)
+    {
+        bool exists = m_Database.AssetsExist(new[] { asset.FullID })[0];
+        if (!exists)
         {
-            bool exists = m_Database.AssetsExist(new[] { asset.FullID })[0];
-            if (!exists)
-            {
 //                m_log.DebugFormat(
 //                    "[ASSET SERVICE]: Storing asset {0} {1}, bytes {2}", asset.Name, asset.FullID, asset.Data.Length);
-               if (!m_Database.StoreAsset(asset))
-                {
-                return UUID.Zero.ToString();
-                }
+           if (!m_Database.StoreAsset(asset))
+            {
+            return UUID.Zero.ToString();
             }
+        }
 //            else
 //            {
 //                m_log.DebugFormat(
 //                    "[ASSET SERVICE]: Not storing asset {0} {1}, bytes {2} as it already exists", asset.Name, asset.FullID, asset.Data.Length);
 //            }
 
-            return asset.ID;
-        }
+        return asset.ID;
+    }
 
-        public bool UpdateContent(string id, byte[] data)
-        {
-            return false;
-        }
+    public bool UpdateContent(string id, byte[] data)
+    {
+        return false;
+    }
 
-        public virtual bool Delete(string id)
-        {
+    public virtual bool Delete(string id)
+    {
 //            m_log.DebugFormat("[ASSET SERVICE]: Deleting asset {0}", id);
 
-            UUID assetID;
-            if (!UUID.TryParse(id, out assetID))
-                return false;
+        UUID assetID;
+        if (!UUID.TryParse(id, out assetID))
+            return false;
 
-            return m_Database.Delete(id);
-        }
+        return m_Database.Delete(id);
+    }
 
-        public void Get(string id, string ForeignAssetService, bool StoreOnLocalGrid, SimpleAssetRetrieved callBack)
-        {
-        }
+    public void Get(string id, string ForeignAssetService, bool StoreOnLocalGrid, SimpleAssetRetrieved callBack)
+    {
     }
 }

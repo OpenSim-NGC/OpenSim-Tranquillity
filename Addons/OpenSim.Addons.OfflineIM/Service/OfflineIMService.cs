@@ -36,128 +36,127 @@ using OpenSim.Framework;
 using OpenSim.Services.Base;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.OfflineIM
+namespace OpenSim.OfflineIM;
+
+public class OfflineIMService : ServiceBase, IOfflineIMService
 {
-    public class OfflineIMService : ServiceBase, IOfflineIMService
+    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private IOfflineIMData m_Database = null;
+    private int m_MaxOfflineIMs = 25;
+    private XmlSerializer m_serializer;
+    private static bool m_Initialized = false;
+
+    public OfflineIMService(IConfigSource config) : base(config)
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private IOfflineIMData m_Database = null;
-        private int m_MaxOfflineIMs = 25;
-        private XmlSerializer m_serializer;
-        private static bool m_Initialized = false;
+        string dllName = string.Empty;
+        string connString = string.Empty;
+        string realm = "im_offline";
 
-        public OfflineIMService(IConfigSource config) : base(config)
+        //
+        // Try reading the [DatabaseService] section, if it exists
+        //
+        IConfig dbConfig = config.Configs["DatabaseService"];
+        if (dbConfig is not null)
         {
-            string dllName = string.Empty;
-            string connString = string.Empty;
-            string realm = "im_offline";
-
-            //
-            // Try reading the [DatabaseService] section, if it exists
-            //
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig is not null)
-            {
-                if (dllName.Length == 0)
-                    dllName = dbConfig.GetString("StorageProvider", string.Empty);
-                if (connString.Length == 0)
-                    connString = dbConfig.GetString("ConnectionString", string.Empty);
-            }
-
-            //
-            // [Messaging] section overrides [DatabaseService], if it exists
-            //
-            IConfig imConfig = config.Configs["Messaging"];
-            if (imConfig is not null)
-            {
-                dllName = imConfig.GetString("StorageProvider", dllName);
-                connString = imConfig.GetString("ConnectionString", connString);
-                realm = imConfig.GetString("Realm", realm);
-                m_MaxOfflineIMs = imConfig.GetInt("MaxOfflineIMs", m_MaxOfflineIMs);
-            }
-
-            //
-            // We tried, but this doesn't exist. We can't proceed.
-            //
-            if (string.IsNullOrEmpty(dllName))
-                throw new Exception("No StorageProvider configured");
-
-            m_Database = LoadPlugin<IOfflineIMData>(dllName, new Object[] { connString, realm });
-            if (m_Database is null)
-                throw new Exception("Could not find a storage interface in the given module " + dllName);
-
-            m_serializer = new XmlSerializer(typeof(GridInstantMessage));
-            if (!m_Initialized)
-            {
-                m_Database.DeleteOld();
-                m_Initialized = true;
-            }
+            if (dllName.Length == 0)
+                dllName = dbConfig.GetString("StorageProvider", string.Empty);
+            if (connString.Length == 0)
+                connString = dbConfig.GetString("ConnectionString", string.Empty);
         }
 
-        public List<GridInstantMessage> GetMessages(UUID principalID)
+        //
+        // [Messaging] section overrides [DatabaseService], if it exists
+        //
+        IConfig imConfig = config.Configs["Messaging"];
+        if (imConfig is not null)
         {
-            List<GridInstantMessage> ims = new List<GridInstantMessage>();
+            dllName = imConfig.GetString("StorageProvider", dllName);
+            connString = imConfig.GetString("ConnectionString", connString);
+            realm = imConfig.GetString("Realm", realm);
+            m_MaxOfflineIMs = imConfig.GetInt("MaxOfflineIMs", m_MaxOfflineIMs);
+        }
 
-            OfflineIMData[] messages = m_Database.Get("PrincipalID", principalID.ToString());
-            if (messages is  null || messages.Length == 0)
-                return ims;
+        //
+        // We tried, but this doesn't exist. We can't proceed.
+        //
+        if (string.IsNullOrEmpty(dllName))
+            throw new Exception("No StorageProvider configured");
 
-            foreach (OfflineIMData m in messages)
-            {
-                using (MemoryStream mstream = new MemoryStream(Encoding.UTF8.GetBytes(m.Data["Message"])))
-                {
-                    GridInstantMessage im = (GridInstantMessage)m_serializer.Deserialize(mstream);
-                    ims.Add(im);
-                }
-            }
+        m_Database = LoadPlugin<IOfflineIMData>(dllName, new Object[] { connString, realm });
+        if (m_Database is null)
+            throw new Exception("Could not find a storage interface in the given module " + dllName);
 
-            // Then, delete them
-            m_Database.Delete("PrincipalID", principalID.ToString());
+        m_serializer = new XmlSerializer(typeof(GridInstantMessage));
+        if (!m_Initialized)
+        {
+            m_Database.DeleteOld();
+            m_Initialized = true;
+        }
+    }
 
+    public List<GridInstantMessage> GetMessages(UUID principalID)
+    {
+        List<GridInstantMessage> ims = new List<GridInstantMessage>();
+
+        OfflineIMData[] messages = m_Database.Get("PrincipalID", principalID.ToString());
+        if (messages is  null || messages.Length == 0)
             return ims;
-        }
 
-        public bool StoreMessage(GridInstantMessage im, out string reason)
+        foreach (OfflineIMData m in messages)
         {
-            reason = string.Empty;
-
-            // Check limits
-            UUID principalID = new UUID(im.toAgentID);
-            long count = m_Database.GetCount("PrincipalID", principalID.ToString());
-            if (count >= m_MaxOfflineIMs)
+            using (MemoryStream mstream = new MemoryStream(Encoding.UTF8.GetBytes(m.Data["Message"])))
             {
-                reason = "Number of offline IMs has maxed out";
-                return false;
+                GridInstantMessage im = (GridInstantMessage)m_serializer.Deserialize(mstream);
+                ims.Add(im);
             }
-
-            string imXml;
-            using (MemoryStream mstream = new MemoryStream())
-            {
-                XmlWriterSettings settings = new XmlWriterSettings();
-                settings.Encoding = Util.UTF8NoBomEncoding;
-
-                using (XmlWriter writer = XmlWriter.Create(mstream, settings))
-                {
-                    m_serializer.Serialize(writer, im);
-                    writer.Flush();
-                    imXml = Util.UTF8NoBomEncoding.GetString(mstream.ToArray());
-                }
-            }
-
-            OfflineIMData data = new OfflineIMData();
-            data.PrincipalID = principalID;
-            data.FromID = new UUID(im.fromAgentID);
-            data.Data = new Dictionary<string, string>();
-            data.Data["Message"] = imXml;
-
-            return m_Database.Store(data);
-
         }
 
-        public void DeleteMessages(UUID userID)
+        // Then, delete them
+        m_Database.Delete("PrincipalID", principalID.ToString());
+
+        return ims;
+    }
+
+    public bool StoreMessage(GridInstantMessage im, out string reason)
+    {
+        reason = string.Empty;
+
+        // Check limits
+        UUID principalID = new UUID(im.toAgentID);
+        long count = m_Database.GetCount("PrincipalID", principalID.ToString());
+        if (count >= m_MaxOfflineIMs)
         {
-            m_Database.Delete("PrincipalID", userID.ToString());
-            m_Database.Delete("FromID", userID.ToString());
+            reason = "Number of offline IMs has maxed out";
+            return false;
         }
+
+        string imXml;
+        using (MemoryStream mstream = new MemoryStream())
+        {
+            XmlWriterSettings settings = new XmlWriterSettings();
+            settings.Encoding = Util.UTF8NoBomEncoding;
+
+            using (XmlWriter writer = XmlWriter.Create(mstream, settings))
+            {
+                m_serializer.Serialize(writer, im);
+                writer.Flush();
+                imXml = Util.UTF8NoBomEncoding.GetString(mstream.ToArray());
+            }
+        }
+
+        OfflineIMData data = new OfflineIMData();
+        data.PrincipalID = principalID;
+        data.FromID = new UUID(im.fromAgentID);
+        data.Data = new Dictionary<string, string>();
+        data.Data["Message"] = imXml;
+
+        return m_Database.Store(data);
+
+    }
+
+    public void DeleteMessages(UUID userID)
+    {
+        m_Database.Delete("PrincipalID", userID.ToString());
+        m_Database.Delete("FromID", userID.ToString());
     }
 }

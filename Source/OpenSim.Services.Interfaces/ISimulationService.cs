@@ -25,108 +25,103 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenSim.Framework;
 using OpenMetaverse;
 
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
+namespace OpenSim.Services.Interfaces;
 
-namespace OpenSim.Services.Interfaces
+public interface ISimulationService
 {
-    public interface ISimulationService
-    {
-        /// <summary>
-        /// Retrieve the scene with the given region ID.
-        /// </summary>
-        /// <param name='regionId'>
-        /// Region identifier.
-        /// </param>
-        /// <returns>
-        /// The scene.
-        /// </returns>
-        IScene GetScene(UUID regionId);
+    /// <summary>
+    /// Retrieve the scene with the given region ID.
+    /// </summary>
+    /// <param name='regionId'>
+    /// Region identifier.
+    /// </param>
+    /// <returns>
+    /// The scene.
+    /// </returns>
+    IScene GetScene(UUID regionId);
 
-        ISimulationService GetInnerService();
+    ISimulationService GetInnerService();
 
-        #region Agents
+    #region Agents
 
-        /// <summary>
-        /// Ask the simulator hosting the destination to create an agent on that region.
-        /// </summary>
-        /// <param name="source">The region that the user is coming from. Will be null if the user
-        /// logged-in directly, or arrived from a simulator that doesn't send this parameter.</param>
-        /// <param name="destination"></param>
-        /// <param name="aCircuit"></param>
-        /// <param name="flags"></param>
-        /// <param name="reason">Reason message in the event of a failure.</param>
-        bool CreateAgent(GridRegion source, GridRegion destination, AgentCircuitData aCircuit, uint flags, EntityTransferContext ctx, out string reason);
+    /// <summary>
+    /// Ask the simulator hosting the destination to create an agent on that region.
+    /// </summary>
+    /// <param name="source">The region that the user is coming from. Will be null if the user
+    /// logged-in directly, or arrived from a simulator that doesn't send this parameter.</param>
+    /// <param name="destination"></param>
+    /// <param name="aCircuit"></param>
+    /// <param name="flags"></param>
+    /// <param name="reason">Reason message in the event of a failure.</param>
+    bool CreateAgent(GridRegion source, GridRegion destination, AgentCircuitData aCircuit, uint flags, EntityTransferContext ctx, out string reason);
 
-        /// <summary>
-        /// Full child agent update.
-        /// </summary>
-        /// <param name="regionHandle"></param>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        bool UpdateAgent(GridRegion destination, AgentData data, EntityTransferContext ctx);
+    /// <summary>
+    /// Full child agent update.
+    /// </summary>
+    /// <param name="regionHandle"></param>
+    /// <param name="data"></param>
+    /// <returns></returns>
+    bool UpdateAgent(GridRegion destination, AgentData data, EntityTransferContext ctx);
 
-        /// <summary>
-        /// Short child agent update, mostly for position.
-        /// </summary>
-        /// <param name="regionHandle"></param>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        bool UpdateAgent(GridRegion destination, AgentPosition data);
+    /// <summary>
+    /// Short child agent update, mostly for position.
+    /// </summary>
+    /// <param name="regionHandle"></param>
+    /// <param name="data"></param>
+    /// <returns></returns>
+    bool UpdateAgent(GridRegion destination, AgentPosition data);
 
-        /// <summary>
-        /// Returns whether a propspective user is allowed to visit the region.
-        /// </summary>
-        /// <param name="destination">Desired destination</param>
-        /// <param name="agentID">The visitor's User ID</param>
-        /// <param name="agentHomeURI">The visitor's Home URI. Will be missing (null) in older OpenSims.</param>
-        /// <param name="viaTeleport">True: via teleport; False: via cross (walking)</param>
-        /// <param name="position">Position in the region</param>
+    /// <summary>
+    /// Returns whether a propspective user is allowed to visit the region.
+    /// </summary>
+    /// <param name="destination">Desired destination</param>
+    /// <param name="agentID">The visitor's User ID</param>
+    /// <param name="agentHomeURI">The visitor's Home URI. Will be missing (null) in older OpenSims.</param>
+    /// <param name="viaTeleport">True: via teleport; False: via cross (walking)</param>
+    /// <param name="position">Position in the region</param>
 
-        /// <param name="sversion">
-        /// Version that the requesting simulator is runing.  If null then no version check is carried out.
-        /// </param>
-        /// <param name="version">Version that the target simulator is running</param>
-        /// <param name="reason">[out] Optional error message</param>
-        /// <returns>True: ok; False: not allowed</returns>
-        bool QueryAccess(GridRegion destination, UUID agentID, string agentHomeURI, bool viaTeleport, Vector3 position, List<UUID> features, EntityTransferContext ctx, out string reason);
+    /// <param name="sversion">
+    /// Version that the requesting simulator is runing.  If null then no version check is carried out.
+    /// </param>
+    /// <param name="version">Version that the target simulator is running</param>
+    /// <param name="reason">[out] Optional error message</param>
+    /// <returns>True: ok; False: not allowed</returns>
+    bool QueryAccess(GridRegion destination, UUID agentID, string agentHomeURI, bool viaTeleport, Vector3 position, List<UUID> features, EntityTransferContext ctx, out string reason);
 
-        /// <summary>
-        /// Message from receiving region to departing region, telling it got contacted by the client.
-        /// When sent over REST, it invokes the opaque uri.
-        /// </summary>
-        /// <param name="regionHandle"></param>
-        /// <param name="id"></param>
-        /// <param name="uri"></param>
-        /// <returns></returns>
-        bool ReleaseAgent(UUID originRegion, UUID id, string uri);
+    /// <summary>
+    /// Message from receiving region to departing region, telling it got contacted by the client.
+    /// When sent over REST, it invokes the opaque uri.
+    /// </summary>
+    /// <param name="regionHandle"></param>
+    /// <param name="id"></param>
+    /// <param name="uri"></param>
+    /// <returns></returns>
+    bool ReleaseAgent(UUID originRegion, UUID id, string uri);
 
-        /// <summary>
-        /// Close agent.
-        /// </summary>
-        /// <param name="regionHandle"></param>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        bool CloseAgent(GridRegion destination, UUID id, string auth_token);
+    /// <summary>
+    /// Close agent.
+    /// </summary>
+    /// <param name="regionHandle"></param>
+    /// <param name="id"></param>
+    /// <returns></returns>
+    bool CloseAgent(GridRegion destination, UUID id, string auth_token);
 
-        #endregion Agents
+    #endregion Agents
 
-        #region Objects
+    #region Objects
 
-        /// <summary>
-        /// Create an object in the destination region. This message is used primarily for prim crossing.
-        /// </summary>
-        /// <param name="regionHandle"></param>
-        /// <param name="sog"></param>
-        /// <param name="isLocalCall"></param>
-        /// <returns></returns>
-        bool CreateObject(GridRegion destination, Vector3 newPosition, ISceneObject sog, bool isLocalCall);
+    /// <summary>
+    /// Create an object in the destination region. This message is used primarily for prim crossing.
+    /// </summary>
+    /// <param name="regionHandle"></param>
+    /// <param name="sog"></param>
+    /// <param name="isLocalCall"></param>
+    /// <returns></returns>
+    bool CreateObject(GridRegion destination, Vector3 newPosition, ISceneObject sog, bool isLocalCall);
 
-        #endregion Objects
+    #endregion Objects
 
-    }
 }

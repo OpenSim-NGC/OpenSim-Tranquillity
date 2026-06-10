@@ -25,420 +25,415 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using log4net;
 using OpenMetaverse;
 
-namespace OpenSim.Framework
+namespace OpenSim.Framework;
+
+public class InventoryFolderImpl : InventoryFolderBase
 {
-    public class InventoryFolderImpl : InventoryFolderBase
+    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
+    public static readonly string PATH_DELIMITER = "/";
+
+    /// <summary>
+    /// Items that are contained in this folder
+    /// </summary>
+    public Dictionary<UUID, InventoryItemBase> Items = new Dictionary<UUID, InventoryItemBase>();
+
+    /// <summary>
+    /// Child folders that are contained in this folder
+    /// </summary>
+    protected Dictionary<UUID, InventoryFolderImpl> m_childFolders = new Dictionary<UUID, InventoryFolderImpl>();
+
+    // Constructors
+    public InventoryFolderImpl(InventoryFolderBase folderbase)
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        Owner = folderbase.Owner;
+        ID = folderbase.ID;
+        Name = folderbase.Name;
+        ParentID = folderbase.ParentID;
+        Type = folderbase.Type;
+        Version = folderbase.Version;
+    }
 
-        public static readonly string PATH_DELIMITER = "/";
+    public InventoryFolderImpl()
+    {
+    }
 
-        /// <summary>
-        /// Items that are contained in this folder
-        /// </summary>
-        public Dictionary<UUID, InventoryItemBase> Items = new Dictionary<UUID, InventoryItemBase>();
-
-        /// <summary>
-        /// Child folders that are contained in this folder
-        /// </summary>
-        protected Dictionary<UUID, InventoryFolderImpl> m_childFolders = new Dictionary<UUID, InventoryFolderImpl>();
-
-        // Constructors
-        public InventoryFolderImpl(InventoryFolderBase folderbase)
+    /// <summary>
+    /// Create a new subfolder.
+    /// </summary>
+    /// <param name="folderID"></param>
+    /// <param name="folderName"></param>
+    /// <param name="type"></param>
+    /// <returns>The newly created subfolder.  Returns null if the folder already exists</returns>
+    public InventoryFolderImpl CreateChildFolder(UUID folderID, string folderName, ushort type)
+    {
+        lock (m_childFolders)
         {
-            Owner = folderbase.Owner;
-            ID = folderbase.ID;
-            Name = folderbase.Name;
-            ParentID = folderbase.ParentID;
-            Type = folderbase.Type;
-            Version = folderbase.Version;
-        }
-
-        public InventoryFolderImpl()
-        {
-        }
-
-        /// <summary>
-        /// Create a new subfolder.
-        /// </summary>
-        /// <param name="folderID"></param>
-        /// <param name="folderName"></param>
-        /// <param name="type"></param>
-        /// <returns>The newly created subfolder.  Returns null if the folder already exists</returns>
-        public InventoryFolderImpl CreateChildFolder(UUID folderID, string folderName, ushort type)
-        {
-            lock (m_childFolders)
+            if (!m_childFolders.ContainsKey(folderID))
             {
-                if (!m_childFolders.ContainsKey(folderID))
+                InventoryFolderImpl subFold = new InventoryFolderImpl()
                 {
-                    InventoryFolderImpl subFold = new InventoryFolderImpl()
-                    {
-                        Name = folderName,
-                        ID = folderID,
-                        Type = (short)type,
-                        ParentID = this.ID,
-                        Owner = Owner
-                    };
-                    m_childFolders.Add(subFold.ID, subFold);
+                    Name = folderName,
+                    ID = folderID,
+                    Type = (short)type,
+                    ParentID = this.ID,
+                    Owner = Owner
+                };
+                m_childFolders.Add(subFold.ID, subFold);
 
-                    return subFold;
-                }
+                return subFold;
             }
-
-            return null;
         }
 
-        /// <summary>
-        /// Add a folder that already exists.
-        /// </summary>
-        /// <param name="folder"></param>
-        public void AddChildFolder(InventoryFolderImpl folder)
+        return null;
+    }
+
+    /// <summary>
+    /// Add a folder that already exists.
+    /// </summary>
+    /// <param name="folder"></param>
+    public void AddChildFolder(InventoryFolderImpl folder)
+    {
+        lock (m_childFolders)
         {
-            lock (m_childFolders)
+            folder.ParentID = ID;
+            m_childFolders[folder.ID] = folder;
+        }
+    }
+
+    /// <summary>
+    /// Does this folder contain the given child folder?
+    /// </summary>
+    /// <param name="folderID"></param>
+    /// <returns></returns>
+    public bool ContainsChildFolder(UUID folderID)
+    {
+        return m_childFolders.ContainsKey(folderID);
+    }
+
+    /// <summary>
+    /// Get a child folder
+    /// </summary>
+    /// <param name="folderID"></param>
+    /// <returns>The folder if it exists, null if it doesn't</returns>
+    public InventoryFolderImpl GetChildFolder(UUID folderID)
+    {
+        lock (m_childFolders)
+        {
+            m_childFolders.TryGetValue(folderID, out InventoryFolderImpl folder);
+            return folder;
+        }
+    }
+
+    /// <summary>
+    /// Removes the given child subfolder.
+    /// </summary>
+    /// <param name="folderID"></param>
+    /// <returns>
+    /// The folder removed, or null if the folder was not present.
+    /// </returns>
+    public InventoryFolderImpl RemoveChildFolder(UUID folderID)
+    {
+        lock (m_childFolders)
+        {
+            if (m_childFolders.TryGetValue(folderID, out InventoryFolderImpl removedFolder))
             {
-                folder.ParentID = ID;
-                m_childFolders[folder.ID] = folder;
+                m_childFolders.Remove(folderID);
+                return removedFolder;
             }
         }
+        return null;
+    }
 
-        /// <summary>
-        /// Does this folder contain the given child folder?
-        /// </summary>
-        /// <param name="folderID"></param>
-        /// <returns></returns>
-        public bool ContainsChildFolder(UUID folderID)
+    /// <summary>
+    /// Delete all the folders and items in this folder.
+    /// </summary>
+    public void Purge()
+    {
+        foreach (InventoryFolderImpl folder in m_childFolders.Values)
         {
-            return m_childFolders.ContainsKey(folderID);
+            folder.Purge();
         }
 
-        /// <summary>
-        /// Get a child folder
-        /// </summary>
-        /// <param name="folderID"></param>
-        /// <returns>The folder if it exists, null if it doesn't</returns>
-        public InventoryFolderImpl GetChildFolder(UUID folderID)
+        m_childFolders.Clear();
+        Items.Clear();
+    }
+
+    /// <summary>
+    /// Returns the item if it exists in this folder or in any of this folder's descendant folders
+    /// </summary>
+    /// <param name="itemID"></param>
+    /// <returns>null if the item is not found</returns>
+    public InventoryItemBase FindItem(UUID itemID)
+    {
+        lock (Items)
         {
-            lock (m_childFolders)
-            {
-                m_childFolders.TryGetValue(folderID, out InventoryFolderImpl folder);
-                return folder;
-            }
+            if (Items.TryGetValue(itemID, out InventoryItemBase it))
+                return it;
         }
 
-        /// <summary>
-        /// Removes the given child subfolder.
-        /// </summary>
-        /// <param name="folderID"></param>
-        /// <returns>
-        /// The folder removed, or null if the folder was not present.
-        /// </returns>
-        public InventoryFolderImpl RemoveChildFolder(UUID folderID)
-        {
-            lock (m_childFolders)
-            {
-                if (m_childFolders.TryGetValue(folderID, out InventoryFolderImpl removedFolder))
-                {
-                    m_childFolders.Remove(folderID);
-                    return removedFolder;
-                }
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Delete all the folders and items in this folder.
-        /// </summary>
-        public void Purge()
+        lock (m_childFolders)
         {
             foreach (InventoryFolderImpl folder in m_childFolders.Values)
             {
-                folder.Purge();
+                InventoryItemBase item = folder.FindItem(itemID);
+                if (item != null)
+                    return item;
             }
-
-            m_childFolders.Clear();
-            Items.Clear();
         }
+        return null;
+    }
 
-        /// <summary>
-        /// Returns the item if it exists in this folder or in any of this folder's descendant folders
-        /// </summary>
-        /// <param name="itemID"></param>
-        /// <returns>null if the item is not found</returns>
-        public InventoryItemBase FindItem(UUID itemID)
+    public InventoryItemBase FindAsset(UUID assetID)
+    {
+        lock (Items)
         {
-            lock (Items)
+            foreach (InventoryItemBase item in Items.Values)
             {
-                if (Items.TryGetValue(itemID, out InventoryItemBase it))
-                    return it;
+                if (item.AssetID.Equals(assetID))
+                    return item;
             }
-
-            lock (m_childFolders)
-            {
-                foreach (InventoryFolderImpl folder in m_childFolders.Values)
-                {
-                    InventoryItemBase item = folder.FindItem(itemID);
-                    if (item != null)
-                        return item;
-                }
-            }
-            return null;
         }
 
-        public InventoryItemBase FindAsset(UUID assetID)
+        lock (m_childFolders)
+        {
+            foreach (InventoryFolderImpl folder in m_childFolders.Values)
+            {
+                InventoryItemBase item = folder.FindAsset(assetID);
+                if (item != null)
+                    return item;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Deletes an item if it exists in this folder or any children
+    /// </summary>
+    /// <param name="folderID"></param>
+    /// <returns></returns>
+    public bool DeleteItem(UUID itemID)
+    {
+        lock (Items)
+        {
+            if (Items.Remove(itemID))
+                return true;
+        }
+
+        lock (m_childFolders)
+        {
+            foreach (InventoryFolderImpl folder in m_childFolders.Values)
+            {
+                if(folder.DeleteItem(itemID))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Returns the folder requested if it is this folder or is a descendent of this folder.  The search is depth
+    /// first.
+    /// </summary>
+    /// <returns>The requested folder if it exists, null if it does not.</returns>
+    public InventoryFolderImpl FindFolder(UUID folderID)
+    {
+        if (folderID.Equals(ID))
+            return this;
+
+        lock (m_childFolders)
+        {
+            foreach (InventoryFolderImpl folder in m_childFolders.Values)
+            {
+                InventoryFolderImpl returnFolder = folder.FindFolder(folderID);
+                if (returnFolder != null)
+                    return returnFolder;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Look through all child subfolders for a folder marked as one for a particular asset type, and return it.
+    /// </summary>
+    /// <param name="type"></param>
+    /// <returns>Returns null if no such folder is found</returns>
+    public InventoryFolderImpl FindFolderForType(int type)
+    {
+        lock (m_childFolders)
+        {
+            foreach (InventoryFolderImpl f in m_childFolders.Values)
+            {
+                if (f.Type == type)
+                    return f;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Find a folder given a PATH_DELIMITER delimited path starting from this folder
+    /// </summary>
+    ///
+    /// This method does not handle paths that contain multiple delimitors
+    ///
+    /// FIXME: We do not yet handle situations where folders have the same name.  We could handle this by some
+    /// XPath like expression
+    ///
+    /// FIXME: Delimitors which occur in names themselves are not currently escapable.
+    ///
+    /// <param name="path">
+    /// The path to the required folder.
+    /// It this is empty or consists only of the PATH_DELIMTER then this folder itself is returned.
+    /// </param>
+    /// <returns>null if the folder is not found</returns>
+    public InventoryFolderImpl FindFolderByPath(string path)
+    {
+        path = path.Trim();
+        if (path.Length == 0)
+            return this;
+
+        if (path == PATH_DELIMITER)
+            return this;
+
+        string[] components = path.Split(new string[] { PATH_DELIMITER }, 2, StringSplitOptions.None);
+
+        lock (m_childFolders)
+        {
+            foreach (InventoryFolderImpl folder in m_childFolders.Values)
+            {
+                if (folder.Name == components[0])
+                    if (components.Length > 1)
+                        return folder.FindFolderByPath(components[1]);
+                    else
+                        return folder;
+            }
+        }
+
+        // We didn't find a folder with the given name
+        return null;
+    }
+
+    /// <summary>
+    /// Find an item given a PATH_DELIMITOR delimited path starting from this folder.
+    ///
+    /// This method does not handle paths that contain multiple delimitors
+    ///
+    /// FIXME: We do not yet handle situations where folders or items have the same name.  We could handle this by some
+    /// XPath like expression
+    ///
+    /// FIXME: Delimitors which occur in names themselves are not currently escapable.
+    /// </summary>
+    /// <param name="path">
+    /// The path to the required item.
+    /// </param>
+    /// <returns>null if the item is not found</returns>
+    public InventoryItemBase FindItemByPath(string path)
+    {
+        string[] components = path.Split(new string[] { PATH_DELIMITER }, 2, StringSplitOptions.None);
+
+        if (components.Length == 1)
         {
             lock (Items)
             {
                 foreach (InventoryItemBase item in Items.Values)
                 {
-                    if (item.AssetID.Equals(assetID))
+                    if (item.Name == components[0])
                         return item;
                 }
             }
-
-            lock (m_childFolders)
-            {
-                foreach (InventoryFolderImpl folder in m_childFolders.Values)
-                {
-                    InventoryItemBase item = folder.FindAsset(assetID);
-                    if (item != null)
-                        return item;
-                }
-            }
-
-            return null;
         }
-
-        /// <summary>
-        /// Deletes an item if it exists in this folder or any children
-        /// </summary>
-        /// <param name="folderID"></param>
-        /// <returns></returns>
-        public bool DeleteItem(UUID itemID)
+        else
         {
-            lock (Items)
-            {
-                if (Items.Remove(itemID))
-                    return true;
-            }
-
-            lock (m_childFolders)
-            {
-                foreach (InventoryFolderImpl folder in m_childFolders.Values)
-                {
-                    if(folder.DeleteItem(itemID))
-                        return true;
-                }
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// Returns the folder requested if it is this folder or is a descendent of this folder.  The search is depth
-        /// first.
-        /// </summary>
-        /// <returns>The requested folder if it exists, null if it does not.</returns>
-        public InventoryFolderImpl FindFolder(UUID folderID)
-        {
-            if (folderID.Equals(ID))
-                return this;
-
-            lock (m_childFolders)
-            {
-                foreach (InventoryFolderImpl folder in m_childFolders.Values)
-                {
-                    InventoryFolderImpl returnFolder = folder.FindFolder(folderID);
-                    if (returnFolder != null)
-                        return returnFolder;
-                }
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Look through all child subfolders for a folder marked as one for a particular asset type, and return it.
-        /// </summary>
-        /// <param name="type"></param>
-        /// <returns>Returns null if no such folder is found</returns>
-        public InventoryFolderImpl FindFolderForType(int type)
-        {
-            lock (m_childFolders)
-            {
-                foreach (InventoryFolderImpl f in m_childFolders.Values)
-                {
-                    if (f.Type == type)
-                        return f;
-                }
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Find a folder given a PATH_DELIMITER delimited path starting from this folder
-        /// </summary>
-        ///
-        /// This method does not handle paths that contain multiple delimitors
-        ///
-        /// FIXME: We do not yet handle situations where folders have the same name.  We could handle this by some
-        /// XPath like expression
-        ///
-        /// FIXME: Delimitors which occur in names themselves are not currently escapable.
-        ///
-        /// <param name="path">
-        /// The path to the required folder.
-        /// It this is empty or consists only of the PATH_DELIMTER then this folder itself is returned.
-        /// </param>
-        /// <returns>null if the folder is not found</returns>
-        public InventoryFolderImpl FindFolderByPath(string path)
-        {
-            path = path.Trim();
-            if (path.Length == 0)
-                return this;
-
-            if (path == PATH_DELIMITER)
-                return this;
-
-            string[] components = path.Split(new string[] { PATH_DELIMITER }, 2, StringSplitOptions.None);
-
             lock (m_childFolders)
             {
                 foreach (InventoryFolderImpl folder in m_childFolders.Values)
                 {
                     if (folder.Name == components[0])
-                        if (components.Length > 1)
-                            return folder.FindFolderByPath(components[1]);
-                        else
-                            return folder;
+                        return folder.FindItemByPath(components[1]);
                 }
             }
-
-            // We didn't find a folder with the given name
-            return null;
         }
 
-        /// <summary>
-        /// Find an item given a PATH_DELIMITOR delimited path starting from this folder.
-        ///
-        /// This method does not handle paths that contain multiple delimitors
-        ///
-        /// FIXME: We do not yet handle situations where folders or items have the same name.  We could handle this by some
-        /// XPath like expression
-        ///
-        /// FIXME: Delimitors which occur in names themselves are not currently escapable.
-        /// </summary>
-        /// <param name="path">
-        /// The path to the required item.
-        /// </param>
-        /// <returns>null if the item is not found</returns>
-        public InventoryItemBase FindItemByPath(string path)
+        // We didn't find an item or intermediate folder with the given name
+        return null;
+    }
+
+    /// <summary>
+    /// Return a copy of the list of child items in this folder.  The items themselves are the originals.
+    /// </summary>
+    public List<InventoryItemBase> RequestListOfItems()
+    {
+        List<InventoryItemBase> itemList = new List<InventoryItemBase>();
+
+        lock (Items)
         {
-            string[] components = path.Split(new string[] { PATH_DELIMITER }, 2, StringSplitOptions.None);
-
-            if (components.Length == 1)
+            foreach (InventoryItemBase item in Items.Values)
             {
-                lock (Items)
-                {
-                    foreach (InventoryItemBase item in Items.Values)
-                    {
-                        if (item.Name == components[0])
-                            return item;
-                    }
-                }
-            }
-            else
-            {
-                lock (m_childFolders)
-                {
-                    foreach (InventoryFolderImpl folder in m_childFolders.Values)
-                    {
-                        if (folder.Name == components[0])
-                            return folder.FindItemByPath(components[1]);
-                    }
-                }
-            }
+                //m_log.DebugFormat(
+                //    "[INVENTORY FOLDER IMPL]: Returning item {0} {1}, OwnerPermissions {2:X}",
+                //    item.Name, item.ID, item.CurrentPermissions);
 
-            // We didn't find an item or intermediate folder with the given name
-            return null;
+                itemList.Add(item);
+            }
         }
 
-        /// <summary>
-        /// Return a copy of the list of child items in this folder.  The items themselves are the originals.
-        /// </summary>
-        public List<InventoryItemBase> RequestListOfItems()
+        //m_log.DebugFormat("[INVENTORY FOLDER IMPL]: Found {0} items", itemList.Count);
+
+        return itemList;
+    }
+
+    /// <summary>
+    /// Return a copy of the list of child folders in this folder.  The folders themselves are the originals.
+    /// </summary>
+    public List<InventoryFolderBase> RequestListOfFolders()
+    {
+        List<InventoryFolderBase> folderList = new List<InventoryFolderBase>(m_childFolders.Count);
+
+        lock (m_childFolders)
         {
-            List<InventoryItemBase> itemList = new List<InventoryItemBase>();
-
-            lock (Items)
+            foreach (InventoryFolderBase folder in m_childFolders.Values)
             {
-                foreach (InventoryItemBase item in Items.Values)
-                {
-                    //m_log.DebugFormat(
-                    //    "[INVENTORY FOLDER IMPL]: Returning item {0} {1}, OwnerPermissions {2:X}",
-                    //    item.Name, item.ID, item.CurrentPermissions);
-
-                    itemList.Add(item);
-                }
+                folderList.Add(folder);
             }
-
-            //m_log.DebugFormat("[INVENTORY FOLDER IMPL]: Found {0} items", itemList.Count);
-
-            return itemList;
         }
 
-        /// <summary>
-        /// Return a copy of the list of child folders in this folder.  The folders themselves are the originals.
-        /// </summary>
-        public List<InventoryFolderBase> RequestListOfFolders()
+        return folderList;
+    }
+
+    public List<InventoryFolderImpl> RequestListOfFolderImpls()
+    {
+        List<InventoryFolderImpl> folderList = new List<InventoryFolderImpl>(m_childFolders.Count);
+
+        lock (m_childFolders)
         {
-            List<InventoryFolderBase> folderList = new List<InventoryFolderBase>(m_childFolders.Count);
-
-            lock (m_childFolders)
+            foreach (InventoryFolderImpl folder in m_childFolders.Values)
             {
-                foreach (InventoryFolderBase folder in m_childFolders.Values)
-                {
-                    folderList.Add(folder);
-                }
+                folderList.Add(folder);
             }
-
-            return folderList;
         }
 
-        public List<InventoryFolderImpl> RequestListOfFolderImpls()
+        return folderList;
+    }
+
+    /// <value>
+    /// The total number of items in this folder and in the immediate child folders (though not from other
+    /// descendants).
+    /// </value>
+    public int TotalCount
+    {
+        get
         {
-            List<InventoryFolderImpl> folderList = new List<InventoryFolderImpl>(m_childFolders.Count);
-
-            lock (m_childFolders)
+            int total = Items.Count;
+            foreach (InventoryFolderImpl folder in m_childFolders.Values)
             {
-                foreach (InventoryFolderImpl folder in m_childFolders.Values)
-                {
-                    folderList.Add(folder);
-                }
+                total += folder.TotalCount;
             }
-
-            return folderList;
-        }
-
-        /// <value>
-        /// The total number of items in this folder and in the immediate child folders (though not from other
-        /// descendants).
-        /// </value>
-        public int TotalCount
-        {
-            get
-            {
-                int total = Items.Count;
-                foreach (InventoryFolderImpl folder in m_childFolders.Values)
-                {
-                    total += folder.TotalCount;
-                }
-                return total;
-            }
+            return total;
         }
     }
 }

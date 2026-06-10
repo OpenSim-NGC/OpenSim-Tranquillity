@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
     <PackageReference Include="CoreJ2K.Skia" Version="2.1.2.38" />
   </ItemGroup>
 

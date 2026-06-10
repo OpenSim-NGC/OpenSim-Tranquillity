@@ -25,14 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver
+namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver;
+
+/// <summary>
+/// Signals an inventory archiving problem
+/// </summary>
+public class InventoryArchiverException : Exception
 {
-    /// <summary>
-    /// Signals an inventory archiving problem
-    /// </summary>
-    public class InventoryArchiverException : Exception
-    {
-        public InventoryArchiverException(string message) : base(message) {}
-        public InventoryArchiverException(string message, Exception e) : base(message, e) {}
-    }
+    public InventoryArchiverException(string message) : base(message) {}
+    public InventoryArchiverException(string message, Exception e) : base(message, e) {}
 }

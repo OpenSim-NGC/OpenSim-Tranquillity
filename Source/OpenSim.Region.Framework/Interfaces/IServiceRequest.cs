@@ -26,20 +26,19 @@
  */
 using OpenMetaverse;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface IServiceRequest
 {
-    public interface IServiceRequest
-    {
-        // Status
-        bool Finished { get; }
+    // Status
+    bool Finished { get; }
 
-        // Request info
-        UUID ItemID { get; set; }
-        uint LocalID { get; set; }
-        UUID ReqID { get; set; }
+    // Request info
+    UUID ItemID { get; set; }
+    uint LocalID { get; set; }
+    UUID ReqID { get; set; }
 
-        void Process();
-        void SendRequest();
-        void Stop();
-    }
+    void Process();
+    void SendRequest();
+    void Stop();
 }

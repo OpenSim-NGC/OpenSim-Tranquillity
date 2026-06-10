@@ -25,108 +25,105 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using OpenMetaverse;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public delegate void ScriptRemoved(UUID script);
+public delegate void ObjectRemoved(UUID prim);
+
+public class ScriptTopStatsData
 {
-    public delegate void ScriptRemoved(UUID script);
-    public delegate void ObjectRemoved(UUID prim);
+    public uint localID;
+    public float time;
+    public int memory;
+};
 
-    public class ScriptTopStatsData
-    {
-        public uint localID;
-        public float time;
-        public int memory;
-    };
+public interface IScriptModule: INonSharedRegionModule
+{
+    /// <summary>
+    /// Triggered when a script is removed from the script module.
+    /// </summary>
+    event ScriptRemoved OnScriptRemoved;
 
-    public interface IScriptModule: INonSharedRegionModule
-    {
-        /// <summary>
-        /// Triggered when a script is removed from the script module.
-        /// </summary>
-        event ScriptRemoved OnScriptRemoved;
+    /// <summary>
+    /// Triggered when an object is removed via the script module.
+    /// </summary>
+    event ObjectRemoved OnObjectRemoved;
 
-        /// <summary>
-        /// Triggered when an object is removed via the script module.
-        /// </summary>
-        event ObjectRemoved OnObjectRemoved;
+    string ScriptEngineName { get; }
 
-        string ScriptEngineName { get; }
+    string GetXMLState(UUID itemID);
+    bool SetXMLState(UUID itemID, string xml);
 
-        string GetXMLState(UUID itemID);
-        bool SetXMLState(UUID itemID, string xml);
+    /// <summary>
+    /// Post a script event to a single script.
+    /// </summary>
+    /// <returns>true if the post suceeded, false if it did not</returns>
+    /// <param name='itemID'>The item ID of the script.</param>
+    /// <param name='name'>The name of the event.</param>
+    /// <param name='args'>
+    /// The arguments of the event.  These are in the order in which they appear.
+    /// e.g. for http_request this will be an object array of key request_id, string method, string body
+    /// </param>
+    bool PostScriptEvent(UUID itemID, string name, Object[] args);
+    bool PostObjectEvent(UUID itemID, string name, Object[] args);
 
-        /// <summary>
-        /// Post a script event to a single script.
-        /// </summary>
-        /// <returns>true if the post suceeded, false if it did not</returns>
-        /// <param name='itemID'>The item ID of the script.</param>
-        /// <param name='name'>The name of the event.</param>
-        /// <param name='args'>
-        /// The arguments of the event.  These are in the order in which they appear.
-        /// e.g. for http_request this will be an object array of key request_id, string method, string body
-        /// </param>
-        bool PostScriptEvent(UUID itemID, string name, Object[] args);
-        bool PostObjectEvent(UUID itemID, string name, Object[] args);
+    /// <summary>
+    /// Suspends a script.
+    /// </summary>
+    /// <param name="itemID">The item ID of the script.</param>
+    bool SuspendScript(UUID itemID);
 
-        /// <summary>
-        /// Suspends a script.
-        /// </summary>
-        /// <param name="itemID">The item ID of the script.</param>
-        bool SuspendScript(UUID itemID);
+    /// <summary>
+    /// Resumes a script.
+    /// </summary>
+    /// <param name="itemID">The item ID of the script.</param>
+    bool ResumeScript(UUID itemID);
 
-        /// <summary>
-        /// Resumes a script.
-        /// </summary>
-        /// <param name="itemID">The item ID of the script.</param>
-        bool ResumeScript(UUID itemID);
+    ArrayList GetScriptErrors(UUID itemID);
 
-        ArrayList GetScriptErrors(UUID itemID);
+    bool HasScript(UUID itemID, out bool running);
 
-        bool HasScript(UUID itemID, out bool running);
+    /// <summary>
+    /// Returns true if a script is running.
+    /// </summary>
+    /// <param name="itemID">The item ID of the script.</param>
+    bool GetScriptState(UUID itemID);
 
-        /// <summary>
-        /// Returns true if a script is running.
-        /// </summary>
-        /// <param name="itemID">The item ID of the script.</param>
-        bool GetScriptState(UUID itemID);
+    void SaveAllState();
 
-        void SaveAllState();
+    /// <summary>
+    /// Starts the processing threads.
+    /// </summary>
+    void StartProcessing();
 
-        /// <summary>
-        /// Starts the processing threads.
-        /// </summary>
-        void StartProcessing();
+    /// <summary>
+    /// Get the execution times of all scripts in the given array if they are currently running.
+    /// </summary>
+    /// <returns>
+    /// A float the value is a representative execution time in milliseconds of all scripts in that Array.
+    /// </returns>
+    float GetScriptExecutionTime(List<UUID> itemIDs);
+    int GetScriptsMemory(List<UUID> itemIDs);
 
-        /// <summary>
-        /// Get the execution times of all scripts in the given array if they are currently running.
-        /// </summary>
-        /// <returns>
-        /// A float the value is a representative execution time in milliseconds of all scripts in that Array.
-        /// </returns>
-        float GetScriptExecutionTime(List<UUID> itemIDs);
-        int GetScriptsMemory(List<UUID> itemIDs);
+    /// <summary>
+    /// Get the execution times of all scripts in each object.
+    /// </summary>
+    /// <returns>
+    /// A dictionary where the key is the root object ID of a linkset
+    /// and the value is a representative execution time in milliseconds of all scripts in that linkset.
+    /// </returns>
+    Dictionary<uint, float> GetObjectScriptsExecutionTimes();
 
-        /// <summary>
-        /// Get the execution times of all scripts in each object.
-        /// </summary>
-        /// <returns>
-        /// A dictionary where the key is the root object ID of a linkset
-        /// and the value is a representative execution time in milliseconds of all scripts in that linkset.
-        /// </returns>
-        Dictionary<uint, float> GetObjectScriptsExecutionTimes();
-
-        /// <summary>
-        /// Get the used memory and exec time of all scripts in each object.
-        /// if time or memory is higher than min values;
-        /// </summary>
-        /// <returns>
-        /// A dictionary where the key is the root object ID of a linkset
-        /// and the value is a class with  amount of bytes being used by the script
-        /// </returns>
-        ICollection<ScriptTopStatsData> GetTopObjectStats(float mintime, int minmemory, out float totaltime, out float totalmemory);
-    }
+    /// <summary>
+    /// Get the used memory and exec time of all scripts in each object.
+    /// if time or memory is higher than min values;
+    /// </summary>
+    /// <returns>
+    /// A dictionary where the key is the root object ID of a linkset
+    /// and the value is a class with  amount of bytes being used by the script
+    /// </returns>
+    ICollection<ScriptTopStatsData> GetTopObjectStats(float mintime, int minmemory, out float totaltime, out float totalmemory);
 }

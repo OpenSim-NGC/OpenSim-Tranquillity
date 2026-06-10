@@ -25,30 +25,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
+namespace OpenSim.Framework;
 
-namespace OpenSim.Framework
+/// <summary>
+/// Region flags used internally by OpenSimulator to store installation specific information about regions.
+/// </summary>
+/// <remarks>
+/// Don't confuse with OpenMetaverse.RegionFlags which are client facing flags (i.e. they go over the wire).
+/// Returned by IGridService.GetRegionFlags()
+/// </remarks>
+[Flags]
+public enum RegionFlags : int
 {
-    /// <summary>
-    /// Region flags used internally by OpenSimulator to store installation specific information about regions.
-    /// </summary>
-    /// <remarks>
-    /// Don't confuse with OpenMetaverse.RegionFlags which are client facing flags (i.e. they go over the wire).
-    /// Returned by IGridService.GetRegionFlags()
-    /// </remarks>
-    [Flags]
-    public enum RegionFlags : int
-    {
-        DefaultRegion = 1, // Used for new Rez. Random if multiple defined
-        FallbackRegion = 2, // Regions we redirect to when the destination is down
-        RegionOnline = 4, // Set when a region comes online, unset when it unregisters and DeleteOnUnregister is false
-        NoDirectLogin = 8, // Region unavailable for direct logins (by name)
-        Persistent = 16, // Don't remove on unregister
-        LockedOut = 32, // Don't allow registration
-        NoMove = 64, // Don't allow moving this region
-        Reservation = 128, // This is an inactive reservation
-        Authenticate = 256, // Require authentication
-        Hyperlink = 512, // Record represents a HG link
-        DefaultHGRegion = 1024 // Record represents a default region for hypergrid teleports only.
-    }
+    DefaultRegion = 1, // Used for new Rez. Random if multiple defined
+    FallbackRegion = 2, // Regions we redirect to when the destination is down
+    RegionOnline = 4, // Set when a region comes online, unset when it unregisters and DeleteOnUnregister is false
+    NoDirectLogin = 8, // Region unavailable for direct logins (by name)
+    Persistent = 16, // Don't remove on unregister
+    LockedOut = 32, // Don't allow registration
+    NoMove = 64, // Don't allow moving this region
+    Reservation = 128, // This is an inactive reservation
+    Authenticate = 256, // Require authentication
+    Hyperlink = 512, // Record represents a HG link
+    DefaultHGRegion = 1024 // Record represents a default region for hypergrid teleports only.
 }

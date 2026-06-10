@@ -25,63 +25,60 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+/// <summary>
+/// An agent in the scene.
+/// </summary>
+/// <remarks>
+/// Interface is a work in progress.  Please feel free to add other required properties and methods.
+/// </remarks>
+public interface IScenePresence : ISceneAgent
 {
     /// <summary>
-    /// An agent in the scene.
+    /// Copy of the script states while the agent is in transit. This state may
+    /// need to be placed back in case of transfer fail.
+    /// </summary>
+    List<string> InTransitScriptStates { get; }
+
+    /// <summary>
+    /// The AttachmentsModule synchronizes on this to avoid race conditions between commands to add and remove attachments.
     /// </summary>
     /// <remarks>
-    /// Interface is a work in progress.  Please feel free to add other required properties and methods.
+    /// All add and remove attachment operations must synchronize on this for the lifetime of their operations.
     /// </remarks>
-    public interface IScenePresence : ISceneAgent
-    {
-        /// <summary>
-        /// Copy of the script states while the agent is in transit. This state may
-        /// need to be placed back in case of transfer fail.
-        /// </summary>
-        List<string> InTransitScriptStates { get; }
+    Object AttachmentsSyncLock { get; }
 
-        /// <summary>
-        /// The AttachmentsModule synchronizes on this to avoid race conditions between commands to add and remove attachments.
-        /// </summary>
-        /// <remarks>
-        /// All add and remove attachment operations must synchronize on this for the lifetime of their operations.
-        /// </remarks>
-        Object AttachmentsSyncLock { get; }
+    int GetAttachmentsCount();
+    /// <summary>
+    /// The scene objects attached to this avatar.
+    /// </summary>
+    /// <returns>
+    /// A copy of the list.
+    /// </returns>
+    /// <remarks>
+    ///  Do not change this list directly - use the attachments module.
+    /// </remarks>
+    List<SceneObjectGroup> GetAttachments();
 
-        int GetAttachmentsCount();
-        /// <summary>
-        /// The scene objects attached to this avatar.
-        /// </summary>
-        /// <returns>
-        /// A copy of the list.
-        /// </returns>
-        /// <remarks>
-        ///  Do not change this list directly - use the attachments module.
-        /// </remarks>
-        List<SceneObjectGroup> GetAttachments();
+    /// <summary>
+    /// The scene objects attached to this avatar at a specific attachment point.
+    /// </summary>
+    /// <param name="attachmentPoint"></param>
+    /// <returns></returns>
+    List<SceneObjectGroup> GetAttachments(uint attachmentPoint);
 
-        /// <summary>
-        /// The scene objects attached to this avatar at a specific attachment point.
-        /// </summary>
-        /// <param name="attachmentPoint"></param>
-        /// <returns></returns>
-        List<SceneObjectGroup> GetAttachments(uint attachmentPoint);
+    /// <summary>
+    /// Does this avatar have any attachments?
+    /// </summary>
+    /// <returns></returns>
+    bool HasAttachments();
 
-        /// <summary>
-        /// Does this avatar have any attachments?
-        /// </summary>
-        /// <returns></returns>
-        bool HasAttachments();
-
-        // Don't use these methods directly.  Instead, use the AttachmentsModule
-        void AddAttachment(SceneObjectGroup gobj);
-        void RemoveAttachment(SceneObjectGroup gobj);
-        void ClearAttachments();
-    }
+    // Don't use these methods directly.  Instead, use the AttachmentsModule
+    void AddAttachment(SceneObjectGroup gobj);
+    void RemoveAttachment(SceneObjectGroup gobj);
+    void ClearAttachments();
 }

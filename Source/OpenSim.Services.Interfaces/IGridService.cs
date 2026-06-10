@@ -25,467 +25,459 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Net;
-using System.Net.Sockets;
-using System.Reflection;
 
 using OpenSim.Framework;
 using OpenMetaverse;
 
-using log4net;
+namespace OpenSim.Services.Interfaces;
 
-namespace OpenSim.Services.Interfaces
+public interface IGridService
 {
-    public interface IGridService
-    {
-        /// <summary>
-        /// Register a region with the grid service.
-        /// </summary>
-        /// <param name="regionInfos"> </param>
-        /// <returns></returns>
-        /// <exception cref="System.Exception">Thrown if region registration failed</exception>
-        string RegisterRegion(UUID scopeID, GridRegion regionInfos);
+    /// <summary>
+    /// Register a region with the grid service.
+    /// </summary>
+    /// <param name="regionInfos"> </param>
+    /// <returns></returns>
+    /// <exception cref="System.Exception">Thrown if region registration failed</exception>
+    string RegisterRegion(UUID scopeID, GridRegion regionInfos);
 
-        /// <summary>
-        /// Deregister a region with the grid service.
-        /// </summary>
-        /// <param name="regionID"></param>
-        /// <returns></returns>
-        /// <exception cref="System.Exception">Thrown if region deregistration failed</exception>
-        bool DeregisterRegion(UUID regionID);
+    /// <summary>
+    /// Deregister a region with the grid service.
+    /// </summary>
+    /// <param name="regionID"></param>
+    /// <returns></returns>
+    /// <exception cref="System.Exception">Thrown if region deregistration failed</exception>
+    bool DeregisterRegion(UUID regionID);
 
-        /// <summary>
-        /// Get information about the regions neighbouring the given co-ordinates (in meters).
-        /// </summary>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        /// <returns></returns>
-        List<GridRegion> GetNeighbours(UUID scopeID, UUID regionID);
+    /// <summary>
+    /// Get information about the regions neighbouring the given co-ordinates (in meters).
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <returns></returns>
+    List<GridRegion> GetNeighbours(UUID scopeID, UUID regionID);
 
-        GridRegion GetRegionByUUID(UUID scopeID, UUID regionID);
-        GridRegion GetRegionByHandle(UUID scopeID, ulong regionhandle);
-        /// <summary>
-        /// Get the region at the given position (in meters)
-        /// </summary>
-        /// <param name="scopeID"></param>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        /// <returns></returns>
-        GridRegion GetRegionByPosition(UUID scopeID, int x, int y);
+    GridRegion GetRegionByUUID(UUID scopeID, UUID regionID);
+    GridRegion GetRegionByHandle(UUID scopeID, ulong regionhandle);
+    /// <summary>
+    /// Get the region at the given position (in meters)
+    /// </summary>
+    /// <param name="scopeID"></param>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <returns></returns>
+    GridRegion GetRegionByPosition(UUID scopeID, int x, int y);
 
-        /// <summary>
-        /// Get information about a region which exactly matches the name given.
-        /// </summary>
-        /// <param name="scopeID"></param>
-        /// <param name="regionName"></param>
-        /// <returns>Returns the region information if the name matched.  Null otherwise.</returns>
-        GridRegion GetRegionByName(UUID scopeID, string regionName);
-        GridRegion GetRegionByURI(UUID scopeID, RegionURI uri);
+    /// <summary>
+    /// Get information about a region which exactly matches the name given.
+    /// </summary>
+    /// <param name="scopeID"></param>
+    /// <param name="regionName"></param>
+    /// <returns>Returns the region information if the name matched.  Null otherwise.</returns>
+    GridRegion GetRegionByName(UUID scopeID, string regionName);
+    GridRegion GetRegionByURI(UUID scopeID, RegionURI uri);
 
-        GridRegion GetLocalRegionByName(UUID scopeID, string regionName);
-        GridRegion GetLocalRegionByURI(UUID scopeID, RegionURI uri);
+    GridRegion GetLocalRegionByName(UUID scopeID, string regionName);
+    GridRegion GetLocalRegionByURI(UUID scopeID, RegionURI uri);
 
-        /// <summary>
-        /// Get information about regions starting with the provided name.
-        /// </summary>
-        /// <param name="name">
-        /// The name to match against.
-        /// </param>
-        /// <param name="maxNumber">
-        /// The maximum number of results to return.
-        /// </param>
-        /// <returns>
-        /// A list of <see cref="RegionInfo"/>s of regions with matching name. If the
-        /// grid-server couldn't be contacted or returned an error, return null.
-        /// </returns>
-        List<GridRegion> GetRegionsByName(UUID scopeID, string name, int maxNumber);
-        List<GridRegion> GetRegionsByURI(UUID scopeID, RegionURI uri, int maxNumber);
+    /// <summary>
+    /// Get information about regions starting with the provided name.
+    /// </summary>
+    /// <param name="name">
+    /// The name to match against.
+    /// </param>
+    /// <param name="maxNumber">
+    /// The maximum number of results to return.
+    /// </param>
+    /// <returns>
+    /// A list of <see cref="RegionInfo"/>s of regions with matching name. If the
+    /// grid-server couldn't be contacted or returned an error, return null.
+    /// </returns>
+    List<GridRegion> GetRegionsByName(UUID scopeID, string name, int maxNumber);
+    List<GridRegion> GetRegionsByURI(UUID scopeID, RegionURI uri, int maxNumber);
 
-        List<GridRegion> GetRegionRange(UUID scopeID, int xmin, int xmax, int ymin, int ymax);
+    List<GridRegion> GetRegionRange(UUID scopeID, int xmin, int xmax, int ymin, int ymax);
 
-        List<GridRegion> GetDefaultRegions(UUID scopeID);
-        List<GridRegion> GetDefaultHypergridRegions(UUID scopeID);
-        List<GridRegion> GetFallbackRegions(UUID scopeID, int x, int y);
-        List<GridRegion> GetHyperlinks(UUID scopeID);
-        List<GridRegion> GetOnlineRegions(UUID scopeID, int x, int y, int maxCount);
+    List<GridRegion> GetDefaultRegions(UUID scopeID);
+    List<GridRegion> GetDefaultHypergridRegions(UUID scopeID);
+    List<GridRegion> GetFallbackRegions(UUID scopeID, int x, int y);
+    List<GridRegion> GetHyperlinks(UUID scopeID);
+    List<GridRegion> GetOnlineRegions(UUID scopeID, int x, int y, int maxCount);
 
-        /// <summary>
-        /// Get internal OpenSimulator region flags.
-        /// </summary>
-        /// <remarks>
-        /// See OpenSimulator.Framework.RegionFlags.  These are not returned in the GridRegion structure -
-        /// they currently need to be requested separately.  Possibly this should change to avoid multiple service calls
-        /// in some situations.
-        /// </remarks>
-        /// <returns>
-        /// The region flags.
-        /// </returns>
-        /// <param name='scopeID'></param>
-        /// <param name='regionID'></param>
-        int GetRegionFlags(UUID scopeID, UUID regionID);
+    /// <summary>
+    /// Get internal OpenSimulator region flags.
+    /// </summary>
+    /// <remarks>
+    /// See OpenSimulator.Framework.RegionFlags.  These are not returned in the GridRegion structure -
+    /// they currently need to be requested separately.  Possibly this should change to avoid multiple service calls
+    /// in some situations.
+    /// </remarks>
+    /// <returns>
+    /// The region flags.
+    /// </returns>
+    /// <param name='scopeID'></param>
+    /// <param name='regionID'></param>
+    int GetRegionFlags(UUID scopeID, UUID regionID);
 
-        Dictionary<string,object> GetExtraFeatures();
-    }
+    Dictionary<string,object> GetExtraFeatures();
+}
 
-    public interface IHypergridLinker
-    {
-        GridRegion TryLinkRegionToCoords(UUID scopeID, string mapName, int xloc, int yloc, UUID ownerID, out string reason);
-        bool TryUnlinkRegion(string mapName);
-    }
+public interface IHypergridLinker
+{
+    GridRegion TryLinkRegionToCoords(UUID scopeID, string mapName, int xloc, int yloc, UUID ownerID, out string reason);
+    bool TryUnlinkRegion(string mapName);
+}
 
-    public class GridRegion
-    {
+public class GridRegion
+{
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
 #pragma warning disable 414
-        private static readonly string LogHeader = "[GRID REGION]";
+    private static readonly string LogHeader = "[GRID REGION]";
 #pragma warning restore 414
 
-        /// <summary>
-        /// The port by which http communication occurs with the region
-        /// </summary>
-        public uint HttpPort { get; set; }
+    /// <summary>
+    /// The port by which http communication occurs with the region
+    /// </summary>
+    public uint HttpPort { get; set; }
 
-        /// <summary>
-        /// A well-formed URI for the host region server (namely "http://" + ExternalHostName)
-        /// </summary>
-        public string ServerURI
-        {
-            get {
-                if (!String.IsNullOrEmpty(m_serverURI)) {
-                    return m_serverURI;
-                } else {
-                    if (HttpPort == 0)
-                        return "http://" + m_externalHostName + "/";
-                    else
-                        return "http://" + m_externalHostName + ":" + HttpPort + "/";
-                }
-            }
-            set {
-                if ( value == null)
-                {
-                    m_serverURI = String.Empty;
-                    return;
-                }
-
-                if ( value.EndsWith("/") )
-                {
-
-                    m_serverURI = value;
-                }
+    /// <summary>
+    /// A well-formed URI for the host region server (namely "http://" + ExternalHostName)
+    /// </summary>
+    public string ServerURI
+    {
+        get {
+            if (!String.IsNullOrEmpty(m_serverURI)) {
+                return m_serverURI;
+            } else {
+                if (HttpPort == 0)
+                    return "http://" + m_externalHostName + "/";
                 else
-                {
-                    m_serverURI = value + '/';
-                }
+                    return "http://" + m_externalHostName + ":" + HttpPort + "/";
             }
         }
+        set {
+            if ( value == null)
+            {
+                m_serverURI = String.Empty;
+                return;
+            }
 
-        protected string m_serverURI;
+            if ( value.EndsWith("/") )
+            {
 
-        /// <summary>
-        /// Provides direct access to the 'm_serverURI' field, without returning a generated URL if m_serverURI is missing.
-        /// </summary>
-        public string RawServerURI
-        {
-            get { return m_serverURI; }
-            set { m_serverURI = value; }
+                m_serverURI = value;
+            }
+            else
+            {
+                m_serverURI = value + '/';
+            }
         }
+    }
+
+    protected string m_serverURI;
+
+    /// <summary>
+    /// Provides direct access to the 'm_serverURI' field, without returning a generated URL if m_serverURI is missing.
+    /// </summary>
+    public string RawServerURI
+    {
+        get { return m_serverURI; }
+        set { m_serverURI = value; }
+    }
 
 
-        public string RegionName
-        {
-            get { return m_regionName; }
-            set { m_regionName = value; }
-        }
-        protected string m_regionName = String.Empty;
+    public string RegionName
+    {
+        get { return m_regionName; }
+        set { m_regionName = value; }
+    }
+    protected string m_regionName = String.Empty;
 
-        /// <summary>
-        /// Region flags.
-        /// </summary>
-        /// <remarks>
-        /// If not set (chiefly if a robust service is running code pre OpenSim 0.8.1) then this will be null and
-        /// should be ignored.  If you require flags information please use the separate IGridService.GetRegionFlags() call
-        /// XXX: This field is currently ignored when used in RegisterRegion, but could potentially be
-        /// used to set flags at this point.
-        /// </remarks>
-        public OpenSim.Framework.RegionFlags? RegionFlags { get; set; }
+    /// <summary>
+    /// Region flags.
+    /// </summary>
+    /// <remarks>
+    /// If not set (chiefly if a robust service is running code pre OpenSim 0.8.1) then this will be null and
+    /// should be ignored.  If you require flags information please use the separate IGridService.GetRegionFlags() call
+    /// XXX: This field is currently ignored when used in RegisterRegion, but could potentially be
+    /// used to set flags at this point.
+    /// </remarks>
+    public OpenSim.Framework.RegionFlags? RegionFlags { get; set; }
 
-        protected string m_externalHostName;
+    protected string m_externalHostName;
 
-        protected IPEndPoint m_internalEndPoint;
+    protected IPEndPoint m_internalEndPoint;
 
-        /// <summary>
-        /// The co-ordinate of this region in region units.
-        /// </summary>
-        public int RegionCoordX { get { return (int)Util.WorldToRegionLoc((uint)RegionLocX); } }
+    /// <summary>
+    /// The co-ordinate of this region in region units.
+    /// </summary>
+    public int RegionCoordX { get { return (int)Util.WorldToRegionLoc((uint)RegionLocX); } }
 
-        /// <summary>
-        /// The co-ordinate of this region in region units
-        /// </summary>
-        public int RegionCoordY { get { return (int)Util.WorldToRegionLoc((uint)RegionLocY); } }
+    /// <summary>
+    /// The co-ordinate of this region in region units
+    /// </summary>
+    public int RegionCoordY { get { return (int)Util.WorldToRegionLoc((uint)RegionLocY); } }
 
-        /// <summary>
-        /// The location of this region in meters.
-        /// DANGER DANGER! Note that this name means something different in RegionInfo.
-        /// </summary>
-        public int RegionLocX
-        {
-            get { return m_regionLocX; }
-            set { m_regionLocX = value; }
-        }
-        protected int m_regionLocX;
+    /// <summary>
+    /// The location of this region in meters.
+    /// DANGER DANGER! Note that this name means something different in RegionInfo.
+    /// </summary>
+    public int RegionLocX
+    {
+        get { return m_regionLocX; }
+        set { m_regionLocX = value; }
+    }
+    protected int m_regionLocX;
 
-        public int RegionSizeX { get; set; }
-        public int RegionSizeY { get; set; }
+    public int RegionSizeX { get; set; }
+    public int RegionSizeY { get; set; }
 
-        /// <summary>
-        /// The location of this region in meters.
-        /// DANGER DANGER! Note that this name means something different in RegionInfo.
-        /// </summary>
-        public int RegionLocY
-        {
-            get { return m_regionLocY; }
-            set { m_regionLocY = value; }
-        }
-        protected int m_regionLocY;
+    /// <summary>
+    /// The location of this region in meters.
+    /// DANGER DANGER! Note that this name means something different in RegionInfo.
+    /// </summary>
+    public int RegionLocY
+    {
+        get { return m_regionLocY; }
+        set { m_regionLocY = value; }
+    }
+    protected int m_regionLocY;
 
-        protected UUID m_estateOwner;
+    protected UUID m_estateOwner;
 
-        public UUID EstateOwner
-        {
-            get { return m_estateOwner; }
-            set { m_estateOwner = value; }
-        }
+    public UUID EstateOwner
+    {
+        get { return m_estateOwner; }
+        set { m_estateOwner = value; }
+    }
 
-        public UUID RegionID = UUID.Zero;
-        public UUID ScopeID = UUID.Zero;
+    public UUID RegionID = UUID.Zero;
+    public UUID ScopeID = UUID.Zero;
 
-        public UUID TerrainImage = UUID.Zero;
-        public UUID ParcelImage = UUID.Zero;
-        public byte Access;
-        public int  Maturity;
-        public string RegionSecret = string.Empty;
-        public string Token = string.Empty;
+    public UUID TerrainImage = UUID.Zero;
+    public UUID ParcelImage = UUID.Zero;
+    public byte Access;
+    public int  Maturity;
+    public string RegionSecret = string.Empty;
+    public string Token = string.Empty;
 
-        public GridRegion()
-        {
+    public GridRegion()
+    {
+        RegionSizeX = (int)Constants.RegionSize;
+        RegionSizeY = (int)Constants.RegionSize;
+        m_serverURI = string.Empty;
+    }
+
+    public GridRegion(uint xcell, uint ycell)
+    {
+        m_regionLocX = (int)Util.RegionToWorldLoc(xcell);
+        m_regionLocY = (int)Util.RegionToWorldLoc(ycell);
+        RegionSizeX = (int)Constants.RegionSize;
+        RegionSizeY = (int)Constants.RegionSize;
+    }
+
+    public GridRegion(RegionInfo ConvertFrom)
+    {
+        m_regionName = ConvertFrom.RegionName;
+        m_regionLocX = (int)(ConvertFrom.WorldLocX);
+        m_regionLocY = (int)(ConvertFrom.WorldLocY);
+        RegionSizeX = (int)ConvertFrom.RegionSizeX;
+        RegionSizeY = (int)ConvertFrom.RegionSizeY;
+        m_internalEndPoint = ConvertFrom.InternalEndPoint;
+        m_externalHostName = ConvertFrom.ExternalHostName;
+        HttpPort = ConvertFrom.HttpPort;
+        RegionID = ConvertFrom.RegionID;
+        ServerURI = ConvertFrom.ServerURI;
+        TerrainImage = ConvertFrom.RegionSettings.TerrainImageID;
+        ParcelImage = ConvertFrom.RegionSettings.ParcelImageID;
+        Access = ConvertFrom.AccessLevel;
+        Maturity = ConvertFrom.RegionSettings.Maturity;
+        RegionSecret = ConvertFrom.regionSecret;
+        EstateOwner = ConvertFrom.EstateSettings.EstateOwner;
+    }
+
+    public GridRegion(GridRegion ConvertFrom)
+    {
+        m_regionName = ConvertFrom.RegionName;
+        RegionFlags = ConvertFrom.RegionFlags;
+        m_regionLocX = ConvertFrom.RegionLocX;
+        m_regionLocY = ConvertFrom.RegionLocY;
+        RegionSizeX = ConvertFrom.RegionSizeX;
+        RegionSizeY = ConvertFrom.RegionSizeY;
+        m_internalEndPoint = ConvertFrom.InternalEndPoint;
+        m_externalHostName = ConvertFrom.ExternalHostName;
+        HttpPort = ConvertFrom.HttpPort;
+        RegionID = ConvertFrom.RegionID;
+        ServerURI = ConvertFrom.ServerURI;
+        TerrainImage = ConvertFrom.TerrainImage;
+        ParcelImage = ConvertFrom.ParcelImage;
+        Access = ConvertFrom.Access;
+        Maturity = ConvertFrom.Maturity;
+        RegionSecret = ConvertFrom.RegionSecret;
+        EstateOwner = ConvertFrom.EstateOwner;
+    }
+
+    public GridRegion(Dictionary<string, object> kvp)
+    {
+        if (kvp.ContainsKey("uuid"))
+            RegionID = new UUID((string)kvp["uuid"]);
+
+        if (kvp.ContainsKey("locX"))
+            RegionLocX = Convert.ToInt32((string)kvp["locX"]);
+
+        if (kvp.ContainsKey("locY"))
+            RegionLocY = Convert.ToInt32((string)kvp["locY"]);
+
+        if (kvp.ContainsKey("sizeX"))
+            RegionSizeX = Convert.ToInt32((string)kvp["sizeX"]);
+        else
             RegionSizeX = (int)Constants.RegionSize;
-            RegionSizeY = (int)Constants.RegionSize;
-            m_serverURI = string.Empty;
-        }
 
-        public GridRegion(uint xcell, uint ycell)
-        {
-            m_regionLocX = (int)Util.RegionToWorldLoc(xcell);
-            m_regionLocY = (int)Util.RegionToWorldLoc(ycell);
+        if (kvp.ContainsKey("sizeY"))
+            RegionSizeY = Convert.ToInt32((string)kvp["sizeY"]);
+        else
             RegionSizeX = (int)Constants.RegionSize;
-            RegionSizeY = (int)Constants.RegionSize;
-        }
 
-        public GridRegion(RegionInfo ConvertFrom)
+        if (kvp.ContainsKey("regionName"))
+            RegionName = (string)kvp["regionName"];
+
+        if (kvp.ContainsKey("access"))
         {
-            m_regionName = ConvertFrom.RegionName;
-            m_regionLocX = (int)(ConvertFrom.WorldLocX);
-            m_regionLocY = (int)(ConvertFrom.WorldLocY);
-            RegionSizeX = (int)ConvertFrom.RegionSizeX;
-            RegionSizeY = (int)ConvertFrom.RegionSizeY;
-            m_internalEndPoint = ConvertFrom.InternalEndPoint;
-            m_externalHostName = ConvertFrom.ExternalHostName;
-            HttpPort = ConvertFrom.HttpPort;
-            RegionID = ConvertFrom.RegionID;
-            ServerURI = ConvertFrom.ServerURI;
-            TerrainImage = ConvertFrom.RegionSettings.TerrainImageID;
-            ParcelImage = ConvertFrom.RegionSettings.ParcelImageID;
-            Access = ConvertFrom.AccessLevel;
-            Maturity = ConvertFrom.RegionSettings.Maturity;
-            RegionSecret = ConvertFrom.regionSecret;
-            EstateOwner = ConvertFrom.EstateSettings.EstateOwner;
+            byte access = Convert.ToByte((string)kvp["access"]);
+            Access = access;
+            Maturity = (int)Util.ConvertAccessLevelToMaturity(access);
         }
 
-        public GridRegion(GridRegion ConvertFrom)
+        if (kvp.ContainsKey("flags") && kvp["flags"] != null)
+            RegionFlags = (OpenSim.Framework.RegionFlags?)Convert.ToInt32((string)kvp["flags"]);
+
+        if (kvp.ContainsKey("serverIP"))
         {
-            m_regionName = ConvertFrom.RegionName;
-            RegionFlags = ConvertFrom.RegionFlags;
-            m_regionLocX = ConvertFrom.RegionLocX;
-            m_regionLocY = ConvertFrom.RegionLocY;
-            RegionSizeX = ConvertFrom.RegionSizeX;
-            RegionSizeY = ConvertFrom.RegionSizeY;
-            m_internalEndPoint = ConvertFrom.InternalEndPoint;
-            m_externalHostName = ConvertFrom.ExternalHostName;
-            HttpPort = ConvertFrom.HttpPort;
-            RegionID = ConvertFrom.RegionID;
-            ServerURI = ConvertFrom.ServerURI;
-            TerrainImage = ConvertFrom.TerrainImage;
-            ParcelImage = ConvertFrom.ParcelImage;
-            Access = ConvertFrom.Access;
-            Maturity = ConvertFrom.Maturity;
-            RegionSecret = ConvertFrom.RegionSecret;
-            EstateOwner = ConvertFrom.EstateOwner;
+            //int port = 0;
+            //Int32.TryParse((string)kvp["serverPort"], out port);
+            //IPEndPoint ep = new IPEndPoint(IPAddress.Parse((string)kvp["serverIP"]), port);
+            ExternalHostName = (string)kvp["serverIP"];
         }
+        else
+            ExternalHostName = "127.0.0.1";
 
-        public GridRegion(Dictionary<string, object> kvp)
+        if (kvp.ContainsKey("serverPort"))
         {
-            if (kvp.ContainsKey("uuid"))
-                RegionID = new UUID((string)kvp["uuid"]);
-
-            if (kvp.ContainsKey("locX"))
-                RegionLocX = Convert.ToInt32((string)kvp["locX"]);
-
-            if (kvp.ContainsKey("locY"))
-                RegionLocY = Convert.ToInt32((string)kvp["locY"]);
-
-            if (kvp.ContainsKey("sizeX"))
-                RegionSizeX = Convert.ToInt32((string)kvp["sizeX"]);
-            else
-                RegionSizeX = (int)Constants.RegionSize;
-
-            if (kvp.ContainsKey("sizeY"))
-                RegionSizeY = Convert.ToInt32((string)kvp["sizeY"]);
-            else
-                RegionSizeX = (int)Constants.RegionSize;
-
-            if (kvp.ContainsKey("regionName"))
-                RegionName = (string)kvp["regionName"];
-
-            if (kvp.ContainsKey("access"))
-            {
-                byte access = Convert.ToByte((string)kvp["access"]);
-                Access = access;
-                Maturity = (int)Util.ConvertAccessLevelToMaturity(access);
-            }
-
-            if (kvp.ContainsKey("flags") && kvp["flags"] != null)
-                RegionFlags = (OpenSim.Framework.RegionFlags?)Convert.ToInt32((string)kvp["flags"]);
-
-            if (kvp.ContainsKey("serverIP"))
-            {
-                //int port = 0;
-                //Int32.TryParse((string)kvp["serverPort"], out port);
-                //IPEndPoint ep = new IPEndPoint(IPAddress.Parse((string)kvp["serverIP"]), port);
-                ExternalHostName = (string)kvp["serverIP"];
-            }
-            else
-                ExternalHostName = "127.0.0.1";
-
-            if (kvp.ContainsKey("serverPort"))
-            {
-                Int32 port = 0;
-                Int32.TryParse((string)kvp["serverPort"], out port);
-                InternalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), port);
-            }
-
-            if (kvp.ContainsKey("serverHttpPort"))
-            {
-                UInt32 port = 0;
-                UInt32.TryParse((string)kvp["serverHttpPort"], out port);
-                HttpPort = port;
-            }
-
-            if (kvp.ContainsKey("serverURI"))
-                ServerURI = (string)kvp["serverURI"];
-
-            if (kvp.ContainsKey("regionMapTexture"))
-                UUID.TryParse((string)kvp["regionMapTexture"], out TerrainImage);
-
-            if (kvp.ContainsKey("parcelMapTexture"))
-                UUID.TryParse((string)kvp["parcelMapTexture"], out ParcelImage);
-
-            if (kvp.ContainsKey("regionSecret"))
-                RegionSecret =(string)kvp["regionSecret"];
-
-            if (kvp.ContainsKey("owner_uuid"))
-                EstateOwner = new UUID(kvp["owner_uuid"].ToString());
-
-            if (kvp.ContainsKey("Token"))
-                Token = kvp["Token"].ToString();
-
-            // m_log.DebugFormat("{0} New GridRegion. id={1}, loc=<{2},{3}>, size=<{4},{5}>",
-            //                         LogHeader, RegionID, RegionLocX, RegionLocY, RegionSizeX, RegionSizeY);
+            Int32 port = 0;
+            Int32.TryParse((string)kvp["serverPort"], out port);
+            InternalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), port);
         }
 
-        public Dictionary<string, object> ToKeyValuePairs()
+        if (kvp.ContainsKey("serverHttpPort"))
         {
-            Dictionary<string, object> kvp = new Dictionary<string, object>();
-            kvp["uuid"] = RegionID.ToString();
-            kvp["locX"] = RegionLocX.ToString();
-            kvp["locY"] = RegionLocY.ToString();
-            kvp["sizeX"] = RegionSizeX.ToString();
-            kvp["sizeY"] = RegionSizeY.ToString();
-            kvp["regionName"] = RegionName;
-
-            if (RegionFlags != null)
-                kvp["flags"] = ((int)RegionFlags).ToString();
-
-            kvp["serverIP"] = ExternalHostName; //ExternalEndPoint.Address.ToString();
-            kvp["serverHttpPort"] = HttpPort.ToString();
-            kvp["serverURI"] = ServerURI;
-            kvp["serverPort"] = InternalEndPoint.Port.ToString();
-            kvp["regionMapTexture"] = TerrainImage.ToString();
-            kvp["parcelMapTexture"] = ParcelImage.ToString();
-            kvp["access"] = Access.ToString();
-            kvp["regionSecret"] = RegionSecret;
-            kvp["owner_uuid"] = EstateOwner.ToString();
-            kvp["Token"] = Token.ToString();
-            // Maturity doesn't seem to exist in the DB
-
-            return kvp;
+            UInt32 port = 0;
+            UInt32.TryParse((string)kvp["serverHttpPort"], out port);
+            HttpPort = port;
         }
 
-        #region Definition of equality
+        if (kvp.ContainsKey("serverURI"))
+            ServerURI = (string)kvp["serverURI"];
 
-        /// <summary>
-        /// Define equality as two regions having the same, non-zero UUID.
-        /// </summary>
-        public bool Equals(GridRegion region)
-        {
-            if ((object)region == null)
-                return false;
-            // Return true if the non-zero UUIDs are equal:
-            return (!RegionID.IsZero()) && RegionID.Equals(region.RegionID);
-        }
+        if (kvp.ContainsKey("regionMapTexture"))
+            UUID.TryParse((string)kvp["regionMapTexture"], out TerrainImage);
 
-        public override bool Equals(Object obj)
-        {
-            if (obj == null)
-                return false;
-            return Equals(obj as GridRegion);
-        }
+        if (kvp.ContainsKey("parcelMapTexture"))
+            UUID.TryParse((string)kvp["parcelMapTexture"], out ParcelImage);
 
-        public override int GetHashCode()
-        {
-            return RegionID.GetHashCode() ^ TerrainImage.GetHashCode() ^ ParcelImage.GetHashCode();
-        }
+        if (kvp.ContainsKey("regionSecret"))
+            RegionSecret =(string)kvp["regionSecret"];
 
-        #endregion
+        if (kvp.ContainsKey("owner_uuid"))
+            EstateOwner = new UUID(kvp["owner_uuid"].ToString());
 
-        /// <value>
-        /// This accessor can throw all the exceptions that Dns.GetHostAddresses can throw.
-        ///
-        /// XXX Isn't this really doing too much to be a simple getter, rather than an explict method?
-        /// </value>
-        public IPEndPoint ExternalEndPoint
-        {
-            get { return Util.getEndPoint(m_externalHostName, m_internalEndPoint.Port); }
-        }
+        if (kvp.ContainsKey("Token"))
+            Token = kvp["Token"].ToString();
 
-        public string ExternalHostName
-        {
-            get { return m_externalHostName; }
-            set { m_externalHostName = value; }
-        }
+        // m_log.DebugFormat("{0} New GridRegion. id={1}, loc=<{2},{3}>, size=<{4},{5}>",
+        //                         LogHeader, RegionID, RegionLocX, RegionLocY, RegionSizeX, RegionSizeY);
+    }
 
-        public IPEndPoint InternalEndPoint
-        {
-            get { return m_internalEndPoint; }
-            set { m_internalEndPoint = value; }
-        }
+    public Dictionary<string, object> ToKeyValuePairs()
+    {
+        Dictionary<string, object> kvp = new Dictionary<string, object>();
+        kvp["uuid"] = RegionID.ToString();
+        kvp["locX"] = RegionLocX.ToString();
+        kvp["locY"] = RegionLocY.ToString();
+        kvp["sizeX"] = RegionSizeX.ToString();
+        kvp["sizeY"] = RegionSizeY.ToString();
+        kvp["regionName"] = RegionName;
 
-        public ulong RegionHandle
-        {
-            get { return Util.UIntsToLong((uint)RegionLocX, (uint)RegionLocY); }
-        }
+        if (RegionFlags != null)
+            kvp["flags"] = ((int)RegionFlags).ToString();
+
+        kvp["serverIP"] = ExternalHostName; //ExternalEndPoint.Address.ToString();
+        kvp["serverHttpPort"] = HttpPort.ToString();
+        kvp["serverURI"] = ServerURI;
+        kvp["serverPort"] = InternalEndPoint.Port.ToString();
+        kvp["regionMapTexture"] = TerrainImage.ToString();
+        kvp["parcelMapTexture"] = ParcelImage.ToString();
+        kvp["access"] = Access.ToString();
+        kvp["regionSecret"] = RegionSecret;
+        kvp["owner_uuid"] = EstateOwner.ToString();
+        kvp["Token"] = Token.ToString();
+        // Maturity doesn't seem to exist in the DB
+
+        return kvp;
+    }
+
+    #region Definition of equality
+
+    /// <summary>
+    /// Define equality as two regions having the same, non-zero UUID.
+    /// </summary>
+    public bool Equals(GridRegion region)
+    {
+        if ((object)region == null)
+            return false;
+        // Return true if the non-zero UUIDs are equal:
+        return (!RegionID.IsZero()) && RegionID.Equals(region.RegionID);
+    }
+
+    public override bool Equals(Object obj)
+    {
+        if (obj == null)
+            return false;
+        return Equals(obj as GridRegion);
+    }
+
+    public override int GetHashCode()
+    {
+        return RegionID.GetHashCode() ^ TerrainImage.GetHashCode() ^ ParcelImage.GetHashCode();
+    }
+
+    #endregion
+
+    /// <value>
+    /// This accessor can throw all the exceptions that Dns.GetHostAddresses can throw.
+    ///
+    /// XXX Isn't this really doing too much to be a simple getter, rather than an explict method?
+    /// </value>
+    public IPEndPoint ExternalEndPoint
+    {
+        get { return Util.getEndPoint(m_externalHostName, m_internalEndPoint.Port); }
+    }
+
+    public string ExternalHostName
+    {
+        get { return m_externalHostName; }
+        set { m_externalHostName = value; }
+    }
+
+    public IPEndPoint InternalEndPoint
+    {
+        get { return m_internalEndPoint; }
+        set { m_internalEndPoint = value; }
+    }
+
+    public ulong RegionHandle
+    {
+        get { return Util.UIntsToLong((uint)RegionLocX, (uint)RegionLocY); }
     }
 }

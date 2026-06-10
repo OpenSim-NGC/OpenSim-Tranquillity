@@ -33,111 +33,110 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using System.Reflection;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization;
+
+public class AuthorizationService : IAuthorizationService
 {
-    public class AuthorizationService : IAuthorizationService
+    private enum AccessFlags
     {
-        private enum AccessFlags
+        None = 0,               /* No restrictions */
+        DisallowResidents = 1,  /* Only gods and managers*/
+        DisallowForeigners = 2, /* Only local people */
+    }
+
+    private static readonly ILog m_log =
+            LogManager.GetLogger(
+            MethodBase.GetCurrentMethod().DeclaringType);
+
+    private IUserManagement m_UserManagement;
+    private Scene m_Scene;
+
+    AccessFlags m_accessValue = AccessFlags.None;
+
+    public AuthorizationService(IConfig config, Scene scene)
+    {
+        m_Scene = scene;
+        m_UserManagement = scene.RequestModuleInterface<IUserManagement>();
+
+        if (config != null)
         {
-            None = 0,               /* No restrictions */
-            DisallowResidents = 1,  /* Only gods and managers*/
-            DisallowForeigners = 2, /* Only local people */
+            string accessStr = config.GetString("Region_" + scene.RegionInfo.RegionName.Replace(' ', '_'), String.Empty);
+            if (accessStr != string.Empty)
+            {
+                try
+                {
+                    m_accessValue = (AccessFlags)Enum.Parse(typeof(AccessFlags), accessStr);
+                }
+                catch (ArgumentException)
+                {
+                    m_log.WarnFormat("[AuthorizationService]: {0} is not a valid access flag", accessStr);
+                }
+            }
+            m_log.DebugFormat("[AuthorizationService]: Region {0} access restrictions: {1}", m_Scene.RegionInfo.RegionName, m_accessValue);
         }
 
-        private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+    }
 
-        private IUserManagement m_UserManagement;
-        private Scene m_Scene;
-
-        AccessFlags m_accessValue = AccessFlags.None;
-
-        public AuthorizationService(IConfig config, Scene scene)
+    public bool IsAuthorizedForRegion(
+        string user, string firstName, string lastName, string regionID, out string message)
+    {
+        // This should not happen
+        if (m_Scene.RegionInfo.RegionID.ToString() != regionID)
         {
-            m_Scene = scene;
-            m_UserManagement = scene.RequestModuleInterface<IUserManagement>();
-
-            if (config != null)
-            {
-                string accessStr = config.GetString("Region_" + scene.RegionInfo.RegionName.Replace(' ', '_'), String.Empty);
-                if (accessStr != string.Empty)
-                {
-                    try
-                    {
-                        m_accessValue = (AccessFlags)Enum.Parse(typeof(AccessFlags), accessStr);
-                    }
-                    catch (ArgumentException)
-                    {
-                        m_log.WarnFormat("[AuthorizationService]: {0} is not a valid access flag", accessStr);
-                    }
-                }
-                m_log.DebugFormat("[AuthorizationService]: Region {0} access restrictions: {1}", m_Scene.RegionInfo.RegionName, m_accessValue);
-            }
-
+            m_log.WarnFormat("[AuthorizationService]: Service for region {0} received request to authorize for region {1}",
+                m_Scene.RegionInfo.RegionID, regionID);
+            message = string.Format("Region {0} received request to authorize for region {1}", m_Scene.RegionInfo.RegionID, regionID);
+            return false;
         }
 
-        public bool IsAuthorizedForRegion(
-            string user, string firstName, string lastName, string regionID, out string message)
+        bool disallowResidents = m_Scene.RegionInfo.DisallowResidents;
+        bool disallowForeigners = m_Scene.RegionInfo.DisallowForeigners;
+
+        if (m_accessValue == AccessFlags.DisallowResidents)
+            disallowResidents = true;
+        else if (m_accessValue == AccessFlags.DisallowForeigners)
+            disallowForeigners = true;
+        
+        if(!UUID.TryParse(user, out UUID userID ))
         {
-            // This should not happen
-            if (m_Scene.RegionInfo.RegionID.ToString() != regionID)
-            {
-                m_log.WarnFormat("[AuthorizationService]: Service for region {0} received request to authorize for region {1}",
-                    m_Scene.RegionInfo.RegionID, regionID);
-                message = string.Format("Region {0} received request to authorize for region {1}", m_Scene.RegionInfo.RegionID, regionID);
-                return false;
-            }
+            message = "Invalid UUID";
+            return false;
+        }
 
-            bool disallowResidents = m_Scene.RegionInfo.DisallowResidents;
-            bool disallowForeigners = m_Scene.RegionInfo.DisallowForeigners;
-
-            if (m_accessValue == AccessFlags.DisallowResidents)
-                disallowResidents = true;
-            else if (m_accessValue == AccessFlags.DisallowForeigners)
-                disallowForeigners = true;
-            
-            if(!UUID.TryParse(user, out UUID userID ))
-            {
-                message = "Invalid UUID";
-                return false;
-            }
-
-            if (m_Scene.Permissions.IsAdministrator(userID))
-            {
-                message = "Authorized";
-                return true;
-            }
-
-            if (disallowResidents == true)
-            {
-                if (!m_UserManagement.IsLocalGridUser(userID))
-                {
-                    message = "No foreign users allowed in this region";
-                    return false;
-                }
-            }
-
-            if ((m_accessValue & AccessFlags.DisallowResidents) != 0)
-            {
-                if(!m_Scene.Permissions.IsEstateManager(userID))
-                {
-                    message = "Only Admins and Managers allowed in this region";
-                    return false;
-                }
-            }
-            else if (disallowForeigners == true)
-            {
-                if (m_UserManagement.IsLocalGridUser(userID) == false)
-                {
-                    message = "Only Local grid users allowed in this region";
-                    return false;
-                }
-            }
-
+        if (m_Scene.Permissions.IsAdministrator(userID))
+        {
             message = "Authorized";
             return true;
         }
 
+        if (disallowResidents == true)
+        {
+            if (!m_UserManagement.IsLocalGridUser(userID))
+            {
+                message = "No foreign users allowed in this region";
+                return false;
+            }
+        }
+
+        if ((m_accessValue & AccessFlags.DisallowResidents) != 0)
+        {
+            if(!m_Scene.Permissions.IsEstateManager(userID))
+            {
+                message = "Only Admins and Managers allowed in this region";
+                return false;
+            }
+        }
+        else if (disallowForeigners == true)
+        {
+            if (m_UserManagement.IsLocalGridUser(userID) == false)
+            {
+                message = "Only Local grid users allowed in this region";
+                return false;
+            }
+        }
+
+        message = "Authorized";
+        return true;
     }
+
 }

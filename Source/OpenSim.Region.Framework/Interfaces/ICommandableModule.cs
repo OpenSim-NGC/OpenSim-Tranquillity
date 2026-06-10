@@ -25,13 +25,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace OpenSim.Region.Framework.Interfaces
+namespace OpenSim.Region.Framework.Interfaces;
+
+public interface ICommandableModule
 {
-    public interface ICommandableModule
+    ICommander CommandInterface
     {
-        ICommander CommandInterface
-        {
-            get;
-        }
+        get;
     }
 }

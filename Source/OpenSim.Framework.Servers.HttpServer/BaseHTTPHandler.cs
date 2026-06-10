@@ -27,15 +27,14 @@
 
 using System.Collections;
 
-namespace OpenSim.Framework.Servers.HttpServer
+namespace OpenSim.Framework.Servers.HttpServer;
+
+public abstract class BaseHTTPHandler : BaseRequestHandler, IGenericHTTPHandler
 {
-    public abstract class BaseHTTPHandler : BaseRequestHandler, IGenericHTTPHandler
-    {
-        public abstract Hashtable Handle(string path, Hashtable Request);
+    public abstract Hashtable Handle(string path, Hashtable Request);
 
-        protected BaseHTTPHandler(string httpMethod, string path) : this(httpMethod, path, null, null) {}
+    protected BaseHTTPHandler(string httpMethod, string path) : this(httpMethod, path, null, null) {}
 
-        protected BaseHTTPHandler(string httpMethod, string path, string name, string description)
-            : base(httpMethod, path, name, description) {}
-    }
+    protected BaseHTTPHandler(string httpMethod, string path, string name, string description)
+        : base(httpMethod, path, name, description) {}
 }
