@@ -119,8 +119,8 @@ public class MoneyService : IMoneyServiceCore, IHostedService
             m_moneyServerPort = serverConfig.GetValue<uint>("ServerPort", m_moneyServerPort);
         }
 
-
         _logger.LogInformation("[MONEY SERVER]: Setup HTTP Server process");
+        
         try
         {
             m_httpServer = new BaseHttpServer(m_moneyServerPort);

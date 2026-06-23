@@ -36,69 +36,47 @@ using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using System.Runtime.InteropServices;
+using OpenSim.Framework.Monitoring;
 
 namespace OpenSim.Server.GridServer;
 
-public class ServerMain
+public class GridService : IHostedService
 {
-    private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
+    private readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
 
-    protected static HttpServerBase m_Server = null;
-    protected static List<IServiceConnector> m_ServiceConnectors = new();
+    private readonly HttpServerBase m_Server = null;
+    private readonly List<IServiceConnector> m_ServiceConnectors = new();
 
-    protected static PluginLoader loader;
-    private static bool m_NoVerifyCertChain = false;
-    private static bool m_NoVerifyCertHostname = false;
+    private readonly PluginLoader loader;
+    private readonly bool m_NoVerifyCertChain = false;
+    private readonly bool m_NoVerifyCertHostname = false;
+    
+    private readonly IServiceProvider _serviceProvider;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<GridService> _logger;
+    private readonly IServerBase _serverBase;
 
-    public static bool ValidateServerCertificate(
-        object sender,
-        X509Certificate certificate,
-        X509Chain chain,
-        SslPolicyErrors sslPolicyErrors)
+    public GridService(
+        IServiceProvider serviceProvider,
+        IConfiguration configuration,
+        ILogger<GridService> logger,
+        IServerBase serverBase
+        )
     {
-        if (m_NoVerifyCertChain)
-            sslPolicyErrors &= ~SslPolicyErrors.RemoteCertificateChainErrors;
+        _serviceProvider = serviceProvider;
+        _configuration = configuration;
+        _logger = logger;
+        _serverBase = serverBase;
 
-        if (m_NoVerifyCertHostname)
-            sslPolicyErrors &= ~SslPolicyErrors.RemoteCertificateNameMismatch;
-
-        if (sslPolicyErrors == SslPolicyErrors.None)
-            return true;
-
-        return false;
-    }
-
-    /// <summary>
-    /// Opens a file and uses it as input to the console command parser.
-    /// </summary>
-    /// <param name="fileName">name of file to use as input to the console</param>
-    private static void PrintFileToConsole(string fileName)
-    {
-        if (File.Exists(fileName))
-        {
-            using(StreamReader readFile = File.OpenText(fileName))
-            {
-                string currentLine;
-                while ((currentLine = readFile.ReadLine()) is not null)
-                {
-                    m_log.InfoFormat("[!]" + currentLine);
-                }
-            }
-        }
-    }
-
-    public static int Main(string[] args)
-    {
-        Culture.SetCurrentCulture();
-        Culture.SetDefaultCurrentCulture();
-
-        ServicePointManager.DefaultConnectionLimit = 64;
-        ServicePointManager.MaxServicePointIdleTime = 30000;
-
-        ServicePointManager.Expect100Continue = false;
-        ServicePointManager.UseNagleAlgorithm = false;
-        ServicePointManager.ServerCertificateValidationCallback = ValidateServerCertificate;
-       
+        // Deal with the old fashioned config here for now.  This will go away when we're fully converted.
+        MainConsole.Instance = serverBase.Console;
+        
+         // Old fashioned initialization. Get Args
+        string[] args = Environment.GetCommandLineArgs();      
         m_Server = new HttpServerBase("R.O.B.U.S.T.", args);
 
         string registryLocation;
@@ -214,7 +192,114 @@ public class ServerMain
         m_Server?.Shutdown();
 
         Environment.Exit(res);
+    }
 
-        return 0;
+    public bool ValidateServerCertificate(
+        object sender,
+        X509Certificate certificate,
+        X509Chain chain,
+        SslPolicyErrors sslPolicyErrors)
+    {
+        if (m_NoVerifyCertChain)
+            sslPolicyErrors &= ~SslPolicyErrors.RemoteCertificateChainErrors;
+
+        if (m_NoVerifyCertHostname)
+            sslPolicyErrors &= ~SslPolicyErrors.RemoteCertificateNameMismatch;
+
+        if (sslPolicyErrors == SslPolicyErrors.None)
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Opens a file and uses it as input to the console command parser.
+    /// </summary>
+    /// <param name="fileName">name of file to use as input to the console</param>
+    private void PrintFileToConsole(string fileName)
+    {
+        if (File.Exists(fileName))
+        {
+            using(StreamReader readFile = File.OpenText(fileName))
+            {
+                string currentLine;
+                while ((currentLine = readFile.ReadLine()) is not null)
+                {
+                    m_log.InfoFormat("[!]" + currentLine);
+                }
+            }
+        }
+    }
+    
+    public virtual void Startup()
+    {
+        _logger.LogInformation("[STARTUP]: Beginning startup processing");
+        _logger.LogInformation("[STARTUP]: Version: " + _serverBase.Version);
+        _logger.LogInformation($"[STARTUP]: Operating system version: {Environment.OSVersion}, .NET platform {Util.RuntimePlatformStr}, Runtime {Environment.Version}");
+        _logger.LogInformation($"[STARTUP]: Processor Architecture: {RuntimeInformation.ProcessArchitecture}({(BitConverter.IsLittleEndian ? "le" : "be")} {(Environment.Is64BitProcess ? "64" : "32")}bit)");
+        _logger.LogInformation($"[STARTUP]: Memory: {GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / (1024 * 1024)} MB");
+        
+        try
+        {
+            _serverBase.RegisterCommonCommands();
+            _serverBase.RegisterCommonComponents(_serverBase.Config);
+        }
+        catch(Exception e)
+        {
+            _logger.LogCritical($"Fatal error: {e}");
+            Environment.Exit(1);
+        }
+    }
+
+    /// <summary>
+    /// Work
+    /// </summary>
+    public void Work()
+    {
+        // //The timer checks the transactions table every 60 seconds
+        // System.Timers.Timer checkTimer = new Timer
+        // {
+        //     Interval = 60 * 1000,
+        //     Enabled = true
+        // };
+
+        // checkTimer.Elapsed += new ElapsedEventHandler(CheckTransaction);
+        // checkTimer.Start();
+
+        while (true)
+        {
+            _serverBase.Console.Prompt();
+        }
+    }
+
+    protected void Shutdown()
+    {
+        Watchdog.Enabled = false;
+        MainServer.Instance.Stop();
+
+        Thread.Sleep(500);
+        WorkManager.Stop();
+
+        _serverBase.Shutdown();
+    }
+
+
+    public Task StartAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("{Service} is running.", nameof(GridService));
+
+        Startup();
+        Work();
+
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("{Service} is stopping.", nameof(GridService));
+
+        Shutdown();
+
+        return Task.CompletedTask;
     }
 }
