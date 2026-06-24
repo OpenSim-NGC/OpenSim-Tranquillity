@@ -185,6 +185,7 @@ class Program
 
             services.AddSingleton<GridService>();
             services.AddHostedService(sp => sp.GetRequiredService<GridService>());
+            services.AddHostedService<GridConsoleRunnerService>();
         });
 
         builder.ConfigureWebHostDefaults(webBuilder =>

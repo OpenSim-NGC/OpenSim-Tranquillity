@@ -261,27 +261,6 @@ public class GridService : IHostedService
         }
     }
 
-    /// <summary>
-    /// Work
-    /// </summary>
-    public void Work()
-    {
-        // //The timer checks the transactions table every 60 seconds
-        // System.Timers.Timer checkTimer = new Timer
-        // {
-        //     Interval = 60 * 1000,
-        //     Enabled = true
-        // };
-
-        // checkTimer.Elapsed += new ElapsedEventHandler(CheckTransaction);
-        // checkTimer.Start();
-
-        while (true)
-        {
-            _serverBase.Console.Prompt();
-        }
-    }
-
     protected void Shutdown()
     {
         _runtimeMonitoringController.DisableWatchdog();
@@ -300,7 +279,6 @@ public class GridService : IHostedService
 
         BuildServer();
         Startup();
-        Work();
 
         return Task.CompletedTask;
     }
