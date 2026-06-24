@@ -12,8 +12,8 @@ using System.CommandLine;
 using Autofac.Extensions.DependencyInjection;
 using Autofac;
 
-using OpenSim.Framework.Console;
 using OpenSim.Server.Base;
+using OpenSim.Server.Base.Hosting;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using log4net.Config;
@@ -78,13 +78,14 @@ class Program
         }
         else
         {
-            rootCommand.SetAction(parseResult => Configure( 
-                logConfig: parseResult.GetValue(logconfigOption), 
-                iniFile: parseResult.GetValue(inifileOption), 
-                iniMaster: parseResult.GetValue(inimasterOption), 
-                iniDirectory: parseResult.GetValue(inidirectoryOption), 
-                consoleType: parseResult.GetValue(consoleOption)
-                )
+            rootCommand.SetAction(parseResult => Configure(new ServerStartupOptions
+                {
+                    LogConfig    = parseResult.GetValue(logconfigOption),
+                    IniFiles     = parseResult.GetValue(inifileOption) ?? [],
+                    IniMaster    = parseResult.GetValue(inimasterOption),
+                    IniDirectory = parseResult.GetValue(inidirectoryOption),
+                    ConsoleType  = parseResult.GetValue(consoleOption),
+                })
             );
         }
          
@@ -93,35 +94,13 @@ class Program
         return 0;
     }
 
-    static void Configure(
-        string logConfig, 
-        List<string> iniFile, 
-        string iniMaster, 
-        string iniDirectory, 
-        string consoleType
-        )
+    static void Configure(ServerStartupOptions options)
     {
         IHostBuilder builder = Host.CreateDefaultBuilder();
 
         builder.ConfigureAppConfiguration(configuration =>
         {
-            configuration.AddIniFile(iniMaster, optional: true, reloadOnChange: true);
-
-            foreach (var item in iniFile)
-            {
-                configuration.AddIniFile(item, optional: true, reloadOnChange: true);
-            }
-
-            if (string.IsNullOrEmpty(iniDirectory) is false)
-            {
-                if (Directory.Exists(iniDirectory))
-                {
-                    foreach (var item in Directory.GetFiles(iniDirectory, "*.ini"))
-                    {
-                        configuration.AddIniFile(item, optional: true, reloadOnChange: true);
-                    }
-                }
-            }
+            configuration.AddOpenSimIniFiles(options);
         });
 
         builder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
@@ -142,30 +121,21 @@ class Program
             // Deal with the old fashioned config here for now.  This will go away when we're fully
             // converted to .NET Generic Host and can use the built in configuration system everywhere
             XmlConfigurator.Configure();
-            var moneyConfig = new MoneyServerConfigSource(iniMaster);
+            var moneyConfig = new MoneyServerConfigSource(options.IniMaster);
             //registryBuilder.RegisterInstance(moneyConfig).AsSelf().SingleInstance();
 
-            var prompt = "MoneyServer> ";
-            ICommandConsole console = null;
-
-            if (consoleType == "basic")
-                console = new CommandConsole(prompt);
-            else if (consoleType == "rest")
-                console = new RemoteConsole(prompt);
-            else if (consoleType == "mock")
-                console = new MockConsole();
-            else if (consoleType == "local")
-                console = new LocalConsole(prompt);
+            var consoleContext = new ConsoleContext(new ConsoleFactory().Create(options.ConsoleType, "MoneyServer> "));
+            registryBuilder.RegisterInstance<IConsoleContext>(consoleContext).AsImplementedInterfaces().SingleInstance();
 
             registryBuilder.RegisterInstance<IServerBase>(
-                new ServerBase { Console = console, Config = moneyConfig.m_config }).AsImplementedInterfaces().SingleInstance();
+                new ServerBase { Console = consoleContext.Console, Config = moneyConfig.m_config }).AsImplementedInterfaces().SingleInstance();
 
             registryBuilder.RegisterType<MoneyDBService>().As<IMoneyDBService>().AsSelf().SingleInstance();
         })
         .ConfigureLogging(loggingBuilder =>
         {
             loggingBuilder.ClearProviders();
-            loggingBuilder.AddLog4Net(log4NetConfigFile: logConfig);
+            loggingBuilder.AddLog4Net(log4NetConfigFile: options.LogConfig);
             loggingBuilder.AddConsole();
         })
         .ConfigureServices(services =>
