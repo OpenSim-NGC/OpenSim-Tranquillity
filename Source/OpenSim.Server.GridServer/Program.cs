@@ -16,7 +16,7 @@ using OpenSim.Framework.Console;
 using OpenSim.Server.Base;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
-using log4net.Config;
+using OpenSim.Server.Base.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -104,6 +104,9 @@ class Program
         string consoleType
         )
     {
+        ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
+        string effectiveLogConfig = log4NetBootstrapper.Configure(logConfig, "OpenSim.Server.GridServer.dll.config");
+
         IHostBuilder builder = Host.CreateDefaultBuilder();
 
         builder.ConfigureAppConfiguration(configuration =>
@@ -142,9 +145,6 @@ class Program
             directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "addon-modules");
             RegisterServices.Register(registry, directoryPath);
 
-            // Deal with the old fashioned config here for now.  This will go away when we're fully
-            // converted to .NET Generic Host and can use the built in configuration system everywhere
-            XmlConfigurator.Configure();
             var gridConfig = new GridServerConfigSource(iniMaster);
             //registryBuilder.RegisterInstance(gridConfig).AsSelf().SingleInstance();
 
@@ -169,7 +169,7 @@ class Program
         .ConfigureLogging(loggingBuilder =>
         {
             loggingBuilder.ClearProviders();
-            loggingBuilder.AddLog4Net(log4NetConfigFile: logConfig);
+            loggingBuilder.AddLog4Net(log4NetConfigFile: effectiveLogConfig);
             loggingBuilder.AddConsole();
         })
         .ConfigureServices(services =>

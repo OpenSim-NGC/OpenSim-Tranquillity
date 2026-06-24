@@ -16,7 +16,6 @@ using OpenSim.Server.Base;
 using OpenSim.Server.Base.Hosting;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
-using log4net.Config;
 using Microsoft.AspNetCore.Hosting;
 using OpenSim.Server.MoneyServer.Models;
 using Microsoft.AspNetCore.Builder;
@@ -96,6 +95,9 @@ class Program
 
     static void Configure(ServerStartupOptions options)
     {
+        ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
+        string effectiveLogConfig = log4NetBootstrapper.Configure(options.LogConfig, "OpenSim.Server.MoneyServer.dll.config");
+
         IHostBuilder builder = Host.CreateDefaultBuilder();
 
         // Transitional bridge for services that still require Nini IConfigSource.
@@ -124,10 +126,6 @@ class Program
             directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "addon-modules");
             RegisterServices.Register(registry, directoryPath);
 
-            // Deal with the old fashioned config here for now.  This will go away when we're fully
-            // converted to .NET Generic Host and can use the built in configuration system everywhere
-            XmlConfigurator.Configure();
-
             registryBuilder.RegisterInstance<IConsoleContext>(consoleContext).AsImplementedInterfaces().SingleInstance();
             registryBuilder.RegisterInstance<ILegacyConfigSourceAccessor>(legacyConfigAccessor).AsImplementedInterfaces().SingleInstance();
 
@@ -139,7 +137,7 @@ class Program
         .ConfigureLogging(loggingBuilder =>
         {
             loggingBuilder.ClearProviders();
-            loggingBuilder.AddLog4Net(log4NetConfigFile: options.LogConfig);
+            loggingBuilder.AddLog4Net(log4NetConfigFile: effectiveLogConfig);
             loggingBuilder.AddConsole();
         })
         .ConfigureServices(services =>
