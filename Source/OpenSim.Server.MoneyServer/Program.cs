@@ -145,6 +145,8 @@ class Program
             services.AddControllers().AddControllersAsServices();
             services.AddSingleton<IProcessSetupService, ProcessSetupService>();
             services.AddSingleton<IPidFileManager, PidFileManager>();
+            services.AddSingleton<IMainServerAccessor, MainServerAccessor>();
+            services.AddSingleton<IRuntimeMonitoringController, RuntimeMonitoringController>();
             services.AddSingleton<MoneySessionStore>();
             services.AddSingleton<IStartupFailureCoordinator, StartupFailureCoordinator>();
             services.AddSingleton<IMoneyServerRuntime, MoneyServerRuntime>();

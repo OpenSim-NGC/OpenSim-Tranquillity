@@ -177,6 +177,8 @@ class Program
             services.AddControllers().AddControllersAsServices();
             services.AddSingleton<IProcessSetupService, ProcessSetupService>();
             services.AddSingleton<IPidFileManager, PidFileManager>();
+            services.AddSingleton<IMainServerAccessor, MainServerAccessor>();
+            services.AddSingleton<IRuntimeMonitoringController, RuntimeMonitoringController>();
 
             services.AddHostedService<ProcessSetupHostedService>();
             services.AddHostedService<PidFileHostedService>();

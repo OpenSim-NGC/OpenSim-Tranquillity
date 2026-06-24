@@ -27,7 +27,6 @@
 
 using System.Timers;
 using OpenSim.Framework;
-using OpenSim.Framework.Monitoring;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Base.Hosting;
@@ -47,6 +46,8 @@ public sealed class MoneyServerRuntime : IMoneyServerRuntime
     private readonly IServerBase _serverBase;
     private readonly IConsoleContext _consoleContext;
     private readonly IStartupFailureCoordinator _startupFailureCoordinator;
+    private readonly IMainServerAccessor _mainServerAccessor;
+    private readonly IRuntimeMonitoringController _runtimeMonitoringController;
     private readonly IMoneyDBService _moneyDBService;
     private readonly MoneyXmlRpcController _moneyXmlRpcController;
 
@@ -62,6 +63,8 @@ public sealed class MoneyServerRuntime : IMoneyServerRuntime
         IServerBase serverBase,
         IConsoleContext consoleContext,
         IStartupFailureCoordinator startupFailureCoordinator,
+        IMainServerAccessor mainServerAccessor,
+        IRuntimeMonitoringController runtimeMonitoringController,
         IMoneyDBService moneyDBService,
         MoneyXmlRpcController moneyXmlRpcController)
     {
@@ -70,6 +73,8 @@ public sealed class MoneyServerRuntime : IMoneyServerRuntime
         _serverBase = serverBase;
         _consoleContext = consoleContext;
         _startupFailureCoordinator = startupFailureCoordinator;
+        _mainServerAccessor = mainServerAccessor;
+        _runtimeMonitoringController = runtimeMonitoringController;
         _moneyDBService = moneyDBService;
         _moneyXmlRpcController = moneyXmlRpcController;
     }
@@ -156,11 +161,11 @@ public sealed class MoneyServerRuntime : IMoneyServerRuntime
             _checkTimer = null;
         }
 
-        Watchdog.Enabled = false;
-        MainServer.Instance.Stop();
+        _runtimeMonitoringController.DisableWatchdog();
+        _mainServerAccessor.Stop();
 
         Thread.Sleep(500);
-        WorkManager.Stop();
+        _runtimeMonitoringController.StopWorkManager();
 
         _serverBase.Shutdown();
     }

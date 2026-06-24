@@ -35,6 +35,7 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Base;
+using OpenSim.Server.Base.Hosting;
 using OpenSim.Server.Handlers.Base;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -59,18 +60,24 @@ public class GridService : IHostedService
     private readonly IConfiguration _configuration;
     private readonly ILogger<GridService> _logger;
     private readonly IServerBase _serverBase;
+    private readonly IMainServerAccessor _mainServerAccessor;
+    private readonly IRuntimeMonitoringController _runtimeMonitoringController;
 
     public GridService(
         IServiceProvider serviceProvider,
         IConfiguration configuration,
         ILogger<GridService> logger,
-        IServerBase serverBase
+        IServerBase serverBase,
+        IMainServerAccessor mainServerAccessor,
+        IRuntimeMonitoringController runtimeMonitoringController
         )
     {
         _serviceProvider = serviceProvider;
         _configuration = configuration;
         _logger = logger;
         _serverBase = serverBase;
+        _mainServerAccessor = mainServerAccessor;
+        _runtimeMonitoringController = runtimeMonitoringController;
 
         // Deal with the old fashioned config here for now.  This will go away when we're fully converted.
         MainConsole.Instance = serverBase.Console;
@@ -152,9 +159,9 @@ public class GridService : IHostedService
             IHttpServer server;
 
             if (port != 0)
-                server = MainServer.Instance.GetHttpServer(port);
+                server = _mainServerAccessor.GetHttpServer(port);
             else
-                server = MainServer.Instance.DefaultServer;
+                server = _mainServerAccessor.DefaultServer;
 
             if (friendlyName == "LLLoginServiceInConnector")
                 server.AddSimpleStreamHandler(new IndexPHPHandler(server));
@@ -274,11 +281,11 @@ public class GridService : IHostedService
 
     protected void Shutdown()
     {
-        Watchdog.Enabled = false;
-        MainServer.Instance.Stop();
+        _runtimeMonitoringController.DisableWatchdog();
+        _mainServerAccessor.Stop();
 
         Thread.Sleep(500);
-        WorkManager.Stop();
+        _runtimeMonitoringController.StopWorkManager();
 
         _serverBase.Shutdown();
     }
