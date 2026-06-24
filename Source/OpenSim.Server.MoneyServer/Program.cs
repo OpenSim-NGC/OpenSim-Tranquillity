@@ -143,9 +143,14 @@ class Program
         .ConfigureServices(services =>
         {
             services.AddControllers().AddControllersAsServices();
+            services.AddSingleton<IProcessSetupService, ProcessSetupService>();
+            services.AddSingleton<IPidFileManager, PidFileManager>();
             services.AddSingleton<MoneySessionStore>();
             services.AddSingleton<IStartupFailureCoordinator, StartupFailureCoordinator>();
             services.AddSingleton<IMoneyServerRuntime, MoneyServerRuntime>();
+
+            services.AddHostedService<ProcessSetupHostedService>();
+            services.AddHostedService<PidFileHostedService>();
 
             services.AddSingleton<MoneyService>();
             services.AddSingleton<IMoneyServiceCore>(sp => sp.GetRequiredService<MoneyService>());

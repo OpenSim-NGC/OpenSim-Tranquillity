@@ -175,6 +175,12 @@ class Program
         .ConfigureServices(services =>
         {
             services.AddControllers().AddControllersAsServices();
+            services.AddSingleton<IProcessSetupService, ProcessSetupService>();
+            services.AddSingleton<IPidFileManager, PidFileManager>();
+
+            services.AddHostedService<ProcessSetupHostedService>();
+            services.AddHostedService<PidFileHostedService>();
+
             services.AddSingleton<GridService>();
             services.AddHostedService(sp => sp.GetRequiredService<GridService>());
         });
