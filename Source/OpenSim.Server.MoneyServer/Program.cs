@@ -152,7 +152,7 @@ class Program
             services.AddSingleton<MoneyService>();
             services.AddSingleton<IMoneyServiceCore>(sp => sp.GetRequiredService<MoneyService>());
             services.AddHostedService(sp => sp.GetRequiredService<MoneyService>());
-            // services.AddHostedService<PidFileService>();
+            services.AddHostedService<MoneyConsoleRunnerService>();
         });
 
         builder.ConfigureWebHostDefaults(webBuilder =>

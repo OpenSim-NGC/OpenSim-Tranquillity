@@ -25,12 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Timers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenMetaverse;
-using System.Text;
 using System.Runtime.InteropServices;
 using OpenSim.Server.MoneyServer.Models;
 using OpenSim.Server.Base.Hosting;
@@ -87,9 +85,8 @@ public class MoneyService : IMoneyServiceCore, IHostedService
         _logger.LogInformation("{Service} is running.", nameof(MoneyService));
 
         _runtime.Initialize();
-
+        _runtime.StartMaintenance();
         Startup();
-        Work();
 
         return Task.CompletedTask;
     }
@@ -124,27 +121,6 @@ public class MoneyService : IMoneyServiceCore, IHostedService
     }
 
     /// <summary>
-    /// Work
-    /// </summary>
-    public void Work()
-    {
-        _runtime.StartMaintenance();
-
-        while (true)
-        {
-            _serverBase.Console.Prompt();
-        }
-    }
-
-    protected void Shutdown()
-    {
-        _runtime.Stop();
-    }
-
-
-
-
-    /// <summary>
     /// Provides a list of help topics that are available.  Overriding classes should append their topics to the
     /// information returned when the base method is called.
     /// </summary>
@@ -153,16 +129,4 @@ public class MoneyService : IMoneyServiceCore, IHostedService
     /// A list of strings that represent different help topics on which more information is available
     /// </returns>
     protected virtual List<string> GetHelpTopics() { return new List<string>(); }
-
-    /// <summary>
-    /// Print statistics to the logfile, if they are active
-    /// </summary>
-    protected void LogDiagnostics(object source, ElapsedEventArgs e)
-    {
-        StringBuilder sb = new StringBuilder("DIAGNOSTICS\n\n");
-        sb.Append(_serverBase.GetUptimeReport());
-        sb.Append(Environment.NewLine);
-        sb.Append(_serverBase.GetThreadsReport());
-        _logger.LogDebug(sb.ToString());
-    }
 }
