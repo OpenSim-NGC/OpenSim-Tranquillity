@@ -49,12 +49,12 @@ public class GridService : IHostedService
 {
     private readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
 
-    private readonly HttpServerBase m_Server = null;
+    private HttpServerBase m_Server = null;
     private readonly List<IServiceConnector> m_ServiceConnectors = new();
 
-    private readonly PluginLoader loader;
-    private readonly bool m_NoVerifyCertChain = false;
-    private readonly bool m_NoVerifyCertHostname = false;
+    private PluginLoader loader;
+    private bool m_NoVerifyCertChain = false;
+    private bool m_NoVerifyCertHostname = false;
     
     private readonly IServiceProvider _serviceProvider;
     private readonly IConfiguration _configuration;
@@ -78,10 +78,19 @@ public class GridService : IHostedService
         _serverBase = serverBase;
         _mainServerAccessor = mainServerAccessor;
         _runtimeMonitoringController = runtimeMonitoringController;
+    }
 
+    /// <summary>
+    /// Boots the legacy HTTP server, loads the service connectors and the plugin loader.
+    /// This work was previously performed in the constructor; it is now invoked by the host
+    /// during <see cref="StartAsync"/> so that constructing the service has no side effects
+    /// and never takes ownership of the process lifetime.
+    /// </summary>
+    private void BuildServer()
+    {
         // Deal with the old fashioned config here for now.  This will go away when we're fully converted.
-        MainConsole.Instance = serverBase.Console;
-        
+        MainConsole.Instance = _serverBase.Console;
+
          // Old fashioned initialization. Get Args
         string[] args = Environment.GetCommandLineArgs();      
         m_Server = new HttpServerBase("R.O.B.U.S.T.", args);
@@ -193,12 +202,6 @@ public class GridService : IHostedService
         PrintFileToConsole("robuststartuplogo.txt");
 
         loader = new PluginLoader(m_Server.Config, registryLocation);
-
-        int res = m_Server.Run();
-
-        m_Server?.Shutdown();
-
-        Environment.Exit(res);
     }
 
     public bool ValidateServerCertificate(
@@ -295,6 +298,7 @@ public class GridService : IHostedService
     {
         _logger.LogInformation("{Service} is running.", nameof(GridService));
 
+        BuildServer();
         Startup();
         Work();
 
