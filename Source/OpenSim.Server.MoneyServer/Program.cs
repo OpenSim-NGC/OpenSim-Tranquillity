@@ -98,6 +98,12 @@ class Program
     {
         IHostBuilder builder = Host.CreateDefaultBuilder();
 
+        // Transitional bridge for services that still require Nini IConfigSource.
+        ILegacyConfigSourceAccessor legacyConfigAccessor = new LegacyIniConfigSourceAccessor(options);
+
+        // Transitional bridge for static MainConsole usage.
+        IConsoleContext consoleContext = new ConsoleContext(new ConsoleFactory().Create(options.ConsoleType, "MoneyServer> "));
+
         builder.ConfigureAppConfiguration(configuration =>
         {
             configuration.AddOpenSimIniFiles(options);
@@ -121,14 +127,12 @@ class Program
             // Deal with the old fashioned config here for now.  This will go away when we're fully
             // converted to .NET Generic Host and can use the built in configuration system everywhere
             XmlConfigurator.Configure();
-            var moneyConfig = new MoneyServerConfigSource(options.IniMaster);
-            //registryBuilder.RegisterInstance(moneyConfig).AsSelf().SingleInstance();
 
-            var consoleContext = new ConsoleContext(new ConsoleFactory().Create(options.ConsoleType, "MoneyServer> "));
             registryBuilder.RegisterInstance<IConsoleContext>(consoleContext).AsImplementedInterfaces().SingleInstance();
+            registryBuilder.RegisterInstance<ILegacyConfigSourceAccessor>(legacyConfigAccessor).AsImplementedInterfaces().SingleInstance();
 
             registryBuilder.RegisterInstance<IServerBase>(
-                new ServerBase { Console = consoleContext.Console, Config = moneyConfig.m_config }).AsImplementedInterfaces().SingleInstance();
+                new ServerBase { Console = consoleContext.Console, Config = legacyConfigAccessor.ConfigSource }).AsImplementedInterfaces().SingleInstance();
 
             registryBuilder.RegisterType<MoneyDBService>().As<IMoneyDBService>().AsSelf().SingleInstance();
         })
@@ -142,6 +146,8 @@ class Program
         {
             services.AddControllers().AddControllersAsServices();
             services.AddSingleton<MoneySessionStore>();
+            services.AddSingleton<IStartupFailureCoordinator, StartupFailureCoordinator>();
+            services.AddSingleton<IMoneyServerRuntime, MoneyServerRuntime>();
 
             services.AddSingleton<MoneyService>();
             services.AddSingleton<IMoneyServiceCore>(sp => sp.GetRequiredService<MoneyService>());

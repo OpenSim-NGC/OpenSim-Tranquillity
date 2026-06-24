@@ -25,49 +25,34 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma warning disable S1128 // Unused "using" should be removed
-using OpenMetaverse;
-using OpenSim.Data.MySQL.MoneyData;
-#pragma warning restore S1128 // Unused "using" should be removed
-
+using OpenSim.Framework.Servers.HttpServer;
 
 namespace OpenSim.Server.MoneyServer;
 
 /// <summary>
-/// IMoney DB Service
+/// Runtime coordinator for MoneyServer startup infrastructure and shutdown behavior.
 /// </summary>
-public interface IMoneyDBService
+public interface IMoneyServerRuntime
 {
-    void Initialise();
+    /// <summary>
+    /// The HTTP server instance created during initialization.
+    /// </summary>
+    BaseHttpServer HttpServer { get; }
 
-    int getBalance(string userID);
+    /// <summary>
+    /// Initializes HTTP listener, legacy console bridge, DB service and XML-RPC handlers.
+    /// Safe to call multiple times.
+    /// </summary>
+    void Initialize();
 
-    bool withdrawMoney(UUID transactionID, string senderID, int amount);
+    /// <summary>
+    /// Starts the periodic transaction-expiry maintenance timer.
+    /// Safe to call multiple times.
+    /// </summary>
+    void StartMaintenance();
 
-    bool giveMoney(UUID transactionID, string receiverID, int amount);
-
-    bool addTransaction(TransactionData transaction);
-
-    bool addUser(string userID, int balance, int status, int type);
-
-    bool updateTransactionStatus(UUID transactionID, int status, string description);
-
-    bool SetTransExpired(int deadTime);
-
-    bool ValidateTransfer(string secureCode, UUID transactionID);
-
-    TransactionData FetchTransaction(UUID transactionID);
-
-    TransactionData FetchTransaction(string userID, int startTime, int endTime, int lastIndex);
-
-    int getTransactionNum(string userID, int startTime, int endTime);
-
-    bool DoTransfer(UUID transactionUUID);
-
-    bool DoAddMoney(UUID transactionUUID);		// Added by Fumi.Iseki
-
-    bool TryAddUserInfo(UserInfo user);
-
-    UserInfo FetchUserInfo(string userID);
-
+    /// <summary>
+    /// Performs runtime shutdown for MoneyServer infrastructure.
+    /// </summary>
+    void Stop();
 }

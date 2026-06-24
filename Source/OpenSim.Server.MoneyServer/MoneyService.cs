@@ -31,12 +31,9 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenMetaverse;
 using System.Text;
-
-using Timer = System.Timers.Timer;
-using OpenSim.Framework.Monitoring;
 using System.Runtime.InteropServices;
-using OpenSim.Server.MoneyServer.Controllers;
 using OpenSim.Server.MoneyServer.Models;
+using OpenSim.Server.Base.Hosting;
 
 /// <summary>
 /// OpenSim Server MoneyServer
@@ -49,102 +46,47 @@ namespace OpenSim.Server.MoneyServer;
 /// </summary>
 public class MoneyService : IMoneyServiceCore, IHostedService
 {
-    private uint m_moneyServerPort = 8008;         // 8008 is default server port
-
-    private int DEAD_TIME = 120;
-
     /// <summary>
     /// Random uuid for private data
     /// </summary>
     protected string m_osSecret = String.Empty;
     public string osSecret => m_osSecret;
 
-    protected BaseHttpServer m_httpServer;
-    public BaseHttpServer HttpServer => m_httpServer;
+    private readonly IMoneyServerRuntime _runtime;
+    public BaseHttpServer HttpServer => _runtime.HttpServer;
 
     private readonly MoneySessionStore m_sessionStore;
     public Dictionary<string, string> SessionDic => m_sessionStore.SessionDic;
     public Dictionary<string, string> SecureSessionDic => m_sessionStore.SecureSessionDic;
     public Dictionary<string, string> WebSessionDic => m_sessionStore.WebSessionDic;
 
-    private readonly MoneyXmlRpcController m_moneyXmlRpcController;
-    private readonly MoneyDBService m_moneyDBService;
-
-    private readonly IServiceProvider _serviceProvider;
-    private readonly IConfiguration _configuration;
     private readonly ILogger<MoneyService> _logger;
     private readonly IServerBase _serverBase;
+    private readonly IStartupFailureCoordinator _startupFailureCoordinator;
 
     public MoneyService(
-        IServiceProvider serviceProvider,
-        IConfiguration configuration,
         ILogger<MoneyService> logger,
         IServerBase serverBase,
+        IStartupFailureCoordinator startupFailureCoordinator,
+        IMoneyServerRuntime runtime,
         MoneySessionStore sessionStore
         )
     {
-        _serviceProvider = serviceProvider;
-        _configuration = configuration;
         _logger = logger;
         _serverBase = serverBase;
+        _startupFailureCoordinator = startupFailureCoordinator;
+        _runtime = runtime;
         m_sessionStore = sessionStore ?? throw new ArgumentNullException(nameof(sessionStore));
-
-        // Deal with the old fashioned config here for now.  This will go away when we're fully converted.
-        MainConsole.Instance = serverBase.Console;
 
         // Random uuid for private data
         m_osSecret = UUID.Random().ToString();
-
-        // [Startup]
-        var startupConfig =_configuration.GetSection("Startup");
-        if (startupConfig.Exists() is false)
-        {
-            _logger.LogInformation("[MONEY SERVER]: [Startup] section is not found. Using default settings");
-        }
-        else
-        {
-            DEAD_TIME = startupConfig.GetValue<int>("ExpiredTime", DEAD_TIME);
-            m_moneyServerPort = startupConfig.GetValue<uint>("ServerPort", m_moneyServerPort);
-        }
-
-        // [MoneyServer]
-        var serverConfig = _configuration.GetSection("MoneyServer");
-        if (serverConfig.Exists() is false)
-        {
-            _logger.LogInformation("[MONEY SERVER]: [MoneyServer] section is not found. Using default settings");
-        }
-        else
-        {
-            DEAD_TIME = serverConfig.GetValue<int>("ExpiredTime", DEAD_TIME);
-            m_moneyServerPort = serverConfig.GetValue<uint>("ServerPort", m_moneyServerPort);
-        }
-
-        _logger.LogInformation("[MONEY SERVER]: Setup HTTP Server process");
-        
-        try
-        {
-            m_httpServer = new BaseHttpServer(m_moneyServerPort);
-            m_httpServer.Start();
-        }
-        catch (Exception e)
-        {
-            _logger.LogError("[MONEY SERVER]: StartupSpecific: Fail to start HTTPS process");
-            _logger.LogError("[MONEY SERVER]: StartupSpecific: Please Check Certificate File or Password. Exit");
-            _logger.LogError("[MONEY SERVER]: StartupSpecific: {0}", e);
-            Environment.Exit(1);
-        }
-
-        _logger.LogInformation("[MONEY SERVER]: Connecting to Money Storage Server");
-        m_moneyDBService = _serviceProvider.GetRequiredService<MoneyDBService>();
-        m_moneyDBService.Initialise();
-
-        m_moneyXmlRpcController = _serviceProvider.GetRequiredService<MoneyXmlRpcController>();
-        m_moneyXmlRpcController.RegisterLegacyHandlers(m_httpServer);
     }
 
     public Task StartAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("{Service} is running.", nameof(MoneyService));
+
+        _runtime.Initialize();
 
         Startup();
         Work();
@@ -156,7 +98,7 @@ public class MoneyService : IMoneyServiceCore, IHostedService
     {
         _logger.LogInformation("{Service} is stopping.", nameof(MoneyService));
 
-        Shutdown();
+        _runtime.Stop();
 
         return Task.CompletedTask;
     }
@@ -177,8 +119,7 @@ public class MoneyService : IMoneyServiceCore, IHostedService
         }
         catch(Exception e)
         {
-            _logger.LogCritical($"Fatal error: {e}");
-            Environment.Exit(1);
+            _startupFailureCoordinator.ThrowFatal("Fatal error while registering startup components.", e);
         }
     }
 
@@ -187,15 +128,7 @@ public class MoneyService : IMoneyServiceCore, IHostedService
     /// </summary>
     public void Work()
     {
-        //The timer checks the transactions table every 60 seconds
-        System.Timers.Timer checkTimer = new Timer
-        {
-            Interval = 60 * 1000,
-            Enabled = true
-        };
-
-        checkTimer.Elapsed += new ElapsedEventHandler(CheckTransaction);
-        checkTimer.Start();
+        _runtime.StartMaintenance();
 
         while (true)
         {
@@ -203,27 +136,9 @@ public class MoneyService : IMoneyServiceCore, IHostedService
         }
     }
 
-    /// <summary>
-    /// Check the transactions table, set expired transaction state to failed
-    /// </summary>
-    private void CheckTransaction(object sender, ElapsedEventArgs e)
-    {
-        long ticksToEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks; //TickstartupTime;
-        int unixEpochTime = (int)((DateTime.UtcNow.Ticks - ticksToEpoch) / 10000000);
-        int deadTime = unixEpochTime - DEAD_TIME;
-
-        m_moneyDBService.SetTransExpired(deadTime);
-    }
-
     protected void Shutdown()
     {
-        Watchdog.Enabled = false;
-        MainServer.Instance.Stop();
-
-        Thread.Sleep(500);
-        WorkManager.Stop();
-
-        _serverBase.Shutdown();
+        _runtime.Stop();
     }
 
 
