@@ -7,6 +7,7 @@
     <Description>The executable for regions simulator</Description>
     <IsPublishable>true</IsPublishable>
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
+    <StartupObject>OpenSim.Server.RegionServer.Program</StartupObject>
   </PropertyGroup>
   
   <ItemGroup>
@@ -81,6 +82,10 @@
     <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.2" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.2" />
     <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Log4Net.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="System.CommandLine" Version="2.0.8" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
     <PackageReference Include="OpenMetaverse" Version="1.2.13" />
     <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />

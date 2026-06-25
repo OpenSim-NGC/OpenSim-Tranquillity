@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\Source\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Server.MoneyServer\OpenSim.Server.MoneyServer.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Server.GridServer\OpenSim.Server.GridServer.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Server.RegionServer\OpenSim.Server.RegionServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>
