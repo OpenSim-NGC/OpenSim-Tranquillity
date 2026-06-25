@@ -110,6 +110,20 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     /// </summary>
     protected IRegionPluginService PluginService { get; set; } = new RegionPluginService();
 
+    /// <summary>
+    /// Provisions TLS certificates before the HTTP listeners are created. Extracted so
+    /// certificate provisioning can be composed and tested independently of the startup
+    /// inheritance chain.
+    /// </summary>
+    protected IRegionCertificateProvisioner CertificateProvisioner { get; set; } = new RegionCertificateProvisioner();
+
+    /// <summary>
+    /// Gates the monitoring watchdogs on all-regions-ready status. Extracted so the
+    /// gating policy can be composed and tested independently of the startup
+    /// inheritance chain.
+    /// </summary>
+    protected IRegionReadyStatusMonitor ReadyStatusMonitor { get; set; } = new RegionReadyStatusMonitor();
+
     private List<string> m_permsModules;
 
     private bool m_securePermissionsLoading = true;
@@ -333,28 +347,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
         // Sure is not the right place for this but do the job...
         // Must always be called before (all) / the HTTP servers starting for the Certs creation or renewals.
-        if (startupConfig.GetBoolean("EnableSelfsignedCertSupport", false))
-        {
-            if (!File.Exists("SSL\\ssl\\" + startupConfig.GetString("CertFileName") + ".p12") || startupConfig.GetBoolean("CertRenewOnStartup"))
-            {
-                Util.CreateOrUpdateSelfsignedCert(
-                    string.IsNullOrEmpty(startupConfig.GetString("CertFileName")) ? "OpenSim" : startupConfig.GetString("CertFileName"),
-                    string.IsNullOrEmpty(startupConfig.GetString("CertHostName")) ? "localhost" : startupConfig.GetString("CertHostName"),
-                    string.IsNullOrEmpty(startupConfig.GetString("CertHostIp")) ? "127.0.0.1" : startupConfig.GetString("CertHostIp"),
-                    string.IsNullOrEmpty(startupConfig.GetString("CertPassword")) ? string.Empty : startupConfig.GetString("CertPassword")
-                );
-            }
-        }
-
-        if (startupConfig.GetBoolean("EnableCertConverter", false))
-        {
-            Util.ConvertPemToPKCS12(
-               string.IsNullOrEmpty(startupConfig.GetString("outputCertName")) ? "letsencrypt" : startupConfig.GetString("outputCertName"),
-               string.IsNullOrEmpty(startupConfig.GetString("PemCertPublicKey")) ? string.Empty : startupConfig.GetString("PemCertPublicKey"),
-               string.IsNullOrEmpty(startupConfig.GetString("PemCertPrivateKey")) ? string.Empty : startupConfig.GetString("PemCertPrivateKey"),
-               string.IsNullOrEmpty(startupConfig.GetString("outputCertPassword")) ? string.Empty : startupConfig.GetString("outputCertPassword")
-           );
-        }
+        CertificateProvisioner.Provision(startupConfig);
 
         if (m_networkServersInfo.HttpUsesSSL)
         {
@@ -369,13 +362,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
         SceneManager.OnRestartSim += HandleRestartRegion;
 
-        // Only enable the watchdogs when all regions are ready.  Otherwise we get false positives when cpu is
-        // heavily used during initial startup.
-        //
-        // FIXME: It's also possible that region ready status should be flipped during an OAR load since this
-        // also makes heavy use of the CPU.
-        SceneManager.OnRegionsReadyStatusChange
-            += sm => { MemoryWatchdog.Enabled = sm.AllRegionsReady; Watchdog.Enabled = sm.AllRegionsReady; };
+        ReadyStatusMonitor.Attach(SceneManager);
     }
 
     /// <summary>
