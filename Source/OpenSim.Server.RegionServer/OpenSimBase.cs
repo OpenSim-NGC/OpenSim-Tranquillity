@@ -103,6 +103,13 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
     public List<IApplicationPlugin> m_plugins = new List<IApplicationPlugin>();
 
+    /// <summary>
+    /// Owns the application-plugin lifecycle (load/post-initialise/dispose). Extracted
+    /// so plugin handling can be composed and tested independently of the startup
+    /// inheritance chain.
+    /// </summary>
+    protected IRegionPluginService PluginService { get; set; } = new RegionPluginService();
+
     private List<string> m_permsModules;
 
     private bool m_securePermissionsLoading = true;
@@ -169,27 +176,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     protected virtual void LoadPlugins()
     {
         IConfig startupConfig = Config.Configs["Startup"];
-        string registryLocation = (startupConfig != null) ? startupConfig.GetString("RegistryLocation", String.Empty) : String.Empty;
-
-        // The location can also be specified in the environment. If there
-        // is no location in the configuration, we must call the constructor
-        // without a location parameter to allow that to happen.
-        if (registryLocation.Length == 0)
-        {
-            using (PluginLoader<IApplicationPlugin> loader = new PluginLoader<IApplicationPlugin>(new ApplicationPluginInitialiser(this)))
-            {
-                loader.Load("/OpenSim/Startup");
-                m_plugins = loader.Plugins;
-            }
-        }
-        else
-        {
-            using (PluginLoader<IApplicationPlugin> loader = new PluginLoader<IApplicationPlugin>(new ApplicationPluginInitialiser(this), registryLocation))
-            {
-                loader.Load("/OpenSim/Startup");
-                m_plugins = loader.Plugins;
-            }
-        }
+        m_plugins = PluginService.Load(this, startupConfig);
     }
 
     protected override List<string> GetHelpTopics()
@@ -273,8 +260,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
         // We still want to post initalize any plugins even if loading has been disabled since a test may have
         // inserted them manually.
-        foreach (IApplicationPlugin plugin in m_plugins)
-            plugin.PostInitialise();
+        PluginService.PostInitialise(m_plugins);
 
         if (m_console != null)
             AddPluginCommands(m_console);
@@ -892,7 +878,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     /// If the request contains a key, "callback" the response will be wrappend in the
     /// associated value for jsonp used with ajax/javascript
     /// </summary>
-    protected class UXSimStatusHandler : SimpleStreamHandler
+    public class UXSimStatusHandler : SimpleStreamHandler
     {
         OpenSimBase m_opensim;
 
@@ -957,8 +943,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
         {
             SceneManager.Close();
 
-            foreach (IApplicationPlugin plugin in m_plugins)
-                plugin.Dispose();
+            PluginService.Dispose(m_plugins);
         }
         catch (Exception e)
         {

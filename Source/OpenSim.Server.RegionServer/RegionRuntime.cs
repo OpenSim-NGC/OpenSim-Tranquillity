@@ -32,6 +32,8 @@ public sealed class RegionRuntime : IRegionRuntime
     private readonly RegionHostOptions _options;
     private readonly IProcessSetupService _processSetupService;
     private readonly IStartupFailureCoordinator _startupFailureCoordinator;
+    private readonly IRuntimeMonitoringController _monitoringController;
+    private readonly IRegionDiagnosticsService _diagnosticsService;
 
     private readonly object _initializeLock = new();
     private bool _initialized;
@@ -41,12 +43,16 @@ public sealed class RegionRuntime : IRegionRuntime
         ILogger<RegionRuntime> logger,
         RegionHostOptions options,
         IProcessSetupService processSetupService,
-        IStartupFailureCoordinator startupFailureCoordinator)
+        IStartupFailureCoordinator startupFailureCoordinator,
+        IRuntimeMonitoringController monitoringController,
+        IRegionDiagnosticsService diagnosticsService)
     {
         _logger = logger;
         _options = options;
         _processSetupService = processSetupService;
         _startupFailureCoordinator = startupFailureCoordinator;
+        _monitoringController = monitoringController;
+        _diagnosticsService = diagnosticsService;
     }
 
     public void Initialize()
@@ -84,6 +90,13 @@ public sealed class RegionRuntime : IRegionRuntime
                 // Non-blocking: StartupSpecific runs and returns. The host keeps
                 // the process alive instead of a blocking main loop.
                 _sim.Startup();
+
+                // Diagnostics and watchdog lifetime are owned by the runtime, not
+                // by the startup inheritance chain.
+                _diagnosticsService.Start(
+                    _sim.Config?.Configs["Startup"],
+                    _sim.GetUptimeReport,
+                    _sim.GetThreadsReport);
             }
             catch (Exception e)
             {
@@ -101,7 +114,14 @@ public sealed class RegionRuntime : IRegionRuntime
 
         try
         {
+            _diagnosticsService.Stop();
+            _monitoringController.DisableWatchdog();
+
+            // The host owns process exit; suppress the legacy Environment.Exit(0).
+            _sim.SuppressExit = true;
             _sim.Shutdown();
+
+            _monitoringController.StopWorkManager();
         }
         catch (Exception e)
         {

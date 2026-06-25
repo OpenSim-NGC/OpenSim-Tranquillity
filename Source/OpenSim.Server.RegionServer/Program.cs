@@ -53,6 +53,8 @@ public static class Program
             services.AddSingleton(new RegionHostOptions(args, background));
             services.AddSingleton<IProcessSetupService, ProcessSetupService>();
             services.AddSingleton<IStartupFailureCoordinator, StartupFailureCoordinator>();
+            services.AddSingleton<IRuntimeMonitoringController, RuntimeMonitoringController>();
+            services.AddSingleton<IRegionDiagnosticsService, RegionDiagnosticsService>();
             services.AddSingleton<IRegionRuntime, RegionRuntime>();
 
             services.AddHostedService<RegionService>();
