@@ -25,259 +25,48 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using Nini.Config;
-using log4net;
-using System.Reflection;
-using System.Net;
-using System.Net.Security;
-using System.Security.Cryptography.X509Certificates;
+using System.Runtime.InteropServices;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
-using OpenSim.Framework.Servers.HttpServer;
-using OpenSim.Server.Base;
 using OpenSim.Server.Base.Hosting;
-using OpenSim.Server.Handlers.Base;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System.Runtime.InteropServices;
-using OpenSim.Framework.Monitoring;
 
 namespace OpenSim.Server.GridServer;
 
+/// <summary>
+/// Host-lifetime orchestration for GridServer.
+/// </summary>
+/// <remarks>
+/// All infrastructure boot and shutdown work is delegated to
+/// <see cref="IGridServerRuntime"/>. This service only coordinates startup and
+/// shutdown through the generic host and never takes ownership of the process
+/// lifetime or performs side effects in its constructor.
+/// </remarks>
 public class GridService : IHostedService
 {
-    private readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
-
-    private HttpServerBase m_Server = null;
-    private readonly List<IServiceConnector> m_ServiceConnectors = new();
-
-    private PluginLoader loader;
-    private bool m_NoVerifyCertChain = false;
-    private bool m_NoVerifyCertHostname = false;
-    
-    private readonly IServiceProvider _serviceProvider;
-    private readonly IConfiguration _configuration;
     private readonly ILogger<GridService> _logger;
     private readonly IServerBase _serverBase;
-    private readonly IMainServerAccessor _mainServerAccessor;
-    private readonly IRuntimeMonitoringController _runtimeMonitoringController;
+    private readonly IStartupFailureCoordinator _startupFailureCoordinator;
+    private readonly IGridServerRuntime _runtime;
 
     public GridService(
-        IServiceProvider serviceProvider,
-        IConfiguration configuration,
         ILogger<GridService> logger,
         IServerBase serverBase,
-        IMainServerAccessor mainServerAccessor,
-        IRuntimeMonitoringController runtimeMonitoringController
-        )
+        IStartupFailureCoordinator startupFailureCoordinator,
+        IGridServerRuntime runtime)
     {
-        _serviceProvider = serviceProvider;
-        _configuration = configuration;
         _logger = logger;
         _serverBase = serverBase;
-        _mainServerAccessor = mainServerAccessor;
-        _runtimeMonitoringController = runtimeMonitoringController;
+        _startupFailureCoordinator = startupFailureCoordinator;
+        _runtime = runtime;
     }
-
-    /// <summary>
-    /// Boots the legacy HTTP server, loads the service connectors and the plugin loader.
-    /// This work was previously performed in the constructor; it is now invoked by the host
-    /// during <see cref="StartAsync"/> so that constructing the service has no side effects
-    /// and never takes ownership of the process lifetime.
-    /// </summary>
-    private void BuildServer()
-    {
-        // Deal with the old fashioned config here for now.  This will go away when we're fully converted.
-        MainConsole.Instance = _serverBase.Console;
-
-         // Old fashioned initialization. Get Args
-        string[] args = Environment.GetCommandLineArgs();      
-        m_Server = new HttpServerBase("R.O.B.U.S.T.", args);
-
-        string registryLocation;
-
-        IConfig serverConfig = m_Server.Config.Configs["Startup"];
-        if (serverConfig == null)
-        {
-            System.Console.WriteLine("Startup config section missing in .ini file");
-            throw new Exception("Configuration error");
-        }
-
-        int dnsTimeout = serverConfig.GetInt("DnsTimeout", 30000);
-        try { ServicePointManager.DnsRefreshTimeout = dnsTimeout; } catch { }
-
-        m_NoVerifyCertChain = serverConfig.GetBoolean("NoVerifyCertChain", m_NoVerifyCertChain);
-        m_NoVerifyCertHostname = serverConfig.GetBoolean("NoVerifyCertHostname", m_NoVerifyCertHostname);
-
-        WebUtil.SetupHTTPClients(m_NoVerifyCertChain, m_NoVerifyCertHostname, null, 32);
-
-        string connList = serverConfig.GetString("ServiceConnectors", string.Empty);
-
-        registryLocation = serverConfig.GetString("RegistryLocation",".");
-
-        IConfig servicesConfig = m_Server.Config.Configs["ServiceList"];
-        if (servicesConfig != null)
-        {
-            List<string> servicesList = new();
-            if (!string.IsNullOrEmpty(connList))
-                servicesList.Add(connList);
-
-            foreach (string k in servicesConfig.GetKeys())
-            {
-                string v = servicesConfig.GetString(k);
-                if (!string.IsNullOrEmpty(v))
-                    servicesList.Add(v);
-            }
-
-            connList = string.Join(",", servicesList.ToArray());
-        }
-
-        string[] conns = connList.Split(new char[] {',', ' ', '\n', '\r', '\t'});
-
-        foreach (string c in conns)
-        {
-            if (string.IsNullOrEmpty(c))
-                continue;
-
-            string configName = string.Empty;
-            string conn = c;
-            uint port = 0;
-
-            string[] split1 = conn.Split(new char[] {'/'});
-            if (split1.Length > 1)
-            {
-                conn = split1[1];
-
-                string[] split2 = split1[0].Split(new char[] {'@'});
-                if (split2.Length > 1)
-                {
-                    configName = split2[0];
-                    port = Convert.ToUInt32(split2[1]);
-                }
-                else
-                {
-                    port = Convert.ToUInt32(split1[0]);
-                }
-            }
-            string[] parts = conn.Split(new char[] {':'});
-            string friendlyName = parts[0];
-            if (parts.Length > 1)
-                friendlyName = parts[1];
-
-            IHttpServer server;
-
-            if (port != 0)
-                server = _mainServerAccessor.GetHttpServer(port);
-            else
-                server = _mainServerAccessor.DefaultServer;
-
-            if (friendlyName == "LLLoginServiceInConnector")
-                server.AddSimpleStreamHandler(new IndexPHPHandler(server));
-
-            m_log.InfoFormat("[SERVER]: Loading {0} on port {1}", friendlyName, server.Port);
-
-            IServiceConnector connector = null;
-
-            object[] modargs = new object[] { m_Server.Config, server, configName };
-            connector = ServerUtils.LoadPlugin<IServiceConnector>(conn, modargs);
-
-            if (connector == null)
-            {
-                modargs = new object[] { m_Server.Config, server };
-                connector = ServerUtils.LoadPlugin<IServiceConnector>(conn, modargs);
-            }
-
-            if (connector != null)
-            {
-                m_ServiceConnectors.Add(connector);
-                m_log.InfoFormat("[SERVER]: {0} loaded successfully", friendlyName);
-            }
-            else
-            {
-                m_log.ErrorFormat("[SERVER]: Failed to load {0}", conn);
-            }
-        }
-
-        PrintFileToConsole("robuststartuplogo.txt");
-
-        loader = new PluginLoader(m_Server.Config, registryLocation);
-    }
-
-    public bool ValidateServerCertificate(
-        object sender,
-        X509Certificate certificate,
-        X509Chain chain,
-        SslPolicyErrors sslPolicyErrors)
-    {
-        if (m_NoVerifyCertChain)
-            sslPolicyErrors &= ~SslPolicyErrors.RemoteCertificateChainErrors;
-
-        if (m_NoVerifyCertHostname)
-            sslPolicyErrors &= ~SslPolicyErrors.RemoteCertificateNameMismatch;
-
-        if (sslPolicyErrors == SslPolicyErrors.None)
-            return true;
-
-        return false;
-    }
-
-    /// <summary>
-    /// Opens a file and uses it as input to the console command parser.
-    /// </summary>
-    /// <param name="fileName">name of file to use as input to the console</param>
-    private void PrintFileToConsole(string fileName)
-    {
-        if (File.Exists(fileName))
-        {
-            using(StreamReader readFile = File.OpenText(fileName))
-            {
-                string currentLine;
-                while ((currentLine = readFile.ReadLine()) is not null)
-                {
-                    m_log.InfoFormat("[!]" + currentLine);
-                }
-            }
-        }
-    }
-    
-    public virtual void Startup()
-    {
-        _logger.LogInformation("[STARTUP]: Beginning startup processing");
-        _logger.LogInformation("[STARTUP]: Version: " + _serverBase.Version);
-        _logger.LogInformation($"[STARTUP]: Operating system version: {Environment.OSVersion}, .NET platform {Util.RuntimePlatformStr}, Runtime {Environment.Version}");
-        _logger.LogInformation($"[STARTUP]: Processor Architecture: {RuntimeInformation.ProcessArchitecture}({(BitConverter.IsLittleEndian ? "le" : "be")} {(Environment.Is64BitProcess ? "64" : "32")}bit)");
-        _logger.LogInformation($"[STARTUP]: Memory: {GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / (1024 * 1024)} MB");
-        
-        try
-        {
-            _serverBase.RegisterCommonCommands();
-            _serverBase.RegisterCommonComponents(_serverBase.Config);
-        }
-        catch(Exception e)
-        {
-            _logger.LogCritical($"Fatal error: {e}");
-            Environment.Exit(1);
-        }
-    }
-
-    protected void Shutdown()
-    {
-        _runtimeMonitoringController.DisableWatchdog();
-        _mainServerAccessor.Stop();
-
-        Thread.Sleep(500);
-        _runtimeMonitoringController.StopWorkManager();
-
-        _serverBase.Shutdown();
-    }
-
 
     public Task StartAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("{Service} is running.", nameof(GridService));
 
-        BuildServer();
+        _runtime.Initialize();
         Startup();
 
         return Task.CompletedTask;
@@ -287,8 +76,27 @@ public class GridService : IHostedService
     {
         _logger.LogInformation("{Service} is stopping.", nameof(GridService));
 
-        Shutdown();
+        _runtime.Stop();
 
         return Task.CompletedTask;
+    }
+
+    public virtual void Startup()
+    {
+        _logger.LogInformation("[STARTUP]: Beginning startup processing");
+        _logger.LogInformation("[STARTUP]: Version: " + _serverBase.Version);
+        _logger.LogInformation($"[STARTUP]: Operating system version: {Environment.OSVersion}, .NET platform {Util.RuntimePlatformStr}, Runtime {Environment.Version}");
+        _logger.LogInformation($"[STARTUP]: Processor Architecture: {RuntimeInformation.ProcessArchitecture}({(BitConverter.IsLittleEndian ? "le" : "be")} {(Environment.Is64BitProcess ? "64" : "32")}bit)");
+        _logger.LogInformation($"[STARTUP]: Memory: {GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / (1024 * 1024)} MB");
+
+        try
+        {
+            _serverBase.RegisterCommonCommands();
+            _serverBase.RegisterCommonComponents(_serverBase.Config);
+        }
+        catch (Exception e)
+        {
+            _startupFailureCoordinator.ThrowFatal("Fatal error while registering startup components.", e);
+        }
     }
 }

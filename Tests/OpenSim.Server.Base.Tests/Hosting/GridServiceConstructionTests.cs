@@ -8,13 +8,10 @@
  */
 
 using System;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Base.Hosting;
 using OpenSim.Server.GridServer;
 using Xunit;
@@ -32,16 +29,11 @@ public sealed class GridServiceConstructionTests
     [Fact]
     public void Constructor_DoesNotTouchInjectedDependencies()
     {
-        IServiceProvider serviceProvider = new ServiceCollection().BuildServiceProvider();
-        IConfiguration configuration = new ConfigurationBuilder().Build();
-
         var exception = Record.Exception(() => new GridService(
-            serviceProvider,
-            configuration,
             NullLogger<GridService>.Instance,
             new ThrowingServerBase(),
-            new ThrowingMainServerAccessor(),
-            new ThrowingRuntimeMonitoringController()));
+            new ThrowingStartupFailureCoordinator(),
+            new ThrowingGridServerRuntime()));
 
         Assert.Null(exception);
     }
@@ -49,34 +41,25 @@ public sealed class GridServiceConstructionTests
     [Fact]
     public void Constructor_ReturnsInstance()
     {
-        IServiceProvider serviceProvider = new ServiceCollection().BuildServiceProvider();
-        IConfiguration configuration = new ConfigurationBuilder().Build();
-
         var sut = new GridService(
-            serviceProvider,
-            configuration,
             NullLogger<GridService>.Instance,
             new ThrowingServerBase(),
-            new ThrowingMainServerAccessor(),
-            new ThrowingRuntimeMonitoringController());
+            new ThrowingStartupFailureCoordinator(),
+            new ThrowingGridServerRuntime());
 
         Assert.NotNull(sut);
     }
 
-    private sealed class ThrowingMainServerAccessor : IMainServerAccessor
+    private sealed class ThrowingStartupFailureCoordinator : IStartupFailureCoordinator
     {
-        public IHttpServer DefaultServer => throw new InvalidOperationException("Constructor must not access the main server.");
-        public IHttpServer GetHttpServer(uint port) => throw new InvalidOperationException("Constructor must not access the main server.");
-        public void Stop() => throw new InvalidOperationException("Constructor must not stop the main server.");
+        public void ThrowFatal(string message, Exception exception = null) => throw new InvalidOperationException("Constructor must not report fatal failures.");
+        public void RequestStop(string message, Exception exception = null) => throw new InvalidOperationException("Constructor must not request stop.");
     }
 
-    private sealed class ThrowingRuntimeMonitoringController : IRuntimeMonitoringController
+    private sealed class ThrowingGridServerRuntime : IGridServerRuntime
     {
-        public void EnableWatchdog() => throw new InvalidOperationException("Constructor must not touch monitoring.");
-        public void DisableWatchdog() => throw new InvalidOperationException("Constructor must not touch monitoring.");
-        public void EnableMemoryWatchdog() => throw new InvalidOperationException("Constructor must not touch monitoring.");
-        public void DisableMemoryWatchdog() => throw new InvalidOperationException("Constructor must not touch monitoring.");
-        public void StopWorkManager() => throw new InvalidOperationException("Constructor must not touch monitoring.");
+        public void Initialize() => throw new InvalidOperationException("Constructor must not initialize the runtime.");
+        public void Stop() => throw new InvalidOperationException("Constructor must not stop the runtime.");
     }
 
     private sealed class ThrowingServerBase : IServerBase

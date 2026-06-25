@@ -179,6 +179,9 @@ class Program
             services.AddSingleton<IPidFileManager, PidFileManager>();
             services.AddSingleton<IMainServerAccessor, MainServerAccessor>();
             services.AddSingleton<IRuntimeMonitoringController, RuntimeMonitoringController>();
+            services.AddSingleton<IStartupFailureCoordinator, StartupFailureCoordinator>();
+            services.AddSingleton<IServiceConnectorLoader, GridServiceConnectorLoader>();
+            services.AddSingleton<IGridServerRuntime, GridServerRuntime>();
 
             services.AddHostedService<ProcessSetupHostedService>();
             services.AddHostedService<PidFileHostedService>();
