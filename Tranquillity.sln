@@ -165,6 +165,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InWorldz.Phlox", "Source\In
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Phlox.ScriptEngine", "Source\Phlox.ScriptEngine\Phlox.ScriptEngine.csproj", "{2E20D7BA-B743-48D1-9B61-4F168DC17D9E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SluaProofRunner", "Tests\SluaProofRunner\SluaProofRunner.csproj", "{BA920564-AEDE-4B49-A31B-096C145B1BD9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -483,6 +485,10 @@ Global
 		{2E20D7BA-B743-48D1-9B61-4F168DC17D9E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2E20D7BA-B743-48D1-9B61-4F168DC17D9E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2E20D7BA-B743-48D1-9B61-4F168DC17D9E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BA920564-AEDE-4B49-A31B-096C145B1BD9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA920564-AEDE-4B49-A31B-096C145B1BD9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA920564-AEDE-4B49-A31B-096C145B1BD9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA920564-AEDE-4B49-A31B-096C145B1BD9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -566,6 +572,7 @@ Global
 		{A7C3D34F-AC32-4379-866A-FE585AF2B6FB} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 		{FC4C33F7-DFAC-4882-98BC-4984D3A16405} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{2E20D7BA-B743-48D1-9B61-4F168DC17D9E} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{BA920564-AEDE-4B49-A31B-096C145B1BD9} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A40AD54B-8BC7-41E4-B241-19B59EA65D2A}

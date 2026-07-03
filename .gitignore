@@ -261,3 +261,9 @@ OpenSimConsoleHistory.txt
 build/
 publish/
 packages/
+
+# Keep live DB credentials out of git: the tracked config-include templates are
+# *.ini.example only; locally-created live copies of these must never be committed.
+Source/OpenSim.Server.RegionServer/AppData/config-include/GridCommon.ini
+Source/OpenSim.Server.RegionServer/AppData/config-include/StandaloneCommon.ini
+Source/OpenSim.Server.RegionServer/AppData/config-include/storage/SQLiteStandalone.ini
