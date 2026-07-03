@@ -161,6 +161,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OpenSim.Addons.OfflineIM", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Framework.PluginMigration.Tests", "Tests\OpenSim.Framework.PluginMigration.Tests\OpenSim.Framework.PluginMigration.Tests.csproj", "{A7C3D34F-AC32-4379-866A-FE585AF2B6FB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InWorldz.Phlox", "Source\InWorldz.Phlox\InWorldz.Phlox.csproj", "{FC4C33F7-DFAC-4882-98BC-4984D3A16405}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -471,6 +473,10 @@ Global
 		{A7C3D34F-AC32-4379-866A-FE585AF2B6FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A7C3D34F-AC32-4379-866A-FE585AF2B6FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A7C3D34F-AC32-4379-866A-FE585AF2B6FB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FC4C33F7-DFAC-4882-98BC-4984D3A16405}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FC4C33F7-DFAC-4882-98BC-4984D3A16405}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FC4C33F7-DFAC-4882-98BC-4984D3A16405}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FC4C33F7-DFAC-4882-98BC-4984D3A16405}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -552,6 +558,7 @@ Global
 		{77DEC20C-0000-0000-0000-000000000000} = {E1748B93-FA13-C50B-BD89-C3B777E73FCB}
 		{E6B51395-0000-0000-0000-000000000000} = {E1748B93-FA13-C50B-BD89-C3B777E73FCB}
 		{A7C3D34F-AC32-4379-866A-FE585AF2B6FB} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
+		{FC4C33F7-DFAC-4882-98BC-4984D3A16405} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A40AD54B-8BC7-41E4-B241-19B59EA65D2A}
