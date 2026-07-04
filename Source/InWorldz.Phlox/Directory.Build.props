@@ -1,8 +1,0 @@
-<Project>
-  <ItemGroup>
-    <PackageReference Include="protobuf-net" Version="3.2.30" />
-    <PackageReference Include="C5" Version="3.0.0" />
-    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
-    <PackageReference Include="StringTemplate4" Version="4.0.8" />
-  </ItemGroup>
-</Project>
