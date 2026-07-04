@@ -32,7 +32,6 @@
 
 using System;
 using OpenSim.Framework;
-using OpenSim.Region.CoreModules.Scripting.HttpRequest;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Shared.Api;
@@ -41,6 +40,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
 {
     public class HttpRequest
     {
+        private static readonly log4net.ILog m_log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
         public AsyncCommandManager m_CmdManager;
 
         public HttpRequest(AsyncCommandManager CmdManager)
@@ -64,20 +65,28 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
             {
                 iHttpReq.RemoveCompletedRequest(req.ReqID);
 
-                // Cast to the concrete type to access Status and ResponseBody
-                if (req is HttpRequestClass httpInfo)
+                // Do NOT cast to the concrete HttpRequestClass: develop's McMaster-based
+                // plugin loader gives region-module plugins isolated AssemblyLoadContexts,
+                // so this assembly's reference to OpenSim.Region.CoreModules can be a
+                // DIFFERENT loaded copy than the one that created the request — the type
+                // names match but identity fails and the cast silently discards the
+                // response. IServiceRequest (shared OpenSim.Region.Framework) carries
+                // ReqID/LocalID; Status and ResponseBody are read reflectively off the
+                // runtime type, which is load-context-agnostic.
+                object[] resobj = new object[]
                 {
-                    object[] resobj = new object[]
-                    {
-                        httpInfo.ReqID.ToString(),
-                        httpInfo.Status,
-                        new object[0],   // metadata — HTTP_BODY_TRUNCATED not implemented
-                        httpInfo.ResponseBody
-                    };
+                    req.ReqID.ToString(),
+                    GetIntField(req, "Status"),
+                    new object[0],   // metadata — HTTP_BODY_TRUNCATED not implemented
+                    GetStringField(req, "ResponseBody")
+                };
 
-                    m_CmdManager.m_ScriptEngine.PostObjectEvent(httpInfo.LocalID,
-                        new EventParams("http_response", resobj, Array.Empty<DetectParams>()));
-                }
+                bool posted = m_CmdManager.m_ScriptEngine.PostObjectEvent(req.LocalID,
+                    new EventParams("http_response", resobj, Array.Empty<DetectParams>()));
+
+                if (m_log.IsDebugEnabled)
+                    m_log.DebugFormat("[Phlox HTTP]: http_response {0} status {1} -> prim {2} (accepted={3})",
+                        req.ReqID, resobj[1], req.LocalID, posted);
 
                 req = iHttpReq.GetNextCompletedRequest();
             }
@@ -86,6 +95,36 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
         public void RemoveEvents(uint localID, OpenMetaverse.UUID itemID)
         {
             // Handled via IHttpRequestModule.StopHttpRequest in AsyncCommandManager.RemoveScript
+        }
+
+        // Load-context-agnostic field readers (see comment in CheckHttpRequests). Field
+        // lookups are cached per concrete runtime type.
+        private static Type s_fieldsType;
+        private static System.Reflection.FieldInfo s_statusField;
+        private static System.Reflection.FieldInfo s_bodyField;
+
+        private static void EnsureFieldCache(object req)
+        {
+            Type t = req.GetType();
+            if (t == s_fieldsType)
+                return;
+            s_statusField = t.GetField("Status");
+            s_bodyField = t.GetField("ResponseBody");
+            s_fieldsType = t;
+        }
+
+        private static int GetIntField(object req, string name)
+        {
+            EnsureFieldCache(req);
+            object v = (name == "Status" ? s_statusField : null)?.GetValue(req);
+            return v is int i ? i : 499;
+        }
+
+        private static string GetStringField(object req, string name)
+        {
+            EnsureFieldCache(req);
+            object v = (name == "ResponseBody" ? s_bodyField : null)?.GetValue(req);
+            return v as string ?? string.Empty;
         }
     }
 }

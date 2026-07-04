@@ -53,8 +53,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
     /// </summary>
     public class AsyncCommandManager
     {
+        private static readonly log4net.ILog m_log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
         private static Thread cmdHandlerThread;
         private static int cmdHandlerThreadCycleSleepms = 100;
+
+        // Rate-limit for pump-loop error logging (ms of Environment.TickCount64)
+        private static long m_lastPumpErrorLog;
 
         private static readonly List<IScriptEngine> m_ScriptEngines =
             new List<IScriptEngine>();
@@ -146,9 +151,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 {
                     return;
                 }
-                catch
+                catch (Exception e)
                 {
-                    // Keep running on unexpected errors
+                    // Keep running on unexpected errors, but never silently: this pump is
+                    // the only conduit for HTTP/XMLRPC/sensor results, and a swallowed
+                    // recurring fault here looks like "async events never arrive".
+                    // Rate-limited so an exception storm cannot flood the log.
+                    long now = Environment.TickCount64;
+                    if (now - m_lastPumpErrorLog > 10000)
+                    {
+                        m_lastPumpErrorLog = now;
+                        m_log.Error("[PhloxAsyncCmd]: async command pump pass failed (pump continues): ", e);
+                    }
                 }
             }
         }
