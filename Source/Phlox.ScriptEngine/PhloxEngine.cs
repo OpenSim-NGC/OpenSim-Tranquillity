@@ -64,6 +64,15 @@ namespace Phlox.ScriptEngine
             m_Enabled = m_Config.GetBoolean("Enabled", false);
             m_log.InfoFormat("[PhloxEngine]: Enabled = {0}", m_Enabled);
 
+            // Deploy-hygiene guard: Phlox is compiled against the tree's Library/C5.dll
+            // (1.1 identity). If the runtime resolves a different C5 (e.g. a NuGet 3.x
+            // copy leaks into the bin dir), scripts die at first timer use with
+            // MissingMethodException. Surface the loaded identity loudly at startup so a
+            // compile/runtime C5 split is caught here, not by script autopsies.
+            m_log.InfoFormat("[PhloxEngine]: C5 loaded: version {0} from {1}",
+                typeof(C5.IntervalHeap<int>).Assembly.GetName().Version,
+                typeof(C5.IntervalHeap<int>).Assembly.Location);
+
             // SLua Tier-1 back-half proof: offline self-test invokable from the region console
             // ("phlox sluaproof"). Registered once (static guard) across regions. Additive; it
             // touches no scene/world state and is unrelated to normal script execution.
