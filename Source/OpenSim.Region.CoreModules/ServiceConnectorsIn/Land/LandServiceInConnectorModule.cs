@@ -98,7 +98,7 @@ public class LandServiceInConnectorModule : ISharedRegionModule, ILandService
         if (!m_Registered)
         {
             m_Registered = true;
-            Object[] args = new Object[] { m_Config, MainServer.Instance, this, scene };
+            Object[] args = new Object[] { m_Config, MainServer.Instance.DefaultServer, this, scene };
             ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:LandServiceInConnector", args);
         }
 

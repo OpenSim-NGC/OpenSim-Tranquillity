@@ -104,7 +104,7 @@ public class SimulationServiceInConnectorModule : ISharedRegionModule
 
             m_log.Info("[SIM SERVICE]: Starting...");
 
-            Object[] args = new Object[] { m_Config, MainServer.Instance, scene };
+            Object[] args = new Object[] { m_Config, MainServer.Instance.DefaultServer, scene };
 
             ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:SimulationServiceInConnector", args);
         }
