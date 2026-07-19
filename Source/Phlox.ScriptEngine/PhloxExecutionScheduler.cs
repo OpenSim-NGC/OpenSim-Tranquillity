@@ -79,6 +79,17 @@ namespace Phlox.ScriptEngine
         private readonly Queue<EnableDisableReq> m_EnableDisableQueue = new();
         private struct EnableDisableReq { public UUID ItemId; public bool Enable; }
 
+        // Transient suspend/resume requests (posted from estate/console threads) and the
+        // suspended set itself. The set is scheduler-thread-only (drained-queue pattern, like
+        // enable/disable) so it needs no lock. Suspension is deliberately NOT persisted —
+        // it lives in scheduler bookkeeping, so a region restart clears it (SL semantics:
+        // suspend is a live-operations pause, not a durable state). It is also NOT
+        // enable/disable: listens, timers and touch subscriptions stay registered and the
+        // user-visible Running flag is untouched; the script just stops receiving timeslices.
+        private readonly Queue<SuspendResumeReq> m_SuspendResumeQueue = new();
+        private struct SuspendResumeReq { public UUID ItemId; public bool Suspend; }
+        private readonly HashSet<UUID> m_Suspended = new();
+
         // Reset requests
         private readonly Queue<UUID> m_PendingResets = new();
 
@@ -287,6 +298,37 @@ namespace Phlox.ScriptEngine
             m_WorkArrived();
         }
 
+        // ── Transient suspend/resume (estate live-ops tool) ────────────────────
+
+        /// <summary>
+        /// Request a transient suspend. Returns false if this scheduler doesn't run the
+        /// script (lets a multi-engine caller try the next engine). Applied on the
+        /// scheduler thread in ProcessSuspendResume.
+        /// </summary>
+        public bool RequestSuspend(UUID itemId)
+        {
+            lock (m_AllScriptsLock)
+                if (!m_AllScripts.ContainsKey(itemId)) return false;
+            lock (m_SuspendResumeQueue)
+                m_SuspendResumeQueue.Enqueue(new SuspendResumeReq { ItemId = itemId, Suspend = true });
+            m_WorkArrived();
+            return true;
+        }
+
+        /// <summary>
+        /// Request a resume. Unknown/non-suspended scripts are a cheap no-op — callers
+        /// like SceneObjectPartInventory.ResumeScripts() invoke this for every script on
+        /// every rez/deed, so the known-script check here keeps that path from queueing.
+        /// </summary>
+        public void RequestResume(UUID itemId)
+        {
+            lock (m_AllScriptsLock)
+                if (!m_AllScripts.ContainsKey(itemId)) return;
+            lock (m_SuspendResumeQueue)
+                m_SuspendResumeQueue.Enqueue(new SuspendResumeReq { ItemId = itemId, Suspend = false });
+            m_WorkArrived();
+        }
+
         public bool ResetNow(UUID itemId)
         {
             Interpreter script;
@@ -393,6 +435,7 @@ namespace Phlox.ScriptEngine
             if (!m_AllScripts.TryGetValue(itemId, out script)) return;
 
             RemoveFromRunQueue(itemId);
+            m_Suspended.Remove(itemId);
             UnregisterFromNotifications(script);
            script.OnUnload(ScriptUnloadReason.Unloaded, RuntimeState.LocalDisableFlag.None);
             m_Engine.StateManager?.ScriptUnloaded(script);
@@ -407,6 +450,7 @@ namespace Phlox.ScriptEngine
             CheckSleepingScripts();
             ProcessEventQueue();
             ProcessEnableDisable();
+            ProcessSuspendResume();
             ProcessResets();
             ProcessSyscallReturns();
 
@@ -430,6 +474,7 @@ namespace Phlox.ScriptEngine
             if (m_RunQueue.Count > 0) return true;
             lock (m_PendingEvents) if (m_PendingEvents.Count > 0) return true;
             lock (m_EnableDisableQueue) if (m_EnableDisableQueue.Count > 0) return true;
+            lock (m_SuspendResumeQueue) if (m_SuspendResumeQueue.Count > 0) return true;
             lock (m_PendingResets) if (m_PendingResets.Count > 0) return true;
             lock (m_SyscallReturns) if (m_SyscallReturns.Count > 0) return true;
             return false;
@@ -622,6 +667,17 @@ namespace Phlox.ScriptEngine
                     continue;
                 }
 
+                // Suspended: accumulate instead of delivering (SL semantics — the event
+                // queue keeps filling, bounded by the depth cap above, and drains on
+                // resume). Note a fired llSetTimerEvent timer only re-arms when its TIMER
+                // event is DELIVERED (CheckAndResetTimer), so a suspended repeating timer
+                // accumulates exactly one pending TIMER event — no flood.
+                if (m_Suspended.Contains(pe.ItemId))
+                {
+                    script.ScriptState.QueueEvent(pe.Evt);
+                    continue;
+                }
+
                 if (script.ScriptState.RunState == RuntimeState.Status.Waiting)
                 {
                     StartEvent(pe.Evt, script, info);
@@ -666,6 +722,84 @@ namespace Phlox.ScriptEngine
                     UnregisterFromNotifications(script);
                 }
                 script.SetScriptEventFlags();
+            }
+        }
+
+        private void ProcessSuspendResume()
+        {
+            List<SuspendResumeReq> batch;
+            lock (m_SuspendResumeQueue)
+            {
+                if (m_SuspendResumeQueue.Count == 0) return;
+                batch = new List<SuspendResumeReq>(m_SuspendResumeQueue);
+                m_SuspendResumeQueue.Clear();
+            }
+
+            foreach (var req in batch)
+            {
+                Interpreter script;
+                if (!m_AllScripts.TryGetValue(req.ItemId, out script)) continue;
+
+                if (req.Suspend)
+                {
+                    if (!m_Suspended.Add(req.ItemId)) continue;
+                    // Park a runnable script: pull it from the run queue but leave
+                    // RunState=Running — "runnable but not queued" is the parked marker
+                    // the resume path re-queues. Sleep-heap entries, timers, touch and
+                    // worldcomm listens all stay registered (the point of TRANSIENT
+                    // suspend); their wake paths funnel through AddToRunQueue, which
+                    // parks instead of queueing while suspended.
+                    RemoveFromRunQueue(req.ItemId);
+                }
+                else
+                {
+                    if (!m_Suspended.Remove(req.ItemId)) continue;
+                    if (!script.ScriptState.Enabled) continue; // disabled while suspended — enable path owns re-queueing
+
+                    if (script.ScriptState.RunState == RuntimeState.Status.Running)
+                    {
+                        // Was mid-timeslice at suspend, or a sleep wake / syscall return
+                        // parked it while suspended — continue execution where it left off.
+                        AddToRunQueue(script);
+                    }
+                    else if (script.ScriptState.RunState == RuntimeState.Status.Waiting)
+                    {
+                        // Deliver the first event that accumulated during suspension (the
+                        // rest drain normally via TransitionToWait once it runs).
+                        DeliverNextQueuedEvent(script);
+                    }
+                    // Sleeping/Syscall: nothing to do — their normal completion paths
+                    // re-queue through the (no longer gated) AddToRunQueue.
+                }
+            }
+        }
+
+        // Kick a Waiting script whose event queue filled while it was suspended. Mirrors
+        // the TransitionToWait drain (dequeue -> find handler -> DoEvent -> re-arm timer)
+        // but from outside the run queue, so it re-queues on success.
+        private void DeliverNextQueuedEvent(Interpreter script)
+        {
+            while (true)
+            {
+                PostedEvent nextEvt;
+                lock (script.ScriptState.EventQueueLock)
+                {
+                    if (script.ScriptState.EventQueue.Count == 0) return;
+                    nextEvt = script.ScriptState.EventQueue.Dequeue();
+                }
+                PhloxEventInfo info = FindEventHandler(nextEvt, script);
+                if (info == null) continue;
+                try
+                {
+                    script.ScriptState.DoEvent(info, nextEvt, nextEvt.Args);
+                    CheckAndResetTimer(script, info);
+                    AddToRunQueue(script);
+                }
+                catch (VMException e)
+                {
+                    TerminateWithError(script, e);
+                }
+                return;
             }
         }
 
@@ -777,6 +911,18 @@ namespace Phlox.ScriptEngine
 
         private void AddToRunQueue(Interpreter script)
         {
+            // Suspended scripts never enter the run queue (removal at suspend + this gate
+            // keeps DoTimeslices' hot path free of per-slice flag checks and keeps
+            // HasWork() honest — a run queue holding only suspended scripts would make
+            // the master scheduler busy-spin). Park as RunState=Running-but-not-queued:
+            // that is the marker ProcessSuspendResume re-queues on resume, so sleep wakes
+            // and syscall returns that land during suspension aren't lost.
+            if (m_Suspended.Contains(script.ItemId))
+            {
+                script.ScriptState.RunState = RuntimeState.Status.Running;
+                return;
+            }
+
             if (m_RunIndex.ContainsKey(script.ItemId)) return;
 
             var node = m_RunQueue.AddLast(script);

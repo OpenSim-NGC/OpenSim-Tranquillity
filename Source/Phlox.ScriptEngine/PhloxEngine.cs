@@ -156,7 +156,100 @@ namespace Phlox.ScriptEngine
             IMoneyModule moneyModule = m_Scene.RequestModuleInterface<IMoneyModule>();
             if (moneyModule != null)
                 moneyModule.OnObjectPaid += HandleObjectPaid;
+
+            // Operator path for transient suspend/resume. There is NO viewer wire for
+            // per-script suspend (Top Objects has Return/Kick/Refresh only; nothing in core
+            // calls IScriptModule.SuspendScript), so the console is the actuator: Top Scripts
+            // identifies the offender, these commands act on it. Registered per region
+            // instance (INonSharedRegionModule) with the console-scene guard — the
+            // ExperienceModule pattern.
+            if (MainConsole.Instance != null)
+            {
+                MainConsole.Instance.Commands.AddCommand("Phlox", false,
+                    "phlox suspend",
+                    "phlox suspend <script-item-uuid | object-name>",
+                    "Transiently pause Phlox script(s): timers/listens/state survive; no timeslices until 'phlox resume'. Not persisted — a region restart clears it. Does NOT touch the Running flag.",
+                    HandleSuspendCommand);
+                MainConsole.Instance.Commands.AddCommand("Phlox", false,
+                    "phlox resume",
+                    "phlox resume <script-item-uuid | object-name>",
+                    "Resume script(s) paused by 'phlox suspend' (accumulated events then deliver).",
+                    HandleResumeCommand);
+            }
+
             m_log.InfoFormat("[PhloxEngine]: Region loaded {0}", scene.RegionInfo.RegionName);
+        }
+
+        // Matches the stock LandManagementModule / ExperienceModule guard: proceed only when
+        // no region is selected (root) or the selected region is THIS instance's scene.
+        private bool WrongConsoleScene()
+        {
+            return !(MainConsole.Instance.ConsoleScene is null
+                     || MainConsole.Instance.ConsoleScene == m_Scene);
+        }
+
+        private void HandleSuspendCommand(string module, string[] args) => HandleSuspendResume(args, true);
+        private void HandleResumeCommand(string module, string[] args) => HandleSuspendResume(args, false);
+
+        private void HandleSuspendResume(string[] args, bool suspend)
+        {
+            if (WrongConsoleScene()) return;
+            string verb = suspend ? "suspend" : "resume";
+            if (args.Length < 3)
+            {
+                MainConsole.Instance.Output($"Usage: phlox {verb} <script-item-uuid | object-name>");
+                return;
+            }
+            if (m_ExeScheduler == null)
+            {
+                MainConsole.Instance.Output("Script engine not running.");
+                return;
+            }
+
+            string target = string.Join(" ", args, 2, args.Length - 2);
+
+            // Direct script-item UUID (as printed by 'experience list-scripts').
+            if (UUID.TryParse(target, out UUID itemId))
+            {
+                bool known = suspend
+                    ? m_ExeScheduler.RequestSuspend(itemId)
+                    : ApplyResume(itemId);
+                MainConsole.Instance.Output(known
+                    ? $"{(suspend ? "Suspended" : "Resumed")} script {itemId}."
+                    : $"Script {itemId} is not running under Phlox in this region.");
+                return;
+            }
+
+            // Object name — act on every Phlox script in matching objects.
+            int hit = 0, missed = 0;
+            foreach (var sog in m_Scene.GetSceneObjectGroups())
+            {
+                if (!string.Equals(sog.Name, target, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                foreach (var part in sog.Parts)
+                {
+                    foreach (var item in part.Inventory.GetInventoryItems(InventoryType.LSL))
+                    {
+                        bool known = suspend
+                            ? m_ExeScheduler.RequestSuspend(item.ItemID)
+                            : ApplyResume(item.ItemID);
+                        if (known) hit++; else missed++;
+                    }
+                }
+            }
+            if (hit == 0 && missed == 0)
+                MainConsole.Instance.Output($"No object named '{target}' with scripts found in this region.");
+            else
+                MainConsole.Instance.Output(
+                    $"{(suspend ? "Suspended" : "Resumed")} {hit} Phlox script(s) in '{target}'." +
+                    (missed > 0 ? $" ({missed} script item(s) not run by Phlox — other engine or not loaded.)" : ""));
+        }
+
+        private bool ApplyResume(UUID itemId)
+        {
+            if (m_ExeScheduler.FindScript(itemId) == null) return false;
+            m_ExeScheduler.RequestResume(itemId);
+            return true;
         }
 
         public void RemoveRegion(Scene scene)
@@ -751,8 +844,23 @@ namespace Phlox.ScriptEngine
             }
             return topScripts;
         }
-        public bool SuspendScript(UUID itemID) => false;
-        public bool ResumeScript(UUID itemID) => false;
+        // Transient suspend (Suspend/Resume Slice 2): pauses timeslice delivery only —
+        // listens/timers/state survive, the Running flag is untouched, and nothing is
+        // persisted (region restart clears it). Returns false for scripts this engine
+        // doesn't run, so a multi-engine caller can try the next engine.
+        public bool SuspendScript(UUID itemID)
+            => m_ExeScheduler != null && m_ExeScheduler.RequestSuspend(itemID);
+
+        // Returning TRUE for unknown scripts is deliberate (fe31bac769): Phlox scripts are
+        // never rez-suspended, so "not suspended" IS success — returning false made
+        // SceneObjectPartInventory.ResumeScripts() `continue` past the changed(CHANGED_OWNER)
+        // post, swallowing that event on ownership transfer. Known suspended scripts now
+        // actually resume (RequestResume is a cheap no-op for non-suspended ones).
+        public bool ResumeScript(UUID itemID)
+        {
+            m_ExeScheduler?.RequestResume(itemID);
+            return true;
+        }
         public int GetScriptsMemory(List<UUID> itemIDs)
         {
             if (m_ExeScheduler == null || itemIDs == null) return 0;
