@@ -45,6 +45,9 @@ namespace Phlox.ScriptEngine
 
         // All scripts regardless of run state
         private readonly System.Collections.Generic.Dictionary<UUID, Interpreter> m_AllScripts = new();
+        // Guards m_AllScripts add/remove against the cross-thread stats snapshot
+        // (SnapshotScriptStats, called from the estate-request thread).
+        private readonly object m_AllScriptsLock = new();
 
         // Run queue — scripts ready to execute
         private readonly SysLinkedList m_RunQueue = new();
@@ -163,8 +166,10 @@ namespace Phlox.ScriptEngine
 
             interp.OnStateChg += OnStateChange;
             interp.ScriptState.StartParameter = req.StartParam;
+            interp.HostLocalId = req.Prim.LocalId;
 
-            m_AllScripts[interp.ItemId] = interp;
+            lock (m_AllScriptsLock)
+                m_AllScripts[interp.ItemId] = interp;
             interp.SetScriptEventFlags();
 
             if (freshStart)
@@ -316,6 +321,36 @@ namespace Phlox.ScriptEngine
             return s;
         }
 
+        // Per-script stats snapshot for the estate Top Scripts report. Taken under the
+        // m_AllScripts lock so it is safe to enumerate from the estate-request thread.
+        internal struct ScriptStatSnapshot
+        {
+            public uint HostLocalId;
+            public double ExecMs;
+            public int MemoryUsed;
+            public bool Enabled;
+        }
+
+        internal List<ScriptStatSnapshot> SnapshotScriptStats()
+        {
+            List<ScriptStatSnapshot> list;
+            lock (m_AllScriptsLock)
+            {
+                list = new List<ScriptStatSnapshot>(m_AllScripts.Count);
+                foreach (Interpreter interp in m_AllScripts.Values)
+                {
+                    list.Add(new ScriptStatSnapshot
+                    {
+                        HostLocalId = interp.HostLocalId,
+                        ExecMs = interp.GetExecutionTime(),
+                        MemoryUsed = interp.ScriptState.MemInfo.MemoryUsed,
+                        Enabled = interp.ScriptState.Enabled
+                    });
+                }
+            }
+            return list;
+        }
+
         // ── Syscall returns ────────────────────────────────────────────────────
 
         public void PostSyscallReturn(UUID itemId, object retValue, int delay)
@@ -361,7 +396,8 @@ namespace Phlox.ScriptEngine
             UnregisterFromNotifications(script);
            script.OnUnload(ScriptUnloadReason.Unloaded, RuntimeState.LocalDisableFlag.None);
             m_Engine.StateManager?.ScriptUnloaded(script);
-            m_AllScripts.Remove(itemId);
+            lock (m_AllScriptsLock)
+                m_AllScripts.Remove(itemId);
         }
 
         // ── Main work loop ─────────────────────────────────────────────────────

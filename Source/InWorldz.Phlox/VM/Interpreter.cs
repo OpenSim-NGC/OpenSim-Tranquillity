@@ -26,6 +26,15 @@ namespace InWorldz.Phlox.VM
 
         public UUID ItemId;
 
+        // Host prim LocalId, stamped at load; used off the hot path to resolve the owning
+        // linkset's root LocalId for the estate per-object script stats (Top Scripts).
+        public uint HostLocalId;
+
+        // Decaying average of per-timeslice execution time (ms), retained for the Top Scripts
+        // report. Written on the scheduler thread inside AddExecutionTime, read approximately
+        // from the estate-request thread (aligned double read/write is atomic on x64).
+        private double _execMs;
+
         public RuntimeState ScriptState
         {
             get
@@ -120,8 +129,14 @@ namespace InWorldz.Phlox.VM
 
         public void AddExecutionTime(double ms)
         {
+            // Retain a cheap decaying average for per-script stats. The Stopwatch cost that
+            // produced 'ms' is already paid by the scheduler; this is just one field write.
+            _execMs = (_execMs * 0.9) + (ms * 0.1);
             _syscallShim.AddExecutionTime(ms);
         }
+
+        // Representative recent per-timeslice execution time in ms (approximate).
+        public double GetExecutionTime() => _execMs;
 
         public float GetAverageScriptTime()
         {

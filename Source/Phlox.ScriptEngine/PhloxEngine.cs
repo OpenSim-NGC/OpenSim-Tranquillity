@@ -725,16 +725,94 @@ namespace Phlox.ScriptEngine
         public bool HasScript(UUID itemID, out bool running) { running = false; return false; }
         public void SaveAllState() { }
         public void StartProcessing() { }
-        public float GetScriptExecutionTime(List<UUID> itemIDs) => 0f;
-        public Dictionary<uint, float> GetObjectScriptsExecutionTimes() => new Dictionary<uint, float>();
+        public float GetScriptExecutionTime(List<UUID> itemIDs)
+        {
+            if (m_ExeScheduler == null || itemIDs == null) return 0f;
+            float time = 0f;
+            foreach (UUID itemID in itemIDs)
+            {
+                var s = m_ExeScheduler.FindScript(itemID);
+                if (s != null && s.ScriptState.Enabled)
+                    time += (float)s.GetExecutionTime();
+            }
+            return time;
+        }
+
+        public Dictionary<uint, float> GetObjectScriptsExecutionTimes()
+        {
+            Dictionary<uint, float> topScripts = new Dictionary<uint, float>();
+            if (m_ExeScheduler == null) return topScripts;
+            foreach (var st in m_ExeScheduler.SnapshotScriptStats())
+            {
+                uint root = ResolveRootLocalId(st.HostLocalId);
+                if (root == 0) continue;
+                topScripts.TryGetValue(root, out float t);
+                topScripts[root] = t + (float)st.ExecMs;
+            }
+            return topScripts;
+        }
         public bool SuspendScript(UUID itemID) => false;
         public bool ResumeScript(UUID itemID) => false;
-        public int GetScriptsMemory(List<UUID> itemIDs) => 0;
-        public ICollection<ScriptTopStatsData> GetTopObjectStats(float minTime, int maxCount,
-            out float totalTime, out float memUsage)
+        public int GetScriptsMemory(List<UUID> itemIDs)
         {
-            totalTime = 0f; memUsage = 0f;
-            return new List<ScriptTopStatsData>();
+            if (m_ExeScheduler == null || itemIDs == null) return 0;
+            int memory = 0;
+            foreach (UUID itemID in itemIDs)
+            {
+                var s = m_ExeScheduler.FindScript(itemID);
+                if (s != null && s.ScriptState.Enabled)
+                    memory += s.ScriptState.MemInfo.MemoryUsed;
+            }
+            return memory;
+        }
+
+        public ICollection<ScriptTopStatsData> GetTopObjectStats(float mintime, int minmemory,
+            out float totaltime, out float totalmemory)
+        {
+            totaltime = 0f;
+            totalmemory = 0f;
+            Dictionary<uint, ScriptTopStatsData> topScripts = new Dictionary<uint, ScriptTopStatsData>();
+            if (m_ExeScheduler == null) return topScripts.Values;
+
+            foreach (var st in m_ExeScheduler.SnapshotScriptStats())
+            {
+                uint root = ResolveRootLocalId(st.HostLocalId);
+                if (root == 0) continue;
+
+                float time = (float)st.ExecMs;
+                int mem = st.MemoryUsed;
+                totaltime += time;
+                totalmemory += mem;
+
+                if (time > mintime || mem > minmemory)
+                {
+                    if (topScripts.TryGetValue(root, out ScriptTopStatsData sd))
+                    {
+                        sd.time += time;
+                        sd.memory += mem;
+                    }
+                    else
+                    {
+                        topScripts[root] = new ScriptTopStatsData
+                        {
+                            localID = root,
+                            time = time,
+                            memory = mem
+                        };
+                    }
+                }
+            }
+            return topScripts.Values;
+        }
+
+        // Resolve a host prim LocalId to its linkset root LocalId (off the hot path).
+        private uint ResolveRootLocalId(uint hostLocalId)
+        {
+            if (hostLocalId == 0 || m_Scene == null) return 0;
+            SceneObjectPart part = m_Scene.GetSceneObjectPart(hostLocalId);
+            SceneObjectGroup grp = part?.ParentGroup;
+            if (grp == null || grp.IsDeleted) return 0;
+            return grp.RootPart.LocalId;
         }
 
         #endregion
