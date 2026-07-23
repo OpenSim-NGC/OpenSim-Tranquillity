@@ -113,19 +113,34 @@ namespace Phlox.ScriptEngine
 
         public bool IsAgentBlocked(UUID experienceId, UUID agentId)
         {
+            // T4: block enforcement read. The module's per-agent cache (loaded on login, updated on
+            // the ExperiencePreferences PUT) is authoritative when it HAS the entry. On a cache MISS
+            // (None) — or when only the service is available — consult the service: Tranquillity's
+            // single permissions table stores block as allow=FALSE, so a present entry with allow=false
+            // is a BLOCK and an ABSENT entry is not-granted. FetchExperiencePermissions returns both,
+            // so a persisted block IS distinguishable here (closes the earlier legion-semantics TODO).
             if (m_module != null)
-                return m_module.GetExperiencePermission(agentId, experienceId) == ExperiencePermission.Blocked;
-            // TODO(legion-semantics): the service-level FetchExperiencePermissions exposes only a
-            // granted bool, so "blocked" is indistinguishable from "not granted" without the module.
+            {
+                ExperiencePermission p = m_module.GetExperiencePermission(agentId, experienceId);
+                if (p == ExperiencePermission.Blocked) return true;
+                if (p == ExperiencePermission.Allowed) return false;
+                // p == None -> cache miss; fall through to the service.
+            }
+            if (m_service != null)
+                return m_service.FetchExperiencePermissions(agentId).TryGetValue(experienceId, out bool granted) && !granted;
             return false;
         }
 
         public bool GrantPermission(UUID experienceId, UUID agentId)
         {
-            if (m_service != null)
-                return m_service.UpdateExperiencePermissions(agentId, experienceId, ExperiencePermission.Allowed);
+            // Prefer the MODULE's setter: it writes the service AND updates the per-agent cache that
+            // the read path (GetExperiencePermission) uses — so an accepted grant is immediately seen
+            // as already-granted (no re-prompt on the next request). Service-only would persist the DB
+            // but leave the cache stale until the next login reload. (T4 coherency; NGC storage untouched.)
             if (m_module != null)
                 return m_module.SetExperiencePermissions(agentId, experienceId, true);
+            if (m_service != null)
+                return m_service.UpdateExperiencePermissions(agentId, experienceId, ExperiencePermission.Allowed);
             return false;
         }
 

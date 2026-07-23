@@ -77,6 +77,27 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 
 ---
 
+## Slice T4 — Block-button persistence loop — ✅ PORTED (2026-07-23)
+
+**Ported and code-path-verified against Legion; NOT executed on this tree.** Completes T3's consent Block button. **Zero schema change** — uses Tranquillity's single permissions table (`experience_permissions.allow BIT`: grant = allow true, **block = allow false**), NOT Legion's dedicated `experience_agent_blocked` table (the TRANQ-AHEAD item — never reverted). Deploy: `Phlox.ScriptEngine.dll` only.
+
+**Key finding:** most of the loop already existed and only needed adapter cache-coherency correctness:
+| Piece | Status |
+|---|---|
+| **Write** — ExperiencePreferences cap PUT `permission=Block` → `SetExperiencePermissions(allow=false)` → `UpdateExperiencePermissions(Blocked)` (persist) + cache + `UpdateScriptExperiencePerms` (revoke running perms) | **Already existed** (`LindenCaps/ExperienceModule.cs:214,231,261`) |
+| **Cache load** — on login, `OnNewClient` loads `FetchExperiencePermissions` (grants + blocks) into the module cache | **Already existed** (`:104`) |
+| **Enforce** — early-denial gate checks agent-block **before** already-granted → code 4, no dialog | **Done in T3** |
+| **Adapter read robustness** — `IsAgentBlocked` was module-cache-only (`None` → "not blocked"); now falls back to the service on a cache miss (single-table `allow=false` entry = block) — closes the legion-semantics TODO | **T4 change** |
+| **Adapter grant coherency** — `GrantPermission` was service-only (cache stale → granted experience re-prompted); now routes through the module setter (updates cache + service) | **T4 change** |
+
+**Loop (verified vs Legion):** Block clicked → viewer PUTs ExperiencePreferences(Block) → `allow=false` persisted + cached (and `ScriptAnswerYes(0)` resolves the current request as denied 4) → next `llRequestExperiencePermissions` → gate hits `IsAgentBlocked` FIRST → **denied 4, no dialog**. Stale-grant: grant (allow=true, now cached) → block (allow=false, overwrites) → denied 4. Unblock (prefs Allow/Forget) → prompts again. **Consent persistence:** Yes → allow=true (Legion & Tranq persist); **No → transient, NOT persisted** (per-request — matches Legion: `ResolveExperiencePerm` posts denied 4 without writing); Block → allow=false persisted.
+
+**Evidence:** commit `<T4-HASH>`. Legion ref `port-source-2026-07-22`: enforcement order `Phlox.ScriptEngine/LSLSystemAPI.cs:12774` (agent-block before granted), Block-via-ExperiencePreferences (parity-ledger CAP-EPREF / D1 recon). Tranquillity: `LindenCaps/ExperienceModule.cs` prefs cap + `Phlox.ScriptEngine/PhloxExperienceAdapter.cs` (T4 adapter fixes).
+
+**Non-identical:** Legion persists agent-block in a dedicated table; Tranquillity uses the single `allow BIT` (equivalent, TRANQ-AHEAD, no migration). Region/parcel BLOCK-list enforcement remains T5.
+
+---
+
 ## Remaining slices (from `experience-port-audit-v2.md` PART D)
 
 | Slice | Scope | State |
@@ -85,7 +106,7 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 | **T1** | script-surface conformance (SS-1..9) | ✅ **PORTED** (this slice) |
 | **T2** | KV quota 16→128 MiB + code 11 | ✅ **PORTED** (this slice) |
 | **T3** | consent (D1): ScriptQuestion+await, 300s/code 18, trusted-bypass | ✅ **PORTED** (this slice) |
-| T4 | ExperiencePreferences ↔ consent Block loop | pending |
+| **T4** | ExperiencePreferences ↔ consent Block loop | ✅ **PORTED** (this slice) |
 | T5 | trusted enforcement + region/parcel admission ladder (absorbs SS-6 remainder) | pending |
 | T6 | ExperienceQuery no-op cap + IsExperienceContributor parity | pending |
 | T7 | acquire policy (DEC-3) | pending |

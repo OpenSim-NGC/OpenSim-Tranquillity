@@ -114,6 +114,30 @@ Touch it. **EXPECT:** the **normal** run-time permission dialog appears and `run
 
 ---
 
+## T4 — Block-button persistence loop (deploy: `Phlox.ScriptEngine.dll`)
+
+Completes T3: the consent dialog's **"Block Experience"** button now persists and takes effect. Use the T3.1 script (touch → `llRequestExperiencePermissions`, with `experience_permissions`/`experience_permissions_denied` handlers).
+
+**T4.1 — Block → denied 4**
+Touch as a fresh avatar → consent dialog → click **Block Experience**. **EXPECT:** `DENIED 4` (the current request is denied), and the block is persisted.
+**FAIL:** `GRANTED`, or a code other than 4.
+
+**T4.2 — persistence proof: re-touch → denied 4 immediately, NO dialog**
+After T4.1, touch the SAME experience object again (same avatar). **EXPECT:** `DENIED 4` **with no dialog** — the persisted block is enforced at the gate before any prompt.
+**FAIL:** the consent dialog appears again (block didn't persist / isn't enforced), or `GRANTED`.
+
+**T4.3 — stale-grant case (block wins over a prior grant)**
+Grant the experience first (touch → **Yes** → `GRANTED`). Then Block it (touch again → **Block**, or use Me▸Experiences ▸ the experience ▸ **Block**). Then touch once more. **EXPECT:** `DENIED 4` — the block is checked *before* the already-granted short-circuit, so a previously-granted experience that is then blocked denies.
+**FAIL:** `GRANTED` (the stale grant wins — the block-before-grant ordering regressed).
+
+**T4.4 — unblock → dialog returns**
+Me▸Experiences ▸ the experience ▸ **Allow** (or **Forget**). Touch again. **EXPECT:** the consent dialog appears again (Allow → immediate `GRANTED`; Forget → prompt again).
+**FAIL:** still `DENIED 4` after unblocking.
+
+**Persistence across restart (grid & standalone):** the block lives in the single permissions table (`allow=false`) and is reloaded into the module cache on the agent's next login — so T4.2 also holds after a region restart (fresh login re-reads the persisted block).
+
+**Consent outcomes recap:** **Yes** → `allow=true` persisted (and cached, so no re-prompt); **No** → transient deny 4 (per-request, NOT persisted — the next touch prompts again); **Block** → `allow=false` persisted (enforced on every later touch).
+
 ### What's deferred (not testable yet)
 - **T4** — the ExperiencePreferences **Block button** persistence loop (the profile Allow/Block/Forget that writes the agent-block T3.5 reads). T3 ships the block *check*; T4 ships the write path.
 - **T5** — trusted **enforcement** + region/parcel BLOCK-list admission ladder (T3 ships the trusted *grant* seam and the estate-allow admission; region-block enforcement and full admission are T5).
