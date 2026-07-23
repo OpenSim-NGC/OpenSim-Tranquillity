@@ -98,6 +98,26 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 
 ---
 
+## Slice T5 — trusted enforcement + admission ladder — ⚠️ PARTIAL (trusted PORTED; region/parcel block = STOP) (2026-07-23)
+
+**Ported and code-path-verified against Legion; NOT executed on this tree.** Phlox layer only; **no adapter change, no NGC change, no new tables.** Deploy: `Phlox.ScriptEngine.dll` only.
+
+**PORTED — trusted enforcement + the admission tiers Tranquillity has a source for:**
+| Item | Legion | Tranquillity source | T5 |
+|---|---|---|---|
+| Trusted → silent grant | `experience_trusted` table | **estate `KeyExperiences`** (NOT Legion's table) via `GetTrustedExperiences`→`GetEstateKeyExperiences()` | wired in T3, verified |
+| Admission includes trusted | `IsExperienceAdmittedAt`: allowed OR trusted OR grid-wide OR parcel-allow | estate allow OR trusted | new `IsExperienceAdmitted` helper — fixes a trusted-but-not-allowed experience being wrongly denied 17 |
+| Admission tier on `llAgentInExperience` (SS-6) | `HasExperiencePermission` admission | estate allow OR trusted | added (closes the *admission* half of SS-6's deferred tier) |
+| Ordering: agent-block wins over trusted | agent-block (4) before trusted-grant | same | verified — block checked before the trusted silent-grant |
+
+**🛑 STOP — region/parcel BLOCK-wins ladder + grid-wide + OTH-1 parcel scoping: NO NGC SOURCE.** Tranquillity has **no** region/estate blocked-experience store (`EstateSettings` has `AllowedExperiences` + `KeyExperiences` only — no `BlockedExperiences`; the RegionExperiences cap hardcodes `blocked` empty), **no** parcel-experience data (`ILandObject` has no `IsExperienceAllowed`/`IsExperienceBlocked`), and **no** grid-wide bit. Implementing these would require either a **new estate field/table** (region-block — breaks the no-schema-change property this port has held for T1-T4) or a **new land-layer subsystem** (parcel experience access entries + `ILandObject` methods). **Flagged for John's decision — not invented here.** SS-6's BLOCK-wins tier therefore remains deferred.
+
+**Evidence:** commit `<T5-HASH>`. Legion ref `port-source-2026-07-22` `Phlox.ScriptEngine/LSLSystemAPI.cs`: `IsExperienceAdmittedAt`:12661, `IsExperienceBlockedInRegion`:12640, `IsExperienceBlockedOnParcelAt`:12699, OTH-1 agent-parcel `HasExperiencePermission`:12614. Tranquillity gap: `EstateSettings.cs:279-292` (allow+key, no block), `ILandObject.cs` (no experience methods), `IExperienceModule.cs:32-33`.
+
+**Non-identical:** trusted from estate `KeyExperiences` (not Legion's `experience_trusted` table — TRANQ-AHEAD, no migration); the entire BLOCK-wins land tier is absent pending the storage decision above.
+
+---
+
 ## Remaining slices (from `experience-port-audit-v2.md` PART D)
 
 | Slice | Scope | State |
@@ -107,7 +127,7 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 | **T2** | KV quota 16→128 MiB + code 11 | ✅ **PORTED** (this slice) |
 | **T3** | consent (D1): ScriptQuestion+await, 300s/code 18, trusted-bypass | ✅ **PORTED** (this slice) |
 | **T4** | ExperiencePreferences ↔ consent Block loop | ✅ **PORTED** (this slice) |
-| T5 | trusted enforcement + region/parcel admission ladder (absorbs SS-6 remainder) | pending |
+| **T5** | trusted enforcement + region/parcel block admission | ⚠️ **PARTIAL** — trusted PORTED; region/parcel block = STOP (no NGC source, John decides) |
 | T6 | ExperienceQuery no-op cap + IsExperienceContributor parity | pending |
 | T7 | acquire policy (DEC-3) | pending |
 | T8 | SL-UNVERIFIED tail parity | pending |

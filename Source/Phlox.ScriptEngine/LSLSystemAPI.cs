@@ -12605,11 +12605,14 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 return;
             }
 
-            // Not admitted on this land (region/estate allow-list) -> land-scope XP_ERROR_NOT_PERMITTED_LAND (17).
-            // (Legion's region/parcel BLOCK-list block-wins tier is T5 — the NGC adapter has no region-block
-            // list yet, only the estate allow + trusted lists.)
-            var allowed = expService.GetAllowedExperiences(World.RegionInfo.RegionID);
-            if (!allowed.Contains(experienceId))
+            // Admission (T5): the experience must be enabled on this land — estate-ALLOWED or region-
+            // TRUSTED (estate KeyExperiences). A trusted experience is a stronger allow, so it admits
+            // here and is silently granted below (previously a trusted-but-not-allowed experience was
+            // wrongly denied 17 before the trusted check). Legion's admission also has grid-wide + parcel-
+            // ALLOW tiers, and a region/parcel BLOCK-wins tier; those have NO source in NGC (no grid-wide
+            // bit, no region-block store, no ILandObject experience methods) — the flagged T5 STOP (see
+            // experience-port-ledger.md). Not admitted -> land-scope XP_ERROR_NOT_PERMITTED_LAND (17).
+            if (!IsExperienceAdmitted(expService, experienceId))
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions_denied",
@@ -12649,8 +12652,9 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 return;
             }
 
-            // T3/D1 consent. A region-TRUSTED experience (Tranquillity estate KeyExperiences) grants
-            // silently — the trusted SEAM; full trusted enforcement is T5.
+            // T5 trusted enforcement. A region-TRUSTED experience (Tranquillity estate KeyExperiences)
+            // grants silently — no dialog. Checked AFTER agent-block (T4), so a personally-blocked
+            // experience is denied 4 even if trusted (block wins over trusted — Legion's order).
             if (expService.GetTrustedExperiences(World.RegionInfo.RegionID).Contains(experienceId))
             {
                 GrantExperienceAndNotify(expService, experienceId, agentId, agent);
@@ -12771,6 +12775,17 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                     new DetectParams[0]));
         }
 
+        // T5 admission — the portable subset of Legion's ladder (IsExperienceAdmittedAt): an experience
+        // is admitted on this land if the estate ALLOWS it OR it is region-TRUSTED (estate KeyExperiences).
+        // Legion's grid-wide + parcel-ALLOW admission tiers and the region/parcel BLOCK-wins tier have no
+        // NGC source (see the T5 STOP in experience-port-ledger.md) and are not represented here.
+        private bool IsExperienceAdmitted(PhloxExperienceAdapter expService, UUID experienceId)
+        {
+            UUID regionId = World.RegionInfo.RegionID;
+            return expService.GetAllowedExperiences(regionId).Contains(experienceId)
+                || expService.GetTrustedExperiences(regionId).Contains(experienceId);
+        }
+
         // ── 660: llAgentInExperience ──
         public int llAgentInExperience(string agent)
         {
@@ -12782,14 +12797,14 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             UUID experienceId = GetScriptExperienceId();
             if (expService == null || experienceId == UUID.Zero) return 0;
 
-            // T1/SS-6: was a bare IsAgentGranted. SL semantics require the target agent to be
-            // PARTICIPATING here — a ROOT presence in this region — and block-wins over grant.
-            // (Legion's full HasExperiencePermission also applies the region/parcel BLOCK + admission
-            // ladder, which needs region-block/parcel data the NGC adapter does not yet expose; that
-            // lands with the trusted/enforcement slice T5. T1 ports the presence + agent-block core.)
+            // SS-6 (presence + agent-block in T1, admission in T5): the target agent must be PARTICIPATING
+            // here — a ROOT presence in this region — with block-wins over grant, AND the experience must
+            // be ADMITTED on this land (estate allow OR trusted). Legion's HasExperiencePermission also
+            // applies the region/parcel BLOCK-wins tier, which has no NGC source (the T5 STOP) — deferred.
             ScenePresence sp = World?.GetScenePresence(agentId);
             if (sp == null || sp.IsChildAgent) return 0;
-            if (expService.IsAgentBlocked(experienceId, agentId)) return 0;   // block wins
+            if (expService.IsAgentBlocked(experienceId, agentId)) return 0;    // block wins
+            if (!IsExperienceAdmitted(expService, experienceId)) return 0;     // T5: admitted on this land
             return expService.IsAgentGranted(experienceId, agentId) ? 1 : 0;
         }
 

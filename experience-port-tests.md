@@ -138,6 +138,35 @@ Me▸Experiences ▸ the experience ▸ **Allow** (or **Forget**). Touch again. 
 
 **Consent outcomes recap:** **Yes** → `allow=true` persisted (and cached, so no re-prompt); **No** → transient deny 4 (per-request, NOT persisted — the next touch prompts again); **Block** → `allow=false` persisted (enforced on every later touch).
 
+## T5 — trusted enforcement + admission (deploy: `Phlox.ScriptEngine.dll`)
+
+T5 makes a **trusted** experience grant silently and fixes admission so a trusted-but-not-allowed experience isn't wrongly denied. **Region/parcel BLOCK enforcement is NOT in this slice** — Tranquillity has no source for it (see the note at the end); those tests are marked N/A pending John's decision. Use the T3.1 touch script.
+
+**T5.1 — trusted experience → silent grant, NO dialog**
+Add the experience to the estate's **Trusted / Key experiences** (Region/Estate ▸ Experiences ▸ Trusted). Touch as a fresh avatar who hasn't accepted it. **EXPECT:** immediate `GRANTED`, **no consent dialog**.
+**FAIL:** a dialog appears, or `DENIED 17`.
+
+**T5.2 — trusted-but-not-allowed still works (the admission fix)**
+Trust the experience but do **not** add it to the estate Allowed list. Touch. **EXPECT:** `GRANTED` silently (trusted admits + grants).
+**FAIL:** `DENIED 17` (the pre-T5 bug — admission denied before the trusted check).
+
+**T5.3 — non-trusted → dialog (T3 regression check)**
+An experience that is estate-**Allowed** but **not** Trusted. Touch. **EXPECT:** the consent dialog appears (T3 behavior intact) — Yes → `GRANTED`.
+**FAIL:** silent grant with no dialog (trusted logic leaked to non-trusted), or `DENIED 17`.
+
+**T5.4 — agent-block wins over trusted**
+Block the experience (Me▸Experiences ▸ Block), then trust it in the estate, then touch. **EXPECT:** `DENIED 4` — the agent's personal block is checked *before* the trusted silent-grant, so block wins over trusted (Legion's order).
+**FAIL:** `GRANTED` (trusted overrode the block — wrong order).
+
+**T5.5 — `llAgentInExperience` admission** — from a granted script, `llAgentInExperience(agent)` returns 1 only if the experience is admitted here (estate allow OR trusted) and the agent is root-present and not blocked; returns 0 if the experience isn't allowed/trusted in this region.
+
+**N/A this slice (the STOP):**
+- **Region-blocked experience → denied even if allowed (block-wins):** N/A — Tranquillity has no region/estate blocked-experience store (estate has Allowed + Key only; the RegionExperiences cap hardcodes `blocked` empty).
+- **Parcel-block / OTH-1 agent-parcel rule:** N/A — Tranquillity's `ILandObject` has no `IsExperienceAllowed`/`IsExperienceBlocked`; there is no per-parcel experience data.
+These need new storage / a land-layer subsystem — **John's decision** (would break the no-schema-change property this port has held). See the T5 STOP in `experience-port-ledger.md`.
+
+**Grid vs standalone:** identical (estate Allowed/Key experiences work the same on both).
+
 ### What's deferred (not testable yet)
 - **T4** — the ExperiencePreferences **Block button** persistence loop (the profile Allow/Block/Forget that writes the agent-block T3.5 reads). T3 ships the block *check*; T4 ships the write path.
 - **T5** — trusted **enforcement** + region/parcel BLOCK-list admission ladder (T3 ships the trusted *grant* seam and the estate-allow admission; region-block enforcement and full admission are T5).
