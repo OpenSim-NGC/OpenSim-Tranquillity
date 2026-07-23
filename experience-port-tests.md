@@ -233,6 +233,31 @@ Region/Estate ▸ Experiences: **Block** an experience (T5b), then reopen the pa
 
 **Grid vs standalone:** identical (caps read the same estate/experience data both ways); A6.1's Blocked list persists only on grid (MySQL VERSION 38), session-only on standalone SQLite, per T5b.
 
+## Slice B — acquire policy (T7) + UNV-6/UNV-7 tail (deploy: `OpenSim.Region.ClientStack.LindenCaps.dll` only; config: `[Experience] ExperienceCreators` in OpenSim.ini)
+
+B1 adds the viewer **Acquire an Experience** flow, grid-configurable (Legion DEC-3 — SL gates on Premium, we gate on `[Experience] ExperienceCreators`, default estate-managers + region-owners). B2/B3 are the UNV-6 root-presence and UNV-7 tie-break tail — **already satisfied** by the T3/T5/T5b ladder (verify-only, no new behavior).
+
+**B1.1 — estate manager can acquire (default policy)**
+As the region owner or an estate manager, open Me ▸ Experiences ▸ **Owned** tab. **EXPECT:** the **Acquire an Experience** button is **enabled**; click it → a new experience is created and its **profile opens in edit mode** for you to name/describe it. Reopen the Owned tab → the new experience is listed. **FAIL:** button disabled for a manager, or clicking creates nothing / no profile opens.
+
+**B1.2 — non-privileged avatar cannot acquire (needs a 2nd avatar)**
+As an avatar who is **neither estate manager, region owner, nor god**, open Me ▸ Experiences ▸ Owned. **EXPECT:** the **Acquire** button is **disabled** (the `purchase` key is withheld). Even a hand-crafted POST creates nothing (defensive server gate). **FAIL:** button enabled, or an acquire succeeds for an unprivileged avatar.
+
+**B1.3 — ExperienceCreators = Anyone (config variant, restart required)**
+Set `[Experience] ExperienceCreators = Anyone` in OpenSim.ini and **restart the region**. As a normal (non-privileged) avatar, open Owned. **EXPECT:** Acquire is **enabled** and works. **FAIL:** still disabled after restart.
+
+**B1.4 — ExperienceCreators = AdminsOnly (config variant, restart required)**
+Set `ExperienceCreators = AdminsOnly`, **restart**. **EXPECT:** only a grid **god/administrator** can acquire; an estate manager who is *not* an admin **cannot** (button disabled). **FAIL:** a non-admin estate manager can still acquire.
+*Config note:* the three variants (`EstateManagersAndRegionOwners` default / `Anyone` / `AdminsOnly`) each need a **region restart** to take effect — the policy is read at module init.
+
+**B2.1 — UNV-6 root-presence (verify; conservative deny-4)**
+`llRequestExperiencePermissions(agent, name)` for an agent who is **not root-present** in the region (offline, or only a child agent). **EXPECT:** `experience_permissions_denied` with code **4** — never a grant. **FAIL:** a grant to a not-truly-present agent. *(SL-UNVERIFIED: Legion's documented conservative choice, carried forward — see ledger DEFERRED-BY-DECISION.)*
+
+**B3.1 — UNV-7 tie-break order (verify; most-restrictive-wins)**
+Stack conflicting rules on one experience and touch: region-**Block** + estate-**Allow** + prior **grant** → `DENIED 17` (block beats admission and grant). Estate-**Trusted** + agent-**Block** → `DENIED 4` (agent-block beats trusted silent-grant). **EXPECT:** the deny at the most-restrictive applicable tier always wins; order is no-exp(5) → region-block(17) → admission(17) → presence(4) → agent-block(4) → granted → trusted → dialog. **FAIL:** any combination that over-grants. *(SL-UNVERIFIED tie-break: Legion's documented ordering, carried forward.)*
+
+**Grid vs standalone:** acquire works on both; the acquired experience **persists** on grid (MySQL `experiences` table) and is session-only on standalone SQLite (parity with all experience storage there). Policy config is per-region on both.
+
 ### What's deferred (not testable yet)
 - **T4** — the ExperiencePreferences **Block button** persistence loop (the profile Allow/Block/Forget that writes the agent-block T3.5 reads). T3 ships the block *check*; T4 ships the write path.
 - **T5** — trusted **enforcement** + region/parcel BLOCK-list admission ladder (T3 ships the trusted *grant* seam and the estate-allow admission; region-block enforcement and full admission are T5).

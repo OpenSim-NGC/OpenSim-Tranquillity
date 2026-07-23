@@ -35,6 +35,13 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
 
     private int CacheTimeout = 1 * 60;
 
+    // B1 (T7 / Legion DEC-3) — acquire policy: who may create ("Acquire an Experience") via the
+    // viewer. SL gates on Premium; the deliberate Legion deviation is grid-configurable. Same key
+    // name + values + default as Legion ([Experience] ExperienceCreators) so operators moving
+    // between Legion and Tranquillity see the same knob. Values: EstateManagersAndRegionOwners
+    // (default) | Anyone | AdminsOnly.
+    private string m_AcquirePolicy = "EstateManagersAndRegionOwners";
+
     public void Initialise(IConfigSource source)
     {
         IConfig config = source.Configs["Experience"];
@@ -48,6 +55,10 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
 
         if (!m_Enabled)
             return;
+
+        // B1 — DEC-3 acquire policy (default estate-managers + region-owners), mirroring Legion's
+        // [Experience] ExperienceCreators key/values/default.
+        m_AcquirePolicy = config.GetString("ExperienceCreators", "EstateManagersAndRegionOwners");
 
         m_log.Info("[Experience] Plugin enabled!");
     }
@@ -122,7 +133,16 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         caps.RegisterHandler("GetExperiences", new GetExperiencesGetHandler(agent, this));
         caps.RegisterHandler("GetAdminExperiences", new GetAdminExperiencesGetHandler(agent, this));
         caps.RegisterHandler("GetCreatorExperiences", new GetCreatorExperiencesGetHandler(agent, this));
-        caps.RegisterHandler("AgentExperiences", new AgentExperiencesGetHandler(agent, this));
+        // B1 (T7 / Legion Slice 6) — AgentExperiences is GET (Owned tab) AND POST (Acquire).
+        // RegisterSimpleHandler method-dispatches both on one cap URL (like ExperiencePreferences),
+        // replacing the former GET-only handler. POST creates an experience owned by the agent when
+        // the acquire policy permits; the `purchase` key (emitted only for permitted agents) is what
+        // enables the viewer's Acquire button (llfloaterexperiences.cpp:240).
+        caps.RegisterSimpleHandler("AgentExperiences",
+            new SimpleStreamHandler(string.Format("/caps/{0}", UUID.Random()), delegate (IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+            {
+                HandleAgentExperiences(httpRequest, httpResponse, agent);
+            }));
         caps.RegisterHandler("GetExperienceInfo", new GetExperienceInfoGetHandler(agent, this));
         caps.RegisterHandler("IsExperienceAdmin", new IsExperienceAdminGetHandler(agent, this));
         caps.RegisterHandler("IsExperienceContributor", new IsExperienceContributorGetHandler(agent, this));
@@ -249,6 +269,88 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
 
         response.RawBuffer = response_bytes;
         response.StatusCode = (int)HttpStatusCode.OK;
+    }
+
+    // B1 (T7 / Legion DEC-3) — AgentExperiences GET/POST. GET returns the agent's OWNED experiences
+    // (viewer Owned tab). POST is "Acquire an Experience": when the acquire policy permits, create a
+    // fresh experience owned by the agent; the viewer snapshots its owned ids, POSTs, diffs the
+    // returned experience_ids, and opens the profile (edit mode) on the new id for the user to name
+    // it (llfloaterexperiences.cpp:246-264). Mirrors Legion HandleAgentExperiences
+    // (CoreModules/Experience/ExperienceModule.cs:737).
+    private void HandleAgentExperiences(IOSHttpRequest request, IOSHttpResponse response, UUID agentID)
+    {
+        bool canAcquire = CanAcquireExperience(agentID);
+
+        if (request.HttpMethod == "POST")
+        {
+            if (canAcquire)
+            {
+                // Fresh random public_id per acquire -> a brand-new experience row. Tranquillity's
+                // uniqueness guard is on the KEY, so — unlike Legion, which uses an EMPTY name to skip
+                // a NAME-uniqueness guard — no name trick is needed here (two acquirers never collide
+                // on the random UUID). Empty name is still correct SL behaviour: the user names it in
+                // the profile the viewer opens. Grid-wide + enabled (Disabled bit clear), owner = agent.
+                ExperienceInfo created = new ExperienceInfo
+                {
+                    public_id = UUID.Random(),
+                    owner_id = agentID,
+                    name = string.Empty,
+                    properties = (int)ExperienceFlags.Grid
+                };
+                ExperienceInfo stored = UpdateExperienceInfo(created);
+                if (stored != null)
+                    m_log.InfoFormat("[EXPERIENCE]: agent {0} acquired experience {1} (policy={2})",
+                        agentID, created.public_id, m_AcquirePolicy);
+                else
+                    m_log.WarnFormat("[EXPERIENCE]: agent {0} acquire failed to persist (policy={1})",
+                        agentID, m_AcquirePolicy);
+            }
+            else
+            {
+                // Defensive: a non-permitted POST creates nothing (the viewer already keeps the button
+                // disabled via the missing `purchase` key; this guards a hand-crafted request).
+                m_log.WarnFormat("[EXPERIENCE]: agent {0} not permitted to acquire an experience (policy={1}) — no create",
+                    agentID, m_AcquirePolicy);
+            }
+        }
+
+        UUID[] owned = GetAgentExperiences(agentID); // owner_id = agent (the agent's OWNED experiences)
+
+        string response_str = "<llsd><map><key>experience_ids</key>";
+        if (owned.Length > 0)
+        {
+            response_str += "<array>";
+            foreach (UUID id in owned)
+                response_str += string.Format("<uuid>{0}</uuid>", id);
+            response_str += "</array>";
+        }
+        else response_str += "<undef />";
+
+        // The `purchase` key's PRESENCE (not its value) enables the viewer's Acquire button
+        // (llfloaterexperiences.cpp:240 enableButton(content.has("purchase"))). Emit it ONLY for a
+        // permitted agent so a non-permitted agent's button stays disabled. 0 = no cost.
+        if (canAcquire)
+            response_str += "<key>purchase</key><integer>0</integer>";
+
+        response_str += "</map></llsd>";
+
+        response.RawBuffer = Encoding.UTF8.GetBytes(response_str);
+        response.StatusCode = (int)HttpStatusCode.OK;
+    }
+
+    // B1 — DEC-3 acquire policy check. Default EstateManagersAndRegionOwners uses the estate-command
+    // gate (estate owner/manager OR god), matching Legion CanAcquireExperience
+    // (CoreModules/Experience/ExperienceModule.cs:778). Grid-configurable via [Experience]
+    // ExperienceCreators; Anyone -> always, AdminsOnly -> god/administrator only.
+    private bool CanAcquireExperience(UUID agentId)
+    {
+        switch (m_AcquirePolicy)
+        {
+            case "Anyone": return true;
+            case "AdminsOnly": return m_scene.Permissions.IsAdministrator(agentId);
+            case "EstateManagersAndRegionOwners":
+            default: return m_scene.Permissions.CanIssueEstateCommand(agentId, false);
+        }
     }
 
     #region IExperienceModule
@@ -1329,52 +1431,8 @@ public class GetAdminExperiencesGetHandler : BaseStreamHandler
     }
 }
 
-public class AgentExperiencesGetHandler : BaseStreamHandler
-{
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-    private UUID m_AgentID = UUID.Zero;
-    private IExperienceModule m_ExperienceModule = null;
-
-    public AgentExperiencesGetHandler(UUID agent_id, IExperienceModule experienceModule)
-        : this(string.Format("/caps/{0}", UUID.Random()), agent_id, experienceModule)
-    {
-    }
-
-    public AgentExperiencesGetHandler(string path, UUID agent_id, IExperienceModule experienceModule)
-        : base("GET", path, null, null)
-    {
-        m_AgentID = agent_id;
-        m_ExperienceModule = experienceModule;
-    }
-
-    protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-    {
-        //m_log.InfoFormat("[EXPERIENCE] AgentExperiences request on {0}", path);
-
-        string response_str = "<llsd><map><key>experience_ids</key>";
-
-        UUID[] agent_experiences = m_ExperienceModule.GetAgentExperiences(m_AgentID);
-
-        if (agent_experiences.Length > 0)
-        {
-            response_str += "<array>";
-
-            foreach (UUID id in agent_experiences)
-                response_str += string.Format("<uuid>{0}</uuid>", id);
-
-            response_str += "</array>";
-        }
-        else
-        {
-            response_str += "<undef />";
-        }
-
-        response_str += "</map></llsd>";
-
-        return Encoding.UTF8.GetBytes(response_str);
-    }
-}
+// B1 — the former AgentExperiencesGetHandler (GET-only) was superseded by the module's
+// HandleAgentExperiences GET/POST delegate (RegisterCaps), which adds the Acquire (POST) path.
 
 public class GetExperiencesGetHandler : BaseStreamHandler
 {

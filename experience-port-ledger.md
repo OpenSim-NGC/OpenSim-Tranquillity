@@ -170,6 +170,40 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 
 ---
 
+## Slice B — acquire policy (T7 / DEC-3) + UNV-6/UNV-7 tail — ✅ PORTED (2026-07-23)
+
+**Ported and code-path-verified against the complete Legion source; NOT executed on this tree.** The last behavioral slice. B1 is a code change (caps layer + one config key); B2/B3 are **verify-and-document** — the ladder already satisfies them from T3/T5/T5b. **One assembly:** `OpenSim.Region.ClientStack.LindenCaps.dll` (+ `OpenSim.ini.example`, not compiled). Build: full solution, `-p:NoWarn=NU1605`, 0 errors, no new warnings. Legion ref (`CoreModules/Experience/ExperienceModule.cs` unless noted).
+
+**B1 — ACQUIRE (T7 / Legion DEC-3, the ONE deliberate deviation from SL).**
+
+| Aspect | Legion | Tranquillity before | Tranquillity now (B1) |
+|---|---|---|---|
+| Config key | `[Experience] ExperienceCreators` = `EstateManagersAndRegionOwners`(default) \| `Anyone` \| `AdminsOnly` (`:45-48,96-97`) | none | **same key/values/default** — `m_AcquirePolicy` read in `Initialise`; documented in `OpenSim.ini.example` `[Experience]` |
+| Policy check | `CanAcquireExperience`:778 — `Anyone`→true, `AdminsOnly`→`IsAdministrator`, default→`Permissions.CanIssueEstateCommand(agent,false)` | n/a | **identical** predicate using `m_scene.Permissions.IsAdministrator`/`CanIssueEstateCommand` (verified present, `Scene.Permissions.cs:836,880`) |
+| AgentExperiences handler | GET owned + POST acquire, one cap, method-dispatched (`:737`) | **GET-only** (`AgentExperiencesGetHandler`); POST unhandled | converted to `RegisterSimpleHandler` GET/POST delegate `HandleAgentExperiences`; old GET-only class removed |
+| GET semantics | `GetExperiencesByOwner(agent)` (owned) | `GetAgentExperiences(agent)` = `WHERE owner_id=agent` — **already owned** (despite the name) | unchanged owned-list; acquire diff works because the new row is owner=agent |
+| Permitted POST | `CreateExperience(owner=agent, enabled+gridwide)` | — | `UpdateExperienceInfo(new ExperienceInfo{ public_id=random, owner_id=agent, name="", properties=Grid })` (`replace into` inserts; Grid bit + Disabled-clear = gridwide+enabled) |
+| Not-permitted POST | logs, creates nothing, no `purchase` (`:759-763`) | — | **same** — defensive log, no create |
+| `purchase` key | emitted **iff** permitted; PRESENCE enables the viewer Acquire button (`:771`, viewer `llfloaterexperiences.cpp:240`) | never emitted | emitted `<integer>0</integer>` **only when** `CanAcquireExperience` — non-permitted agent's button stays disabled |
+| Empty-name / uniqueness | empty name skips Legion's **name**-uniqueness guard → fresh UUID, no collision (`:745-753`) | Tranquillity's guard is on the **KEY** (console create checks existing-by-key; no name guard) | fresh random `public_id` per acquire → no collision; empty name kept as SL behaviour (user names it in the profile) — **name trick not needed here, documented** |
+
+**B2 — UNV-6 root-presence (VERIFY-ONLY, already ported T3/T5).** Legion (`Phlox.ScriptEngine/LSLSystemAPI.cs:12755`): *"SL's exact root-presence requirement undocumented (D-SLTEST); the target agent must have a ROOT presence in this region to be granted. Chosen conservative behavior — deny (code 4) if absent or child agent; can never over-grant."* Tranquillity **already matches** — `llRequestExperiencePermissions:12637-12646` denies code 4 when `sp == null || sp.IsChildAgent` (after admission, before agent-block); `llAgentInExperience` returns 0 for a non-root presence. **No code change.** Carried forward as **DEFERRED-BY-DECISION** (SL behavior unpublished; conservative choice that can't over-grant; verify against live SL if access appears).
+
+**B3 — UNV-7 ladder tie-break (VERIFY-ONLY, already ported T5b).** Legion (`LSLSystemAPI.cs:12727`): *"SL's fine-grain tie-break order undocumented (D-SLTEST); the permission ladder is applied MOST-RESTRICTIVE-WINS in a fixed order — block (parcel/region) BEFORE admission BEFORE agent-block BEFORE grant. A deny at any tier wins, so no combination can over-grant."* Tranquillity's ladder is **identical** minus the parcel-block sub-term (no NGC source): no-exp(5) → region-block(17) → admission(17) → presence(4) → agent-block(4) → granted → trusted silent-grant → dialog. **No code change.** Carried forward as **DEFERRED-BY-DECISION** (unverifiable tie-break; Legion's ordering adopted; live-SL confirmation if access appears).
+
+**Traces (code-path, not executed):**
+- *Permitted acquire:* estate mgr POSTs → `CanAcquireExperience`=true → new experience persisted owner=agent → response `experience_ids` includes it + `purchase` present → viewer diffs the new id, opens the profile. ✓ matches Legion.
+- *Non-permitted:* normal avatar → `CanAcquireExperience`=false → GET/POST returns owned ids, **no `purchase`** → button disabled; a forced POST creates nothing. ✓
+- *`Anyone`:* any agent → true → acquire works. *`AdminsOnly`:* `IsAdministrator` only → non-admin estate mgr denied. ✓ each matches Legion's switch.
+
+**No regression to T1-T5b/Slice A:** B1 touches only the AgentExperiences cap (GET semantics unchanged; POST is new). B2/B3 changed nothing. The consent/admission/block ladders (T3-T5b) are untouched and independently re-read here for the UNV verification.
+
+**Evidence:** commit `<SLICEB-HASH>`. Legion ref `port-source-2026-07-22`.
+
+**Non-identical / notes:** acquire persists via `UpdateExperienceInfo` (`replace into`) rather than a dedicated `CreateExperience` (Tranquillity has none; behavior is equivalent). Uniqueness is key-scoped not name-scoped, so the empty-name is SL-fidelity not a guard-bypass. Policy read once at module init (restart to change) — same as Legion.
+
+---
+
 ## Remaining slices (from `experience-port-audit-v2.md` PART D)
 
 | Slice | Scope | State |
@@ -182,6 +216,64 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 | **T5** | trusted enforcement + region/parcel block admission | ⚠️ **PARTIAL** — trusted PORTED; region block → **T5b**; parcel block = STOP |
 | **T5b** | region-block list (estate-level), block-wins tier | ✅ **PORTED** — resolves the region half of T5's STOP (first schema change: EstateStore VERSION 38); parcel-block + OTH-1 + grid-wide = separate project |
 | **Slice A** | cap surface: A1 ExperienceQuery no-op · A2 IsExperienceContributor parity (+guard) · A3 Find pagination · A4 GetExperienceInfo quota/marketplace · A5 UpdateExperience owner-only group · A6 RegionExperiences blocked/error-shape | ✅ **PORTED** (folds in T6 + T-caps + CAP-RE-ERR) |
-| T7 | acquire policy (DEC-3) | pending |
-| T8 | SL-UNVERIFIED tail parity (remainder after CAP-RE-ERR) | pending |
-| — | `llDeleteKeyValueSL` registration (SS-4 tail) | pending (small follow-up) |
+| **Slice B** | acquire policy (T7 / DEC-3, grid-configurable) + UNV-6 root-presence + UNV-7 tie-break | ✅ **PORTED** — B1 acquire is new; B2/B3 verified already-satisfied (DEFERRED-BY-DECISION, SL-unverified) |
+| T8 | SL-UNVERIFIED tail parity (remainder after CAP-RE-ERR / UNV-6 / UNV-7) | ↳ folded — UNV-6/UNV-7 done in Slice B; UNV-1/2/3/4 ride with the deferred KV rework |
+| — | `llDeleteKeyValueSL` registration (SS-4 tail) | deferred → with the KV async rework project |
+
+---
+
+# FINAL STATE SUMMARY — Experience port (handoff artifact)
+
+*Written at the close of Slice B, the last behavioral slice. This is the whole-state handoff: anyone picking this up (Mike, Royale, a future John) should be able to understand what was done, how it was verified, what deviates, and what remains — from this section alone.*
+
+## 1. What was ported and verified — the behavioral parity claim
+
+Tranquillity's Second Life **Experience** system was brought to **behavioral parity** with Legion — the verified-SL-conformant reference — across these slices, all committed to `develop`:
+
+- **T1** — script-surface conformance (SS-1..9): the `llGetExperienceDetails` SL layout, the full `XP_ERROR_*` 0-18 table, key-length/property constants.
+- **T2** — KV quota raised 16→128 MiB with `XP_ERROR_QUOTA_EXCEEDED` (code 11) enforcement.
+- **T3** — real SL **consent**: `ScriptQuestion` + await, 300 s timeout (code 18), trusted-experience silent-grant seam.
+- **T4** — the **ExperiencePreferences ↔ consent Block** persistence loop (Allow/Block/Forget round-trips; block wins over a stale grant).
+- **T5** — trusted **enforcement** + the admission ladder (estate-allow OR trusted).
+- **T5b** — the **region-block** (estate-level `BlockedExperiences`) block-wins tier; the port's **one schema change** (MySQL EstateStore VERSION 38).
+- **Slice A** — the cap surface: ExperienceQuery no-op, IsExperienceContributor parity + null-guard, FindExperienceByName pagination, GetExperienceInfo quota/marketplace fixes, UpdateExperience owner-only group, RegionExperiences blocked-list + error-shape.
+- **Slice B** — **acquire** (grid-configurable) + the UNV-6/UNV-7 tail.
+
+The resulting permission ladder (both `llRequestExperiencePermissions` and `llAgentInExperience`) is Legion's, tier-for-tier: **no-exp(5) → region-block(17) → admission(17) → root-presence(4) → agent-block(4) → already-granted → trusted silent-grant → consent dialog**, with block/most-restrictive winning at every tie.
+
+## 2. Verification standard
+
+Every slice was **code-path-verified against the complete, SL-conformant Legion source at tag `port-source-2026-07-22`** — handler-by-handler, comparing response shapes, LLSD keys, error codes, and ladder ordering, with Legion `file:line` citations recorded per row above. **Nothing in this port was executed on this tree** (no live grid, no DB, no Docker — a standing safety constraint). The on-grid validation plan — the concrete click-through tests a human runs to confirm behavior — lives in **`experience-port-tests.md`** (per-slice, with the second-avatar and config-restart cases flagged). Builds were full-solution with `-p:NoWarn=NU1605`; each slice ended at 0 errors with no new warning delta.
+
+## 3. The deliberate deviation carried from Legion
+
+**Acquire policy (T7 / DEC-3).** Second Life gates experience *creation* on a paid **Premium** account. Legion deliberately replaced that with a **grid-configurable** policy, and Tranquillity carries the same deviation: `[Experience] ExperienceCreators` = `EstateManagersAndRegionOwners` (default) | `Anyone` | `AdminsOnly`. This is the single intentional departure from SL behavior — chosen, documented, and identical to Legion's knob so operators moving between the two grids see the same setting.
+
+## 4. Where Tranquillity's implementation was KEPT over Legion's (TRANQ-AHEAD — deliberately preserved, not overlooked)
+
+The reconcile principle was **NGC storage is authoritative; translation lives in the Phlox/adapter layer**. Where Tranquillity's own design was sound (or better), it was kept rather than replaced with Legion's storage:
+
+- **Grid-service wire protocol** — Tranquillity's Robust connector topology (Local/Remote + ServerConnector, form-in/XML-out) is retained; Legion is region-local direct-MySQL. Behavior reconciled, transport untouched.
+- **Inventory-field script association** — the script's persisted `TaskInventoryItem.ExperienceID` is the SL-canonical source; kept over Legion's in-memory `m_ScriptExperiences` map.
+- **Single-table allow-BIT permissions** — one permissions table with `allow BIT` encodes grant (`true`) and block (`false`); no separate `experience_agent_blocked` table. Distinguishable and migration-free.
+- **Estate-sourced trusted list** — "trusted" = estate `KeyExperiences`, not a dedicated `experience_trusted` table.
+
+These are **TRANQ-AHEAD**: preserved on purpose. The adapter (`PhloxExperienceAdapter`) is the single seam where any future move toward Legion's exact storage would happen.
+
+## 5. Deferred projects (with reasons)
+
+Two coherent bodies of work were **deliberately not attempted** — each wants one focused pass, not a piecemeal graft:
+
+**(i) KV async model + surface tail.** Tranquillity's key-value store is synchronous (returns `int`) where SL/Legion is asynchronous via the `dataserver` event. This couples together: the async `dataserver` return contract, the `llDataSizeKeyValue (used,total)` list surface, `llDataSizeKeyValueSL`/`llDeleteKeyValueSL` registration, and the UNV-1/2/3/4 KV semantics (key-exists-vs-empty, checked-flag compare-and-set, clamp defaults). These are one interdependent rework — doing them singly would churn the same call sites repeatedly. **Deferred as a unit.**
+
+**(ii) Parcel block/allow + OTH-1 + the grid-wide bit.** Legion's ladder has a **parcel**-scoped block/allow tier and an OTH-1 agent-parcel scoping rule, plus a grid-wide experience bit. Tranquillity has **no NGC data source** for any of these — `ILandObject` has no experience methods, and there is no grid-wide flag. Implementing them needs a **new land-layer subsystem** (per-parcel experience access entries + `ILandObject` API), not a translation. The region-block half was closed in T5b; the parcel half is a separate project. **Deferred pending that subsystem.**
+
+## 6. SL-UNVERIFIED items carried from Legion as documented choices
+
+Where SL's exact behavior is unpublished, Legion made **conservative, can't-over-grant** choices and documented them (D-SLTEST). Tranquillity adopts the same choices, recorded here as **DEFERRED-BY-DECISION** — correct-by-construction, to be confirmed against live SL only if access appears:
+
+- **UNV-6** — root-presence requirement: deny (code 4) an absent/child-agent target rather than risk granting a not-truly-present agent. *(Ported; matches Legion.)*
+- **UNV-7** — permission-ladder tie-break: most-restrictive-wins in a fixed order (block → admission → presence → agent-block → grant). *(Ported; matches Legion.)*
+- **UNV-1/2/3/4** — KV semantics (exists-vs-empty distinction, checked-flag compare-and-set, clamp defaults): ride with deferred project (i).
+
+**Bottom line:** behavioral parity with Legion is complete for everything both grids can express with Tranquillity's current data model; the two deferred projects are the only gaps, both gated on new storage/subsystems rather than on translation, and both scoped above. The port never changed NGC storage except the single T5b estate migration (VERSION 38).
