@@ -98,7 +98,7 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 
 ---
 
-## Slice T5 — trusted enforcement + admission ladder — ⚠️ PARTIAL (trusted PORTED; region/parcel block = STOP) (2026-07-23)
+## Slice T5 — trusted enforcement + admission ladder — ⚠️ PARTIAL (trusted PORTED; region block → resolved in T5b; parcel block = STOP) (2026-07-23)
 
 **Ported and code-path-verified against Legion; NOT executed on this tree.** Phlox layer only; **no adapter change, no NGC change, no new tables.** Deploy: `Phlox.ScriptEngine.dll` only.
 
@@ -112,9 +112,38 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 
 **🛑 STOP — region/parcel BLOCK-wins ladder + grid-wide + OTH-1 parcel scoping: NO NGC SOURCE.** Tranquillity has **no** region/estate blocked-experience store (`EstateSettings` has `AllowedExperiences` + `KeyExperiences` only — no `BlockedExperiences`; the RegionExperiences cap hardcodes `blocked` empty), **no** parcel-experience data (`ILandObject` has no `IsExperienceAllowed`/`IsExperienceBlocked`), and **no** grid-wide bit. Implementing these would require either a **new estate field/table** (region-block — breaks the no-schema-change property this port has held for T1-T4) or a **new land-layer subsystem** (parcel experience access entries + `ILandObject` methods). **Flagged for John's decision — not invented here.** SS-6's BLOCK-wins tier therefore remains deferred.
 
+> **UPDATE (T5b, 2026-07-23):** the **region-block** half is now resolved — John's decision was taken to make the first schema change (estate `BlockedExperiences` mirroring Allowed/Key; EstateStore VERSION 38). See the T5b slice below. **Parcel-block, OTH-1 agent-parcel scoping, and the grid-wide bit remain deferred as a separate project.**
+
 **Evidence:** commit `<T5-HASH>`. Legion ref `port-source-2026-07-22` `Phlox.ScriptEngine/LSLSystemAPI.cs`: `IsExperienceAdmittedAt`:12661, `IsExperienceBlockedInRegion`:12640, `IsExperienceBlockedOnParcelAt`:12699, OTH-1 agent-parcel `HasExperiencePermission`:12614. Tranquillity gap: `EstateSettings.cs:279-292` (allow+key, no block), `ILandObject.cs` (no experience methods), `IExperienceModule.cs:32-33`.
 
 **Non-identical:** trusted from estate `KeyExperiences` (not Legion's `experience_trusted` table — TRANQ-AHEAD, no migration); the entire BLOCK-wins land tier is absent pending the storage decision above.
+
+---
+
+## Slice T5b — region-block list (estate-level), block-wins tier — ✅ PORTED (2026-07-23)
+
+**Ported and code-path-verified against the complete Legion source; NOT executed on this tree.** Resolves the **region** half of the T5 STOP. **FIRST schema change of this port** — one estate list mirroring the existing Allowed/Key arrays (MySQL `estate_blocked_experiences`, EstateStore **VERSION 38**). **Parcel-block + OTH-1 + grid-wide remain a separate project.** Deploy: `OpenSim.Framework.dll`, `OpenSim.Data.MySQL.dll`, `OpenSim.Region.CoreModules.dll`, `OpenSim.Region.Framework.dll`, `OpenSim.Region.ClientStack.LindenCaps.dll`, `Phlox.ScriptEngine.dll` (+ MySQL migrates to VERSION 38 on startup).
+
+**What persists (reported exactly, per the task):**
+- **MySQL (grid):** a NEW table `estate_blocked_experiences (EstateID int, uuid char(36))`, mirror of `estate_allowed_experiences` / `estate_key_experiences`. `MySQLEstateData` load (both overloads) and save wire it through the existing `LoadUUIDList`/`SaveUUIDList` helpers. `EstateStore.migrations` **VERSION 38** creates it. **This is the only new persisted object.**
+- **SQLite (standalone):** NOTHING new persists — Tranquillity's SQLite estate store already does not persist Allowed/Key experiences (in-memory for the session); BlockedExperiences behaves identically (session-only). No SQLite migration added (parity, not a regression).
+- **In-memory:** `EstateSettings.BlockedExperiences` (`List<UUID>` + `UUID[]` property + `AddBlockedExperience`/`RemoveBlockedExperience`/`BlockedExperiencesCount`), mirroring the Allowed/Key members; cap reuses `Constants.EstateAccessLimits.AllowedExperiences`.
+
+| Item | Legion | Tranquillity (T5b) | Verified |
+|---|---|---|---|
+| Region-block store | `experience_blocked` (region-scoped) | **estate `BlockedExperiences`** (new estate list/table — NOT Legion's table; TRANQ estate-scoped) | mirror of existing Allowed/Key path |
+| Block-wins in `llRequestExperiencePermissions` | `IsExperienceBlockedOnObjectParcel OR IsExperienceBlockedInRegion` → denied **17**, checked FIRST (before admission) | region-only `IsExperienceBlockedInRegion` → denied **17** (`XP_ERROR_NOT_PERMITTED_LAND`), inserted BEFORE the T5 admission check | Legion `LSLSystemAPI.cs:12735-12743` (code 17, first) ✓ |
+| Block-wins in `llAgentInExperience` (SS-6) | region/parcel block in `HasExperiencePermission` | region `IsExperienceBlockedInRegion` → return 0, before agent-block/admission/grant | Legion `HasExperiencePermission:12624-12625` ✓ |
+| Adapter read | `expService.GetBlockedExperiences(regionId)` | `PhloxExperienceAdapter.GetBlockedExperiences` → `IExperienceModule.GetEstateBlockedExperiences()` → `EstateSettings.BlockedExperiences` | mirror of `GetTrustedExperiences` ✓ |
+| Operator set path | Region/Estate ▸ Experiences ▸ Blocked | same panel — viewer already sends estate-access deltas **BLOCKED_ADD (64) / BLOCKED_REMOVE (128)**, previously **DISCARDED**; now handled in `EstateManagementModule.handleEstateExperienceDeltaRequest` (add→`AddBlockedExperience`, remove→`RemoveBlockedExperience`) | mirrors the allowed 16/32 branches ✓ |
+
+**Ladder (verified vs Legion):** `llRequestExperiencePermissions` order is now no-exp(5) → **region-block(17)** → admission(17) → presence(4) → agent-block(4) → granted → trusted silent-grant → dialog. Legion's order is identical minus the parcel-block sub-check folded into its block tier (`IsExperienceBlockedOnObjectParcel || IsExperienceBlockedInRegion`). Tranquillity omits only the parcel term (no source). Denial code **17** confirmed at Legion `LSLSystemAPI.cs:12740`.
+
+**Files:** `OpenSim.Framework/EstateSettings.cs` (blocked field/property + 3 helpers); `OpenSim.Data.MySQL/MySQLEstateData.cs` (load×2 + save) + `Resources/EstateStore.migrations` (VERSION 38); `OpenSim.Region.CoreModules/World/Estate/EstateManagementModule.cs` (delta branches 64/128); `OpenSim.Region.Framework/Interfaces/IExperienceModule.cs` (`GetEstateBlockedExperiences`); `OpenSim.Region.ClientStack.LindenCaps/ExperienceModule.cs` (impl); `Phlox.ScriptEngine/PhloxExperienceAdapter.cs` (`GetBlockedExperiences`) + `LSLSystemAPI.cs` (`IsExperienceBlockedInRegion` helper + block-wins in both gates). Build: full solution, `-p:NoWarn=NU1605`, 0 errors.
+
+**Evidence:** commit `<T5b-HASH>`. Legion ref `port-source-2026-07-22`.
+
+**Non-identical:** block list is estate-scoped (Tranquillity estate model) rather than Legion's region-scoped `experience_blocked` table — TRANQ semantics, first migration of this port (VERSION 38). Parcel-block, OTH-1 agent-parcel scoping, and the grid-wide bit remain absent — **separate project.**
 
 ---
 
@@ -127,7 +156,8 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 | **T2** | KV quota 16→128 MiB + code 11 | ✅ **PORTED** (this slice) |
 | **T3** | consent (D1): ScriptQuestion+await, 300s/code 18, trusted-bypass | ✅ **PORTED** (this slice) |
 | **T4** | ExperiencePreferences ↔ consent Block loop | ✅ **PORTED** (this slice) |
-| **T5** | trusted enforcement + region/parcel block admission | ⚠️ **PARTIAL** — trusted PORTED; region/parcel block = STOP (no NGC source, John decides) |
+| **T5** | trusted enforcement + region/parcel block admission | ⚠️ **PARTIAL** — trusted PORTED; region block → **T5b**; parcel block = STOP |
+| **T5b** | region-block list (estate-level), block-wins tier | ✅ **PORTED** — resolves the region half of T5's STOP (first schema change: EstateStore VERSION 38); parcel-block + OTH-1 + grid-wide = separate project |
 | T6 | ExperienceQuery no-op cap + IsExperienceContributor parity | pending |
 | T7 | acquire policy (DEC-3) | pending |
 | T8 | SL-UNVERIFIED tail parity | pending |

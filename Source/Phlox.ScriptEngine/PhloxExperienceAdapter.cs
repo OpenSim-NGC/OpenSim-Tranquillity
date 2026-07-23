@@ -167,6 +167,17 @@ namespace Phlox.ScriptEngine
             return trusted != null ? new List<UUID>(trusted) : new List<UUID>();
         }
 
+        /// <summary>
+        /// Region-BLOCKED experiences (T5b) — estate `BlockedExperiences` (the third list next to
+        /// allowed + key/trusted). The block-wins tier of the admission ladder: a region-blocked
+        /// experience is denied regardless of allow/trusted/prior-grant.
+        /// </summary>
+        public List<UUID> GetBlockedExperiences(UUID regionId)
+        {
+            UUID[] blocked = m_module?.GetEstateBlockedExperiences();
+            return blocked != null ? new List<UUID>(blocked) : new List<UUID>();
+        }
+
         // ────────────────────────── Experience metadata ──────────────────────────
 
         public PhloxExperienceInfo GetExperience(UUID experienceId)

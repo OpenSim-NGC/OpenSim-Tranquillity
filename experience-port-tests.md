@@ -167,6 +167,43 @@ These need new storage / a land-layer subsystem — **John's decision** (would b
 
 **Grid vs standalone:** identical (estate Allowed/Key experiences work the same on both).
 
+## T5b — region-block list (estate-level), block-wins tier (deploy: `OpenSim.Framework.dll`, `OpenSim.Data.MySQL.dll`, `OpenSim.Region.CoreModules.dll`, `OpenSim.Region.Framework.dll`, `OpenSim.Region.ClientStack.LindenCaps.dll`, `Phlox.ScriptEngine.dll`; **MySQL schema: EstateStore VERSION 38**)
+
+T5b adds the estate **BlockedExperiences** list (a third list beside Allowed + Key/Trusted) and wires it as the **block-wins** tier of the admission ladder — a region-blocked experience is denied `17` (`XP_ERROR_NOT_PERMITTED_LAND`) regardless of allow/trusted/prior-grant. Resolves the *region* half of the T5 STOP; **parcel-block + OTH-1 remain a separate project.** Use the T3.1 touch script. Region deploy requires the schema migration (grid: MySQL auto-migrates to VERSION 38 on startup; standalone SQLite does **not** persist estate experience lists — the block list is in-memory for the session, same as Allowed/Key today).
+
+**How the operator sets it:** the viewer's Region/Estate ▸ Experiences panel **Blocked** list — the viewer already sends `ESTATE_ACCESS_BLOCKED_EXPERIENCE_ADD` (64) / `_REMOVE` (128) estate-access deltas, which Tranquillity previously **discarded**; T5b handles them (add/remove on `EstateSettings.BlockedExperiences`, persisted).
+
+**T5b.1 — region-blocked experience → denied 17 (block wins over allow)**
+Add the experience to the estate **Allowed** list (so admission would pass), then add it to the estate **Blocked** list. Touch. **EXPECT:** `DENIED 17` — block is checked before admission/trusted/grant.
+**FAIL:** `GRANTED`, or the dialog appears (block not enforced / wrong precedence).
+
+**T5b.2 — block wins over trusted**
+Add the experience to the estate **Trusted/Key** list (would silent-grant), then **Block** it. Touch as a fresh avatar. **EXPECT:** `DENIED 17` — no silent grant.
+**FAIL:** `GRANTED` silently (trusted overrode the region block).
+
+**T5b.3 — block wins over a prior grant (stale grant)**
+Grant the experience (touch → **Yes** → `GRANTED`). Then add it to the estate **Blocked** list. Touch again. **EXPECT:** `DENIED 17` — the region block is checked before the already-granted short-circuit.
+**FAIL:** `GRANTED` (stale grant wins).
+
+**T5b.4 — unblock → prior behavior returns**
+Remove the experience from the estate **Blocked** list (viewer sends BLOCKED_REMOVE / 128). Touch again. **EXPECT:** the pre-block outcome returns — `GRANTED` silently if it's Trusted, or the consent dialog if merely Allowed.
+**FAIL:** still `DENIED 17` after unblocking (the REMOVE delta wasn't handled / didn't persist).
+
+**T5b.5 — `llAgentInExperience` region-block** — from a granted script, add the experience to the estate **Blocked** list; `llAgentInExperience(agent)` returns **0** even for a root-present, admitted, previously-granted agent (region block checked before admission and grant).
+**FAIL:** returns `1` for a region-blocked experience.
+
+**T5b.6 — persistence across restart (grid only)**
+After T5b.1, restart the region. Touch again. **EXPECT:** still `DENIED 17` — the block persisted to `estate_blocked_experiences` (VERSION 38) and reloaded with the estate settings. **Standalone (SQLite):** N/A — estate experience lists are in-memory (Allowed/Key behave the same); the block is lost on restart.
+**FAIL (grid):** `GRANTED`/dialog after restart (block didn't persist or didn't reload).
+
+**Delta discard check (regression):** before T5b the BLOCKED_ADD/REMOVE deltas (64/128) were silently dropped by `handleEstateExperienceDeltaRequest`; confirm the panel's Blocked add/remove now actually changes behavior (T5b.1 vs T5b.4).
+
+**Still N/A after T5b (the remaining STOP — separate project):**
+- **Parcel-block / parcel-allow / OTH-1 agent-parcel scoping:** N/A — `ILandObject` still has no `IsExperienceAllowed`/`IsExperienceBlocked`; no per-parcel experience data. Deferred.
+- **Grid-wide experience bit** (a grid-wide experience running everywhere unless blocked): N/A — no grid-wide flag source. Deferred.
+
+**Grid vs standalone:** block **enforcement** identical; block **persistence** grid-only (MySQL VERSION 38); standalone SQLite keeps the block for the session only (parity with existing Allowed/Key behavior).
+
 ### What's deferred (not testable yet)
 - **T4** — the ExperiencePreferences **Block button** persistence loop (the profile Allow/Block/Forget that writes the agent-block T3.5 reads). T3 ships the block *check*; T4 ships the write path.
 - **T5** — trusted **enforcement** + region/parcel BLOCK-list admission ladder (T3 ships the trusted *grant* seam and the estate-allow admission; region-block enforcement and full admission are T5).

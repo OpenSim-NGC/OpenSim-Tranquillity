@@ -525,6 +525,11 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         return m_scene.RegionInfo.EstateSettings.KeyExperiences;
     }
 
+    public UUID[] GetEstateBlockedExperiences()
+    {
+        return m_scene.RegionInfo.EstateSettings.BlockedExperiences;
+    }
+
 
     // These need to be added to the existing AccessList enum!
     public const int ACCESS_LIST_ALLOWED = 8;
