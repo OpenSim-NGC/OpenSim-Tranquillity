@@ -11330,9 +11330,37 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
         // ── 610–620: Experience KV Store (upgraded to use ExperienceService) ──
 
+        // ── SL Experience error codes (XP_ERROR_*) + limits, ported from Legion
+        //    (port-source-2026-07-22) to match the SL wiki XP_ERROR table 0-18.
+        //    Script-surface conformance — Experience port T1 (SS-1..9). ──
+        private const int XP_ERROR_NONE = 0;
+        private const int XP_ERROR_THROTTLED = 1;
+        private const int XP_ERROR_EXPERIENCES_DISABLED = 2;
+        private const int XP_ERROR_INVALID_PARAMETERS = 3;
+        private const int XP_ERROR_NOT_PERMITTED = 4;
+        private const int XP_ERROR_NO_EXPERIENCE = 5;
+        private const int XP_ERROR_NOT_FOUND = 6;
+        private const int XP_ERROR_INVALID_EXPERIENCE = 7;
+        private const int XP_ERROR_EXPERIENCE_DISABLED = 8;
+        private const int XP_ERROR_EXPERIENCE_SUSPENDED = 9;
+        private const int XP_ERROR_UNKNOWN_ERROR = 10;
+        private const int XP_ERROR_QUOTA_EXCEEDED = 11;
+        private const int XP_ERROR_STORE_DISABLED = 12;
+        private const int XP_ERROR_STORAGE_EXCEPTION = 13;
+        private const int XP_ERROR_KEY_NOT_FOUND = 14;
+        private const int XP_ERROR_RETRY_UPDATE = 15;
+        private const int XP_ERROR_MATURITY_EXCEEDED = 16;
+        private const int XP_ERROR_NOT_PERMITTED_LAND = 17;
+        private const int XP_ERROR_REQUEST_PERM_TIMEOUT = 18;
+        // SL key-value key length cap (SL wiki llCreateKeyValue): 1011 bytes (was 255).
+        private const int MAX_EXPERIENCE_KEY_LENGTH = 1011;
+        // Viewer experience-property bit PROPERTY_DISABLED (indra VP_DISABLED = 1<<6);
+        // used to report the llGetExperienceDetails state field.
+        private const int VP_DISABLED = 1 << 6;
+
         public int llCreateKeyValue(string key, string value)
         {
-            if (string.IsNullOrEmpty(key) || key.Length > 255) return -1;
+            if (string.IsNullOrEmpty(key) || key.Length > MAX_EXPERIENCE_KEY_LENGTH) return -1;
             var expService = GetExperienceAdapter();
             UUID expId = GetScriptExperienceId();
             if (expService == null || expId == UUID.Zero)
@@ -11375,7 +11403,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
         public int llUpdateKeyValue(string key, string value, string check)
         {
-            if (string.IsNullOrEmpty(key) || key.Length > 255) return -1;
+            if (string.IsNullOrEmpty(key) || key.Length > MAX_EXPERIENCE_KEY_LENGTH) return -1;
             var expService = GetExperienceAdapter();
             UUID expId = GetScriptExperienceId();
             if (expService == null || expId == UUID.Zero)
@@ -11495,14 +11523,17 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
         }
 
+        // The ...SL wrappers present SL's async-dataserver CSV shape "1,<value>" (success) /
+        // "0,<XP_ERROR>" (failure). T1 makes the failure payload a NUMERIC XP_ERROR code (was a
+        // free-text message), matching SL/Legion. (The underlying KV model stays synchronous —
+        // the async request-key + dataserver-event contract is a later architecture slice, not T1.)
         public string llCreateKeyValueSL(string key, string value)
         {
             int result = llCreateKeyValue(key, value);
             if (result == 0)
                 return "1," + (value ?? string.Empty);
-            if (result == -2)
-                return "0,key already exists";
-            return "0,error";
+            // SL: creating an existing key (or a generic KV failure) => XP_ERROR_STORAGE_EXCEPTION.
+            return "0," + XP_ERROR_STORAGE_EXCEPTION;
         }
 
         public string llReadKeyValueSL(string key)
@@ -11510,7 +11541,8 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             string val = llReadKeyValue(key);
             if (!string.IsNullOrEmpty(val))
                 return "1," + val;
-            return "0,key not found";
+            // SL: a missing key => XP_ERROR_KEY_NOT_FOUND (14). (SS-4)
+            return "0," + XP_ERROR_KEY_NOT_FOUND;
         }
 
         public string llUpdateKeyValueSL(string key, string value, string check)
@@ -11518,9 +11550,8 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             int result = llUpdateKeyValue(key, value, check);
             if (result == 0)
                 return "1," + (value ?? string.Empty);
-            if (result == -3)
-                return "0,check failed";
-            return "0,error";
+            // SL: a checked-update mismatch (CAS fail) => XP_ERROR_RETRY_UPDATE (15).
+            return "0," + XP_ERROR_RETRY_UPDATE;
         }
 		
         // ── Tier 6: Standalone ──
@@ -11901,10 +11932,13 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 case 11: return "experience data quota exceeded";
                 case 12: return "key-value store is disabled";
                 case 13: return "key-value store communication failed";
-                case 14: return "key already exists";
-                case 15: return "content rating too high";
-                case 16: return "not allowed to run in current location";
-                case 17: return "experience permissions request timed out";
+                // T1/SS-5,8,9: rows 14-18 corrected to the SL wiki XP_ERROR table (were shifted:
+                // 14 said "key already exists", 15/16/17 were off by one, 18 was missing).
+                case 14: return "key doesn't exist";                       // XP_ERROR_KEY_NOT_FOUND
+                case 15: return "retry update";                           // XP_ERROR_RETRY_UPDATE
+                case 16: return "experience content rating too high";     // XP_ERROR_MATURITY_EXCEEDED
+                case 17: return "not allowed to run on this land";        // XP_ERROR_NOT_PERMITTED_LAND
+                case 18: return "experience permissions request timed out"; // XP_ERROR_REQUEST_PERM_TIMEOUT
                 default: return "unknown error id";
             }
         }
@@ -12510,34 +12544,36 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             var expService = GetExperienceAdapter();
             UUID experienceId = GetScriptExperienceId();
 
-            // No experience associated with this script
+            // No experience associated with this script -> XP_ERROR_NO_EXPERIENCE (5). (T1/SS-7)
             if (expService == null || experienceId == UUID.Zero)
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions_denied",
-                    new object[] { agent, 17 }, // XP_ERROR_NOT_PERMITTED
+                    new object[] { agent, XP_ERROR_NO_EXPERIENCE },
                     new DetectParams[0]));
                 return;
             }
 
-            // Check if experience is allowed in this region
+            // Experience not admitted on this land (region allow-list) -> land-scope denial
+            // XP_ERROR_NOT_PERMITTED_LAND (17). (T1/SS-7 — was 18/REQUEST_PERM_TIMEOUT, wrong)
             var allowed = expService.GetAllowedExperiences(World.RegionInfo.RegionID);
             if (!allowed.Contains(experienceId))
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions_denied",
-                    new object[] { agent, 18 }, // XP_ERROR_NOT_FOUND
+                    new object[] { agent, XP_ERROR_NOT_PERMITTED_LAND },
                     new DetectParams[0]));
                 return;
             }
 
-            // Check if agent is present
+            // Target agent must have a ROOT presence here -> else agent-scope
+            // XP_ERROR_NOT_PERMITTED (4). (T1/SS-7 — was 17/land, wrong)
             ScenePresence sp = World.GetScenePresence(agentId);
             if (sp == null || sp.IsChildAgent)
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions_denied",
-                    new object[] { agent, 17 },
+                    new object[] { agent, XP_ERROR_NOT_PERMITTED },
                     new DetectParams[0]));
                 return;
             }
@@ -12557,11 +12593,14 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions_denied",
-                    new object[] { agent, 4 }, // XP_ERROR_REQUEST_DENIED
+                    new object[] { agent, XP_ERROR_NOT_PERMITTED }, // 4 — agent's personal block
                     new DetectParams[0]));
                 return;
             }
 
+            // NOTE (T3): the auto-grant below is the pre-consent behavior. Real SL consent
+            // (ScriptQuestion dialog + await ScriptAnswerYes, 300s timeout -> code 18) is a
+            // separate slice (T3) — T1 only corrects the denial-path error codes above.
             // Auto-grant since viewer-native experience dialogs require viewer support
             // Permission is persisted in MySQL via ExperienceService
             expService.GrantPermission(experienceId, agentId);
@@ -12584,12 +12623,20 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         {
             UUID agentId;
             if (!UUID.TryParse(agent, out agentId)) return 0;
+            if (agentId == UUID.Zero) return 0;
 
             var expService = GetExperienceAdapter();
             UUID experienceId = GetScriptExperienceId();
-
             if (expService == null || experienceId == UUID.Zero) return 0;
 
+            // T1/SS-6: was a bare IsAgentGranted. SL semantics require the target agent to be
+            // PARTICIPATING here — a ROOT presence in this region — and block-wins over grant.
+            // (Legion's full HasExperiencePermission also applies the region/parcel BLOCK + admission
+            // ladder, which needs region-block/parcel data the NGC adapter does not yet expose; that
+            // lands with the trusted/enforcement slice T5. T1 ports the presence + agent-block core.)
+            ScenePresence sp = World?.GetScenePresence(agentId);
+            if (sp == null || sp.IsChildAgent) return 0;
+            if (expService.IsAgentBlocked(experienceId, agentId)) return 0;   // block wins
             return expService.IsAgentGranted(experienceId, agentId) ? 1 : 0;
         }
 
@@ -12608,15 +12655,23 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             if (exp == null)
                 return new LSLList();
 
-            // SL format: [name, owner, description, group, maturity, metadata]
+            // T1/SS-1: SL layout is [ name, owner key, experience id, state (int), state message,
+            // group key ] — NOT the old [name, owner, description, group, maturity, ""], which
+            // silently returned wrong data at every index for SL-written scripts (High severity).
+            // State uses the XP_ERROR vocabulary: NONE(0) for a valid enabled experience,
+            // EXPERIENCE_DISABLED(8) when the viewer PROPERTY_DISABLED bit is set. The message comes
+            // from llGetExperienceErrorMessage so the state and its text can never drift apart.
+            int state = (exp.Properties & VP_DISABLED) != 0
+                ? XP_ERROR_EXPERIENCE_DISABLED
+                : XP_ERROR_NONE;
             return new LSLList(new object[]
             {
                 exp.Name ?? string.Empty,
                 exp.OwnerId.ToString(),
-                exp.Description ?? string.Empty,
-                exp.GroupId.ToString(),
-                exp.Maturity,
-                string.Empty
+                expId.ToString(),
+                state,
+                llGetExperienceErrorMessage(state),
+                exp.GroupId.ToString()
             });
         }
 

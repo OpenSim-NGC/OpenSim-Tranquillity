@@ -59,6 +59,10 @@ namespace Phlox.ScriptEngine
             public string Description;
             public UUID GroupId;
             public int Maturity;
+            // Viewer property bitmask (PROPERTY_DISABLED/PROPERTY_PRIVATE/…). Mapped from NGC
+            // ExperienceInfo.properties so the Phlox surface (llGetExperienceDetails state) can
+            // report enabled/disabled — T1/SS-1.
+            public int Properties;
         }
 
         // ────────────────────────── Key-Value store ──────────────────────────
@@ -157,6 +161,7 @@ namespace Phlox.ScriptEngine
                 Description = info.description,
                 GroupId = info.group_id,
                 Maturity = info.maturity,
+                Properties = info.properties,
             };
         }
 
