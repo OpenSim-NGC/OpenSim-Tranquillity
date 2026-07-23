@@ -140,6 +140,18 @@ namespace Phlox.ScriptEngine
             return allowed != null ? new List<UUID>(allowed) : new List<UUID>();
         }
 
+        /// <summary>
+        /// Region-TRUSTED experiences. Tranquillity's trusted list = the estate "key" experiences
+        /// (EstateKeyExperience) — NOT a dedicated table (Legion uses experience_trusted; we do not
+        /// port Legion's storage). A trusted experience grants consent silently (no dialog). This is
+        /// the T3 consent SEAM; full trusted ENFORCEMENT (admission/consent-bypass) is T5.
+        /// </summary>
+        public List<UUID> GetTrustedExperiences(UUID regionId)
+        {
+            UUID[] trusted = m_module?.GetEstateKeyExperiences();
+            return trusted != null ? new List<UUID>(trusted) : new List<UUID>();
+        }
+
         // ────────────────────────── Experience metadata ──────────────────────────
 
         public PhloxExperienceInfo GetExperience(UUID experienceId)

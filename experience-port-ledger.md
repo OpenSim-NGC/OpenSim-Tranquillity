@@ -53,6 +53,30 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 
 ---
 
+## Slice T3 — real SL consent (Legion D1) — ✅ PORTED (2026-07-23)
+
+**Ported and code-path-verified against Legion; NOT executed on this tree.** Replaces auto-grant with the ScriptQuestion consent dialog + await + per-cause codes + 300s timeout + trusted seam. All in the Phlox/adapter layer — **client stack and NGC storage untouched** (Tranquillity's `LLClientView.SendScriptQuestion(…,experience)` already builds the Experience block, guarded on `experience != Zero`; `OnScriptAnswer` already fires on `ScriptAnswerYes`). Deploy: `Phlox.ScriptEngine.dll` only.
+
+**STEP-0 gate (definitive):** a throwaway .NET 8 reflection app confirmed `ScriptQuestionPacket.ExperienceBlock` (declaring type `ScriptQuestionPacket`) with `ExperienceID : OpenMetaverse.UUID`, the `ScriptQuestionPacket.Experience` holder field, and `ScriptAnswerYesPacket` — all present in OpenMetaverse 1.2.13. Consent packet path buildable.
+
+| Item | Legion (verified) | Tranquillity (was) | T3 change | State |
+|------|-------------------|--------------------|-----------|-------|
+| Gate order | no-exp 5 → block 17 → admission 17 → presence 4 → **agent-block 4 (before granted)** → granted → trusted → dialog | auto-grant; granted checked *before* block | full gate, **agent-block before already-granted** | **PORTED** |
+| Consent | ScriptQuestion+Experience dialog, await `ScriptAnswerYes` | **auto-grant, no dialog** | `SendScriptQuestion(…,PERMISSION_EXPERIENCE, experienceId)` + await | **PORTED** |
+| Correlation | pending map keyed by ItemID; match by TaskID+ItemID via `OnScriptAnswer` | none | `m_pendingExpPerms` + `RegisterPendingExperiencePerm`/`ResolveExperiencePerm` (first-wins) | **PORTED** |
+| Yes / No / disconnect | Yes→grant; No→4; disconnect→4 | n/a | ported verbatim | **PORTED** |
+| Timeout | 300s → code 18 | none | `EXPERIENCE_PERM_TIMEOUT_MS=300000` → `_denied 18` | **PORTED** |
+| Trusted silent-grant | region-trusted → grant, no dialog | n/a | seam: `adapter.GetTrustedExperiences` → NGC `GetEstateKeyExperiences()` (estate, not Legion's table) | **PORTED (seam)** |
+| Landmine guard | Experience block only when real experience | already guarded in Tranq `LLClientView:12335` | verified; normal `llRequestPermissions` dialogs keep working | **VERIFIED** |
+
+**Adapter translations (Legion granular → NGC coarse):** `GrantPermission`→`adapter.GrantPermission`→NGC `UpdateExperiencePermissions(Allowed)`; `IsAgentGranted`/`IsAgentBlocked`→`adapter` (module `GetExperiencePermission`); `GetTrustedExperiences`→**new adapter method**→`GetEstateKeyExperiences()`; `InvalidatePermission`→adapter no-op. **Tranquillity storage semantics used, Legion's NOT ported:** permissions = single `allow BIT` table (grant=Allowed); script↔experience = `TaskInventoryItem.ExperienceID`; trusted = estate `EstateKeyExperience`.
+
+**Evidence:** commit `<T3-HASH>`. Legion ref `port-source-2026-07-22` `Phlox.ScriptEngine/LSLSystemAPI.cs`: gate `:12708`, `GrantExperienceAndNotify` `:12823`, `RegisterPendingExperiencePerm` `:12837`, `HandleExperienceScriptAnswer` `:12868`, `ResolveExperiencePerm` `:12890`, consts/`PendingExperiencePerm` `:1337`.
+
+**Deferred:** **T4** = ExperiencePreferences Block-button *persistence* (T3 ships the block *check*, not the write). **T5** = trusted *enforcement* + region/parcel BLOCK-list admission ladder (T3 ships the trusted *grant* seam + estate-allow admission only). Non-identical: region/parcel BLOCK tier absent (NGC adapter lacks a region-block list) → T5.
+
+---
+
 ## Remaining slices (from `experience-port-audit-v2.md` PART D)
 
 | Slice | Scope | State |
@@ -60,7 +84,7 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 | GATE-PORT | LibOMV ScriptQuestion Experience block present | ✅ PASSED (pre-work gate) |
 | **T1** | script-surface conformance (SS-1..9) | ✅ **PORTED** (this slice) |
 | **T2** | KV quota 16→128 MiB + code 11 | ✅ **PORTED** (this slice) |
-| T3 | consent (D1): ScriptQuestion + await, 300s/code 18, trusted-bypass | pending |
+| **T3** | consent (D1): ScriptQuestion+await, 300s/code 18, trusted-bypass | ✅ **PORTED** (this slice) |
 | T4 | ExperiencePreferences ↔ consent Block loop | pending |
 | T5 | trusted enforcement + region/parcel admission ladder (absorbs SS-6 remainder) | pending |
 | T6 | ExperienceQuery no-op cap + IsExperienceContributor parity | pending |
