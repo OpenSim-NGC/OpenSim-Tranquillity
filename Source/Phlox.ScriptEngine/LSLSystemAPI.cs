@@ -11357,7 +11357,28 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         // Viewer experience-property bit PROPERTY_DISABLED (indra VP_DISABLED = 1<<6);
         // used to report the llGetExperienceDetails state field.
         private const int VP_DISABLED = 1 << 6;
+        // SL per-experience KV quota: 128 MiB (was NGC's 16 MiB). T2 ports Legion DEC-2/UNV-5.
+        private const long MAX_DATA_QUOTA = 128L * 1024 * 1024;
 
+        // UTF-8 byte count for a KV key/value — the quota basis (matches Legion's KvBytes and the
+        // MySQL SUM(LENGTH(`key`)+LENGTH(`value`)) used-size on the grid backend).
+        private static long KvBytes(string s) => s == null ? 0 : System.Text.Encoding.UTF8.GetByteCount(s);
+
+        // True if updating `key` to `value` would push this experience's KV store over MAX_DATA_QUOTA.
+        // Delta-aware (Legion ExceedsQuota): an existing key swaps its value (key stays); a new key
+        // adds the whole pair. Basis: key+value UTF-8 bytes.
+        private bool ExceedsQuota(PhloxExperienceAdapter expService, UUID expId, string key, string value)
+        {
+            long used = expService.DataSizeKeyValue(expId);
+            string existing = expService.ReadKeyValue(expId, key); // null iff key absent
+            long oldPair = existing != null ? KvBytes(key) + KvBytes(existing) : 0;
+            long newPair = KvBytes(key) + KvBytes(value);
+            return used - oldPair + newPair > MAX_DATA_QUOTA;
+        }
+
+        // KV int return contract: 0 ok · -1 invalid/error · -2 duplicate (create) ·
+        // -3 CAS-fail/not-found (update) · -4 not-found (delete) · -5 quota exceeded (create/update).
+        // The ...SL wrappers translate these to the SL XP_ERROR codes.
         public int llCreateKeyValue(string key, string value)
         {
             if (string.IsNullOrEmpty(key) || key.Length > MAX_EXPERIENCE_KEY_LENGTH) return -1;
@@ -11370,6 +11391,11 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             try
             {
+                // T2/DEC-2: quota check BEFORE the write (Legion — never write-then-detect). A create
+                // only ADDS a pair; reject if that would exceed 128 MiB -> -5 (llCreateKeyValueSL emits
+                // 0,11 = XP_ERROR_QUOTA_EXCEEDED). No write.
+                if (expService != null && expService.DataSizeKeyValue(expId) + KvBytes(key) + KvBytes(value) > MAX_DATA_QUOTA)
+                    return -5;
                 bool ok = expService != null
                     ? expService.CreateKeyValue(expId, key, value)
                     : false;
@@ -11410,6 +11436,11 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 expId = m_host.OwnerID;
             try
             {
+                // T2/DEC-2: delta-aware quota check BEFORE the write (Legion ExceedsQuota). If the
+                // projected total after this update exceeds 128 MiB -> -5 (llUpdateKeyValueSL emits
+                // 0,11). No write. (If a CAS would also fail, quota wins at the boundary — benign.)
+                if (expService != null && ExceedsQuota(expService, expId, key, value))
+                    return -5;
                 bool ok = expService != null
                     ? expService.UpdateKeyValue(expId, key, value, check)
                     : false;
@@ -11532,6 +11563,8 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             int result = llCreateKeyValue(key, value);
             if (result == 0)
                 return "1," + (value ?? string.Empty);
+            if (result == -5) // over the 128 MiB quota (T2)
+                return "0," + XP_ERROR_QUOTA_EXCEEDED;
             // SL: creating an existing key (or a generic KV failure) => XP_ERROR_STORAGE_EXCEPTION.
             return "0," + XP_ERROR_STORAGE_EXCEPTION;
         }
@@ -11550,6 +11583,8 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             int result = llUpdateKeyValue(key, value, check);
             if (result == 0)
                 return "1," + (value ?? string.Empty);
+            if (result == -5) // over the 128 MiB quota (T2)
+                return "0," + XP_ERROR_QUOTA_EXCEEDED;
             // SL: a checked-update mismatch (CAS fail) => XP_ERROR_RETRY_UPDATE (15).
             return "0," + XP_ERROR_RETRY_UPDATE;
         }

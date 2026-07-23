@@ -15,7 +15,11 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
 
     private IUserAccountService m_UserService = null;
 
-    private const int MAX_QUOTA = 1024 * 1024 * 16;
+    // SL per-experience KV quota: 128 MiB (was 16 MiB). Raised to the SL/Legion value so this
+    // internal check (a redundant backstop) aligns with the authoritative Phlox-layer quota gate
+    // in LSLSystemAPI, which emits XP_ERROR_QUOTA_EXCEEDED (11) on a byte-basis pre-write check.
+    // Experience port T2 (Legion DEC-2/UNV-5, port-source-2026-07-22).
+    private const int MAX_QUOTA = 1024 * 1024 * 128;
 
     public ExperienceService(IConfigSource config)
         : base(config)
