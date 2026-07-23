@@ -204,6 +204,35 @@ After T5b.1, restart the region. Touch again. **EXPECT:** still `DENIED 17` — 
 
 **Grid vs standalone:** block **enforcement** identical; block **persistence** grid-only (MySQL VERSION 38); standalone SQLite keeps the block for the session only (parity with existing Allowed/Key behavior).
 
+## Slice A — cap surface (T6 + T-caps + CAP-RE-ERR) (deploy: `OpenSim.Region.ClientStack.LindenCaps.dll` only)
+
+Six viewer-facing cap conformance fixes. All in the caps layer — they sit above the script/permission layers (T1-T5b), so none change grant/consent/admission behavior. Most are visible in the **Experiences floater** (Me ▸ Experiences) and the **experience profile** (double-click an experience). Some need a **second avatar** (the admin-vs-owner distinction) — flagged inline.
+
+**A3.1 — Experiences search is paginated**
+Open the experience picker (e.g. a script's "Set Experience" dropdown ▸ pick, or the Region/Estate ▸ Experiences ▸ Allowed ▸ Add). Search a term matching **more than 30** experiences (seed enough, or search a common substring). **EXPECT:** first page shows ≤30 results and the picker's **Next** page button is enabled; paging Next shows the following results; Previous returns. **FAIL:** all results dropped / empty list (the old 0-based bug), or Next never enables when >30 match, or a page returns the same rows.
+*Setup note:* needs >30 matching experiences to see a second page; with ≤30 there is simply no Next (correct).
+
+**A4.1 — experience profile shows quota + marketplace + logo**
+Open an experience profile that has a **marketplace URL** and a **logo** set (set them via the profile Edit if needed, save, reopen). **EXPECT:** the profile's Marketplace link and logo image both render; the reported storage quota reads **128** (MB). **FAIL:** Marketplace panel blank/hidden despite a set URL (the old empty-marketplace bug in GetExperienceInfo), or quota shows 16.
+*Consistency check:* the same experience opened via search (FindExperienceByName), via profile (GetExperienceInfo), and immediately after a profile Save (UpdateExperience) must all show **quota 128** and the **same marketplace/logo** — previously GetExperienceInfo dropped the marketplace and Find/Update reported quota 16.
+
+**A5.1 — non-admin cannot edit (needs a 2nd avatar)**
+As an avatar who is **neither owner nor a group Experience-Admin** of an experience, open its profile. **EXPECT:** no Edit capability / a Save has no effect — the experience is returned unchanged. **FAIL:** a non-admin's edits persist.
+
+**A5.2 — group field is OWNER-ONLY (needs a 2nd avatar)**
+Give avatar B **Experience Admin** group power (but B is NOT the experience owner). As B, edit the profile: change the **name/description/slurl/maturity** AND the **group**. Save. **EXPECT:** name/description/slurl/maturity **save**, but the **group is unchanged** (owner-only). Then as the **owner**, change the group and Save. **EXPECT:** the group change **takes**. **FAIL:** B's group change persisted (the old "any admin changes group" bug), or the owner cannot change the group.
+
+**A1.1 — ExperienceQuery serves without breaking the viewer (no visible effect by design)**
+Cross a parcel/region boundary with an experience-enabled attachment/script active (this is when the viewer calls ExperienceQuery). **EXPECT:** no viewer error, no "missing cap" log, and **no visible change** — per-agent EEP is stubbed, so the no-op answering "all permitted" is correct (the viewer clears nothing). **FAIL:** viewer logs a missing ExperienceQuery cap, or an experience-driven environment is wrongly cleared/kept (would only matter once per-agent EEP is implemented — out of scope).
+
+**A2.1 — IsExperienceContributor / IsExperienceAdmin robustness (regression)**
+These caps already returned `{status:bool}` (owner ∪ group power) — unchanged surface. Query one for an **unknown/zero experience id** (or an id with no record). **EXPECT:** `{status:false}`, a well-formed response. **FAIL:** a 500 / unparseable response (the pre-A2 NRE on a null experience).
+
+**A6.1 — RegionExperiences Blocked list now populated (ties to T5b)**
+Region/Estate ▸ Experiences: **Block** an experience (T5b), then reopen the panel. **EXPECT:** the **Blocked** editor lists that experience (previously always empty — the cap hardcoded `blocked=undef`). The panel still loads cleanly with allowed/trusted intact. **FAIL:** Blocked list empty after blocking, or the panel fails to load (parse error).
+
+**Grid vs standalone:** identical (caps read the same estate/experience data both ways); A6.1's Blocked list persists only on grid (MySQL VERSION 38), session-only on standalone SQLite, per T5b.
+
 ### What's deferred (not testable yet)
 - **T4** — the ExperiencePreferences **Block button** persistence loop (the profile Allow/Block/Forget that writes the agent-block T3.5 reads). T3 ships the block *check*; T4 ships the write path.
 - **T5** — trusted **enforcement** + region/parcel BLOCK-list admission ladder (T3 ships the trusted *grant* seam and the estate-allow admission; region-block enforcement and full admission are T5).

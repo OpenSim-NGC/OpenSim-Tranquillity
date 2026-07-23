@@ -147,6 +147,29 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 
 ---
 
+## Slice A — cap surface (T6 + T-caps + CAP-RE-ERR) — ✅ PORTED (2026-07-23)
+
+**Ported and code-path-verified against the complete Legion source; NOT executed on this tree.** Caps layer only (`OpenSim.Region.ClientStack.LindenCaps/ExperienceModule.cs`) — sits above the script/permission layers (T1-T5b), no grant/consent/admission behavior touched. **One assembly:** `OpenSim.Region.ClientStack.LindenCaps.dll`. Build: full solution, `-p:NoWarn=NU1605`, 0 errors, no new warnings. Legion reference (all in `CoreModules/Experience/ExperienceModule.cs`): the 14 caps are verified-conformant per `experience-parity-ledger.md` Slices 0-6.
+
+| Item | Finding (Tranquillity before) | Legion reference | Fix | Verified: shape match |
+|---|---|---|---|---|
+| **A1 ExperienceQuery** | cap **not registered** | `HandleExperienceQuery`:929 — documented NO-OP: per-agent EEP stubbed → answer all queried experiences `true` | added `ExperienceQueryGetHandler` + registration; GET `?experiences=csv` → `{experiences:{<uuid>:true}}` | **Confirmed Tranq per-agent EEP is stubbed** (`LSLSystemAPI.cs:11905/11928` `llSetAgentEnvironment`/`llReplaceAgentEnvironment` log-only) — no-op is correct; not registering was the only gap |
+| **A2 IsExperienceContributor** | cap **present + conformant** (owner ∪ `GP_EXPERIENCE_CREATOR`, `{status:bool}`) | `HandleIsExperienceContributor`:912 / `IsAgentExperienceContributor`:899 | **no surface change**; added Legion's null/zero guard to `IsExperienceAdmin`+`IsExperienceContributor` (were NRE-on-unknown-id → 500) | predicate + `{status:bool}` already matched; guard prevents unparseable 500 |
+| **A3 FindExperienceByName** | literal `// todo: handle pages`; ignored page/page_size; no next/prev urls | `HandleFindExperienceByName`:584 — 1-based page clamp, page_size 30, `next_page_url`/`previous_page_url` on presence | in-handler paging over the full result set + emit the two page-url keys; quota→128 | keys `experience_keys`/`next_page_url`/`previous_page_url` match; **Tranq SQL has no LIMIT** (unbounded) so paging is exact — no storage change (Legion had to fix a 50-row SQL cap; we don't) |
+| **A4 GetExperienceInfo** | quota literal 128 **but** Find/Update emitted `info.quota`=**16**; GetExperienceInfo dropped marketplace (empty `<string/>`) | `ExperienceToOSD`:375 quota **hardcoded 128**; `BuildExtendedMetadata`:409 always emits logo+marketplace | all three handlers now emit **128**; GetExperienceInfo emits real `info.marketplace` like Find/Update | quota consistent 128 across Find/Info/Update = Legion; marketplace/logo now present. **Maturity conversion NOT ported** — Tranq stores 13/21/42 natively, so Legion's `MaturityToSimAccess` would be wrong here (verified: Tranq `maturity` field is already SIM_ACCESS) |
+| **A5 UpdateExperience** | admin-gated write present; but **ANY admin could change group_id**; non-admin echoed unchanged (already reject-shaped) | `HandleUpdateExperience`:975 — admin-gated; **group_id OWNER-ONLY**:1010; non-admin → reject-shaped echo:990 | group change now gated on `owner_id == agent` (non-owner admin keeps existing group); quota→128; documented the existing non-admin reject-echo | owner-only group rule matches Legion exactly; non-admin path already echoes unchanged info (Legion-equivalent) |
+| **A6 RegionExperiences** | error shape already well-formed; **`blocked` hardcoded `<undef/>`** (T5b store not surfaced) | `BuildRegionExperiencesLLSD`:417 — `blocked` is a real array from `GetBlockedExperiences` | **error shape: confirmed viewer-safe, no change**; wired `blocked` from `GetEstateBlockedExperiences()` (T5b) — was always empty | allowed/blocked/trusted arrays + conditional default/disabled match Legion; T5b blocks now visible in the Region panel |
+
+**Failure mode guarded (item 9):** a 200 the viewer can't parse (key-name mismatch / 500). Every handler emits hand-built LLSD with the exact keys Legion emits (and thus Firestorm reads); A2's null-guard removes the one NRE path. No key renamed; all additions are new keys the viewer reads conditionally.
+
+**No regression to T1-T5b:** caps are read-only over the same estate/experience/permission data; grant/consent/admission ladders (T3-T5b) untouched. A6 surfaces the T5b block store but does not change enforcement.
+
+**Evidence:** commit `<SLICEA-HASH>`. Legion ref `port-source-2026-07-22`.
+
+**Non-identical / notes:** Tranq serves caps via `BaseStreamHandler` classes emitting hand-built LLSD strings (Legion serves inline via `WriteLLSD`) — response *shape* is the conformance contract, matched item-by-item. A2 contributor/admin predicates read live group powers via `ScenePresence.ControllingClient.GetGroupPowers` (caller is in-region) vs Legion's `IGroupsModule.GetMembershipData` — equivalent for the self-querying viewer. Maturity conversion deliberately omitted (native 13/21/42). Per-agent EEP remains stubbed (A1 no-op revisit-if-shipped).
+
+---
+
 ## Remaining slices (from `experience-port-audit-v2.md` PART D)
 
 | Slice | Scope | State |
@@ -158,7 +181,7 @@ Behavior-only. Touched **`Phlox.ScriptEngine/LSLSystemAPI.cs`** + **`Phlox.Scrip
 | **T4** | ExperiencePreferences ↔ consent Block loop | ✅ **PORTED** (this slice) |
 | **T5** | trusted enforcement + region/parcel block admission | ⚠️ **PARTIAL** — trusted PORTED; region block → **T5b**; parcel block = STOP |
 | **T5b** | region-block list (estate-level), block-wins tier | ✅ **PORTED** — resolves the region half of T5's STOP (first schema change: EstateStore VERSION 38); parcel-block + OTH-1 + grid-wide = separate project |
-| T6 | ExperienceQuery no-op cap + IsExperienceContributor parity | pending |
+| **Slice A** | cap surface: A1 ExperienceQuery no-op · A2 IsExperienceContributor parity (+guard) · A3 Find pagination · A4 GetExperienceInfo quota/marketplace · A5 UpdateExperience owner-only group · A6 RegionExperiences blocked/error-shape | ✅ **PORTED** (folds in T6 + T-caps + CAP-RE-ERR) |
 | T7 | acquire policy (DEC-3) | pending |
-| T8 | SL-UNVERIFIED tail parity | pending |
+| T8 | SL-UNVERIFIED tail parity (remainder after CAP-RE-ERR) | pending |
 | — | `llDeleteKeyValueSL` registration (SS-4 tail) | pending (small follow-up) |
