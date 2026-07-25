@@ -19,6 +19,7 @@ using OpenSim.Framework.Servers;
 using Microsoft.AspNetCore.Hosting;
 using OpenSim.Server.MoneyServer.Models;
 using Microsoft.AspNetCore.Builder;
+using OpenSim.Server.MoneyServer.Controllers;
 
 namespace OpenSim.Server.MoneyServer;
 
@@ -132,6 +133,7 @@ class Program
             registryBuilder.RegisterInstance<IServerBase>(
                 new ServerBase { Console = consoleContext.Console, Config = legacyConfigAccessor.ConfigSource }).AsImplementedInterfaces().SingleInstance();
 
+            registryBuilder.RegisterType<MoneyXmlRpcController>().AsSelf().SingleInstance();
             registryBuilder.RegisterType<MoneyDBService>().As<IMoneyDBService>().AsSelf().SingleInstance();
         })
         .ConfigureLogging(loggingBuilder =>
