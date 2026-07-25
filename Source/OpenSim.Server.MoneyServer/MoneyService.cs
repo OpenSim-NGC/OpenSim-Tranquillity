@@ -226,9 +226,6 @@ public class MoneyService : IMoneyServiceCore, IHostedService
         _serverBase.Shutdown();
     }
 
-
-
-
     /// <summary>
     /// Provides a list of help topics that are available.  Overriding classes should append their topics to the
     /// information returned when the base method is called.
