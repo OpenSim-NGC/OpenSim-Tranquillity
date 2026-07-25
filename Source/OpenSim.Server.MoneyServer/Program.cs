@@ -107,6 +107,14 @@ class Program
         // Transitional bridge for static MainConsole usage.
         IConsoleContext consoleContext = new ConsoleContext(new ConsoleFactory().Create(options.ConsoleType, "MoneyServer> "));
 
+        // Bridges the legacy console "quit"/"shutdown" commands to the host lifetime.
+        // HostLifetime is assigned after the host is built (see below).
+        HostLifetimeServerBase serverBase = new HostLifetimeServerBase
+        {
+            Console = consoleContext.Console,
+            Config = legacyConfigAccessor.ConfigSource
+        };
+
         builder.ConfigureAppConfiguration(configuration =>
         {
             configuration.AddOpenSimIniFiles(options);
@@ -131,7 +139,7 @@ class Program
             registryBuilder.RegisterInstance<ILegacyConfigSourceAccessor>(legacyConfigAccessor).AsImplementedInterfaces().SingleInstance();
 
             registryBuilder.RegisterInstance<IServerBase>(
-                new ServerBase { Console = consoleContext.Console, Config = legacyConfigAccessor.ConfigSource }).AsImplementedInterfaces().SingleInstance();
+                serverBase).AsImplementedInterfaces().SingleInstance();
 
             registryBuilder.RegisterType<MoneyXmlRpcController>().AsSelf().SingleInstance();
             registryBuilder.RegisterType<MoneyDBService>().As<IMoneyDBService>().AsSelf().SingleInstance();
@@ -186,6 +194,10 @@ class Program
         });
 
         MoneyHost = builder.Build();
+
+        // Now that the host exists, let the console "quit"/"shutdown" commands stop it.
+        serverBase.HostLifetime = MoneyHost.Services.GetRequiredService<IHostApplicationLifetime>();
+
         MoneyHost.Run();
     }
 }

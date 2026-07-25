@@ -132,6 +132,11 @@ class Program
 
         builder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
 
+        // Bridges the legacy console "quit"/"shutdown" commands to the host lifetime.
+        // Assigned inside ConfigureContainer (once the console/config exist) and its
+        // HostLifetime is wired after the host is built (see below).
+        HostLifetimeServerBase serverBase = null;
+
         builder.ConfigureContainer<ContainerBuilder>(registryBuilder =>
         {
             // The registry we're building into
@@ -160,8 +165,9 @@ class Program
             else if (consoleType == "local")
                 console = new LocalConsole(prompt);
 
+            serverBase = new HostLifetimeServerBase { Console = console, Config = gridConfig.m_config };
             registryBuilder.RegisterInstance<IServerBase>(
-                new ServerBase { Console = console, Config = gridConfig.m_config }).
+                serverBase).
                     AsImplementedInterfaces().
                     SingleInstance();
 
@@ -215,6 +221,10 @@ class Program
         });
 
         GridHost = builder.Build();
+
+        // Now that the host exists, let the console "quit"/"shutdown" commands stop it.
+        serverBase.HostLifetime = GridHost.Services.GetRequiredService<IHostApplicationLifetime>();
+
         GridHost.Run();
     }
 }

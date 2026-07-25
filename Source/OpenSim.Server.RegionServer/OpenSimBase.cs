@@ -912,6 +912,47 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     #endregion
 
     /// <summary>
+    /// Optional hook that routes an interactive shutdown request to the generic host
+    /// instead of tearing the runtime down inline.
+    /// </summary>
+    /// <remarks>
+    /// When set (by <see cref="RegionRuntime"/>), the console "quit"/"shutdown" commands and
+    /// the Ctrl-C handler request a cooperative host stop rather than running the legacy
+    /// teardown and <c>Environment.Exit(0)</c> directly. The host then performs the single
+    /// teardown through <see cref="ShutdownHosted"/> via <c>RegionRuntime.Stop()</c>.
+    /// </remarks>
+    public Action HostShutdownRequested { get; set; }
+
+    /// <summary>
+    /// Entry point used by the console "quit"/"shutdown" commands and the Ctrl-C handler.
+    /// In hosted mode this only requests a cooperative host shutdown; the actual teardown is
+    /// performed once by <see cref="ShutdownHosted"/>. In standalone mode (no host hook) it
+    /// falls back to the legacy inline teardown.
+    /// </summary>
+    public override void Shutdown()
+    {
+        Action hook = HostShutdownRequested;
+        if (hook is not null)
+        {
+            hook();
+            return;
+        }
+
+        base.Shutdown();
+    }
+
+    /// <summary>
+    /// Performs the actual runtime teardown under host control, suppressing the legacy
+    /// <c>Environment.Exit(0)</c> so the host owns process exit. Invoked once by
+    /// <c>RegionRuntime.Stop()</c>.
+    /// </summary>
+    public void ShutdownHosted()
+    {
+        SuppressExit = true;
+        base.Shutdown();
+    }
+
+    /// <summary>
     /// Performs any last-minute sanity checking and shuts down the region server
     /// </summary>
     protected override void ShutdownSpecific()

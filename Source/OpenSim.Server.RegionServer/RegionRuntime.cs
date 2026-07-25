@@ -7,6 +7,7 @@
  * with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Nini.Config;
 using OpenSim.Framework;
@@ -34,6 +35,7 @@ public sealed class RegionRuntime : IRegionRuntime
     private readonly IStartupFailureCoordinator _startupFailureCoordinator;
     private readonly IRuntimeMonitoringController _monitoringController;
     private readonly IRegionDiagnosticsService _diagnosticsService;
+    private readonly IHostApplicationLifetime _hostLifetime;
 
     private readonly object _initializeLock = new();
     private bool _initialized;
@@ -45,7 +47,8 @@ public sealed class RegionRuntime : IRegionRuntime
         IProcessSetupService processSetupService,
         IStartupFailureCoordinator startupFailureCoordinator,
         IRuntimeMonitoringController monitoringController,
-        IRegionDiagnosticsService diagnosticsService)
+        IRegionDiagnosticsService diagnosticsService,
+        IHostApplicationLifetime hostLifetime)
     {
         _logger = logger;
         _options = options;
@@ -53,6 +56,7 @@ public sealed class RegionRuntime : IRegionRuntime
         _startupFailureCoordinator = startupFailureCoordinator;
         _monitoringController = monitoringController;
         _diagnosticsService = diagnosticsService;
+        _hostLifetime = hostLifetime;
     }
 
     public void Initialize()
@@ -87,6 +91,11 @@ public sealed class RegionRuntime : IRegionRuntime
             {
                 _sim = new OpenSim(configSource);
 
+                // Route interactive "quit"/"shutdown" (and Ctrl-C) through the host lifetime
+                // instead of the legacy inline teardown + Environment.Exit(0). The host then
+                // performs the single teardown via ShutdownHosted() in Stop().
+                _sim.HostShutdownRequested = () => _hostLifetime.StopApplication();
+
                 // Non-blocking: StartupSpecific runs and returns. The host keeps
                 // the process alive instead of a blocking main loop.
                 _sim.Startup();
@@ -117,9 +126,9 @@ public sealed class RegionRuntime : IRegionRuntime
             _diagnosticsService.Stop();
             _monitoringController.DisableWatchdog();
 
-            // The host owns process exit; suppress the legacy Environment.Exit(0).
-            _sim.SuppressExit = true;
-            _sim.Shutdown();
+            // The host owns process exit; ShutdownHosted() suppresses the legacy
+            // Environment.Exit(0) and performs the single runtime teardown.
+            _sim.ShutdownHosted();
 
             _monitoringController.StopWorkManager();
         }
