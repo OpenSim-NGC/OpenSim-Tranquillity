@@ -150,8 +150,8 @@ class Program
             directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "addon-modules");
             RegisterServices.Register(registry, directoryPath);
 
-            var gridConfig = new GridServerConfigSource(iniMaster);
-            //registryBuilder.RegisterInstance(gridConfig).AsSelf().SingleInstance();
+            var gridConfig = new GridServerConfigSource(iniMaster, iniFile, iniDirectory);
+            registryBuilder.RegisterInstance(gridConfig).AsSelf().SingleInstance();
 
             var prompt = "GridServer> ";
             ICommandConsole console = null;
@@ -166,11 +166,9 @@ class Program
                 console = new LocalConsole(prompt);
 
             serverBase = new HostLifetimeServerBase { Console = console, Config = gridConfig.m_config };
-            registryBuilder.RegisterInstance<IServerBase>(
-                serverBase).
-                    AsImplementedInterfaces().
-                    SingleInstance();
-
+            registryBuilder.RegisterInstance<IServerBase>(serverBase).
+                AsImplementedInterfaces().
+                SingleInstance();
         })
         .ConfigureLogging(loggingBuilder =>
         {
@@ -180,13 +178,19 @@ class Program
         })
         .ConfigureServices(services =>
         {
-            services.AddControllers().AddControllersAsServices();
+            // GridServer currently serves all HTTP through the legacy BaseHttpServer
+            // (via service connectors), not ASP.NET controllers, so Kestrel/MVC is
+            // disabled to avoid a port clash on the [Network] port. Re-enable together
+            // with the ConfigureWebHostDefaults block below if controllers are added.
+            // services.AddControllers().AddControllersAsServices();
             services.AddSingleton<IProcessSetupService, ProcessSetupService>();
             services.AddSingleton<IPidFileManager, PidFileManager>();
             services.AddSingleton<IMainServerAccessor, MainServerAccessor>();
             services.AddSingleton<IRuntimeMonitoringController, RuntimeMonitoringController>();
             services.AddSingleton<IStartupFailureCoordinator, StartupFailureCoordinator>();
             services.AddSingleton<IServiceConnectorLoader, GridServiceConnectorLoader>();
+            services.AddSingleton<IGridHttpServerFactory, GridHttpServerFactory>();
+            services.AddSingleton<IGridCertificateProvisioner, GridCertificateProvisioner>();
             services.AddSingleton<IGridServerRuntime, GridServerRuntime>();
 
             services.AddHostedService<ProcessSetupHostedService>();
@@ -197,28 +201,33 @@ class Program
             services.AddHostedService<GridConsoleRunnerService>();
         });
 
-        builder.ConfigureWebHostDefaults(webBuilder =>
-        {
-            webBuilder.ConfigureServices((context, services) =>
-            {
-                string urls = context.Configuration.GetValue<string>("GridServer:AspNetUrls", string.Empty);
-                if (!string.IsNullOrWhiteSpace(urls))
-                {
-                    webBuilder.UseSetting(WebHostDefaults.ServerUrlsKey, urls);
-                }
-                else
-                {
-                    int port = context.Configuration.GetValue<int>("GridServer:AspNetPort", 8002);
-                    webBuilder.UseUrls($"http://*:{port}");
-                }
-            });
-
-            webBuilder.Configure(app =>
-            {
-                app.UseRouting();
-                app.UseEndpoints(endpoints => endpoints.MapControllers());
-            });
-        });
+        // ASP.NET / Kestrel is disabled: GridServer has no controllers and the legacy
+        // BaseHttpServer already owns the [Network] port (e.g. 8002). Leaving Kestrel
+        // enabled would bind GridServer:AspNetPort (default 8002) and clash with it.
+        // Re-enable this block (and services.AddControllers() above) when ASP.NET
+        // endpoints are introduced.
+        // builder.ConfigureWebHostDefaults(webBuilder =>
+        // {
+        //     webBuilder.ConfigureServices((context, services) =>
+        //     {
+        //         string urls = context.Configuration.GetValue<string>("GridServer:AspNetUrls", string.Empty);
+        //         if (!string.IsNullOrWhiteSpace(urls))
+        //         {
+        //             webBuilder.UseSetting(WebHostDefaults.ServerUrlsKey, urls);
+        //         }
+        //         else
+        //         {
+        //             int port = context.Configuration.GetValue<int>("GridServer:AspNetPort", 8002);
+        //             webBuilder.UseUrls($"http://*:{port}");
+        //         }
+        //     });
+        //
+        //     webBuilder.Configure(app =>
+        //     {
+        //         app.UseRouting();
+        //         app.UseEndpoints(endpoints => endpoints.MapControllers());
+        //     });
+        // });
 
         GridHost = builder.Build();
 

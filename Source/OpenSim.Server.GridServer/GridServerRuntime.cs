@@ -50,11 +50,12 @@ public sealed class GridServerRuntime : IGridServerRuntime
     private readonly IMainServerAccessor _mainServerAccessor;
     private readonly IRuntimeMonitoringController _runtimeMonitoringController;
     private readonly IServiceConnectorLoader _connectorLoader;
+    private readonly IGridHttpServerFactory _httpServerFactory;
+    private readonly IGridCertificateProvisioner _certificateProvisioner;
 
     private readonly object _initializeLock = new();
     private bool _initialized;
 
-    private HttpServerBase _server;
     private PluginLoader _loader;
     private readonly List<IServiceConnector> _serviceConnectors = new();
 
@@ -67,7 +68,9 @@ public sealed class GridServerRuntime : IGridServerRuntime
         IStartupFailureCoordinator startupFailureCoordinator,
         IMainServerAccessor mainServerAccessor,
         IRuntimeMonitoringController runtimeMonitoringController,
-        IServiceConnectorLoader connectorLoader)
+        IServiceConnectorLoader connectorLoader,
+        IGridHttpServerFactory httpServerFactory,
+        IGridCertificateProvisioner certificateProvisioner)
     {
         _logger = logger;
         _serverBase = serverBase;
@@ -75,6 +78,8 @@ public sealed class GridServerRuntime : IGridServerRuntime
         _mainServerAccessor = mainServerAccessor;
         _runtimeMonitoringController = runtimeMonitoringController;
         _connectorLoader = connectorLoader;
+        _httpServerFactory = httpServerFactory;
+        _certificateProvisioner = certificateProvisioner;
     }
 
     /// <inheritdoc/>
@@ -91,16 +96,16 @@ public sealed class GridServerRuntime : IGridServerRuntime
             // Transitional sync with legacy static console access.
             MainConsole.Instance = _serverBase.Console;
 
-            // Old fashioned initialization. The legacy HttpServerBase still owns
-            // config loading and HTTP listener creation while the migration is in
-            // progress; it is now constructed here under host control instead of in
-            // the GridService constructor.
-            string[] args = Environment.GetCommandLineArgs();
-            _server = new HttpServerBase("R.O.B.U.S.T.", args);
+            // The fully merged configuration is loaded by GridServerConfigSource and
+            // shared through IServerBase.Config; the HTTP listeners are created by a
+            // dedicated DI service instead of the legacy HttpServerBase.
+            IConfigSource config = _serverBase.Config;
 
-            IConfig serverConfig = _server.Config.Configs["Startup"];
+            IConfig serverConfig = config.Configs["Startup"];
             if (serverConfig == null)
                 _startupFailureCoordinator.ThrowFatal("Startup config section missing in .ini file");
+
+            _certificateProvisioner.Provision(serverConfig);
 
             int dnsTimeout = serverConfig.GetInt("DnsTimeout", 30000);
             try { ServicePointManager.DnsRefreshTimeout = dnsTimeout; } catch { }
@@ -112,11 +117,15 @@ public sealed class GridServerRuntime : IGridServerRuntime
 
             string registryLocation = serverConfig.GetString("RegistryLocation", ".");
 
-            _serviceConnectors.AddRange(_connectorLoader.LoadConnectors(_server.Config));
+            // Create and start the HTTP listeners before the connectors are loaded,
+            // since connectors bind to those servers.
+            _httpServerFactory.CreateAndStart(config, _serverBase.Console);
+
+            _serviceConnectors.AddRange(_connectorLoader.LoadConnectors(config));
 
             PrintFileToConsole("robuststartuplogo.txt");
 
-            _loader = new PluginLoader(_server.Config, registryLocation);
+            _loader = new PluginLoader(config, registryLocation);
 
             _initialized = true;
         }
