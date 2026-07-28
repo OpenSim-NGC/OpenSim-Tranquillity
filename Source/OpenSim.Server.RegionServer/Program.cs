@@ -7,10 +7,17 @@
  * with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+using System.CommandLine;
+
+using Autofac;
+using Autofac.Extensions.DependencyInjection;
+
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Nini.Config;
+
+using OpenSim.Server.Base;
 using OpenSim.Server.Base.Hosting;
 
 namespace OpenSim.Server.RegionServer;
@@ -19,7 +26,11 @@ namespace OpenSim.Server.RegionServer;
 /// Generic-host entry point for the RegionServer.
 /// </summary>
 /// <remarks>
-/// Replaces <c>Application.Main()</c> as the executable shell. The region runtime is
+/// Replaces <c>Application.Main()</c> as the executable shell and mirrors the
+/// GridServer startup: command-line parsing is handled by System.CommandLine, the
+/// service provider is backed by Autofac (so plugin <c>IModule</c>s discovered by
+/// <see cref="RegisterServices"/> can register themselves), and the merged .ini
+/// configuration is fed to the host <c>IConfiguration</c>. The region runtime is
 /// hosted behind <see cref="RegionService"/> and started/stopped through the host
 /// lifecycle instead of a static main loop. Foreground mode hosts an interactive
 /// console prompt loop; background mode relies on the host to keep the process alive
@@ -29,7 +40,90 @@ public static class Program
 {
     public static IHost RegionHost { get; private set; }
 
-    public static async Task<int> Main(string[] args)
+    public static int Main(string[] args)
+    {
+        var logconfigOption = new Option<string>("--logconfig")
+        {
+            Description = "Instruct log4net to use this file as configuration file.",
+            DefaultValueFactory = ParseResult => "OpenSim.Server.RegionServer.dll.config",
+        };
+        var inifileOption = new Option<List<string>>("--inifile")
+        {
+            Description = "Specify the location of zero or more .ini file(s) to read."
+        };
+        var inimasterOption = new Option<string>("--inimaster")
+        {
+            Description = "The path to the master ini file. The master ini file will be read first and then overridden by any .ini files specified by --inifile or --inidirectory options.",
+            DefaultValueFactory = ParseResult => "OpenSim.ini",
+        };
+        var inidirectoryOption = new Option<string>("--inidirectory")
+        {
+            Description = "The path to folder for config ini files. The RegionServer will read all of *.ini files " +
+                              "in this directory and override OpenSim.ini settings",
+            DefaultValueFactory = ParseResult => "config",
+        };
+        var consoleOption = new Option<string>("--console")
+        {
+            Description = "console type, one of basic, local or rest.",
+            DefaultValueFactory = ParseResult => "local",
+        };
+
+        consoleOption.AcceptOnlyFromAmong("basic", "local", "rest");
+
+        var backgroundOption = new Option<bool>("--background")
+        {
+            Description = "Run without an interactive console prompt loop.",
+            DefaultValueFactory = ParseResult => false,
+        };
+
+        RootCommand rootCommand = new RootCommand("Launch the OpenSim Region Server");
+
+        rootCommand.Options.Add(logconfigOption);
+        rootCommand.Options.Add(inifileOption);
+        rootCommand.Options.Add(inimasterOption);
+        rootCommand.Options.Add(inidirectoryOption);
+        rootCommand.Options.Add(consoleOption);
+        rootCommand.Options.Add(backgroundOption);
+
+        ParseResult parseResult = rootCommand.Parse(args);
+
+        if (parseResult.Errors.Count != 0)
+        {
+            foreach (var parseError in parseResult.Errors)
+            {
+                Console.Error.WriteLine(parseError.Message);
+            }
+
+            return 1;
+        }
+        else
+        {
+            rootCommand.SetAction(parseResult => Configure(
+                args: args,
+                logConfig: parseResult.GetValue(logconfigOption),
+                iniFile: parseResult.GetValue(inifileOption),
+                iniMaster: parseResult.GetValue(inimasterOption),
+                iniDirectory: parseResult.GetValue(inidirectoryOption),
+                consoleType: parseResult.GetValue(consoleOption),
+                background: parseResult.GetValue(backgroundOption)
+                )
+            );
+        }
+
+        rootCommand.Parse(args).Invoke();
+
+        return 0;
+    }
+
+    static void Configure(
+        string[] args,
+        string logConfig,
+        List<string> iniFile,
+        string iniMaster,
+        string iniDirectory,
+        string consoleType,
+        bool background
+        )
     {
         // Hook the appdomain to the crash reporter before anything else runs.
         Application.RegisterCrashDumpHandler();
@@ -37,16 +131,51 @@ public static class Program
         // Configure log4net up front so that early startup output is captured.
         ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
         string effectiveLogConfig = log4NetBootstrapper.Configure(
-            ResolveLogConfig(args), "OpenSim.Server.RegionServer.dll.config");
-
-        bool background = IsBackground(args);
+            logConfig, "OpenSim.Server.RegionServer.dll.config");
 
         IHostBuilder builder = Host.CreateDefaultBuilder();
 
-        builder.ConfigureLogging(loggingBuilder =>
+        builder.ConfigureAppConfiguration(configuration =>
+        {
+            configuration.AddIniFile(iniMaster, optional: true, reloadOnChange: true);
+
+            foreach (var item in iniFile)
+            {
+                configuration.AddIniFile(item, optional: true, reloadOnChange: true);
+            }
+
+            if (string.IsNullOrEmpty(iniDirectory) is false)
+            {
+                if (Directory.Exists(iniDirectory))
+                {
+                    foreach (var item in Directory.GetFiles(iniDirectory, "*.ini"))
+                    {
+                        configuration.AddIniFile(item, optional: true, reloadOnChange: true);
+                    }
+                }
+            }
+        });
+
+        builder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
+
+        builder.ConfigureContainer<ContainerBuilder>(registryBuilder =>
+        {
+            // The registry we're building into
+            var registry = registryBuilder.ComponentRegistryBuilder;
+
+            // Search the Service Runtime directory first
+            var directoryPath = AppDomain.CurrentDomain.BaseDirectory;
+            RegisterServices.Register(registry, directoryPath, "OpenSim.*.dll");
+
+            // Register any plugins dropped into the addons directory also
+            directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "addon-modules");
+            RegisterServices.Register(registry, directoryPath);
+        })
+        .ConfigureLogging(loggingBuilder =>
         {
             loggingBuilder.ClearProviders();
             loggingBuilder.AddLog4Net(log4NetConfigFile: effectiveLogConfig);
+            loggingBuilder.AddConsole();
         })
         .ConfigureServices(services =>
         {
@@ -67,35 +196,6 @@ public static class Program
 
         RegionHost = builder.Build();
 
-        await RegionHost.RunAsync().ConfigureAwait(false);
-
-        return 0;
-    }
-
-    /// <summary>
-    /// Reads the <c>--logconfig</c> switch value (if any) from the raw arguments
-    /// without disturbing the full Nini configuration build performed later.
-    /// </summary>
-    private static string ResolveLogConfig(string[] args)
-    {
-        ArgvConfigSource probe = new ArgvConfigSource(args);
-        probe.AddSwitch("Startup", "logconfig");
-        return probe.Configs["Startup"].GetString("logconfig", string.Empty);
-    }
-
-    /// <summary>
-    /// Determines whether the server should run without an interactive console.
-    /// </summary>
-    private static bool IsBackground(string[] args)
-    {
-        ArgvConfigSource probe = new ArgvConfigSource(args);
-        probe.Alias.AddAlias("On", true);
-        probe.Alias.AddAlias("Off", false);
-        probe.Alias.AddAlias("True", true);
-        probe.Alias.AddAlias("False", false);
-        probe.Alias.AddAlias("Yes", true);
-        probe.Alias.AddAlias("No", false);
-        probe.AddSwitch("Startup", "background");
-        return probe.Configs["Startup"].GetBoolean("background", false);
+        RegionHost.Run();
     }
 }
