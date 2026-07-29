@@ -17,7 +17,6 @@
     <Deterministic>true</Deterministic>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <GenerateDependencyFile>false</GenerateDependencyFile>
-    <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
     <EnableDefaultItems>false</EnableDefaultItems>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <NoWarn>CA1416,SYSLIB0011,SYSLIB0014,SYSLIB0039</NoWarn>
