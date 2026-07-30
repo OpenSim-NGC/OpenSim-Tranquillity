@@ -13,6 +13,8 @@ namespace OpenSim.Server.Base.Hosting;
 
 public sealed class Log4NetBootstrapper : ILog4NetBootstrapper
 {
+    public string LogPath { get; set; } = ".";
+
     public string ResolveConfigPath(string configuredPath, string defaultPath)
     {
         return string.IsNullOrWhiteSpace(configuredPath) ? defaultPath : configuredPath;
@@ -20,8 +22,12 @@ public sealed class Log4NetBootstrapper : ILog4NetBootstrapper
 
     public string Configure(string configuredPath, string defaultPath)
     {
+        if (string.IsNullOrWhiteSpace(LogPath) is false)
+            log4net.GlobalContext.Properties["LogPath"] = LogPath;
+
         string configPath = ResolveConfigPath(configuredPath, defaultPath);
         XmlConfigurator.Configure(new FileInfo(configPath));
+
         return configPath;
     }
 }

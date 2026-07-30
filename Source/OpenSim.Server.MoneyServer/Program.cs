@@ -96,7 +96,11 @@ class Program
 
     static void Configure(ServerStartupOptions options)
     {
+        
         ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
+        var logPath = Environment.GetEnvironmentVariable("LOG_PATH");
+        if (string.IsNullOrWhiteSpace(logPath) is false)
+            log4NetBootstrapper.LogPath = logPath;
         string effectiveLogConfig = log4NetBootstrapper.Configure(options.LogConfig, "OpenSim.Server.MoneyServer.dll.config");
 
         IHostBuilder builder = Host.CreateDefaultBuilder();

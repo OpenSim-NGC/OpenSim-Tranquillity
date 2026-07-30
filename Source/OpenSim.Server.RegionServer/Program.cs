@@ -16,7 +16,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-
+using OpenMetaverse.Packets;
 using OpenSim.Server.Base;
 using OpenSim.Server.Base.Hosting;
 
@@ -130,8 +130,11 @@ public static class Program
 
         // Configure log4net up front so that early startup output is captured.
         ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
-        string effectiveLogConfig = log4NetBootstrapper.Configure(
-            logConfig, "OpenSim.Server.RegionServer.dll.config");
+        var logPath = Environment.GetEnvironmentVariable("LOG_PATH");
+        if (string.IsNullOrWhiteSpace(logPath) is false)
+            log4NetBootstrapper.LogPath = logPath;
+        string effectiveLogConfig = 
+            log4NetBootstrapper.Configure(logConfig, "OpenSim.Server.RegionServer.dll.config");
 
         IHostBuilder builder = Host.CreateDefaultBuilder();
 

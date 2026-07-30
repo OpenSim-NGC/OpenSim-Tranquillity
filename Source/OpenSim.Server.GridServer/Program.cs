@@ -105,6 +105,9 @@ class Program
         )
     {
         ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
+        var logPath = Environment.GetEnvironmentVariable("LOG_PATH");
+        if (string.IsNullOrWhiteSpace(logPath) is false)
+            log4NetBootstrapper.LogPath = logPath;
         string effectiveLogConfig = log4NetBootstrapper.Configure(logConfig, "OpenSim.Server.GridServer.dll.config");
 
         IHostBuilder builder = Host.CreateDefaultBuilder();

@@ -14,6 +14,8 @@ namespace OpenSim.Server.Base.Hosting;
 /// </summary>
 public interface ILog4NetBootstrapper
 {
+    string LogPath { get; set; }
+    
     /// <summary>
     /// Resolves the log4net config path using a configured path with fallback to a server default.
     /// </summary>
