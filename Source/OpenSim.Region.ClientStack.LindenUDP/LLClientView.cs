@@ -847,8 +847,18 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             flags |= RegionFlags.RestrictPushObject;
         if (Scene.RegionInfo.EstateSettings.DenyAnonymous)
             flags |= RegionFlags.DenyAnonymous;
-        //DenyIdentified  unused
-        //DenyTransacted  unused
+        // SECURITY FIX (Laxton Consulting / IMA, @llaxton, 2026-07-26): these two bits were
+        // previously never computed here at all - commented out as "unused" - meaning
+        // GetRegionFlags() could never set them regardless of estate configuration.
+        // This is the root cause of the dead enforcement chain: even after fixing the
+        // capability packet construction further down in this file to read these bits
+        // correctly, the value being read was always zero because it was never set here
+        // in the first place. Follows the identical working pattern used one line above
+        // for DenyAnonymous.
+        if (Scene.RegionInfo.EstateSettings.DenyIdentified)
+            flags |= RegionFlags.DenyIdentified;
+        if (Scene.RegionInfo.EstateSettings.DenyTransacted)
+            flags |= RegionFlags.DenyTransacted;
         if (Scene.RegionInfo.RegionSettings.AllowLandJoinDivide)
             flags |= RegionFlags.AllowParcelChanges;
         //AbuseEmailToEstateOwner -> block flyover
@@ -6674,8 +6684,16 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         LLSDxmlEncode2.AddElem("PassPrice", landData.PassPrice, sb);
         LLSDxmlEncode2.AddElem("PublicCount", (int)0, sb); //TODO
         LLSDxmlEncode2.AddElem("RegionDenyAnonymous", (regionFlags & (uint)RegionFlags.DenyAnonymous) != 0, sb);
-        LLSDxmlEncode2.AddElem("RegionDenyIdentified", false, sb);
-        LLSDxmlEncode2.AddElem("RegionDenyTransacted", false, sb);
+        // SECURITY FIX (Laxton Consulting / IMA, @llaxton, 2026-07-26): these two values were
+        // previously hardcoded to false regardless of actual estate configuration.
+        // EstateSettings.DenyIdentified/DenyTransacted are correctly stored and
+        // correctly folded into regionFlags by EstateManagementModule.cs, but this
+        // capability packet - which is what the viewer actually enforces client-side
+        // access restrictions against - never read those bits, silently telling every
+        // viewer these restrictions were always off. Now follows the same working
+        // pattern already used one line above for RegionDenyAnonymous.
+        LLSDxmlEncode2.AddElem("RegionDenyIdentified", (regionFlags & (uint)RegionFlags.DenyIdentified) != 0, sb);
+        LLSDxmlEncode2.AddElem("RegionDenyTransacted", (regionFlags & (uint)RegionFlags.DenyTransacted) != 0, sb);
         LLSDxmlEncode2.AddElem("RegionPushOverride", (regionFlags & (uint)RegionFlags.RestrictPushObject) != 0, sb);
         LLSDxmlEncode2.AddElem("RentPrice", (int) 0, sb);
         LLSDxmlEncode2.AddElem("RequestResult", request_result, sb);
