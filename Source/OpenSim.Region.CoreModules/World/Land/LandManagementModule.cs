@@ -1740,7 +1740,15 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
 
     public void EventManagerOnLandBuy(Object o, EventManager.LandBuyArgs e)
     {
-        if (e.economyValidated && e.landValidated)
+        // FIX (Laxton Consulting / IMA, @llaxton, 2026-07-29): economyValidated defaults
+        // to false and is only ever set by an active IMoneyModule subscriber. With no
+        // economy module loaded at all, even a genuinely free (price 0) parcel could
+        // never complete a purchase. Now allows completion when parcelPrice == 0
+        // regardless of economyValidated; all priced-parcel (> 0) behavior, and every
+        // existing economy module, is unaffected - the validator already confirms
+        // parcelPrice matches the parcel's real stored SalePrice before landValidated
+        // can become true, so this cannot be used to buy a priced parcel for free.
+        if (e.landValidated && (e.economyValidated || e.parcelPrice == 0))
         {
             ILandObject land;
             lock (m_landList)
