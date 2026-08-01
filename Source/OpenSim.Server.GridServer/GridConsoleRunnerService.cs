@@ -44,9 +44,12 @@ namespace OpenSim.Server.GridServer;
 /// <see cref="OpenSim.Framework.ICommandConsole.Prompt"/> is a blocking call that
 /// reads from stdin.  This does not block the host's async machinery.
 ///
-/// Shutdown: when the host cancels the stopping token the loop exits after the
-/// current prompt completes.  If stdin is blocking the host shutdown timeout
-/// (default 5 s) will elapse and the process exits normally.
+/// Shutdown: the loop observes <see cref="IHostApplicationLifetime.ApplicationStopping"/>
+/// (cancelled synchronously by the "shutdown"/"quit" commands) as well as the
+/// background-service stopping token, so it exits as soon as the current prompt
+/// completes rather than requiring a second keypress.  If stdin is otherwise
+/// blocking the host shutdown timeout (default 5 s) will elapse and the process
+/// exits normally.
 /// </remarks>
 public sealed class GridConsoleRunnerService : BackgroundService
 {
@@ -81,16 +84,27 @@ public sealed class GridConsoleRunnerService : BackgroundService
             return;
         }
 
+        // Observe ApplicationStopping as well as the BackgroundService stopping token.
+        // A console "shutdown"/"quit" command runs synchronously inside Prompt() and calls
+        // IHostApplicationLifetime.StopApplication(), which cancels ApplicationStopping before
+        // Prompt() returns. The BackgroundService stoppingToken is only cancelled later when
+        // StopAsync runs — by which time the loop has already re-entered the blocking Prompt()
+        // call, requiring a second Enter keypress to observe cancellation. Checking
+        // ApplicationStopping lets the loop exit immediately after the shutdown command runs.
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+            stoppingToken, _hostLifetime.ApplicationStopping);
+        CancellationToken shutdownToken = linkedCts.Token;
+
         // Run the blocking prompt loop on a thread-pool thread.
         await Task.Run(() =>
         {
-            while (!stoppingToken.IsCancellationRequested)
+            while (!shutdownToken.IsCancellationRequested)
             {
                 try
                 {
                     _serverBase.Console.Prompt();
                 }
-                catch (Exception) when (stoppingToken.IsCancellationRequested)
+                catch (Exception) when (shutdownToken.IsCancellationRequested)
                 {
                     // Host is stopping — exit the loop cleanly.
                     break;
@@ -100,6 +114,6 @@ public sealed class GridConsoleRunnerService : BackgroundService
                     _logger.LogError(e, "[CONSOLE]: Unhandled error during console prompt.");
                 }
             }
-        }, stoppingToken).ConfigureAwait(false);
+        }, shutdownToken).ConfigureAwait(false);
     }
 }

@@ -59,16 +59,27 @@ public sealed class RegionConsoleRunnerService : BackgroundService
             return;
         }
 
+        // Observe ApplicationStopping as well as the BackgroundService stopping token.
+        // A console "shutdown"/"quit" command runs synchronously inside Prompt() and calls
+        // IHostApplicationLifetime.StopApplication(), which cancels ApplicationStopping before
+        // Prompt() returns. The BackgroundService stoppingToken is only cancelled later when
+        // StopAsync runs — by which time the loop has already re-entered the blocking Prompt()
+        // call, requiring a second Enter keypress to observe cancellation. Checking
+        // ApplicationStopping lets the loop exit immediately after the shutdown command runs.
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+            stoppingToken, _hostLifetime.ApplicationStopping);
+        CancellationToken shutdownToken = linkedCts.Token;
+
         // Run the blocking prompt loop on a thread-pool thread.
         await Task.Run(() =>
         {
-            while (!stoppingToken.IsCancellationRequested)
+            while (!shutdownToken.IsCancellationRequested)
             {
                 try
                 {
                     MainConsole.Instance?.Prompt();
                 }
-                catch (Exception) when (stoppingToken.IsCancellationRequested)
+                catch (Exception) when (shutdownToken.IsCancellationRequested)
                 {
                     // Host is stopping — exit the loop cleanly.
                     break;
@@ -78,6 +89,6 @@ public sealed class RegionConsoleRunnerService : BackgroundService
                     _logger.LogError(e, "[CONSOLE]: Unhandled error during console prompt.");
                 }
             }
-        }, stoppingToken).ConfigureAwait(false);
+        }, shutdownToken).ConfigureAwait(false);
     }
 }
