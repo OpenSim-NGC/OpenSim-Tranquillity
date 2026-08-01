@@ -232,8 +232,6 @@ public class FSAssetConnector : ServiceBase, IAssetService
                 if (m_readCount > 0)
                 {
                     double avg = (double)m_readTicks / (double)m_readCount;
-//                        if (avg > 10000)
-//                            Environment.Exit(0);
                     m_log.InfoFormat("[FSASSETS]: Read stats: {0} files, {1} ticks, avg {2:F2}, missing {3}, FS {4}", m_readCount, m_readTicks, (double)m_readTicks / (double)m_readCount, m_missingAssets, m_missingAssetsFS);
                 }
                 m_readCount = 0;
