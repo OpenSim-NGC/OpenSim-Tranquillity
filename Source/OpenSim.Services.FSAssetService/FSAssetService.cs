@@ -205,13 +205,15 @@ public class FSAssetConnector : ServiceBase, IAssetService
 
             if(m_WriterThread == null)
             {
-                m_WriterThread = new Thread(Writer);
+                // Background so the infinite Sleep loop cannot block process shutdown.
+                m_WriterThread = new Thread(Writer) { IsBackground = true };
                 m_WriterThread.Start();
             }
 
             if (m_showStats && m_StatsThread == null)
             {
-                m_StatsThread = new Thread(Stats);
+                // Background so the infinite Sleep loop cannot block process shutdown.
+                m_StatsThread = new Thread(Stats) { IsBackground = true };
                 m_StatsThread.Start();
             }
         }
