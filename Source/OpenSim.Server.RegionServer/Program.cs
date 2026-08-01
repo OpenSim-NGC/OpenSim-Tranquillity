@@ -130,7 +130,7 @@ public static class Program
 
         // Configure log4net up front so that early startup output is captured.
         ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
-        var logPath = Environment.GetEnvironmentVariable("LOG_PATH");
+        var logPath = Environment.GetEnvironmentVariable("LOGDIR");
         if (string.IsNullOrWhiteSpace(logPath) is false)
             log4NetBootstrapper.LogPath = logPath;
         string effectiveLogConfig = 

@@ -98,7 +98,7 @@ class Program
     {
         
         ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
-        var logPath = Environment.GetEnvironmentVariable("LOG_PATH");
+        var logPath = Environment.GetEnvironmentVariable("LOGDIR");
         if (string.IsNullOrWhiteSpace(logPath) is false)
             log4NetBootstrapper.LogPath = logPath;
         string effectiveLogConfig = log4NetBootstrapper.Configure(options.LogConfig, "OpenSim.Server.MoneyServer.dll.config");

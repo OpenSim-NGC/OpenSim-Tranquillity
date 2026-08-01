@@ -86,14 +86,21 @@ fi
 # Options handled.  Start things up.
 #
 
-BINDIR="$HOME/release/${release}"
-CONFIGDIR="$HOME/config"
-CONFIGFILE="$HOME/config/${SERVICENAME}.ini"
-CONSOLE="local"
+export BINDIR="$HOME/release/${release}"
+export LOGDIR="$HOME/data/logs"
+export CONFIGDIR="$HOME/config"
+export CONFIGFILE="$HOME/config/OpenSim.Server.${SERVICENAME}.ini"
+export CONSOLE="local"
  
-LOGCONFIG=""
-if [ -f ${CONFIGDIR}/${SERVICENAME}.exe.config ]; then
-    LOGCONFIG="-logconfig=${CONFIGDIR}/${SERVICENAME}.exe.config"
+export LOGCONFIG=""
+if [ -f ${CONFIGDIR}/OpenSim.Server.${SERVICENAME}.dll.config ]; then
+    export LOGCONFIG="-logconfig=${CONFIGDIR}/OpenSim.Server.${SERVICENAME}.dll.config"
+fi
+
+# Check for .env settings and if we find them load them
+if [ -x ${HOME}/.env.${SERVICENAME} ]
+then
+    source ${HOME}/.env.OpenSim.Server.${SERVICENAME} 
 fi
 
 if [ ! -d $BINDIR ]; then
@@ -104,12 +111,6 @@ fi
 if [ ! -f $CONFIGFILE ]; then
     echo "Cannot find configuration $CONFIGFILE to run!"
     exit 2
-fi
-
-# Check for .env settings and if we find them load them
-if [ -x ${HOME}/.env.${SERVICENAME} ]
-then
-    source ${HOME}/.env.${SERVICENAME} 
 fi
 
 ## And Start it up
