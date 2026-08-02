@@ -8,10 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="Nini.dll" HintPath="../../Library/Nini.dll" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Framework.Monitoring/OpenSim.Framework.Monitoring.csproj" />

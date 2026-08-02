@@ -133,13 +133,6 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     /// </value>
     public IConfigSource ConfigSource { get; private set; }
 
-    protected EnvConfigSource m_EnvConfigSource = new EnvConfigSource();
-
-    public EnvConfigSource envConfigSource
-    {
-        get { return m_EnvConfigSource; }
-    }
-
     public uint HttpServerPort
     {
         get { return m_httpServerPort; }
@@ -166,7 +159,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     protected virtual void LoadConfigSettings(IConfigSource configSource)
     {
         m_configLoader = new ConfigurationLoader();
-        ConfigSource = m_configLoader.LoadConfigSettings(configSource, envConfigSource, out m_configSettings, out m_networkServersInfo);
+        ConfigSource = m_configLoader.LoadConfigSettings(configSource, out m_configSettings, out m_networkServersInfo);
         Config = ConfigSource;
         ReadExtraConfigSettings();
     }

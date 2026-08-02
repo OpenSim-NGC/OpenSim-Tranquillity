@@ -66,7 +66,7 @@ public class ConfigurationLoader
     /// <param name="networkInfo"></param>
     /// <returns>A configuration that gets passed to modules</returns>
     public IConfigSource LoadConfigSettings(
-            IConfigSource argvSource, EnvConfigSource envConfigSource, out ConfigSettings configSettings,
+            IConfigSource argvSource, out ConfigSettings configSettings,
             out NetworkServersInfo networkInfo)
     {
         m_configSettings = configSettings = new ConfigSettings();

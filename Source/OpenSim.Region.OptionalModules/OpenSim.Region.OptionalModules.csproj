@@ -10,7 +10,6 @@
   <ItemGroup>
     <Reference Include="NDesk.Options" HintPath="../../Library/NDesk.Options.dll" />
     <Reference Include="netcd" HintPath="../../Library/netcd.dll" />
-    <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
     <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
   </ItemGroup>
 
