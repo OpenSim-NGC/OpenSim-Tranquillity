@@ -2,15 +2,16 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <OutputType>Exe</OutputType>
-    <AssemblyTitle>OpenSim.Server.RobustServer</AssemblyTitle>
-    <Product>OpenSim.Server.RobustServer</Product>
+    <AssemblyTitle>OpenSim.Server.GridServer</AssemblyTitle>
+    <Product>OpenSim.Server.GridServer</Product>
     <Description>The executable for grid services</Description>
     <IsPublishable>true</IsPublishable>
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
   </PropertyGroup>
-
+  
   <ItemGroup>
-    <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
   </ItemGroup>
 
   <ItemGroup>
@@ -57,14 +58,22 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="log4net" Version="3.3.1" />
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
     <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.2" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.2" />
-    <PackageReference Include="log4net" Version="3.3.1" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
     <PackageReference Include="OpenMetaverse" Version="1.2.13" />
     <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />
     <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.13" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Ini" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Log4Net.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="System.CommandLine" Version="2.0.8" />
+    <PackageReference Include="Autofac" Version="9.1.0" />
+    <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="11.0.0" />
   </ItemGroup>
   
   <ItemGroup>

@@ -15,7 +15,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="Nini" HintPath="..\..\Library\Nini.dll" />
   </ItemGroup>
 
   <ItemGroup>

@@ -10,7 +10,13 @@ WORKDIR /src
 #COPY ["Source/OpenSim.Server.GridServer/OpenSim.Server.GridServer.csproj", "Source/OpenSim.Server.GridServer/"]
 COPY . .
 
-RUN dotnet restore "Source/OpenSim.Server.GridServer/OpenSim.Server.GridServer.csproj"
+# Mount the secrets to supply the GitHub credentials referenced by nuget.config
+# (%GITHUB_ACTOR% / %GITHUB_TOKEN%) and restore packages in one layer.
+RUN --mount=type=secret,id=github_actor \
+    --mount=type=secret,id=github_token \
+    export GITHUB_ACTOR=$(cat /run/secrets/github_actor) && \
+    export GITHUB_TOKEN=$(cat /run/secrets/github_token) && \
+    dotnet restore "Source/OpenSim.Server.GridServer/OpenSim.Server.GridServer.csproj"
 #COPY . .
 # WORKDIR "/src/Source/OpenSim.Server.GridServer"
 RUN dotnet build "Source/OpenSim.Server.GridServer/OpenSim.Server.GridServer.csproj" --skip-restore -c $configuration -o /app/build

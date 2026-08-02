@@ -28,10 +28,6 @@
     
     
     
-    <Reference Include="Nini">
-      <HintPath>..\..\bin\Nini.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
   </ItemGroup>
   
   <ItemGroup>

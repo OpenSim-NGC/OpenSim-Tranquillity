@@ -1,0 +1,43 @@
+name: CI Build & Deploy
+
+on:
+  push:
+    branches:
+      - develop
+      - master
+      - 'release/*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # CRITICAL: NBGV relies on the full commit history to evaluate version height
+
+    - name: Setup .NET Desktop/Core
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Activate Nerdbank.GitVersioning
+      uses: dotnet/nbgv@v0.4.1
+      id: nbgv # Instantiates environment arrays (e.g., \$NBGV_NuGetPackageVersion)
+
+    - name: Restore Dependencies
+      run: dotnet restore
+
+    - name: Build Solution
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Pack Artifacts
+      run: dotnet pack --configuration Release --no-build
+
+    # Conditional Execution: Triggers deployment pipelines strictly for production code signatures
+    - name: Publish Production Release
+      if: github.ref == 'refs/heads/master'
+      run: |
+        echo "Deploying version \${{ steps.nbgv.outputs.SimpleVersion }} to Production Env!"
+        # Insert target dotnet nuget push or server staging scripts here

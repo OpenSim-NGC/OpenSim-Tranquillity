@@ -9,7 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
     <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
   </ItemGroup>
 
