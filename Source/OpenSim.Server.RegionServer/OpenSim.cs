@@ -71,10 +71,24 @@ public class OpenSim : OpenSimBase
 
     private string m_timedScript = "disabled";
     private int m_timeInterval = 1200;
-    private System.Timers.Timer m_scriptTimer;
+
+    /// <summary>
+    /// Registers the simulator status/stats HTTP handlers. Extracted from
+    /// <see cref="StartupSpecific"/> so handler wiring can be composed and tested
+    /// independently of the startup inheritance chain.
+    /// </summary>
+    protected IRegionStatusHandlerRegistrar StatusHandlerRegistrar { get; set; } = new RegionStatusHandlerRegistrar();
+
+    /// <summary>
+    /// Runs the startup/shutdown/timed console-command scripts. Extracted so the
+    /// script orchestration can be composed and tested independently of the startup
+    /// inheritance chain.
+    /// </summary>
+    protected IRegionStartupScriptService StartupScriptService { get; set; }
 
     public OpenSim(IConfigSource configSource) : base(configSource)
     {
+        StartupScriptService = new RegionStartupScriptService(RunCommandScript);
     }
 
     protected override void ReadExtraConfigSettings()
@@ -168,20 +182,7 @@ public class OpenSim : OpenSimBase
 
         base.StartupSpecific();
 
-        MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new SimStatusHandler());
-        MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new XSimStatusHandler(this));
-        if (userStatsURI != String.Empty)
-            MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new UXSimStatusHandler(this));
-        MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new SimRobotsHandler());
-        MainServer.Instance.DefaultServer.AddSimpleStreamHandler(new IndexPHPHandler(MainServer.Instance.DefaultServer));
-
-        if (!string.IsNullOrEmpty(managedStatsURI))
-        {
-            string urlBase = $"/{managedStatsURI}/";
-            StatsManager.StatsPassword = managedStatsPassword;
-            MainServer.Instance.DefaultServer.AddHTTPHandler(urlBase, StatsManager.HandleStatsRequest);
-            m_log.InfoFormat("[OPENSIM] Enabling remote managed stats fetch. URL = {0}", urlBase);
-        }
+        StatusHandlerRegistrar.Register(MainServer.Instance.DefaultServer, this);
 
         MethodInfo mi = m_console.GetType().GetMethod("SetServer", BindingFlags.Public | BindingFlags.Instance, null, new Type[] { typeof(BaseHttpServer) }, null);
 
@@ -206,25 +207,10 @@ public class OpenSim : OpenSimBase
             ChangeSelectedRegion("region", new string[] {"change", "region", "root"});
 
         //Run Startup Commands
-        if (String.IsNullOrEmpty(m_startupCommandsFile))
-        {
-            m_log.Info("[STARTUP]: No startup command script specified. Moving on...");
-        }
-        else
-        {
-            RunCommandScript(m_startupCommandsFile);
-        }
+        StartupScriptService.RunStartupScript(m_startupCommandsFile);
 
         // Start timer script (run a script every xx seconds)
-        if (m_timedScript != "disabled")
-        {
-            m_scriptTimer = new System.Timers.Timer()
-            {
-                Enabled = true,
-                Interval = m_timeInterval*1000,
-            };
-            m_scriptTimer.Elapsed += RunAutoTimerScript;
-        }
+        StartupScriptService.StartTimerScript(m_timedScript, m_timeInterval);
     }
 
     /// <summary>
@@ -456,31 +442,10 @@ public class OpenSim : OpenSimBase
 
     protected override void ShutdownSpecific()
     {
-        if (m_shutdownCommandsFile != String.Empty)
-        {
-            RunCommandScript(m_shutdownCommandsFile);
-        }
-
-        if (m_timedScript != "disabled")
-        {
-            m_scriptTimer.Dispose();
-            m_timedScript = "disabled";
-        }
+        StartupScriptService.RunShutdownScript(m_shutdownCommandsFile);
+        StartupScriptService.Stop();
 
         base.ShutdownSpecific();
-    }
-
-    /// <summary>
-    /// Timer to run a specific text file as console commands.  Configured in in the main ini file
-    /// </summary>
-    /// <param name="sender"></param>
-    /// <param name="e"></param>
-    private void RunAutoTimerScript(object sender, EventArgs e)
-    {
-        if (m_timedScript != "disabled")
-        {
-            RunCommandScript(m_timedScript);
-        }
     }
 
     private void WatchdogTimeoutHandler(Watchdog.ThreadWatchdogInfo twi)

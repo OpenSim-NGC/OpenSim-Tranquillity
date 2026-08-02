@@ -2195,18 +2195,11 @@ public static class Util
         // if section does not exist then user isn't expecting them, so don't bother.
         if (enVars != null)
         {
-            // load the values from the environment
-            EnvConfigSource envConfigSource = new();
-            // add the requested keys
-            string[] env_keys = enVars.GetKeys();
-            foreach (string key in env_keys)
-            {
-                envConfigSource.AddEnv(key, string.Empty);
-            }
-            // load the values from environment
-            envConfigSource.LoadEnv();
-            // add them in to the master
-            ConfigSource.Merge(envConfigSource);
+            // Each key in [Environment] names an environment variable to import;
+            // an unset variable resolves to an empty string (legacy behaviour).
+            foreach (string key in enVars.GetKeys())
+                enVars.Set(key, Environment.GetEnvironmentVariable(key) ?? string.Empty);
+
             ConfigSource.ExpandKeyValues();
         }
     }

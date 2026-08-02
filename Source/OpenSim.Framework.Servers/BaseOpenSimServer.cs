@@ -26,8 +26,6 @@
  */
 
 using System.Reflection;
-using System.Text;
-using System.Timers;
 using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
@@ -35,7 +33,6 @@ using log4net;
 using OpenMetaverse;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Framework.Servers.HttpServer;
-using Timer = System.Timers.Timer;
 using Nini.Config;
 using System.Runtime.InteropServices;
 
@@ -52,14 +49,6 @@ public abstract class BaseOpenSimServer : ServerBase
     /// Used by tests to suppress Environment.Exit(0) so that post-run operations are possible.
     /// </summary>
     public bool SuppressExit { get; set; }
-
-    /// <summary>
-    /// This will control a periodic log printout of the current 'show stats' (if they are active) for this
-    /// server.
-    /// </summary>
-
-    private int m_periodDiagnosticTimerMS = 60 * 60 * 1000;
-    private Timer m_periodicDiagnosticsTimer = new Timer(60 * 60 * 1000);
 
     /// <summary>
     /// Random uuid for private data
@@ -114,26 +103,15 @@ public abstract class BaseOpenSimServer : ServerBase
         ServicePointManager.ServerCertificateValidationCallback = ValidateServerCertificate;
 
         WebUtil.SetupHTTPClients(m_NoVerifyCertChain, m_NoVerifyCertHostname, null, 32 );
-
-        int logShowStatsSeconds = startupConfig.GetInt("LogShowStatsSeconds", m_periodDiagnosticTimerMS / 1000);
-        m_periodDiagnosticTimerMS = logShowStatsSeconds * 1000;
-        m_periodicDiagnosticsTimer.Elapsed += new ElapsedEventHandler(LogDiagnostics);
-        if (m_periodDiagnosticTimerMS != 0)
-        {
-            m_periodicDiagnosticsTimer.Interval = m_periodDiagnosticTimerMS;
-            m_periodicDiagnosticsTimer.Enabled = true;
-        }
     }
 
     protected override void ShutdownSpecific()
     {
-        Watchdog.Enabled = false;
         base.ShutdownSpecific();
-        
+
         MainServer.Instance.Stop();
 
         Thread.Sleep(500);
-        WorkManager.Stop();
 
         RemovePIDFile();
 
@@ -152,20 +130,6 @@ public abstract class BaseOpenSimServer : ServerBase
     /// A list of strings that represent different help topics on which more information is available
     /// </returns>
     protected virtual List<string> GetHelpTopics() { return new List<string>(); }
-
-    /// <summary>
-    /// Print statistics to the logfile, if they are active
-    /// </summary>
-    protected void LogDiagnostics(object source, ElapsedEventArgs e)
-    {
-        StringBuilder sb = new StringBuilder("DIAGNOSTICS\n\n");
-        sb.Append(GetUptimeReport());
-        sb.Append(StatsManager.SimExtraStats.Report());
-        sb.Append(Environment.NewLine);
-        sb.Append(GetThreadsReport());
-
-        m_log.Debug(sb);
-    }
 
     /// <summary>
     /// Performs initialisation of the scene, such as loading configuration from disk.

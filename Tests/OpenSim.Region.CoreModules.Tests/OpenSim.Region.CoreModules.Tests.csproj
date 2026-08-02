@@ -11,9 +11,6 @@
     <Reference Include="XMLRPC">
       <HintPath>..\..\Library\XMLRPC.dll</HintPath>
     </Reference>
-    <Reference Include="Nini">
-      <HintPath>..\..\Library\Nini.dll</HintPath>
-    </Reference>
   </ItemGroup>
   
   <ItemGroup>

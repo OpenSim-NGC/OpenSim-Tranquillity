@@ -117,6 +117,5 @@ echo "Starting grid service OpenSim.Server.GridServer (${SERVICENAME}) in direct
 CMDARGS="-inifile=${CONFIGFILE} -console=$CONSOLE ${LOGCONFIG}"
 
 (cd ${BINDIR} && screen -S ${SERVICENAME} -d -m dotnet OpenSim.Server.GridServer.dll ${CMDARGS})
-# (cd ${BINDIR} && screen -S ${SERVICENAME} -d -m dotnet Robust.dll ${CMDARGS})
 
 exit 0

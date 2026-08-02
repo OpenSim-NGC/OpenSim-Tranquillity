@@ -27,15 +27,17 @@
 
 using Nini.Config;
 using System.Xml;
-using OpenSim.Server.Base;
+using System.CommandLine;
 using OpenSim.Framework;
+using OpenSim.Framework.Console;
+using OpenSim.Server.Base.Hosting;
 using OpenMetaverse;
 
 namespace OpenSim.ConsoleClient;
 
 public class OpenSimConsoleClient
 {
-    protected static ServicesServerBase m_Server = null;
+    private static bool m_Running = true;
     private static string m_Host;
     private static int m_Port;
     private static string m_User;
@@ -44,45 +46,142 @@ public class OpenSimConsoleClient
 
     static int Main(string[] args)
     {
-        m_Server = new ServicesServerBase("Client", args);
-
-        IConfig serverConfig = m_Server.Config.Configs["Startup"];
-        if (serverConfig == null)
+        var logconfigOption = new Option<string>("--logconfig")
         {
-            System.Console.WriteLine("Startup config section missing in .ini file");
-            throw new Exception("Configuration error");
+            Description = "Instruct log4net to use this file as configuration file.",
+            DefaultValueFactory = _ => "OpenSim.ConsoleClient.dll.config",
+        };
+        var inifileOption = new Option<List<string>>("--inifile")
+        {
+            Description = "Specify the location of zero or more .ini file(s) to read."
+        };
+        var inimasterOption = new Option<string>("--inimaster")
+        {
+            Description = "The path to the master ini file. The master ini file will be read first and then overridden by any .ini files specified by --inifile options.",
+            DefaultValueFactory = _ => "OpenSim.ConsoleClient.ini",
+        };
+        var consoleOption = new Option<string>("--console")
+        {
+            Description = "console type, one of basic, local, rest or mock.",
+            DefaultValueFactory = _ => "local",
+        };
+        consoleOption.AcceptOnlyFromAmong("basic", "local", "rest", "mock");
+
+        var hostOption = new Option<string>("--host", "-h")
+        {
+            Description = "The remote console host to connect to."
+        };
+        var portOption = new Option<int?>("--port", "-p")
+        {
+            Description = "The remote console port to connect to."
+        };
+        var userOption = new Option<string>("--user", "-u")
+        {
+            Description = "The user name used to authenticate with the remote console."
+        };
+        var passOption = new Option<string>("--pass", "-P")
+        {
+            Description = "The password used to authenticate with the remote console."
+        };
+
+        RootCommand rootCommand = new RootCommand("OpenSim Remote Console Client");
+
+        rootCommand.Options.Add(logconfigOption);
+        rootCommand.Options.Add(inifileOption);
+        rootCommand.Options.Add(inimasterOption);
+        rootCommand.Options.Add(consoleOption);
+        rootCommand.Options.Add(hostOption);
+        rootCommand.Options.Add(portOption);
+        rootCommand.Options.Add(userOption);
+        rootCommand.Options.Add(passOption);
+
+        ParseResult parseResult = rootCommand.Parse(args);
+
+        if (parseResult.Errors.Count != 0)
+        {
+            foreach (var parseError in parseResult.Errors)
+                System.Console.Error.WriteLine(parseError.Message);
+
+            return 1;
         }
 
-        ArgvConfigSource argvConfig = new ArgvConfigSource(args);
+        rootCommand.SetAction(parseResult => Run(
+            logConfig: parseResult.GetValue(logconfigOption),
+            iniFiles: parseResult.GetValue(inifileOption),
+            iniMaster: parseResult.GetValue(inimasterOption),
+            consoleType: parseResult.GetValue(consoleOption),
+            host: parseResult.GetValue(hostOption),
+            port: parseResult.GetValue(portOption),
+            user: parseResult.GetValue(userOption),
+            pass: parseResult.GetValue(passOption)));
 
-        argvConfig.AddSwitch("Startup", "host", "h");
-        argvConfig.AddSwitch("Startup", "port", "p");
-        argvConfig.AddSwitch("Startup", "user", "u");
-        argvConfig.AddSwitch("Startup", "pass", "P");
+        return rootCommand.Parse(args).Invoke();
+    }
 
-        m_Server.Config.Merge(argvConfig);
+    static void Run(
+        string logConfig,
+        List<string> iniFiles,
+        string iniMaster,
+        string consoleType,
+        string host,
+        int? port,
+        string user,
+        string pass)
+    {
+        ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
+        log4NetBootstrapper.Configure(logConfig, "OpenSim.ConsoleClient.dll.config");
 
-        m_User = serverConfig.GetString("user", "Test");
-        m_Host = serverConfig.GetString("host", "localhost");
-        m_Port = serverConfig.GetInt("port", 8003);
-        m_Pass = serverConfig.GetString("pass", "secret");
+        IConfigSource config = LoadConfig(iniMaster, iniFiles);
+        IConfig startupConfig = config.Configs["Startup"];
+
+        // Command-line options take precedence over the ini file, which in turn
+        // overrides the built-in defaults.
+        m_User = !string.IsNullOrEmpty(user) ? user : startupConfig?.GetString("user", "Test") ?? "Test";
+        m_Host = !string.IsNullOrEmpty(host) ? host : startupConfig?.GetString("host", "localhost") ?? "localhost";
+        m_Port = port ?? startupConfig?.GetInt("port", 8003) ?? 8003;
+        m_Pass = !string.IsNullOrEmpty(pass) ? pass : startupConfig?.GetString("pass", "secret") ?? "secret";
+
+        string prompt = "Client> ";
+        MainConsole.Instance = consoleType switch
+        {
+            "basic" => new CommandConsole(prompt),
+            "rest" => new RemoteConsole(prompt),
+            "mock" => new MockConsole(),
+            _ => new LocalConsole(prompt),
+        };
 
         Requester.MakeRequest("http://"+m_Host+":"+m_Port.ToString()+"/StartSession/", String.Format("USER={0}&PASS={1}", m_User, m_Pass), LoginReply);
 
-
-        while (m_Server.Running)
+        while (m_Running)
         {
             System.Threading.Thread.Sleep(500);
             MainConsole.Instance.Prompt();
         }
 
-        string pidFile = serverConfig.GetString("PIDFile", string.Empty);
+        string pidFile = startupConfig?.GetString("PIDFile", string.Empty) ?? string.Empty;
         if (pidFile.Length > 0)
             File.Delete(pidFile);
 
         Environment.Exit(0);
+    }
 
-        return 0;
+    private static IConfigSource LoadConfig(string iniMaster, List<string> iniFiles)
+    {
+        IniConfigSource config = new IniConfigSource();
+
+        if (!string.IsNullOrEmpty(iniMaster) && File.Exists(iniMaster))
+            config.Merge(new IniConfigSource(iniMaster));
+
+        if (iniFiles != null)
+        {
+            foreach (string iniFile in iniFiles)
+            {
+                if (File.Exists(iniFile))
+                    config.Merge(new IniConfigSource(iniFile));
+            }
+        }
+
+        return config;
     }
 
     private static void SendCommand(string module, string[] cmd)

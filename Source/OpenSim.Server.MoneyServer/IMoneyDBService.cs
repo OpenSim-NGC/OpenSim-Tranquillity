@@ -38,6 +38,8 @@ namespace OpenSim.Server.MoneyServer;
 /// </summary>
 public interface IMoneyDBService
 {
+    void Initialise();
+
     int getBalance(string userID);
 
     bool withdrawMoney(UUID transactionID, string senderID, int amount);
