@@ -54,7 +54,7 @@ public static class Program
         var inimasterOption = new Option<string>("--inimaster")
         {
             Description = "The path to the master ini file. The master ini file will be read first and then overridden by any .ini files specified by --inifile or --inidirectory options.",
-            DefaultValueFactory = ParseResult => "OpenSim.ini",
+            DefaultValueFactory = ParseResult => "OpenSimDefaults.ini",
         };
         var inidirectoryOption = new Option<string>("--inidirectory")
         {
@@ -182,7 +182,7 @@ public static class Program
         })
         .ConfigureServices(services =>
         {
-            services.AddSingleton(new RegionHostOptions(args, background));
+            services.AddSingleton(new RegionHostOptions(iniFile, iniMaster, iniDirectory, consoleType, logConfig, background));
             services.AddSingleton<IProcessSetupService, ProcessSetupService>();
             services.AddSingleton<IStartupFailureCoordinator, StartupFailureCoordinator>();
             services.AddSingleton<IRuntimeMonitoringController, RuntimeMonitoringController>();

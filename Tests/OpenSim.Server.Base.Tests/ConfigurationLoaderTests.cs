@@ -14,9 +14,15 @@ using Xunit;
 
 namespace OpenSim.Server.Base.Tests;
 
+// These tests mutate the process-global working directory, so they must not run
+// in parallel with other collections (some of which load config from their own CWD).
+[CollectionDefinition("WorkingDirectorySensitive", DisableParallelization = true)]
+public sealed class WorkingDirectorySensitiveCollection { }
+
 /// <summary>
 /// Ported from the legacy NUnit <c>OpenSim.Tests.ConfigurationLoaderTests</c>.
 /// </summary>
+[Collection("WorkingDirectorySensitive")]
 public sealed class ConfigurationLoaderTests : IDisposable
 {
     private const string TestSubdirectory = "test";
@@ -100,6 +106,37 @@ public sealed class ConfigurationLoaderTests : IDisposable
         source.Configs.Remove(source.Configs["Network"]);
 
         Assert.Equal(_config.ToString(), source.ToString());
+    }
+
+    /// <summary>
+    /// Multiple --inifile values (encoded as inifile, inifile2, ...) are all merged.
+    /// </summary>
+    [Fact]
+    public void MultipleIniFilesAreAllLoaded()
+    {
+        _config = new IniConfigSource();
+
+        IniConfigSource ini = new IniConfigSource();
+        ini.AddConfig("SectionOne").Set("keyA", "valueA");
+        CreateIni("first.ini", ini);
+
+        ini = new IniConfigSource();
+        ini.AddConfig("SectionTwo").Set("keyB", "valueB");
+        CreateIni("second.ini", ini);
+
+        ConfigurationLoader cl = new ConfigurationLoader();
+        IConfigSource argvSource = new IniConfigSource();
+        IConfig startup = argvSource.AddConfig("Startup");
+        startup.Set("inimaster", "none");
+        startup.Set("inifile", "first.ini");
+        startup.Set("inifile2", "second.ini");
+        argvSource.AddConfig("Network");
+
+        IConfigSource source = cl.LoadConfigSettings(
+            argvSource, out ConfigSettings _, out NetworkServersInfo _);
+
+        Assert.Equal("valueA", source.Configs["SectionOne"].GetString("keyA"));
+        Assert.Equal("valueB", source.Configs["SectionTwo"].GetString("keyB"));
     }
 
     private void CreateIni(string filepath, IniConfigSource source)

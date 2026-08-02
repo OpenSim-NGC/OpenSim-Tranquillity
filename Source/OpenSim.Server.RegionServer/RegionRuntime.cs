@@ -85,7 +85,7 @@ public sealed class RegionRuntime : IRegionRuntime
             _logger.LogInformation("[OPENSIM MAIN]: Default culture changed to {Culture}",
                 Culture.GetDefaultCurrentCulture().DisplayName);
 
-            IConfigSource configSource = BuildConfigSource(_options.Args);
+            IConfigSource configSource = BuildConfigSource(_options);
 
             try
             {
@@ -143,14 +143,16 @@ public sealed class RegionRuntime : IRegionRuntime
     }
 
     /// <summary>
-    /// Builds the Nini configuration source from the original command-line
-    /// arguments, preserving the aliases, switches and default sections that
-    /// <c>Application.Main()</c> historically configured.
+    /// Builds the Nini configuration source from the already-parsed command-line
+    /// options, populating a <c>[Startup]</c> section directly instead of
+    /// re-parsing the raw process arguments. <c>ConfigurationLoader</c> then reads
+    /// these switches to load the ini files (with <c>Include-*</c> expansion).
     /// </summary>
-    internal static IConfigSource BuildConfigSource(string[] args)
+    internal static IConfigSource BuildConfigSource(RegionHostOptions options)
     {
-        ArgvConfigSource configSource = new ArgvConfigSource(args);
+        IniConfigSource configSource = new IniConfigSource();
 
+        // Boolean aliases so GetBoolean("background") accepts the legacy tokens.
         configSource.Alias.AddAlias("On", true);
         configSource.Alias.AddAlias("Off", false);
         configSource.Alias.AddAlias("True", true);
@@ -158,23 +160,29 @@ public sealed class RegionRuntime : IRegionRuntime
         configSource.Alias.AddAlias("Yes", true);
         configSource.Alias.AddAlias("No", false);
 
-        configSource.AddSwitch("Startup", "background");
-        configSource.AddSwitch("Startup", "inifile");
-        configSource.AddSwitch("Startup", "inimaster");
-        configSource.AddSwitch("Startup", "inidirectory");
-        configSource.AddSwitch("Startup", "physics");
-        configSource.AddSwitch("Startup", "gui");
-        configSource.AddSwitch("Startup", "console");
-        configSource.AddSwitch("Startup", "save_crashes");
-        configSource.AddSwitch("Startup", "crash_dir");
-        configSource.AddSwitch("Startup", "logconfig");
+        IConfig startup = configSource.AddConfig("Startup");
+
+        if (!string.IsNullOrWhiteSpace(options.IniMaster))
+            startup.Set("inimaster", options.IniMaster);
+        if (!string.IsNullOrWhiteSpace(options.IniDirectory))
+            startup.Set("inidirectory", options.IniDirectory);
+        if (!string.IsNullOrWhiteSpace(options.ConsoleType))
+            startup.Set("console", options.ConsoleType);
+        if (!string.IsNullOrWhiteSpace(options.LogConfig))
+            startup.Set("logconfig", options.LogConfig);
+        startup.Set("background", options.Background);
+
+        // Multiple --inifile values: the first is `inifile`, the rest are
+        // `inifile2`, `inifile3`, ... read back the same way by ConfigurationLoader.
+        for (int i = 0; i < options.IniFiles.Count; i++)
+            startup.Set(i == 0 ? "inifile" : $"inifile{i + 1}", options.IniFiles[i]);
 
         configSource.AddConfig("StandAlone");
         configSource.AddConfig("Network");
 
         // Crash dump settings are read by the static crash handler in Application.
-        Application.m_saveCrashDumps = configSource.Configs["Startup"].GetBoolean("save_crashes", false);
-        Application.m_crashDir = configSource.Configs["Startup"].GetString("crash_dir", Application.m_crashDir);
+        Application.m_saveCrashDumps = startup.GetBoolean("save_crashes", false);
+        Application.m_crashDir = startup.GetString("crash_dir", Application.m_crashDir);
 
         return configSource;
     }
