@@ -10,9 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpenMetaverse" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.13" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
     <PackageReference Include="FluentAssertions" Version="8.10.0" />
     <PackageReference Include="System.Runtime.Caching" Version="10.0.8" />
