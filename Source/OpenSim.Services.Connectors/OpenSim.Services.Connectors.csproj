@@ -29,8 +29,5 @@
     <PackageReference Include="CoreJ2K.Skia" Version="2.1.2.38" />
     <PackageReference Include="log4net" Version="3.3.1" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
-    <PackageReference Include="OpenMetaverse" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.13" />
   </ItemGroup>
 </Project>
