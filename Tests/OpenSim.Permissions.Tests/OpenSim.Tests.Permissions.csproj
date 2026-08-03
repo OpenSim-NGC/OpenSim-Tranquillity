@@ -33,9 +33,4 @@
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
-  </ItemGroup>
 </Project>
