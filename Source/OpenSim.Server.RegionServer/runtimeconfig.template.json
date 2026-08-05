@@ -4,7 +4,6 @@
       "System.GC.HighMemoryPercent": 50,
       "System.Globalization.UseNls": true,
       "System.Reflection.Metadata.MetadataUpdater.IsSupported": false,
-      "System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization": true,
       "System.Runtime.TieredCompilation.QuickJit": false
   }
 }

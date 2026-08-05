@@ -28,7 +28,6 @@
 using System.Timers;
 using OpenMetaverse;
 using OpenSim.Framework;
-using System.Runtime.Serialization.Formatters.Binary;
 using Timer = System.Timers.Timer;
 
 namespace OpenSim.Region.Framework.Scenes;
@@ -300,10 +299,56 @@ public class KeyframeMotion
 
         try
         {
-            using (MemoryStream ms = new MemoryStream(data))
+            // ONLY the explicit KFM1 format is accepted. Legacy BinaryFormatter
+            // blobs (and any malformed / short / oversized input) are refused by
+            // returning null - callers treat that as "no keyframe motion", which
+            // is the intended graceful degradation. We never BinaryFormatter-
+            // deserialize this (possibly foreign) byte[].
+            if (data == null || data.Length < 8 || data.Length > KFM_MAX_BYTES)
+                return null;
+
+            using (MemoryStream ms = new MemoryStream(data, false))
+            using (BinaryReader br = new BinaryReader(ms))
             {
-                BinaryFormatter fmt = new BinaryFormatter();
-                newMotion = (KeyframeMotion)fmt.Deserialize(ms);
+                if (br.ReadByte() != (byte)'K' || br.ReadByte() != (byte)'F' ||
+                    br.ReadByte() != (byte)'M' || br.ReadByte() != (byte)'1')
+                    return null;
+                if (br.ReadUInt32() != KFM_VERSION)
+                    return null;
+
+                newMotion = new KeyframeMotion();
+
+                newMotion.m_serializedPosition = ReadVector3(br);
+                newMotion.m_basePosition = ReadVector3(br);
+                newMotion.m_baseRotation = ReadQuaternion(br);
+                newMotion.m_currentFrame = ReadKeyframe(br);
+
+                int frameCount = br.ReadInt32();
+                if (frameCount < 0 || frameCount > KFM_MAX_FRAMES)
+                    return null;
+                List<Keyframe> frames = new List<Keyframe>(frameCount);
+                for (int i = 0; i < frameCount; i++)
+                    frames.Add(ReadKeyframe(br));
+                newMotion.m_frames = frames;
+
+                int kfCount = br.ReadInt32();
+                if (kfCount < -1 || kfCount > KFM_MAX_FRAMES)
+                    return null;
+                if (kfCount < 0)
+                    newMotion.m_keyframes = null;
+                else
+                {
+                    Keyframe[] kfs = new Keyframe[kfCount];
+                    for (int i = 0; i < kfCount; i++)
+                        kfs[i] = ReadKeyframe(br);
+                    newMotion.m_keyframes = kfs;
+                }
+
+                newMotion.m_mode = (PlayMode)br.ReadInt32();
+                newMotion.m_data = (DataFormat)br.ReadInt32();
+                newMotion.m_running = br.ReadBoolean();
+                newMotion.m_iterations = br.ReadInt32();
+                newMotion.m_skipLoops = br.ReadInt32();
             }
 
             newMotion.m_group = grp;
@@ -364,6 +409,23 @@ public class KeyframeMotion
 
         if (m_running)
             Start();
+    }
+
+    // ---- KFM1 safe serialization format ----
+    // Explicit length-prefixed binary, replaces the old BinaryFormatter blob.
+    // Magic 'K''F''M''1' + uint version, then the serializable fields written
+    // by hand. No type names in the stream; nothing arbitrary is instantiated.
+    private const uint KFM_VERSION = 1;
+    private const int  KFM_MAX_FRAMES = 1 << 20;          // sanity bound on counts
+    private const int  KFM_MAX_BYTES  = 16 * 1024 * 1024; // sanity bound on blob size
+
+    // Parameterless ctor used only by FromData() to build an instance we then
+    // populate field-by-field from a KFM1 blob.
+    private KeyframeMotion()
+    {
+        m_timerStopped = true;
+        m_isCrossing = false;
+        m_waitingCrossing = false;
     }
 
     public KeyframeMotion(SceneObjectGroup grp, PlayMode mode, DataFormat data)
@@ -824,16 +886,120 @@ public class KeyframeMotion
 
         using (MemoryStream ms = new MemoryStream())
         {
-            BinaryFormatter fmt = new BinaryFormatter();
             if (!m_selected && tmp != null)
                 m_serializedPosition = tmp.AbsolutePosition;
-            fmt.Serialize(ms, this);
+
+            // Write the explicit KFM1 format (no BinaryFormatter). bw wraps ms;
+            // we do not dispose bw so ms stays open for ToArray() below (ms is
+            // disposed by its own using).
+            BinaryWriter bw = new BinaryWriter(ms);
+            bw.Write((byte)'K');
+            bw.Write((byte)'F');
+            bw.Write((byte)'M');
+            bw.Write((byte)'1');
+            bw.Write(KFM_VERSION);
+
+            WriteVector3(bw, m_serializedPosition);
+            WriteVector3(bw, m_basePosition);
+            WriteQuaternion(bw, m_baseRotation);
+            WriteKeyframe(bw, m_currentFrame);
+
+            List<Keyframe> frames = m_frames;
+            bw.Write(frames == null ? 0 : frames.Count);
+            if (frames != null)
+            {
+                for (int i = 0; i < frames.Count; i++)
+                    WriteKeyframe(bw, frames[i]);
+            }
+
+            if (m_keyframes == null)
+                bw.Write(-1);
+            else
+            {
+                bw.Write(m_keyframes.Length);
+                for (int i = 0; i < m_keyframes.Length; i++)
+                    WriteKeyframe(bw, m_keyframes[i]);
+            }
+
+            bw.Write((int)m_mode);
+            bw.Write((int)m_data);
+            bw.Write(m_running);
+            bw.Write(m_iterations);
+            bw.Write(m_skipLoops);
+            bw.Flush();
+
             m_group = tmp;
             if (!timerWasStopped && m_running && !m_waitingCrossing)
                 StartTimer();
 
             return ms.ToArray();
         }
+    }
+
+    // ---- KFM1 primitive (de)serialization helpers ----
+
+    private static void WriteVector3(BinaryWriter bw, Vector3 v)
+    {
+        bw.Write(v.X);
+        bw.Write(v.Y);
+        bw.Write(v.Z);
+    }
+
+    private static Vector3 ReadVector3(BinaryReader br)
+    {
+        float x = br.ReadSingle();
+        float y = br.ReadSingle();
+        float z = br.ReadSingle();
+        return new Vector3(x, y, z);
+    }
+
+    private static void WriteQuaternion(BinaryWriter bw, Quaternion q)
+    {
+        bw.Write(q.X);
+        bw.Write(q.Y);
+        bw.Write(q.Z);
+        bw.Write(q.W);
+    }
+
+    private static Quaternion ReadQuaternion(BinaryReader br)
+    {
+        float x = br.ReadSingle();
+        float y = br.ReadSingle();
+        float z = br.ReadSingle();
+        float w = br.ReadSingle();
+        return new Quaternion(x, y, z, w);
+    }
+
+    private static void WriteKeyframe(BinaryWriter bw, Keyframe kf)
+    {
+        bw.Write(kf.Position.HasValue);
+        if (kf.Position.HasValue)
+            WriteVector3(bw, kf.Position.Value);
+
+        bw.Write(kf.Rotation.HasValue);
+        if (kf.Rotation.HasValue)
+            WriteQuaternion(bw, kf.Rotation.Value);
+
+        WriteQuaternion(bw, kf.StartRotation);
+        bw.Write(kf.TimeMS);
+        bw.Write(kf.TimeTotal);
+        WriteVector3(bw, kf.AngularVelocity);
+        WriteVector3(bw, kf.StartPosition);
+    }
+
+    private static Keyframe ReadKeyframe(BinaryReader br)
+    {
+        Keyframe kf = new Keyframe();
+        if (br.ReadBoolean())
+            kf.Position = ReadVector3(br);
+        if (br.ReadBoolean())
+            kf.Rotation = ReadQuaternion(br);
+        kf.StartRotation = ReadQuaternion(br);
+        kf.TimeMS = br.ReadInt32();
+        kf.TimeTotal = br.ReadInt32();
+        kf.AngularVelocity = ReadVector3(br);
+        kf.StartPosition = ReadVector3(br);
+        return kf;
     }
 
     public void StartCrossingCheck()
