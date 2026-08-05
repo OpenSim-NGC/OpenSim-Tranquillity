@@ -63,9 +63,7 @@ public class OpenSimAppender : AnsiColorTerminalAppender
                 else
                     level = "normal";
 
-                // The console's Output method appends its own line terminator, so strip the
-                // trailing newline produced by the layout's %newline to avoid a blank line.
-                m_console.Output(loggingMessage.TrimEnd('\r', '\n'), level);
+                m_console.Output(loggingMessage, level);
             }
             else
             {
