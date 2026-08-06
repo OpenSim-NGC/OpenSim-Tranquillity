@@ -82,10 +82,11 @@ fi
 # Options handled.  Start things up.
 #
 
-BINDIR="$HOME/release/${release}"
-CONFIGDIR="$HOME/config"
-CONFIGFILE="$HOME/config/${SERVICENAME}.ini"
-CONSOLE="basic"
+export BINDIR="$HOME/release/${release}"
+export LOGDIR="$HOME/data/logs"
+export CONFIGDIR="$HOME/config"
+export CONFIGFILE="$HOME/config/OpenSim.Server.${SERVICENAME}.ini"
+export CONSOLE="local"
 
 if [ ! -d $BINDIR ]; then
     echo "Runtime directory $BINDIR does not exist!"

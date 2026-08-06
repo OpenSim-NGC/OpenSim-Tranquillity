@@ -10,7 +10,6 @@
 
   <ItemGroup>
     <Reference Include="NDesk.Options" HintPath="../../Library/NDesk.Options.dll" />
-    <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
     <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
   </ItemGroup>
   
@@ -43,8 +42,5 @@
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
     <PackageReference Include="CoreJ2K.Skia" Version="2.1.2.38" />
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
-    <PackageReference Include="OpenMetaverse" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.13" />
   </ItemGroup>
 </Project>

@@ -60,110 +60,22 @@ public class Application
     public static string m_crashDir = "crashes";
 
     /// <summary>
-    /// Instance of the OpenSim class.  This could be OpenSim or OpenSimBackground depending on the configuration
+    /// Hooks the global crash reporter to the current app domain.
     /// </summary>
-    protected static OpenSimBase m_sim = null;
-
-    //could move our main function into OpenSimMain and kill this class
-    public static void Main(string[] args)
+    /// <remarks>
+    /// Previously the first statement of <c>Main()</c>. The generic-host entry point
+    /// (<see cref="Program"/>) now owns process startup and invokes this before the
+    /// host is built so unhandled exceptions are captured for the full lifetime.
+    /// </remarks>
+    public static void RegisterCrashDumpHandler()
     {
-        // First line, hook the appdomain to the crash reporter
         AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
+    }
 
-        Culture.SetCurrentCulture();
-        Culture.SetDefaultCurrentCulture();
-
-        ServicePointManager.DefaultConnectionLimit = 32;
-        ServicePointManager.MaxServicePointIdleTime = 30000;
-
-        try { ServicePointManager.DnsRefreshTimeout = 5000; } catch { }
-        ServicePointManager.Expect100Continue = false;
-        ServicePointManager.UseNagleAlgorithm = false;
-
-        // Add the arguments supplied when running the application to the configuration
-        ArgvConfigSource configSource = new ArgvConfigSource(args);
-
-        // Configure Log4Net
-        configSource.AddSwitch("Startup", "logconfig");
-        string logConfigFile = configSource.Configs["Startup"].GetString("logconfig", string.Empty);
-        if (!string.IsNullOrEmpty(logConfigFile))
-        {
-            XmlConfigurator.Configure(new System.IO.FileInfo(logConfigFile));
-            m_log.Info($"[OPENSIM MAIN]: configured log4net using \"{logConfigFile}\" as configuration file");
-        }
-        else
-        {
-            XmlConfigurator.Configure(new System.IO.FileInfo("OpenSim.dll.config"));
-            m_log.Info("[OPENSIM MAIN]: configured log4net using default OpenSim.dll.config");
-        }
-
-        m_log.Info($"[OPENSIM MAIN]: System Locale is {System.Threading.Thread.CurrentThread.CurrentCulture}");
-
-        int workerThreadsMin = 500;
-        int workerThreadsMax = 1000;
-        int iocpThreadsMin = 1000;
-        int iocpThreadsMax = 2000;
-
-        System.Threading.ThreadPool.GetMinThreads(out int currentMinWorkerThreads, out int currentMinIocpThreads);
-        m_log.Info($"[OPENSIM MAIN]: Runtime gave us {currentMinWorkerThreads} min worker threads and {currentMinIocpThreads} min IOCP threads");
-
-        System.Threading.ThreadPool.GetMaxThreads(out int workerThreads, out int iocpThreads);
-        m_log.Info($"[OPENSIM MAIN]: Runtime gave us {workerThreads} max worker threads and {iocpThreads} max IOCP threads");
-
-        if (workerThreads < workerThreadsMin)
-        {
-            workerThreads = workerThreadsMin;
-            m_log.Info($"[OPENSIM MAIN]: Bumping up max worker threads to {workerThreads}");
-        }
-        if (workerThreads > workerThreadsMax)
-        {
-            workerThreads = workerThreadsMax;
-            m_log.Info($"[OPENSIM MAIN]: Limiting max worker threads to {workerThreads}");
-        }
-
-        // Increase the number of IOCP threads available.
-        // Mono defaults to a tragically low number (24 on 6-core / 8GB Fedora 17)
-        if (iocpThreads < iocpThreadsMin)
-        {
-            iocpThreads = iocpThreadsMin;
-            m_log.Info($"[OPENSIM MAIN]: Bumping up max IOCP threads to {iocpThreads}");
-        }
-        // Make sure we don't overallocate IOCP threads and thrash system resources
-        if ( iocpThreads > iocpThreadsMax )
-        {
-            iocpThreads = iocpThreadsMax;
-            m_log.Info($"[OPENSIM MAIN]: Limiting max IOCP completion threads to {iocpThreads}");
-        }
-        // set the resulting worker and IO completion thread counts back to ThreadPool
-        if ( System.Threading.ThreadPool.SetMaxThreads(workerThreads, iocpThreads) )
-        {
-            m_log.Info($"[OPENSIM MAIN]: Threadpool set to {workerThreads} max worker threads and {iocpThreads} max IOCP threads");
-        }
-        else
-        {
-            m_log.Warn("[OPENSIM MAIN]: Threadpool reconfiguration failed, runtime defaults still in effect.");
-        }
-
-        // Check if the system is compatible with OpenSimulator.
-        // Ensures that the minimum system requirements are met
-        string error = string.Empty;
-        if (Util.IsEnvironmentSupported(ref error))
-        {
-            m_log.Info("[OPENSIM MAIN]: Environment is supported by OpenSimulator.");
-        }
-        else
-        {
-            m_log.Warn($"[OPENSIM MAIN]: Environment is not supported by OpenSimulator: {error}\n");
-        }
-
-        m_log.Info($"Default culture changed to {Culture.GetDefaultCurrentCulture().DisplayName}");
-
-        // Configure nIni aliases and localles
-
-        // Validate that the user has the most basic configuration done
-        // If not, offer to do the most basic configuration for them warning them along the way of the importance of
-        // reading these files.
-        /*
+    // The legacy interactive configuration bootstrap is retained for reference.
+    /*
+    private static void LegacyConfigurationBootstrap()
+    {
         m_log.Info("Checking for reguired configuration...\n");
 
         bool OpenSim_Ini = (File.Exists(Path.Combine(Util.configDir(), "OpenSim.ini")))
@@ -266,7 +178,6 @@ public class Application
             }
             MainConsole.Instance = null;
         }
-        */
         configSource.Alias.AddAlias("On", true);
         configSource.Alias.AddAlias("Off", false);
         configSource.Alias.AddAlias("True", true);
@@ -321,6 +232,7 @@ public class Application
             }
         }
     }
+    */
 
     private static bool _IsHandlingException = false; // Make sure we don't go recursive on ourself
 

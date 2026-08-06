@@ -103,6 +103,27 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
     public List<IApplicationPlugin> m_plugins = new List<IApplicationPlugin>();
 
+    /// <summary>
+    /// Owns the application-plugin lifecycle (load/post-initialise/dispose). Extracted
+    /// so plugin handling can be composed and tested independently of the startup
+    /// inheritance chain.
+    /// </summary>
+    protected IRegionPluginService PluginService { get; set; } = new RegionPluginService();
+
+    /// <summary>
+    /// Provisions TLS certificates before the HTTP listeners are created. Extracted so
+    /// certificate provisioning can be composed and tested independently of the startup
+    /// inheritance chain.
+    /// </summary>
+    protected IRegionCertificateProvisioner CertificateProvisioner { get; set; } = new RegionCertificateProvisioner();
+
+    /// <summary>
+    /// Gates the monitoring watchdogs on all-regions-ready status. Extracted so the
+    /// gating policy can be composed and tested independently of the startup
+    /// inheritance chain.
+    /// </summary>
+    protected IRegionReadyStatusMonitor ReadyStatusMonitor { get; set; } = new RegionReadyStatusMonitor();
+
     private List<string> m_permsModules;
 
     private bool m_securePermissionsLoading = true;
@@ -111,13 +132,6 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     /// The config information passed into the OpenSimulator region server.
     /// </value>
     public IConfigSource ConfigSource { get; private set; }
-
-    protected EnvConfigSource m_EnvConfigSource = new EnvConfigSource();
-
-    public EnvConfigSource envConfigSource
-    {
-        get { return m_EnvConfigSource; }
-    }
 
     public uint HttpServerPort
     {
@@ -145,7 +159,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     protected virtual void LoadConfigSettings(IConfigSource configSource)
     {
         m_configLoader = new ConfigurationLoader();
-        ConfigSource = m_configLoader.LoadConfigSettings(configSource, envConfigSource, out m_configSettings, out m_networkServersInfo);
+        ConfigSource = m_configLoader.LoadConfigSettings(configSource, out m_configSettings, out m_networkServersInfo);
         Config = ConfigSource;
         ReadExtraConfigSettings();
     }
@@ -169,27 +183,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     protected virtual void LoadPlugins()
     {
         IConfig startupConfig = Config.Configs["Startup"];
-        string registryLocation = (startupConfig != null) ? startupConfig.GetString("RegistryLocation", String.Empty) : String.Empty;
-
-        // The location can also be specified in the environment. If there
-        // is no location in the configuration, we must call the constructor
-        // without a location parameter to allow that to happen.
-        if (registryLocation.Length == 0)
-        {
-            using (PluginLoader<IApplicationPlugin> loader = new PluginLoader<IApplicationPlugin>(new ApplicationPluginInitialiser(this)))
-            {
-                loader.Load("/OpenSim/Startup");
-                m_plugins = loader.Plugins;
-            }
-        }
-        else
-        {
-            using (PluginLoader<IApplicationPlugin> loader = new PluginLoader<IApplicationPlugin>(new ApplicationPluginInitialiser(this), registryLocation))
-            {
-                loader.Load("/OpenSim/Startup");
-                m_plugins = loader.Plugins;
-            }
-        }
+        m_plugins = PluginService.Load(this, startupConfig);
     }
 
     protected override List<string> GetHelpTopics()
@@ -273,8 +267,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
         // We still want to post initalize any plugins even if loading has been disabled since a test may have
         // inserted them manually.
-        foreach (IApplicationPlugin plugin in m_plugins)
-            plugin.PostInitialise();
+        PluginService.PostInitialise(m_plugins);
 
         if (m_console != null)
             AddPluginCommands(m_console);
@@ -347,28 +340,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
         // Sure is not the right place for this but do the job...
         // Must always be called before (all) / the HTTP servers starting for the Certs creation or renewals.
-        if (startupConfig.GetBoolean("EnableSelfsignedCertSupport", false))
-        {
-            if (!File.Exists("SSL\\ssl\\" + startupConfig.GetString("CertFileName") + ".p12") || startupConfig.GetBoolean("CertRenewOnStartup"))
-            {
-                Util.CreateOrUpdateSelfsignedCert(
-                    string.IsNullOrEmpty(startupConfig.GetString("CertFileName")) ? "OpenSim" : startupConfig.GetString("CertFileName"),
-                    string.IsNullOrEmpty(startupConfig.GetString("CertHostName")) ? "localhost" : startupConfig.GetString("CertHostName"),
-                    string.IsNullOrEmpty(startupConfig.GetString("CertHostIp")) ? "127.0.0.1" : startupConfig.GetString("CertHostIp"),
-                    string.IsNullOrEmpty(startupConfig.GetString("CertPassword")) ? string.Empty : startupConfig.GetString("CertPassword")
-                );
-            }
-        }
-
-        if (startupConfig.GetBoolean("EnableCertConverter", false))
-        {
-            Util.ConvertPemToPKCS12(
-               string.IsNullOrEmpty(startupConfig.GetString("outputCertName")) ? "letsencrypt" : startupConfig.GetString("outputCertName"),
-               string.IsNullOrEmpty(startupConfig.GetString("PemCertPublicKey")) ? string.Empty : startupConfig.GetString("PemCertPublicKey"),
-               string.IsNullOrEmpty(startupConfig.GetString("PemCertPrivateKey")) ? string.Empty : startupConfig.GetString("PemCertPrivateKey"),
-               string.IsNullOrEmpty(startupConfig.GetString("outputCertPassword")) ? string.Empty : startupConfig.GetString("outputCertPassword")
-           );
-        }
+        CertificateProvisioner.Provision(startupConfig);
 
         if (m_networkServersInfo.HttpUsesSSL)
         {
@@ -383,13 +355,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
         SceneManager.OnRestartSim += HandleRestartRegion;
 
-        // Only enable the watchdogs when all regions are ready.  Otherwise we get false positives when cpu is
-        // heavily used during initial startup.
-        //
-        // FIXME: It's also possible that region ready status should be flipped during an OAR load since this
-        // also makes heavy use of the CPU.
-        SceneManager.OnRegionsReadyStatusChange
-            += sm => { MemoryWatchdog.Enabled = sm.AllRegionsReady; Watchdog.Enabled = sm.AllRegionsReady; };
+        ReadyStatusMonitor.Attach(SceneManager);
     }
 
     /// <summary>
@@ -892,7 +858,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     /// If the request contains a key, "callback" the response will be wrappend in the
     /// associated value for jsonp used with ajax/javascript
     /// </summary>
-    protected class UXSimStatusHandler : SimpleStreamHandler
+    public class UXSimStatusHandler : SimpleStreamHandler
     {
         OpenSimBase m_opensim;
 
@@ -939,6 +905,47 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     #endregion
 
     /// <summary>
+    /// Optional hook that routes an interactive shutdown request to the generic host
+    /// instead of tearing the runtime down inline.
+    /// </summary>
+    /// <remarks>
+    /// When set (by <see cref="RegionRuntime"/>), the console "quit"/"shutdown" commands and
+    /// the Ctrl-C handler request a cooperative host stop rather than running the legacy
+    /// teardown and <c>Environment.Exit(0)</c> directly. The host then performs the single
+    /// teardown through <see cref="ShutdownHosted"/> via <c>RegionRuntime.Stop()</c>.
+    /// </remarks>
+    public Action HostShutdownRequested { get; set; }
+
+    /// <summary>
+    /// Entry point used by the console "quit"/"shutdown" commands and the Ctrl-C handler.
+    /// In hosted mode this only requests a cooperative host shutdown; the actual teardown is
+    /// performed once by <see cref="ShutdownHosted"/>. In standalone mode (no host hook) it
+    /// falls back to the legacy inline teardown.
+    /// </summary>
+    public override void Shutdown()
+    {
+        Action hook = HostShutdownRequested;
+        if (hook is not null)
+        {
+            hook();
+            return;
+        }
+
+        base.Shutdown();
+    }
+
+    /// <summary>
+    /// Performs the actual runtime teardown under host control, suppressing the legacy
+    /// <c>Environment.Exit(0)</c> so the host owns process exit. Invoked once by
+    /// <c>RegionRuntime.Stop()</c>.
+    /// </summary>
+    public void ShutdownHosted()
+    {
+        SuppressExit = true;
+        base.Shutdown();
+    }
+
+    /// <summary>
     /// Performs any last-minute sanity checking and shuts down the region server
     /// </summary>
     protected override void ShutdownSpecific()
@@ -957,8 +964,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
         {
             SceneManager.Close();
 
-            foreach (IApplicationPlugin plugin in m_plugins)
-                plugin.Dispose();
+            PluginService.Dispose(m_plugins);
         }
         catch (Exception e)
         {
