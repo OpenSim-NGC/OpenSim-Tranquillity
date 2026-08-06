@@ -1766,6 +1766,10 @@ public partial class Scene : SceneBase
                 // Check if any objects have reached their targets
                 CheckAtTargets();
 
+                // Phlox: fire moving_start/moving_end on general physical movement
+                // (mirrors Legion Grid heartbeat ordering — right after CheckAtTargets).
+                CheckMovingTransitions();
+
                 // Update SceneObjectGroups that have scheduled themselves for updates
                 // Objects queue their updates onto all scene presences
                 if (Frame % m_update_objects == 0)
@@ -2006,6 +2010,38 @@ public partial class Scene : SceneBase
                     grp.CheckAtTargets();
             }
         }
+    }
+
+    // Phlox: minimum squared velocity (linear or angular) for a physical group to
+    // be considered "moving". Ported from Legion Grid Scene.cs.
+    private const float MOVING_VELOCITY_THRESHOLD_SQ = 0.01f;
+
+    // Phlox: fire moving_start / moving_end on GENERAL (physical) movement, not just
+    // keyframed motion. Legion-exclusive heartbeat trigger ported from Legion Grid
+    // Scene.cs; invoked from Heartbeat() immediately after CheckAtTargets().
+    private void CheckMovingTransitions()
+    {
+        ForEachSOG(sog =>
+        {
+            SceneObjectPart rootPart = sog.RootPart;
+            if (rootPart is null)
+                return;
+
+            PhysicsActor physActor = rootPart.PhysActor;
+            if (physActor is null || !physActor.IsPhysical)
+                return;
+
+            bool currentlyMoving =
+                physActor.Velocity.LengthSquared() > MOVING_VELOCITY_THRESHOLD_SQ ||
+                physActor.RotationalVelocity.LengthSquared() > MOVING_VELOCITY_THRESHOLD_SQ;
+
+            if (currentlyMoving && !sog.WasMoving)
+                m_eventManager.TriggerMovingStartEvent(rootPart.LocalId);
+            else if (!currentlyMoving && sog.WasMoving)
+                m_eventManager.TriggerMovingEndEvent(rootPart.LocalId);
+
+            sog.WasMoving = currentlyMoving;
+        });
     }
 
     /// <summary>

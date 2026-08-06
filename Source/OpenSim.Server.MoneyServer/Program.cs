@@ -12,11 +12,10 @@ using System.CommandLine;
 using Autofac.Extensions.DependencyInjection;
 using Autofac;
 
-using OpenSim.Framework.Console;
 using OpenSim.Server.Base;
+using OpenSim.Server.Base.Hosting;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
-using log4net.Config;
 using Microsoft.AspNetCore.Hosting;
 using OpenSim.Server.MoneyServer.Models;
 using Microsoft.AspNetCore.Builder;
@@ -79,13 +78,14 @@ class Program
         }
         else
         {
-            rootCommand.SetAction(parseResult => Configure( 
-                logConfig: parseResult.GetValue(logconfigOption), 
-                iniFile: parseResult.GetValue(inifileOption), 
-                iniMaster: parseResult.GetValue(inimasterOption), 
-                iniDirectory: parseResult.GetValue(inidirectoryOption), 
-                consoleType: parseResult.GetValue(consoleOption)
-                )
+            rootCommand.SetAction(parseResult => Configure(new ServerStartupOptions
+                {
+                    LogConfig    = parseResult.GetValue(logconfigOption),
+                    IniFiles     = parseResult.GetValue(inifileOption) ?? [],
+                    IniMaster    = parseResult.GetValue(inimasterOption),
+                    IniDirectory = parseResult.GetValue(inidirectoryOption),
+                    ConsoleType  = parseResult.GetValue(consoleOption),
+                })
             );
         }
          
@@ -94,35 +94,34 @@ class Program
         return 0;
     }
 
-    static void Configure(
-        string logConfig, 
-        List<string> iniFile, 
-        string iniMaster, 
-        string iniDirectory, 
-        string consoleType
-        )
+    static void Configure(ServerStartupOptions options)
     {
+        
+        ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
+        var logPath = Environment.GetEnvironmentVariable("LOGDIR");
+        if (string.IsNullOrWhiteSpace(logPath) is false)
+            log4NetBootstrapper.LogPath = logPath;
+        string effectiveLogConfig = log4NetBootstrapper.Configure(options.LogConfig, "OpenSim.Server.MoneyServer.dll.config");
+
         IHostBuilder builder = Host.CreateDefaultBuilder();
+
+        // Transitional bridge for services that still require Nini IConfigSource.
+        ILegacyConfigSourceAccessor legacyConfigAccessor = new LegacyIniConfigSourceAccessor(options);
+
+        // Transitional bridge for static MainConsole usage.
+        IConsoleContext consoleContext = new ConsoleContext(new ConsoleFactory().Create(options.ConsoleType, "MoneyServer> "));
+
+        // Bridges the legacy console "quit"/"shutdown" commands to the host lifetime.
+        // HostLifetime is assigned after the host is built (see below).
+        HostLifetimeServerBase serverBase = new HostLifetimeServerBase
+        {
+            Console = consoleContext.Console,
+            Config = legacyConfigAccessor.ConfigSource
+        };
 
         builder.ConfigureAppConfiguration(configuration =>
         {
-            configuration.AddIniFile(iniMaster, optional: true, reloadOnChange: true);
-
-            foreach (var item in iniFile)
-            {
-                configuration.AddIniFile(item, optional: true, reloadOnChange: true);
-            }
-
-            if (string.IsNullOrEmpty(iniDirectory) is false)
-            {
-                if (Directory.Exists(iniDirectory))
-                {
-                    foreach (var item in Directory.GetFiles(iniDirectory, "*.ini"))
-                    {
-                        configuration.AddIniFile(item, optional: true, reloadOnChange: true);
-                    }
-                }
-            }
+            configuration.AddOpenSimIniFiles(options);
         });
 
         builder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
@@ -140,26 +139,11 @@ class Program
             directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "addon-modules");
             RegisterServices.Register(registry, directoryPath);
 
-            // Deal with the old fashioned config here for now.  This will go away when we're fully
-            // converted to .NET Generic Host and can use the built in configuration system everywhere
-            XmlConfigurator.Configure();
-            var moneyConfig = new MoneyServerConfigSource(iniMaster);
-            //registryBuilder.RegisterInstance(moneyConfig).AsSelf().SingleInstance();
-
-            var prompt = "MoneyServer> ";
-            ICommandConsole console = null;
-
-            if (consoleType == "basic")
-                console = new CommandConsole(prompt);
-            else if (consoleType == "rest")
-                console = new RemoteConsole(prompt);
-            else if (consoleType == "mock")
-                console = new MockConsole();
-            else if (consoleType == "local")
-                console = new LocalConsole(prompt);
+            registryBuilder.RegisterInstance<IConsoleContext>(consoleContext).AsImplementedInterfaces().SingleInstance();
+            registryBuilder.RegisterInstance<ILegacyConfigSourceAccessor>(legacyConfigAccessor).AsImplementedInterfaces().SingleInstance();
 
             registryBuilder.RegisterInstance<IServerBase>(
-                new ServerBase { Console = console, Config = moneyConfig.m_config }).AsImplementedInterfaces().SingleInstance();
+                serverBase).AsImplementedInterfaces().SingleInstance();
 
             registryBuilder.RegisterType<MoneyXmlRpcController>().AsSelf().SingleInstance();
             registryBuilder.RegisterType<MoneyDBService>().As<IMoneyDBService>().AsSelf().SingleInstance();
@@ -167,18 +151,27 @@ class Program
         .ConfigureLogging(loggingBuilder =>
         {
             loggingBuilder.ClearProviders();
-            loggingBuilder.AddLog4Net(log4NetConfigFile: logConfig);
+            loggingBuilder.AddLog4Net(log4NetConfigFile: effectiveLogConfig);
             loggingBuilder.AddConsole();
         })
         .ConfigureServices(services =>
         {
             services.AddControllers().AddControllersAsServices();
+            services.AddSingleton<IProcessSetupService, ProcessSetupService>();
+            services.AddSingleton<IPidFileManager, PidFileManager>();
+            services.AddSingleton<IMainServerAccessor, MainServerAccessor>();
+            services.AddSingleton<IRuntimeMonitoringController, RuntimeMonitoringController>();
             services.AddSingleton<MoneySessionStore>();
+            services.AddSingleton<IStartupFailureCoordinator, StartupFailureCoordinator>();
+            services.AddSingleton<IMoneyServerRuntime, MoneyServerRuntime>();
+
+            services.AddHostedService<ProcessSetupHostedService>();
+            services.AddHostedService<PidFileHostedService>();
 
             services.AddSingleton<MoneyService>();
             services.AddSingleton<IMoneyServiceCore>(sp => sp.GetRequiredService<MoneyService>());
             services.AddHostedService(sp => sp.GetRequiredService<MoneyService>());
-            // services.AddHostedService<PidFileService>();
+            services.AddHostedService<MoneyConsoleRunnerService>();
         });
 
         builder.ConfigureWebHostDefaults(webBuilder =>
@@ -205,6 +198,10 @@ class Program
         });
 
         MoneyHost = builder.Build();
+
+        // Now that the host exists, let the console "quit"/"shutdown" commands stop it.
+        serverBase.HostLifetime = MoneyHost.Services.GetRequiredService<IHostApplicationLifetime>();
+
         MoneyHost.Run();
     }
 }

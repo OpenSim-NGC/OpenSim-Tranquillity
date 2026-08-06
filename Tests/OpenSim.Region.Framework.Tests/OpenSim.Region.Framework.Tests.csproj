@@ -25,16 +25,6 @@
   </ItemGroup>
   
   <ItemGroup>
-    
-    
-    
-    <Reference Include="Nini">
-      <HintPath>..\..\bin\Nini.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-  </ItemGroup>
-  
-  <ItemGroup>
     <ProjectReference Include="..\..\OpenSim\Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\..\OpenSim\Framework\Servers\OpenSim.Framework.Servers.csproj" />
     <ProjectReference Include="..\..\OpenSim\Framework\Servers\HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
@@ -47,11 +37,6 @@
     <ProjectReference Include="..\..\OpenSim\Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
     <ProjectReference Include="..\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
-    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.8-beta" />
   </ItemGroup>
 </Project>
 

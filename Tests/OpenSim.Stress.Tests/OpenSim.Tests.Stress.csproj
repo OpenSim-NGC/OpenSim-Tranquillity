@@ -8,9 +8,6 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    
-    
-    
     <Reference Include="XMLRPC">
       <HintPath>..\..\bin\XMLRPC.dll</HintPath>
       <Private>False</Private>
@@ -45,11 +42,5 @@
 
   <ItemGroup>
     <Using Include="NUnit.Framework" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="OpenMetaverse" Version="1.2.8-beta" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.8-beta" />
-    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.8-beta" />
   </ItemGroup>
 </Project>
