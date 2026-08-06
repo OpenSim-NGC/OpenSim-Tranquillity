@@ -438,6 +438,22 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
     protected SceneObjectPart m_rootPart;
     // private Dictionary<UUID, scriptEvents> m_scriptEvents = new Dictionary<UUID, scriptEvents>();
 
+    // Phlox: tracks whether this group was moving on the previous heartbeat so
+    // Scene.CheckMovingTransitions() can fire moving_start/moving_end on general
+    // (non-keyframed) movement. Ported from Legion Grid SceneObjectGroup.cs.
+    public bool WasMoving { get; set; }
+
+    // Phlox seam: linkset data is per-linkset (per-group) in SL, but Tranquillity
+    // stores it natively on the root SceneObjectPart and serializes/persists it there.
+    // Expose a group-level accessor that delegates to the root part so the SL/Phlox
+    // call sites see a group-level store while persistence rides Tranquillity's
+    // existing per-part path (no parallel store).
+    public LinksetData LinksetData
+    {
+        get { return RootPart?.LinksetData; }
+        set { if (RootPart is not null) RootPart.LinksetData = value; }
+    }
+
     private Dictionary<int, scriptPosTarget> m_targets = new();
     private Dictionary<int, scriptRotTarget> m_rotTargets = new();
     private Dictionary<UUID, List<int>> m_targetsByScript = new();

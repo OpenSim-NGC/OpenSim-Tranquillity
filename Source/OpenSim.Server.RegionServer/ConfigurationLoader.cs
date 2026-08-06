@@ -66,7 +66,7 @@ public class ConfigurationLoader
     /// <param name="networkInfo"></param>
     /// <returns>A configuration that gets passed to modules</returns>
     public IConfigSource LoadConfigSettings(
-            IConfigSource argvSource, EnvConfigSource envConfigSource, out ConfigSettings configSettings,
+            IConfigSource argvSource, out ConfigSettings configSettings,
             out NetworkServersInfo networkInfo)
     {
         m_configSettings = configSettings = new ConfigSettings();
@@ -108,30 +108,38 @@ public class ConfigurationLoader
             }
         }
 
-        string iniFileName = startupConfig.GetString("inifile", "OpenSim.ini");
+        // Support one or more inifiles: `inifile`, then `inifile2`, `inifile3`, ...
+        List<string> iniFileNames = new() { startupConfig.GetString("inifile", "OpenSim.ini") };
+        for (int n = 2; startupConfig.Contains("inifile" + n); n++)
+            iniFileNames.Add(startupConfig.GetString("inifile" + n));
 
-        if (IsUri(iniFileName))
+        bool firstIniFile = true;
+        foreach (string iniFileName in iniFileNames)
         {
-            if (!sources.Contains(iniFileName))
-                sources.Add(iniFileName);
-            Application.iniFilePath = iniFileName;
-        }
-        else
-        {
-            Application.iniFilePath = Path.GetFullPath(
-                Path.Combine(Util.configDir(), iniFileName));
-
-            if (!File.Exists(Application.iniFilePath))
+            if (IsUri(iniFileName))
             {
-                iniFileName = "OpenSim.xml";
-                Application.iniFilePath = Path.GetFullPath(Path.Combine(Util.configDir(), iniFileName));
+                if (!sources.Contains(iniFileName))
+                    sources.Add(iniFileName);
+
+                if (firstIniFile)
+                    Application.iniFilePath = iniFileName;
+            }
+            else
+            {
+                string iniFilePath = Path.GetFullPath(Path.Combine(Util.configDir(), iniFileName));
+
+                // Legacy fallback to the XML configuration form.
+                if (!File.Exists(iniFilePath))
+                    iniFilePath = Path.GetFullPath(Path.Combine(Util.configDir(), "OpenSim.xml"));
+
+                if (firstIniFile)
+                    Application.iniFilePath = iniFilePath;
+
+                if (File.Exists(iniFilePath) && !sources.Contains(iniFilePath))
+                    sources.Add(iniFilePath);
             }
 
-            if (File.Exists(Application.iniFilePath))
-            {
-                if (!sources.Contains(Application.iniFilePath))
-                    sources.Add(Application.iniFilePath);
-            }
+            firstIniFile = false;
         }
 
         m_config = new IniConfigSource();
