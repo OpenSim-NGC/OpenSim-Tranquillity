@@ -11,7 +11,6 @@
   <ItemGroup>
     <Reference Include="C5" HintPath="../../Library/C5.dll" />
     <Reference Include="NDesk.Options" HintPath="../../Library/NDesk.Options.dll" />
-    <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,8 +28,5 @@
   <ItemGroup>
     <PackageReference Include="log4net" Version="3.3.1" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
-    <PackageReference Include="OpenMetaverse" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.13" />
   </ItemGroup>
 </Project>

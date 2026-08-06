@@ -10,7 +10,6 @@
   <ItemGroup>
     <Reference Include="NDesk.Options" HintPath="../../Library/NDesk.Options.dll" />
     <Reference Include="netcd" HintPath="../../Library/netcd.dll" />
-    <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
     <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
   </ItemGroup>
 
@@ -41,8 +40,5 @@
     <PackageReference Include="System.Data.SQLite" Version="2.0.3" />
     <!-- Phlox bot framework: BotPersistenceManager keeps its isolated local bot DB via Microsoft.Data.Sqlite -->
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.7" />
-    <PackageReference Include="OpenMetaverse" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.13" />
   </ItemGroup>
 </Project>
