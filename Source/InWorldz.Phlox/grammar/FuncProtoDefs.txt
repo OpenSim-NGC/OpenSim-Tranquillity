@@ -1,0 +1,2514 @@
+dd
+{"llSin", new FunctionSig {
+FunctionName = "llSin",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"theta"}
+}},
+
+{"llCos", new FunctionSig {
+FunctionName = "llCos",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"theta"}
+}},
+
+{"llTan", new FunctionSig {
+FunctionName = "llTan",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"theta"}
+}},
+
+{"llAtan2", new FunctionSig {
+FunctionName = "llAtan2",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float,SymbolTable.Types.Float},
+ParamNames = new string[] {"y","x"}
+}},
+
+{"llSqrt", new FunctionSig {
+FunctionName = "llSqrt",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"val"}
+}},
+
+{"llPow", new FunctionSig {
+FunctionName = "llPow",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float,SymbolTable.Types.Float},
+ParamNames = new string[] {"base","exponent"}
+}},
+
+{"llAbs", new FunctionSig {
+FunctionName = "llAbs",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"val"}
+}},
+
+{"llFabs", new FunctionSig {
+FunctionName = "llFabs",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"val"}
+}},
+
+{"llFrand", new FunctionSig {
+FunctionName = "llFrand",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"mag"}
+}},
+
+{"llFloor", new FunctionSig {
+FunctionName = "llFloor",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"val"}
+}},
+
+{"llCeil", new FunctionSig {
+FunctionName = "llCeil",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"val"}
+}},
+
+{"llRound", new FunctionSig {
+FunctionName = "llRound",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"val"}
+}},
+
+{"llVecMag", new FunctionSig {
+FunctionName = "llVecMag",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"v"}
+}},
+
+{"llVecNorm", new FunctionSig {
+FunctionName = "llVecNorm",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"v"}
+}},
+
+{"llVecDist", new FunctionSig {
+FunctionName = "llVecDist",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Vector},
+ParamNames = new string[] {"v1","v2"}
+}},
+
+{"llRot2Euler", new FunctionSig {
+FunctionName = "llRot2Euler",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Rotation},
+ParamNames = new string[] {"q"}
+}},
+
+{"llEuler2Rot", new FunctionSig {
+FunctionName = "llEuler2Rot",
+ReturnType = SymbolTable.Types.Rotation,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"v"}
+}},
+
+{"llAxes2Rot", new FunctionSig {
+FunctionName = "llAxes2Rot",
+ReturnType = SymbolTable.Types.Rotation,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Vector,SymbolTable.Types.Vector},
+ParamNames = new string[] {"fwd","left","up"}
+}},
+
+{"llRot2Fwd", new FunctionSig {
+FunctionName = "llRot2Fwd",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Rotation},
+ParamNames = new string[] {"q"}
+}},
+
+{"llRot2Left", new FunctionSig {
+FunctionName = "llRot2Left",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Rotation},
+ParamNames = new string[] {"q"}
+}},
+
+{"llRot2Up", new FunctionSig {
+FunctionName = "llRot2Up",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Rotation},
+ParamNames = new string[] {"q"}
+}},
+
+{"llRotBetween", new FunctionSig {
+FunctionName = "llRotBetween",
+ReturnType = SymbolTable.Types.Rotation,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Vector},
+ParamNames = new string[] {"v1","v2"}
+}},
+
+{"llWhisper", new FunctionSig {
+FunctionName = "llWhisper",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.String},
+ParamNames = new string[] {"channel","msg"}
+}},
+
+{"llSay", new FunctionSig {
+FunctionName = "llSay",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.String},
+ParamNames = new string[] {"channel","msg"}
+}},
+
+{"llShout", new FunctionSig {
+FunctionName = "llShout",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.String},
+ParamNames = new string[] {"channel","msg"}
+}},
+
+{"llListen", new FunctionSig {
+FunctionName = "llListen",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.String,SymbolTable.Types.Key,SymbolTable.Types.String},
+ParamNames = new string[] {"channel","name","id","msg"}
+}},
+
+{"llListenControl", new FunctionSig {
+FunctionName = "llListenControl",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"number","active"}
+}},
+
+{"llListenRemove", new FunctionSig {
+FunctionName = "llListenRemove",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llSensor", new FunctionSig {
+FunctionName = "llSensor",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Key,SymbolTable.Types.Integer,SymbolTable.Types.Float,SymbolTable.Types.Float},
+ParamNames = new string[] {"name","id","type","range","arc"}
+}},
+
+{"llSensorRepeat", new FunctionSig {
+FunctionName = "llSensorRepeat",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Key,SymbolTable.Types.Integer,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Float},
+ParamNames = new string[] {"name","id","type","range","arc","rate"}
+}},
+
+{"llSensorRemove", new FunctionSig {
+FunctionName = "llSensorRemove",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llDetectedName", new FunctionSig {
+FunctionName = "llDetectedName",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llDetectedKey", new FunctionSig {
+FunctionName = "llDetectedKey",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llDetectedOwner", new FunctionSig {
+FunctionName = "llDetectedOwner",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llDetectedType", new FunctionSig {
+FunctionName = "llDetectedType",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llDetectedPos", new FunctionSig {
+FunctionName = "llDetectedPos",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llDetectedVel", new FunctionSig {
+FunctionName = "llDetectedVel",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llDetectedGrab", new FunctionSig {
+FunctionName = "llDetectedGrab",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llDetectedRot", new FunctionSig {
+FunctionName = "llDetectedRot",
+ReturnType = SymbolTable.Types.Rotation,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llDetectedGroup", new FunctionSig {
+FunctionName = "llDetectedGroup",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llDetectedLinkNumber", new FunctionSig {
+FunctionName = "llDetectedLinkNumber",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llDie", new FunctionSig {
+FunctionName = "llDie",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGround", new FunctionSig {
+FunctionName = "llGround",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"offset"}
+}},
+
+{"llCloud", new FunctionSig {
+FunctionName = "llCloud",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"offset"}
+}},
+
+{"llWind", new FunctionSig {
+FunctionName = "llWind",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"offset"}
+}},
+
+{"llSetStatus", new FunctionSig {
+FunctionName = "llSetStatus",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"status","value"}
+}},
+
+{"llGetStatus", new FunctionSig {
+FunctionName = "llGetStatus",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"status"}
+}},
+
+{"llSetScale", new FunctionSig {
+FunctionName = "llSetScale",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"scale"}
+}},
+
+{"llGetScale", new FunctionSig {
+FunctionName = "llGetScale",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSetColor", new FunctionSig {
+FunctionName = "llSetColor",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Integer},
+ParamNames = new string[] {"color","face"}
+}},
+
+{"llGetAlpha", new FunctionSig {
+FunctionName = "llGetAlpha",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"face"}
+}},
+
+{"llSetAlpha", new FunctionSig {
+FunctionName = "llSetAlpha",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float,SymbolTable.Types.Integer},
+ParamNames = new string[] {"alpha","face"}
+}},
+
+{"llGetColor", new FunctionSig {
+FunctionName = "llGetColor",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"face"}
+}},
+
+{"llSetTexture", new FunctionSig {
+FunctionName = "llSetTexture",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Integer},
+ParamNames = new string[] {"texture","face"}
+}},
+
+{"llScaleTexture", new FunctionSig {
+FunctionName = "llScaleTexture",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Integer},
+ParamNames = new string[] {"u","v","face"}
+}},
+
+{"llOffsetTexture", new FunctionSig {
+FunctionName = "llOffsetTexture",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Integer},
+ParamNames = new string[] {"u","v","face"}
+}},
+
+{"llRotateTexture", new FunctionSig {
+FunctionName = "llRotateTexture",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float,SymbolTable.Types.Integer},
+ParamNames = new string[] {"rot","face"}
+}},
+
+{"llGetTexture", new FunctionSig {
+FunctionName = "llGetTexture",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"face"}
+}},
+
+{"llSetPos", new FunctionSig {
+FunctionName = "llSetPos",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"pos"}
+}},
+
+{"llGetPos", new FunctionSig {
+FunctionName = "llGetPos",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetLocalPos", new FunctionSig {
+FunctionName = "llGetLocalPos",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSetRot", new FunctionSig {
+FunctionName = "llSetRot",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Rotation},
+ParamNames = new string[] {"rot"}
+}},
+
+{"llGetRot", new FunctionSig {
+FunctionName = "llGetRot",
+ReturnType = SymbolTable.Types.Rotation,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetLocalRot", new FunctionSig {
+FunctionName = "llGetLocalRot",
+ReturnType = SymbolTable.Types.Rotation,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSetForce", new FunctionSig {
+FunctionName = "llSetForce",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Integer},
+ParamNames = new string[] {"force","local"}
+}},
+
+{"llGetForce", new FunctionSig {
+FunctionName = "llGetForce",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llTarget", new FunctionSig {
+FunctionName = "llTarget",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Float},
+ParamNames = new string[] {"position","range"}
+}},
+
+{"llTargetRemove", new FunctionSig {
+FunctionName = "llTargetRemove",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llRotTarget", new FunctionSig {
+FunctionName = "llRotTarget",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Rotation,SymbolTable.Types.Float},
+ParamNames = new string[] {"rot","error"}
+}},
+
+{"llRotTargetRemove", new FunctionSig {
+FunctionName = "llRotTargetRemove",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llMoveToTarget", new FunctionSig {
+FunctionName = "llMoveToTarget",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Float},
+ParamNames = new string[] {"target","tau"}
+}},
+
+{"llStopMoveToTarget", new FunctionSig {
+FunctionName = "llStopMoveToTarget",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llApplyImpulse", new FunctionSig {
+FunctionName = "llApplyImpulse",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Integer},
+ParamNames = new string[] {"force","local"}
+}},
+
+{"llApplyRotationalImpulse", new FunctionSig {
+FunctionName = "llApplyRotationalImpulse",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Integer},
+ParamNames = new string[] {"force","local"}
+}},
+
+{"llSetTorque", new FunctionSig {
+FunctionName = "llSetTorque",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Integer},
+ParamNames = new string[] {"torque","local"}
+}},
+
+{"llGetTorque", new FunctionSig {
+FunctionName = "llGetTorque",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSetForceAndTorque", new FunctionSig {
+FunctionName = "llSetForceAndTorque",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Vector,SymbolTable.Types.Integer},
+ParamNames = new string[] {"force","torque","local"}
+}},
+
+{"llGetVel", new FunctionSig {
+FunctionName = "llGetVel",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetAccel", new FunctionSig {
+FunctionName = "llGetAccel",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetOmega", new FunctionSig {
+FunctionName = "llGetOmega",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetTimeOfDay", new FunctionSig {
+FunctionName = "llGetTimeOfDay",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetWallclock", new FunctionSig {
+FunctionName = "llGetWallclock",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetTime", new FunctionSig {
+FunctionName = "llGetTime",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llResetTime", new FunctionSig {
+FunctionName = "llResetTime",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetAndResetTime", new FunctionSig {
+FunctionName = "llGetAndResetTime",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSound", new FunctionSig {
+FunctionName = "llSound",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Float,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"sound","volume","queue","loop"}
+}},
+
+{"llPlaySound", new FunctionSig {
+FunctionName = "llPlaySound",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Float},
+ParamNames = new string[] {"sound","volume"}
+}},
+
+{"llLoopSound", new FunctionSig {
+FunctionName = "llLoopSound",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Float},
+ParamNames = new string[] {"sound","volume"}
+}},
+
+{"llLoopSoundMaster", new FunctionSig {
+FunctionName = "llLoopSoundMaster",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Float},
+ParamNames = new string[] {"sound","volume"}
+}},
+
+{"llLoopSoundSlave", new FunctionSig {
+FunctionName = "llLoopSoundSlave",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Float},
+ParamNames = new string[] {"sound","volume"}
+}},
+
+{"llPlaySoundSlave", new FunctionSig {
+FunctionName = "llPlaySoundSlave",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Float},
+ParamNames = new string[] {"sound","volume"}
+}},
+
+{"llTriggerSound", new FunctionSig {
+FunctionName = "llTriggerSound",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Float},
+ParamNames = new string[] {"sound","volume"}
+}},
+
+{"llStopSound", new FunctionSig {
+FunctionName = "llStopSound",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llPreloadSound", new FunctionSig {
+FunctionName = "llPreloadSound",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"sound"}
+}},
+
+{"llGetSubString", new FunctionSig {
+FunctionName = "llGetSubString",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","start","end"}
+}},
+
+{"llDeleteSubString", new FunctionSig {
+FunctionName = "llDeleteSubString",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","start","end"}
+}},
+
+{"llInsertString", new FunctionSig {
+FunctionName = "llInsertString",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Integer,SymbolTable.Types.String},
+ParamNames = new string[] {"dst","position","src"}
+}},
+
+{"llToUpper", new FunctionSig {
+FunctionName = "llToUpper",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"src"}
+}},
+
+{"llToLower", new FunctionSig {
+FunctionName = "llToLower",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"src"}
+}},
+
+{"llGiveMoney", new FunctionSig {
+FunctionName = "llGiveMoney",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.Integer},
+ParamNames = new string[] {"destination","amount"}
+}},
+
+{"llMakeExplosion", new FunctionSig {
+FunctionName = "llMakeExplosion",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.String,SymbolTable.Types.Vector},
+ParamNames = new string[] {"particles","scale","vel","lifetime","arc","texture","offset"}
+}},
+
+{"llMakeFountain", new FunctionSig {
+FunctionName = "llMakeFountain",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Integer,SymbolTable.Types.String,SymbolTable.Types.Vector,SymbolTable.Types.Float},
+ParamNames = new string[] {"particles","scale","vel","lifetime","arc","bounce","texture","offset","bounce_offset"}
+}},
+
+{"llMakeSmoke", new FunctionSig {
+FunctionName = "llMakeSmoke",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.String,SymbolTable.Types.Vector},
+ParamNames = new string[] {"particles","scale","vel","lifetime","arc","texture","offset"}
+}},
+
+{"llMakeFire", new FunctionSig {
+FunctionName = "llMakeFire",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.String,SymbolTable.Types.Vector},
+ParamNames = new string[] {"particles","scale","vel","lifetime","arc","texture","offset"}
+}},
+
+{"llRezObject", new FunctionSig {
+FunctionName = "llRezObject",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Vector,SymbolTable.Types.Vector,SymbolTable.Types.Rotation,SymbolTable.Types.Integer},
+ParamNames = new string[] {"inventory","pos","vel","rot","param"}
+}},
+
+{"llLookAt", new FunctionSig {
+FunctionName = "llLookAt",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Float,SymbolTable.Types.Float},
+ParamNames = new string[] {"target","strength","damping"}
+}},
+
+{"llStopLookAt", new FunctionSig {
+FunctionName = "llStopLookAt",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSetTimerEvent", new FunctionSig {
+FunctionName = "llSetTimerEvent",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"sec"}
+}},
+
+{"llSleep", new FunctionSig {
+FunctionName = "llSleep",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"sec"}
+}},
+
+{"llGetMass", new FunctionSig {
+FunctionName = "llGetMass",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llCollisionFilter", new FunctionSig {
+FunctionName = "llCollisionFilter",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Key,SymbolTable.Types.Integer},
+ParamNames = new string[] {"name","id","accept"}
+}},
+
+{"llTakeControls", new FunctionSig {
+FunctionName = "llTakeControls",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"controls","accept","pass_on"}
+}},
+
+{"llReleaseControls", new FunctionSig {
+FunctionName = "llReleaseControls",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llAttachToAvatar", new FunctionSig {
+FunctionName = "llAttachToAvatar",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"attach_point"}
+}},
+
+{"llDetachFromAvatar", new FunctionSig {
+FunctionName = "llDetachFromAvatar",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llTakeCamera", new FunctionSig {
+FunctionName = "llTakeCamera",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"avatar"}
+}},
+
+{"llReleaseCamera", new FunctionSig {
+FunctionName = "llReleaseCamera",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"avatar"}
+}},
+
+{"llGetOwner", new FunctionSig {
+FunctionName = "llGetOwner",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llInstantMessage", new FunctionSig {
+FunctionName = "llInstantMessage",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.String},
+ParamNames = new string[] {"user","message"}
+}},
+
+{"llEmail", new FunctionSig {
+FunctionName = "llEmail",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.String,SymbolTable.Types.String},
+ParamNames = new string[] {"address","subject","message"}
+}},
+
+{"llGetNextEmail", new FunctionSig {
+FunctionName = "llGetNextEmail",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.String},
+ParamNames = new string[] {"address","subject"}
+}},
+
+{"llGetKey", new FunctionSig {
+FunctionName = "llGetKey",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSetBuoyancy", new FunctionSig {
+FunctionName = "llSetBuoyancy",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"buoyancy"}
+}},
+
+{"llSetHoverHeight", new FunctionSig {
+FunctionName = "llSetHoverHeight",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float,SymbolTable.Types.Integer,SymbolTable.Types.Float},
+ParamNames = new string[] {"height","water","tau"}
+}},
+
+{"llStopHover", new FunctionSig {
+FunctionName = "llStopHover",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llMinEventDelay", new FunctionSig {
+FunctionName = "llMinEventDelay",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"delay"}
+}},
+
+{"llSoundPreload", new FunctionSig {
+FunctionName = "llSoundPreload",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"sound"}
+}},
+
+{"llRotLookAt", new FunctionSig {
+FunctionName = "llRotLookAt",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Rotation,SymbolTable.Types.Float,SymbolTable.Types.Float},
+ParamNames = new string[] {"target","strength","damping"}
+}},
+
+{"llStringLength", new FunctionSig {
+FunctionName = "llStringLength",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"str"}
+}},
+
+{"llStartAnimation", new FunctionSig {
+FunctionName = "llStartAnimation",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"anim"}
+}},
+
+{"llStopAnimation", new FunctionSig {
+FunctionName = "llStopAnimation",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"anim"}
+}},
+
+{"llPointAt", new FunctionSig {
+FunctionName = "llPointAt",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"pos"}
+}},
+
+{"llStopPointAt", new FunctionSig {
+FunctionName = "llStopPointAt",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llTargetOmega", new FunctionSig {
+FunctionName = "llTargetOmega",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Float,SymbolTable.Types.Float},
+ParamNames = new string[] {"axis","spinrate","gain"}
+}},
+
+{"llGetStartParameter", new FunctionSig {
+FunctionName = "llGetStartParameter",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGodLikeRezObject", new FunctionSig {
+FunctionName = "llGodLikeRezObject",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.Vector},
+ParamNames = new string[] {"inventory","pos"}
+}},
+
+{"llRequestPermissions", new FunctionSig {
+FunctionName = "llRequestPermissions",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.Integer},
+ParamNames = new string[] {"agent","perm"}
+}},
+
+{"llGetPermissionsKey", new FunctionSig {
+FunctionName = "llGetPermissionsKey",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetPermissions", new FunctionSig {
+FunctionName = "llGetPermissions",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetLinkNumber", new FunctionSig {
+FunctionName = "llGetLinkNumber",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSetLinkColor", new FunctionSig {
+FunctionName = "llSetLinkColor",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Vector,SymbolTable.Types.Integer},
+ParamNames = new string[] {"linknumber","color","face"}
+}},
+
+{"llCreateLink", new FunctionSig {
+FunctionName = "llCreateLink",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.Integer},
+ParamNames = new string[] {"target","parent"}
+}},
+
+{"llBreakLink", new FunctionSig {
+FunctionName = "llBreakLink",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"linknum"}
+}},
+
+{"llBreakAllLinks", new FunctionSig {
+FunctionName = "llBreakAllLinks",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetLinkKey", new FunctionSig {
+FunctionName = "llGetLinkKey",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"linknumber"}
+}},
+
+{"llGetLinkName", new FunctionSig {
+FunctionName = "llGetLinkName",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"linknumber"}
+}},
+
+{"llGetInventoryNumber", new FunctionSig {
+FunctionName = "llGetInventoryNumber",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"type"}
+}},
+
+{"llGetInventoryName", new FunctionSig {
+FunctionName = "llGetInventoryName",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"type","number"}
+}},
+
+{"llSetScriptState", new FunctionSig {
+FunctionName = "llSetScriptState",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Integer},
+ParamNames = new string[] {"name","run"}
+}},
+
+{"llGetEnergy", new FunctionSig {
+FunctionName = "llGetEnergy",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGiveInventory", new FunctionSig {
+FunctionName = "llGiveInventory",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.String},
+ParamNames = new string[] {"destination","inventory"}
+}},
+
+{"llRemoveInventory", new FunctionSig {
+FunctionName = "llRemoveInventory",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"item"}
+}},
+
+{"llSetText", new FunctionSig {
+FunctionName = "llSetText",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Vector,SymbolTable.Types.Float},
+ParamNames = new string[] {"text","color","alpha"}
+}},
+
+{"llWater", new FunctionSig {
+FunctionName = "llWater",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"offset"}
+}},
+
+{"llPassTouches", new FunctionSig {
+FunctionName = "llPassTouches",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"pass"}
+}},
+
+{"llRequestAgentData", new FunctionSig {
+FunctionName = "llRequestAgentData",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.Integer},
+ParamNames = new string[] {"id","data"}
+}},
+
+{"llRequestInventoryData", new FunctionSig {
+FunctionName = "llRequestInventoryData",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"name"}
+}},
+
+{"llSetDamage", new FunctionSig {
+FunctionName = "llSetDamage",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"damage"}
+}},
+
+{"llTeleportAgentHome", new FunctionSig {
+FunctionName = "llTeleportAgentHome",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llModifyLand", new FunctionSig {
+FunctionName = "llModifyLand",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"action","brush"}
+}},
+
+{"llCollisionSound", new FunctionSig {
+FunctionName = "llCollisionSound",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Float},
+ParamNames = new string[] {"impact_sound","impact_volume"}
+}},
+
+{"llCollisionSprite", new FunctionSig {
+FunctionName = "llCollisionSprite",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"impact_sprite"}
+}},
+
+{"llGetAnimation", new FunctionSig {
+FunctionName = "llGetAnimation",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llResetScript", new FunctionSig {
+FunctionName = "llResetScript",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llMessageLinked", new FunctionSig {
+FunctionName = "llMessageLinked",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Integer,SymbolTable.Types.String,SymbolTable.Types.Key},
+ParamNames = new string[] {"linknum","num","str","id"}
+}},
+
+{"llPushObject", new FunctionSig {
+FunctionName = "llPushObject",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.Vector,SymbolTable.Types.Vector,SymbolTable.Types.Integer},
+ParamNames = new string[] {"id","impulse","ang_impulse","local"}
+}},
+
+{"llPassCollisions", new FunctionSig {
+FunctionName = "llPassCollisions",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"pass"}
+}},
+
+{"llGetScriptName", new FunctionSig {
+FunctionName = "llGetScriptName",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetNumberOfSides", new FunctionSig {
+FunctionName = "llGetNumberOfSides",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llAxisAngle2Rot", new FunctionSig {
+FunctionName = "llAxisAngle2Rot",
+ReturnType = SymbolTable.Types.Rotation,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Float},
+ParamNames = new string[] {"axis","angle"}
+}},
+
+{"llRot2Axis", new FunctionSig {
+FunctionName = "llRot2Axis",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Rotation},
+ParamNames = new string[] {"rot"}
+}},
+
+{"llRot2Angle", new FunctionSig {
+FunctionName = "llRot2Angle",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Rotation},
+ParamNames = new string[] {"rot"}
+}},
+
+{"llAcos", new FunctionSig {
+FunctionName = "llAcos",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"val"}
+}},
+
+{"llAsin", new FunctionSig {
+FunctionName = "llAsin",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"val"}
+}},
+
+{"llAngleBetween", new FunctionSig {
+FunctionName = "llAngleBetween",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Rotation,SymbolTable.Types.Rotation},
+ParamNames = new string[] {"a","b"}
+}},
+
+{"llGetInventoryKey", new FunctionSig {
+FunctionName = "llGetInventoryKey",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"name"}
+}},
+
+{"llAllowInventoryDrop", new FunctionSig {
+FunctionName = "llAllowInventoryDrop",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"add"}
+}},
+
+{"llGetSunDirection", new FunctionSig {
+FunctionName = "llGetSunDirection",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetTextureOffset", new FunctionSig {
+FunctionName = "llGetTextureOffset",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"face"}
+}},
+
+{"llGetTextureScale", new FunctionSig {
+FunctionName = "llGetTextureScale",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"side"}
+}},
+
+{"llGetTextureRot", new FunctionSig {
+FunctionName = "llGetTextureRot",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"side"}
+}},
+
+{"llSubStringIndex", new FunctionSig {
+FunctionName = "llSubStringIndex",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.String},
+ParamNames = new string[] {"source","pattern"}
+}},
+
+{"llGetOwnerKey", new FunctionSig {
+FunctionName = "llGetOwnerKey",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llGetCenterOfMass", new FunctionSig {
+FunctionName = "llGetCenterOfMass",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llListSort", new FunctionSig {
+FunctionName = "llListSort",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","stride","ascending"}
+}},
+
+{"llGetListLength", new FunctionSig {
+FunctionName = "llGetListLength",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List},
+ParamNames = new string[] {"src"}
+}},
+
+{"llList2Integer", new FunctionSig {
+FunctionName = "llList2Integer",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","index"}
+}},
+
+{"llList2Float", new FunctionSig {
+FunctionName = "llList2Float",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","index"}
+}},
+
+{"llList2String", new FunctionSig {
+FunctionName = "llList2String",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","index"}
+}},
+
+{"llList2Key", new FunctionSig {
+FunctionName = "llList2Key",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","index"}
+}},
+
+{"llList2Vector", new FunctionSig {
+FunctionName = "llList2Vector",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","index"}
+}},
+
+{"llList2Rot", new FunctionSig {
+FunctionName = "llList2Rot",
+ReturnType = SymbolTable.Types.Rotation,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","index"}
+}},
+
+{"llList2List", new FunctionSig {
+FunctionName = "llList2List",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","start","end"}
+}},
+
+{"llDeleteSubList", new FunctionSig {
+FunctionName = "llDeleteSubList",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","start","end"}
+}},
+
+{"llGetListEntryType", new FunctionSig {
+FunctionName = "llGetListEntryType",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","index"}
+}},
+
+{"llList2CSV", new FunctionSig {
+FunctionName = "llList2CSV",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List},
+ParamNames = new string[] {"src"}
+}},
+
+{"llCSV2List", new FunctionSig {
+FunctionName = "llCSV2List",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"src"}
+}},
+
+{"llListRandomize", new FunctionSig {
+FunctionName = "llListRandomize",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","stride"}
+}},
+
+{"llList2ListStrided", new FunctionSig {
+FunctionName = "llList2ListStrided",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.Integer,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","start","end","stride"}
+}},
+
+{"llGetRegionCorner", new FunctionSig {
+FunctionName = "llGetRegionCorner",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llListInsertList", new FunctionSig {
+FunctionName = "llListInsertList",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.List,SymbolTable.Types.Integer},
+ParamNames = new string[] {"dest","src","start"}
+}},
+
+{"llListFindList", new FunctionSig {
+FunctionName = "llListFindList",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.List},
+ParamNames = new string[] {"src","test"}
+}},
+
+{"llGetObjectName", new FunctionSig {
+FunctionName = "llGetObjectName",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSetObjectName", new FunctionSig {
+FunctionName = "llSetObjectName",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"name"}
+}},
+
+{"llGetDate", new FunctionSig {
+FunctionName = "llGetDate",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llEdgeOfWorld", new FunctionSig {
+FunctionName = "llEdgeOfWorld",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Vector},
+ParamNames = new string[] {"pos","dir"}
+}},
+
+{"llGetAgentInfo", new FunctionSig {
+FunctionName = "llGetAgentInfo",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llAdjustSoundVolume", new FunctionSig {
+FunctionName = "llAdjustSoundVolume",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"volume"}
+}},
+
+{"llSetSoundQueueing", new FunctionSig {
+FunctionName = "llSetSoundQueueing",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"queue"}
+}},
+
+{"llSetSoundRadius", new FunctionSig {
+FunctionName = "llSetSoundRadius",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"radius"}
+}},
+
+{"llKey2Name", new FunctionSig {
+FunctionName = "llKey2Name",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llSetTextureAnim", new FunctionSig {
+FunctionName = "llSetTextureAnim",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Integer,SymbolTable.Types.Integer,SymbolTable.Types.Integer,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Float},
+ParamNames = new string[] {"mode","face","sizex","sizey","start","length","rate"}
+}},
+
+{"llTriggerSoundLimited", new FunctionSig {
+FunctionName = "llTriggerSoundLimited",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Float,SymbolTable.Types.Vector,SymbolTable.Types.Vector},
+ParamNames = new string[] {"sound","volume","top_north_east","bottom_south_west"}
+}},
+
+{"llEjectFromLand", new FunctionSig {
+FunctionName = "llEjectFromLand",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"avatar"}
+}},
+
+{"llParseString2List", new FunctionSig {
+FunctionName = "llParseString2List",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.List,SymbolTable.Types.List},
+ParamNames = new string[] {"src","separators","spacers"}
+}},
+
+{"llOverMyLand", new FunctionSig {
+FunctionName = "llOverMyLand",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llGetLandOwnerAt", new FunctionSig {
+FunctionName = "llGetLandOwnerAt",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"pos"}
+}},
+
+{"llGetNotecardLine", new FunctionSig {
+FunctionName = "llGetNotecardLine",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Integer},
+ParamNames = new string[] {"name","line"}
+}},
+
+{"llGetAgentSize", new FunctionSig {
+FunctionName = "llGetAgentSize",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llSameGroup", new FunctionSig {
+FunctionName = "llSameGroup",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llUnSit", new FunctionSig {
+FunctionName = "llUnSit",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llGroundSlope", new FunctionSig {
+FunctionName = "llGroundSlope",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"offset"}
+}},
+
+{"llGroundNormal", new FunctionSig {
+FunctionName = "llGroundNormal",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"offset"}
+}},
+
+{"llGroundCountour", new FunctionSig {
+FunctionName = "llGroundCountour",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"offset"}
+}},
+
+{"llGetAttached", new FunctionSig {
+FunctionName = "llGetAttached",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetFreeMemory", new FunctionSig {
+FunctionName = "llGetFreeMemory",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetRegionName", new FunctionSig {
+FunctionName = "llGetRegionName",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetRegionTimeDilation", new FunctionSig {
+FunctionName = "llGetRegionTimeDilation",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetRegionFPS", new FunctionSig {
+FunctionName = "llGetRegionFPS",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llParticleSystem", new FunctionSig {
+FunctionName = "llParticleSystem",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List},
+ParamNames = new string[] {"rules"}
+}},
+
+{"llGroundRepel", new FunctionSig {
+FunctionName = "llGroundRepel",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float,SymbolTable.Types.Integer,SymbolTable.Types.Float},
+ParamNames = new string[] {"height","water","tau"}
+}},
+
+{"llGiveInventoryList", new FunctionSig {
+FunctionName = "llGiveInventoryList",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.String,SymbolTable.Types.List},
+ParamNames = new string[] {"target","folder","inventory"}
+}},
+
+{"llSetVehicleType", new FunctionSig {
+FunctionName = "llSetVehicleType",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"type"}
+}},
+
+{"llSetVehicleFloatParam", new FunctionSig {
+FunctionName = "llSetVehicleFloatParam",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Float},
+ParamNames = new string[] {"param","value"}
+}},
+
+{"llSetVehicleVectorParam", new FunctionSig {
+FunctionName = "llSetVehicleVectorParam",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Vector},
+ParamNames = new string[] {"param","vec"}
+}},
+
+{"llSetVehicleFlags", new FunctionSig {
+FunctionName = "llSetVehicleFlags",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Rotation,SymbolTable.Types.Integer},
+ParamNames = new string[] {"param","rot","flags"}
+}},
+
+{"llRemoveVehicleFlags", new FunctionSig {
+FunctionName = "llRemoveVehicleFlags",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"flags"}
+}},
+
+{"llSitTarget", new FunctionSig {
+FunctionName = "llSitTarget",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Rotation},
+ParamNames = new string[] {"offset","rot"}
+}},
+
+{"llAvatarOnSitTarget", new FunctionSig {
+FunctionName = "llAvatarOnSitTarget",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llAddToLandPassList", new FunctionSig {
+FunctionName = "llAddToLandPassList",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.Float},
+ParamNames = new string[] {"avatar","hours"}
+}},
+
+{"llSetTouchText", new FunctionSig {
+FunctionName = "llSetTouchText",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"text"}
+}},
+
+{"llSetSitText", new FunctionSig {
+FunctionName = "llSetSitText",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"text"}
+}},
+
+{"llSetCameraEyeOffset", new FunctionSig {
+FunctionName = "llSetCameraEyeOffset",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"offset"}
+}},
+
+{"llSetCameraAtOffset", new FunctionSig {
+FunctionName = "llSetCameraAtOffset",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"offset"}
+}},
+
+{"llDumpList2String", new FunctionSig {
+FunctionName = "llDumpList2String",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.String},
+ParamNames = new string[] {"src","separator"}
+}},
+
+{"llScriptDanger", new FunctionSig {
+FunctionName = "llScriptDanger",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"pos"}
+}},
+
+{"llDialog", new FunctionSig {
+FunctionName = "llDialog",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.String,SymbolTable.Types.List,SymbolTable.Types.Integer},
+ParamNames = new string[] {"avatar","message","buttons","chat_channel"}
+}},
+
+{"llVolumeDetect", new FunctionSig {
+FunctionName = "llVolumeDetect",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"detect"}
+}},
+
+{"llResetOtherScript", new FunctionSig {
+FunctionName = "llResetOtherScript",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"name"}
+}},
+
+{"llGetScriptState", new FunctionSig {
+FunctionName = "llGetScriptState",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"name"}
+}},
+
+{"llSetRemoteScriptAccessPin", new FunctionSig {
+FunctionName = "llSetRemoteScriptAccessPin",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"pin"}
+}},
+
+{"llRemoteLoadScriptPin", new FunctionSig {
+FunctionName = "llRemoteLoadScriptPin",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.String,SymbolTable.Types.Integer,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"target","name","pin","running","start_param"}
+}},
+
+{"llOpenRemoteDataChannel", new FunctionSig {
+FunctionName = "llOpenRemoteDataChannel",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSendRemoteData", new FunctionSig {
+FunctionName = "llSendRemoteData",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.String,SymbolTable.Types.Integer,SymbolTable.Types.String},
+ParamNames = new string[] {"channel","dest","idata","sdata"}
+}},
+
+{"llRemoteDataReply", new FunctionSig {
+FunctionName = "llRemoteDataReply",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.Key,SymbolTable.Types.String,SymbolTable.Types.Integer},
+ParamNames = new string[] {"channel","message_id","sdata","idata"}
+}},
+
+{"llCloseRemoteDataChannel", new FunctionSig {
+FunctionName = "llCloseRemoteDataChannel",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"channel"}
+}},
+
+{"llMD5String", new FunctionSig {
+FunctionName = "llMD5String",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","nonce"}
+}},
+
+{"llSetPrimitiveParams", new FunctionSig {
+FunctionName = "llSetPrimitiveParams",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List},
+ParamNames = new string[] {"rules"}
+}},
+
+{"llStringToBase64", new FunctionSig {
+FunctionName = "llStringToBase64",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"str"}
+}},
+
+{"llBase64ToString", new FunctionSig {
+FunctionName = "llBase64ToString",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"str"}
+}},
+
+{"llXorBase64Strings", new FunctionSig {
+FunctionName = "llXorBase64Strings",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.String},
+ParamNames = new string[] {"s1","s2"}
+}},
+
+{"llLog10", new FunctionSig {
+FunctionName = "llLog10",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"val"}
+}},
+
+{"llLog", new FunctionSig {
+FunctionName = "llLog",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Float},
+ParamNames = new string[] {"val"}
+}},
+
+{"llGetAnimationList", new FunctionSig {
+FunctionName = "llGetAnimationList",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llSetParcelMusicURL", new FunctionSig {
+FunctionName = "llSetParcelMusicURL",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"url"}
+}},
+
+{"llGetRootPosition", new FunctionSig {
+FunctionName = "llGetRootPosition",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetRootRotation", new FunctionSig {
+FunctionName = "llGetRootRotation",
+ReturnType = SymbolTable.Types.Rotation,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetObjectDesc", new FunctionSig {
+FunctionName = "llGetObjectDesc",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSetObjectDesc", new FunctionSig {
+FunctionName = "llSetObjectDesc",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"name"}
+}},
+
+{"llGetCreator", new FunctionSig {
+FunctionName = "llGetCreator",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetTimestamp", new FunctionSig {
+FunctionName = "llGetTimestamp",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSetLinkAlpha", new FunctionSig {
+FunctionName = "llSetLinkAlpha",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Float,SymbolTable.Types.Integer},
+ParamNames = new string[] {"linknumber","alpha","face"}
+}},
+
+{"llGetNumberOfPrims", new FunctionSig {
+FunctionName = "llGetNumberOfPrims",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetNumberOfNotecardLines", new FunctionSig {
+FunctionName = "llGetNumberOfNotecardLines",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"name"}
+}},
+
+{"llGetBoundingBox", new FunctionSig {
+FunctionName = "llGetBoundingBox",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"object"}
+}},
+
+{"llGetGeometricCenter", new FunctionSig {
+FunctionName = "llGetGeometricCenter",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetPrimitiveParams", new FunctionSig {
+FunctionName = "llGetPrimitiveParams",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List},
+ParamNames = new string[] {"params"}
+}},
+
+{"llIntegerToBase64", new FunctionSig {
+FunctionName = "llIntegerToBase64",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"number"}
+}},
+
+{"llBase64ToInteger", new FunctionSig {
+FunctionName = "llBase64ToInteger",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"str"}
+}},
+
+{"llGetGMTclock", new FunctionSig {
+FunctionName = "llGetGMTclock",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetSimulatorHostname", new FunctionSig {
+FunctionName = "llGetSimulatorHostname",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSetLocalRot", new FunctionSig {
+FunctionName = "llSetLocalRot",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Rotation},
+ParamNames = new string[] {"rot"}
+}},
+
+{"llParseStringKeepNulls", new FunctionSig {
+FunctionName = "llParseStringKeepNulls",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.List,SymbolTable.Types.List},
+ParamNames = new string[] {"src","separators","spacers"}
+}},
+
+{"llRezAtRoot", new FunctionSig {
+FunctionName = "llRezAtRoot",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Vector,SymbolTable.Types.Vector,SymbolTable.Types.Rotation,SymbolTable.Types.Integer},
+ParamNames = new string[] {"inventory","pos","vel","rot","param"}
+}},
+
+{"llGetObjectPermMask", new FunctionSig {
+FunctionName = "llGetObjectPermMask",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"mask"}
+}},
+
+{"llSetObjectPermMask", new FunctionSig {
+FunctionName = "llSetObjectPermMask",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"mask","value"}
+}},
+
+{"llGetInventoryPermMask", new FunctionSig {
+FunctionName = "llGetInventoryPermMask",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Integer},
+ParamNames = new string[] {"item","mask"}
+}},
+
+{"llSetInventoryPermMask", new FunctionSig {
+FunctionName = "llSetInventoryPermMask",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"item","mask","value"}
+}},
+
+{"llGetInventoryCreator", new FunctionSig {
+FunctionName = "llGetInventoryCreator",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"item"}
+}},
+
+{"llOwnerSay", new FunctionSig {
+FunctionName = "llOwnerSay",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"msg"}
+}},
+
+{"llRequestSimulatorData", new FunctionSig {
+FunctionName = "llRequestSimulatorData",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Integer},
+ParamNames = new string[] {"simulator","data"}
+}},
+
+{"llForceMouselook", new FunctionSig {
+FunctionName = "llForceMouselook",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"mouselook"}
+}},
+
+{"llGetObjectMass", new FunctionSig {
+FunctionName = "llGetObjectMass",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llListReplaceList", new FunctionSig {
+FunctionName = "llListReplaceList",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List,SymbolTable.Types.List,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"dest","src","start","end"}
+}},
+
+{"llLoadURL", new FunctionSig {
+FunctionName = "llLoadURL",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.String,SymbolTable.Types.String},
+ParamNames = new string[] {"avatar","message","url"}
+}},
+
+{"llParcelMediaCommandList", new FunctionSig {
+FunctionName = "llParcelMediaCommandList",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List},
+ParamNames = new string[] {"command"}
+}},
+
+{"llParcelMediaQuery", new FunctionSig {
+FunctionName = "llParcelMediaQuery",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List},
+ParamNames = new string[] {"query"}
+}},
+
+{"llModPow", new FunctionSig {
+FunctionName = "llModPow",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"a","b","c"}
+}},
+
+{"llGetInventoryType", new FunctionSig {
+FunctionName = "llGetInventoryType",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"name"}
+}},
+
+{"llSetPayPrice", new FunctionSig {
+FunctionName = "llSetPayPrice",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.List},
+ParamNames = new string[] {"price","quick_pay_buttons"}
+}},
+
+{"llGetCameraPos", new FunctionSig {
+FunctionName = "llGetCameraPos",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetCameraRot", new FunctionSig {
+FunctionName = "llGetCameraRot",
+ReturnType = SymbolTable.Types.Rotation,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llSetPrimURL", new FunctionSig {
+FunctionName = "llSetPrimURL",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"url"}
+}},
+
+{"llRefreshPrimURL", new FunctionSig {
+FunctionName = "llRefreshPrimURL",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llEscapeURL", new FunctionSig {
+FunctionName = "llEscapeURL",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"url"}
+}},
+
+{"llUnescapeURL", new FunctionSig {
+FunctionName = "llUnescapeURL",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"url"}
+}},
+
+{"llMapDestination", new FunctionSig {
+FunctionName = "llMapDestination",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Vector,SymbolTable.Types.Vector},
+ParamNames = new string[] {"simname","pos","look_at"}
+}},
+
+{"llAddToLandBanList", new FunctionSig {
+FunctionName = "llAddToLandBanList",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.Float},
+ParamNames = new string[] {"avatar","hours"}
+}},
+
+{"llRemoveFromLandPassList", new FunctionSig {
+FunctionName = "llRemoveFromLandPassList",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"avatar"}
+}},
+
+{"llRemoveFromLandBanList", new FunctionSig {
+FunctionName = "llRemoveFromLandBanList",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"avatar"}
+}},
+
+{"llSetCameraParams", new FunctionSig {
+FunctionName = "llSetCameraParams",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.List},
+ParamNames = new string[] {"rules"}
+}},
+
+{"llClearCameraParams", new FunctionSig {
+FunctionName = "llClearCameraParams",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llListStatistics", new FunctionSig {
+FunctionName = "llListStatistics",
+ReturnType = SymbolTable.Types.Float,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.List},
+ParamNames = new string[] {"operation","src"}
+}},
+
+{"llGetUnixTime", new FunctionSig {
+FunctionName = "llGetUnixTime",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetParcelFlags", new FunctionSig {
+FunctionName = "llGetParcelFlags",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"pos"}
+}},
+
+{"llGetRegionFlags", new FunctionSig {
+FunctionName = "llGetRegionFlags",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llXorBase64StringsCorrect", new FunctionSig {
+FunctionName = "llXorBase64StringsCorrect",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.String},
+ParamNames = new string[] {"s1","s2"}
+}},
+
+{"llHTTPRequest", new FunctionSig {
+FunctionName = "llHTTPRequest",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.List,SymbolTable.Types.String},
+ParamNames = new string[] {"url","parameters","body"}
+}},
+
+{"llResetLandBanList", new FunctionSig {
+FunctionName = "llResetLandBanList",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llResetLandPassList", new FunctionSig {
+FunctionName = "llResetLandPassList",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llGetObjectPrimCount", new FunctionSig {
+FunctionName = "llGetObjectPrimCount",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"object_id"}
+}},
+
+{"llGetParcelPrimOwners", new FunctionSig {
+FunctionName = "llGetParcelPrimOwners",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector},
+ParamNames = new string[] {"pos"}
+}},
+
+{"llGetParcelPrimCount", new FunctionSig {
+FunctionName = "llGetParcelPrimCount",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Integer,SymbolTable.Types.Integer},
+ParamNames = new string[] {"pos","category","sim_wide"}
+}},
+
+{"llGetParcelMaxPrims", new FunctionSig {
+FunctionName = "llGetParcelMaxPrims",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.Integer},
+ParamNames = new string[] {"pos","sim_wide"}
+}},
+
+{"llGetParcelDetails", new FunctionSig {
+FunctionName = "llGetParcelDetails",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Vector,SymbolTable.Types.List},
+ParamNames = new string[] {"pos","params"}
+}},
+
+{"llSetLinkPrimitiveParams", new FunctionSig {
+FunctionName = "llSetLinkPrimitiveParams",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.List},
+ParamNames = new string[] {"linknumber","rules"}
+}},
+
+{"llSetLinkTexture", new FunctionSig {
+FunctionName = "llSetLinkTexture",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.String,SymbolTable.Types.Integer},
+ParamNames = new string[] {"linknumber","texture","face"}
+}},
+
+{"llStringTrim", new FunctionSig {
+FunctionName = "llStringTrim",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String,SymbolTable.Types.Integer},
+ParamNames = new string[] {"src","trim_type"}
+}},
+
+{"llRegionSay", new FunctionSig {
+FunctionName = "llRegionSay",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.String},
+ParamNames = new string[] {"channel","msg"}
+}},
+
+{"llGetObjectDetails", new FunctionSig {
+FunctionName = "llGetObjectDetails",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.List},
+ParamNames = new string[] {"id","params"}
+}},
+
+{"llSetClickAction", new FunctionSig {
+FunctionName = "llSetClickAction",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"action"}
+}},
+
+{"llGetRegionAgentCount", new FunctionSig {
+FunctionName = "llGetRegionAgentCount",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llTextBox", new FunctionSig {
+FunctionName = "llTextBox",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.String,SymbolTable.Types.Integer},
+ParamNames = new string[] {"avatar","message","chat_channel"}
+}},
+
+{"llGetAgentLanguage", new FunctionSig {
+FunctionName = "llGetAgentLanguage",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"avatar"}
+}},
+
+{"llDetectedTouchUV", new FunctionSig {
+FunctionName = "llDetectedTouchUV",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"index"}
+}},
+
+{"llDetectedTouchFace", new FunctionSig {
+FunctionName = "llDetectedTouchFace",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"index"}
+}},
+
+{"llDetectedTouchPos", new FunctionSig {
+FunctionName = "llDetectedTouchPos",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"index"}
+}},
+
+{"llDetectedTouchNormal", new FunctionSig {
+FunctionName = "llDetectedTouchNormal",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"index"}
+}},
+
+{"llDetectedTouchBinormal", new FunctionSig {
+FunctionName = "llDetectedTouchBinormal",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"index"}
+}},
+
+{"llDetectedTouchST", new FunctionSig {
+FunctionName = "llDetectedTouchST",
+ReturnType = SymbolTable.Types.Vector,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"index"}
+}},
+
+{"llSHA1String", new FunctionSig {
+FunctionName = "llSHA1String",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"src"}
+}},
+
+{"llGetFreeURLs", new FunctionSig {
+FunctionName = "llGetFreeURLs",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llRequestURL", new FunctionSig {
+FunctionName = "llRequestURL",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llRequestSecureURL", new FunctionSig {
+FunctionName = "llRequestSecureURL",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {},
+ParamNames = new string[] {}
+}},
+
+{"llReleaseURL", new FunctionSig {
+FunctionName = "llReleaseURL",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.String},
+ParamNames = new string[] {"url"}
+}},
+
+{"llHTTPResponse", new FunctionSig {
+FunctionName = "llHTTPResponse",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.Integer,SymbolTable.Types.String},
+ParamNames = new string[] {"request_id","status","body"}
+}},
+
+{"llGetHTTPHeader", new FunctionSig {
+FunctionName = "llGetHTTPHeader",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key,SymbolTable.Types.String},
+ParamNames = new string[] {"request_id","header"}
+}},
+
+{"llSetPrimMediaParams", new FunctionSig {
+FunctionName = "llSetPrimMediaParams",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.List},
+ParamNames = new string[] {"face","params"}
+}},
+
+{"llGetPrimMediaParams", new FunctionSig {
+FunctionName = "llGetPrimMediaParams",
+ReturnType = SymbolTable.Types.List,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.List},
+ParamNames = new string[] {"face","params"}
+}},
+
+{"llClearPrimMedia", new FunctionSig {
+FunctionName = "llClearPrimMedia",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"face"}
+}},
+
+{"llSetLinkPrimitiveParamsFast", new FunctionSig {
+FunctionName = "llSetLinkPrimitiveParamsFast",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.List},
+ParamNames = new string[] {"linknumber","rules"}
+}},
+
+{"llGetLinkPrimitiveParams", new FunctionSig {
+FunctionName = "llGetLinkPrimitiveParams",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.List},
+ParamNames = new string[] {"linknumber","rules"}
+}},
+
+{"llLinkParticleSystem", new FunctionSig {
+FunctionName = "llLinkParticleSystem",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.List},
+ParamNames = new string[] {"linknumber","rules"}
+}},
+
+{"llSetLinkTextureAnim", new FunctionSig {
+FunctionName = "llSetLinkTextureAnim",
+ReturnType = SymbolTable.Types.Void,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer,SymbolTable.Types.Integer,SymbolTable.Types.Integer,SymbolTable.Types.Integer,SymbolTable.Types.Integer,SymbolTable.Types.Float,SymbolTable.Types.Float,SymbolTable.Types.Float},
+ParamNames = new string[] {"link","mode","face","sizex","sizey","start","length","rate"}
+}},
+
+{"llGetLinkNumberOfSides", new FunctionSig {
+FunctionName = "llGetLinkNumberOfSides",
+ReturnType = SymbolTable.Types.Integer,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Integer},
+ParamNames = new string[] {"link"}
+}},
+
+{"llGetUsername", new FunctionSig {
+FunctionName = "llGetUsername",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llRequestUsername", new FunctionSig {
+FunctionName = "llRequestUsername",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llGetDisplayName", new FunctionSig {
+FunctionName = "llGetDisplayName",
+ReturnType = SymbolTable.Types.String,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+
+{"llRequestDisplayName", new FunctionSig {
+FunctionName = "llRequestDisplayName",
+ReturnType = SymbolTable.Types.Key,
+ParamTypes = new SymbolTable.Types[] {SymbolTable.Types.Key},
+ParamNames = new string[] {"id"}
+}},
+

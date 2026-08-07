@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Offline SLua conformance runner: compiles Luau snippets with the Phlox SLua
+       compiler, executes them on the Phlox VM with a recording syscall shim, and
+       compares against expected SLua behavior (PASS / DIVERGENCE / GAP buckets).
+       Console tool, not an NUnit suite; not part of the grid runtime. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SluaProofRunner</AssemblyName>
+    <RootNamespace>Phlox.ScriptEngine</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Source\InWorldz.Phlox\InWorldz.Phlox.csproj" />
+    <!-- C5 as an explicit local-file reference so it lands in the output dir and in
+         deps.json as a local assembly (not a NuGet package identity) — the runner must
+         load the same Library/C5.dll identity Phlox is compiled against. -->
+    <Reference Include="C5">
+      <HintPath>..\..\Library\C5.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

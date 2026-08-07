@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Matches YEngine: this lib transitively references the OpenSim app project, which
+         under solution-level `dotnet publish -r` produces a duplicate apphost relative path
+         (NETSDK1152). Suppress, as YEngine does, so publish succeeds. -->
+    <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+    <PreserveCompilationContext>false</PreserveCompilationContext>
+    <OutputType>Library</OutputType>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- Phlox sources predate ImplicitUsings; the Tranquillity root Directory.Build.props
+         sets ImplicitUsings=enable, so override it back to disable here (and Nullable=disable). -->
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AssemblyName>Phlox.ScriptEngine</AssemblyName>
+    <Deterministic>true</Deterministic>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>CA1416,SYSLIB0011,SYSLIB0014,SYSLIB0039</NoWarn>
+  </PropertyGroup>
+
+  <!-- NuGet deps Phlox brings in (not used elsewhere in Tranquillity) -->
+  <ItemGroup>
+    <PackageReference Include="protobuf-net" Version="3.*" />
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.7" />
+    <PackageReference Include="log4net" Version="3.3.1" />
+  </ItemGroup>
+
+  <!-- C5 via develop's Library/C5.dll (single identity — avoids the dual-C5 TypeLoadException). -->
+  <ItemGroup>
+    <Reference Include="C5" HintPath="..\..\Library\C5.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\InWorldz.Phlox\InWorldz.Phlox.csproj" />
+    <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="..\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
+    <ProjectReference Include="..\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="LSLSystemAPI.cs" />
+    <Compile Include="PhloxExperienceAdapter.cs" />
+    <Compile Include="LinksetDataPhloxExtensions.cs" />
+    <Compile Include="PhloxEngine.cs" />
+    <Compile Include="SluaBackHalfProof.cs" />
+    <Compile Include="PhloxExecutionScheduler.cs" />
+    <Compile Include="PhloxLoadRequest.cs" />
+    <Compile Include="PhloxMasterScheduler.cs" />
+    <Compile Include="PhloxScriptLoader.cs" />
+    <Compile Include="WorkStatus.cs" />
+    <Compile Include="PhloxListenManager.cs" />
+    <Compile Include="AsyncCommand\AsyncCommandManager.cs" />
+    <Compile Include="AsyncCommand\Plugins\SensorRepeat.cs" />
+    <Compile Include="AsyncCommand\Plugins\HttpRequest.cs" />
+    <Compile Include="AsyncCommand\Plugins\XmlRequest.cs" />
+    <Compile Include="StateManager.cs" />
+  </ItemGroup>
+
+</Project>
