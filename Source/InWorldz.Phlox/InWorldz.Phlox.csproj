@@ -60,9 +60,7 @@
 
   <!-- OpenMetaverse via NuGet (develop migrated libomv off Library/ DLLs). -->
   <ItemGroup>
-    <PackageReference Include="OpenMetaverse" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />
-	<PackageReference Include="protobuf-net" Version="3.2.30" />
+	  <PackageReference Include="protobuf-net" Version="3.2.30" />
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
     <PackageReference Include="StringTemplate4" Version="4.0.8" />
   </ItemGroup>
