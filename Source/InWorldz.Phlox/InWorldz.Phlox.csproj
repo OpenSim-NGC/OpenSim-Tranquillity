@@ -1,0 +1,383 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+    <PreserveCompilationContext>false</PreserveCompilationContext>
+    <OutputType>Library</OutputType>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>InWorldz.Phlox</AssemblyName>
+    <Deterministic>true</Deterministic>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <EnableDefaultItems>false</EnableDefaultItems>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <BaseAddress>285212672</BaseAddress>
+    <ConfigurationOverrideFile></ConfigurationOverrideFile>
+    <DefineConstants>TRACE</DefineConstants>
+    <DocumentationFile></DocumentationFile>
+    <DebugSymbols>True</DebugSymbols>
+    <FileAlignment>4096</FileAlignment>
+    <Optimize>False</Optimize>
+    <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
+    <UseCommonOutputDirectory>True</UseCommonOutputDirectory>
+    <AppendTargetFrameworkToOutputPath>False</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>False</AppendRuntimeIdentifierToOutputPath>
+    <RegisterForComInterop>False</RegisterForComInterop>
+    <RemoveIntegerChecks>False</RemoveIntegerChecks>
+    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
+    <WarningLevel>4</WarningLevel>
+    <NoStdLib>False</NoStdLib>
+    <NoWarn>CA1416,SYSLIB0011,SYSLIB0014,SYSLIB0039</NoWarn>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <BaseAddress>285212672</BaseAddress>
+    <ConfigurationOverrideFile></ConfigurationOverrideFile>
+    <DefineConstants></DefineConstants>
+    <DocumentationFile></DocumentationFile>
+    <DebugSymbols>False</DebugSymbols>
+    <FileAlignment>4096</FileAlignment>
+    <Optimize>True</Optimize>
+    <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
+    <UseCommonOutputDirectory>True</UseCommonOutputDirectory>
+    <AppendTargetFrameworkToOutputPath>False</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>False</AppendRuntimeIdentifierToOutputPath>
+    <RegisterForComInterop>False</RegisterForComInterop>
+    <RemoveIntegerChecks>False</RemoveIntegerChecks>
+    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
+    <WarningLevel>4</WarningLevel>
+    <NoStdLib>False</NoStdLib>
+    <NoWarn>CA1416,SYSLIB0011,SYSLIB0014,SYSLIB0039</NoWarn>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+
+  <!-- OpenMetaverse via NuGet (develop migrated libomv off Library/ DLLs). -->
+  <ItemGroup>
+	  <PackageReference Include="protobuf-net" Version="3.2.30" />
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+    <PackageReference Include="StringTemplate4" Version="4.0.8" />
+  </ItemGroup>
+
+  <!-- C5 via develop's Library/C5.dll (single identity — avoids the dual-C5 TypeLoadException). -->
+  <ItemGroup>
+    <Reference Include="C5" HintPath="..\..\Library\C5.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="ByteCompiler\AssemblerLexer.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ByteCompiler\AssemblerParser.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ByteCompiler\AssemblerVisitor.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ByteCompiler\AssemblerBaseVisitor.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ByteCompiler\BytecodeGenerator.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ByteCompiler\EventSymbol.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ByteCompiler\FunctionSymbol.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ByteCompiler\FwdReferenceBehavior.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ByteCompiler\GenerationException.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ByteCompiler\LabelSymbol.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\BaseScope.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\Branch.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\BuiltInTypeSymbol.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\ConstantSymbol.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\DefaultConstants.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\EventSymbol.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\GlobalScope.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\IScope.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\ISymbolType.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\LabelSymbol.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\LocalScope.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\LSLAst.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\LSLBaseVisitor.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\LSLErrorNode.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\LSLLexer.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\LSLParser.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\LSLTreeAdaptor.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\LSLVisitor.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\MethodSymbol.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\ScopedSymbol.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\StateSymbol.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\Symbol.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\SymbolTable.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\TemplateMapping.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Compiler\VariableSymbol.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Glue\CompilerFrontend.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Glue\ISystemAPI.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Glue\LSLListenerTraceRedirector.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Glue\SyscallShim.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Serialization\SerializationException.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Serialization\SerializedLSLList.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Serialization\SerializedLSLPrimitive.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Serialization\SerializedPostedEvent.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Serialization\SerializedRuntimeState.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Serialization\SerializedScript.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Serialization\SerializedStackFrame.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\CheckException.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\DefaultLSLListener.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\Defaults.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\FunctionSig.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\ILSLListener.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\ISyscallShim.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\LSLList.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\NullListener.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\OpCodes.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\ScriptUnloadReason.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\Sentinel.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\SupportedEventList.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\TooManyErrorsException.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Types\VarTypes.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Util\Clock.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Util\Encoding.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Util\LinkedHashMap.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Util\MemoryCalc.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Util\Preloader.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="VM\ActiveListen.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="VM\CompiledScript.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="VM\DetectVariables.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="VM\EventInfo.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="VM\FunctionInfo.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="VM\Interpreter.Actions.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="VM\Interpreter.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="VM\MemoryInfo.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="VM\PostedEvent.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="VM\RuntimeState.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="VM\StackFrame.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="VM\VMException.cs">
+      <SubType>Code</SubType>
+    </Compile>
+	<Compile Include="Compiler\CompilerStubs.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Compiler\LSLListener.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="ByteCompiler\AssemblerListener.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="ByteCompiler\AssemblerBaseListener.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Compiler\LSLBaseListener.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Compiler\DefVisitor.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Compiler\TypesVisitor.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Compiler\AnalyzeVisitor.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Compiler\GenVisitor.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Compiler\ByteCodeEmitter.cs">
+	  <SubType>Code</SubType>
+	</Compile>	
+	<Compile Include="SLua\SLuaCompiler.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="SLua\LuaLib.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="SLua\LuaPattern.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Types\LSLTable.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Types\LuaClosure.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Types\LuaGmatch.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Types\LuaNil.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Types\LuaError.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Types\LuaDetected.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	<Compile Include="Serialization\SerializedLSLTable.cs">
+	  <SubType>Code</SubType>
+	</Compile>
+	  </ItemGroup>
+
+  <!-- Exclude ANTLR3-generated files — replaced by ANTLR4 visitors -->
+  <ItemGroup>
+    <Compile Remove="Compiler\Def.cs" />
+    <Compile Remove="Compiler\Types.cs" />
+    <Compile Remove="Compiler\Analyze.cs" />
+    <Compile Remove="Compiler\Gen.cs" />
+  </ItemGroup>
+
+</Project>

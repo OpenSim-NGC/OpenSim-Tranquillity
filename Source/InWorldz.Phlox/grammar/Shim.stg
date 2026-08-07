@@ -1,0 +1,172 @@
+group Shim;
+
+isystemapi(functionlist) ::= <<
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using OpenMetaverse;
+
+using InWorldz.Phlox.Types;
+
+namespace InWorldz.Phlox.Glue
+{
+	public interface ISystemAPI
+	{
+		<functionlist; separator="\n">
+	}
+}
+>>
+
+apidef(returntype, funcname, paramlist) ::= <<
+<if(returntype)><returntype><else>void<endif> <funcname>(<paramlist; separator=",">);
+>>
+
+apiparam(type, name) ::= <<
+<type> <name>
+>>
+
+defaultmethods(functionlist) ::= <<
+using System;
+using System.Collections.Generic;
+
+namespace InWorldz.Phlox.Types
+{
+	public class Defaults
+	{
+		<functionlist>
+	}
+}
+>>
+
+syscallshim(shimlist, functions) ::= <<
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using OpenMetaverse;
+
+using InWorldz.Phlox.Types;
+
+namespace InWorldz.Phlox.Glue
+{
+	public class SyscallShim : ISyscallShim
+	{
+		public delegate void ShimCall();
+
+		private InWorldz.Phlox.VM.Interpreter _interpreter;
+		private ISystemAPI _systemAPI;
+
+		public InWorldz.Phlox.VM.Interpreter Interpreter
+		{
+			get
+			{
+				return _interpreter;
+			}
+
+			set
+			{
+				_interpreter = value;
+			}
+		}
+
+		public ISystemAPI SystemAPI
+		{
+			get
+			{
+				return _systemAPI;
+			}
+
+			set
+			{
+				_systemAPI = value;
+			}
+		}
+
+		private string ConvToString(object o) { return (string)o; }
+		private int ConvToInt(object o) { return (int)o; }
+		private float ConvToFloat(object o) { return (float)o; }
+		private Vector3 ConvToVector(object o) { return (Vector3)o; }
+		private LSLList ConvToLSLList(object o) { return (LSLList)o; }
+		private Quaternion ConvToQuat(object o) { return (Quaternion)o; }
+		private UUID ConvToUUID(object o) { return UUID.Parse((string)o); }
+
+		private string ConvToLSLType(string o) { return o; }
+		private int ConvToLSLType(int o) { return o; }
+		private float ConvToLSLType(float o) { return o; }
+		private Vector3 ConvToLSLType(Vector3 o) { return o; }
+		private LSLList ConvToLSLType(LSLList o) { return o; }
+		private Quaternion ConvToLSLType(Quaternion o) { return o; }
+		private string ConvToLSLType(UUID o) { return o.ToString(); }
+
+		<shimlist>
+		
+		public void Call(int funcid)
+        {
+            _shimMap[funcid]();
+        }
+		
+		<functions; separator="\n">
+	}
+}
+>>
+
+shimlist(shims) ::= <<
+private ShimCall[] _shimMap = new ShimCall[<length(shims)>];
+
+public SyscallShim()
+{
+	<shims:shiminit(); separator="\n">
+}
+>>
+
+shiminit() ::= <<
+	_shimMap[<it.TableIndex>] = Shim_<it.FunctionName>;
+>>
+
+shimfunc(funcname, parameterpops, syscall) ::= <<
+private void Shim_<funcname>()
+{
+	<parameterpops; separator="\n">
+
+	<syscall>
+}
+
+>>
+
+parmpop(parmtype, parmnum) ::= <<
+<type> p<parmnum> = <convfunc>(_interpreter.ScriptState.Operands.Pop());
+>>
+
+syscall(returntype, functionname, paramnames) ::= <<
+<if(returntype)><returntype> ret = <endif>_systemAPI.<functionname>(<paramnames; separator=",">);
+<if(returntype)>
+
+_interpreter.ScriptState.Operands.Push(ConvToLSLType(ret));<endif>
+>>
+
+functiondict(sigs) ::= <<
+static public Dictionary\<string, FunctionSig\> SystemMethods = new Dictionary\<string, FunctionSig\>()
+{
+	<sigs>
+};
+>>
+
+functionsig(id, returntype, paramtypes, paramnames, tableindex) ::= <<
+{"<id>", new FunctionSig {
+	FunctionName =  "<id>",
+	ReturnType = VarType.<returntype>,
+	ParamTypes = new VarType[] {<paramtypes:type(); separator=", ">},
+	ParamNames = new string[] {<paramnames:formatstring(); separator=", ">},
+	TableIndex = <tableindex>
+}},
+
+>>
+
+type() ::= <<
+VarType.<it>
+>>
+
+formatstring() ::= <<
+"<it>"
+>>

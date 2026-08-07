@@ -1,0 +1,1160 @@
+group ByteCode;
+
+file(globalCount, statenames, globals, functions, states) ::= <<
+.globals <globalCount>
+<statenames:statedef()>
+
+<globals>
+
+halt
+
+<functions>
+
+<states>
+
+>>
+
+statedef() ::= <<
+.statedef <it.RawName>
+
+>>
+
+gstore(expression, gindex) ::= <<
+<if (expression)>
+<expression>
+gstore <gindex>
+
+<endif>
+>>
+
+
+//
+// Load operations
+//
+sconst(constText) ::= <<
+sconst <constText>
+>>
+
+iconst(constText) ::= <<
+iconst <constText>
+>>
+
+fconst(constText) ::=<<
+fconst <constText>
+>>
+
+idload(isglobal, index) ::=<<
+<if(isglobal)>gload <index>
+<else>load <index>
+<endif>
+>>
+
+syssconst(value) ::=<<
+sconst "<value>"
+>>
+
+sysvconst(value) ::=<<
+vconst <value>
+>>
+
+sysrconst(value) ::=<<
+rconst <value>
+>>
+
+sysconstload(template, value) ::=<<
+<(template)(value)>
+>>
+
+vconst(x, y, z) ::=<<
+vconst \<<x>,<y>,<z>\>
+>>
+
+buildvec(x, y, z) ::=<<
+<x>
+<y>
+<z>
+buildvec
+>>
+
+rconst(x, y, z, w) ::=<<
+rconst \<<x>,<y>,<z>,<w>\>
+>>
+
+buildrot(x, y, z, w) ::=<<
+<x>
+<y>
+<z>
+<w>
+buildrot
+>>
+
+buildlist(exprs) ::=<<
+<exprs; separator="\n">
+buildlist <length(exprs)>
+>>
+
+
+//
+// Pre and post increment/decrement
+//
+ipostinc(isglobal, index) ::=<<
+<if(isglobal)>ipostinc.g <index>
+<else>ipostinc.l <index>
+<endif>
+>>
+
+fpostinc(isglobal, index) ::=<<
+<if(isglobal)>fpostinc.g <index>
+<else>fpostinc.l <index>
+<endif>
+>>
+
+ipostdec(isglobal, index) ::=<<
+<if(isglobal)>ipostdec.g <index>
+<else>ipostdec.l <index>
+<endif>
+>>
+
+fpostdec(isglobal, index) ::=<<
+<if(isglobal)>fpostdec.g <index>
+<else>fpostdec.l <index>
+<endif>
+>>
+
+loadsub(isglobal, index, subidx) ::=<<
+<if(isglobal)>gload.sub <index>,<subidx>
+<else>load.sub <index>,<subidx>
+<endif>
+>>
+
+fpostincsub(isglobal, index, subindex) ::=<<
+<if(isglobal)>fpostinc.g.sub <index>,<subindex>
+<else>fpostinc.l.sub <index>,<subindex>
+<endif>
+>>
+
+fpostdecsub(isglobal, index, subindex) ::=<<
+<if(isglobal)>fpostdec.g.sub <index>,<subindex>
+<else>fpostdec.l.sub <index>,<subindex>
+<endif>
+>>
+
+ipreinc(isglobal, index) ::=<<
+<if(isglobal)>ipreinc.g <index>
+<else>ipreinc.l <index>
+<endif>
+>>
+
+fpreinc(isglobal, index) ::=<<
+<if(isglobal)>fpreinc.g <index>
+<else>fpreinc.l <index>
+<endif>
+>>
+
+fpreincsub(isglobal, index, subindex) ::=<<
+<if(isglobal)>fpreinc.g.sub <index>,<subindex>
+<else>fpreinc.l.sub <index>,<subindex>
+<endif>
+>>
+
+ipredec(isglobal, index) ::=<<
+<if(isglobal)>ipredec.g <index>
+<else>ipredec.l <index>
+<endif>
+>>
+
+fpredec(isglobal, index) ::=<<
+<if(isglobal)>fpredec.g <index>
+<else>fpredec.l <index>
+<endif>
+>>
+
+fpredecsub(isglobal, index, subindex) ::=<<
+<if(isglobal)>fpredec.g.sub <index>,<subindex>
+<else>fpredec.l.sub <index>,<subindex>
+<endif>
+>>
+
+
+
+methcall(name, exprs, isSyscall, popresult) ::=<<
+<exprs; separator="\n">
+<if(isSyscall)>syscall <name>
+<else>call <name>
+<endif>
+
+<if(popresult)>pop
+<endif>
+>>
+
+
+//
+// Negation
+//
+ineg(expr) ::=<<
+<expr>
+ineg
+>>
+
+fneg(expr) ::=<<
+<expr>
+fneg
+>>
+
+vneg(expr) ::=<<
+<expr>
+vneg
+>>
+
+rneg(expr) ::=<<
+<expr>
+rneg
+>>
+
+ilnot(expr) ::=<<
+<expr>
+ilnot
+>>
+
+ubitnot(expr) ::=<<
+<expr>
+ibunot
+>>
+
+
+//
+// Casting
+//
+icast(expr) ::=<<
+<expr>
+icast
+>>
+
+fcast(expr) ::=<<
+<expr>
+fcast
+>>
+
+scast(expr) ::=<<
+<expr>
+scast
+>>
+
+vcast(expr) ::=<<
+<expr>
+vcast
+>>
+
+rcast(expr) ::=<<
+<expr>
+rcast
+>>
+
+lcast(expr) ::=<<
+<expr>
+lcast
+>>
+
+
+//
+// Multiplication
+//
+mul(subtemplate, lexpr, rexpr) ::=<<
+<(subtemplate)(lexpr=lexpr,rexpr=rexpr)>
+>>
+
+iimul(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+imul
+>>
+
+ffmul(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+fmul
+>>
+
+ifmul(lexpr, rexpr) ::=<<
+<lexpr>
+fcast
+<rexpr>
+fmul
+>>
+
+fimul(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+fcast
+fmul
+>>
+
+ivmul(lexpr, rexpr) ::=<<
+<rexpr>
+<lexpr>
+vimul
+>>
+
+vimul(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+vimul
+>>
+
+fvmul(lexpr, rexpr) ::=<<
+<rexpr>
+<lexpr>
+vfmul
+>>
+
+vfmul(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+vfmul
+>>
+
+vvmul(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+vmul
+>>
+
+vrmul(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+vrmul
+>>
+
+rrmul(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+rmul
+>>
+
+
+//
+// Division
+//
+div(subtemplate, lexpr, rexpr) ::=<<
+<(subtemplate)(lexpr=lexpr,rexpr=rexpr)>
+>>
+
+iidiv(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+idiv
+>>
+
+ifdiv(lexpr, rexpr) ::=<<
+<lexpr>
+fcast
+<rexpr>
+fdiv
+>>
+
+ffdiv(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+fdiv
+>>
+
+fidiv(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+fcast
+fdiv
+>>
+
+vidiv(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+vidiv
+>>
+
+vfdiv(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+vfdiv
+>>
+
+vrdiv(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+vrdiv
+>>
+
+rrdiv(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+rdiv
+>>
+
+//
+// Modulus 
+//
+mod(subtemplate, lexpr, rexpr) ::=<<
+<(subtemplate)(lexpr=lexpr,rexpr=rexpr)>
+>>
+
+imod(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+imod
+>>
+
+vcross(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+vcross
+>>
+
+
+//
+// Addition
+//
+add(subtemplate, lexpr, rexpr) ::=<<
+<(subtemplate)(lexpr=lexpr,rexpr=rexpr)>
+>>
+
+iiadd(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+iadd
+>>
+
+ifadd(lexpr, rexpr) ::=<<
+<lexpr>
+fcast
+<rexpr>
+fadd
+>>
+
+fiadd(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+fcast
+fadd
+>>
+
+ffadd(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+fadd
+>>
+
+lprep(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+list.prepend
+>>
+
+lapp(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+list.append
+>>
+
+vvadd(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+vadd
+>>
+
+rradd(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+radd
+>>
+
+
+
+//
+// Subtraction
+//
+ssadd(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+sconcat
+>>
+
+subtract(subtemplate, lexpr, rexpr) ::=<<
+<(subtemplate)(lexpr=lexpr,rexpr=rexpr)>
+>>
+
+iisub(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+isub
+>>
+
+ifsub(lexpr, rexpr) ::=<<
+<lexpr>
+fcast
+<rexpr>
+fsub
+>>
+
+fisub(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+fcast
+fsub
+>>
+
+ffsub(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+fsub
+>>
+
+
+vvsub(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+vsub
+>>
+
+
+rrsub(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+rsub
+>>
+
+//
+// Shifts
+//
+lshift(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+ilsh
+>>
+
+rshift(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+irsh
+>>
+
+
+
+//
+// Comparison
+//
+compare(operation, lexpr, rexpr) ::=<<
+<(operation)(lexpr=lexpr,rexpr=rexpr)>
+>>
+
+ilt(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+ilt
+>>
+
+flt(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+flt
+>>
+
+igt(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+igt
+>>
+
+fgt(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+fgt
+>>
+
+ilte(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+ilte
+>>
+
+flte(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+flte
+>>
+
+igte(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+igte
+>>
+
+fgte(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+fgte
+>>
+
+equals(subtemplate, lexpr, rexpr) ::=<<
+<(subtemplate)(lexpr=lexpr,rexpr=rexpr)>
+>>
+
+ieq(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+ieq
+>>
+
+feq(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+feq
+>>
+
+veq(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+veq
+>>
+
+req(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+req
+>>
+
+leq(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+leq
+>>
+
+seq(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+seq
+>>
+
+notequals(subtemplate, lexpr, rexpr) ::=<<
+<(subtemplate)(lexpr=lexpr,rexpr=rexpr)>
+>>
+
+ineq(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+ineq
+>>
+
+fneq(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+fneq
+>>
+
+vneq(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+vneq
+>>
+
+rneq(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+rneq
+>>
+
+lneq(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+lneq
+>>
+
+sneq(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+sneq
+>>
+
+
+//
+// Initialization
+//
+ginit(subtemplate, gindex) ::=<<
+<(subtemplate)(gindex=gindex)>
+>>
+
+iinitg(gindex) ::=<<
+iinit.g <gindex>
+
+>>
+
+finitg(gindex) ::=<<
+finit.g <gindex>
+
+>>
+
+vinitg(gindex) ::=<<
+vinit.g <gindex>
+
+>>
+
+rinitg(gindex) ::=<<
+rinit.g <gindex>
+
+>>
+
+sinitg(gindex) ::=<<
+sinit.g <gindex>
+
+>>
+
+kinitg(gindex) ::=<<
+kinit.g <gindex>
+
+>>
+
+linitg(gindex) ::=<<
+linit.g <gindex>
+
+>>
+
+
+
+//
+// Bitwise
+//
+bitor(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+ibor
+>>
+
+bitand(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+iband
+>>
+
+bitxor(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+ibxor
+>>
+
+
+//
+// Logical
+//
+boolor(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+ilor
+>>
+
+booland(lexpr, rexpr) ::=<<
+<lexpr>
+<rexpr>
+iland
+>>
+
+
+//
+// Assignment
+//
+assign(isglobal, index, expr, pushfinal) ::=<<
+<expr>
+<if(isglobal)>gstore <index>
+<if(pushfinal)>gload <index>
+<endif>
+<else>store <index>
+<if(pushfinal)>load <index>
+<endif>
+<endif>
+>>
+
+subassign(isglobal, index, subindex, expr) ::=<<
+<expr>
+<if(isglobal)>gstore.sub <index>,<subindex>
+<if(pushfinal)>gload.sub <index>,<subindex>
+<endif>
+<else>store.sub <index>,<subindex>
+<if(pushfinal)>load.sub <index>,<subindex>
+<endif>
+<endif>
+>>
+
+subassignop(subtemplate, isglobal, index, subindex, expr, pushfinal) ::=<<
+<(subtemplate)(isglobal=isglobal,index=index,subindex=subindex,expr=expr,pushfinal=pushfinal)>
+>>
+
+//
+// Template to support any kind of operation followed by assignment ( +=, -= )
+//
+xxxa(isglobal, index, subindex, expr, op, cast, pushfinal) ::=<<
+<if(isglobal)>gload<if(subindex)>.sub<endif> <index><if(subindex)>, <subindex><endif>
+<expr>
+<cast>
+<op>
+gstore<if(subindex)>.sub<endif> <index><if(subindex)>, <subindex><endif>
+<if(pushfinal)>gload<if(subindex)>.sub<endif> <index><if(subindex)>, <subindex><endif>
+<endif>
+<else>load<if(subindex)>.sub<endif> <index><if(subindex)>, <subindex><endif>
+<expr>
+<cast>
+<op>
+store<if(subindex)>.sub<endif> <index><if(subindex)>, <subindex><endif>
+<if(pushfinal)>load<if(subindex)>.sub<endif> <index><if(subindex)>, <subindex><endif>
+<endif>
+<endif>
+
+>>
+
+//
+// Addditive assignment
+//
+iiaa(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="iadd", pushfinal=pushfinal)>
+>>
+
+fiaa(isglobal, index, subindex, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, subindex=subindex, expr=expr, op="fadd", cast="fcast", pushfinal=pushfinal)>
+<endif>
+>>
+
+ffaa(isglobal, index, subindex, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, subindex=subindex, expr=expr, op="fadd", pushfinal=pushfinal)>
+>>
+
+vvaa(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="vadd", pushfinal=pushfinal)>
+>>
+
+rraa(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="radd", pushfinal=pushfinal)>
+>>
+
+laa(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="list.append", pushfinal=pushfinal)>
+>>
+
+ssaa(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="sconcat", pushfinal=pushfinal)>
+>>
+
+
+//
+// Subtraction assignment
+//
+iisa(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="isub", pushfinal=pushfinal)>
+>>
+
+fisa(isglobal, index, subindex, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, subindex=subindex, expr=expr, op="fsub", cast="fcast", pushfinal=pushfinal)>
+>>
+
+vvsa(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="vsub", pushfinal=pushfinal)>
+>>
+
+rrsa(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="rsub", pushfinal=pushfinal)>
+>>
+
+ffsa(isglobal, index, subindex, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, subindex=subindex, expr=expr, op="fsub", pushfinal=pushfinal)>
+>>
+
+//
+// Multiplication assignment
+//
+iima(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="imul", pushfinal=pushfinal)>
+>>
+
+fima(isglobal, index, subindex, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, subindex=subindex, expr=expr, op="fmul", cast="fcast", pushfinal=pushfinal)>
+>>
+
+ffma(isglobal, index, subindex, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, subindex=subindex, expr=expr, op="fmul", pushfinal=pushfinal)>
+>>
+
+vima(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="vimul", pushfinal=pushfinal)>
+>>
+
+vfma(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="vfmul", pushfinal=pushfinal)>
+>>
+
+vvma(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="vmul", pushfinal=pushfinal)>
+>>
+
+vrma(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="vrmul", pushfinal=pushfinal)>
+>>
+
+rrma(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="rmul", pushfinal=pushfinal)>
+>>
+
+
+//
+// Division assignment
+//
+iida(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="idiv", pushfinal=pushfinal)>
+>>
+
+fida(isglobal, index, subindex, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, subindex=subindex, expr=expr, op="fdiv", cast="fcast", pushfinal=pushfinal)>
+>>
+
+ffda(isglobal, index, subindex, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, subindex=subindex, expr=expr, op="fdiv", pushfinal=pushfinal)>
+>>
+
+vida(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="vidiv", pushfinal=pushfinal)>
+>>
+
+vfda(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="vfdiv", pushfinal=pushfinal)>
+>>
+
+vrda(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="vrdiv", pushfinal=pushfinal)>
+>>
+
+rrda(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="rdiv", pushfinal=pushfinal)>
+>>
+
+
+//
+// Modulus assignment
+//
+iimodassign(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="imod", pushfinal=pushfinal)>
+>>
+
+vvmodassign(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="vcross", pushfinal=pushfinal)>
+>>
+
+
+//
+// Shift assignment
+//
+iilsa(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="ilsh", pushfinal=pushfinal)>
+>>
+
+iirsa(isglobal, index, expr, pushfinal) ::=<<
+<xxxa(isglobal=isglobal, index=index, expr=expr, op="irsh", pushfinal=pushfinal)>
+>>
+
+
+//
+// Method definitions
+//
+methoddef(methodname, argcount, localscount, content) ::=<<
+.def <methodname>: args=<argcount>, locals=<localscount>
+<content; separator="\n">
+ret
+
+>>
+
+
+//
+// Local variable storage and init
+//
+lstore(expression, gindex) ::= <<
+<if (expression)>
+<expression>
+store <gindex>
+
+<endif>
+>>
+
+linit(subtemplate, lindex) ::=<<
+<(subtemplate)(lindex=lindex)>
+>>
+
+iinitl(lindex) ::=<<
+iinit.l <lindex>
+
+>>
+
+finitl(lindex) ::=<<
+finit.l <lindex>
+
+>>
+
+vinitl(lindex) ::=<<
+vinit.l <lindex>
+
+>>
+
+rinitl(lindex) ::=<<
+rinit.l <lindex>
+
+>>
+
+sinitl(lindex) ::=<<
+sinit.l <lindex>
+
+>>
+
+kinitl(lindex) ::=<<
+kinit.l <lindex>
+
+>>
+
+linitl(lindex) ::=<<
+linit.l <lindex>
+
+>>
+
+
+//
+// Pop the top of the stack after the given expression
+//
+pop(expression) ::=<<
+<expression>
+pop
+
+>>
+
+
+//
+// Returns from the given function with the optional expression
+//
+return(expression) ::=<<
+<expression>
+ret
+
+>>
+
+
+//
+// Writes a label
+//
+label(id) ::=<<
+<id>:
+
+>>
+
+//
+// Jump statement
+//
+jump(id) ::=<<
+jmp <id>
+
+>>
+
+
+//
+// Template that just dumps a list of expressions
+//
+dump(content) ::=<<
+<content; separator="\n">
+>>
+
+//
+// If/Else statement
+//
+ifelse(evalexpr, stmt, altstmt, endlabel, altlabel, needsBoolEval) ::=<<
+<evalexpr>
+<if(needsBoolEval)>booleval
+<endif>
+
+brf <altlabel>
+<stmt>
+jmp <endlabel>
+<altlabel>:
+<altstmt>
+<endlabel>:
+
+>>
+
+//
+// While statement
+//
+while(evalexpr, stmt, loopstartlabel, loopoutlabel, needsBoolEval) ::=<<
+<loopstartlabel>:
+<evalexpr>
+<if(needsBoolEval)>booleval
+<endif>
+
+brf <loopoutlabel>
+<stmt>
+jmp <loopstartlabel>
+<loopoutlabel>:
+
+>>
+
+//
+// Do while statement
+//
+dowhile(evalexpr, stmt, loopstartlabel, loopoutlabel, needsBoolEval) ::=<<
+<loopstartlabel>:
+<stmt>
+<evalexpr>
+<if(needsBoolEval)>booleval
+<endif>
+
+brf <loopoutlabel>
+jmp <loopstartlabel>
+<loopoutlabel>:
+
+>>
+
+//
+// For loop
+//
+forloop(initexpr, condexpr, loopexpr, stmt, loopstartlabel, loopoutlabel, needsBoolEval) ::=<<
+<initexpr>
+<if(initexpr)>pop
+<endif>
+
+<loopstartlabel>:
+<if(condexpr)>
+
+<condexpr>
+<if(needsBoolEval)>booleval
+<endif>
+
+brf <loopoutlabel>
+<endif>
+
+<stmt>
+<loopexpr>
+<if(loopexpr)>pop
+<endif>
+
+jmp <loopstartlabel>
+<loopoutlabel>:
+>>
+
+
+//
+// State change
+//
+statechg(id) ::=<<
+<if(id)>statechg @<id>
+
+<else>statechg @default
+
+<endif>
+>>
+
+//
+// Event definitions
+//
+eventdef(eventname, argcount, localscount, content) ::=<<
+.evt <eventname>: args=<argcount>, locals=<localscount>
+<content; separator="\n">
+ret
+
+>>

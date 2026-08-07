@@ -265,7 +265,11 @@
     ; edit the line ulimit -s 262144, and change this last value
 
     ;# {DefaultScriptEngine} {} {Default script engine} {YEngine}
-    ;; Default script engine to use. Currently, we only have YEngine
+    ;; Default script engine to use. Options: "YEngine" (default) or "InWorldz.Phlox".
+    ;; YEngine remains the default/fallback. To run the Phlox engine instead, set this
+    ;; to "InWorldz.Phlox" (the [InWorldz.Phlox] section below must also have Enabled=true,
+    ;; which it is by default). Both engines can be loaded together; each only handles the
+    ;; scripts routed to it, so this choice selects which engine compiles new scripts.
     ; DefaultScriptEngine = "YEngine"
     
     ;# {HttpProxy} {} {Proxy URL for llHTTPRequest and dynamic texture loading} {} http://proxy.com:8080
@@ -1027,6 +1031,18 @@
     ; ClientCertFilename = ""
     ; ClientCertPassword = ""    
 
+
+[InWorldz.Phlox]
+    ;; The Phlox (InWorldz/Halcyon) LSL/OSSL script engine: compiled-bytecode execution,
+    ;; script-state persistence across restarts, plus SL parity and the iz/OSSL heritage
+    ;; functions, and SLua (SL-conformant Luau) script support. Phlox disables itself
+    ;; unless this section is present with Enabled=true. Enabled here by default so it is
+    ;; AVAILABLE; it only becomes the active engine when
+    ;; DefaultScriptEngine = "InWorldz.Phlox" (see [Startup]). With the default
+    ;; DefaultScriptEngine = "YEngine", Phlox loads but stays idle (engines route by name).
+    ;; Phlox keeps its bytecode cache + script-state SQLite under ScriptEngines/Phlox/
+    ;; (auto-created; needs the native e_sqlite3 lib, shipped by publish).
+    Enabled = true
 
 [YEngine]
     ;; implements non preemptive microthreading, so fixing problems like llSleep or long events handlers
