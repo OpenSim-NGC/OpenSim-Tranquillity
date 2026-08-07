@@ -292,6 +292,16 @@ public class EstateSettings
         set { l_KeyExperiences = new List<UUID>(value); }
     }
 
+    // Region/estate BLOCKED experiences (T5b) — the block-wins tier of the admission ladder.
+    // A third list next to AllowedExperiences + KeyExperiences, same shape/persistence.
+    private List<UUID> l_BlockedExperiences = new List<UUID>();
+
+    public UUID[] BlockedExperiences
+    {
+        get { return l_BlockedExperiences.ToArray(); }
+        set { l_BlockedExperiences = new List<UUID>(value); }
+    }
+
     public bool DoDenyMinors = true;
     public bool DoDenyAnonymous = true;
 
@@ -500,6 +510,27 @@ public class EstateSettings
     {
         if (l_KeyExperiences.Contains(experienceKey))
             l_KeyExperiences.Remove(experienceKey);
+    }
+
+    public int BlockedExperiencesCount()
+    {
+        return l_BlockedExperiences.Count;
+    }
+
+    public void AddBlockedExperience(UUID experienceKey)
+    {
+        if (experienceKey == UUID.Zero)
+            return;
+        // Cap reuses the Allowed-experiences limit (no separate Blocked limit constant).
+        if (!l_BlockedExperiences.Contains(experienceKey) &&
+            (l_BlockedExperiences.Count < (int)Constants.EstateAccessLimits.AllowedExperiences))
+            l_BlockedExperiences.Add(experienceKey);
+    }
+
+    public void RemoveBlockedExperience(UUID experienceKey)
+    {
+        if (l_BlockedExperiences.Contains(experienceKey))
+            l_BlockedExperiences.Remove(experienceKey);
     }
 
     public Dictionary<string, object> ToMap()

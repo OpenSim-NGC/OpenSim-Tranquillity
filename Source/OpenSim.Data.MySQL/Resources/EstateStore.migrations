@@ -95,3 +95,11 @@ CREATE TABLE IF NOT EXISTS `estate_key_experiences` (
   KEY `EstateID` (`EstateID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 COMMIT;
+
+:VERSION 38
+CREATE TABLE IF NOT EXISTS `estate_blocked_experiences` (
+  `EstateID` int(10) unsigned NOT NULL,
+  `uuid` char(36) NOT NULL,
+  KEY `EstateID` (`EstateID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+COMMIT;

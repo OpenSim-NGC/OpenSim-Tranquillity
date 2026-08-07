@@ -11330,9 +11330,58 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
         // ── 610–620: Experience KV Store (upgraded to use ExperienceService) ──
 
+        // ── SL Experience error codes (XP_ERROR_*) + limits, ported from Legion
+        //    (port-source-2026-07-22) to match the SL wiki XP_ERROR table 0-18.
+        //    Script-surface conformance — Experience port T1 (SS-1..9). ──
+        private const int XP_ERROR_NONE = 0;
+        private const int XP_ERROR_THROTTLED = 1;
+        private const int XP_ERROR_EXPERIENCES_DISABLED = 2;
+        private const int XP_ERROR_INVALID_PARAMETERS = 3;
+        private const int XP_ERROR_NOT_PERMITTED = 4;
+        private const int XP_ERROR_NO_EXPERIENCE = 5;
+        private const int XP_ERROR_NOT_FOUND = 6;
+        private const int XP_ERROR_INVALID_EXPERIENCE = 7;
+        private const int XP_ERROR_EXPERIENCE_DISABLED = 8;
+        private const int XP_ERROR_EXPERIENCE_SUSPENDED = 9;
+        private const int XP_ERROR_UNKNOWN_ERROR = 10;
+        private const int XP_ERROR_QUOTA_EXCEEDED = 11;
+        private const int XP_ERROR_STORE_DISABLED = 12;
+        private const int XP_ERROR_STORAGE_EXCEPTION = 13;
+        private const int XP_ERROR_KEY_NOT_FOUND = 14;
+        private const int XP_ERROR_RETRY_UPDATE = 15;
+        private const int XP_ERROR_MATURITY_EXCEEDED = 16;
+        private const int XP_ERROR_NOT_PERMITTED_LAND = 17;
+        private const int XP_ERROR_REQUEST_PERM_TIMEOUT = 18;
+        // SL key-value key length cap (SL wiki llCreateKeyValue): 1011 bytes (was 255).
+        private const int MAX_EXPERIENCE_KEY_LENGTH = 1011;
+        // Viewer experience-property bit PROPERTY_DISABLED (indra VP_DISABLED = 1<<6);
+        // used to report the llGetExperienceDetails state field.
+        private const int VP_DISABLED = 1 << 6;
+        // SL per-experience KV quota: 128 MiB (was NGC's 16 MiB). T2 ports Legion DEC-2/UNV-5.
+        private const long MAX_DATA_QUOTA = 128L * 1024 * 1024;
+
+        // UTF-8 byte count for a KV key/value — the quota basis (matches Legion's KvBytes and the
+        // MySQL SUM(LENGTH(`key`)+LENGTH(`value`)) used-size on the grid backend).
+        private static long KvBytes(string s) => s == null ? 0 : System.Text.Encoding.UTF8.GetByteCount(s);
+
+        // True if updating `key` to `value` would push this experience's KV store over MAX_DATA_QUOTA.
+        // Delta-aware (Legion ExceedsQuota): an existing key swaps its value (key stays); a new key
+        // adds the whole pair. Basis: key+value UTF-8 bytes.
+        private bool ExceedsQuota(PhloxExperienceAdapter expService, UUID expId, string key, string value)
+        {
+            long used = expService.DataSizeKeyValue(expId);
+            string existing = expService.ReadKeyValue(expId, key); // null iff key absent
+            long oldPair = existing != null ? KvBytes(key) + KvBytes(existing) : 0;
+            long newPair = KvBytes(key) + KvBytes(value);
+            return used - oldPair + newPair > MAX_DATA_QUOTA;
+        }
+
+        // KV int return contract: 0 ok · -1 invalid/error · -2 duplicate (create) ·
+        // -3 CAS-fail/not-found (update) · -4 not-found (delete) · -5 quota exceeded (create/update).
+        // The ...SL wrappers translate these to the SL XP_ERROR codes.
         public int llCreateKeyValue(string key, string value)
         {
-            if (string.IsNullOrEmpty(key) || key.Length > 255) return -1;
+            if (string.IsNullOrEmpty(key) || key.Length > MAX_EXPERIENCE_KEY_LENGTH) return -1;
             var expService = GetExperienceAdapter();
             UUID expId = GetScriptExperienceId();
             if (expService == null || expId == UUID.Zero)
@@ -11342,6 +11391,11 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             try
             {
+                // T2/DEC-2: quota check BEFORE the write (Legion — never write-then-detect). A create
+                // only ADDS a pair; reject if that would exceed 128 MiB -> -5 (llCreateKeyValueSL emits
+                // 0,11 = XP_ERROR_QUOTA_EXCEEDED). No write.
+                if (expService != null && expService.DataSizeKeyValue(expId) + KvBytes(key) + KvBytes(value) > MAX_DATA_QUOTA)
+                    return -5;
                 bool ok = expService != null
                     ? expService.CreateKeyValue(expId, key, value)
                     : false;
@@ -11375,13 +11429,18 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
         public int llUpdateKeyValue(string key, string value, string check)
         {
-            if (string.IsNullOrEmpty(key) || key.Length > 255) return -1;
+            if (string.IsNullOrEmpty(key) || key.Length > MAX_EXPERIENCE_KEY_LENGTH) return -1;
             var expService = GetExperienceAdapter();
             UUID expId = GetScriptExperienceId();
             if (expService == null || expId == UUID.Zero)
                 expId = m_host.OwnerID;
             try
             {
+                // T2/DEC-2: delta-aware quota check BEFORE the write (Legion ExceedsQuota). If the
+                // projected total after this update exceeds 128 MiB -> -5 (llUpdateKeyValueSL emits
+                // 0,11). No write. (If a CAS would also fail, quota wins at the boundary — benign.)
+                if (expService != null && ExceedsQuota(expService, expId, key, value))
+                    return -5;
                 bool ok = expService != null
                     ? expService.UpdateKeyValue(expId, key, value, check)
                     : false;
@@ -11495,14 +11554,19 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
         }
 
+        // The ...SL wrappers present SL's async-dataserver CSV shape "1,<value>" (success) /
+        // "0,<XP_ERROR>" (failure). T1 makes the failure payload a NUMERIC XP_ERROR code (was a
+        // free-text message), matching SL/Legion. (The underlying KV model stays synchronous —
+        // the async request-key + dataserver-event contract is a later architecture slice, not T1.)
         public string llCreateKeyValueSL(string key, string value)
         {
             int result = llCreateKeyValue(key, value);
             if (result == 0)
                 return "1," + (value ?? string.Empty);
-            if (result == -2)
-                return "0,key already exists";
-            return "0,error";
+            if (result == -5) // over the 128 MiB quota (T2)
+                return "0," + XP_ERROR_QUOTA_EXCEEDED;
+            // SL: creating an existing key (or a generic KV failure) => XP_ERROR_STORAGE_EXCEPTION.
+            return "0," + XP_ERROR_STORAGE_EXCEPTION;
         }
 
         public string llReadKeyValueSL(string key)
@@ -11510,7 +11574,8 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             string val = llReadKeyValue(key);
             if (!string.IsNullOrEmpty(val))
                 return "1," + val;
-            return "0,key not found";
+            // SL: a missing key => XP_ERROR_KEY_NOT_FOUND (14). (SS-4)
+            return "0," + XP_ERROR_KEY_NOT_FOUND;
         }
 
         public string llUpdateKeyValueSL(string key, string value, string check)
@@ -11518,9 +11583,10 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             int result = llUpdateKeyValue(key, value, check);
             if (result == 0)
                 return "1," + (value ?? string.Empty);
-            if (result == -3)
-                return "0,check failed";
-            return "0,error";
+            if (result == -5) // over the 128 MiB quota (T2)
+                return "0," + XP_ERROR_QUOTA_EXCEEDED;
+            // SL: a checked-update mismatch (CAS fail) => XP_ERROR_RETRY_UPDATE (15).
+            return "0," + XP_ERROR_RETRY_UPDATE;
         }
 		
         // ── Tier 6: Standalone ──
@@ -11901,10 +11967,13 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 case 11: return "experience data quota exceeded";
                 case 12: return "key-value store is disabled";
                 case 13: return "key-value store communication failed";
-                case 14: return "key already exists";
-                case 15: return "content rating too high";
-                case 16: return "not allowed to run in current location";
-                case 17: return "experience permissions request timed out";
+                // T1/SS-5,8,9: rows 14-18 corrected to the SL wiki XP_ERROR table (were shifted:
+                // 14 said "key already exists", 15/16/17 were off by one, 18 was missing).
+                case 14: return "key doesn't exist";                       // XP_ERROR_KEY_NOT_FOUND
+                case 15: return "retry update";                           // XP_ERROR_RETRY_UPDATE
+                case 16: return "experience content rating too high";     // XP_ERROR_MATURITY_EXCEEDED
+                case 17: return "not allowed to run on this land";        // XP_ERROR_NOT_PERMITTED_LAND
+                case 18: return "experience permissions request timed out"; // XP_ERROR_REQUEST_PERM_TIMEOUT
                 default: return "unknown error id";
             }
         }
@@ -12500,6 +12569,22 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             return expService.IsAgentGranted(experienceId, agentId);
         }
 
+        // ── D1 consent state (ported from Legion port-source-2026-07-22). One pending request per
+        //    script instance (LSLSystemAPI is per-script), keyed by ItemID; the ScriptAnswerYes packet
+        //    carries no ExperienceID, so the answer is correlated by TaskID + ItemID via OnScriptAnswer. ──
+        private const int PERMISSION_EXPERIENCE = 0x2000;       // JoinAnExperience bit
+        private const int EXPERIENCE_PERM_TIMEOUT_MS = 300000;  // 300s (SL: "at least 5 minutes")
+        private sealed class PendingExperiencePerm
+        {
+            public UUID AgentId;
+            public UUID ExperienceId;
+            public IClientAPI Client;
+            public System.Threading.Timer Timer;
+        }
+        private readonly Dictionary<UUID, PendingExperiencePerm> m_pendingExpPerms = new Dictionary<UUID, PendingExperiencePerm>();
+        private readonly object m_pendingExpLock = new object();
+        private IClientAPI m_expHookedClient = null;
+
         // ── 659: llRequestExperiencePermissions ──
         public void llRequestExperiencePermissions(string agent, string name)
         {
@@ -12510,73 +12595,217 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             var expService = GetExperienceAdapter();
             UUID experienceId = GetScriptExperienceId();
 
-            // No experience associated with this script
+            // No experience associated with this script -> XP_ERROR_NO_EXPERIENCE (5). (SS-7)
             if (expService == null || experienceId == UUID.Zero)
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions_denied",
-                    new object[] { agent, 17 }, // XP_ERROR_NOT_PERMITTED
+                    new object[] { agent, XP_ERROR_NO_EXPERIENCE },
                     new DetectParams[0]));
                 return;
             }
 
-            // Check if experience is allowed in this region
-            var allowed = expService.GetAllowedExperiences(World.RegionInfo.RegionID);
-            if (!allowed.Contains(experienceId))
+            // T5b block-wins: a region-BLOCKED experience is denied regardless of allow/trusted/prior-
+            // grant, land-scope XP_ERROR_NOT_PERMITTED_LAND (17). Checked FIRST (before admission,
+            // trusted, and already-granted) so block wins over everything. (Legion also has a parcel-
+            // block tier at this precedence — deferred; Tranquillity has no parcel-experience source.)
+            if (IsExperienceBlockedInRegion(expService, experienceId))
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions_denied",
-                    new object[] { agent, 18 }, // XP_ERROR_NOT_FOUND
+                    new object[] { agent, XP_ERROR_NOT_PERMITTED_LAND },
                     new DetectParams[0]));
                 return;
             }
 
-            // Check if agent is present
+            // Admission (T5): the experience must be enabled on this land — estate-ALLOWED or region-
+            // TRUSTED (estate KeyExperiences). A trusted experience is a stronger allow, so it admits
+            // here and is silently granted below (previously a trusted-but-not-allowed experience was
+            // wrongly denied 17 before the trusted check). Legion's admission also has grid-wide + parcel-
+            // ALLOW tiers, and a region/parcel BLOCK-wins tier; those have NO source in NGC (no grid-wide
+            // bit, no region-block store, no ILandObject experience methods) — the flagged T5 STOP (see
+            // experience-port-ledger.md). Not admitted -> land-scope XP_ERROR_NOT_PERMITTED_LAND (17).
+            if (!IsExperienceAdmitted(expService, experienceId))
+            {
+                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
+                    "experience_permissions_denied",
+                    new object[] { agent, XP_ERROR_NOT_PERMITTED_LAND },
+                    new DetectParams[0]));
+                return;
+            }
+
+            // Target agent must have a ROOT presence here -> else agent-scope XP_ERROR_NOT_PERMITTED (4).
             ScenePresence sp = World.GetScenePresence(agentId);
             if (sp == null || sp.IsChildAgent)
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions_denied",
-                    new object[] { agent, 17 },
+                    new object[] { agent, XP_ERROR_NOT_PERMITTED },
                     new DetectParams[0]));
                 return;
             }
 
-            // Check if agent already granted
-            if (expService.IsAgentGranted(experienceId, agentId))
-            {
-                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                    "experience_permissions",
-                    new object[] { agent },
-                    new DetectParams[0]));
-                return;
-            }
-
-            // Check if agent explicitly blocked
+            // T3/D1 gate order (Legion): the agent's PERSONAL block wins over everything below and is
+            // checked BEFORE the already-granted short-circuit, so a resident who blocked this experience
+            // is never re-granted (SL code 4). (The Block-button persistence loop is T4.)
             if (expService.IsAgentBlocked(experienceId, agentId))
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions_denied",
-                    new object[] { agent, 4 }, // XP_ERROR_REQUEST_DENIED
+                    new object[] { agent, XP_ERROR_NOT_PERMITTED }, // 4 — agent's personal block
                     new DetectParams[0]));
                 return;
             }
 
-            // Auto-grant since viewer-native experience dialogs require viewer support
-            // Permission is persisted in MySQL via ExperienceService
+            // Already granted -> notify immediately, no dialog.
+            if (expService.IsAgentGranted(experienceId, agentId))
+            {
+                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
+                    "experience_permissions", new object[] { agent }, new DetectParams[0]));
+                return;
+            }
+
+            // T5 trusted enforcement. A region-TRUSTED experience (Tranquillity estate KeyExperiences)
+            // grants silently — no dialog. Checked AFTER agent-block (T4), so a personally-blocked
+            // experience is denied 4 even if trusted (block wins over trusted — Legion's order).
+            if (expService.GetTrustedExperiences(World.RegionInfo.RegionID).Contains(experienceId))
+            {
+                GrantExperienceAndNotify(expService, experienceId, agentId, agent);
+                return;
+            }
+
+            // Non-trusted: PROMPT the agent and AWAIT the answer — this REPLACES the former auto-grant.
+            // The Experience block on the ScriptQuestion (attached only when experienceId != Zero, guarded
+            // in LLClientView) makes the viewer show the experience consent dialog. Resolves to
+            // experience_permissions on Yes / _denied 4 on No/disconnect / _denied 18 on timeout.
+            string ownerName = m_host.ParentGroup.RootPart.OwnerID.ToString();
+            var ownerAcct = World?.UserAccountService?.GetUserAccount(
+                World.RegionInfo.ScopeID, m_host.ParentGroup.RootPart.OwnerID);
+            if (ownerAcct != null) ownerName = ownerAcct.FirstName + " " + ownerAcct.LastName;
+            if (string.IsNullOrEmpty(ownerName)) ownerName = "(unknown)";
+
+            RegisterPendingExperiencePerm(sp.ControllingClient, experienceId, agentId);
+            sp.ControllingClient.SendScriptQuestion(
+                m_host.UUID, m_host.ParentGroup.RootPart.Name, ownerName, m_itemID,
+                PERMISSION_EXPERIENCE, experienceId);
+        }
+
+        // Grant + persist an experience permission and post experience_permissions. Shared by the
+        // trusted-bypass path and the accepted-answer path.
+        private void GrantExperienceAndNotify(PhloxExperienceAdapter expService, UUID experienceId, UUID agentId, string agent)
+        {
             expService.GrantPermission(experienceId, agentId);
-
-            var expModule = GetExperienceModule();
-            expModule?.InvalidatePermission(experienceId, agentId);
-
+            expService.InvalidatePermission(experienceId, agentId);
             m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                "experience_permissions",
-                new object[] { agent },
-                new DetectParams[0]));
-
+                "experience_permissions", new object[] { agent }, new DetectParams[0]));
             var expInfo = expService.GetExperience(experienceId);
-            m_log.InfoFormat("[PhloxAPI]: Experience permission auto-granted: agent={0} experience={1}",
+            m_log.InfoFormat("[PhloxAPI]: Experience permission granted: agent={0} experience={1}",
                 agentId, expInfo?.Name ?? experienceId.ToString());
+        }
+
+        // Record the pending request (keyed by m_itemID) and start its 300s timeout. Hooks the client's
+        // answer/disconnect events (re-hooking if the target client changed).
+        private void RegisterPendingExperiencePerm(IClientAPI client, UUID experienceId, UUID agentId)
+        {
+            lock (m_pendingExpLock)
+            {
+                if (m_pendingExpPerms.TryGetValue(m_itemID, out PendingExperiencePerm prior))
+                {
+                    prior.Timer?.Dispose();
+                    m_pendingExpPerms.Remove(m_itemID);
+                }
+                if (m_expHookedClient != client)
+                {
+                    if (m_expHookedClient != null)
+                    {
+                        m_expHookedClient.OnScriptAnswer -= HandleExperienceScriptAnswer;
+                        m_expHookedClient.OnConnectionClosed -= HandleExperienceConnectionClosed;
+                    }
+                    client.OnScriptAnswer += HandleExperienceScriptAnswer;
+                    client.OnConnectionClosed += HandleExperienceConnectionClosed;
+                    m_expHookedClient = client;
+                }
+                var pending = new PendingExperiencePerm { AgentId = agentId, ExperienceId = experienceId, Client = client };
+                pending.Timer = new System.Threading.Timer(
+                    _ => ResolveExperiencePerm(m_itemID, granted: false, errorCode: XP_ERROR_REQUEST_PERM_TIMEOUT),
+                    null, EXPERIENCE_PERM_TIMEOUT_MS, System.Threading.Timeout.Infinite);
+                m_pendingExpPerms[m_itemID] = pending;
+            }
+        }
+
+        // ScriptAnswerYes arrived (via OnScriptAnswer). Correlate by TaskID (this object) + ItemID;
+        // a non-zero PERMISSION_EXPERIENCE bit means accepted, zero means denied.
+        private void HandleExperienceScriptAnswer(IClientAPI client, UUID taskID, UUID itemID, int answer)
+        {
+            if (taskID != m_host.UUID) return;
+            bool granted = (answer & PERMISSION_EXPERIENCE) != 0;
+            ResolveExperiencePerm(itemID, granted, granted ? XP_ERROR_NONE : XP_ERROR_NOT_PERMITTED);
+        }
+
+        // Agent disconnected mid-dialog: resolve every pending request on this client as denied.
+        private void HandleExperienceConnectionClosed(IClientAPI client)
+        {
+            List<UUID> pendingKeys;
+            lock (m_pendingExpLock)
+                pendingKeys = new List<UUID>(m_pendingExpPerms.Keys);
+            foreach (UUID itemId in pendingKeys)
+                ResolveExperiencePerm(itemId, granted: false, errorCode: XP_ERROR_NOT_PERMITTED);
+        }
+
+        // Single resolution point for grant / user-deny / timeout / disconnect. Removes the pending
+        // entry atomically (first resolver wins — no double-post), disposes the timer, unhooks the
+        // client once nothing is pending; the grant + script event happen OUTSIDE the lock.
+        private void ResolveExperiencePerm(UUID itemID, bool granted, int errorCode)
+        {
+            PendingExperiencePerm pending;
+            IClientAPI clientToUnhook = null;
+            lock (m_pendingExpLock)
+            {
+                if (!m_pendingExpPerms.TryGetValue(itemID, out pending))
+                    return; // already resolved by another path
+                m_pendingExpPerms.Remove(itemID);
+                pending.Timer?.Dispose();
+                if (m_pendingExpPerms.Count == 0 && m_expHookedClient != null)
+                {
+                    clientToUnhook = m_expHookedClient;
+                    m_expHookedClient = null;
+                }
+            }
+            if (clientToUnhook != null)
+            {
+                clientToUnhook.OnScriptAnswer -= HandleExperienceScriptAnswer;
+                clientToUnhook.OnConnectionClosed -= HandleExperienceConnectionClosed;
+            }
+
+            string agent = pending.AgentId.ToString();
+            var expService = GetExperienceAdapter();
+            if (granted && expService != null)
+                GrantExperienceAndNotify(expService, pending.ExperienceId, pending.AgentId, agent);
+            else
+                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
+                    "experience_permissions_denied",
+                    new object[] { agent, errorCode },
+                    new DetectParams[0]));
+        }
+
+        // T5 admission — the portable subset of Legion's ladder (IsExperienceAdmittedAt): an experience
+        // is admitted on this land if the estate ALLOWS it OR it is region-TRUSTED (estate KeyExperiences).
+        // Legion's grid-wide + parcel-ALLOW admission tiers and the region/parcel BLOCK-wins tier have no
+        // NGC source (see the T5 STOP in experience-port-ledger.md) and are not represented here.
+        private bool IsExperienceAdmitted(PhloxExperienceAdapter expService, UUID experienceId)
+        {
+            UUID regionId = World.RegionInfo.RegionID;
+            return expService.GetAllowedExperiences(regionId).Contains(experienceId)
+                || expService.GetTrustedExperiences(regionId).Contains(experienceId);
+        }
+
+        // T5b block-wins tier (Legion IsExperienceBlockedInRegion): an experience on the estate
+        // BlockedExperiences list is denied regardless of allow/trusted/prior-grant. Region granularity
+        // only — Legion also has a parcel-block tier with no NGC parcel-experience source (deferred).
+        private bool IsExperienceBlockedInRegion(PhloxExperienceAdapter expService, UUID experienceId)
+        {
+            UUID regionId = World.RegionInfo.RegionID;
+            return expService.GetBlockedExperiences(regionId).Contains(experienceId);
         }
 
         // ── 660: llAgentInExperience ──
@@ -12584,12 +12813,22 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         {
             UUID agentId;
             if (!UUID.TryParse(agent, out agentId)) return 0;
+            if (agentId == UUID.Zero) return 0;
 
             var expService = GetExperienceAdapter();
             UUID experienceId = GetScriptExperienceId();
-
             if (expService == null || experienceId == UUID.Zero) return 0;
 
+            // SS-6 (presence + agent-block in T1, admission in T5, region-block in T5b): the target agent
+            // must be PARTICIPATING here — a ROOT presence in this region — with block-wins over grant, AND
+            // the experience must not be region-BLOCKED and must be ADMITTED on this land (estate allow OR
+            // trusted). Legion's HasExperiencePermission also applies a parcel BLOCK-wins tier, which has no
+            // NGC source (the T5 STOP) — deferred to a separate project (region granularity only here).
+            ScenePresence sp = World?.GetScenePresence(agentId);
+            if (sp == null || sp.IsChildAgent) return 0;
+            if (IsExperienceBlockedInRegion(expService, experienceId)) return 0; // T5b region block wins
+            if (expService.IsAgentBlocked(experienceId, agentId)) return 0;    // agent block wins
+            if (!IsExperienceAdmitted(expService, experienceId)) return 0;     // T5: admitted on this land
             return expService.IsAgentGranted(experienceId, agentId) ? 1 : 0;
         }
 
@@ -12608,15 +12847,23 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             if (exp == null)
                 return new LSLList();
 
-            // SL format: [name, owner, description, group, maturity, metadata]
+            // T1/SS-1: SL layout is [ name, owner key, experience id, state (int), state message,
+            // group key ] — NOT the old [name, owner, description, group, maturity, ""], which
+            // silently returned wrong data at every index for SL-written scripts (High severity).
+            // State uses the XP_ERROR vocabulary: NONE(0) for a valid enabled experience,
+            // EXPERIENCE_DISABLED(8) when the viewer PROPERTY_DISABLED bit is set. The message comes
+            // from llGetExperienceErrorMessage so the state and its text can never drift apart.
+            int state = (exp.Properties & VP_DISABLED) != 0
+                ? XP_ERROR_EXPERIENCE_DISABLED
+                : XP_ERROR_NONE;
             return new LSLList(new object[]
             {
                 exp.Name ?? string.Empty,
                 exp.OwnerId.ToString(),
-                exp.Description ?? string.Empty,
-                exp.GroupId.ToString(),
-                exp.Maturity,
-                string.Empty
+                expId.ToString(),
+                state,
+                llGetExperienceErrorMessage(state),
+                exp.GroupId.ToString()
             });
         }
 

@@ -1279,6 +1279,13 @@
     ;# {Enabled} {} {Use Experience Tools on this region} {true false} false
     ; Enabled = true
 
+    ;# {ExperienceCreators} {Enabled:true} {Who may Acquire (create) an experience via the viewer?} {EstateManagersAndRegionOwners Anyone AdminsOnly} EstateManagersAndRegionOwners
+    ;; Acquire policy (deliberate deviation from Second Life, which gates creation on Premium).
+    ;;   EstateManagersAndRegionOwners  (default) — estate owner/manager or grid god
+    ;;   Anyone                                   — any avatar may acquire
+    ;;   AdminsOnly                               — grid administrators/gods only
+    ; ExperienceCreators = EstateManagersAndRegionOwners
+
 [Architecture]
     ;# {Include-Architecture} {} {Choose one of the following architectures} {config-include/Standalone.ini config-include/StandaloneHypergrid.ini config-include/Grid.ini config-include/GridHypergrid.ini} config-include/Standalone.ini
     ;; Uncomment one of the following includes as required.  For instance, to create a standalone OpenSim,
