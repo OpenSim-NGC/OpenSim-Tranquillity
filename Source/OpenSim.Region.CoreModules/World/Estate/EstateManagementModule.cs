@@ -1825,15 +1825,54 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
         if (reportType != 0)
             remoteClient.SendLandStatReply(reportType, requestFlags, 0, new LandStatReportItem[0]);
 
-        IScriptModule scriptModule = Scene.RequestModuleInterface<IScriptModule>();
-        if (scriptModule == null)
+        // More than one script engine can be registered (YEngine + Phlox). The singular
+        // RequestModuleInterface<IScriptModule>() returns only the first-registered
+        // engine, so a single-engine query would omit every script owned by the other.
+        // Aggregate across ALL registered engines and merge per-object stats (a linkset
+        // can hold scripts in more than one engine).
+        IScriptModule[] scriptModules = Scene.RequestModuleInterfaces<IScriptModule>();
+        if (scriptModules == null || scriptModules.Length == 0)
+        {
             remoteClient.SendLandStatReply(reportType, requestFlags, 0, new LandStatReportItem[0]);
+            return;
+        }
 
-        ICollection<ScriptTopStatsData>  sceneData = scriptModule.GetTopObjectStats(
-                0.001f, 1024, out float totaltime, out float totalmemory);
+        Dictionary<uint, ScriptTopStatsData> mergedData = new Dictionary<uint, ScriptTopStatsData>();
+        foreach (IScriptModule sm in scriptModules)
+        {
+            if (sm == null)
+                continue;
+
+            ICollection<ScriptTopStatsData> part = sm.GetTopObjectStats(0.001f, 1024, out _, out _);
+            if (part == null)
+                continue;
+
+            foreach (ScriptTopStatsData d in part)
+            {
+                if (mergedData.TryGetValue(d.localID, out ScriptTopStatsData acc))
+                {
+                    acc.time += d.time;
+                    acc.memory += d.memory;
+                }
+                else
+                {
+                    mergedData[d.localID] = new ScriptTopStatsData
+                    {
+                        localID = d.localID,
+                        time = d.time,
+                        memory = d.memory
+                    };
+                }
+            }
+        }
+
+        ICollection<ScriptTopStatsData> sceneData = mergedData.Values;
 
         if(sceneData == null || sceneData.Count == 0)
+        {
             remoteClient.SendLandStatReply(0, requestFlags, 0, new LandStatReportItem[0]);
+            return;
+        }
 
         IUrlModule urlModule = Scene.RequestModuleInterface<IUrlModule>();
 
