@@ -35,14 +35,6 @@
     <Reference Include="C5" HintPath="..\..\Library\C5.dll" />
   </ItemGroup>
 
-  <!-- Nini via develop's Library/; OpenMetaverse via NuGet (develop migrated libomv off Library/). -->
-  <ItemGroup>
-    <Reference Include="Nini" HintPath="..\..\Library\Nini.dll" />
-    <PackageReference Include="OpenMetaverse" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.2.13" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.2.13" />
-  </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\InWorldz.Phlox\InWorldz.Phlox.csproj" />
     <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
