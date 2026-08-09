@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <!-- Matches YEngine: this lib transitively references the OpenSim app project, which
          under solution-level `dotnet publish -r` produces a duplicate apphost relative path
          (NETSDK1152). Suppress, as YEngine does, so publish succeeds. -->
@@ -26,8 +25,8 @@
   <ItemGroup>
     <PackageReference Include="protobuf-net" Version="3.*" />
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.7" />
-    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
+    <PackageReference Include="log4net" Version="3.3.2" />
   </ItemGroup>
 
   <!-- C5 via develop's Library/C5.dll (single identity — avoids the dual-C5 TypeLoadException). -->

@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <AssemblyTitle>OpenSim.Region.OptionalModules</AssemblyTitle>
     <Product>OpenSim.Region.OptionalModules.Properties</Product>
     <Description>Optional modules for OpenSim</Description>
@@ -35,10 +34,10 @@
   </ItemGroup>
 
 <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.1" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
-    <PackageReference Include="System.Data.SQLite" Version="2.0.3" />
+    <PackageReference Include="log4net" Version="3.3.2" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.10" />
+    <PackageReference Include="System.Data.SQLite" Version="2.0.4" />
     <!-- Phlox bot framework: BotPersistenceManager keeps its isolated local bot DB via Microsoft.Data.Sqlite -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
   </ItemGroup>
 </Project>
