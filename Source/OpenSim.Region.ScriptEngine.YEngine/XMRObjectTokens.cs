@@ -2061,8 +2061,8 @@ public class OTDecompile: ObjectTokens
                  // arrayfieldobj = arg$0.glblVars
                  // iartypename = iar<type>
                 OTOpndField arrayfield = (OTOpndField)array;
-                OTOpnd arrayfieldobj = arrayfield.obj;
-                string iartypename = arrayfield.field.Name;
+                OTOpnd arrayfieldobj = arrayfield.Obj;
+                string iartypename = arrayfield.Field.Name;
 
                  // See if they are what they are supposed to be.
                 if((arrayfieldobj is OTOpndField) && iartypename.StartsWith("iar"))
@@ -2071,7 +2071,7 @@ public class OTDecompile: ObjectTokens
                     OTOpndField arrayfieldobjfield = (OTOpndField)arrayfieldobj;
 
                      // See if the parts are what they are supposed to be.
-                    if(IsArg0OrXMRInst(arrayfieldobjfield.obj) && (arrayfieldobjfield.field.Name == "glblVars"))
+                    if(IsArg0OrXMRInst(arrayfieldobjfield.Obj) && (arrayfieldobjfield.Field.Name == "glblVars"))
                     {
                          // Everything matches up, make a global variable instead of an array reference.
                         return new OTOpndGlobal(iartypename, ((OTOpndInt)index).value, byref, decompile.scriptObjCode);
@@ -2859,8 +2859,8 @@ public class OTDecompile: ObjectTokens
      */
     private class OTOpndField: OTOpnd
     {
-        public OTOpnd obj;
-        public FieldInfo field;
+        public OTOpnd Obj { get; private set; }
+        public FieldInfo Field { get; private set; }
 
         public static OTOpnd Make(OTOpnd obj, FieldInfo field)
         {
@@ -2885,8 +2885,8 @@ public class OTDecompile: ObjectTokens
             // some other field, output code to access it
             // sometimes the object comes as by reference (value types), so we might need to deref it first
             OTOpndField it = new OTOpndField();
-            it.obj = obj.GetNonByRefOpnd();
-            it.field = field;
+            it.Obj = obj.GetNonByRefOpnd();
+            it.Field = field;
             return it;
         }
 
@@ -2898,14 +2898,14 @@ public class OTDecompile: ObjectTokens
         {
             get
             {
-                return obj.HasSideEffects;
+                return Obj.HasSideEffects;
             }
         }
 
         public override void CountRefs(bool writing)
         {
             // the field may be getting written to, but the object is being read
-            obj.CountRefs(false);
+            Obj.CountRefs(false);
         }
 
         public override OTOpnd ReplaceOperand(OTOpnd oldopnd, OTOpnd newopnd, ref bool rc)
@@ -2915,7 +2915,7 @@ public class OTDecompile: ObjectTokens
                 rc = true;
                 return newopnd;
             }
-            obj = obj.ReplaceOperand(oldopnd, newopnd, ref rc);
+            Obj = Obj.ReplaceOperand(oldopnd, newopnd, ref rc);
             return this;
         }
 
@@ -2924,7 +2924,7 @@ public class OTDecompile: ObjectTokens
             if(!(other is OTOpndField))
                 return false;
             OTOpndField otherfield = (OTOpndField)other;
-            return (field.Name == otherfield.field.Name) && obj.SameAs(otherfield.obj);
+            return (Field.Name == otherfield.Field.Name) && Obj.SameAs(otherfield.Obj);
         }
 
         public override string PrintableString
@@ -2932,13 +2932,13 @@ public class OTDecompile: ObjectTokens
             get
             {
                 StringBuilder sb = new StringBuilder();
-                if(obj is OTOpndBinOp)
+                if(Obj is OTOpndBinOp)
                     sb.Append('(');
-                sb.Append(obj.PrintableString);
-                if(obj is OTOpndBinOp)
+                sb.Append(Obj.PrintableString);
+                if(Obj is OTOpndBinOp)
                     sb.Append(')');
                 sb.Append('.');
-                sb.Append(field.Name);
+                sb.Append(Field.Name);
                 return sb.ToString();
             }
         }
@@ -3544,9 +3544,9 @@ public class OTDecompile: ObjectTokens
         {
             get
             {
-                if(field.DeclaringType == typeof(ScriptBaseClass))
-                    return field.Name;
-                return field.DeclaringType.Name + "." + field.Name;
+                if(this.field.DeclaringType == typeof(ScriptBaseClass))
+                    return this.field.Name;
+                return this.field.DeclaringType.Name + "." + this.field.Name;
             }
         }
     }
@@ -4384,16 +4384,16 @@ public class OTDecompile: ObjectTokens
                 if((binop.left is OTOpndField) && (binop.opCode.ToString() == "bne.un") && (binop.rite is OTOpndInt))
                 {
                     OTOpndField leftfield = (OTOpndField)binop.left;
-                    if(leftfield.field.Name == _callMode)
+                    if(leftfield.Field.Name == _callMode)
                     {
                         bool ok = false;
-                        if(leftfield.obj is OTOpndArg)
+                        if(leftfield.Obj is OTOpndArg)
                         {
-                            ok = ((OTOpndArg)leftfield.obj).index == 0;
+                            ok = ((OTOpndArg)leftfield.Obj).index == 0;
                         }
-                        if(leftfield.obj is OTOpndLocal)
+                        if(leftfield.Obj is OTOpndLocal)
                         {
-                            ok = ((OTOpndLocal)leftfield.obj).local.name.StartsWith(_xmrinstlocal);
+                            ok = ((OTOpndLocal)leftfield.Obj).local.name.StartsWith(_xmrinstlocal);
                         }
                         if(ok)
                         {
@@ -4425,12 +4425,12 @@ public class OTDecompile: ObjectTokens
                 if((unop.opCode == MyOp.Brfalse) && (unop.value is OTOpndField))
                 {
                     OTOpndField valuefield = (OTOpndField)unop.value;
-                    if(valuefield.field.Name == _doGblInit)
+                    if(valuefield.Field.Name == _doGblInit)
                     {
                         bool ok = false;
-                        if(valuefield.obj is OTOpndLocal)
+                        if(valuefield.Obj is OTOpndLocal)
                         {
-                            ok = ((OTOpndLocal)valuefield.obj).local.name.StartsWith(_xmrinstlocal);
+                            ok = ((OTOpndLocal)valuefield.Obj).local.name.StartsWith(_xmrinstlocal);
                         }
                         if(ok)
                         {
@@ -4966,9 +4966,9 @@ public class OTDecompile: ObjectTokens
                 if((array.array is OTOpndField) && (array.index is OTOpndInt))
                 {
                     OTOpndField arrayfield = (OTOpndField)array.array;
-                    if((arrayfield.obj is OTOpndLocal) &&
-                            ((OTOpndLocal)arrayfield.obj).local.name.StartsWith(_xmrinstlocal) &&
-                            (arrayfield.field.Name == _ehArgs))
+                    if((arrayfield.Obj is OTOpndLocal) &&
+                            ((OTOpndLocal)arrayfield.Obj).local.name.StartsWith(_xmrinstlocal) &&
+                            (arrayfield.Field.Name == _ehArgs))
                     {
                         int index = ((OTOpndInt)array.index).value;
                         decompile.eharglist[index] = ((OTOpndLocal)varwr).local;

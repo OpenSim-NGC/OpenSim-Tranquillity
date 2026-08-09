@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <AssemblyTitle>OpenSim</AssemblyTitle>
     <Product>OpenSim.Server.RegionServer</Product>
@@ -81,19 +80,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="SkiaSharp" Version="3.119.2" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.2" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.2" />
-    <PackageReference Include="log4net" Version="3.3.1" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Ini" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
+    <PackageReference Include="SkiaSharp" Version="4.151.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="4.151.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="4.151.1" />
+    <PackageReference Include="log4net" Version="3.3.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Ini" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Logging.Log4Net.AspNetCore" Version="10.0.0" />
-    <PackageReference Include="System.CommandLine" Version="2.0.8" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
-    <PackageReference Include="Autofac" Version="9.1.0" />
-    <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="11.0.0" />
+    <PackageReference Include="System.CommandLine" Version="2.0.10" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.10" />
+    <PackageReference Include="Autofac" Version="9.3.2" />
+    <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="11.0.2" />
   </ItemGroup>
 
   <ItemGroup>

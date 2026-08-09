@@ -201,10 +201,11 @@ public static class SkiaImageUtils
         using (SKPaint paint = new())
         {
             paint.IsAntialias = true;
-            paint.FilterQuality = SKFilterQuality.High;
+
+            SKSamplingOptions sampling = new(SKCubicResampler.Mitchell);
 
             canvas.Clear(SKColors.Transparent);
-            canvas.DrawBitmap(image, new SKRect(0, 0, width, height), paint);
+            canvas.DrawBitmap(image, new SKRect(0, 0, width, height), sampling, paint);
         }
 
         return result;

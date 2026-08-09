@@ -1,15 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <ProjectType>Local</ProjectType>
-    <TargetFramework>net8.0</TargetFramework>
     <AssemblyTitle>OpenSim.Data.MySQL.MoneyData</AssemblyTitle>
     <Company>OpenSim</Company>
     <Product>OpenSim.Data.MySQL.MoneyData</Product>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.1" />
-    <PackageReference Include="MySqlConnector" Version="2.5.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
+    <PackageReference Include="log4net" Version="3.3.2" />
+    <PackageReference Include="MySqlConnector" Version="2.6.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.10" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="XMLRPC" HintPath="../../Library/XMLRPC.dll" />
