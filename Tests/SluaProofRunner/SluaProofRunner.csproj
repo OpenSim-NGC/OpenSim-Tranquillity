@@ -6,7 +6,6 @@
        Console tool, not an NUnit suite; not part of the grid runtime. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>SluaProofRunner</AssemblyName>

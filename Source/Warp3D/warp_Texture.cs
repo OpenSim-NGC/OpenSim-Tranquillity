@@ -409,8 +409,9 @@ public class warp_Texture : IDisposable
             canvas.Clear(SKColors.Transparent);
             var srcRect = new SKRect(0, 0, src.Width, src.Height);
             var dstRect = new SKRect(0, 0, width, height);
-            var paint = new SKPaint { FilterQuality = SKFilterQuality.High };
-            canvas.DrawBitmap(src, srcRect, dstRect, paint);
+            var sampling = new SKSamplingOptions(SKCubicResampler.Mitchell);
+            using var paint = new SKPaint { IsAntialias = true };
+            canvas.DrawBitmap(src, srcRect, dstRect, sampling, paint);
         }
         return dst;
     }

@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-      <TargetFramework>net8.0</TargetFramework>
       <AssemblyTitle>OpenSim.Framework</AssemblyTitle>
       <Company>http://opensimulator.org</Company>
       <Product>OpenSim.Framework</Product>
@@ -14,14 +13,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
-    <PackageReference Include="System.Security.Permissions" Version="10.0.8" />
-    <PackageReference Include="System.Threading.AccessControl" Version="10.0.8" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.10" />
+    <PackageReference Include="System.Security.Permissions" Version="10.0.10" />
+    <PackageReference Include="System.Threading.AccessControl" Version="10.0.10" />
     <PackageReference Include="System.Threading.Tasks" Version="4.3.0" />
     <PackageReference Include="System.Threading.Timer" Version="4.3.0" />
-    <PackageReference Include="SkiaSharp" Version="3.119.2" />
-    <PackageReference Include="CoreJ2K.Skia" Version="2.1.2.38" />
-    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="SkiaSharp" Version="4.151.1" />
+    <PackageReference Include="CoreJ2K.Skia" Version="2.3.3.91" />
+    <PackageReference Include="log4net" Version="3.3.2" />
     <PackageReference Include="McMaster.NETCore.Plugins" Version="2.0.0" />
     <PackageReference Include="zlib.net-mutliplatform" Version="1.1.0" />
   </ItemGroup>

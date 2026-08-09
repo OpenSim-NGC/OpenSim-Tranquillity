@@ -11,5 +11,5 @@ build:
   verbosity: minimal
 test: off
 artifacts:
-- path: build\Debug\net8.0
+- path: build\Debug\net10.0
   name: NGC-Tranquillity
