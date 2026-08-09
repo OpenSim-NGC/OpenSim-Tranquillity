@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <AssemblyTitle>Inworldz.Phlox</AssemblyTitle>
+    <AssemblyTitle>InWorldz.Phlox</AssemblyTitle>
   </PropertyGroup>
 
   <ItemGroup>

@@ -2,24 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <!-- Matches YEngine: this lib transitively references the OpenSim app project, which
-         under solution-level `dotnet publish -r` produces a duplicate apphost relative path
-         (NETSDK1152). Suppress, as YEngine does, so publish succeeds. -->
-    <!-- <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles> -->
-    <!-- <PreserveCompilationContext>false</PreserveCompilationContext> -->
-    <!-- <OutputType>Library</OutputType> -->
-    <!-- <GenerateAssemblyInfo>false</GenerateAssemblyInfo> -->
-    <!-- Phlox sources predate ImplicitUsings; the Tranquillity root Directory.Build.props
-         sets ImplicitUsings=enable, so override it back to disable here (and Nullable=disable). -->
-    <!-- <ImplicitUsings>disable</ImplicitUsings> -->
-    <Nullable>disable</Nullable>
-    <AssemblyName>Phlox.ScriptEngine</AssemblyName>
-    <!-- <Deterministic>true</Deterministic> -->
-    <!-- <ProduceReferenceAssembly>false</ProduceReferenceAssembly> -->
-    <!-- <GenerateDependencyFile>false</GenerateDependencyFile> -->
-    <!-- <EnableDefaultItems>false</EnableDefaultItems> -->
-    <!-- <AllowUnsafeBlocks>true</AllowUnsafeBlocks> -->
-    <!-- <NoWarn>CA1416,SYSLIB0011,SYSLIB0014,SYSLIB0039</NoWarn> -->
+    <AssemblyTitle>Phlox.ScriptEngine</AssemblyTitle>
   </PropertyGroup>
 
   <!-- NuGet deps Phlox brings in (not used elsewhere in Tranquillity) -->
