@@ -21,20 +21,25 @@ export CONFIGDIR="${CONFIGDIR:-$HOME/config}"
 export DATADIR="${DATADIR:-$HOME/data}"
 export LOGDIR="${LOGDIR:-$HOME/data/log}"
 export REGIONCONFIG="${REGIONCONFIG:-${CONFIGDIR}/regions/${REGIONNAME}}"
-export CONFIGFILE="${CONFIGFILE:-${CONFIGDIR}/OpenSim.Server.RegionServer.ini}"
-export LOGCONFIG="${LOGCONFIG:-${REGIONCONFIG}/OpenSim.Server.RegionServer.dll.config}"
-
-export DEFAULTCONFIG="${BINDIR}/OpenSimDefaults.ini"
 
 if [ ! -d $BINDIR ]; then
     echo "Runtime directory $BINDIR does not exist!"
     exit 1
 fi
 
-if [ ! -f $CONFIGFILE ]; then
-    echo "Cannot find configuration $CONFIGFILE to run!"
+if [ ! -d $CONFIGDIR ]; then
+    echo "Cannot find configuration directory $CONFIGDIR"
     exit 2
 fi
+
+if [ ! -d $REGIONCONFIG ]; then
+    echo "Cannot find region configuration directory $REGIONCONFIG"
+    exit 2
+fi
+
+export CONFIGFILE="${CONFIGFILE:-${CONFIGDIR}/OpenSim.Server.RegionServer.ini}"
+export LOGCONFIG="${LOGCONFIG:-${REGIONCONFIG}/OpenSim.Server.RegionServer.dll.config}"
+export DEFAULTCONFIG="${DEFAULTCONFIG:-${BINDIR}/OpenSimDefaults.ini}"
 
 if [ ! -d $REGIONCONFIG ]; then
     echo "Region configuration $REGIONCONFIG not found!"

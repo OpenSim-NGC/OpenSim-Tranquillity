@@ -22,24 +22,10 @@ export DATADIR="${DATADIR:-$HOME/data}"
 export LOGDIR="${LOGDIR:-$HOME/data/log}"
 
 # Handle a couple of different possible config file names.
-CONFIGFILE=""
-if [ -f ${CONFIGDIR}/GridServer.${SERVICENAME}.ini ]; then
-    export CONFIGFILE="${CONFIGDIR}/GridServer.${SERVICENAME}.ini"
-elif [ -f ${CONFIGDIR}/OpenSim.Server.GridServer.ini ]; then
-    export CONFIGFILE="${CONFIGDIR}/OpenSim.Server.GridServer.ini"
-fi
+export CONFIGFILE="${CONFIGFILE:-${CONFIGDIR}/GridServer.${SERVICENAME}.ini}"
+export LOGCONFIG="${LOGCONFIG:-${CONFIGDIR}/GridServer.${SERVICENAME}.dll.config}"
 
-# Same as above for the log configuration file.  If none is found then we will use 
-# the default log config file in the runtime directory generated from App.confi
-export LOGCONFIG=""
-if [ -f ${CONFIGDIR}/GridServer.${SERVICENAME}.dll.config ]; then
-    export LOGCONFIG="${CONFIGDIR}/GridServer.${SERVICENAME}.dll.config"
-elif [ -f ${CONFIGDIR}/OpenSim.Server.GridServer.dll.config ]; then
-    export LOGCONFIG="${CONFIGDIR}/OpenSim.Server.GridServer.dll.config"
-else
-    export LOGCONFIG="${BINDIR}/OpenSim.Server.GridServer.dll.config"
-fi
-
+# Verify the environment
 if [ ! -d $BINDIR ]; then
     echo "Runtime directory $BINDIR does not exist!"
     exit 1
