@@ -1,15 +1,13 @@
 #!/bin/bash
 
-SERVER_NAME="$(hostname -f)"
+# saner programming env: these switches turn some bugs into errors
+set -o errexit -o pipefail -o noclobber -o nounset
 
-! getopt --test > /dev/null 
-if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
-    echo "I’m sorry, `getopt --test` failed in this environment."
-    exit 1
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-OPTIONS=av
-LONGOPTS=all,verbose
+OPTIONS=c:
+LONGOPTS=command:
 
 # -use ! and PIPESTATUS to get exit code with errexit set
 # -temporarily store output to be able to check for errors
@@ -25,19 +23,14 @@ fi
 # read getopt’s output this way to handle the quoting right:
 eval set -- "$PARSED"
 
-all=n
-v=n 
+command=""
 
 # now enjoy the options in order and nicely split until we see --
 while true; do
     case "$1" in
-        -v|--verbose)
-            v=y
-            shift
-            ;;
-        -a|--all)
-            all=y
-            shift
+        -c|--command)
+            command="$2"
+            shift 2
             ;;
         --)
             shift
@@ -50,32 +43,15 @@ while true; do
     esac
 done
 
-REGIONNAME=""
-
 # handle non-option arguments
-if [ "$all" == "n" ]  && [ $# -ne 1 ]; then
+if [[ $# -ne 1 ]]; then
     echo "$0: A single region name is required."
     exit 4
-else
-    REGIONNAME=$1
 fi
 
-while read -r -a region
-do
-    if test ${region[1]+_}
-    then
-        this=${region[0]}
-        if [[ "${this}" =~ ^# ]]; then
-            continue
-        fi
-        
-        if [ "$all" == "y" ] || [ "${this}" == "${REGIONNAME}" ]
-        then
-            echo "Restarting Region: ${this}"
-            sudo systemctl restart opensim-region@${this}.service
-            sleep 10
-        fi
-    fi
-done < $HOME/bin/RegionList.txt
+export REGIONNAME=$1
+
+echo "Running command '$command' on Region $REGIONNAME"
+screen -S $REGIONNAME -p 0 -X stuff "$command^M^M"
 
 exit 0
