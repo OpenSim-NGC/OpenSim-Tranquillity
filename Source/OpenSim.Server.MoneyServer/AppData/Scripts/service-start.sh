@@ -21,29 +21,18 @@ export CONFIGDIR="${CONFIGDIR:-$HOME/config}"
 export DATADIR="${DATADIR:-$HOME/data}"
 export LOGDIR="${LOGDIR:-$HOME/data/log}"
 
-# Handle a couple of different possible config file names.
-CONFIGFILE=""
-if [ -f ${CONFIGDIR}/OpenSim.Server.${SERVICENAME}.ini ]; then
-    export CONFIGFILE="${CONFIGDIR}/OpenSim.Server.${SERVICENAME}.ini"
-elif [ -f ${CONFIGDIR}/${SERVICENAME}.ini ]; then
-    export CONFIGFILE="${CONFIGDIR}/${SERVICENAME}.ini"
-fi
-
-# Same as above for the log configuration file.  If none is found then we will use 
-# the default log config file in the runtime directory generated from App.confi
-export LOGCONFIG=""
-if [ -f ${CONFIGDIR}/OpenSim.Server.${SERVICENAME}.dll.config ]; then
-    LOGCONFIG="${CONFIGDIR}/OpenSim.Server.${SERVICENAME}.dll.config"
-elif [ -f ${CONFIGDIR}/${SERVICENAME}.dll.config ]; then
-    LOGCONFIG="${CONFIGDIR}/${SERVICENAME}.dll.config"
-else
-    LOGCONFIG="$BINDIR/OpenSim.Server.${SERVICENAME}.dll.config"
-fi
-
 if [ ! -d $BINDIR ]; then
     echo "Runtime directory $BINDIR does not exist!"
     exit 1
 fi
+
+if [ ! -f $CONFIGDIR ]; then
+    echo "Cannot find configuration directory $CONFIGDIR to"
+    exit 2
+fi
+
+export CONFIGFILE="${CONFIGFILE:-$CONFIGDIR/${SERVICENAME}.ini}"
+export LOGCONFIG="${LOGCONFIG:-$BINDIR/OpenSim.Server.${SERVICENAME}.dll.config}"
 
 if [ ! -f $CONFIGFILE ]; then
     echo "Cannot find configuration $CONFIGFILE to run!"
