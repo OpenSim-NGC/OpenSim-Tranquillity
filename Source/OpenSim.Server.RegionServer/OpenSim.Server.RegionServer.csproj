@@ -73,7 +73,7 @@
     <ProjectReference Include="../../Source/OpenSim.Region.ScriptEngine.Shared/OpenSim.Region.ScriptEngine.Shared.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.ScriptEngine.YEngine/OpenSim.Region.ScriptEngine.YEngine.csproj" />
     <!-- Phlox flows to output like YEngine so its full dependency closure (InWorldz.Phlox,
-         C5, protobuf-net, Antlr4, Microsoft.Data.Sqlite/e_sqlite3) deploys automatically —
+         C5, protobuf-net, Antlr4, System.Data.SQLite/e_sqlite3) deploys automatically —
          no manual DLL copying, no compile/runtime identity splits. -->
     <ProjectReference Include="../../Source/Phlox.ScriptEngine/Phlox.ScriptEngine.csproj" />
     <ProjectReference Include="../../Addons/os-webrtc-janus/WebRtcVoiceRegionModule/WebRtcVoiceRegionModule.csproj" />

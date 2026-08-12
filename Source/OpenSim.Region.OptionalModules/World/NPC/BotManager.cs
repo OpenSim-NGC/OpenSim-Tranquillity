@@ -22,7 +22,6 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Services.Interfaces;
 using System.IO;
-using Microsoft.Data.Sqlite;
 
 namespace OpenSim.Region.OptionalModules.World.NPC
 {

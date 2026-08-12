@@ -44,7 +44,7 @@ Two settings in `OpenSim.ini` control it:
 
 Runtime data lives under `ScriptEngines/Phlox/` in the region's working
 directory (auto-created): the compiled-bytecode cache and the script-state
-SQLite database (via `Microsoft.Data.Sqlite`; the native `e_sqlite3` library
+SQLite database (via `System.Data.SQLite`; the native `e_sqlite3` library
 ships with publish output).
 
 ## Architecture note
