@@ -3,7 +3,7 @@
  * StateManager.cs — Script runtime state persistence
  *
  * Ported from halcyon-reference/InWorldz/InWorldz.Phlox.Engine/StateManager.cs
- * Adapted for .NET 8: System.Data.SQLite → Microsoft.Data.Sqlite
+ * Adapted for .NET 8: System.Data.SQLite (ADO.NET provider)
  *                     IndexedPriorityQueue → SortedDictionary
  *                     ThreadTracker → plain Thread
  *
@@ -20,7 +20,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using log4net;
-using Microsoft.Data.Sqlite;
+using System.Data.SQLite;
 using OpenMetaverse;
 using InWorldz.Phlox.VM;
 using InWorldz.Phlox.Serialization;
@@ -229,7 +229,7 @@ namespace Phlox.ScriptEngine
             }
         }
 
-        private static void SaveSingleInTransaction(SqliteConnection conn, Interpreter interp)
+        private static void SaveSingleInTransaction(SQLiteConnection conn, Interpreter interp)
         {
             SerializedRuntimeState srs = SerializedRuntimeState.FromRuntimeState(interp.ScriptState);
             byte[] blob;
@@ -256,7 +256,7 @@ namespace Phlox.ScriptEngine
 
         private void EnsureDatabase()
         {
-            SQLitePCL.Batteries_V2.Init();
+            DllmapConfigHelper.RegisterAssembly(typeof(SQLiteConnection).Assembly);
             try
             {
                 Directory.CreateDirectory(DB_DIR);
@@ -277,9 +277,9 @@ namespace Phlox.ScriptEngine
             }
         }
 
-        private static SqliteConnection OpenConnection()
+        private static SQLiteConnection OpenConnection()
         {
-            var conn = new SqliteConnection($"Data Source={DB_FILE};Mode=ReadWriteCreate");
+            var conn = new SQLiteConnection($"Data Source={DB_FILE}");
             conn.Open();
             using var pragma = conn.CreateCommand();
             pragma.CommandText = "PRAGMA journal_mode=WAL";

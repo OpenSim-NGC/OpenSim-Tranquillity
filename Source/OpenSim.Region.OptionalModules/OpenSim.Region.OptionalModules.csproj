@@ -36,8 +36,8 @@
 <ItemGroup>
     <PackageReference Include="log4net" Version="3.3.2" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.10" />
+    <!-- System.Data.SQLite (+ native SQLite/e_sqlite3) backs both WebStats and the Phlox bot persistence DB -->
     <PackageReference Include="System.Data.SQLite" Version="2.0.4" />
-    <!-- Phlox bot framework: BotPersistenceManager keeps its isolated local bot DB via Microsoft.Data.Sqlite -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
+    <PackageReference Include="SQLite" Version="3.53.4" />
   </ItemGroup>
 </Project>

@@ -13,7 +13,7 @@ using System.Timers;
 // Timer to System.Timers.Timer to resolve the System.Threading.Timer ambiguity.
 using Timer = System.Timers.Timer;
 using log4net;
-using Microsoft.Data.Sqlite;
+using System.Data.SQLite;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -90,7 +90,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         private int m_respawnRate = 2;
 
         // ── Runtime state ──
-        private SqliteConnection m_db;
+        private SQLiteConnection m_db;
         private Scene m_scene;
         private BotManager m_botManager;
         private Timer m_positionSaveTimer;
@@ -164,8 +164,9 @@ namespace OpenSim.Region.OptionalModules.World.NPC
 
         private void InitializeDatabase(string dbPath)
         {
+            DllmapConfigHelper.RegisterAssembly(typeof(SQLiteConnection).Assembly);
             string connStr = $"Data Source={dbPath}";
-            m_db = new SqliteConnection(connStr);
+            m_db = new SQLiteConnection(connStr);
             m_db.Open();
 
             // Enable WAL mode for crash safety
