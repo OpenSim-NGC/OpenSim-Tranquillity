@@ -28,7 +28,7 @@ public class OpenSimRegionContextFactory : IDesignTimeDbContextFactory<OpenSimRe
         var regionConnectionString = configuration.GetConnectionString("OpenSimRegionConnection") ??
             throw new InvalidOperationException("Connection string 'OpenSimRegionConnection' not found.");
 
-        // Configure DbContext to use MySQL with Pomelo provider
+        // Configure DbContext to use MySQL with the Microting (Pomelo fork) provider
         optionsBuilder.UseMySql(regionConnectionString, ServerVersion.AutoDetect(regionConnectionString),
             mySqlOptions => mySqlOptions.MigrationsAssembly(typeof(OpenSimRegionContext).Assembly.FullName));                
 

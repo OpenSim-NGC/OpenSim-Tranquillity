@@ -28,7 +28,7 @@ public class OpenSimSearchContextFactory : IDesignTimeDbContextFactory<OpenSimSe
         var connectionString = configuration.GetConnectionString("OpenSimSearchConnection") ??
             throw new InvalidOperationException("Connection string 'OpenSimSearchConnection' not found.");
             
-        // Configure DbContext to use MySQL with Pomelo provider
+        // Configure DbContext to use MySQL with the Microting (Pomelo fork) provider
         optionsBuilder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString),
             mySqlOptions => mySqlOptions.MigrationsAssembly(typeof(OpenSimSearchContext).Assembly.FullName));
 
