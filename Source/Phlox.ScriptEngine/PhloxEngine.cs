@@ -378,8 +378,16 @@ namespace Phlox.ScriptEngine
 
         private void OnGetScriptRunning(IClientAPI controllingClient, UUID objectID, UUID itemID)
         {
-            if (m_ExeScheduler == null) return;
-            // TODO: implement ScriptRunningReply when LindenCaps reference is available
+            // OnGetScriptRunning is a broadcast EventManager event — every registered engine
+            // receives it. Reply ONLY for scripts WE own; otherwise, with YEngine + Phlox both
+            // enabled, Phlox would race a SendScriptRunningReply(false) for a YEngine-owned script
+            // it knows nothing about, and the viewer could show a running script as stopped.
+            // HasScript is the ownership check (FindScript != null), mirroring YEngine's
+            // TryGetInstance guard (XMREngine.cs:1579). SendScriptRunningReply is on IClientAPI
+            // (OpenSim.Framework, already referenced) — no LindenCaps reference is needed.
+            bool running;
+            if (!HasScript(itemID, out running)) return;
+            controllingClient.SendScriptRunningReply(objectID, itemID, running);
         }
 
         private void OnChatFromWorld(object sender, OSChatMessage chat)
@@ -815,7 +823,14 @@ namespace Phlox.ScriptEngine
         }
 
         public System.Collections.ArrayList GetScriptErrors(UUID itemID) => new System.Collections.ArrayList();
-        public bool HasScript(UUID itemID, out bool running) { running = false; return false; }
+        public bool HasScript(UUID itemID, out bool running)
+        {
+            running = false;
+            if (m_ExeScheduler == null || m_ExeScheduler.FindScript(itemID) == null)
+                return false;
+            running = m_ExeScheduler.GetScriptRunning(itemID);
+            return true;
+        }
         public void SaveAllState() { }
         public void StartProcessing() { }
         public float GetScriptExecutionTime(List<UUID> itemIDs)
