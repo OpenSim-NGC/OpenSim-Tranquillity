@@ -88,7 +88,13 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
                 IConfig thisModuleConfig = source.Configs["HGInventoryAccessModule"];
                 if (thisModuleConfig != null)
                 {
-                    m_OutboundPermission = thisModuleConfig.GetBoolean("OutboundPermission", true);
+                    // SECURITY FIX (Laxton Consulting / IMA, @llaxton, 2026-07-26): default changed from
+                    // true to false. Prior default silently allowed Hypergrid asset export from
+                    // every grid unless an administrator explicitly opted out - a default-allow
+                    // posture for content leaving the grid. This is now default-deny; grid
+                    // owners who want the prior behavior must explicitly set
+                    // OutboundPermission = true in their HGInventoryAccessModule config section.
+                    m_OutboundPermission = thisModuleConfig.GetBoolean("OutboundPermission", false);
                     m_RestrictInventoryAccessAbroad = thisModuleConfig.GetBoolean("RestrictInventoryAccessAbroad", true);
                     m_CheckSeparateAssets = thisModuleConfig.GetBoolean("CheckSeparateAssets", false);
                     m_LocalAssetsURL = thisModuleConfig.GetString("RegionHGAssetServerURI", string.Empty);
@@ -376,7 +382,15 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
         if (isForeignSender && senderAssetServer != string.Empty)
             m_assMapper.Get(item.AssetID, sender, senderAssetServer);
 
-        if (isForeignReceiver && receiverAssetServer != string.Empty && m_OutboundPermission)
+        // SECURITY FIX (Laxton Consulting / IMA, @llaxton, 2026-07-26): previously this check only
+        // consulted the grid-wide m_OutboundPermission administrative toggle and never
+        // examined the item's own CurrentPermissions Export bit - meaning a creator's
+        // explicit per-item "do not allow export" setting (PermissionMask.Export unset)
+        // was silently ignored on every Hypergrid inventory transfer. Both the grid-wide
+        // policy AND the item's own export permission must now be true for the asset to
+        // actually leave the grid.
+        bool itemExportAllowed = (item.CurrentPermissions & (uint)OpenSim.Framework.PermissionMask.Export) != 0;
+        if (isForeignReceiver && receiverAssetServer != string.Empty && m_OutboundPermission && itemExportAllowed)
             m_assMapper.Post(item.AssetID, receiver, receiverAssetServer);
     }
 
