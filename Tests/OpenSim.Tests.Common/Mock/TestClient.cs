@@ -39,7 +39,7 @@ namespace OpenSim.Tests.Common;
 
 public class TestClient : IClientAPI, IClientCore
 {
-    EventWaitHandle wh = new EventWaitHandle (false, EventResetMode.AutoReset, "Crossing");
+    EventWaitHandle wh = new EventWaitHandle (false, EventResetMode.AutoReset);
 
     private Scene m_scene;
 

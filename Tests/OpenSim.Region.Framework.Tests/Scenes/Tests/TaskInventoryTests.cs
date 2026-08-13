@@ -53,11 +53,11 @@ namespace OpenSim.Region.Framework.Tests
             TaskInventoryHelpers.AddSceneObject(scene.AssetService, sop1, "tso", taskSceneObjectItemId, user1.PrincipalID);
 
             TaskInventoryItem addedItem = sop1.Inventory.GetInventoryItem(taskSceneObjectItemId);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.True(addedItem.InvType)InventoryType.Object));
-            Assert.True(addedItem.Type)AssetType.Object));
+            Assert.Equal(taskSceneObjectItemId, addedItem.ItemID);
+            Assert.Equal(user1.PrincipalID, addedItem.OwnerID);
+            Assert.Equal(sop1.UUID, addedItem.ParentID);
+            Assert.Equal((int)InventoryType.Object, addedItem.InvType);
+            Assert.Equal((int)AssetType.Object, addedItem.Type);
         }
 
         [Fact]
@@ -86,15 +86,15 @@ namespace OpenSim.Region.Framework.Tests
 
             SceneObjectGroup rezzedObject = scene.GetSceneObjectGroup("tso");
 
-            // TODO: Fix this assertion
-            Assert.Equal(,);
+            Assert.NotNull(rezzedObject);
+            Assert.Equal(rezPos, rezzedObject.AbsolutePosition);
 
             // Velocity doesn't get applied, probably because there is no physics in tests (yet)
-            //Assert.Equal(,);
-            Assert.Equal(,);
+            //Assert.Equal(rezVel, rezzedObject.Velocity);
+            Assert.Equal(Vector3.Zero, rezzedObject.Velocity);
 
             // Confusingly, this isn't the rezzedObject.Rotation
-            Assert.Equal(,);
+            Assert.Equal(rezRot, rezzedObject.RootPart.RotationOffset);
         }
 
         /// <summary>
@@ -126,7 +126,7 @@ namespace OpenSim.Region.Framework.Tests
 
             InventoryItemBase ncUserItem
                 = InventoryArchiveUtils.FindItemByPath(scene.InventoryService, user1.PrincipalID, "Objects/ncItem");
-            Assert.True(ncUserItem);
+            Assert.NotNull(ncUserItem);
         }
 
         /// <summary>
@@ -156,7 +156,7 @@ namespace OpenSim.Region.Framework.Tests
 
             InventoryItemBase ncUserItem
                 = InventoryArchiveUtils.FindItemByPath(scene.InventoryService, user1.PrincipalID, "Notecards/ncItem");
-            Assert.True(ncUserItem);
+            Assert.NotNull(ncUserItem);
         }
     }
 }

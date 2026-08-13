@@ -28,7 +28,6 @@
 /*  undo has changed, this tests dont apply without large changes
 using System;
 using System.Reflection;
-using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -58,21 +57,21 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             // which is the way that AddSceneObject() sets up the object (i.e. it creates the SOP first).  However,
             // this is somewhat by chance.  Really, we shouldn't be storing undo states at all if the object is not
             // in a scene.
-            Assert.Equal(,);
+            Assert.Equal(0, g1.RootPart.UndoCount);
 
             g1.GroupResize(firstSize);
-            Assert.Equal(,);
+            Assert.Equal(1, g1.RootPart.UndoCount);
 
             g1.GroupResize(secondSize);
-            Assert.Equal(,);
+            Assert.Equal(2, g1.RootPart.UndoCount);
 
             g1.RootPart.Undo();
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(1, g1.RootPart.UndoCount);
+            Assert.Equal(firstSize, g1.GroupScale);
 
             g1.RootPart.Redo();
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(2, g1.RootPart.UndoCount);
+            Assert.Equal(secondSize, g1.GroupScale);
         }
 
         [Fact]
@@ -98,8 +97,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             g1.RootPart.Undo();
             g1.RootPart.Undo();
 
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(0, g1.RootPart.UndoCount);
+            Assert.Equal(secondSize, g1.GroupScale);
         }
 
         [Fact]
@@ -119,11 +118,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             g1.GroupResize(firstSize);
             g1.GroupResize(secondSize);
 
-            Assert.Equal(,);
+            Assert.Equal(0, g1.RootPart.UndoCount);
 
             g1.RootPart.Undo();
 
-            Assert.Equal(,);
+            Assert.Equal(secondSize, g1.GroupScale);
         }
 
         [Fact]
@@ -140,18 +139,18 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             g1.RootPart.Undo();
 
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(0, g1.RootPart.UndoCount);
+            Assert.Equal(originalSize, g1.GroupScale);
 
             g1.GroupResize(newSize);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(1, g1.RootPart.UndoCount);
+            Assert.Equal(newSize, g1.GroupScale);
 
             g1.RootPart.Undo();
             g1.RootPart.Undo();
 
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(0, g1.RootPart.UndoCount);
+            Assert.Equal(originalSize, g1.GroupScale);
         }
 
         [Fact]
@@ -168,16 +167,16 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             g1.RootPart.Redo();
 
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(0, g1.RootPart.UndoCount);
+            Assert.Equal(originalSize, g1.GroupScale);
 
             g1.GroupResize(newSize);
             g1.RootPart.Undo();
             g1.RootPart.Redo();
             g1.RootPart.Redo();
 
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(1, g1.RootPart.UndoCount);
+            Assert.Equal(newSize, g1.GroupScale);
         }
     }
 }

@@ -28,7 +28,6 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -40,7 +39,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     {
         private TestScene m_scene;
 
-        public void Init()
+        public SceneStatisticsTests()
         {
             m_scene = new SceneHelpers().SetupScene();
         }
@@ -48,20 +47,20 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         [Fact]
         public void TestAddRemovePhysicalLinkset()
         {
-            Assert.True(m_scene.SceneGraph.GetActiveObjectsCount()));
+            Assert.Equal(0, m_scene.SceneGraph.GetActiveObjectsCount());
 
             UUID ownerId = TestHelpers.ParseTail(0x1);
             SceneObjectGroup so1 = SceneHelpers.CreateSceneObject(3, ownerId, "so1", 0x10);
             m_scene.AddSceneObject(so1);
             so1.ScriptSetPhysicsStatus(true);
 
-            Assert.True(m_scene.SceneGraph.GetTotalObjectsCount()));
-            Assert.True(m_scene.SceneGraph.GetActiveObjectsCount()));
+            Assert.Equal(3, m_scene.SceneGraph.GetTotalObjectsCount());
+            Assert.Equal(3, m_scene.SceneGraph.GetActiveObjectsCount());
 
             m_scene.DeleteSceneObject(so1, false);
 
-            Assert.True(m_scene.SceneGraph.GetTotalObjectsCount()));
-            Assert.True(m_scene.SceneGraph.GetActiveObjectsCount()));
+            Assert.Equal(0, m_scene.SceneGraph.GetTotalObjectsCount());
+            Assert.Equal(0, m_scene.SceneGraph.GetActiveObjectsCount());
         }
     }
 }

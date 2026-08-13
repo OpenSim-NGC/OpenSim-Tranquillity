@@ -1203,6 +1203,14 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         if (!disposed)
         {
             disposed = true;
+
+            // Nothing below releases unmanaged resources; it all touches managed objects
+            // (scene events, controlling client, etc.). Doing that from the finalizer can
+            // throw because those objects may already have been collected, and an exception
+            // escaping a finalizer crashes the process. So skip cleanup during finalization.
+            if (!disposing)
+                return;
+
             IsDeleted = true;
             if (m_updateAgentReceivedAfterTransferEvent != null)
             {
