@@ -832,7 +832,21 @@ namespace Phlox.ScriptEngine
             return true;
         }
         public void SaveAllState() { }
-        public void StartProcessing() { }
+        public void StartProcessing()
+        {
+            // Phlox compiles asynchronously (OnRezScript enqueues; PhloxScriptLoader
+            // compiles on a worker thread), so unlike YEngine the boot batch is NOT
+            // complete at this point. We fire unconditionally anyway: RegionReadyModule
+            // holds LoginLock until this signal arrives, and gating it on an async
+            // drain barrier risks never firing at all, which is the exact defect this
+            // fixes. Logins may open slightly before the last script finishes
+            // compiling. Do not "correct" this to wait for the queue.
+            if (m_Scene == null || m_Scene.EventManager == null)
+                return;
+
+            m_Scene.EventManager.TriggerEmptyScriptCompileQueue(0, string.Empty);
+            m_log.Info("[PhloxEngine]: StartProcessing fired TriggerEmptyScriptCompileQueue(0) — RegionReady LoginLock release signal");
+        }
         public float GetScriptExecutionTime(List<UUID> itemIDs)
         {
             if (m_ExeScheduler == null || itemIDs == null) return 0f;
