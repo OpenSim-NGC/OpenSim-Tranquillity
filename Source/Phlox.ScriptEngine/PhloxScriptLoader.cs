@@ -144,9 +144,20 @@ namespace Phlox.ScriptEngine
         {
             bool didWork = false;
 
-            didWork |= ProcessNextUnload();
-            didWork |= ProcessNextLoad();
-            didWork |= ProcessNextCompile();
+            // Top-level backstop: the load worker must survive anything a single request throws.
+            // PerformLoad already guards per-request; this covers the unload/compile paths too, so
+            // one failure can never stop the worker from draining the queue (which would strand the
+            // RegionReady LoginLock signal). Per-failure logging only — no summary/barrier machinery.
+            try
+            {
+                didWork |= ProcessNextUnload();
+                didWork |= ProcessNextLoad();
+                didWork |= ProcessNextCompile();
+            }
+            catch (Exception ex)
+            {
+                m_log.Error("[PhloxLoader]: unhandled exception in DoWork — swallowed to keep the load worker alive", ex);
+            }
 
             return new WorkStatus
             {
@@ -213,28 +224,67 @@ namespace Phlox.ScriptEngine
 
         private void PerformLoad(PhloxLoadRequest req)
         {
-            // Find asset UUID from prim inventory
-            UUID assetId = FindAssetId(req);
-            if (assetId == UUID.Zero) return;
-
-            // 1. Already loaded and running (shared script)
-            if (TryStartSharedScript(assetId, req)) return;
-
-            // 2. Recently unloaded — still in memory
-            if (TryStartFromUnloadedCache(assetId, req)) return;
-
-            // 3. Compiled bytecode on disk
-            if (TryStartFromDiskCache(assetId, req)) return;
-
-            // 4. Need to compile from source text (already in req.ScriptText from OnRezScript)
-            if (!string.IsNullOrEmpty(req.ScriptText))
+            // Per-request guard: a throw from any start path (notably the previously-unguarded
+            // BeginScriptRun in TryStartSharedScript / TryStartFromUnloadedCache) must not escape
+            // and kill the load worker or abort the rest of the boot rez batch. One bad script
+            // fails alone, with a full diagnostic; every other script still loads.
+            try
             {
-                CompileAndStart(assetId, req);
-                return;
-            }
+                // Find asset UUID from prim inventory
+                UUID assetId = FindAssetId(req);
+                if (assetId == UUID.Zero) return;
 
-            // 5. Fallback: fetch from asset server
-            SubmitAssetRequest(assetId, req);
+                // 1. Already loaded and running (shared script)
+                if (TryStartSharedScript(assetId, req)) return;
+
+                // 2. Recently unloaded — still in memory
+                if (TryStartFromUnloadedCache(assetId, req)) return;
+
+                // 3. Compiled bytecode on disk
+                if (TryStartFromDiskCache(assetId, req)) return;
+
+                // 4. Need to compile from source text (already in req.ScriptText from OnRezScript)
+                if (!string.IsNullOrEmpty(req.ScriptText))
+                {
+                    CompileAndStart(assetId, req);
+                    return;
+                }
+
+                // 5. Fallback: fetch from asset server
+                SubmitAssetRequest(assetId, req);
+            }
+            catch (Exception ex)
+            {
+                LogLoadFailure(req, ex);
+            }
+        }
+
+        // Per-failure diagnostic for a load that threw: item name + UUID, prim name + localID, and the
+        // full exception with stack. Deliberately defensive — resolving the names must never itself throw.
+        private void LogLoadFailure(PhloxLoadRequest req, Exception ex)
+        {
+            string itemName = "?";
+            string primName = "?";
+            uint localId = 0;
+            UUID itemId = (req != null) ? req.ItemID : UUID.Zero;
+            try
+            {
+                if (req != null && req.Prim != null)
+                {
+                    primName = req.Prim.Name;
+                    localId = req.Prim.LocalId;
+                    if (req.Prim.Inventory != null)
+                    {
+                        TaskInventoryItem item = req.Prim.Inventory.GetInventoryItem(req.ItemID);
+                        if (item != null) itemName = item.Name;
+                    }
+                }
+            }
+            catch { /* diagnostics must not mask the original failure */ }
+
+            m_log.Error(string.Format(
+                "[PhloxLoader]: Script load FAILED — item '{0}' ({1}) in prim '{2}' (localID {3}). This script did not start; the rest of the batch continues.",
+                itemName, itemId, primName, localId), ex);
         }
 
         private UUID FindAssetId(PhloxLoadRequest req)
