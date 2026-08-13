@@ -1429,7 +1429,14 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
                 {
                     curByte = LandChannel.LAND_TYPE_OWNED_BY_GROUP;
                 }
-                else if (currentParcelLandData.SalePrice > 0 &&
+                // FIX (Laxton Consulting / IMA, @llaxton, 2026-07-29): previously checked
+                // SalePrice > 0 as a proxy for whether a parcel is for sale. Since every
+                // parcel defaults to SalePrice = 0, this made it impossible to distinguish
+                // "not for sale" from "for sale at no cost" - a genuinely free parcel with
+                // the ForSale flag actively set would never render as purchasable. Now
+                // checks the actual ForSale flag bit, matching the pattern already used
+                // correctly in this file's own purchase-validation logic.
+                else if ((currentParcelLandData.Flags & (uint)ParcelFlags.ForSale) != 0 &&
                             (currentParcelLandData.AuthBuyerID.IsZero() ||
                             currentParcelLandData.AuthBuyerID.Equals(remote_client.AgentId)))
                 {
