@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Ported from Halcyon/InWorldz to Legion Grid (dotnet8-modernization)
+// Ported from Halcyon/InWorldz to Legion Grid (dotnet10-modernization)
 // Adaptations:
 //   - OpenSim.Framework.Communications.Cache removed (not present in modern OpenSim)
 //   - Bot/ScenePresence scanning paths removed (iw* bot functions not ported)

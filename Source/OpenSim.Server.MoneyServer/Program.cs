@@ -153,6 +153,8 @@ class Program
             loggingBuilder.ClearProviders();
             loggingBuilder.AddLog4Net(log4NetConfigFile: effectiveLogConfig);
             loggingBuilder.AddConsole();
+                        
+            LoggerProvider.LoggerFactory = loggingBuilder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
         })
         .ConfigureServices(services =>
         {

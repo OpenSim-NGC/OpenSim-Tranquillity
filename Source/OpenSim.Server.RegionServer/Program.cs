@@ -17,6 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenMetaverse.Packets;
+using OpenSim.Framework;
 using OpenSim.Server.Base;
 using OpenSim.Server.Base.Hosting;
 
@@ -179,6 +180,8 @@ public static class Program
             loggingBuilder.ClearProviders();
             loggingBuilder.AddLog4Net(log4NetConfigFile: effectiveLogConfig);
             loggingBuilder.AddConsole();
+                        
+            LoggerProvider.LoggerFactory = loggingBuilder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
         })
         .ConfigureServices(services =>
         {
