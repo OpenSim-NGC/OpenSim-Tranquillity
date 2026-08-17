@@ -29,6 +29,8 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 // The physical implementation of the terrain is wrapped in this class.
@@ -312,7 +314,7 @@ public sealed class BSTerrainManager : IDisposable
     // TODO: redo terrain implementation selection to allow other base types than heightMap.
     private BSTerrainPhys BuildPhysicalTerrain(Vector3 terrainRegionBase, uint id, float[] heightMap, Vector3 minCoords, Vector3 maxCoords)
     {
-        m_physicsScene.Logger.DebugFormat("{0} Terrain for {1}/{2} created with {3}",
+        m_physicsScene.Logger.LogDebug("{0} Terrain for {1}/{2} created with {3}",
                                             LogHeader, m_physicsScene.RegionName, terrainRegionBase,
                                             (BSTerrainPhys.TerrainImplementation)BSParam.TerrainImplementation);
         BSTerrainPhys newTerrainPhys = null;
@@ -327,7 +329,7 @@ public sealed class BSTerrainManager : IDisposable
                                             heightMap, minCoords, maxCoords);
                 break;
             default:
-                m_physicsScene.Logger.ErrorFormat("{0} Bad terrain implementation specified. Type={1}/{2},Region={3}/{4}",
+                m_physicsScene.Logger.LogError("{0} Bad terrain implementation specified. Type={1}/{2},Region={3}/{4}",
                                             LogHeader,
                                             (int)BSParam.TerrainImplementation,
                                             BSParam.TerrainImplementation,
@@ -434,7 +436,7 @@ public sealed class BSTerrainManager : IDisposable
         }
         else
         {
-            m_physicsScene.Logger.ErrorFormat("{0} GetTerrainHeightAtXY: terrain not found: region={1}, x={2}, y={3}",
+            m_physicsScene.Logger.LogError("{0} GetTerrainHeightAtXY: terrain not found: region={1}, x={2}, y={3}",
                     LogHeader, m_physicsScene.RegionName, tX, tY);
             DetailLog("{0},BSTerrainManager.GetTerrainHeightAtXYZ,terrainNotFound,pos={1},base={2}",
                                 BSScene.DetailLogZero, pos, terrainBaseXYZ);
@@ -456,7 +458,7 @@ public sealed class BSTerrainManager : IDisposable
         }
         else
         {
-            m_physicsScene.Logger.ErrorFormat("{0} GetWaterHeightAtXY: terrain not found: pos={1}, terrainBase={2}, height={3}",
+            m_physicsScene.Logger.LogError("{0} GetWaterHeightAtXY: terrain not found: pos={1}, terrainBase={2}, height={3}",
                     LogHeader, m_physicsScene.RegionName, pos, terrainBaseXYZ, ret);
         }
         return ret;

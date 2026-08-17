@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
@@ -35,13 +34,14 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Neighbour;
 
 public class NeighbourServicesOutConnector :
         NeighbourServicesConnector, ISharedRegionModule, INeighbourService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private List<Scene> m_Scenes = new List<Scene>();
@@ -66,7 +66,7 @@ public class NeighbourServicesOutConnector :
             if (name == Name)
             {
                 m_Enabled = true;
-                m_log.Info("[NEIGHBOUR CONNECTOR]: Neighbour out connector enabled");
+                m_log.LogInformation("[NEIGHBOUR CONNECTOR]: Neighbour out connector enabled");
             }
         }
     }
@@ -101,7 +101,7 @@ public class NeighbourServicesOutConnector :
             return;
 
         m_GridService = scene.GridService;
-        m_log.InfoFormat("[NEIGHBOUR CONNECTOR]: Enabled out neighbours for region {0}", scene.RegionInfo.RegionName);
+        m_log.LogInformation("[NEIGHBOUR CONNECTOR]: Enabled out neighbours for region {0}", scene.RegionInfo.RegionName);
 
     }
 
@@ -118,7 +118,7 @@ public class NeighbourServicesOutConnector :
             {
                 //uint x, y;
                 //Util.RegionHandleToRegionLoc(regionHandle, out x, out y);
-                //m_log.DebugFormat("[NEIGHBOUR SERVICE OUT CONNECTOR]: HelloNeighbour from region {0} to neighbour {1} at {2}-{3}",
+                //m_log.LogDebug("[NEIGHBOUR SERVICE OUT CONNECTOR]: HelloNeighbour from region {0} to neighbour {1} at {2}-{3}",
                 //                            thisRegion.RegionName, s.Name, x, y );
                 return s.IncomingHelloNeighbour(thisRegion);
             }

@@ -33,6 +33,7 @@ using OpenSim.Framework.Console;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Animation;
+using Microsoft.Extensions.Logging;
 using AnimationSet = OpenSim.Region.Framework.Scenes.Animation.AnimationSet;
 
 namespace OpenSim.Region.OptionalModules.Avatar.Animations;
@@ -42,7 +43,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Animations;
 /// </summary>
 public class AnimationsCommandModule : ISharedRegionModule
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private List<Scene> m_scenes = new List<Scene>();
 
@@ -52,27 +53,27 @@ public class AnimationsCommandModule : ISharedRegionModule
 
     public void Initialise(IConfigSource source)
     {
-//            m_log.DebugFormat("[ANIMATIONS COMMAND MODULE]: INITIALIZED MODULE");
+//            m_log.LogDebug("[ANIMATIONS COMMAND MODULE]: INITIALIZED MODULE");
     }
 
     public void PostInitialise()
     {
-//            m_log.DebugFormat("[ANIMATIONS COMMAND MODULE]: POST INITIALIZED MODULE");
+//            m_log.LogDebug("[ANIMATIONS COMMAND MODULE]: POST INITIALIZED MODULE");
     }
 
     public void Close()
     {
-//            m_log.DebugFormat("[ANIMATIONS COMMAND MODULE]: CLOSED MODULE");
+//            m_log.LogDebug("[ANIMATIONS COMMAND MODULE]: CLOSED MODULE");
     }
 
     public void AddRegion(Scene scene)
     {
-//            m_log.DebugFormat("[ANIMATIONS COMMAND MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[ANIMATIONS COMMAND MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
     }
 
     public void RemoveRegion(Scene scene)
     {
-//            m_log.DebugFormat("[ATTACHMENTS COMMAND MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[ATTACHMENTS COMMAND MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
 
         lock (m_scenes)
             m_scenes.Remove(scene);
@@ -80,7 +81,7 @@ public class AnimationsCommandModule : ISharedRegionModule
 
     public void RegionLoaded(Scene scene)
     {
-//            m_log.DebugFormat("[ANIMATIONS COMMAND MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[ANIMATIONS COMMAND MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
 
         lock (m_scenes)
             m_scenes.Add(scene);

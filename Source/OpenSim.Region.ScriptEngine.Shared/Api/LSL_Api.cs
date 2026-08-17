@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.Assets;
@@ -54,6 +53,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using AssetLandmark = OpenSim.Framework.AssetLandmark;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
@@ -79,7 +79,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api;
 /// </summary>
 public class LSL_Api : ILSL_Api, IScriptApi
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private int m_llRequestAgentDataCacheTimeout;
     public int LlRequestAgentDataCacheTimeoutMs
@@ -1637,7 +1637,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
 
     public LSL_Integer llGetStatus(int status)
     {
-        // m_log.Debug(m_host.ToString() + " status is " + m_host.GetEffectiveObjectFlags().ToString());
+        // m_log.LogDebug(m_host.ToString() + " status is " + m_host.GetEffectiveObjectFlags().ToString());
         return status switch
         {
             ScriptBaseClass.STATUS_PHYSICS => (LSL_Integer)(IsPhysical() ? 1 : 0),
@@ -1785,7 +1785,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
             return;
 
         string requestFromIPAddress = m_UrlModule.GetHttpHeader(id, "x-remote-ip");
-        //m_log.Debug("IP from header='" + requestFromIPAddress + "' IP from endpoint='" + logonFromIPAddress + "'");
+        //m_log.LogDebug("IP from header='" + requestFromIPAddress + "' IP from endpoint='" + logonFromIPAddress + "'");
         if (requestFromIPAddress == null)
             return;
 
@@ -4012,7 +4012,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
 
     public virtual void llSleep(double sec)
     {
-//            m_log.Info("llSleep snoozing " + sec + "s.");
+//            m_log.LogInformation("llSleep snoozing " + sec + "s.");
 
         Sleep((int)(sec * 1000));
     }
@@ -6521,7 +6521,7 @@ public void llDetachFromAvatar()
         for (int i = start; i <= end; i += stride, j++)
             res[j] = src.Data[i];
 
-        //m_log.Debug($" test {size} {j}");
+        //m_log.LogDebug($" test {size} {j}");
         return new LSL_List(res);
     }
 
@@ -13486,7 +13486,7 @@ public void llDetachFromAvatar()
         }
         catch(Exception)
         {
-            //m_log.Error("[LSL_API]: llRequestSimulatorData" + e.ToString());
+            //m_log.LogError("[LSL_API]: llRequestSimulatorData" + e.ToString());
             return ScriptBaseClass.NULL_KEY;
         }
     }
@@ -15967,7 +15967,7 @@ public void llDetachFromAvatar()
         if (ossl != null)
         {
             ossl.CheckThreatLevel(ThreatLevel.High, "print");
-            m_log.Info("LSL print():" + str);
+            m_log.LogInformation("LSL print():" + str);
         }
     }
 
@@ -16222,7 +16222,7 @@ public void llDetachFromAvatar()
 
             Vector3 b1 = group.AbsolutePosition + new Vector3(minX, minY, minZ);
             Vector3 b2 = group.AbsolutePosition + new Vector3(maxX, maxY, maxZ);
-            //m_log.DebugFormat("[LLCASTRAY]: min<{0},{1},{2}>, max<{3},{4},{5}> = hitp<{6},{7},{8}>", b1.X,b1.Y,b1.Z,b2.X,b2.Y,b2.Z,intersection.ipoint.X,intersection.ipoint.Y,intersection.ipoint.Z);
+            //m_log.LogDebug("[LLCASTRAY]: min<{0},{1},{2}>, max<{3},{4},{5}> = hitp<{6},{7},{8}>", b1.X,b1.Y,b1.Z,b2.X,b2.Y,b2.Z,intersection.ipoint.X,intersection.ipoint.Y,intersection.ipoint.Z);
             if (!(intersection.ipoint.X >= b1.X && intersection.ipoint.X <= b2.X &&
                 intersection.ipoint.Y >= b1.Y && intersection.ipoint.Y <= b2.Y &&
                 intersection.ipoint.Z >= b1.Z && intersection.ipoint.Z <= b2.Z))
@@ -16829,7 +16829,7 @@ public void llDetachFromAvatar()
                             // For now, sculpt rendering is disabled in SkiaSharp-only mode
                             else if (omvPrim.Sculpt != null && omvPrim.Sculpt.Type != SculptType.Mesh && sculptAsset != null)
                             {
-                                m_log.WarnFormat("[LSL API] Sculpt rendering for prim {0} is not supported in SkiaSharp-only mode", 
+                                m_log.LogWarning("[LSL API] Sculpt rendering for prim {0} is not supported in SkiaSharp-only mode", 
                                     omvPrim.ID.ToString());
                             }
 
@@ -18591,7 +18591,7 @@ public void llDetachFromAvatar()
         client.OnScriptAnswer -= handleScriptExperienceAnswer;
         m_waitingForScriptExperienceAnswer = false;
 
-        m_log.InfoFormat("[EXPERIENCE] Script answer from {0} is {1}", client.AgentId, answer);
+        m_log.LogInformation("[EXPERIENCE] Script answer from {0} is {1}", client.AgentId, answer);
 
         if ((answer & ScriptBaseClass.PERMISSION_TAKE_CONTROLS) == 0)
             llReleaseControls();
@@ -18600,7 +18600,7 @@ public void llDetachFromAvatar()
 
         if (answer != 0)
         {
-            m_log.InfoFormat("[EXPERIENCE] Permissions granted by {0} to {1}", client.AgentId, m_item.ExperienceID);
+            m_log.LogInformation("[EXPERIENCE] Permissions granted by {0} to {1}", client.AgentId, m_item.ExperienceID);
 
             World.ExperienceModule.SetExperiencePermission(client.AgentId, m_item.ExperienceID, ExperiencePermission.Allowed);
             SendExperienceEvent(ExperienceEvent.Permissions);

@@ -27,18 +27,18 @@
 
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 
 using OpenSim.Region.Framework.Interfaces;
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.Framework.Scenes;
 
 public abstract class SceneBase : IScene
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
 #pragma warning disable 414
     private static readonly string LogHeader = "[SCENE]";
@@ -277,7 +277,7 @@ public abstract class SceneBase : IScene
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("[SCENE]: SceneBase.cs: Close() - Failed with exception {0}", e));
+            m_log.LogError(string.Format("[SCENE]: SceneBase.cs: Close() - Failed with exception {0}", e));
         }
     }
 
@@ -406,7 +406,7 @@ public abstract class SceneBase : IScene
     /// <param name="mod"></param>
     public void RegisterModuleInterface<M>(M mod)
     {
-//            m_log.DebugFormat("[SCENE BASE]: Registering interface {0}", typeof(M));
+//            m_log.LogDebug("[SCENE BASE]: Registering interface {0}", typeof(M));
 
         List<Object> l = null;
         if (!ModuleInterfaces.TryGetValue(typeof(M), out l))

@@ -26,12 +26,13 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Agent.AssetTransaction;
 
@@ -40,7 +41,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction;
 /// </summary>
 public class AgentAssetTransactions
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // Fields
     private bool m_dumpAssetsToFile;
@@ -74,7 +75,7 @@ public class AgentAssetTransactions
             {
                 uploader = new AssetXferUploader(this, m_Scene, transactionID, m_dumpAssetsToFile);
 
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[AGENT ASSETS TRANSACTIONS]: Adding asset xfer uploader {0} since it didn't previously exist", transactionID);
 
                 XferUploaders.Add(transactionID, uploader);
@@ -96,7 +97,7 @@ public class AgentAssetTransactions
         {
             foreach (AssetXferUploader uploader in XferUploaders.Values)
             {
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[AGENT ASSETS TRANSACTIONS]: In HandleXfer, inspect xfer upload with xfer id {0}",
 //                        uploader.XferID);
 
@@ -110,7 +111,7 @@ public class AgentAssetTransactions
 
         if (foundUploader != null)
         {
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[AGENT ASSETS TRANSACTIONS]: Found xfer uploader for xfer id {0}, packet id {1}, data length {2}",
 //                    xferID, packetID, data.Length);
 
@@ -126,7 +127,7 @@ public class AgentAssetTransactions
                     return;
             }
 
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[AGENT ASSET TRANSACTIONS]: Could not find uploader for xfer id {0}, packet id {1}, data length {2}",
                 xferID, packetID, data.Length);
         }
@@ -139,11 +140,11 @@ public class AgentAssetTransactions
             bool removed = XferUploaders.Remove(transactionID);
 
             if (!removed)
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[AGENT ASSET TRANSACTIONS]: Received request to remove xfer uploader with transaction ID {0} but none found",
                     transactionID);
 //                else
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[AGENT ASSET TRANSACTIONS]: Removed xfer uploader with transaction ID {0}", transactionID);
 
             return removed;

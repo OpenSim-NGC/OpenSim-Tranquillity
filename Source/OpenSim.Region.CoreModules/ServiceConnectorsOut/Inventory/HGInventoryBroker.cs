@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using System.Collections.Concurrent;
 using System.Reflection;
@@ -37,11 +36,13 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory;
 
 public class HGInventoryBroker : ISharedRegionModule, IInventoryService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private static bool m_Enabled = false;
@@ -72,7 +73,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
                 m_UserManagement = m_Scenes[0].RequestModuleInterface<IUserManagement>();
 
                 if (m_UserManagement == null)
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[HG INVENTORY CONNECTOR]: Could not retrieve IUserManagement module from {0}",
                         m_Scenes[0].RegionInfo.RegionName);
             }
@@ -102,7 +103,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
                 IConfig inventoryConfig = source.Configs["InventoryService"];
                 if (inventoryConfig == null)
                 {
-                    m_log.Error("[HG INVENTORY CONNECTOR]: InventoryService missing from OpenSim.ini");
+                    m_log.LogError("[HG INVENTORY CONNECTOR]: InventoryService missing from OpenSim.ini");
                     return;
                 }
 
@@ -110,7 +111,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
 
                 if (localDll.Length == 0)
                 {
-                    m_log.Error("[HG INVENTORY CONNECTOR]: No LocalGridInventoryService named in section InventoryService");
+                    m_log.LogError("[HG INVENTORY CONNECTOR]: No LocalGridInventoryService named in section InventoryService");
                     //return;
                     throw new Exception("Unable to proceed. Please make sure your ini files in config-include are updated according to .example's");
                 }
@@ -120,12 +121,12 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
 
                 if (m_LocalGridInventoryService == null)
                 {
-                    m_log.Error("[HG INVENTORY CONNECTOR]: Can't load local inventory service");
+                    m_log.LogError("[HG INVENTORY CONNECTOR]: Can't load local inventory service");
                     return;
                 }
 
                 m_Enabled = true;
-                m_log.InfoFormat("[HG INVENTORY CONNECTOR]: HG inventory broker enabled with inner connector of type {0}", m_LocalGridInventoryService.GetType());
+                m_log.LogInformation("[HG INVENTORY CONNECTOR]: HG inventory broker enabled with inner connector of type {0}", m_LocalGridInventoryService.GetType());
             }
         }
     }
@@ -153,7 +154,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
             // we can't just add the region.  But this approach is super-messy.
             if (m_LocalGridInventoryService is RemoteXInventoryServicesConnector)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[HG INVENTORY BROKER]: Manually setting scene in RemoteXInventoryServicesConnector to {0}",
                     scene.RegionInfo.RegionName);
 
@@ -161,7 +162,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
             }
             else if (m_LocalGridInventoryService is LocalInventoryServicesConnector)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[HG INVENTORY BROKER]: Manually setting scene in LocalInventoryServicesConnector to {0}",
                     scene.RegionInfo.RegionName);
 
@@ -185,7 +186,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         if (!m_Enabled)
             return;
 
-        m_log.InfoFormat("[HG INVENTORY CONNECTOR]: Enabled HG inventory for region {0}", scene.RegionInfo.RegionName);
+        m_log.LogInformation("[HG INVENTORY CONNECTOR]: Enabled HG inventory for region {0}", scene.RegionInfo.RegionName);
 
     }
 
@@ -197,7 +198,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         {
             if(s.TryGetScenePresence(clientID, out ScenePresence sp) && !sp.IsChildAgent && sp.ControllingClient != null && sp.ControllingClient.IsActive)
             {
-                //m_log.DebugFormat("[HG INVENTORY CACHE]: OnClientClosed in {0}, but user {1} still in sim. Keeping inventoryURL in cache",
+                //m_log.LogDebug("[HG INVENTORY CACHE]: OnClientClosed in {0}, but user {1} still in sim. Keeping inventoryURL in cache",
                 //        scene.RegionInfo.RegionName, clientID);
                 return;
             }
@@ -236,7 +237,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
                         {
                             inventoryURL = inventoryURL.Trim('/');
                             m_InventoryURLs[userID] = inventoryURL;
-                            //m_log.DebugFormat("[HG INVENTORY CONNECTOR]: Added {0} to the cache of inventory URLs", inventoryURL);
+                            //m_log.LogDebug("[HG INVENTORY CONNECTOR]: Added {0} to the cache of inventory URLs", inventoryURL);
                             return inventoryURL;
                         }
                     }
@@ -249,7 +250,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
                 {
                     inventoryURL = inventoryURL.Trim('/');
                     m_InventoryURLs[userID] = inventoryURL;
-                    //m_log.DebugFormat("[HG INVENTORY CONNECTOR]: Added {0} to the cache of inventory URLs", inventoryURL);
+                    //m_log.LogDebug("[HG INVENTORY CONNECTOR]: Added {0} to the cache of inventory URLs", inventoryURL);
                     return inventoryURL;
                 }
             }
@@ -289,7 +290,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
 
     public InventoryFolderBase GetRootFolder(UUID userID)
     {
-        //m_log.DebugFormat("[HG INVENTORY CONNECTOR]: GetRootFolder for {0}", userID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: GetRootFolder for {0}", userID);
         InventoryFolderBase root = m_Cache.GetRootFolder(userID);
         if (root is not null)
             return root;
@@ -309,7 +310,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
 
     public InventoryFolderBase GetFolderForType(UUID userID, FolderType type)
     {
-        //m_log.DebugFormat("[HG INVENTORY CONNECTOR]: GetFolderForType {0} type {1}", userID, type);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: GetFolderForType {0} type {1}", userID, type);
         InventoryFolderBase f = m_Cache.GetFolderForType(userID, type);
         if (f != null)
             return f;
@@ -329,7 +330,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
 
     public InventoryCollection GetFolderContent(UUID userID, UUID folderID)
     {
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: GetFolderContent " + folderID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: GetFolderContent " + folderID);
 
         string invURL = GetInventoryServiceURL(userID);
 
@@ -339,7 +340,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         InventoryCollection c = m_Cache.GetFolderContent(userID, folderID);
         if (c != null)
         {
-            m_log.Debug("[HG INVENTORY CONNECTOR]: GetFolderContent found content in cache " + folderID);
+            m_log.LogDebug("[HG INVENTORY CONNECTOR]: GetFolderContent found content in cache " + folderID);
             return c;
         }
 
@@ -365,7 +366,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
 
     public List<InventoryItemBase> GetFolderItems(UUID userID, UUID folderID)
     {
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: GetFolderItems " + folderID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: GetFolderItems " + folderID);
 
         string invURL = GetInventoryServiceURL(userID);
 
@@ -375,7 +376,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         List<InventoryItemBase> items = m_Cache.GetFolderItems(userID, folderID);
         if (items != null)
         {
-            m_log.Debug("[HG INVENTORY CONNECTOR]: GetFolderItems found items in cache " + folderID);
+            m_log.LogDebug("[HG INVENTORY CONNECTOR]: GetFolderItems found items in cache " + folderID);
             return items;
         }
 
@@ -389,7 +390,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         if (folder == null)
             return false;
 
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: AddFolder " + folder.ID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: AddFolder " + folder.ID);
 
         string invURL = GetInventoryServiceURL(folder.Owner);
 
@@ -406,7 +407,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         if (folder == null)
             return false;
 
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: UpdateFolder " + folder.ID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: UpdateFolder " + folder.ID);
 
         string invURL = GetInventoryServiceURL(folder.Owner);
 
@@ -425,7 +426,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         if (folderIDs.Count == 0)
             return false;
 
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: DeleteFolders for " + ownerID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: DeleteFolders for " + ownerID);
 
         string invURL = GetInventoryServiceURL(ownerID);
 
@@ -442,7 +443,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         if (folder == null)
             return false;
 
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: MoveFolder for " + folder.Owner);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: MoveFolder for " + folder.Owner);
 
         string invURL = GetInventoryServiceURL(folder.Owner);
 
@@ -459,7 +460,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         if (folder == null)
             return false;
 
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: PurgeFolder for " + folder.Owner);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: PurgeFolder for " + folder.Owner);
 
         string invURL = GetInventoryServiceURL(folder.Owner);
 
@@ -476,7 +477,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         if (item == null)
             return false;
 
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: AddItem " + item.ID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: AddItem " + item.ID);
 
         string invURL = GetInventoryServiceURL(item.Owner);
 
@@ -493,7 +494,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         if (item == null)
             return false;
 
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: UpdateItem " + item.ID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: UpdateItem " + item.ID);
 
         string invURL = GetInventoryServiceURL(item.Owner);
 
@@ -512,7 +513,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         if (items.Count == 0)
             return true;
 
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: MoveItems for " + ownerID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: MoveItems for " + ownerID);
 
         string invURL = GetInventoryServiceURL(ownerID);
 
@@ -526,7 +527,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
 
     public bool DeleteItems(UUID ownerID, List<UUID> itemIDs)
     {
-        //m_log.DebugFormat("[HG INVENTORY CONNECTOR]: Delete {0} items for user {1}", itemIDs.Count, ownerID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: Delete {0} items for user {1}", itemIDs.Count, ownerID);
 
         if (itemIDs == null)
             return false;
@@ -545,7 +546,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
 
     public InventoryItemBase GetItem(UUID principalID, UUID itemID)
     {
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: GetItem " + item.ID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: GetItem " + item.ID);
 
         string invURL = GetInventoryServiceURL(principalID);
 
@@ -562,7 +563,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         if (itemIDs is null || itemIDs.Length == 0)
             return Array.Empty<InventoryItemBase>();
 
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: GetMultipleItems " + item.ID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: GetMultipleItems " + item.ID);
 
         string invURL = GetInventoryServiceURL(userID);
 
@@ -577,7 +578,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
 
     public InventoryFolderBase GetFolder(UUID principalID, UUID folderID)
     {
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: GetFolder " + folder.ID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: GetFolder " + folder.ID);
 
         string invURL = GetInventoryServiceURL(principalID);
 
@@ -601,7 +602,7 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
 
     public int GetAssetPermissions(UUID userID, UUID assetID)
     {
-        //m_log.Debug("[HG INVENTORY CONNECTOR]: GetAssetPermissions " + assetID);
+        //m_log.LogDebug("[HG INVENTORY CONNECTOR]: GetAssetPermissions " + assetID);
 
         string invURL = GetInventoryServiceURL(userID);
 

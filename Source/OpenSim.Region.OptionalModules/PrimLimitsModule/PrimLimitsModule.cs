@@ -26,12 +26,13 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules;
 
@@ -44,7 +45,7 @@ namespace OpenSim.Region.OptionalModules;
 public class PrimLimitsModule : INonSharedRegionModule
 {
     protected IDialogModule m_dialogModule;
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private bool m_enabled;
 
     private Scene m_scene;
@@ -62,7 +63,7 @@ public class PrimLimitsModule : INonSharedRegionModule
         if(!modules.Contains("PrimLimitsModule"))
             return;
 
-        m_log.DebugFormat("[PRIM LIMITS]: Initialized module");
+        m_log.LogDebug("[PRIM LIMITS]: Initialized module");
         m_enabled = true;
     }
 
@@ -81,7 +82,7 @@ public class PrimLimitsModule : INonSharedRegionModule
         scene.Permissions.OnObjectEnterWithScripts += CanObjectEnterWithScripts;
         scene.Permissions.OnDuplicateObject += CanDuplicateObject;
 
-        m_log.DebugFormat("[PRIM LIMITS]: Region {0} added", scene.RegionInfo.RegionName);
+        m_log.LogDebug("[PRIM LIMITS]: Region {0} added", scene.RegionInfo.RegionName);
     }
 
     public void RemoveRegion(Scene scene)

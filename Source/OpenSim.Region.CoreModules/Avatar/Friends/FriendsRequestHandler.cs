@@ -35,7 +35,7 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Avatar.Friends;
 
@@ -43,7 +43,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends;
 //    public class FriendsRequestHandler : BaseStreamHandlerBasicDOSProtector
 public class FriendsSimpleRequestHandler : SimpleStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private FriendsModule m_FriendsModule;
     /*
@@ -80,7 +80,7 @@ public class FriendsSimpleRequestHandler : SimpleStreamHandler
         httpResponse.KeepAlive = false;
         httpResponse.StatusCode = (int)HttpStatusCode.OK;
         httpResponse.ContentType = "text/xml";
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
 
         try
         {
@@ -124,7 +124,7 @@ public class FriendsSimpleRequestHandler : SimpleStreamHandler
         }
         catch (Exception e)
         {
-            m_log.Debug("[FRIENDS]: Exception {0}" + e.ToString());
+            m_log.LogDebug("[FRIENDS]: Exception {0}" + e.ToString());
             httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
 
         }

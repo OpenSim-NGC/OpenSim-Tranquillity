@@ -34,14 +34,15 @@ using OpenSim.Region.Framework.Scenes;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Framework.InventoryAccess;
 
 public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedRegionModule, IInventoryAccessModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static HGAssetMapper m_assMapper;
     public static HGAssetMapper AssetMapper
@@ -83,7 +84,7 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
 
                 InitialiseCommon(source);
 
-                m_log.InfoFormat("[HG INVENTORY ACCESS MODULE]: {0} enabled.", Name);
+                m_log.LogInformation("[HG INVENTORY ACCESS MODULE]: {0} enabled.", Name);
 
                 IConfig thisModuleConfig = source.Configs["HGInventoryAccessModule"];
                 if (thisModuleConfig != null)
@@ -101,7 +102,7 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
                     m_LocalAssetsURL = m_LocalAssetsURL.Trim('/');
                 }
                 else
-                    m_log.Warn("[HG INVENTORY ACCESS MODULE]: HGInventoryAccessModule configs not found");
+                    m_log.LogWarning("[HG INVENTORY ACCESS MODULE]: HGInventoryAccessModule configs not found");
 
                 m_bypassPermissions = !Util.GetConfigVarFromSections<bool>(source, "serverside_object_permissions",
                                         new string[] { "Startup", "Permissions" }, true);
@@ -146,7 +147,7 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
 
     protected void OnCompleteMovementToRegion(IClientAPI client, bool arg2)
     {
-        //m_log.DebugFormat("[HG INVENTORY ACCESS MODULE]: OnCompleteMovementToRegion of user {0}", client.Name);
+        //m_log.LogDebug("[HG INVENTORY ACCESS MODULE]: OnCompleteMovementToRegion of user {0}", client.Name);
         if (client.SceneAgent is ScenePresence sp)
         {
             AgentCircuitData aCircuit = sp.Scene.AuthenticateHandler.GetAgentCircuitData(client.AgentId);
@@ -292,7 +293,7 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
         }
         else
         {
-            m_log.Debug("[HGScene]: Scene.Inventory did not create asset");
+            m_log.LogDebug("[HGScene]: Scene.Inventory did not create asset");
         }
     }
 
@@ -321,7 +322,7 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
 
         if(item.AssetType == (int)AssetType.Link || item.AssetType == (int)AssetType.LinkFolder)
         {
-            m_log.Error("[HGScene]: request to rez a asset inventory link");
+            m_log.LogError("[HGScene]: request to rez a asset inventory link");
             return null;
         }
 
@@ -351,7 +352,7 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
             return;
         if(item.AssetType == (int)AssetType.Link || item.AssetType == (int)AssetType.LinkFolder)
         {
-            m_log.Error("[HGScene]: request to fetch a asset inventory link");
+            m_log.LogError("[HGScene]: request to fetch a asset inventory link");
             return;
         }
 
@@ -375,7 +376,7 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
         // If both users have the same asset server, no need to transfer the asset
         if (senderAssetServer.Equals(receiverAssetServer))
         {
-            m_log.Debug("[HGScene]: Asset transfer between foreign users, but they have the same server. No transfer.");
+            m_log.LogDebug("[HGScene]: Asset transfer between foreign users, but they have the same server. No transfer.");
             return;
         }
 
@@ -417,7 +418,7 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
                     }
                     if(assetServerURL.Length == 0)
                     {
-                        m_log.Debug($"[HGScene]: user {userID} asset server returned empty url");
+                        m_log.LogDebug($"[HGScene]: user {userID} asset server returned empty url");
                         return false;
                     }
                     return true;
@@ -427,17 +428,17 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
             {
                 if (IsLocalInventoryAssetsUser(userID, out assetServerURL))
                 {
-                    m_log.Debug($"[HGScene]: user {userID} has local assets {assetServerURL}");
+                    m_log.LogDebug($"[HGScene]: user {userID} has local assets {assetServerURL}");
                     return false;
                 }
                 else
                 {
                     if(assetServerURL.Length == 0)
                     {
-                        m_log.Debug($"[HGScene]: user {userID} asset server returned empty url");
+                        m_log.LogDebug($"[HGScene]: user {userID} asset server returned empty url");
                         return false;
                     }
-                    m_log.Debug($"[HGScene]: user {userID} has foreign assets {assetServerURL}");
+                    m_log.LogDebug($"[HGScene]: user {userID} has foreign assets {assetServerURL}");
                     return true;
                 }
             }
@@ -487,7 +488,7 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
     {
         if(!client.IsActive)
             return;
-        m_log.DebugFormat("[HG INVENTORY ACCESS MODULE]: Restoring root folder for local user {0}", client.Name);
+        m_log.LogDebug("[HG INVENTORY ACCESS MODULE]: Restoring root folder for local user {0}", client.Name);
         InventoryFolderBase root = m_Scene.InventoryService.GetRootFolder(client.AgentId);
         InventoryCollection content = m_Scene.InventoryService.GetFolderContent(client.AgentId, root.ID);
 
@@ -518,7 +519,7 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
         InventoryFolderBase root = m_Scene.InventoryService.GetRootFolder(client.AgentId);
         if (root != null)
         {
-            m_log.DebugFormat("[HG INVENTORY ACCESS MODULE]: Changing root inventory for user {0}", client.Name);
+            m_log.LogDebug("[HG INVENTORY ACCESS MODULE]: Changing root inventory for user {0}", client.Name);
             InventoryCollection content = m_Scene.InventoryService.GetFolderContent(client.AgentId, root.ID);
 
             List<InventoryFolderBase> keep = new List<InventoryFolderBase>();

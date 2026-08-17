@@ -29,13 +29,14 @@ using System.Reflection;
 using OpenSim.Framework.Servers.HttpServer;
 
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.OptionalModules.World.WorldView;
 
 public class WorldViewRequestHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected WorldViewModule m_WorldViewModule;
     protected Object m_RequestLock = new Object();
@@ -70,7 +71,7 @@ public class WorldViewRequestHandler : BaseStreamHandler
         }
         catch (Exception e)
         {
-            m_log.Debug("[WORLDVIEW]: Exception: " + e.ToString());
+            m_log.LogDebug("[WORLDVIEW]: Exception: " + e.ToString());
         }
 
         return Array.Empty<byte>();

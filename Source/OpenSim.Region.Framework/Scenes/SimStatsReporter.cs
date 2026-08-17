@@ -29,6 +29,8 @@ using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.Framework.Scenes;
 
 /// <summary>
@@ -39,7 +41,7 @@ namespace OpenSim.Region.Framework.Scenes;
 /// </remarks>
 public class SimStatsReporter
 {
-    private static readonly log4net.ILog m_log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
     public delegate void SendStatResult(SimStats stats);
     public event SendStatResult OnSendStatsResult;
@@ -237,9 +239,9 @@ public class SimStatsReporter
         }
         catch (Exception e)
         {
-            m_log.Warn(string.Format(
+            m_log.LogWarning(e, string.Format(
                 "[SIM STATS REPORTER] Update for {0} failed with exception ",
-                m_scene.RegionInfo.RegionName), e);
+                m_scene.RegionInfo.RegionName));
         }
     }
 
@@ -252,7 +254,7 @@ public class SimStatsReporter
 
         if(Monitor.TryEnter(m_statsLock))
         {
-            // m_log.Debug("Firing Stats Heart Beat");
+            // m_log.LogDebug("Firing Stats Heart Beat");
             float[] newvalues = new float[(int)StatsIndex.ArraySize];
 
             uint regionFlags = 0;
@@ -536,7 +538,7 @@ public class SimStatsReporter
         if (m_pendingDownloads < 0)
             m_pendingDownloads = 0;
 
-        //m_log.InfoFormat("[stats]: Adding {0} to pending downloads to make {1}", count, m_pendingDownloads);
+        //m_log.LogInformation("[stats]: Adding {0} to pending downloads to make {1}", count, m_pendingDownloads);
     }
 
     public void addScriptEvents(int count)

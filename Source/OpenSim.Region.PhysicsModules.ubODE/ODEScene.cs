@@ -32,12 +32,13 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModules.ubODE;
 
@@ -168,7 +169,7 @@ public readonly struct ODEchangeitem
 
 public partial class ODEScene : PhysicsScene
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public Scene m_frameWorkScene = null;
 
@@ -329,7 +330,7 @@ public partial class ODEScene : PhysicsScene
         mesher = m_frameWorkScene.RequestModuleInterface<IMesher>();
         if (mesher == null)
         {
-            m_log.ErrorFormat("[ubODE] No mesher. module disabled");
+            m_log.LogError("[ubODE] No mesher. module disabled");
             return;
         }
 
@@ -594,7 +595,7 @@ public partial class ODEScene : PhysicsScene
             }
             catch (AccessViolationException)
             {
-                m_log.Warn("[PHYSICS]: Unable to collide test a space");
+                m_log.LogWarning("[PHYSICS]: Unable to collide test a space");
             }
             return;
         }
@@ -617,13 +618,13 @@ public partial class ODEScene : PhysicsScene
         }
         catch (SEHException)
         {
-            m_log.Error("[PHYSICS]: The Operating system shut down ODE because of corrupt memory.  This could be a result of really irregular terrain.  If this repeats continuously, restart using Basic Physics and terrain fill your terrain.  Restarting the sim.");
+            m_log.LogError("[PHYSICS]: The Operating system shut down ODE because of corrupt memory.  This could be a result of really irregular terrain.  If this repeats continuously, restart using Basic Physics and terrain fill your terrain.  Restarting the sim.");
             //ode.drelease(world);
             base.TriggerPhysicsBasedRestart();
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[PHYSICS]: Unable to collide test an object: {0}", e.Message);
+            m_log.LogWarning("[PHYSICS]: Unable to collide test an object: {0}", e.Message);
             return;
         }
 
@@ -634,13 +635,13 @@ public partial class ODEScene : PhysicsScene
         // try get physical actors
         if (!actor_name_map.TryGetValue(g1, out PhysicsActor p1))
         {
-            m_log.WarnFormat("[PHYSICS]: failed actor mapping for geom 1");
+            m_log.LogWarning("[PHYSICS]: failed actor mapping for geom 1");
             return;
         }
 
         if (!actor_name_map.TryGetValue(g2, out PhysicsActor p2))
         {
-            m_log.WarnFormat("[PHYSICS]: failed actor mapping for geom 2");
+            m_log.LogWarning("[PHYSICS]: failed actor mapping for geom 2");
             return;
         }
 
@@ -884,7 +885,7 @@ public partial class ODEScene : PhysicsScene
             }
             catch (AccessViolationException)
             {
-                m_log.Warn("[PHYSICS]: Unable to collide test a space");
+                m_log.LogWarning("[PHYSICS]: Unable to collide test a space");
             }
             return;
         }
@@ -903,13 +904,13 @@ public partial class ODEScene : PhysicsScene
         }
         catch (SEHException)
         {
-            m_log.Error("[PHYSICS]: The Operating system shut down ODE because of corrupt memory.  This could be a result of really irregular terrain.  If this repeats continuously, restart using Basic Physics and terrain fill your terrain.  Restarting the sim.");
+            m_log.LogError("[PHYSICS]: The Operating system shut down ODE because of corrupt memory.  This could be a result of really irregular terrain.  If this repeats continuously, restart using Basic Physics and terrain fill your terrain.  Restarting the sim.");
             //ode.drelease(world);
             base.TriggerPhysicsBasedRestart();
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[PHYSICS]: Unable to collide test an object: {0}", e.Message);
+            m_log.LogWarning("[PHYSICS]: Unable to collide test an object: {0}", e.Message);
             return;
         }
 
@@ -920,13 +921,13 @@ public partial class ODEScene : PhysicsScene
         // try get physical actors
         if (!actor_name_map.TryGetValue(g1, out PhysicsActor p1))
         {
-            m_log.WarnFormat("[PHYSICS]: failed actor mapping for geom 1");
+            m_log.LogWarning("[PHYSICS]: failed actor mapping for geom 1");
             return;
         }
 
         if (!actor_name_map.TryGetValue(g2, out PhysicsActor p2))
         {
-            m_log.WarnFormat("[PHYSICS]: failed actor mapping for geom 2");
+            m_log.LogWarning("[PHYSICS]: failed actor mapping for geom 2");
             return;
         }
 
@@ -1165,7 +1166,7 @@ public partial class ODEScene : PhysicsScene
                 }
                 catch (AccessViolationException)
                 {
-                    m_log.Warn("[PHYSICS]: Unable to collide Character to static space");
+                    m_log.LogWarning("[PHYSICS]: Unable to collide Character to static space");
                 }
             }
         }
@@ -1199,7 +1200,7 @@ public partial class ODEScene : PhysicsScene
                 }
                 catch (Exception e)
                 {
-                    m_log.Warn("[PHYSICS]: Unable to collide Active to Static: " + e.Message);
+                    m_log.LogWarning("[PHYSICS]: Unable to collide Active to Static: " + e.Message);
                 }
             }
             // colide active amoung them
@@ -1209,7 +1210,7 @@ public partial class ODEScene : PhysicsScene
             }
             catch (Exception e)
             {
-                    m_log.Warn("[PHYSICS]: Unable to collide in Active: " + e.Message);
+                    m_log.LogWarning("[PHYSICS]: Unable to collide in Active: " + e.Message);
             }
         }
         /*
@@ -1220,7 +1221,7 @@ public partial class ODEScene : PhysicsScene
         }
         catch (Exception e)
         {
-                m_log.Warn("[PHYSICS]: Unable to collide Active to Character: " + e.Message);
+                m_log.LogWarning("[PHYSICS]: Unable to collide Active to Character: " + e.Message);
         }
         */
     }
@@ -1283,7 +1284,7 @@ public partial class ODEScene : PhysicsScene
             else
                 chr._charsListIndex = -1;
             if (chr.bad)
-                m_log.DebugFormat("[PHYSICS] Added BAD actor {0} to characters list", chr.m_baseLocalID);
+                m_log.LogDebug("[PHYSICS] Added BAD actor {0} to characters list", chr.m_baseLocalID);
         }
     }
 
@@ -1318,7 +1319,7 @@ public partial class ODEScene : PhysicsScene
 
     public override void RemoveAvatar(PhysicsActor actor)
     {
-        //m_log.Debug("[PHYSICS]:ODELOCK");
+        //m_log.LogDebug("[PHYSICS]:ODELOCK");
         if (world == IntPtr.Zero)
             return;
         ((OdeCharacter) actor).Destroy();
@@ -1500,7 +1501,7 @@ public partial class ODEScene : PhysicsScene
             }
             else
             {
-                m_log.Info("[Physics]: Invalid or empty Space passed to 'MoveGeomToStaticSpace':" + currentspace +
+                m_log.LogInformation("[Physics]: Invalid or empty Space passed to 'MoveGeomToStaticSpace':" + currentspace +
                                " Geom:" + geom);
             }
         }
@@ -1525,7 +1526,7 @@ public partial class ODEScene : PhysicsScene
         // put the geom in the newspace
         //waitForSpaceUnlock(StaticSpace);
         if(UBOdeNative.SpaceQuery(StaticSpace, geom))
-            m_log.Info("[Physics]: 'MoveGeomToStaticSpace' geom already in static space:" + geom);
+            m_log.LogInformation("[Physics]: 'MoveGeomToStaticSpace' geom already in static space:" + geom);
         else
             UBOdeNative.SpaceAdd(StaticSpace, geom);
 
@@ -1556,7 +1557,7 @@ public partial class ODEScene : PhysicsScene
             int donechanges = 0;
             if (!ChangesQueue.IsEmpty)
             {
-                m_log.InfoFormat("[ubODE] start processing pending actor operations");
+                m_log.LogInformation("[ubODE] start processing pending actor operations");
                 int tstart = Util.EnvironmentTickCount();
 
                 UBOdeNative.AllocateODEDataForThread(~0U);
@@ -1580,19 +1581,19 @@ public partial class ODEScene : PhysicsScene
                     {
                         try
                         {
-                            m_log.WarnFormat($"[PHYSICS]: Operation failed for a actor {item.actor.Name} {item.what}");
+                            m_log.LogWarning($"[PHYSICS]: Operation failed for a actor {item.actor.Name} {item.what}");
                         }
                         catch
                         {
-                            m_log.WarnFormat("[PHYSICS]: Operation failed for a unknown actor");
+                            m_log.LogWarning("[PHYSICS]: Operation failed for a unknown actor");
                         }
                     }
                     donechanges++;
                 }
                 int time = Util.EnvironmentTickCountSubtract(tstart);
-                m_log.InfoFormat("[ubODE] finished {0} operations in {1}ms", donechanges, time);
+                m_log.LogInformation("[ubODE] finished {0} operations in {1}ms", donechanges, time);
             }
-            m_log.InfoFormat("[ubODE] {0} prim actors loaded",_prims.Count);
+            m_log.LogInformation("[ubODE] {0} prim actors loaded",_prims.Count);
         }
         m_lastframe = Util.GetTimeStamp() + 0.5;
         step_time = -0.5f;
@@ -1672,11 +1673,11 @@ public partial class ODEScene : PhysicsScene
                 {
                     try
                     {
-                        m_log.WarnFormat($"[PHYSICS]: Operation failed for a actor {item.actor.Name} {item.what}");
+                        m_log.LogWarning($"[PHYSICS]: Operation failed for a actor {item.actor.Name} {item.what}");
                     }
                     catch
                     {
-                        m_log.WarnFormat("[PHYSICS]: Operation failed for a unknown actor");
+                        m_log.LogWarning("[PHYSICS]: Operation failed for a unknown actor");
                     }
                 }
                 if (maxChangestime < Util.GetTimeStampMS())
@@ -1784,7 +1785,7 @@ public partial class ODEScene : PhysicsScene
                             if (actor != null)
                             {
                                 if (actor.bad)
-                                    m_log.WarnFormat("[PHYSICS]: BAD Actor {0} in _characters list was not removed?", actor.m_uuid);
+                                    m_log.LogWarning("[PHYSICS]: BAD Actor {0} in _characters list was not removed?", actor.m_uuid);
 
                                 actor.UpdatePositionAndVelocity();
                             }
@@ -1809,7 +1810,7 @@ public partial class ODEScene : PhysicsScene
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[PHYSICS]: {0}, {1}, {2}", e.Message, e.TargetSite, e);
+                    m_log.LogError("[PHYSICS]: {0}, {1}, {2}", e.Message, e.TargetSite, e);
                     //ode.dunlock(world);
                 }
 

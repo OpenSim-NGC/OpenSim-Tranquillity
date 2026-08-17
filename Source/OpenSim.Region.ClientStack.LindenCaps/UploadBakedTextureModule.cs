@@ -28,7 +28,6 @@
 using System.Net;
 using System.Reflection;
 using System.Timers;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -36,13 +35,14 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Capabilities;
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public class UploadBakedTextureModule : ISharedRegionModule
 {
-   private static readonly ILog m_log =LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+   private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private int m_nscenes;
     IAssetCache m_assetCache = null;
@@ -142,7 +142,7 @@ public class UploadBakedTextureModule : ISharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[UPLOAD BAKED TEXTURE HANDLER]: Error: {0}", e.Message);
+            m_log.LogError("[UPLOAD BAKED TEXTURE HANDLER]: Error: {0}", e.Message);
         }
         httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
     }
@@ -150,7 +150,7 @@ public class UploadBakedTextureModule : ISharedRegionModule
 
 class BakedTextureUploader
 {
-    // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    // private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_uploaderPath = String.Empty;
     private IHttpServer m_httpListener;

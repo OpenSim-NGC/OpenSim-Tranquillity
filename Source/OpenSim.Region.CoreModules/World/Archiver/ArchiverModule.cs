@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using NDesk.Options;
 using Nini.Config;
 
@@ -36,6 +35,8 @@ using OpenSim.Region.Framework.Scenes;
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.World.Archiver;
 
 /// <summary>
@@ -43,8 +44,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver;
 /// </summary>
 public class ArchiverModule : INonSharedRegionModule, IRegionArchiverModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public Scene Scene { get; private set; }
 
@@ -66,14 +66,14 @@ public class ArchiverModule : INonSharedRegionModule, IRegionArchiverModule
 
     public void Initialise(IConfigSource source)
     {
-        //m_log.Debug("[ARCHIVER] Initialising");
+        //m_log.LogDebug("[ARCHIVER] Initialising");
     }
 
     public void AddRegion(Scene scene)
     {
         Scene = scene;
         Scene.RegisterModuleInterface<IRegionArchiverModule>(this);
-        //m_log.DebugFormat("[ARCHIVER]: Enabled for region {0}", scene.RegionInfo.RegionName);
+        //m_log.LogDebug("[ARCHIVER]: Enabled for region {0}", scene.RegionInfo.RegionName);
     }
 
     public void RegionLoaded(Scene scene)
@@ -136,8 +136,8 @@ public class ArchiverModule : INonSharedRegionModule, IRegionArchiverModule
             }
             catch
             {
-                m_log.ErrorFormat("[ARCHIVER MODULE] failure parsing displacement");
-                m_log.ErrorFormat("[ARCHIVER MODULE]    Must be represented as vector3: --displacement \"<128,128,0>\"");
+                m_log.LogError("[ARCHIVER MODULE] failure parsing displacement");
+                m_log.LogError("[ARCHIVER MODULE]    Must be represented as vector3: --displacement \"<128,128,0>\"");
                 return;
             }
         });
@@ -149,8 +149,8 @@ public class ArchiverModule : INonSharedRegionModule, IRegionArchiverModule
             }
             catch
             {
-                m_log.ErrorFormat("[ARCHIVER MODULE] failure parsing rotation");
-                m_log.ErrorFormat("[ARCHIVER MODULE]    Must be an angle in degrees between -360 and +360: --rotation 45");
+                m_log.LogError("[ARCHIVER MODULE] failure parsing rotation");
+                m_log.LogError("[ARCHIVER MODULE]    Must be an angle in degrees between -360 and +360: --rotation 45");
                 return;
             }
 
@@ -161,13 +161,13 @@ public class ArchiverModule : INonSharedRegionModule, IRegionArchiverModule
         {
             try
             {
-                m_log.Info("[ARCHIVER MODULE] Warning: --rotation-center no longer does anything and will be removed soon!");
+                m_log.LogInformation("[ARCHIVER MODULE] Warning: --rotation-center no longer does anything and will be removed soon!");
                 rotationCenter = v == null ? Vector3.Zero : Vector3.Parse(v);
             }
             catch
             {
-                m_log.ErrorFormat("[ARCHIVER MODULE] failure parsing rotation displacement");
-                m_log.ErrorFormat("[ARCHIVER MODULE]    Must be represented as vector3: --rotation-center \"<128,128,0>\"");
+                m_log.LogError("[ARCHIVER MODULE] failure parsing rotation displacement");
+                m_log.LogError("[ARCHIVER MODULE]    Must be represented as vector3: --rotation-center \"<128,128,0>\"");
                 return;
             }
         });
@@ -179,8 +179,8 @@ public class ArchiverModule : INonSharedRegionModule, IRegionArchiverModule
             }
             catch
             {
-                m_log.ErrorFormat("[ARCHIVER MODULE] failure parsing bounding cube origin");
-                m_log.ErrorFormat("[ARCHIVER MODULE]    Must be represented as vector3: --bounding-origin \"<128,128,0>\"");
+                m_log.LogError("[ARCHIVER MODULE] failure parsing bounding cube origin");
+                m_log.LogError("[ARCHIVER MODULE]    Must be represented as vector3: --bounding-origin \"<128,128,0>\"");
                 return;
             }
         });
@@ -192,8 +192,8 @@ public class ArchiverModule : INonSharedRegionModule, IRegionArchiverModule
             }
             catch
             {
-                m_log.ErrorFormat("[ARCHIVER MODULE] failure parsing bounding cube size");
-                m_log.ErrorFormat("[ARCHIVER MODULE]    Must be represented as a positive vector3: --bounding-size \"<256,256,4096>\"");
+                m_log.LogError("[ARCHIVER MODULE] failure parsing bounding cube size");
+                m_log.LogError("[ARCHIVER MODULE]    Must be represented as a positive vector3: --bounding-size \"<256,256,4096>\"");
                 return;
             }
         });
@@ -211,10 +211,10 @@ public class ArchiverModule : INonSharedRegionModule, IRegionArchiverModule
 
         List<string> mainParams = options.Parse(cmdparams);
 
-//            m_log.DebugFormat("MERGE OAR IS [{0}]", mergeOar);
+//            m_log.LogDebug("MERGE OAR IS [{0}]", mergeOar);
 //
 //            foreach (string param in mainParams)
-//                m_log.DebugFormat("GOT PARAM [{0}]", param);
+//                m_log.LogDebug("GOT PARAM [{0}]", param);
 
         Dictionary<string, object> archiveOptions = new Dictionary<string, object>();
 
@@ -234,11 +234,11 @@ public class ArchiverModule : INonSharedRegionModule, IRegionArchiverModule
             }
             catch
             {
-                m_log.ErrorFormat("[ARCHIVER MODULE] default user must be in format \"First Last\"", defaultUser);
+                m_log.LogError("[ARCHIVER MODULE] default user must be in format \"First Last\"", defaultUser);
             }
             if (defaultUserUUID.IsZero())
             {
-                m_log.ErrorFormat("[ARCHIVER MODULE] cannot find specified default user {0}", defaultUser);
+                m_log.LogError("[ARCHIVER MODULE] cannot find specified default user {0}", defaultUser);
                 return;
             }
             else
@@ -310,7 +310,7 @@ public class ArchiverModule : INonSharedRegionModule, IRegionArchiverModule
 
     public void ArchiveRegion(string savePath, Guid requestId, Dictionary<string, object> options)
     {
-        m_log.InfoFormat(
+        m_log.LogInformation(
             "[ARCHIVER]: Writing archive for region {0} to {1}", Scene.RegionInfo.RegionName, savePath);
 
         new ArchiveWriteRequest(Scene, savePath, requestId).ArchiveRegion(options);
@@ -339,7 +339,7 @@ public class ArchiverModule : INonSharedRegionModule, IRegionArchiverModule
 
     public void DearchiveRegion(string loadPath, Guid requestId, Dictionary<string, object> options)
     {
-        m_log.InfoFormat(
+        m_log.LogInformation(
             "[ARCHIVER]: Loading archive to region {0} from {1}", Scene.RegionInfo.RegionName, loadPath);
 
         new ArchiveReadRequest(Scene, loadPath, requestId, options).DearchiveRegion();

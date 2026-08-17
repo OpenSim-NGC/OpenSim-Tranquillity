@@ -26,6 +26,8 @@
  */
 using OMV = OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 public abstract class BSLinkset
@@ -60,7 +62,7 @@ public abstract class BSLinkset
         }
         if (ret == null)
         {
-            physScene.Logger.ErrorFormat("[BULLETSIM LINKSET] Factory could not create linkset. Parent name={1}, ID={2}", parent.Name, parent.LocalID);
+            physScene.Logger.LogError("[BULLETSIM LINKSET] Factory could not create linkset. Parent name={1}, ID={2}", parent.Name, parent.LocalID);
         }
         return ret;
     }

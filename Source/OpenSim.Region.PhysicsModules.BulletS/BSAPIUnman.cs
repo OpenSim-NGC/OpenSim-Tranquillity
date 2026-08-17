@@ -29,6 +29,8 @@ using System.Security;
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 public sealed class BSAPIUnman : BSAPITemplate
@@ -154,9 +156,9 @@ public sealed class BSAPIUnman : BSAPITemplate
 
         // If Debug logging level, enable logging from the unmanaged code
         m_DebugLogCallbackHandle = null;
-        if (BSScene.m_log.IsDebugEnabled && PhysicsScene.PhysicsLogging.Enabled)
+        if (BSScene.m_log.IsEnabled(LogLevel.Debug) && PhysicsScene.PhysicsLogging.Enabled)
         {
-            BSScene.m_log.DebugFormat("{0}: Initialize: Setting debug callback for unmanaged code", BSScene.LogHeader);
+            BSScene.m_log.LogDebug("{0}: Initialize: Setting debug callback for unmanaged code", BSScene.LogHeader);
             if (PhysicsScene.PhysicsLogging.Enabled)
                 // The handle is saved in a variable to make sure it doesn't get freed after this call
                 m_DebugLogCallbackHandle = new BSAPICPP.DebugLogCallback(BulletLoggerPhysLog);
@@ -170,19 +172,19 @@ public sealed class BSAPIUnman : BSAPITemplate
         {
 
             BulletEngineVersion = Marshal.PtrToStringAnsi(BSAPICPP.GetVersion2());
-            BSScene.m_log.DebugFormat("{0}: Initialize: GetVersionInfo returned {1}", BSScene.LogHeader, BulletEngineVersion);
+            BSScene.m_log.LogDebug("{0}: Initialize: GetVersionInfo returned {1}", BSScene.LogHeader, BulletEngineVersion);
             string legacyValue = BSParam.VersionLegacyValue;
             if (BulletEngineVersion.Equals(legacyValue))
             {
                 // The old version of BulletSim returned a static string for the version.
                 // Convert that old static string into what is probably the correct version information.
                 BulletEngineVersion = BSParam.VersionLegacyReplacement;
-                BSScene.m_log.DebugFormat("{0}: Initialize: BulletSim version converted from legacy {1} to {2}",
+                BSScene.m_log.LogDebug("{0}: Initialize: BulletSim version converted from legacy {1} to {2}",
                     BSScene.LogHeader, legacyValue, BulletEngineVersion);
             }
         }
         catch (Exception e) {
-            BSScene.m_log.DebugFormat("{0}: Initialize: Could not fetch Bullet version info. Exception: {1}", BSScene.LogHeader, e);
+            BSScene.m_log.LogDebug("{0}: Initialize: Could not fetch Bullet version info. Exception: {1}", BSScene.LogHeader, e);
         }
 
         // Call the unmanaged code with the buffers and other information
@@ -196,7 +198,7 @@ public sealed class BSAPIUnman : BSAPITemplate
     // Called directly from unmanaged code so don't do much
     private void BulletLogger(string msg)
     {
-        BSScene.m_log.Debug("[BULLETS UNMANAGED]:" + msg);
+        BSScene.m_log.LogDebug("[BULLETS UNMANAGED]:" + msg);
     }
 
     // Called directly from unmanaged code so don't do much

@@ -29,6 +29,8 @@ using System.Runtime.InteropServices;
 using OpenSim.Framework;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.SharedBase;
 
 public delegate void PositionUpdate(Vector3 position);
@@ -166,7 +168,7 @@ public class CollisionEventUpdate : EventArgs
 
 public abstract class PhysicsActor
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public delegate void RequestTerseUpdate();
     public delegate void CollisionUpdate(EventArgs e);

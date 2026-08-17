@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Framework;
@@ -35,12 +34,13 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList;
 
 public class LocalMuteListServicesConnector : ISharedRegionModule, IMuteListService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private List<Scene> m_Scenes = new List<Scene>();
@@ -82,7 +82,7 @@ public class LocalMuteListServicesConnector : ISharedRegionModule, IMuteListServ
         IConfig userConfig = source.Configs["MuteListService"];
         if (userConfig == null)
         {
-            m_log.Error("[MuteList LOCALCONNECTOR]: MuteListService missing from configuration");
+            m_log.LogError("[MuteList LOCALCONNECTOR]: MuteListService missing from configuration");
             return;
         }
 
@@ -91,7 +91,7 @@ public class LocalMuteListServicesConnector : ISharedRegionModule, IMuteListServ
 
         if (serviceDll.Length == 0)
         {
-            m_log.Error("[MuteList LOCALCONNECTOR]: No LocalServiceModule named in section MuteListService");
+            m_log.LogError("[MuteList LOCALCONNECTOR]: No LocalServiceModule named in section MuteListService");
             return;
         }
 
@@ -102,18 +102,18 @@ public class LocalMuteListServicesConnector : ISharedRegionModule, IMuteListServ
         }
         catch
         {
-            m_log.Error("[MuteList LOCALCONNECTOR]: Failed to load mute service");
+            m_log.LogError("[MuteList LOCALCONNECTOR]: Failed to load mute service");
             return;
         }
 
         if (m_service == null)
         {
-            m_log.Error("[MuteList LOCALCONNECTOR]: Can't load MuteList service");
+            m_log.LogError("[MuteList LOCALCONNECTOR]: Can't load MuteList service");
             return;
         }
 
         m_Enabled = true;
-        m_log.Info("[MuteList LOCALCONNECTOR]: enabled");
+        m_log.LogInformation("[MuteList LOCALCONNECTOR]: enabled");
     }
 
     public void Close()

@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Framework;
@@ -34,11 +33,13 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset;
 
 public class LocalAssetServicesConnector : ISharedRegionModule, IAssetService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAssetCache m_Cache = null;
 
@@ -67,29 +68,29 @@ public class LocalAssetServicesConnector : ISharedRegionModule, IAssetService
                 IConfig assetConfig = source.Configs["AssetService"];
                 if (assetConfig == null)
                 {
-                    m_log.Error("[LOCAL ASSET SERVICES CONNECTOR]: AssetService missing from OpenSim.ini");
+                    m_log.LogError("[LOCAL ASSET SERVICES CONNECTOR]: AssetService missing from OpenSim.ini");
                     return;
                 }
 
                 string serviceDll = assetConfig.GetString("LocalServiceModule", string.Empty);
                 if (string.IsNullOrEmpty(serviceDll))
                 {
-                    m_log.Error("[LOCAL ASSET SERVICES CONNECTOR]: No LocalServiceModule named in section AssetService");
+                    m_log.LogError("[LOCAL ASSET SERVICES CONNECTOR]: No LocalServiceModule named in section AssetService");
                     return;
                 }
 
-                //m_log.DebugFormat("[LOCAL ASSET SERVICES CONNECTOR]: Loading asset service at {0}", serviceDll);
+                //m_log.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Loading asset service at {0}", serviceDll);
 
                 object[] args = new object[] { source };
                 m_AssetService = ServerUtils.LoadPlugin<IAssetService>(serviceDll, args);
 
                 if (m_AssetService == null)
                 {
-                    m_log.Error("[LOCAL ASSET SERVICES CONNECTOR]: Fail to load asset service " + serviceDll);
+                    m_log.LogError("[LOCAL ASSET SERVICES CONNECTOR]: Fail to load asset service " + serviceDll);
                     return;
                 }
                 m_Enabled = true;
-                m_log.Info("[LOCAL ASSET SERVICES CONNECTOR]: Local asset connector enabled");
+                m_log.LogInformation("[LOCAL ASSET SERVICES CONNECTOR]: Local asset connector enabled");
             }
         }
     }
@@ -128,10 +129,10 @@ public class LocalAssetServicesConnector : ISharedRegionModule, IAssetService
         }
 
         if (m_Cache == null)
-            m_log.DebugFormat("[LOCAL ASSET SERVICES CONNECTOR]: Enabled asset connector with caching for region {0}",
+            m_log.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Enabled asset connector with caching for region {0}",
                 scene.RegionInfo.RegionName);
         else
-            m_log.DebugFormat("[LOCAL ASSET SERVICES CONNECTOR]: Enabled asset connector without caching for region {0}",
+            m_log.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Enabled asset connector without caching for region {0}",
                 scene.RegionInfo.RegionName);
     }
 
@@ -156,7 +157,7 @@ public class LocalAssetServicesConnector : ISharedRegionModule, IAssetService
             }
 
         //if (null == asset)
-        //    m_log.WarnFormat("[LOCAL ASSET SERVICES CONNECTOR]: Could not synchronously find asset with id {0}", id);
+        //    m_log.LogWarning("[LOCAL ASSET SERVICES CONNECTOR]: Could not synchronously find asset with id {0}", id);
         }
 
         return asset;
@@ -169,7 +170,7 @@ public class LocalAssetServicesConnector : ISharedRegionModule, IAssetService
 
     public AssetBase GetCached(string id)
     {
-//            m_log.DebugFormat("[LOCAL ASSET SERVICES CONNECTOR]: Cache request for {0}", id);
+//            m_log.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Cache request for {0}", id);
 
         AssetBase asset = null;
         if (m_Cache != null)
@@ -203,7 +204,7 @@ public class LocalAssetServicesConnector : ISharedRegionModule, IAssetService
 
     public byte[] GetData(string id)
     {
-//            m_log.DebugFormat("[LOCAL ASSET SERVICES CONNECTOR]: Requesting data for asset {0}", id);
+//            m_log.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Requesting data for asset {0}", id);
 
         AssetBase asset = null;
 
@@ -229,7 +230,7 @@ public class LocalAssetServicesConnector : ISharedRegionModule, IAssetService
 
     public bool Get(string id, object sender, AssetRetrieved handler)
     {
-//            m_log.DebugFormat("[LOCAL ASSET SERVICES CONNECTOR]: Asynchronously requesting asset {0}", id);
+//            m_log.LogDebug("[LOCAL ASSET SERVICES CONNECTOR]: Asynchronously requesting asset {0}", id);
 
         if (m_Cache != null)
         {
@@ -257,7 +258,7 @@ public class LocalAssetServicesConnector : ISharedRegionModule, IAssetService
                     m_Cache.Cache(a);
             }
 //                if (null == a)
-//                    m_log.WarnFormat("[LOCAL ASSET SERVICES CONNECTOR]: Could not asynchronously find asset with id {0}", id);
+//                    m_log.LogWarning("[LOCAL ASSET SERVICES CONNECTOR]: Could not asynchronously find asset with id {0}", id);
 
             Util.FireAndForget(o => handler(assetID, s, a), null, "LocalAssetServiceConnector.GotFromServiceCallback");
         });
@@ -297,7 +298,7 @@ public class LocalAssetServicesConnector : ISharedRegionModule, IAssetService
                     m_Cache.Cache(a);
             }
             //if (null == a)
-            //.   m_log.WarnFormat("[LOCAL ASSET SERVICES CONNECTOR]: Could not asynchronously find asset with id {0}", id);
+            //.   m_log.LogWarning("[LOCAL ASSET SERVICES CONNECTOR]: Could not asynchronously find asset with id {0}", id);
 
             Util.FireAndForget(o => callBack(a), null, "LocalAssetServiceConnector.GotFromServiceCallback");
         });

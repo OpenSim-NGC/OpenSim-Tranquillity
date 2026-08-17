@@ -28,19 +28,20 @@
 // Dedicated to Quill Littlefeather
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
 
 class ServerReleaseNotesModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_enabled;
     private string m_ServerReleaseNotesURL;
@@ -65,7 +66,7 @@ class ServerReleaseNotesModule : ISharedRegionModule
             capURL.Equals("false", StringComparison.OrdinalIgnoreCase) ||
             capURL == "0")
         {
-            m_log.DebugFormat("[ServerReleaseNotesModule]: Cap_ServerReleaseNotes not enabled in config");
+            m_log.LogDebug("[ServerReleaseNotesModule]: Cap_ServerReleaseNotes not enabled in config");
             return;
         }
 
@@ -76,18 +77,18 @@ class ServerReleaseNotesModule : ISharedRegionModule
         m_ServerReleaseNotesURL = config.GetString("ServerReleaseNotesURL", m_ServerReleaseNotesURL);
         if (string.IsNullOrEmpty(m_ServerReleaseNotesURL))
         {
-            m_log.Error("[ServerReleaseNotesModule]: ServerReleaseNotesURL not configured. Cap disabled.");
+            m_log.LogError("[ServerReleaseNotesModule]: ServerReleaseNotesURL not configured. Cap disabled.");
             return;
         }
 
         if (!Uri.IsWellFormedUriString(m_ServerReleaseNotesURL, UriKind.Absolute))
         {
-            m_log.ErrorFormat("[ServerReleaseNotesModule]: Invalid ServerReleaseNotesURL '{0}'. Cap Disabled", m_ServerReleaseNotesURL);
+            m_log.LogError("[ServerReleaseNotesModule]: Invalid ServerReleaseNotesURL '{0}'. Cap Disabled", m_ServerReleaseNotesURL);
             return;
         }
 
         m_enabled = true;
-        m_log.InfoFormat("[ServerReleaseNotesModule]: Enabled. Redirecting ServerReleaseNotes cap to {0}", m_ServerReleaseNotesURL);
+        m_log.LogInformation("[ServerReleaseNotesModule]: Enabled. Redirecting ServerReleaseNotes cap to {0}", m_ServerReleaseNotesURL);
     }
 
     public void AddRegion(Scene scene)

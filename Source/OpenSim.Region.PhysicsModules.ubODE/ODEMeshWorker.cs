@@ -4,9 +4,10 @@
 
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModules.ubODE;
 
@@ -62,7 +63,7 @@ public class ODEPhysRepData
 
 public class ODEMeshWorker
 {
-    private readonly ILog m_log;
+    private readonly ILogger m_log;
     private readonly ODEScene m_scene;
     private readonly IMesher m_mesher;
 
@@ -77,7 +78,7 @@ public class ODEMeshWorker
 
     private readonly object m_threadLock = new();
 
-    public ODEMeshWorker(ODEScene pScene, ILog pLog, IMesher pMesher, IConfig pConfig)
+    public ODEMeshWorker(ODEScene pScene, ILogger pLog, IMesher pMesher, IConfig pConfig)
     {
         m_scene = pScene;
         m_log = pLog;
@@ -211,7 +212,7 @@ public class ODEMeshWorker
 
             if (vertexCount == 0 || indexCount == 0)
             {
-                m_log.WarnFormat("[PHYSICS]: Invalid mesh data on prim {0} mesh UUID {1}",
+                m_log.LogWarning("[PHYSICS]: Invalid mesh data on prim {0} mesh UUID {1}",
                     repData.actor.Name, repData.pbs.SculptTexture.ToString());
                 repData.meshState = MeshState.MeshFailed;
                 repData.hasOBB = false;
@@ -872,11 +873,11 @@ public class ODEMeshWorker
 public class ODEAssetRequest
 {
     private readonly ODEMeshWorker m_worker;
-    private readonly ILog m_log;
+    private readonly ILogger m_log;
     private readonly ODEPhysRepData repData;
 
     public ODEAssetRequest(ODEMeshWorker pWorker, RequestAssetDelegate provider,
-        ODEPhysRepData pRepData, ILog plog)
+        ODEPhysRepData pRepData, ILogger plog)
     {
         m_worker = pWorker;
         m_log = plog;
@@ -907,11 +908,11 @@ public class ODEAssetRequest
                 m_worker.AssetLoaded(repData);
             }
             else
-                m_log.WarnFormat("[PHYSICS]: asset provider returned invalid mesh data for prim {0} asset UUID {1}.",
+                m_log.LogWarning("[PHYSICS]: asset provider returned invalid mesh data for prim {0} asset UUID {1}.",
                     repData.actor.Name, asset.ID.ToString());
         }
         else
-            m_log.WarnFormat("[PHYSICS]: asset provider returned null asset for mesh of prim {0}.",
+            m_log.LogWarning("[PHYSICS]: asset provider returned null asset for mesh of prim {0}.",
                 repData.actor.Name);
     }
 }

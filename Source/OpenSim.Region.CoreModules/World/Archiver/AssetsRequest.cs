@@ -27,11 +27,12 @@
 
 using System.Reflection;
 using System.Timers;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization.External;
 using OpenSim.Services.Interfaces;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.World.Archiver;
 
@@ -40,7 +41,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver;
 /// </summary>
 class AssetsRequest
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Method called when all the necessary assets for an archive request have been received.
@@ -152,7 +153,7 @@ class AssetsRequest
                 {
                     if(!UUID.TryParse(thiskey, out UUID id) || id.IsZero())
                     {
-                        m_log.InfoFormat($"[ARCHIVER]: cannot save asset {kvp.Key} because it has Invalid UUID");
+                        m_log.LogInformation($"[ARCHIVER]: cannot save asset {kvp.Key} because it has Invalid UUID");
                         m_notFoundAssetUuids.Add(kvp.Key);
                         continue;
                     }
@@ -162,7 +163,7 @@ class AssetsRequest
                 sbyte assetType = kvp.Value;
                 if (assetType == (sbyte)AssetType.Unknown)
                 {
-                    m_log.InfoFormat("[ARCHIVER]: Rewriting broken asset type for {0} to {1}", thiskey, SLUtil.AssetTypeFromCode(assetType));
+                    m_log.LogInformation("[ARCHIVER]: Rewriting broken asset type for {0} to {1}", thiskey, SLUtil.AssetTypeFromCode(assetType));
                     asset.Type = assetType;
                 }
 
@@ -177,7 +178,7 @@ class AssetsRequest
 
             catch (Exception e)
             {
-                m_log.ErrorFormat("[ARCHIVER]: Execute failed with {0}", e);
+                m_log.LogError("[ARCHIVER]: Execute failed with {0}", e);
             }
         }
 
@@ -185,11 +186,11 @@ class AssetsRequest
         int totalerrors = m_notFoundAssetUuids.Count + m_previousErrorsCount;
 
         if(m_timeout)
-            m_log.DebugFormat("[ARCHIVER]: Aborted because AssetService request timeout. Successfully added {0} assets", m_foundAssetUuids.Count);
+            m_log.LogDebug("[ARCHIVER]: Aborted because AssetService request timeout. Successfully added {0} assets", m_foundAssetUuids.Count);
         else if(totalerrors == 0)
-            m_log.DebugFormat("[ARCHIVER]: Successfully added all {0} assets", m_foundAssetUuids.Count);
+            m_log.LogDebug("[ARCHIVER]: Successfully added all {0} assets", m_foundAssetUuids.Count);
         else
-            m_log.DebugFormat("[ARCHIVER]: Successfully added {0} assets ({1} of total possible assets requested were not found, were damaged or were not assets)",
+            m_log.LogDebug("[ARCHIVER]: Successfully added {0} assets ({1} of total possible assets requested were not found, were damaged or were not assets)",
                         m_foundAssetUuids.Count, totalerrors);
 
         GC.Collect();
@@ -218,7 +219,7 @@ class AssetsRequest
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[ARCHIVER]: Terminating archive creation since asset requster callback failed with {0}", e);
         }
     }
@@ -227,7 +228,7 @@ class AssetsRequest
     {
         if (asset.Type == (sbyte)AssetType.Object && asset.Data != null && m_options.ContainsKey("home"))
         {
-            //m_log.DebugFormat("[ARCHIVER]: Rewriting object data for {0}", asset.ID);
+            //m_log.LogDebug("[ARCHIVER]: Rewriting object data for {0}", asset.ID);
             string xml = ExternalRepresentationUtils.RewriteSOP(Utils.BytesToString(asset.Data), string.Empty, m_options["home"].ToString(), m_userAccountService, m_scopeID);
             asset.Data = Utils.StringToBytes(xml);
         }

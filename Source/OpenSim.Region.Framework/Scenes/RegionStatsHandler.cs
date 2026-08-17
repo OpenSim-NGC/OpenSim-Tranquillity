@@ -30,11 +30,13 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.Framework.Scenes;
 
 public class RegionStatsSimpleHandler : SimpleStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string osXStatsURI = String.Empty;
     //private string osSecret = String.Empty;
@@ -85,7 +87,7 @@ public class RegionStatsSimpleHandler : SimpleStreamHandler
 // legacy do not use. This will removed in future
 public class RegionStatsHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string osXStatsURI = String.Empty;
     //private string osSecret = String.Empty;

@@ -27,7 +27,6 @@
 
 using System.Collections;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -38,6 +37,8 @@ using OpenSim.Services.Interfaces;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OpenSim.Capabilities.Handlers;
 using OpenSim.Framework.Monitoring;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
 
@@ -53,7 +54,7 @@ public class WebFetchInvDescModule : INonSharedRegionModule
         public OSHttpRequest request;
     }
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Control whether requests will be processed asynchronously.
@@ -218,7 +219,7 @@ public class WebFetchInvDescModule : INonSharedRegionModule
 
     private class PollServiceInventoryEventArgs : PollServiceEventArgs
     {
-        //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private Dictionary<UUID, Hashtable> responses = new Dictionary<UUID, Hashtable>();
         private HashSet<UUID> dropedResponses = new HashSet<UUID>();

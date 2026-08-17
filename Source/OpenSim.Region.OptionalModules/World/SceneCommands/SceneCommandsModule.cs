@@ -31,6 +31,8 @@ using OpenSim.Framework.Console;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.OptionalModules.Avatar.Attachments;
 
 /// <summary>
@@ -38,7 +40,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Attachments;
 /// </summary>
 public class SceneCommandsModule : ISceneCommandsModule, INonSharedRegionModule
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_scene;
 
@@ -48,22 +50,22 @@ public class SceneCommandsModule : ISceneCommandsModule, INonSharedRegionModule
 
     public void Initialise(IConfigSource source)
     {
-//            m_log.DebugFormat("[SCENE COMMANDS MODULE]: INITIALIZED MODULE");
+//            m_log.LogDebug("[SCENE COMMANDS MODULE]: INITIALIZED MODULE");
     }
 
     public void PostInitialise()
     {
-//            m_log.DebugFormat("[SCENE COMMANDS MODULE]: POST INITIALIZED MODULE");
+//            m_log.LogDebug("[SCENE COMMANDS MODULE]: POST INITIALIZED MODULE");
     }
 
     public void Close()
     {
-//            m_log.DebugFormat("[SCENE COMMANDS MODULE]: CLOSED MODULE");
+//            m_log.LogDebug("[SCENE COMMANDS MODULE]: CLOSED MODULE");
     }
 
     public void AddRegion(Scene scene)
     {
-//            m_log.DebugFormat("[SCENE COMMANDS MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[SCENE COMMANDS MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
 
         m_scene = scene;
 
@@ -72,12 +74,12 @@ public class SceneCommandsModule : ISceneCommandsModule, INonSharedRegionModule
 
     public void RemoveRegion(Scene scene)
     {
-//            m_log.DebugFormat("[SCENE COMMANDS MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[SCENE COMMANDS MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
     }
 
     public void RegionLoaded(Scene scene)
     {
-//            m_log.DebugFormat("[ATTACHMENTS COMMAND MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[ATTACHMENTS COMMAND MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
 
         scene.AddCommand(
             "Debug", this, "debug scene get",

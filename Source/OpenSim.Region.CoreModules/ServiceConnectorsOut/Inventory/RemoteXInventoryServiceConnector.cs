@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
@@ -35,12 +34,13 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Inventory;
 
 public class RemoteXInventoryServicesConnector : ISharedRegionModule, IInventoryService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Scene used by this module.  This currently needs to be publicly settable for HGInventoryBroker.
@@ -60,7 +60,7 @@ public class RemoteXInventoryServicesConnector : ISharedRegionModule, IInventory
                 m_UserManager = Scene.RequestModuleInterface<IUserManagement>();
 
                 if (m_UserManager == null)
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[XINVENTORY CONNECTOR]: Could not retrieve IUserManagement module from {0}",
                         Scene.RegionInfo.RegionName);
             }
@@ -111,7 +111,7 @@ public class RemoteXInventoryServicesConnector : ISharedRegionModule, IInventory
                 Init(source);
                 m_Enabled = true;
 
-                m_log.Info("[XINVENTORY CONNECTOR]: Remote XInventory enabled");
+                m_log.LogInformation("[XINVENTORY CONNECTOR]: Remote XInventory enabled");
             }
         }
     }
@@ -127,7 +127,7 @@ public class RemoteXInventoryServicesConnector : ISharedRegionModule, IInventory
     public void AddRegion(Scene scene)
     {
 //            m_Scene = scene;
-        //m_log.Debug("[XXXX] Adding scene " + m_Scene.RegionInfo.RegionName);
+        //m_log.LogDebug("[XXXX] Adding scene " + m_Scene.RegionInfo.RegionName);
 
         if (!m_Enabled)
             return;
@@ -149,7 +149,7 @@ public class RemoteXInventoryServicesConnector : ISharedRegionModule, IInventory
         if (!m_Enabled)
             return;
 
-        m_log.InfoFormat("[XINVENTORY CONNECTOR]: Enabled remote XInventory for region {0}", scene.RegionInfo.RegionName);
+        m_log.LogInformation("[XINVENTORY CONNECTOR]: Enabled remote XInventory for region {0}", scene.RegionInfo.RegionName);
 
     }
 
@@ -289,10 +289,10 @@ public class RemoteXInventoryServicesConnector : ISharedRegionModule, IInventory
 
     public  InventoryItemBase GetItem(UUID userID, UUID itemID)
     {
-        //m_log.DebugFormat("[XINVENTORY CONNECTOR]: GetItem {0}", item.ID);
+        //m_log.LogDebug("[XINVENTORY CONNECTOR]: GetItem {0}", item.ID);
 
         if (m_RemoteConnector == null)
-            m_log.DebugFormat("[XINVENTORY CONNECTOR]: connector stub is null!!!");
+            m_log.LogDebug("[XINVENTORY CONNECTOR]: connector stub is null!!!");
         return m_RemoteConnector.GetItem(userID, itemID);
     }
 
@@ -306,7 +306,7 @@ public class RemoteXInventoryServicesConnector : ISharedRegionModule, IInventory
 
     public  InventoryFolderBase GetFolder(UUID userID, UUID folderID)
     {
-        //m_log.DebugFormat("[XINVENTORY CONNECTOR]: GetFolder {0}", folder.ID);
+        //m_log.LogDebug("[XINVENTORY CONNECTOR]: GetFolder {0}", folder.ID);
 
         return m_RemoteConnector.GetFolder(userID, folderID);
     }

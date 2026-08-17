@@ -33,7 +33,7 @@ using OpenSim.Region.Framework.Interfaces;
 
 using OpenMetaverse;
 
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes;
 
@@ -44,7 +44,7 @@ public class TerrainChannel : ITerrainChannel
 {
     const string LogHeader = "[TERRAIN CHANNEL]: ";
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected TerrainData m_terrainData;
 
@@ -220,7 +220,7 @@ public class TerrainChannel : ITerrainChannel
     // ITerrainChannel.Merge
     public void Merge(ITerrainChannel newTerrain, Vector3 displacement, float radianRotation, Vector2 rotationDisplacement)
     {
-        m_log.DebugFormat(LogHeader + "{0} Merge. inSize=<{1},{2}>, disp={3}, rot={4}, rotDisp={5}, outSize=<{6},{7}>", LogHeader,
+        m_log.LogDebug(LogHeader + "{0} Merge. inSize=<{1},{2}>, disp={3}, rot={4}, rotDisp={5}, outSize=<{6},{7}>", LogHeader,
                                     newTerrain.Width, newTerrain.Height,
                                     displacement, radianRotation, rotationDisplacement,
                                     m_terrainData.SizeX, m_terrainData.SizeY);
@@ -308,7 +308,7 @@ public class TerrainChannel : ITerrainChannel
     /// <param name="boundingSize">&lt;x, y&gt;</param>
     public void MergeWithBounding(ITerrainChannel newTerrain, Vector3 displacement, float rotationDegrees, Vector2 boundingOrigin, Vector2 boundingSize)
     {
-        m_log.DebugFormat(LogHeader + "{0} MergeWithBounding: inSize=<{1},{2}>, rot={3}, boundingOrigin={4}, boundingSize={5}, disp={6}, outSize=<{7},{8}>",
+        m_log.LogDebug(LogHeader + "{0} MergeWithBounding: inSize=<{1},{2}>, rot={3}, boundingOrigin={4}, boundingSize={5}, disp={6}, outSize=<{7},{8}>",
                             LogHeader, newTerrain.Width, newTerrain.Height, rotationDegrees, boundingOrigin.ToString(),
                             boundingSize.ToString(), displacement, m_terrainData.SizeX, m_terrainData.SizeY);
 
@@ -377,7 +377,7 @@ public class TerrainChannel : ITerrainChannel
                     }
                     catch (Exception)   //just in case we've still not taken care of every way the arrays might go out of bounds! ;)
                     {
-                        m_log.DebugFormat(LogHeader + "{0} MergeWithBounding - Rotate: Out of Bounds sx={1} sy={2} dx={3} dy={4}", sx, sy, x, y);
+                        m_log.LogDebug(LogHeader + "{0} MergeWithBounding - Rotate: Out of Bounds sx={1} sy={2} dx={3} dy={4}", sx, sy, x, y);
                     }
                 }
             }
@@ -407,7 +407,7 @@ public class TerrainChannel : ITerrainChannel
         if (endY > tmpY) endY = tmpY;
         if (endY < 0) endY = 0;
 
-        //m_log.DebugFormat("{0} MergeWithBounding: inSize=<{1},{2}>, disp=<{3},{4}> rot={5}, offset=<{6},{7}>, boundingStart=<{8},{9}>, boundingEnd=<{10},{11}>, cosR={12}, sinR={13}, outSize=<{14},{15}>", LogHeader,
+        //m_log.LogDebug("{0} MergeWithBounding: inSize=<{1},{2}>, disp=<{3},{4}> rot={5}, offset=<{6},{7}>, boundingStart=<{8},{9}>, boundingEnd=<{10},{11}>, cosR={12}, sinR={13}, outSize=<{14},{15}>", LogHeader,
         //                            baseX, baseY, dispX, dispY, radianRotation, offsetX, offsetY, startX, startY, endX, endY, cosR, sinR, newX, newY);
 
         int dx, dy;
@@ -426,7 +426,7 @@ public class TerrainChannel : ITerrainChannel
                     }
                     catch (Exception)   //just in case we've still not taken care of every way the arrays might go out of bounds! ;)
                     {
-                        m_log.DebugFormat(LogHeader + "{0} MergeWithBounding - Bound & Displace: Out of Bounds sx={1} sy={2} dx={3} dy={4}", x, y, dx, dy);
+                        m_log.LogDebug(LogHeader + "{0} MergeWithBounding - Bound & Displace: Out of Bounds sx={1} sy={2} dx={3} dy={4}", x, y, dx, dy);
                     }
                 }
             }

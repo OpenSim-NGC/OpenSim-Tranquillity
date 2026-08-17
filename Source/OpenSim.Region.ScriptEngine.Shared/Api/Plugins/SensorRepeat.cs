@@ -31,11 +31,13 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
 
 public class SensorRepeat
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Used by one-off and repeated sensors
@@ -488,7 +490,7 @@ public class SensorRepeat
 
         Action<ScenePresence> senseEntity = new(presence =>
         {
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[SENSOR REPEAT]: Inspecting scene presence {0}, type {1} on sensor sweep for {2}, type {3}",
             //    presence.Name, presence.PresenceType, ts.name, ts.type);
 
@@ -497,7 +499,7 @@ public class SensorRepeat
                 INPC npcData = m_npcModule.GetNPC(presence.UUID, presence.Scene);
                 if (npcData is null || !npcData.SenseAsAgent)
                 {
-                    //m_log.DebugFormat(
+                    //m_log.LogDebug(
                     //    "[SENSOR REPEAT]: Discarding NPC {0} from agent sense sweep for script item id {1}",
                     //    presence.Name, ts.itemID);
                     return;
@@ -515,7 +517,7 @@ public class SensorRepeat
                     INPC npcData = m_npcModule.GetNPC(presence.UUID, presence.Scene);
                     if (npcData is not null && npcData.SenseAsAgent)
                     {
-                        //m_log.DebugFormat(
+                        //m_log.LogDebug(
                         //    "[SENSOR REPEAT]: Discarding NPC {0} from non-agent sense sweep for script item id {1}",
                         //    presence.Name, ts.itemID);
                         return;

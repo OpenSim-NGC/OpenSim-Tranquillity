@@ -25,20 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
 
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage;
 
 public class PresenceModule : ISharedRegionModule, IPresenceModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
 #pragma warning disable 0067
@@ -119,7 +119,7 @@ public class PresenceModule : ISharedRegionModule, IPresenceModule
             return;
 
         IClientAPI client = (IClientAPI)sender;
-        m_log.DebugFormat("[PRESENCE MODULE]: OnlineNotification requested by {0}", client.Name);
+        m_log.LogDebug("[PRESENCE MODULE]: OnlineNotification requested by {0}", client.Name);
 
         PresenceInfo[] status = PresenceService.GetAgents(args.ToArray());
 

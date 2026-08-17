@@ -28,7 +28,6 @@
 using System.Reflection;
 using System.Text;
 using System.Xml;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -37,6 +36,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.CoreModules.Avatar.Attachments;
@@ -44,7 +44,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments;
 public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
 {
     #region INonSharedRegionModule
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public int DebugLevel { get; set; }
 
@@ -116,7 +116,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             m_scene.EventManager.OnNewClient -= SubscribeToClientEvents;
             m_scene.EventManager.OnStartScript -= OnScriptStarted;
             m_scene.EventManager.OnStopScript -= OnScriptStopped;
-            m_log.WarnFormat("[ATTACHMENTS MODULE]: InventoryService unvailable!. Module disabled");
+            m_log.LogWarning("[ATTACHMENTS MODULE]: InventoryService unvailable!. Module disabled");
             return;
         }
 
@@ -390,27 +390,27 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
 
         if (sp.Appearance is null)
         {
-            m_log.Warn($"[ATTACHMENTS MODULE]: Appearance has not been initialized for agent {sp.UUID}");
+            m_log.LogWarning($"[ATTACHMENTS MODULE]: Appearance has not been initialized for agent {sp.UUID}");
             return;
         }
 
         if (sp.GetAttachmentsCount() > 0)
         {
             if (DebugLevel > 0)
-                m_log.Debug(
+                m_log.LogDebug(
                     $"[ATTACHMENTS MODULE]: Not doing attachment rez for {sp.Name} in {m_scene.Name} as their viewer has already rezzed attachments");
               return;
         }
 
         if (DebugLevel > 0)
-            m_log.Debug($"[ATTACHMENTS MODULE]: Rezzing any attachments for {sp.Name} from simulator-side");
+            m_log.LogDebug($"[ATTACHMENTS MODULE]: Rezzing any attachments for {sp.Name} from simulator-side");
 
         Dictionary<UUID, string> itemData = new();
         IAttachmentsService attServ = m_scene.RequestModuleInterface<IAttachmentsService>();
         if (attServ is not null)
         {
             // old avination service that was never donated
-            m_log.Debug("[ATTACHMENT]: Loading attachment data from attachment service");
+            m_log.LogDebug("[ATTACHMENT]: Loading attachment data from attachment service");
             string stateData = attServ.Get(sp.UUID.ToString());
             if (!string.IsNullOrEmpty(stateData))
             {
@@ -446,7 +446,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
                     continue;
                 uint attachmentPt = (uint)attach.AttachPoint;
 
-                //m_log.DebugFormat(
+                //m_log.LogDebug(
                 //    "[ATTACHMENTS MODULE]: Doing initial rez of attachment with itemID {0}, assetID {1}, point {2} for {3} in {4}",
                 //    attach.ItemID, attach.AssetID, p, sp.Name, m_scene.RegionInfo.RegionName);
 
@@ -457,7 +457,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
                     {
                         d = new XmlDocument();
                         d.LoadXml(xmlData);
-                        m_log.Info($"[ATTACHMENT]: Found saved state for item {attach.ItemID}, loading it");
+                        m_log.LogInformation($"[ATTACHMENT]: Found saved state for item {attach.ItemID}, loading it");
                     }
 
                     // If we're an NPC then skip all the item checks and manipulations since we don't have an
@@ -467,7 +467,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
                 catch (Exception e)
                 {
                     UUID agentId = (sp.ControllingClient is null) ? UUID.Zero : sp.ControllingClient.AgentId;
-                    m_log.ErrorFormat("[ATTACHMENTS MODULE]: Unable to rez attachment with itemID {0}, assetID {1}, point {2} for {3}: {4}\n{5}",
+                    m_log.LogError("[ATTACHMENTS MODULE]: Unable to rez attachment with itemID {0}, assetID {1}, point {2} for {3}: {4}\n{5}",
                         attach.ItemID, attach.AssetID, attachmentPt, agentId, e.Message, e.StackTrace);
                 }
             }
@@ -488,13 +488,13 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
                 InventoryItemBase attItem = attItems[indx];
                 if(attItem is null)
                 {
-                    m_log.Error($"[ATTACHMENTS MODULE]: inventory item {items[indx]} not found, removing from {sp.Name} appearance");
+                    m_log.LogError($"[ATTACHMENTS MODULE]: inventory item {items[indx]} not found, removing from {sp.Name} appearance");
                     sp.Appearance.RemoveAttachment(attachments[indx].AttachPoint, items[indx]);
                     continue;
                 }
                 if (attItem.Owner.NotEqual(sp.UUID))
                 {
-                    m_log.Error($"[ATTACHMENTS MODULE]: inventory item {items[indx]} has wrong owner, removing from {sp.Name} appearance");
+                    m_log.LogError($"[ATTACHMENTS MODULE]: inventory item {items[indx]} has wrong owner, removing from {sp.Name} appearance");
                     sp.Appearance.RemoveAttachment(attachments[indx].AttachPoint, items[indx]);
                     continue;
                 }
@@ -502,7 +502,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
                 AvatarAttachment attach = attachments[indx];
                 uint attachmentPt = (uint)attach.AttachPoint;
 
-                //m_log.DebugFormat(
+                //m_log.LogDebug(
                 //    "[ATTACHMENTS MODULE]: Doing initial rez of attachment with itemID {0}, assetID {1}, point {2} for {3} in {4}",
                 //    attach.ItemID, attach.AssetID, p, sp.Name, m_scene.RegionInfo.RegionName);
 
@@ -513,7 +513,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
                     {
                         d = new XmlDocument();
                         d.LoadXml(xmlData);
-                        m_log.Info($"[ATTACHMENT]: Found saved state for item {attach.ItemID}, loading it");
+                        m_log.LogInformation($"[ATTACHMENT]: Found saved state for item {attach.ItemID}, loading it");
                     }
 
                     // If we're an NPC then skip all the item checks and manipulations since we don't have an
@@ -523,7 +523,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
                 catch (Exception e)
                 {
                     UUID agentId = (sp.ControllingClient is null) ? UUID.Zero : sp.ControllingClient.AgentId;
-                    m_log.ErrorFormat("[ATTACHMENTS MODULE]: Unable to rez attachment with itemID {0}, assetID {1}, point {2} for {3}: {4}\n{5}",
+                    m_log.LogError("[ATTACHMENTS MODULE]: Unable to rez attachment with itemID {0}, assetID {1}, point {2} for {3}: {4}\n{5}",
                         attach.ItemID, attach.AssetID, attachmentPt, agentId, e.Message, e.StackTrace);
                 }
             }
@@ -538,7 +538,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
         List<SceneObjectGroup> attachments = sp.GetAttachments();
 
         if (DebugLevel > 0)
-            m_log.Debug(
+            m_log.LogDebug(
                 $"[ATTACHMENTS MODULE]: Saving {attachments.Count} attachments for {sp.Name} in {m_scene.Name}");
 
         if (attachments.Count <= 0)
@@ -566,7 +566,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             return;
 
         if (DebugLevel > 0)
-            m_log.Debug(
+            m_log.LogDebug(
                 $"[ATTACHMENTS MODULE]: Deleting {sp.Name} attachments from scene {m_scene.Name}, silent = {silent}");
 
         List<SceneObjectGroup> attachments = sp.GetAttachments();
@@ -600,14 +600,14 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
     private bool AttachObjectInternal(IScenePresence sp, SceneObjectGroup group, uint attachmentPt,
             bool silent, bool addToInventory, bool resumeScripts, bool append, UUID experience)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //      "[ATTACHMENTS MODULE]: Attaching object {0} {1} to {2} point {3} from ground (silent = {4})",
         //      group.Name, group.LocalId, sp.Name, attachmentPt, silent);
         int sittingAvs = group.GetSittingAvatarsCount(); 
         if (sittingAvs > 0)
         {
             if (DebugLevel > 0)
-                m_log.Warn(
+                m_log.LogWarning(
                     $"[ATTACHMENTS MODULE]: Ignoring request to attach {group.Name}({group.UUID}) to {sp.Name} at point {attachmentPt} since {sittingAvs} avatars are still sitting on it");
             return false;
         }
@@ -657,7 +657,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
 
         if(attachmentPt > (uint)AttachmentPoint.LastValid)
         {
-            m_log.Warn($"[ATTACHMENTS MODULE]: Invalid attachment point {attachmentPt} SP {sp.Name}");
+            m_log.LogWarning($"[ATTACHMENTS MODULE]: Invalid attachment point {attachmentPt} SP {sp.Name}");
             return false;
         }
 
@@ -671,7 +671,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             if (group.UUID.Equals(sog.UUID))
             {
                 // if (DebugLevel > 0)
-                // m_log.WarnFormat(
+                // m_log.LogWarning(
                 //      "[ATTACHMENTS MODULE]: Ignoring request to attach {0} {1} to {2} on {3} since it's already attached",
                 //      group.Name, group.LocalId, sp.Name, attachmentPt);
                 return false;
@@ -689,7 +689,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
 
         if(attachments.Count - toRemove.Count >= Constants.MaxAgentAttachments)
         {
-            m_log.Warn($"[ATTACHMENTS MODULE]: Max attachments exceded {sp.Name}");
+            m_log.LogWarning($"[ATTACHMENTS MODULE]: Max attachments exceded {sp.Name}");
             return false;
         }
 
@@ -753,7 +753,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             return null;
 
         if (DebugLevel > 0)
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ATTACHMENTS MODULE]: RezSingleAttachmentFromInventory to point {0} from item {1} for {2} in {3}",
                 (AttachmentPoint)AttachmentPt, itemID, sp.Name, m_scene.Name);
 
@@ -775,7 +775,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
         if (alreadyOn)
         {
             if (DebugLevel > 0)
-                m_log.Debug(
+                m_log.LogDebug(
                     $"[ATTACHMENTS MODULE]: Ignoring request by {sp.Name} to wear item {itemID} at {AttachmentPt} since it is already worn");
             return null;
         }
@@ -792,7 +792,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             return;
 
         if (DebugLevel > 0)
-            m_log.Debug(
+            m_log.LogDebug(
                 $"[ATTACHMENTS MODULE]: Rezzing {rezlist.Count} attachments from inventory for {sp.Name} in {m_scene.Name}");
 
         foreach (KeyValuePair<UUID, uint> rez in rezlist)
@@ -816,7 +816,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             return;
 
         if (DebugLevel > 0)
-            m_log.Debug(
+            m_log.LogDebug(
                 $"[ATTACHMENTS MODULE]: DetachSingleAttachmentToGround() for {sp.UUID}, object {soLocalId}");
 
         SceneObjectGroup so = m_scene.GetGroupByPrim(soLocalId);
@@ -833,7 +833,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             return;
 
         if (DebugLevel > 0)
-            m_log.Debug(
+            m_log.LogDebug(
                 $"[ATTACHMENTS MODULE]: In DetachSingleAttachmentToGround(), object is {so.Name} {so.LocalId}, associated item is {inventoryID}");
 
         lock (sp.AttachmentsSyncLock)
@@ -893,7 +893,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
     {
         if (so.AttachedAvatar.NotEqual(sp.UUID))
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[ATTACHMENTS MODULE]: Tried to detach object {0} from {1} {2} but attached avatar id was {3} in {4}",
                 so.Name, sp.Name, sp.UUID, so.AttachedAvatar, m_scene.RegionInfo.RegionName);
 
@@ -925,7 +925,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
         }
 
         if (DebugLevel > 0)
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ATTACHMENTS MODULE]: Detaching object {0} {1} (FromItemID {2}) for {3} in {4}",
                 so.Name, so.LocalId, so.FromItemID, sp.Name, m_scene.Name);
 
@@ -940,7 +940,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
         lock (sp.AttachmentsSyncLock)
         {
             // Save avatar attachment information
-            //m_log.Debug("[ATTACHMENTS MODULE]: Detaching from UserID: " + sp.UUID + ", ItemID: " + itemID);
+            //m_log.LogDebug("[ATTACHMENTS MODULE]: Detaching from UserID: " + sp.UUID + ", ItemID: " + itemID);
 
             bool changed = sp.Appearance.DetachAttachment(so.FromItemID);
             if (changed && m_scene.AvatarFactory is not null)
@@ -1006,7 +1006,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
         {
             if (DebugLevel > 0)
             {
-                m_log.Debug(
+                m_log.LogDebug(
                     $"[ATTACHMENTS MODULE]: Don't need to update asset for unchanged attachment {grp.UUID}, attachpoint {grp.AttachmentPoint}");
             }
             return;
@@ -1028,14 +1028,14 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             return;
         }
 
-        m_log.Debug($"[ATTACHMENTS MODULE]: Updating asset for attachment {grp.UUID}, attachpoint {grp.AttachmentPoint}");
+        m_log.LogDebug($"[ATTACHMENTS MODULE]: Updating asset for attachment {grp.UUID}, attachpoint {grp.AttachmentPoint}");
 
         InventoryItemBase item = m_scene.InventoryService.GetItem(sp.UUID, grp.FromItemID);
         if (item is not null)
         {
             if (item.Owner.NotEqual(sp.UUID))
             {
-                m_log.Debug($"[ATTACHMENTS MODULE]: Updating asset for attachment owner mismach: agent {sp.UUID}, owner{item.Owner}");
+                m_log.LogDebug($"[ATTACHMENTS MODULE]: Updating asset for attachment owner mismach: agent {sp.UUID}, owner{item.Owner}");
                 return;
             }
 
@@ -1097,7 +1097,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
     private void AttachToAgent(IScenePresence sp, SceneObjectGroup so, uint attachmentpoint, Vector3 attachOffset, bool silent, UUID experience)
     {
         if (DebugLevel > 0)
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ATTACHMENTS MODULE]: Adding attachment {0} to avatar {1} at pt {2} pos {3} {4} in {5}",
                 so.Name, sp.Name, attachmentpoint, attachOffset, so.RootPart.AttachedPos, m_scene.Name);
 
@@ -1131,7 +1131,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             if (so.HasPrivateAttachmentPoint)
             {
                 if (DebugLevel > 0)
-                    m_log.Debug(
+                    m_log.LogDebug(
                         $"[ATTACHMENTS MODULE]: Killing private HUD {so.Name} for avatars other than {sp.Name} at attachment point {so.AttachmentPoint}");
 
                 // As this scene object can now only be seen by the attaching avatar, tell everybody else in the
@@ -1167,7 +1167,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             return null;
 
         if (DebugLevel > 0)
-            m_log.Debug(
+            m_log.LogDebug(
                 $"[ATTACHMENTS MODULE]: Called AddSceneObjectAsAttachment for object {grp.Name} {grp.LocalId} for {sp.Name}");
 
         InventoryItemBase newItem = m_invAccessModule.CopyToInventory(
@@ -1287,11 +1287,11 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
         {
             if(ItemIDNotZero)
             {
-                m_log.Warn($"[ATTACHMENTS MODULE]: did not attach item {itemID} to avatar {sp.Name} at point {attachmentPt}");
+                m_log.LogWarning($"[ATTACHMENTS MODULE]: did not attach item {itemID} to avatar {sp.Name} at point {attachmentPt}");
             }
             else
             {
-                m_log.Warn($"[ATTACHMENTS MODULE]: did not attach item with asset {assetID} to avatar {sp.Name} at point {attachmentPt}");
+                m_log.LogWarning($"[ATTACHMENTS MODULE]: did not attach item with asset {assetID} to avatar {sp.Name} at point {attachmentPt}");
             }
 
             return null;
@@ -1306,7 +1306,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
         }
 
         if (DebugLevel > 0)
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ATTACHMENTS MODULE]: Rezzed single object {0} with {1} prims for attachment to {2} on point {3} in {4}",
                 objatt.Name, objatt.PrimCount, sp.Name, attachmentPt, m_scene.Name);
 
@@ -1335,7 +1335,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.Error(
+            m_log.LogError(
                 $"[ATTACHMENTS MODULE]: Failed to attach {objatt.Name} {objatt.UUID} for {sp.Name}, Error: {e.Message}");
             doneAttach = false;
         }
@@ -1365,19 +1365,19 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
     /// <param name="att"></param>
     private void ShowAttachInUserInventory(IScenePresence sp, uint AttachmentPt, UUID itemID, SceneObjectGroup att, bool append)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[USER INVENTORY]: Updating attachment {0} for {1} at {2} using item ID {3}",
         //    att.Name, sp.Name, AttachmentPt, itemID);
 
         if (itemID.IsZero())
         {
-            m_log.Error("[ATTACHMENTS MODULE]: Unable to save attachment. Error inventory item ID");
+            m_log.LogError("[ATTACHMENTS MODULE]: Unable to save attachment. Error inventory item ID");
             return;
         }
 
         if (AttachmentPt == 0)
         {
-            m_log.Error("[ATTACHMENTS MODULE]: Unable to save attachment. Error attachment point");
+            m_log.LogError("[ATTACHMENTS MODULE]: Unable to save attachment. Error attachment point");
             return;
         }
 
@@ -1390,7 +1390,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
         if (changed && m_scene.AvatarFactory is not null)
         {
             if (DebugLevel > 0)
-                m_log.Debug(
+                m_log.LogDebug(
                     $"[ATTACHMENTS MODULE]: Queueing appearance save for {sp.Name}, attachment {att.Name} point {AttachmentPt}");
 
             m_scene.AvatarFactory.QueueAppearanceSave(sp.UUID);
@@ -1404,12 +1404,12 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
     private ISceneEntity Client_OnRezSingleAttachmentFromInv(IClientAPI remoteClient, UUID itemID, uint AttachmentPt)
     {
         if (DebugLevel > 0)
-            m_log.Debug(
+            m_log.LogDebug(
                 $"[ATTACHMENTS MODULE]: Rezzing attachment to point {(AttachmentPoint)AttachmentPt} from item {itemID} for {remoteClient.Name}");
 
         if (remoteClient.SceneAgent is not ScenePresence sp)
         {
-            m_log.Error(
+            m_log.LogError(
                 $"[ATTACHMENTS MODULE]: Could not find presence {remoteClient.Name} {remoteClient.AgentId} in RezSingleAttachmentFromInventory()");
             return null;
         }
@@ -1422,7 +1422,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
         if (remoteClient.SceneAgent is ScenePresence sp)
             RezMultipleAttachmentsFromInventory(sp, rezlist);
         else
-            m_log.ErrorFormat(
+            m_log.LogError(
                 $"[ATTACHMENTS MODULE]: Could not find presence {remoteClient.Name} {remoteClient.AgentId} in RezMultipleAttachmentsFromInventory()");
     }
 
@@ -1432,14 +1432,14 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             return;
 
         if (DebugLevel > 0)
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 $"[ATTACHMENTS MODULE]: Attaching object with localid {objectLocalID} to {remoteClient.Name} point {AttachmentPt} from ground (silent = {silent})");
 
         try
         {
             if(remoteClient.SceneAgent is not ScenePresence sp)
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     $"[ATTACHMENTS MODULE]: Could not find presence {remoteClient.Name} {remoteClient.AgentId}");
                 return;
             }
@@ -1464,7 +1464,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             if (AttachObject(sp, group , AttachmentPt, false, true, append, UUID.Zero))
             {
                 if (DebugLevel > 0)
-                    m_log.Debug(
+                    m_log.LogDebug(
                         $"[ATTACHMENTS MODULE]: Saving avatar attachment. AgentID: {remoteClient.AgentId}, AttachmentPoint: {AttachmentPt}");
 
                 // Save avatar attachment information
@@ -1473,7 +1473,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.Error($"[ATTACHMENTS MODULE]: exception upon Attach Object {e.Message}");
+            m_log.LogError($"[ATTACHMENTS MODULE]: exception upon Attach Object {e.Message}");
         }
     }
 

@@ -31,12 +31,14 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Agent.AssetTransaction;
 
 public class AssetTransactionModule : INonSharedRegionModule,
         IAgentAssetTransactions
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected Scene m_Scene;
     private bool m_dumpAssetsToFile = false;
@@ -128,7 +130,7 @@ public class AssetTransactionModule : INonSharedRegionModule,
     /// <param name="userID"></param>
     public void RemoveAgentAssetTransactions(UUID userID)
     {
-        // m_log.DebugFormat("Removing agent asset transactions structure for agent {0}", userID);
+        // m_log.LogDebug("Removing agent asset transactions structure for agent {0}", userID);
 
         lock (AgentTransactions)
         {
@@ -157,7 +159,7 @@ public class AssetTransactionModule : INonSharedRegionModule,
             string description, string name, sbyte invType,
             sbyte type, byte wearableType, uint nextOwnerMask)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[TRANSACTIONS MANAGER] Called HandleItemCreationFromTransaction with item {0}", name);
 
         AgentAssetTransactions transactions = GetUserTransactions(remoteClient.AgentId);
@@ -182,7 +184,7 @@ public class AssetTransactionModule : INonSharedRegionModule,
     public void HandleItemUpdateFromTransaction(IClientAPI remoteClient,
             UUID transactionID, InventoryItemBase item)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[ASSET TRANSACTION MODULE]: Called HandleItemUpdateFromTransaction with item {0}",
 //                item.Name);
 
@@ -207,7 +209,7 @@ public class AssetTransactionModule : INonSharedRegionModule,
     public void HandleTaskItemUpdateFromTransaction(
         IClientAPI remoteClient, SceneObjectPart part, UUID transactionID, TaskInventoryItem item)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[ASSET TRANSACTION MODULE]: Called HandleTaskItemUpdateFromTransaction with item {0} in {1} for {2} in {3}",
 //                item.Name, part.Name, remoteClient.Name, m_Scene.RegionInfo.RegionName);
 
@@ -231,7 +233,7 @@ public class AssetTransactionModule : INonSharedRegionModule,
             UUID assetID, UUID transactionID, sbyte type, byte[] data,
             bool storeLocal, bool tempFile)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[ASSET TRANSACTION MODULE]: HandleUDPUploadRequest - assetID: {0}, transaction {1}, type {2}, storeLocal {3}, tempFile {4}, data.Length {5}",
 //                assetID, transactionID, type, storeLocal, tempFile, data.Length);
 
@@ -284,7 +286,7 @@ public class AssetTransactionModule : INonSharedRegionModule,
     public void HandleXfer(IClientAPI remoteClient, ulong xferID,
             uint packetID, byte[] data)
     {
-//            m_log.Debug("xferID: " + xferID + "  packetID: " + packetID + "  data length " + data.Length);
+//            m_log.LogDebug("xferID: " + xferID + "  packetID: " + packetID + "  data length " + data.Length);
         AgentAssetTransactions transactions = GetUserTransactions(remoteClient.AgentId);
 
         transactions.HandleXfer(xferID, packetID, data);

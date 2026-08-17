@@ -39,6 +39,7 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Region.PhysicsModules.SharedBase;
+using Microsoft.Extensions.Logging;
 using Timer = System.Timers.Timer;
 using TPFlags = OpenSim.Framework.Constants.TeleportFlags;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
@@ -127,7 +128,7 @@ public partial class Scene : SceneBase
             {
                 if (!value)
                 {
-                    m_log.Info("Stopping all Scripts in Scene");
+                    m_log.LogInformation("Stopping all Scripts in Scene");
 
                     EntityBase[] entities = Entities.GetEntities();
                     foreach (EntityBase ent in entities)
@@ -138,7 +139,7 @@ public partial class Scene : SceneBase
                 }
                 else
                 {
-                    m_log.Info("Starting all Scripts in Scene");
+                    m_log.LogInformation("Starting all Scripts in Scene");
 
                     EntityBase[] entities = Entities.GetEntities();
                     foreach (EntityBase ent in entities)
@@ -896,7 +897,7 @@ public partial class Scene : SceneBase
         {
             EstateSettings es = estateDataService.LoadEstateSettings(RegionInfo.RegionID, false);
             if (es == null)
-                m_log.Error($"[SCENE]: Region {Name} failed to load estate settings. Using defaults");
+                m_log.LogError($"[SCENE]: Region {Name} failed to load estate settings. Using defaults");
             RegionInfo.EstateSettings = es;
         }
 
@@ -949,7 +950,7 @@ public partial class Scene : SceneBase
 
             UseBackup = startupConfig.GetBoolean("UseSceneBackup", UseBackup);
             if (!UseBackup)
-                m_log.Info($"[SCENE]: Backup has been disabled for {RegionInfo.RegionName}");
+                m_log.LogInformation($"[SCENE]: Backup has been disabled for {RegionInfo.RegionName}");
 
             //Animation states
             m_useFlySlow = startupConfig.GetBoolean("enableflyslow", false);
@@ -1025,7 +1026,7 @@ public partial class Scene : SceneBase
             m_persistAfter *= 10000000;
 
             m_defaultScriptEngine = startupConfig.GetString("DefaultScriptEngine", "YEngine");
-            m_log.InfoFormat("[SCENE]: Default script engine {0}", m_defaultScriptEngine);
+            m_log.LogInformation("[SCENE]: Default script engine {0}", m_defaultScriptEngine);
 
             m_strictAccessControl = startupConfig.GetBoolean("StrictAccessControl", m_strictAccessControl);
             m_seeIntoBannedRegion = startupConfig.GetBoolean("SeeIntoBannedRegion", m_seeIntoBannedRegion);
@@ -1038,7 +1039,7 @@ public partial class Scene : SceneBase
             if (m_generateMaptiles)
             {
                 int maptileRefresh = Util.GetConfigVarFromSections<int>(config, "MaptileRefresh", possibleMapConfigSections, 0);
-                m_log.InfoFormat("[SCENE]: Region {0}, WORLD MAP refresh time set to {1} seconds", RegionInfo.RegionName, maptileRefresh);
+                m_log.LogInformation("[SCENE]: Region {0}, WORLD MAP refresh time set to {1} seconds", RegionInfo.RegionName, maptileRefresh);
                 if (maptileRefresh != 0)
                 {
                     m_mapGenerationTimer.Interval = maptileRefresh * 1000;
@@ -1059,7 +1060,7 @@ public partial class Scene : SceneBase
                 else
                 {
                     RegionInfo.RegionSettings.TerrainImageID = RegionInfo.MaptileStaticUUID;
-                    m_log.InfoFormat("[SCENE]: Region {0}, maptile set to {1}", RegionInfo.RegionName, RegionInfo.MaptileStaticUUID.ToString());
+                    m_log.LogInformation("[SCENE]: Region {0}, maptile set to {1}", RegionInfo.RegionName, RegionInfo.MaptileStaticUUID.ToString());
                 }
             }
 
@@ -1129,7 +1130,7 @@ public partial class Scene : SceneBase
             }
             catch (Exception)
             {
-                m_log.Warn("[PRIORITIZER]: UpdatePrioritizationScheme was not recognized, setting to default BestAvatarResponsiveness");
+                m_log.LogWarning("[PRIORITIZER]: UpdatePrioritizationScheme was not recognized, setting to default BestAvatarResponsiveness");
                 UpdatePrioritizationScheme = UpdatePrioritizationSchemes.BestAvatarResponsiveness;
             }
 
@@ -1148,7 +1149,7 @@ public partial class Scene : SceneBase
 
         }
 
-        m_log.DebugFormat("[SCENE]: Using the {0} prioritization scheme", UpdatePrioritizationScheme);
+        m_log.LogDebug("[SCENE]: Using the {0} prioritization scheme", UpdatePrioritizationScheme);
 
         #endregion Interest Management
 
@@ -1195,7 +1196,7 @@ public partial class Scene : SceneBase
         // Operating system has killed the plugin
         m_sceneGraph.UnRecoverableError += () =>
         {
-            m_log.Error($"[SCENE]: Restarting region {Name} due to unrecoverable physics crash");
+            m_log.LogError($"[SCENE]: Restarting region {Name} due to unrecoverable physics crash");
             RestartNow();
         };
 
@@ -1373,14 +1374,14 @@ public partial class Scene : SceneBase
                     }
                     catch
                     {
-                        m_log.Error("[SCENE]: Couldn't inform clients of regionup");
+                        m_log.LogError("[SCENE]: Couldn't inform clients of regionup");
                 
                     }
                 }
             }
             else
             {
-                m_log.Info(
+                m_log.LogInformation(
                     $"[SCENE]: Got notice about far away Region: {otherRegion.RegionName} at ({otherRegion.RegionLocX}, {otherRegion.RegionLocY})");
             }
         }
@@ -1449,7 +1450,7 @@ public partial class Scene : SceneBase
             }
         }
 
-        m_log.Info($"[REGION]: Restarting region {Name}");
+        m_log.LogInformation($"[REGION]: Restarting region {Name}");
 
         Close();
 
@@ -1502,7 +1503,7 @@ public partial class Scene : SceneBase
     {
         if (m_shuttingDown)
         {
-            m_log.Warn($"[SCENE]: Ignoring close request because already closing {Name}");
+            m_log.LogWarning($"[SCENE]: Ignoring close request because already closing {Name}");
             return;
         }
 
@@ -1514,14 +1515,14 @@ public partial class Scene : SceneBase
             etcd.Delete("RootAgents");
         }
 
-        m_log.Info($"[SCENE]: Closing down the single simulator: {Name}");
+        m_log.LogInformation($"[SCENE]: Closing down the single simulator: {Name}");
 
         StatsReporter.Close();
         m_restartTimer.Stop();
         m_restartTimer.Close();
 
         if (!GridService.DeregisterRegion(RegionInfo.RegionID))
-            m_log.Warn($"[SCENE]: Deregister from grid failed for region {Name}");
+            m_log.LogWarning($"[SCENE]: Deregister from grid failed for region {Name}");
 
         // Kick all ROOT agents with the message, 'The simulator is going down'
         ForEachScenePresence(delegate(ScenePresence avatar)
@@ -1545,13 +1546,13 @@ public partial class Scene : SceneBase
         // Stop all client threads.
         ForEachScenePresence(delegate(ScenePresence avatar) { CloseAgent(avatar.UUID, false); });
 
-        m_log.Debug("[SCENE]: TriggerSceneShuttingDown");
+        m_log.LogDebug("[SCENE]: TriggerSceneShuttingDown");
         EventManager.TriggerSceneShuttingDown(this);
 
-        m_log.Debug("[SCENE]: Persisting changed objects");
+        m_log.LogDebug("[SCENE]: Persisting changed objects");
         Backup(true);
 
-        m_log.Debug("[SCENE]: Closing scene");
+        m_log.LogDebug("[SCENE]: Closing scene");
 
         m_sceneGraph.Close();
 
@@ -1562,7 +1563,7 @@ public partial class Scene : SceneBase
         // attempt to reference a null or disposed physics scene.
         if (PhysicsScene is not null)
         {
-            m_log.Debug("[SCENE]: Dispose Physics");
+            m_log.LogDebug("[SCENE]: Dispose Physics");
             PhysicsScene phys = PhysicsScene;
             // remove the physics engine from both Scene and SceneGraph
             PhysicsScene = null;
@@ -1591,13 +1592,13 @@ public partial class Scene : SceneBase
         m_active = true;
 
         m_unixStartTime = Util.UnixTimeSinceEpoch();
-//            m_log.DebugFormat("[SCENE]: Starting Heartbeat timer for {0}", RegionInfo.RegionName);
+//            m_log.LogDebug("[SCENE]: Starting Heartbeat timer for {0}", RegionInfo.RegionName);
         if (m_heartbeatThread is not null)
         {
             m_hbRestarts++;
             if(m_hbRestarts > 10)
                 Environment.Exit(1);
-            m_log.Error($"[SCENE]: Restarting heartbeat thread because it hasn't reported in in region {Name}");
+            m_log.LogError($"[SCENE]: Restarting heartbeat thread because it hasn't reported in in region {Name}");
 //int pid = System.Diagnostics.Process.GetCurrentProcess().Id;
 //System.Diagnostics.Process proc = new System.Diagnostics.Process();
 //proc.EnableRaisingEvents=false;
@@ -1690,7 +1691,7 @@ public partial class Scene : SceneBase
             framestart = Util.GetTimeStampMS();
             ++Frame;
 
-            // m_log.DebugFormat("[SCENE]: Processing frame {0} in {1}", Frame, RegionInfo.RegionName);
+            // m_log.LogDebug("[SCENE]: Processing frame {0} in {1}", Frame, RegionInfo.RegionName);
 
             otherMS = agentMS = tempOnRezMS = eventMS = backupMS = terrainMS = landMS = 0f;
 
@@ -1836,7 +1837,7 @@ public partial class Scene : SceneBase
                     {
                         if (!StartDisabled)
                         {
-                            m_log.Info($"[REGION]: Enabling logins for {Name}");
+                            m_log.LogInformation($"[REGION]: Enabling logins for {Name}");
                             LoginsEnabled = true;
                         }
 
@@ -1888,7 +1889,7 @@ public partial class Scene : SceneBase
             }
             catch (Exception e)
             {
-                m_log.Error($"[SCENE]: Failed on region {Name}: {e.Message}:{e.StackTrace}");
+                m_log.LogError($"[SCENE]: Failed on region {Name}: {e.Message}:{e.StackTrace}");
             }
 
             EventManager.TriggerRegionHeartbeatEnd(this);
@@ -1938,7 +1939,7 @@ public partial class Scene : SceneBase
                 && Util.EnvironmentTickCountSubtract(
                     m_lastFrameTick, previousFrameTick) > (int)(FrameTime * 1000 * 2))
 
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[SCENE]: Frame took {0} ms (desired max {1} ms) in {2}",
                     Util.EnvironmentTickCountSubtract(m_lastFrameTick, previousFrameTick),
                     FrameTime * 1000,
@@ -2106,7 +2107,7 @@ public partial class Scene : SceneBase
         {
             if(m_backingup)
             {
-                m_log.Warn($"[Scene] Backup of {Name} already running. New call skipped");
+                m_log.LogWarning($"[Scene] Backup of {Name} already running. New call skipped");
                 return;
             }
 
@@ -2256,7 +2257,7 @@ public partial class Scene : SceneBase
         }
         catch (Exception e)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[TERRAIN]: Scene.cs: LoadWorldMap() baked terrain - Failed with exception {0}{1}", e.Message, e.StackTrace);
         }
 
@@ -2267,7 +2268,7 @@ public partial class Scene : SceneBase
             {
                 if(Bakedmap is not null)
                 {
-                    m_log.Warn("[TERRAIN]: terrain not found. Used stored baked terrain.");
+                    m_log.LogWarning("[TERRAIN]: terrain not found. Used stored baked terrain.");
                     Heightmap = Bakedmap.MakeCopy();
                     SimulationDataService.StoreTerrain(Heightmap.GetTerrainData(), RegionInfo.RegionID);
                 }
@@ -2280,7 +2281,7 @@ public partial class Scene : SceneBase
                     if (terrainConfig is not null)
                         m_InitialTerrain = terrainConfig.GetString("InitialTerrain", m_InitialTerrain);
 
-                    m_log.InfoFormat("[TERRAIN]: No default terrain. Generating a new terrain {0}.", m_InitialTerrain);
+                    m_log.LogInformation("[TERRAIN]: No default terrain. Generating a new terrain {0}.", m_InitialTerrain);
                     Heightmap = new TerrainChannel(m_InitialTerrain, (int)RegionInfo.RegionSizeX, (int)RegionInfo.RegionSizeY, (int)RegionInfo.RegionSizeZ);
 
                     SimulationDataService.StoreTerrain(Heightmap.GetTerrainData(), RegionInfo.RegionID);
@@ -2293,7 +2294,7 @@ public partial class Scene : SceneBase
         }
         catch (IOException e)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[TERRAIN]: Scene.cs: LoadWorldMap() - Regenerating as failed with exception {0}{1}",
                 e.Message, e.StackTrace);
 
@@ -2307,7 +2308,7 @@ public partial class Scene : SceneBase
         }
         catch (Exception e)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[TERRAIN]: Scene.cs: LoadWorldMap() - Failed with exception {0}{1}", e.Message, e.StackTrace);
         }
 
@@ -2335,7 +2336,7 @@ public partial class Scene : SceneBase
 
         GridRegion region = new(RegionInfo);
         string error = GridService.RegisterRegion(RegionInfo.ScopeID, region);
-        // m_log.DebugFormat("[SCENE]: RegisterRegionWithGrid. name={0},id={1},loc=<{2},{3}>,size=<{4},{5}>",
+        // m_log.LogDebug("[SCENE]: RegisterRegionWithGrid. name={0},id={1},loc=<{2},{3}>,size=<{4},{5}>",
         //                    m_regionName,
         //                    RegionInfo.RegionID,
         //                    RegionInfo.RegionLocX, RegionInfo.RegionLocY,
@@ -2355,7 +2356,7 @@ public partial class Scene : SceneBase
     /// <param name="regionID">Unique Identifier of the Region to load parcel data for</param>
     public void loadAllLandObjectsFromStorage(UUID regionID)
     {
-        m_log.Info("[SCENE]: Loading land objects from storage");
+        m_log.LogInformation("[SCENE]: Loading land objects from storage");
         List<LandData> landData = SimulationDataService.LoadLandObjects(regionID);
 
         if (LandChannel is not null)
@@ -2371,7 +2372,7 @@ public partial class Scene : SceneBase
         }
         else
         {
-            m_log.Error("[SCENE]: Land Channel is not defined. Cannot load from storage!");
+            m_log.LogError("[SCENE]: Land Channel is not defined. Cannot load from storage!");
         }
     }
 
@@ -2386,11 +2387,11 @@ public partial class Scene : SceneBase
     public virtual void LoadPrimsFromStorage(UUID regionID)
     {
         LoadingPrims = true;
-        m_log.Info("[SCENE]: Loading objects from datastore");
+        m_log.LogInformation("[SCENE]: Loading objects from datastore");
 
         List<SceneObjectGroup> PrimsFromDB = SimulationDataService.LoadObjects(regionID);
 
-        m_log.InfoFormat("[SCENE]: Loaded {0} objects from the datastore", PrimsFromDB.Count);
+        m_log.LogInformation("[SCENE]: Loaded {0} objects from the datastore", PrimsFromDB.Count);
 
         foreach (SceneObjectGroup group in PrimsFromDB)
         {
@@ -2533,7 +2534,7 @@ public partial class Scene : SceneBase
                         EntityIntersection ei = target.TestIntersectionOBB(NewRay, Quaternion.Identity, frontFacesOnly, FaceCenter);
 
                         // Un-comment out the following line to Get Raytrace results printed to the console.
-                        // m_log.Info("[RAYTRACERESULTS]: Hit:" + ei.HitTF.ToString() + " Point: " + ei.ipoint.ToString() + " Normal: " + ei.normal.ToString());
+                        // m_log.LogInformation("[RAYTRACERESULTS]: Hit:" + ei.HitTF.ToString() + " Point: " + ei.ipoint.ToString() + " Normal: " + ei.normal.ToString());
                         float ScaleOffset = 0.5f;
 
                         // If we hit something
@@ -2565,7 +2566,7 @@ public partial class Scene : SceneBase
                         EntityIntersection ei = m_sceneGraph.GetClosestIntersectingPrim(NewRay, true, false);
 
                         // Un-comment the following line to print the raytrace results to the console.
-                        //m_log.Info("[RAYTRACERESULTS]: Hit:" + ei.HitTF.ToString() + " Point: " + ei.ipoint.ToString() + " Normal: " + ei.normal.ToString());
+                        //m_log.LogInformation("[RAYTRACERESULTS]: Hit:" + ei.HitTF.ToString() + " Point: " + ei.ipoint.ToString() + " Normal: " + ei.normal.ToString());
 
                         if (ei.HitTF)
                         {
@@ -2628,7 +2629,7 @@ public partial class Scene : SceneBase
     public virtual SceneObjectGroup AddNewPrim(UUID ownerID, UUID groupID,
         Vector3 pos, Quaternion rot, PrimitiveBaseShape shape, uint addFlags = 0)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENE]: Scene.AddNewPrim() pcode {0} called for {1} in {2}", shape.PCode, ownerID, RegionInfo.RegionName);
 
         SceneObjectGroup sceneObject;
@@ -2853,7 +2854,7 @@ public partial class Scene : SceneBase
     /// <param name="removeScripts">If true, then scripts are removed.  If false, then they are only stopped.</para>
     public void DeleteSceneObject(SceneObjectGroup group, bool silent, bool removeScripts)
     {
-        // m_log.DebugFormat("[SCENE]: Deleting scene object {0} {1}", group.Name, group.UUID);
+        // m_log.LogDebug("[SCENE]: Deleting scene object {0} {1}", group.Name, group.UUID);
 
         if (removeScripts)
             group.RemoveScriptInstances(true);
@@ -2899,7 +2900,7 @@ public partial class Scene : SceneBase
         // use this to mean also full delete
         if (removeScripts)
             group.Dispose();
-        // m_log.DebugFormat("[SCENE]: Exit DeleteSceneObject() for {0} {1}", group.Name, group.UUID);
+        // m_log.LogDebug("[SCENE]: Exit DeleteSceneObject() for {0} {1}", group.Name, group.UUID);
     }
 
     /// <summary>
@@ -2959,7 +2960,7 @@ public partial class Scene : SceneBase
                     }
                     catch (Exception)
                     {
-                        m_log.Warn("[SCENE]: exception when trying to remove the prim that crossed the border.");
+                        m_log.LogWarning("[SCENE]: exception when trying to remove the prim that crossed the border.");
                     }
                     return;
                 }
@@ -2976,7 +2977,7 @@ public partial class Scene : SceneBase
                     }
                     catch (Exception)
                     {
-                        m_log.Warn("[SCENE]: exception when trying to return the prim that crossed the border.");
+                        m_log.LogWarning("[SCENE]: exception when trying to return the prim that crossed the border.");
                     }
                     return;
                 }
@@ -3011,7 +3012,7 @@ public partial class Scene : SceneBase
     /// <returns></returns>
     public bool IncomingCreateObject(Vector3 newPosition, ISceneObject sog)
     {
-        //m_log.DebugFormat(" >>> IncomingCreateObject(sog) <<< {0} deleted? {1} isAttach? {2}", ((SceneObjectGroup)sog).AbsolutePosition,
+        //m_log.LogDebug(" >>> IncomingCreateObject(sog) <<< {0} deleted? {1} isAttach? {2}", ((SceneObjectGroup)sog).AbsolutePosition,
         //    ((SceneObjectGroup)sog).IsDeleted, ((SceneObjectGroup)sog).RootPart.IsAttachment);
 
         SceneObjectGroup newObject;
@@ -3021,7 +3022,7 @@ public partial class Scene : SceneBase
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[INTERREGION]: Problem casting object, exception {0}{1}", e.Message, e.StackTrace);
+            m_log.LogWarning("[INTERREGION]: Problem casting object, exception {0}{1}", e.Message, e.StackTrace);
             return false;
         }
 
@@ -3036,7 +3037,7 @@ public partial class Scene : SceneBase
 
     public bool IncomingAttechments(ScenePresence sp, List<SceneObjectGroup> attachments)
     {
-        //m_log.DebugFormat(" >>> IncomingCreateObject(sog) <<< {0} deleted? {1} isAttach? {2}", ((SceneObjectGroup)sog).AbsolutePosition,
+        //m_log.LogDebug(" >>> IncomingCreateObject(sog) <<< {0} deleted? {1} isAttach? {2}", ((SceneObjectGroup)sog).AbsolutePosition,
         //    ((SceneObjectGroup)sog).IsDeleted, ((SceneObjectGroup)sog).RootPart.IsAttachment);
 
         if (!EntityTransferModule.HandleIncomingAttachments(sp, attachments) || sp.IsDeleted)
@@ -3060,7 +3061,7 @@ public partial class Scene : SceneBase
     {
         if (sceneObject.OwnerID.IsZero())
         {
-            m_log.ErrorFormat("[SCENE]: Owner ID for {0} was zero", sceneObject.UUID);
+            m_log.LogError("[SCENE]: Owner ID for {0} was zero", sceneObject.UUID);
             return false;
         }
 
@@ -3070,7 +3071,7 @@ public partial class Scene : SceneBase
         int flags = GetUserFlags(sceneObject.OwnerID);
         if (RegionInfo.EstateSettings.IsBanned(sceneObject.OwnerID, flags))
         {
-            m_log.InfoFormat("[INTERREGION]: Denied prim crossing for banned avatar {0}", sceneObject.OwnerID);
+            m_log.LogInformation("[INTERREGION]: Denied prim crossing for banned avatar {0}", sceneObject.OwnerID);
 
             return false;
         }
@@ -3099,9 +3100,9 @@ public partial class Scene : SceneBase
             {
                 SceneObjectGroup grp = sceneObject;
 
-                // m_log.DebugFormat(
+                // m_log.LogDebug(
                 //     "[ATTACHMENT]: Received attachment {0}, inworld asset id {1}", grp.FromItemID, grp.UUID);
-                // m_log.DebugFormat(
+                // m_log.LogDebug(
                 //     "[ATTACHMENT]: Attach to avatar {0} at position {1}", sp.UUID, grp.AbsolutePosition);
 
                 // We must currently not resume scripts at this stage since AttachmentsModule does not have the
@@ -3114,17 +3115,17 @@ public partial class Scene : SceneBase
                 if (attached)
                     RootPrim.RemFlag(PrimFlags.TemporaryOnRez);
                 else
-                    m_log.DebugFormat("[SCENE]: Attachment {0} arrived but failed to attach, setting to temp", sceneObject.UUID);
+                    m_log.LogDebug("[SCENE]: Attachment {0} arrived but failed to attach, setting to temp", sceneObject.UUID);
             }
             else
             {
-                m_log.DebugFormat("[SCENE]: Attachment {0} arrived and scene presence was not found, setting to temp", sceneObject.UUID);
+                m_log.LogDebug("[SCENE]: Attachment {0} arrived and scene presence was not found, setting to temp", sceneObject.UUID);
 //                    RootPrim.RemFlag(PrimFlags.TemporaryOnRez);
 //                    RootPrim.AddFlag(PrimFlags.TemporaryOnRez);
             }
             if (sceneObject.OwnerID.IsZero())
             {
-                m_log.ErrorFormat("[SCENE]: Owner ID for {0} was zero after attachment processing. BUG!", sceneObject.UUID);
+                m_log.LogError("[SCENE]: Owner ID for {0} was zero after attachment processing. BUG!", sceneObject.UUID);
                 return false;
             }
         }
@@ -3132,7 +3133,7 @@ public partial class Scene : SceneBase
         {
             if (sceneObject.OwnerID.IsZero())
             {
-                m_log.ErrorFormat("[SCENE]: Owner ID for non-attachment {0} was zero", sceneObject.UUID);
+                m_log.LogError("[SCENE]: Owner ID for non-attachment {0} was zero", sceneObject.UUID);
                 return false;
             }
             AddRestoredSceneObject(sceneObject, true, false);
@@ -3212,7 +3213,7 @@ public partial class Scene : SceneBase
 
             if (sp is null)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[SCENE]: Adding new child scene presence {0} {1} to scene {2} at pos {3}, tpflags: {4}",
                     client.Name, client.AgentId, RegionInfo.RegionName, client.StartPos,
                     ((TPFlags)aCircuit.teleportFlags).ToString());
@@ -3236,7 +3237,7 @@ public partial class Scene : SceneBase
                 // actually occurs).
 
 
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[SCENE]: Already found {0} scene presence for {1} in {2} when asked to add new scene presence",
                     sp.IsChildAgent ? "child" : "root", sp.Name, RegionInfo.RegionName);
 
@@ -3322,7 +3323,7 @@ public partial class Scene : SceneBase
         // Do the verification here
         if ((aCircuit.teleportFlags & (uint)Constants.TeleportFlags.ViaHGLogin) != 0)
         {
-            m_log.DebugFormat("[SCENE]: Incoming client {0} {1} in region {2} via HG login", aCircuit.firstname, aCircuit.lastname, RegionInfo.RegionName);
+            m_log.LogDebug("[SCENE]: Incoming client {0} {1} in region {2} via HG login", aCircuit.firstname, aCircuit.lastname, RegionInfo.RegionName);
             vialogin = true;
             IUserAgentVerificationModule userVerification = RequestModuleInterface<IUserAgentVerificationModule>();
             if (userVerification is not null && ep is not null)
@@ -3330,18 +3331,18 @@ public partial class Scene : SceneBase
                 if (!userVerification.VerifyClient(aCircuit, ep.Address.ToString()))
                 {
                     // uh-oh, this is fishy
-                    m_log.DebugFormat("[SCENE]: User Client Verification for {0} {1} in {2} returned false", aCircuit.firstname, aCircuit.lastname, RegionInfo.RegionName);
+                    m_log.LogDebug("[SCENE]: User Client Verification for {0} {1} in {2} returned false", aCircuit.firstname, aCircuit.lastname, RegionInfo.RegionName);
                     return false;
                 }
                 else
-                    m_log.DebugFormat("[SCENE]: User Client Verification for {0} {1} in {2} returned true", aCircuit.firstname, aCircuit.lastname, RegionInfo.RegionName);
+                    m_log.LogDebug("[SCENE]: User Client Verification for {0} {1} in {2} returned true", aCircuit.firstname, aCircuit.lastname, RegionInfo.RegionName);
 
             }
         }
 
         else if ((aCircuit.teleportFlags & (uint)Constants.TeleportFlags.ViaLogin) != 0)
         {
-            m_log.DebugFormat("[SCENE]: Incoming client {0} {1} in region {2} via regular login. Client IP verification not performed.",
+            m_log.LogDebug("[SCENE]: Incoming client {0} {1} in region {2} via regular login. Client IP verification not performed.",
                 aCircuit.firstname, aCircuit.lastname, RegionInfo.RegionName);
             vialogin = true;
         }
@@ -3374,7 +3375,7 @@ public partial class Scene : SceneBase
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[SCENE]: Exception while closing aborted client: {0}", e.StackTrace);
+            m_log.LogDebug("[SCENE]: Exception while closing aborted client: {0}", e.StackTrace);
         }
 
         return false;
@@ -3646,7 +3647,7 @@ public partial class Scene : SceneBase
         }
         else
         {
-            m_log.DebugFormat("[SCENE]: Unable to teleport user home: no AgentTransferModule is active");
+            m_log.LogDebug("[SCENE]: Unable to teleport user home: no AgentTransferModule is active");
             client.SendTeleportFailed("Unable to perform teleports on this simulator.");
         }
         return false;
@@ -3690,7 +3691,7 @@ public partial class Scene : SceneBase
     {
         Vector3 pos;
         const bool frontFacesOnly = true;
-        //m_log.Info("HITTARGET: " + RayTargetObj.ToString() + ", COPYTARGET: " + localID.ToString());
+        //m_log.LogInformation("HITTARGET: " + RayTargetObj.ToString() + ", COPYTARGET: " + localID.ToString());
         SceneObjectPart target = GetSceneObjectPart(localID);
         SceneObjectPart target2 = GetSceneObjectPart(RayTargetObj);
 
@@ -3702,7 +3703,7 @@ public partial class Scene : SceneBase
             direction.Normalize();
 
             //pos = target2.AbsolutePosition;
-            //m_log.Info("[OBJECT_REZ]: TargetPos: " + pos.ToString() + ", RayStart: " + RayStart.ToString() + ", RayEnd: " + RayEnd.ToString() + ", Volume: " + Util.GetDistanceTo(RayStart,RayEnd).ToString() + ", mag1: " + Util.GetMagnitude(RayStart).ToString() + ", mag2: " + Util.GetMagnitude(RayEnd).ToString());
+            //m_log.LogInformation("[OBJECT_REZ]: TargetPos: " + pos.ToString() + ", RayStart: " + RayStart.ToString() + ", RayEnd: " + RayEnd.ToString() + ", Volume: " + Util.GetDistanceTo(RayStart,RayEnd).ToString() + ", mag1: " + Util.GetMagnitude(RayStart).ToString() + ", mag2: " + Util.GetMagnitude(RayEnd).ToString());
 
             // TODO: Raytrace better here
 
@@ -3713,7 +3714,7 @@ public partial class Scene : SceneBase
             EntityIntersection ei = target2.TestIntersectionOBB(NewRay, Quaternion.Identity, frontFacesOnly, CopyCenters);
 
             // Un-comment out the following line to Get Raytrace results printed to the console.
-            //m_log.Info("[RAYTRACERESULTS]: Hit:" + ei.HitTF.ToString() + " Point: " + ei.ipoint.ToString() + " Normal: " + ei.normal.ToString());
+            //m_log.LogInformation("[RAYTRACERESULTS]: Hit:" + ei.HitTF.ToString() + " Point: " + ei.ipoint.ToString() + " Normal: " + ei.normal.ToString());
             float ScaleOffset = 0.5f;
 
             // If we hit something
@@ -3764,7 +3765,7 @@ public partial class Scene : SceneBase
 
         if (aCircuit is null)
         {
-            m_log.DebugFormat("[APPEARANCE] Client did not supply a circuit. Non-Linden? Creating default appearance.");
+            m_log.LogDebug("[APPEARANCE] Client did not supply a circuit. Non-Linden? Creating default appearance.");
             appearance = new AvatarAppearance();
             return;
         }
@@ -3772,7 +3773,7 @@ public partial class Scene : SceneBase
         appearance = aCircuit.Appearance;
         if (appearance is null)
         {
-            m_log.DebugFormat("[APPEARANCE]: Appearance not found in {0}, returning default", RegionInfo.RegionName);
+            m_log.LogDebug("[APPEARANCE]: Appearance not found in {0}, returning default", RegionInfo.RegionName);
             appearance = new AvatarAppearance();
         }
     }
@@ -3802,7 +3803,7 @@ public partial class Scene : SceneBase
         // However, will keep for now just in case.
         if (acd is null)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[SCENE]: No agent circuit found for {0} in {1}, aborting Scene.RemoveClient", agentID, Name);
 
             return;
@@ -3820,7 +3821,7 @@ public partial class Scene : SceneBase
             // However, will keep for now just in case.
             if (avatar is null)
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[SCENE]: Called RemoveClient() with agent ID {0} but no such presence is in the scene.", agentID);
                 m_authenticateHandler.RemoveCircuit(agentID);
 
@@ -3831,7 +3832,7 @@ public partial class Scene : SceneBase
             {
                 isChildAgent = avatar.IsChildAgent;
 
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[SCENE]: Removing {0} agent {1} {2} from {3}",
                     isChildAgent ? "child" : "root", avatar.Name, agentID, Name);
 
@@ -3861,9 +3862,9 @@ public partial class Scene : SceneBase
                 }
 
                 m_eventManager.TriggerClientClosed(agentID, this);
-//                    m_log.Debug("[Scene]TriggerClientClosed done");
+//                    m_log.LogDebug("[Scene]TriggerClientClosed done");
                 m_eventManager.TriggerOnRemovePresence(agentID);
-//                    m_log.Debug("[Scene]TriggerOnRemovePresence done");
+//                    m_log.LogDebug("[Scene]TriggerOnRemovePresence done");
 
                 if (!isChildAgent)
                 {
@@ -3879,14 +3880,13 @@ public partial class Scene : SceneBase
                 }
 
                 // It's possible for child agents to have transactions if changes are being made cross-border.
-//                        m_log.Debug("[Scene]RemoveAgentAssetTransactions");
+//                        m_log.LogDebug("[Scene]RemoveAgentAssetTransactions");
                 AgentTransactionsModule?.RemoveAgentAssetTransactions(agentID);
-                m_log.Debug("[Scene] The avatar has left the building");
+                m_log.LogDebug("[Scene] The avatar has left the building");
             }
             catch (Exception e)
             {
-                m_log.Error(
-                    string.Format("[SCENE]: Exception removing {0} from {1}.  Cleaning up.  Exception ", avatar.Name, Name), e);
+                m_log.LogError(e, string.Format("[SCENE]: Exception removing {0} from {1}.  Cleaning up.  Exception ", avatar.Name, Name));
             }
             finally
             {
@@ -3907,14 +3907,13 @@ public partial class Scene : SceneBase
                 }
                 catch (Exception e)
                 {
-                    m_log.Error(
-                        string.Format("[SCENE]: Exception in final clean up of {0} in {1}.  Exception ", avatar.Name, Name), e);
+                    m_log.LogError(e, string.Format("[SCENE]: Exception in final clean up of {0} in {1}.  Exception ", avatar.Name, Name));
                 }
             }
         }
 
-        //m_log.InfoFormat("[SCENE] Memory pre  GC {0}", System.GC.GetTotalMemory(false));
-        //m_log.InfoFormat("[SCENE] Memory post GC {0}", System.GC.GetTotalMemory(true));
+        //m_log.LogInformation("[SCENE] Memory pre  GC {0}", System.GC.GetTotalMemory(false));
+        //m_log.LogInformation("[SCENE] Memory post GC {0}", System.GC.GetTotalMemory(true));
     }
 
     /// <summary>
@@ -4018,7 +4017,7 @@ public partial class Scene : SceneBase
 
         // Don't disable this log message - it's too helpful
         string curViewer = Util.GetViewerName(acd);
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[SCENE]: Region {0} told of incoming {1} agent {2} {3} {4} (circuit code {5}, IP {6}, viewer {7}, teleportflags ({8}), position {9}. {10}",
             RegionInfo.RegionName,
             (acd.child ? "child" : "root"),
@@ -4033,7 +4032,7 @@ public partial class Scene : SceneBase
             (source is null) ? "" : string.Format("From region {0} ({1}){2}", source.RegionName, source.RegionID, (source.RawServerURI is null) ? "" : " @ " + source.ServerURI)
         );
 
-//            m_log.DebugFormat("NewUserConnection stack {0}", Environment.StackTrace);
+//            m_log.LogDebug("NewUserConnection stack {0}", Environment.StackTrace);
 
         if (!LoginsEnabled)
         {
@@ -4080,7 +4079,7 @@ public partial class Scene : SceneBase
 
         if (ViewerDenied)
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[SCENE]: Access denied for {0} {1} using {2}",
                 acd.firstname, acd.lastname, curViewer);
             reason = "Access denied, your viewer " +curViewer.Trim() +" is not allowed.";
@@ -4098,7 +4097,7 @@ public partial class Scene : SceneBase
             if (sp is not null && !sp.IsDeleted && sp.IsChildAgent &&
                 (sp.LifecycleState == ScenePresenceState.Running || sp.LifecycleState == ScenePresenceState.PreRemove))
             {
-                m_log.Debug($"[SCENE]: Reusing existing child scene presence for {sp.Name}, state {sp.LifecycleState} in {Name}");
+                m_log.LogDebug($"[SCENE]: Reusing existing child scene presence for {sp.Name}, state {sp.LifecycleState} in {Name}");
 
                 // In the case where, for example, an A B C D region layout, an avatar may
                 // teleport from A -> D, but then -> C before A has asked B to close its old child agent.  When C
@@ -4113,7 +4112,7 @@ public partial class Scene : SceneBase
 
 //                    if (!acd.ChildrenCapSeeds.ContainsKey(RegionInfo.RegionHandle))
 //                    {
-//                        m_log.DebugFormat(
+//                        m_log.LogDebug(
 //                            "[SCENE]: Setting DoNotCloseAfterTeleport for child scene presence {0} in {1} because source will attempt close.",
 //                            sp.Name, Name);
 
@@ -4126,7 +4125,7 @@ public partial class Scene : SceneBase
                 if (EntityTransferModule.IsInTransit(sp.UUID))
                 {
                     sp.DoNotCloseAfterTeleport = true;
-                    m_log.Debug($"[SCENE]: Set DoNotCloseAfterTeleport for child scene presence {sp.Name} in {Name} because this region will attempt end-of-teleport close from a previous close.");
+                    m_log.LogDebug($"[SCENE]: Set DoNotCloseAfterTeleport for child scene presence {sp.Name} in {Name} because this region will attempt end-of-teleport close from a previous close.");
                 }
             }
         }
@@ -4146,7 +4145,7 @@ public partial class Scene : SceneBase
 
                 if (!sp.IsDeleted && sp.LifecycleState == ScenePresenceState.Removing)
                 {
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[SCENE]: Agent {0} in {1} was still being removed after {2}s.  Aborting NewUserConnection.",
                         sp.Name, Name, polls * pollInterval / 1000);
 
@@ -4154,7 +4153,7 @@ public partial class Scene : SceneBase
                 }
                 else if (polls != pollsLeft)
                 {
-                    m_log.DebugFormat(
+                    m_log.LogDebug(
                         "[SCENE]: NewUserConnection for agent {0} in {1} had to wait {2}s for in-progress removal to complete on an old presence.",
                         sp.Name, Name, polls * pollInterval / 1000);
                 }
@@ -4213,7 +4212,7 @@ public partial class Scene : SceneBase
                     // We have a zombie from a crashed session.
                     // Or the same user is trying to be root twice here, won't work.
                     // Kill it.
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[SCENE]: Existing root scene presence detected for {0} {1} in {2} when connecting.  Removing existing presence.",
                         sp.Name, sp.UUID, RegionInfo.RegionName);
 
@@ -4223,7 +4222,7 @@ public partial class Scene : SceneBase
                     sp = null;
                 }
                 //else
-                //    m_log.WarnFormat("[SCENE]: Existing root scene presence for {0} {1} in {2}, but agent is in trasit", sp.Name, sp.UUID, RegionInfo.RegionName);
+                //    m_log.LogWarning("[SCENE]: Existing root scene presence for {0} {1} in {2}, but agent is in trasit", sp.Name, sp.UUID, RegionInfo.RegionName);
             }
 
             // Optimistic: add or update the circuit data with the new agent circuit data and teleport flags.
@@ -4253,7 +4252,7 @@ public partial class Scene : SceneBase
                     }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat(
+                        m_log.LogError(
                             "[SCENE]: Exception verifying presence {0}{1}", e.Message, e.StackTrace);
 
                         m_authenticateHandler.RemoveCircuit(acd);
@@ -4271,14 +4270,14 @@ public partial class Scene : SceneBase
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[SCENE]: Exception authorizing user {0}{1}", e.Message, e.StackTrace);
 
                     m_authenticateHandler.RemoveCircuit(acd);
                     return false;
                 }
 
-                m_log.InfoFormat(
+                m_log.LogInformation(
                     "[SCENE {0}]: authorized {1} agent {2} {3} {4} (circuit code {5})",
                     Name, (acd.child ? "child" : "root"), acd.firstname, acd.lastname,
                     acd.AgentID, acd.circuitcode);
@@ -4296,7 +4295,7 @@ public partial class Scene : SceneBase
 
                 if (sp.IsChildAgent)
                 {
-                    m_log.DebugFormat(
+                    m_log.LogDebug(
                         "[SCENE]: Adjusting known seeds for existing agent {0} in {1}",
                         acd.AgentID, RegionInfo.RegionName);
 
@@ -4450,7 +4449,7 @@ public partial class Scene : SceneBase
             if (!AuthorizationService.IsAuthorizedForRegion(
                 agent.AgentID.ToString(), agent.firstname, agent.lastname, RegionInfo.RegionID.ToString(), out reason))
             {
-                m_log.WarnFormat("[CONNECTION BEGIN]: Denied access to: {0} ({1} {2}) at {3} because: {4}",
+                m_log.LogWarning("[CONNECTION BEGIN]: Denied access to: {0} ({1} {2}) at {3} because: {4}",
                                  agent.AgentID, agent.firstname, agent.lastname, RegionInfo.RegionName, reason);
                 return false;
             }
@@ -4465,7 +4464,7 @@ public partial class Scene : SceneBase
             if(RegionInfo.EstateSettings is null)
             {
                 // something is broken?  let it get in
-                m_log.ErrorFormat("[CONNECTION BEGIN]: Estate Settings is null!");
+                m_log.LogError("[CONNECTION BEGIN]: Estate Settings is null!");
                 return true;
             }
 
@@ -4473,7 +4472,7 @@ public partial class Scene : SceneBase
             int flags = GetUserFlags(agent.AgentID);
             if (RegionInfo.EstateSettings.IsBanned(agent.AgentID, flags))
             {
-                m_log.WarnFormat("[CONNECTION BEGIN]: Denied access to: {0} ({1} {2}) at {3} because the user is on the banlist",
+                m_log.LogWarning("[CONNECTION BEGIN]: Denied access to: {0} ({1} {2}) at {3} because the user is on the banlist",
                         agent.AgentID, agent.firstname, agent.lastname, RegionInfo.RegionName);
                 reason = string.Format("Denied access to region {0}: You have been banned from that region.",
                         RegionInfo.RegionName);
@@ -4499,7 +4498,7 @@ public partial class Scene : SceneBase
 
             if(estateGroups is null)
             {
-                m_log.ErrorFormat("[CONNECTION BEGIN]: Estate GroupMembership is null!");
+                m_log.LogError("[CONNECTION BEGIN]: Estate GroupMembership is null!");
                 goto Label_GroupsDone;
             }
 
@@ -4511,7 +4510,7 @@ public partial class Scene : SceneBase
 
             if(GroupMembership is null)
             {
-                m_log.ErrorFormat("[CONNECTION BEGIN]: GroupMembership is null!");
+                m_log.LogError("[CONNECTION BEGIN]: GroupMembership is null!");
                 goto Label_GroupsDone;
             }
 
@@ -4533,7 +4532,7 @@ public partial class Scene : SceneBase
 Label_GroupsDone:
             if (!groupAccess)
             {
-                m_log.WarnFormat("[CONNECTION BEGIN]: Denied access to: {0} ({1} {2}) at {3} because the user does not have access to the estate",
+                m_log.LogWarning("[CONNECTION BEGIN]: Denied access to: {0} ({1} {2}) at {3} because the user does not have access to the estate",
                                  agent.AgentID, agent.firstname, agent.lastname, RegionInfo.RegionName);
                 reason = String.Format("Denied access to private region {0}: You do not have access to that region.",
                                  RegionInfo.RegionName);
@@ -4591,12 +4590,12 @@ Label_GroupsDone:
 //                }
 //                else
 //                {
-//                    m_log.Info("[USERLOGOFF]: System sending the LogOff user message failed to sucessfully authenticate");
+//                    m_log.LogInformation("[USERLOGOFF]: System sending the LogOff user message failed to sucessfully authenticate");
 //                }
 //            }
 //            else
 //            {
-//                m_log.InfoFormat("[USERLOGOFF]: Got a logoff request for {0} but the user isn't here.  The user might already have been logged out", AvatarID.ToString());
+//                m_log.LogInformation("[USERLOGOFF]: Got a logoff request for {0} but the user isn't here.  The user might already have been logged out", AvatarID.ToString());
 //            }
 //        }
 
@@ -4617,12 +4616,12 @@ Label_GroupsDone:
 //                }
 //                catch (Exception e)
 //                {
-//                    m_log.ErrorFormat("[SCENE]: Unable to do agent crossing, exception {0}{1}", e.Message, e.StackTrace);
+//                    m_log.LogError("[SCENE]: Unable to do agent crossing, exception {0}{1}", e.Message, e.StackTrace);
 //                }
 //            }
 //            else
 //            {
-//                m_log.ErrorFormat(
+//                m_log.LogError(
 //                    "[SCENE]: Could not find presence for agent {0} crossing into scene {1}",
 //                    agentID, RegionInfo.RegionName);
 //            }
@@ -4637,13 +4636,13 @@ Label_GroupsDone:
     /// <returns>true if we handled it.</returns>
     public virtual bool IncomingUpdateChildAgent(AgentData cAgentData)
     {
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[SCENE]: Incoming child agent update for {0} in {1}", cAgentData.AgentID, RegionInfo.RegionName);
 
         if (!LoginsEnabled)
         {
 //                reason = "Logins Disabled";
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[SCENE]: update for {0} in {1} refused: Logins Disabled", cAgentData.AgentID, RegionInfo.RegionName);
             return false;
         }
@@ -4651,7 +4650,7 @@ Label_GroupsDone:
         int flags = GetUserFlags(cAgentData.AgentID);
         if (RegionInfo.EstateSettings.IsBanned(cAgentData.AgentID, flags))
         {
-            m_log.DebugFormat("[SCENE]: Denying root agent entry to {0}: banned", cAgentData.AgentID);
+            m_log.LogDebug("[SCENE]: Denying root agent entry to {0}: banned", cAgentData.AgentID);
             return false;
         }
 
@@ -4660,7 +4659,7 @@ Label_GroupsDone:
             (float)RegionInfo.RegionSizeX * 0.5f, (float)RegionInfo.RegionSizeY  * 0.5f);
         if (nearestParcel is null)
         {
-            m_log.InfoFormat(
+            m_log.LogInformation(
                 "[SCENE]: Denying root agent entry to {0} in {1}: no allowed parcel",
                 cAgentData.AgentID, RegionInfo.RegionName);
 
@@ -4677,13 +4676,13 @@ Label_GroupsDone:
         {
             if (!sp.IsChildAgent)
             {
-                m_log.WarnFormat("[SCENE]: Ignoring a child update on a root agent {0} {1} in {2}",
+                m_log.LogWarning("[SCENE]: Ignoring a child update on a root agent {0} {1} in {2}",
                         sp.Name, sp.UUID, Name);
                 return false;
             }
             if (cAgentData.SessionID.NotEqual(sp.ControllingClient.SessionId))
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[SCENE]: Attempt to update agent {0} with diferent session id {1} != {2}",
                     sp.UUID, sp.ControllingClient.SessionId, cAgentData.SessionID);
                 return false;
@@ -4699,7 +4698,7 @@ Label_GroupsDone:
 
                 if (sp.IsChildAgent)
                 {
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[SCENE]: Found presence {0} {1} unexpectedly still child in {2}",
                         sp.Name, sp.UUID, Name);
                     return false;
@@ -4720,7 +4719,7 @@ Label_GroupsDone:
     /// <returns>true if we handled it.</returns>
     public virtual bool IncomingUpdateChildAgent(AgentPosition cAgentData)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[SCENE PRESENCE]: IncomingChildAgentDataUpdate POSITION for {0} in {1}, position {2}",
 //                cAgentData.AgentID, Name, cAgentData.Position);
 
@@ -4729,7 +4728,7 @@ Label_GroupsDone:
         {
 //                if (childAgentUpdate.ControllingClient.SessionId != cAgentData.SessionID)
 //                    // Only warn for now
-//                    m_log.WarnFormat("[SCENE]: Attempt at updating position of agent {0} with invalid session id {1}. Neighbor running older version?",
+//                    m_log.LogWarning("[SCENE]: Attempt at updating position of agent {0} with invalid session id {1}. Neighbor running older version?",
 //                        childAgentUpdate.UUID, cAgentData.SessionID);
 
             // I can't imagine *yet* why we would get an update if the agent is a root agent..
@@ -4761,7 +4760,7 @@ Label_GroupsDone:
             Thread.Sleep(250);
 
         if (sp is null)
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[SCENE PRESENCE]: Did not find presence with id {0} in {1} before timeout",
                 agentID, RegionInfo.RegionName);
 
@@ -4777,14 +4776,14 @@ Label_GroupsDone:
     /// <returns></returns>
     public bool CloseAgent(UUID agentID, bool force, string auth_token)
     {
-        //m_log.DebugFormat("[SCENE]: Processing incoming close agent {0} in region {1} with auth_token {2}", agentID, RegionInfo.RegionName, auth_token);
+        //m_log.LogDebug("[SCENE]: Processing incoming close agent {0} in region {1} with auth_token {2}", agentID, RegionInfo.RegionName, auth_token);
 
         // Check that the auth_token is valid
         AgentCircuitData acd = AuthenticateHandler.GetAgentCircuitData(agentID);
 
         if (acd is null)
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[SCENE]: Request to close agent {0} but no such agent in scene {1}.  May have been closed previously.",
                 agentID, Name);
 
@@ -4797,7 +4796,7 @@ Label_GroupsDone:
         }
         else
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[SCENE]: Request to close agent {0} with invalid authorization token {1} in {2}",
                 agentID, auth_token, Name);
         }
@@ -4824,7 +4823,7 @@ Label_GroupsDone:
             // want to obey this close since C may have renewed the child agent lease on B.
             if (sp.DoNotCloseAfterTeleport)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[SCENE]: Not pre-closing {0} agent {1} in {2} since another simulator has re-established the child connection",
                     sp.IsChildAgent ? "child" : "root", sp.Name, Name);
 
@@ -4836,7 +4835,7 @@ Label_GroupsDone:
 
             if (sp.LifecycleState != ScenePresenceState.Running)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[SCENE]: Called IncomingPreCloseAgent() for {0} in {1} but presence is already in state {2}",
                     sp.Name, Name, sp.LifecycleState);
 
@@ -4876,7 +4875,7 @@ Label_GroupsDone:
                 if (m_clientManager.TryGetValue(agentID, out IClientAPI client))
                 {
                     client.Close(force, force);
-                    m_log.DebugFormat( "[SCENE]: Dead client for agent ID {0} was cleaned up in {1}", agentID, Name);
+                    m_log.LogDebug( "[SCENE]: Dead client for agent ID {0} was cleaned up in {1}", agentID, Name);
                     ret = true;
                 }
 
@@ -4890,7 +4889,7 @@ Label_GroupsDone:
 
             if (sp.LifecycleState != ScenePresenceState.Running && sp.LifecycleState != ScenePresenceState.PreRemove)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[SCENE]: Called CloseClient() for {0} in {1} but presence is already in state {2}",
                     sp.Name, Name, sp.LifecycleState);
 
@@ -4902,7 +4901,7 @@ Label_GroupsDone:
             // want to obey this close since C may have renewed the child agent lease on B.
             if (sp.DoNotCloseAfterTeleport)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[SCENE]: Not closing {0} agent {1} in {2} since another simulator has re-established the child connection",
                     sp.IsChildAgent ? "child" : "root", sp.Name, Name);
 
@@ -4958,7 +4957,7 @@ Label_GroupsDone:
     {
         if (EntityTransferModule is null)
         {
-            m_log.DebugFormat("[SCENE]: Unable to perform teleports: no AgentTransferModule is active");
+            m_log.LogDebug("[SCENE]: Unable to perform teleports: no AgentTransferModule is active");
             return;
         }
 
@@ -4999,7 +4998,7 @@ Label_GroupsDone:
     {
         if (EntityTransferModule is null)
         {
-            m_log.Debug("[SCENE]: Unable to perform teleports: no AgentTransferModule is active");
+            m_log.LogDebug("[SCENE]: Unable to perform teleports: no AgentTransferModule is active");
             return;
         }
 
@@ -5014,7 +5013,7 @@ Label_GroupsDone:
     {
         if (EntityTransferModule is null)
         {
-            m_log.Debug("[SCENE]: Unable to perform teleports: no AgentTransferModule is active");
+            m_log.LogDebug("[SCENE]: Unable to perform teleports: no AgentTransferModule is active");
             return;
         }
 
@@ -5035,7 +5034,7 @@ Label_GroupsDone:
         }
         else
         {
-            m_log.Debug("[SCENE]: Unable to cross agent to neighbouring region, because there is no AgentTransferModule");
+            m_log.LogDebug("[SCENE]: Unable to cross agent to neighbouring region, because there is no AgentTransferModule");
         }
 
         return false;
@@ -5093,7 +5092,7 @@ Label_GroupsDone:
     /// <param name="cmdparams"></param>
     public void HandleEditCommand(string[] cmdparams)
     {
-        m_log.Debug($"Searching for Primitive: '{cmdparams[2]}'");
+        m_log.LogDebug($"Searching for Primitive: '{cmdparams[2]}'");
 
         EntityBase[] entityList = GetEntities();
         foreach (EntityBase ent in entityList)
@@ -5109,7 +5108,7 @@ Label_GroupsDone:
                             new Vector3(Convert.ToSingle(cmdparams[3]), Convert.ToSingle(cmdparams[4]),
                                           Convert.ToSingle(cmdparams[5])));
 
-                        m_log.Debug($"Edited scale of Primitive: {part.Name}");
+                        m_log.LogDebug($"Edited scale of Primitive: {part.Name}");
                     }
                 }
             }
@@ -5147,7 +5146,7 @@ Label_GroupsDone:
 
     public LandData GetLandData(uint x, uint y)
     {
-//            m_log.DebugFormat("[SCENE]: returning land for {0},{1}", x, y);
+//            m_log.LogDebug("[SCENE]: returning land for {0},{1}", x, y);
         ILandObject parcel = LandChannel.GetLandObject((int)x, (int)y);
         if (parcel is null)
             return null;
@@ -5738,7 +5737,7 @@ Environment.Exit(1);
             {
                 // Ultimate backup if we have no idea where they are and
                 // the last allowed position was in another parcel
-                m_log.Debug("Have no idea where they are, sending them to: " + avatar.lastKnownAllowedPosition.ToString());
+                m_log.LogDebug("Have no idea where they are, sending them to: " + avatar.lastKnownAllowedPosition.ToString());
                 return avatar.lastKnownAllowedPosition;
             }
 
@@ -5876,7 +5875,7 @@ Environment.Exit(1);
             bool parcelEnvOvr = RegionInfo.EstateSettings.AllowEnvironmentOverride;
             EstateSettings es = estateDataService.LoadEstateSettings(RegionInfo.RegionID, false);
             if (es == null)
-                m_log.Error($"[SCENE]: Region {RegionInfo.RegionName} failed to reload estate settings. Using defaults");
+                m_log.LogError($"[SCENE]: Region {RegionInfo.RegionName} failed to reload estate settings. Using defaults");
             RegionInfo.EstateSettings = es;
             if(parcelEnvOvr && !RegionInfo.EstateSettings.AllowEnvironmentOverride)
                 ClearAllParcelEnvironments();
@@ -5933,7 +5932,7 @@ Environment.Exit(1);
             g.GetAxisAlignedBoundingBoxRaw(out float ominX, out float omaxX, out float ominY,
                 out float omaxY, out float ominZ, out float omaxZ);
 
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[SCENE]: For {0} found AxisAlignedBoundingBoxRaw {1}, {2}",
 //                    g.Name, new Vector3(ominX, ominY, ominZ), new Vector3(omaxX, omaxY, omaxZ));
 
@@ -6012,7 +6011,7 @@ Environment.Exit(1);
     //
     //            foreach (SceneObjectGroup grp in objectsToDelete)
     //            {
-    //                m_log.InfoFormat("[SCENE]: Deleting dropped attachment {0} of user {1}", grp.UUID, grp.OwnerID);
+    //                m_log.LogInformation("[SCENE]: Deleting dropped attachment {0} of user {1}", grp.UUID, grp.OwnerID);
     //                DeleteSceneObject(grp, true);
     //            }
     //        }
@@ -6091,14 +6090,14 @@ Environment.Exit(1);
         {
             if (!AuthorizeUser(aCircuit, false, out reason))
             {
-                //m_log.DebugFormat("[SCENE]: Denying access for {0}", agentID);
+                //m_log.LogDebug("[SCENE]: Denying access for {0}", agentID);
 //                    reason = "Region authorization fail";
                 return false;
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[SCENE]: Exception authorizing agent: {0} " + e.StackTrace, e.Message);
+            m_log.LogDebug("[SCENE]: Exception authorizing agent: {0} " + e.StackTrace, e.Message);
             reason = "Error authorizing agent: " + e.Message;
             return false;
         }
@@ -6136,7 +6135,7 @@ Environment.Exit(1);
         {
             reason = "The region is full";
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[SCENE]: Denying presence with id {0} entry into {1} since region is at agent limit of {2}",
                 agentID, RegionInfo.RegionName, RegionInfo.RegionSettings.AgentLimit);
 
@@ -6207,7 +6206,7 @@ Environment.Exit(1);
             // allow position relocation
             if (!TestLandRestrictions(agentID, out reason, ref posX, ref posY))
             {
-                // m_log.DebugFormat("[SCENE]: Denying {0} because they are banned on all parcels", agentID);
+                // m_log.LogDebug("[SCENE]: Denying {0} because they are banned on all parcels", agentID);
                 reason = "You dont have access to the region parcels";
                 return false;
             }

@@ -29,7 +29,6 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Text;
 using System.Xml;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
@@ -41,6 +40,8 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.World.Archiver;
 
 /// <summary>
@@ -48,7 +49,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver;
 /// </summary>
 public class ArchiveReadRequest
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Contains data used while dearchiving a single scene.
@@ -204,7 +205,7 @@ public class ArchiveReadRequest
         if (options.ContainsKey("default-user"))
         {
             m_defaultUser = (UUID)options["default-user"];
-            m_log.InfoFormat("Using User {0} as default user", m_defaultUser.ToString());
+            m_log.LogInformation("Using User {0} as default user", m_defaultUser.ToString());
         }
         else
         {
@@ -218,10 +219,10 @@ public class ArchiveReadRequest
         }
         catch (EntryPointNotFoundException e)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[ARCHIVER]: Mismatch between Mono and zlib1g library version when trying to create compression stream."
                     + "If you've manually installed Mono, have you appropriately updated zlib1g as well?");
-            m_log.Error(e);
+            m_log.LogError(e, e.Message);
         }
 
         m_errorMessage = String.Empty;
@@ -277,7 +278,7 @@ public class ArchiveReadRequest
                 m_boundingSize = bsOption;
                 m_boundingBox = true;
             }
-            if (clip) m_log.InfoFormat("[ARCHIVER]: The bounding cube specified is larger than the destination region! Clipping to {0}.", m_boundingSize.ToString());
+            if (clip) m_log.LogInformation("[ARCHIVER]: The bounding cube specified is larger than the destination region! Clipping to {0}.", m_boundingSize.ToString());
         }
 
         m_debug = options.ContainsKey("debug");
@@ -341,7 +342,7 @@ public class ArchiveReadRequest
             int indx = filename.LastIndexOf(ArchiveConstants.ASSET_EXTENSION_SEPARATOR);
             if (indx < 32)
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[ARCHIVER]: Could not find extension information in asset path {0} since it's missing the separator {1}.  Skipping",
                     assetPath, ArchiveConstants.ASSET_EXTENSION_SEPARATOR);
                 failedAssetRestores++;
@@ -374,7 +375,7 @@ public class ArchiveReadRequest
 
                 int tot = successfulAssetRestores + failedAssetRestores + skipedAssetRestores;
                 if (tot % 250 == 0)
-                    m_log.Debug("[ARCHIVER]:  done " + tot  + "; uploaded: " + successfulAssetRestores + " failed: "+ failedAssetRestores + " assets...");
+                    m_log.LogDebug("[ARCHIVER]:  done " + tot  + "; uploaded: " + successfulAssetRestores + " failed: "+ failedAssetRestores + " assets...");
             }
         }
         else
@@ -384,14 +385,14 @@ public class ArchiveReadRequest
 
         if (exits is null)
         {
-            m_log.Error("[ARCHIVER]: asset service AssetsExists failed");
+            m_log.LogError("[ARCHIVER]: asset service AssetsExists failed");
             failedAssetRestores += uuids.Count;
             return;
         }
 
         if (exits.Length != uuids.Count)
         {
-            m_log.Error("[ARCHIVER]: asset service AssetsExists return size mismatch");
+            m_log.LogError("[ARCHIVER]: asset service AssetsExists return size mismatch");
             failedAssetRestores += uuids.Count;
             return;
         }
@@ -412,7 +413,7 @@ public class ArchiveReadRequest
 
             int tot = successfulAssetRestores + failedAssetRestores + skipedAssetRestores;
             if (tot % 250 == 0)
-                    m_log.Debug("[ARCHIVER]:  done " + tot  + "; uploaded: " + successfulAssetRestores + " failed: "+ failedAssetRestores + " assets...");
+                    m_log.LogDebug("[ARCHIVER]:  done " + tot  + "; uploaded: " + successfulAssetRestores + " failed: "+ failedAssetRestores + " assets...");
             }
         }
     }
@@ -448,7 +449,7 @@ public class ArchiveReadRequest
 
             while ((data = archive.ReadEntry(out fullPath, out TarArchiveReader.TarEntryType entryType)) is not null)
             {
-                //m_log.DebugFormat(
+                //m_log.LogDebug(
                 //    "[ARCHIVER]: Successfully read {0} ({1} bytes)", filePath, data.Length);
 
                 if (TarArchiveReader.TarEntryType.TYPE_DIRECTORY == entryType)
@@ -518,11 +519,11 @@ public class ArchiveReadRequest
             if (assetsFilesCount > 0)
                 loadNeededAssets(assetsFiles, assetsFilesCount, ref successfulAssetRestores, ref failedAssetRestores, ref skippedAssetRestores);
 
-            //m_log.Debug("[ARCHIVER]: Reached end of archive");
+            //m_log.LogDebug("[ARCHIVER]: Reached end of archive");
         }
         catch (Exception e)
         {
-            m_log.Error($"[ARCHIVER]: Aborting load with error in archive file {fullPath}: {e.Message}");
+            m_log.LogError($"[ARCHIVER]: Aborting load with error in archive file {fullPath}: {e.Message}");
             m_errorMessage += e.Message;
             m_rootScene.EventManager.TriggerOarFileLoaded(m_requestId, new List<UUID>(), m_errorMessage);
             return;
@@ -535,23 +536,23 @@ public class ArchiveReadRequest
 
         if (!m_skipAssets)
         {
-            m_log.Info($"[ARCHIVER]:   Restored {successfulAssetRestores + skippedAssetRestores} assets");
-            m_log.Info($"[ARCHIVER]:     Skipped {skippedAssetRestores} asset uploads");
+            m_log.LogInformation($"[ARCHIVER]:   Restored {successfulAssetRestores + skippedAssetRestores} assets");
+            m_log.LogInformation($"[ARCHIVER]:     Skipped {skippedAssetRestores} asset uploads");
 
             if (failedAssetRestores > 0)
             {
-                m_log.Error($"[ARCHIVER]:     Failed to load {failedAssetRestores} assets");
+                m_log.LogError($"[ARCHIVER]:     Failed to load {failedAssetRestores} assets");
                 m_errorMessage += $"Failed to load {failedAssetRestores} assets";
             }
         }
 
         foreach (DearchiveContext sceneContext in sceneContexts.Values)
         {
-            m_log.Info($"[ARCHIVER]: Loading region {sceneContext.Scene.RegionInfo.RegionName}");
+            m_log.LogInformation($"[ARCHIVER]: Loading region {sceneContext.Scene.RegionInfo.RegionName}");
 
             if (!m_merge)
             {
-                m_log.Info("[ARCHIVER]: Clearing all existing scene objects");
+                m_log.LogInformation("[ARCHIVER]: Clearing all existing scene objects");
                 sceneContext.Scene.DeleteAllSceneObjects();
             }
 
@@ -568,7 +569,7 @@ public class ArchiveReadRequest
             }
             catch (Exception e)
             {
-                m_log.Error($"[ARCHIVER]: Error loading parcels or objects :{e.Message}");
+                m_log.LogError($"[ARCHIVER]: Error loading parcels or objects :{e.Message}");
                 m_errorMessage += e.Message;
                 m_rootScene.EventManager.TriggerOarFileLoaded(m_requestId, new List<UUID>(), m_errorMessage);
                 return;
@@ -582,7 +583,7 @@ public class ArchiveReadRequest
         {
             WorkManager.RunInThread(o =>
             {
-                m_log.Info("[ARCHIVER]: Starting scripts in scene objects...");
+                m_log.LogInformation("[ARCHIVER]: Starting scripts in scene objects...");
                 foreach (DearchiveContext sceneContext in sceneContexts.Values)
                 {
                     foreach (SceneObjectGroup sceneObject in sceneContext.SceneObjects)
@@ -593,11 +594,11 @@ public class ArchiveReadRequest
 
                     sceneContext.SceneObjects.Clear();
                 }
-                m_log.Info("[ARCHIVER]: Start scripts done");
+                m_log.LogInformation("[ARCHIVER]: Start scripts done");
             }, null, $"ReadArchiveStartScripts (request {m_requestId})");
         }
 
-        m_log.InfoFormat("[ARCHIVER]: Successfully loaded archive");
+        m_log.LogInformation("[ARCHIVER]: Successfully loaded archive");
 
         m_rootScene.EventManager.TriggerOarFileLoaded(m_requestId, dearchivedScenes.GetLoadedScenes(), m_errorMessage);
     }
@@ -641,7 +642,7 @@ public class ArchiveReadRequest
                 // If the control file wasn't the first file then reset the read pointer
                 if (!firstFile)
                 {
-                    m_log.Warn("[ARCHIVER]: Control file wasn't the first file in the archive");
+                    m_log.LogWarning("[ARCHIVER]: Control file wasn't the first file in the archive");
                     if (m_loadStream.CanSeek)
                     {
                         m_loadStream.Seek(0, SeekOrigin.Begin);
@@ -677,7 +678,7 @@ public class ArchiveReadRequest
     protected void LoadObjects(Scene scene, List<string> serialisedSceneObjects, List<SceneObjectGroup> sceneObjects)
     {
         // Reload serialized prims
-        m_log.Info($"[ARCHIVER]: Loading {serialisedSceneObjects.Count} scene objects.  Please wait.");
+        m_log.LogInformation($"[ARCHIVER]: Loading {serialisedSceneObjects.Count} scene objects.  Please wait.");
 
         // Convert rotation to radians
         double rotation = MathF.PI * m_rotation / 180f;
@@ -708,7 +709,7 @@ public class ArchiveReadRequest
 
             Vector3 pos = sceneObject.AbsolutePosition;
             if (m_debug)
-                m_log.Debug($"[ARCHIVER]: Loading object from OAR with original scene position {pos}");
+                m_log.LogDebug($"[ARCHIVER]: Loading object from OAR with original scene position {pos}");
 
             // Happily this does not do much to the object since it hasn't been added to the scene yet
             if (!sceneObject.IsAttachment)
@@ -728,7 +729,7 @@ public class ArchiveReadRequest
                     offset *= rot;
                     // Restore the object position back to relative to the region
                     pos = m_rotationCenter + offset;
-                    if (m_debug) m_log.Debug($"[ARCHIVER]: After rotation, object from OAR is at scene position {pos}");
+                    if (m_debug) m_log.LogDebug($"[ARCHIVER]: After rotation, object from OAR is at scene position {pos}");
                 }
                 if (m_boundingBox)
                 {
@@ -736,7 +737,7 @@ public class ArchiveReadRequest
                         || pos.Y < m_boundingOrigin.Y || pos.Y >= boundingExtent.Y
                         || pos.Z < m_boundingOrigin.Z || pos.Z >= boundingExtent.Z)
                     {
-                        if (m_debug) m_log.Debug($"[ARCHIVER]: Skipping object from OAR in scene because it's position {pos} is outside of bounding cube.");
+                        if (m_debug) m_log.LogDebug($"[ARCHIVER]: Skipping object from OAR in scene because it's position {pos} is outside of bounding cube.");
                         continue;
                     }
                     //adjust object position to be relative to <0,0> so we can apply the displacement
@@ -750,15 +751,15 @@ public class ArchiveReadRequest
                         || pos.Y < 0 || pos.Y >= scene.RegionInfo.RegionSizeY
                         || pos.Z < Constants.MinSimulationHeight || pos.Z > Constants.MaxSimulationHeight)
                     {
-                        if (m_debug) m_log.Debug($"[ARCHIVER]: Skipping object from OAR After displacement clip {pos}");
+                        if (m_debug) m_log.LogDebug($"[ARCHIVER]: Skipping object from OAR After displacement clip {pos}");
                         continue;
                     }
-                    if (m_debug) m_log.Debug($"[ARCHIVER]: After displacement, object from OAR is at scene position {pos}");
+                    if (m_debug) m_log.LogDebug($"[ARCHIVER]: After displacement, object from OAR is at scene position {pos}");
                 }
                 sceneObject.AbsolutePosition = pos;
             }
             if (m_debug)
-                m_log.Debug($"[ARCHIVER]: Placing object from OAR in scene at position {pos}.  ");
+                m_log.LogDebug($"[ARCHIVER]: Placing object from OAR in scene at position {pos}.  ");
 
             bool isTelehub = (sceneObject.UUID.Equals(oldTelehubUUID)) && (!oldTelehubUUID.IsZero());
 
@@ -787,22 +788,22 @@ public class ArchiveReadRequest
             }
         }
 
-        m_log.Info($"[ARCHIVER]: Loaded {sceneObjectsLoadedCount} scene objects to the scene");
+        m_log.LogInformation($"[ARCHIVER]: Loaded {sceneObjectsLoadedCount} scene objects to the scene");
         int ignoredObjects = serialisedSceneObjects.Count - sceneObjectsLoadedCount - mergeskip;
 
         if(mergeskip > 0)
         {
             if(m_mergeReplaceObjects)
-                m_log.Info($"[ARCHIVER]:     Replaced {mergeskip} scene objects");
+                m_log.LogInformation($"[ARCHIVER]:     Replaced {mergeskip} scene objects");
             else
-                m_log.Info($"[ARCHIVER]:     Skipped {mergeskip} scene objects that already existed in the scene");
+                m_log.LogInformation($"[ARCHIVER]:     Skipped {mergeskip} scene objects that already existed in the scene");
         }
         if (ignoredObjects > 0)
-            m_log.Warn($"[ARCHIVER]:     Ignored {ignoredObjects} possible out of bounds");
+            m_log.LogWarning($"[ARCHIVER]:     Ignored {ignoredObjects} possible out of bounds");
 
         if (!oldTelehubUUID.IsZero())
         {
-            m_log.Warn($"[ARCHIVER]: Telehub object not found: {oldTelehubUUID}");
+            m_log.LogWarning($"[ARCHIVER]: Telehub object not found: {oldTelehubUUID}");
             scene.RegionInfo.RegionSettings.TelehubObject = UUID.Zero;
             scene.RegionInfo.RegionSettings.ClearSpawnPoints();
         }
@@ -884,12 +885,12 @@ public class ArchiveReadRequest
     {
         if(serialisedParcels.Count == 0)
         {
-            m_log.Info("[ARCHIVER]: No parcels to load, or skiping load");
+            m_log.LogInformation("[ARCHIVER]: No parcels to load, or skiping load");
             return;
         }
 
         // Reload serialized parcels
-        m_log.Info($"[ARCHIVER]: Loading {serialisedParcels.Count} parcels.  Please wait.");
+        m_log.LogInformation($"[ARCHIVER]: Loading {serialisedParcels.Count} parcels.  Please wait.");
         List<LandData> landData = new();
         ILandObject landObject;
         List<ILandObject> parcels;
@@ -921,20 +922,20 @@ public class ArchiveReadRequest
             bool[,] srcLandBitmap = landObject.ConvertBytesToLandBitmap(overrideRegionSize);
             if (landObject.IsLandBitmapEmpty(srcLandBitmap))
             {
-                m_log.Info($"[ARCHIVER]: Skipping source parcel {parcel.Name} with GlobalID: {parcel.GlobalID} LocalID: {parcel.LocalID} that has no claimed land.");
+                m_log.LogInformation($"[ARCHIVER]: Skipping source parcel {parcel.Name} with GlobalID: {parcel.GlobalID} LocalID: {parcel.LocalID} that has no claimed land.");
                 continue;
             }
-            //m_log.DebugFormat("[ARCHIVER]: Showing claimed land for source parcel: {0} with GlobalID: {1} LocalID: {2}.",
+            //m_log.LogDebug("[ARCHIVER]: Showing claimed land for source parcel: {0} with GlobalID: {1} LocalID: {2}.",
             //   parcel.Name, parcel.GlobalID, parcel.LocalID);
             //landObject.DebugLandBitmap(srcLandBitmap);
 
             bool[,] dstLandBitmap = landObject.RemapLandBitmap(srcLandBitmap, displacement, m_rotation, boundingOrigin, boundingSize, regionSize, out bool isEmptyNow);
             if (isEmptyNow)
             {
-                m_log.Warn($"[ARCHIVER]: Not adding destination parcel {parcel.Name} with GlobalID: {parcel.GlobalID} LocalID: {parcel.LocalID} because, after applying rotation, bounding and displacement, it has no claimed land.");
+                m_log.LogWarning($"[ARCHIVER]: Not adding destination parcel {parcel.Name} with GlobalID: {parcel.GlobalID} LocalID: {parcel.LocalID} because, after applying rotation, bounding and displacement, it has no claimed land.");
                 continue;
             }
-            //m_log.DebugFormat("[ARCHIVER]: Showing claimed land for destination parcel: {0} with GlobalID: {1} LocalID: {2} after applying rotation, bounding and displacement.",
+            //m_log.LogDebug("[ARCHIVER]: Showing claimed land for destination parcel: {0} with GlobalID: {1} LocalID: {2} after applying rotation, bounding and displacement.",
             //    parcel.Name, parcel.GlobalID, parcel.LocalID);
             //landObject.DebugLandBitmap(dstLandBitmap);
 
@@ -1001,12 +1002,12 @@ public class ArchiveReadRequest
             parcel.ParcelAccessList = accessList;
 
             if (m_debug)
-                m_log.Debug($"[ARCHIVER]: Adding parcel {parcel.Name}, local id {parcel.LocalID}, owner {parcel.OwnerID}, group {parcel.GroupID}, isGroupOwned {parcel.IsGroupOwned}, area {parcel.Area}");
+                m_log.LogDebug($"[ARCHIVER]: Adding parcel {parcel.Name}, local id {parcel.LocalID}, owner {parcel.OwnerID}, group {parcel.GroupID}, isGroupOwned {parcel.IsGroupOwned}, area {parcel.Area}");
 
             landData.Add(parcel);
         }
 
-        m_log.Info($"[ARCHIVER]: Clearing {parcels.Count} parcels.");
+        m_log.LogInformation($"[ARCHIVER]: Clearing {parcels.Count} parcels.");
         bool setupDefaultParcel = (landData.Count == 0);
         scene.LandChannel.Clear(setupDefaultParcel);
 
@@ -1021,11 +1022,11 @@ public class ArchiveReadRequest
                     j++;
                 }
             }
-            m_log.Info($"[ARCHIVER]: Keeping {j} old parcels.");
+            m_log.LogInformation($"[ARCHIVER]: Keeping {j} old parcels.");
         }
 
         scene.EventManager.TriggerIncomingLandDataFromStorage(landData);
-        m_log.Info($"[ARCHIVER]: Added {landData.Count} total parcels.");
+        m_log.LogInformation($"[ARCHIVER]: Added {landData.Count} total parcels.");
     }
 
     /// <summary>
@@ -1117,7 +1118,7 @@ public class ArchiveReadRequest
                     // And since its the first time we've seen this and no alias exists print a warning
                     if (aliasUser is null)
                     {
-                        m_log.Warn($"[ARCHIVEREADREQUEST] No alias found for User {aliasID} and not a local user");
+                        m_log.LogWarning($"[ARCHIVEREADREQUEST] No alias found for User {aliasID} and not a local user");
                     }
                 }
             }
@@ -1143,7 +1144,7 @@ public class ArchiveReadRequest
     {
         if (assetType == (sbyte)AssetType.Unknown)
         {
-            m_log.Warn($"[ARCHIVER]: Importing {data.Length} byte asset {assetID} with unknown type");
+            m_log.LogWarning($"[ARCHIVER]: Importing {data.Length} byte asset {assetID} with unknown type");
         }
         else if (assetType == (sbyte)AssetType.Object)
         {
@@ -1158,7 +1159,7 @@ public class ArchiveReadRequest
                 return false;
         }
 
-        //m_log.DebugFormat("[ARCHIVER]: Importing asset {0}, type {1}", uuid, assetType);
+        //m_log.LogDebug("[ARCHIVER]: Importing asset {0}, type {1}", uuid, assetType);
         AssetBase asset = new(assetID, string.Empty, assetType, UUID.Zero.ToString())
         {
             Data = data
@@ -1190,7 +1191,7 @@ public class ArchiveReadRequest
         }
         catch (Exception e)
         {
-            m_log.Error(
+            m_log.LogError(
                 $"[ARCHIVER]: Could not parse region settings file {settingsPath}: {e.Message}");
             return false;
         }
@@ -1283,7 +1284,7 @@ public class ArchiveReadRequest
             terrainModule.LoadFromStream(terrainPath, ms);
         }
 
-        m_log.Debug($"[ARCHIVER]: Restored terrain {terrainPath}");
+        m_log.LogDebug($"[ARCHIVER]: Restored terrain {terrainPath}");
 
         return true;
     }
@@ -1325,7 +1326,7 @@ public class ArchiveReadRequest
                             $"The OAR you are trying to load has major version number of {majorVersion} but this version can only load OARs with major version number {MAX_MAJOR_VERSION} and below");
                     }
 
-                    m_log.InfoFormat($"[ARCHIVER]: Loading OAR with version {version}");
+                    m_log.LogInformation($"[ARCHIVER]: Loading OAR with version {version}");
                 }
                 else if (xtr.Name.ToString() == "datetime")
                 {
@@ -1360,7 +1361,7 @@ public class ArchiveReadRequest
                         m_incomingRegionSize = value;
                         if(multiRegion)
                             dearchivedScenes.SetRegionSize(m_incomingRegionSize);
-                        m_log.Debug($"[ARCHIVER]: Found region_size info {m_incomingRegionSize}");
+                        m_log.LogDebug($"[ARCHIVER]: Found region_size info {m_incomingRegionSize}");
                     }
                 }
             }

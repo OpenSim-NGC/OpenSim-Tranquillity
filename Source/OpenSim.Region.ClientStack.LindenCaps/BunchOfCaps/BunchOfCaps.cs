@@ -35,8 +35,6 @@ using System.Text;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
-
 using OpenSim.Framework;
 using OpenSim.Framework.Capabilities;
 using OpenSim.Region.Framework.Interfaces;
@@ -45,6 +43,7 @@ using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
@@ -77,7 +76,7 @@ public delegate IClientAPI GetClientDelegate(UUID agentID);
 
 public partial class BunchOfCaps
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_Scene;
     private UUID m_AgentID;
@@ -129,7 +128,7 @@ public partial class BunchOfCaps
         m_userAccountService = m_Scene.RequestModuleInterface<IUserAccountService>();
         m_moneyModule = m_Scene.RequestModuleInterface<IMoneyModule>();
         if (m_UserManager is null)
-            m_log.Error("[CAPS]: GetDisplayNames disabled because user management component not found");
+            m_log.LogError("[CAPS]: GetDisplayNames disabled because user management component not found");
 
         UserAccount account = m_userAccountService?.GetUserAccount(m_Scene.RegionInfo.ScopeID, m_AgentID);
         if (account is null) // Hypergrid?
@@ -161,7 +160,7 @@ public partial class BunchOfCaps
         string seedcapsBase = "/CAPS/" + m_HostCapsObj.CapsObjectPath + "0000";
 
         m_HostCapsObj.RegisterSimpleHandler("SEED", new SimpleStreamHandler(seedcapsBase, SeedCapRequest));
-        // m_log.DebugFormat(
+        // m_log.LogDebug(
         //     "[CAPS]: Registered seed capability {0} for {1}", seedcapsBase, m_HostCapsObj.AgentID);
 
         RegisterRegionServiceHandlers();
@@ -211,7 +210,7 @@ public partial class BunchOfCaps
         }
         catch (Exception e)
         {
-            m_log.Error("[CAPS]: Error " + e.Message);
+            m_log.LogError("[CAPS]: Error " + e.Message);
         }
     }
 
@@ -267,7 +266,7 @@ public partial class BunchOfCaps
         }
         catch (Exception e)
         {
-            m_log.Error("[CAPS]: " + e.ToString());
+            m_log.LogError("[CAPS]: " + e.ToString());
         }
     }
 
@@ -283,7 +282,7 @@ public partial class BunchOfCaps
         }
         catch (Exception e)
         {
-            m_log.Error("[CAPS]: Error " + e.Message);
+            m_log.LogError("[CAPS]: Error " + e.Message);
         }
     }
     /// <summary>
@@ -297,7 +296,7 @@ public partial class BunchOfCaps
     /// <returns></returns>
     public void SeedCapRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        m_log.Debug(
+        m_log.LogDebug(
             $"[CAPS]: Received SEED caps request in {m_regionName} for agent {m_HostCapsObj.AgentID}");
 
         if(httpRequest.HttpMethod != "POST" || httpRequest.ContentType != "application/llsd+xml")
@@ -315,7 +314,7 @@ public partial class BunchOfCaps
 
         if (!m_Scene.CheckClient(m_HostCapsObj.AgentID, httpRequest.RemoteIPEndPoint))
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 $"[CAPS]: Unauthorized CAPS client {m_HostCapsObj.AgentID} from {httpRequest.RemoteIPEndPoint}");
             httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
             return;
@@ -394,8 +393,8 @@ public partial class BunchOfCaps
     /// <returns></returns>
     public LLSDAssetUploadResponse NewAgentInventoryRequest(LLSDAssetUploadRequest llsdRequest)
     {
-        //m_log.Debug("[CAPS]: NewAgentInventoryRequest Request is: " + llsdRequest.ToString());
-        //m_log.Debug("asset upload request via CAPS" + llsdRequest.inventory_type + " , " + llsdRequest.asset_type);
+        //m_log.LogDebug("[CAPS]: NewAgentInventoryRequest Request is: " + llsdRequest.ToString());
+        //m_log.LogDebug("asset upload request via CAPS" + llsdRequest.inventory_type + " , " + llsdRequest.asset_type);
 
         // start by getting the client
         IClientAPI client = null;
@@ -622,7 +621,7 @@ public partial class BunchOfCaps
         lock (m_ModelCost)
             m_FileAgentInventoryState = FileAgentInventoryState.processUpload;
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[BUNCH OF CAPS]: Uploaded asset {0} for inventory item {1}, inv type {2}, asset type {3}",
             assetID, inventoryItem, inventoryType, assetType);
 
@@ -675,7 +674,7 @@ public partial class BunchOfCaps
         {
             inType = (sbyte)CustomInventoryType.AnimationSet;
             assType = (sbyte)CustomAssetType.AnimationSet;
-            m_log.Debug("got animset upload request");
+            m_log.LogDebug("got animset upload request");
         }
         else if (inventoryType == "wearable")
         {
@@ -1036,7 +1035,7 @@ public partial class BunchOfCaps
 
             else // not a mesh model
             {
-                m_log.ErrorFormat("[CAPS Asset Upload] got unsuported assetType for object upload");
+                m_log.LogError("[CAPS Asset Upload] got unsuported assetType for object upload");
                 return;
             }
         }
@@ -1222,7 +1221,7 @@ public partial class BunchOfCaps
         }
         catch { }
 
-        m_log.Debug("[CAPS]: CreateInventoryCategory failed to process request");
+        m_log.LogDebug("[CAPS]: CreateInventoryCategory failed to process request");
         httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
     }
 
@@ -1247,7 +1246,7 @@ public partial class BunchOfCaps
             UUID folderID = content["folder-id"].AsUUID();
             UUID itemID = content["item-id"].AsUUID();
 
-            //  m_log.InfoFormat("[CAPS]: CopyInventoryFromNotecard, FolderID:{0}, ItemID:{1}, NotecardID:{2}, ObjectID:{3}", folderID, itemID, notecardID, objectID);
+            //  m_log.LogInformation("[CAPS]: CopyInventoryFromNotecard, FolderID:{0}, ItemID:{1}, NotecardID:{2}, ObjectID:{3}", folderID, itemID, notecardID, objectID);
 
             UUID noteAssetID = UUID.Zero;
             UUID agentID = m_HostCapsObj.AgentID;
@@ -1280,7 +1279,7 @@ public partial class BunchOfCaps
                     if (copyItem == null)
                         throw new Exception("Failed to find notecard item" + notecardID.ToString());
 
-                    m_log.InfoFormat("[CAPS]: CopyInventoryFromNotecard, ItemID:{0}, FolderID:{1}", copyItem.ID, copyItem.Folder);
+                    m_log.LogInformation("[CAPS]: CopyInventoryFromNotecard, ItemID:{0}, FolderID:{1}", copyItem.ID, copyItem.Folder);
                     if (client != null)
                         client.SendBulkUpdateInventory(copyItem);
                     return;
@@ -1394,14 +1393,14 @@ public partial class BunchOfCaps
             if (!m_Scene.InventoryService.AddItem(item))
                 throw new Exception("Failed create the notecard item" + notecardID.ToString());
 
-            m_log.InfoFormat("[CAPS]: CopyInventoryFromNotecard, ItemID:{0} FolderID:{1}", item.ID, item.Folder);
+            m_log.LogInformation("[CAPS]: CopyInventoryFromNotecard, ItemID:{0} FolderID:{1}", item.ID, item.Folder);
             if (client != null)
                 client.SendBulkUpdateInventory(item);
             return;
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[CAPS]: CopyInventoryFromNotecard : {0}", e.Message);
+            m_log.LogError("[CAPS]: CopyInventoryFromNotecard : {0}", e.Message);
             copyItem = null;
         }
 
@@ -2265,8 +2264,7 @@ public partial class BunchOfCaps
 
     public class AssetUploader
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         public event UpLoadedAsset OnUpLoad;
         private UpLoadedAsset handlerUpLoad = null;
@@ -2411,7 +2409,7 @@ public partial class BunchOfCaps
 
         private void TimedOut(object sender, ElapsedEventArgs args)
         {
-            m_log.InfoFormat("[CAPS]: Removing URL and handler for timed out mesh upload");
+            m_log.LogInformation("[CAPS]: Removing URL and handler for timed out mesh upload");
             httpListener.RemoveStreamHandler("POST", uploaderPath);
         }
 
@@ -2457,13 +2455,13 @@ public partial class BunchOfCaps
         public virtual void Timedout(object state)
         {
             Stop();
-            m_log.InfoFormat("[CAPS]: Removing URL and handler for timed out service");
+            m_log.LogInformation("[CAPS]: Removing URL and handler for timed out service");
         }
     }
 
     public class ScriptResourceSummary : ExpiringCapBase
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private Scene m_scene;
         private UUID m_agentID;
@@ -2548,7 +2546,7 @@ public partial class BunchOfCaps
 
     public class ScriptResourceDetails : ExpiringCapBase
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private Scene m_scene;
         private UUID m_agentID;

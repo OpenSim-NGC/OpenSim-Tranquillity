@@ -27,7 +27,6 @@
 
 using System.Reflection;
 using OpenSim.Framework.Servers;
-using log4net;
 using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -35,11 +34,14 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Servers.HttpServer;
 
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.OptionalModules.WebSocketEchoModule;
 
 public class WebSocketEchoModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool enabled;
     public string Name { get { return "WebSocketEchoModule"; } }
@@ -53,7 +55,7 @@ public class WebSocketEchoModule : ISharedRegionModule
     {
         enabled = (pConfig.Configs["WebSocketEcho"] != null);
 //            if (enabled)
-//                m_log.DebugFormat("[WebSocketEchoModule]: INITIALIZED MODULE");
+//                m_log.LogDebug("[WebSocketEchoModule]: INITIALIZED MODULE");
     }
 
     /// <summary>
@@ -95,14 +97,14 @@ public class WebSocketEchoModule : ISharedRegionModule
 
     private void HandlerOnOnPong(object sender, PongEventArgs pongdata)
     {
-        m_log.Info("[WebSocketEchoModule]: Got a pong..  ping time: " + pongdata.PingResponseMS);
+        m_log.LogInformation("[WebSocketEchoModule]: Got a pong..  ping time: " + pongdata.PingResponseMS);
     }
 
     private void HandlerOnOnData(object sender, WebsocketDataEventArgs data)
     {
         WebSocketHttpServerHandler obj = sender as WebSocketHttpServerHandler;
         obj.SendData(data.Data);
-        m_log.Info("[WebSocketEchoModule]: We received a bunch of ugly non-printable bytes");
+        m_log.LogInformation("[WebSocketEchoModule]: We received a bunch of ugly non-printable bytes");
         obj.SendPingCheck();
     }
 
@@ -117,7 +119,7 @@ public class WebSocketEchoModule : ISharedRegionModule
     {
         WebSocketHttpServerHandler obj = sender as WebSocketHttpServerHandler;
         obj.SendMessage(text.Data);
-        m_log.Info("[WebSocketEchoModule]: We received this: " + text.Data);
+        m_log.LogInformation("[WebSocketEchoModule]: We received this: " + text.Data);
     }
 
     // Remove the references to our handler
@@ -154,16 +156,16 @@ public class WebSocketEchoModule : ISharedRegionModule
 
     public void AddRegion(Scene scene)
     {
-//            m_log.DebugFormat("[WebSocketEchoModule]: REGION {0} ADDED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[WebSocketEchoModule]: REGION {0} ADDED", scene.RegionInfo.RegionName);
     }
 
     public void RemoveRegion(Scene scene)
     {
-//            m_log.DebugFormat("[WebSocketEchoModule]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[WebSocketEchoModule]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
     }
 
     public void RegionLoaded(Scene scene)
     {
-//            m_log.DebugFormat("[WebSocketEchoModule]: REGION {0} LOADED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[WebSocketEchoModule]: REGION {0} LOADED", scene.RegionInfo.RegionName);
     }
 }

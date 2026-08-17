@@ -29,8 +29,9 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Services.Interfaces;
-using log4net;
 using System.Reflection;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.ClientStack.LindenUDP;
 
@@ -51,7 +52,7 @@ public class J2KImage
     /// </remarks>
     private const int ASSET_REQUEST_TIMEOUT = 100000000;
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public uint LastSequence;
     public float Priority;
@@ -145,7 +146,7 @@ public class J2KImage
         {
             if (!m_assetRequested || DateTime.UtcNow.Ticks > AssetRequestTime + ASSET_REQUEST_TIMEOUT)
             {
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[J2KIMAGE]: Requesting asset {0} from request in packet {1}, already requested? {2}, due to timeout? {3}",
 //                        TextureID, LastSequence, m_assetRequested, DateTime.UtcNow.Ticks > AssetRequestTime + ASSET_REQUEST_TIMEOUT);
 
@@ -165,7 +166,7 @@ public class J2KImage
                     //Request decode
                     m_decodeRequested = true;
 
-//                        m_log.DebugFormat("[J2KIMAGE]: Requesting decode of asset {0}", TextureID);
+//                        m_log.LogDebug("[J2KIMAGE]: Requesting decode of asset {0}", TextureID);
 
                     // Do we have a jpeg decoder?
                     if (J2KDecoder != null)
@@ -191,7 +192,7 @@ public class J2KImage
                 // Check for missing image asset data
                 if (m_asset == null)
                 {
-                    //m_log.Warn("[J2KIMAGE]: RunUpdate() called with missing asset data (no missing image texture?). Canceling texture transfer");
+                    //m_log.LogWarning("[J2KIMAGE]: RunUpdate() called with missing asset data (no missing image texture?). Canceling texture transfer");
                     m_currentPacket = m_stopPacket;
                     return;
                 }
@@ -201,7 +202,7 @@ public class J2KImage
                     // This shouldn't happen, but if it does, we really can't proceed
                     if (m_layers == null)
                     {
-                        m_log.Warn("[J2KIMAGE]: RunUpdate() called with missing Layers. Canceling texture transfer");
+                        m_log.LogWarning("[J2KIMAGE]: RunUpdate() called with missing Layers. Canceling texture transfer");
                         m_currentPacket = m_stopPacket;
                         return;
                     }
@@ -247,7 +248,7 @@ public class J2KImage
 
         if (m_asset == null)
         {
-            m_log.Warn("[J2KIMAGE]: Sending ImageNotInDatabase for texture " + TextureID);
+            m_log.LogWarning("[J2KIMAGE]: Sending ImageNotInDatabase for texture " + TextureID);
             client.SendImageNotFound(TextureID);
             return true;
         }
@@ -266,7 +267,7 @@ public class J2KImage
             try { Buffer.BlockCopy(m_asset, 0, firstImageData, 0, FIRST_PACKET_SIZE); }
             catch (Exception)
             {
-                m_log.ErrorFormat("[J2KIMAGE]: Texture block copy for the first packet failed. textureid={0}, assetlength={1}", TextureID, m_asset.Length);
+                m_log.LogError("[J2KIMAGE]: Texture block copy for the first packet failed. textureid={0}, assetlength={1}", TextureID, m_asset.Length);
                 return true;
             }
 
@@ -307,7 +308,7 @@ public class J2KImage
                 try { Buffer.BlockCopy(m_asset, currentPosition, imageData, 0, imagePacketSize); }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[J2KIMAGE]: Texture block copy for the first packet failed. textureid={0}, assetlength={1}, currentposition={2}, imagepacketsize={3}, exception={4}",
+                    m_log.LogError("[J2KIMAGE]: Texture block copy for the first packet failed. textureid={0}, assetlength={1}, currentposition={2}, imagepacketsize={3}, exception={4}",
                         TextureID, m_asset.Length, currentPosition, imagePacketSize, e.Message);
                     return false;
                 }
@@ -405,7 +406,7 @@ public class J2KImage
 
     private void AssetReceived(string id, Object sender, AssetBase asset)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[J2KIMAGE]: Received asset {0} ({1} bytes)", id, asset != null ? asset.Data.Length.ToString() : "n/a");
 
         UUID assetID = UUID.Zero;
@@ -428,7 +429,7 @@ public class J2KImage
                 if (!assetServerURL.EndsWith("/") && !assetServerURL.EndsWith("="))
                     assetServerURL = assetServerURL + "/";
 
-//                    m_log.DebugFormat("[J2KIMAGE]: texture {0} not found in local asset storage. Trying user's storage.", assetServerURL + id);
+//                    m_log.LogDebug("[J2KIMAGE]: texture {0} not found in local asset storage. Trying user's storage.", assetServerURL + id);
                 AssetService.Get(assetServerURL + id, InventoryAccessModule, AssetReceived);
                 return;
             }

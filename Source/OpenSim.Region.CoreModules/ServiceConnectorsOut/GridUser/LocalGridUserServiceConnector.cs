@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -35,11 +34,14 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser;
 
 public class LocalGridUserServicesConnector : ISharedRegionModule, IGridUserService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IGridUserService m_GridUserService;
 
@@ -70,7 +72,7 @@ public class LocalGridUserServicesConnector : ISharedRegionModule, IGridUserServ
                 IConfig userConfig = source.Configs["GridUserService"];
                 if (userConfig == null)
                 {
-                    m_log.Error("[LOCAL GRID USER SERVICE CONNECTOR]: GridUserService missing from OpenSim.ini");
+                    m_log.LogError("[LOCAL GRID USER SERVICE CONNECTOR]: GridUserService missing from OpenSim.ini");
                     return;
                 }
 
@@ -78,7 +80,7 @@ public class LocalGridUserServicesConnector : ISharedRegionModule, IGridUserServ
 
                 if (serviceDll.Length == 0)
                 {
-                    m_log.Error("[LOCAL GRID USER SERVICE CONNECTOR]: No LocalServiceModule named in section GridUserService");
+                    m_log.LogError("[LOCAL GRID USER SERVICE CONNECTOR]: No LocalServiceModule named in section GridUserService");
                     return;
                 }
 
@@ -87,7 +89,7 @@ public class LocalGridUserServicesConnector : ISharedRegionModule, IGridUserServ
 
                 if (m_GridUserService == null)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[LOCAL GRID USER SERVICE CONNECTOR]: Cannot load user account service specified as {0}", serviceDll);
                     return;
                 }
@@ -96,7 +98,7 @@ public class LocalGridUserServicesConnector : ISharedRegionModule, IGridUserServ
 
                 m_Enabled = true;
 
-                m_log.Info("[LOCAL GRID USER SERVICE CONNECTOR]: Local grid user connector enabled");
+                m_log.LogInformation("[LOCAL GRID USER SERVICE CONNECTOR]: Local grid user connector enabled");
             }
         }
     }
@@ -136,7 +138,7 @@ public class LocalGridUserServicesConnector : ISharedRegionModule, IGridUserServ
         if (!m_Enabled)
             return;
 
-        m_log.InfoFormat("[LOCAL GRID USER SERVICE CONNECTOR]: Enabled local grid user for region {0}", scene.RegionInfo.RegionName);
+        m_log.LogInformation("[LOCAL GRID USER SERVICE CONNECTOR]: Enabled local grid user for region {0}", scene.RegionInfo.RegionName);
     }
 
     #endregion

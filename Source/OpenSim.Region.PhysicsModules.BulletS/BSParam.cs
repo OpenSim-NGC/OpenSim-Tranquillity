@@ -31,6 +31,8 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenMetaverse;
 using Nini.Config;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 public static class BSParam
@@ -318,7 +320,7 @@ public static class BSParam
             if (prop == null)
             {
                 // This should only be output when someone adds a new INI parameter and misspells the name.
-                s.Logger.ErrorFormat("{0} SetValueByName: did not find '{1}'. Verify specified property name is the same as the given INI parameters name.", LogHeader, pName);
+                s.Logger.LogError("{0} SetValueByName: did not find '{1}'. Verify specified property name is the same as the given INI parameters name.", LogHeader, pName);
             }
             else
             {
@@ -332,7 +334,7 @@ public static class BSParam
             if (prop == null)
             {
                 // This should only be output when someone adds a new INI parameter and misspells the name.
-                s.Logger.ErrorFormat("{0} GetValueByName: did not find '{1}'. Verify specified property name is the same as the given INI parameter name.", LogHeader, pName);
+                s.Logger.LogError("{0} GetValueByName: did not find '{1}'. Verify specified property name is the same as the given INI parameter name.", LogHeader, pName);
             }
             return (T)prop.GetValue(null, null);
         }
@@ -356,7 +358,7 @@ public static class BSParam
                 }
                 catch
                 {
-                    s.Logger.Error($"{LogHeader} Failed setting string parameter value '{valAsString}'");
+                    s.Logger.LogError($"{LogHeader} Failed setting string parameter value '{valAsString}'");
                 }
                 return;
             }
@@ -369,7 +371,7 @@ public static class BSParam
             }
             catch (Exception e)
             {
-                s.Logger.Error($"{LogHeader} Exception getting parser for type '{genericType}': {e.Message}");
+                s.Logger.LogError($"{LogHeader} Exception getting parser for type '{genericType}': {e.Message}");
                 return;
             }
             if (parser != null)
@@ -380,15 +382,15 @@ public static class BSParam
                     T setValue = (T)parser.Invoke(genericType, new Object[] { valAsString });
                     // Store the parsed value
                     setter(s, setValue);
-                    // s.Logger.DebugFormat("{0} Parameter {1} = {2}", LogHeader, name, setValue);
+                    // s.Logger.LogDebug("{0} Parameter {1} = {2}", LogHeader, name, setValue);
                 }
                 catch
                 {
-                    s.Logger.Error($"{LogHeader} Failed parsing parameter value '{valAsString}' as type '{genericType}'");
+                    s.Logger.LogError($"{LogHeader} Failed parsing parameter value '{valAsString}' as type '{genericType}'");
                 }
             }
             else
-                s.Logger.Error($"{LogHeader} Could not find parameter parser for type '{genericType}'");
+                s.Logger.LogError($"{LogHeader} Could not find parameter parser for type '{genericType}'");
         }
         public override bool HasSetOnObject
         {

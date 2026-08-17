@@ -26,19 +26,19 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.Groups;
 
 public class GroupsModule : ISharedRegionModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Dictionary<UUID, GroupMembershipData> m_GroupMap =
             new Dictionary<UUID, GroupMembershipData>();
@@ -64,14 +64,14 @@ public class GroupsModule : ISharedRegionModule
 
         if (groupsConfig == null)
         {
-            m_log.Info("[GROUPS]: No configuration found. Using defaults");
+            m_log.LogInformation("[GROUPS]: No configuration found. Using defaults");
         }
         else
         {
             m_Enabled = groupsConfig.GetBoolean("Enabled", false);
             if (!m_Enabled)
             {
-                m_log.Info("[GROUPS]: Groups disabled in configuration");
+                m_log.LogInformation("[GROUPS]: Groups disabled in configuration");
                 return;
             }
 
@@ -139,7 +139,7 @@ public class GroupsModule : ISharedRegionModule
         if (!m_Enabled)
             return;
 
-//            m_log.Debug("[GROUPS]: Shutting down group module.");
+//            m_log.LogDebug("[GROUPS]: Shutting down group module.");
 
         lock (m_ClientMap)
         {
@@ -248,11 +248,11 @@ public class GroupsModule : ISharedRegionModule
 //                    IClientAPI cli = m_ClientMap[agentID];
 //                    if (cli != null)
 //                    {
-//                        //m_log.Info("[GROUPS]: Removing all reference to groups for " + cli.Name);
+//                        //m_log.LogInformation("[GROUPS]: Removing all reference to groups for " + cli.Name);
 //                    }
 //                    else
 //                    {
-//                        //m_log.Info("[GROUPS]: Removing all reference to groups for " + agentID.ToString());
+//                        //m_log.LogInformation("[GROUPS]: Removing all reference to groups for " + agentID.ToString());
 //                    }
                 m_ClientMap.Remove(agentID);
             }

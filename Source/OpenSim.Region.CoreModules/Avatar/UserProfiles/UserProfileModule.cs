@@ -30,7 +30,6 @@ using System.Globalization;
 using System.Reflection;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
@@ -39,6 +38,7 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Hypergrid;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.UserProfilesService;
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.CoreModules.Avatar.UserProfiles;
@@ -49,7 +49,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
     /// <summary>
     /// Logging
     /// </summary>
-    static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // The pair of Dictionaries are used to handle the switching of classified ads
     // by maintaining a cache of classified id to creator id mappings and an interest
@@ -215,7 +215,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.Error($"[UserProfileModule]: Process fail {e.Message} : {e.StackTrace}");
+            m_log.LogError($"[UserProfileModule]: Process fail {e.Message} : {e.StackTrace}");
         }
     }
 
@@ -280,7 +280,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
 
         if (profileConfig is null)
         {
-            //m_log.Debug("[PROFILES]: UserProfiles disabled, no configuration");
+            //m_log.LogDebug("[PROFILES]: UserProfiles disabled, no configuration");
             Enabled = false;
             return;
         }
@@ -297,7 +297,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
         OSHTTPURI tmp = new(ProfileServerUri, true);
         if (!tmp.IsResolvedHost)
         {
-            m_log.ErrorFormat("[UserProfileModule: {0}", tmp.IsValidHost ?  "Could not resolve ProfileServiceURL" : "ProfileServiceURL is a invalid host");
+            m_log.LogError("[UserProfileModule: {0}", tmp.IsValidHost ?  "Could not resolve ProfileServiceURL" : "ProfileServiceURL is a invalid host");
             throw new Exception("UserProfileModule init error");
         }
 
@@ -305,7 +305,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
 
         m_allowUserProfileWebURLs = profileConfig.GetBoolean("AllowUserProfileWebURLs", m_allowUserProfileWebURLs);
 
-        m_log.Debug("[UserProfileModule]: Full Profiles Enabled");
+        m_log.LogDebug("[UserProfileModule]: Full Profiles Enabled");
 
         MainConsole.Instance.Commands.AddCommand("Debug", false, "profiles status",
             "profiles status",
@@ -370,7 +370,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
         m_userManagementModule = Scene.RequestModuleInterface<IUserManagement>();
         if(m_userManagementModule is null)
         {
-             m_log.Error("[UserProfileModule]: UserManagementModule not loaded. Profiles Disabled");
+             m_log.LogError("[UserProfileModule]: UserManagementModule not loaded. Profiles Disabled");
             Enabled = false;
             return;
         }
@@ -1106,7 +1106,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
             }
         }
 
-        //m_log.DebugFormat("[PROFILES]: PickInfoRequest: {0} : {1}", pick.Name.ToString(), pick.SnapshotId.ToString());
+        //m_log.LogDebug("[PROFILES]: PickInfoRequest: {0} : {1}", pick.Name.ToString(), pick.SnapshotId.ToString());
 
         lock(m_profilesCache)
         {
@@ -1229,7 +1229,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
     /// </param>
     public void PickInfoUpdate(IClientAPI remoteClient, UUID pickID, UUID creatorID, bool topPick, string name, string desc, UUID snapshotID, int sortOrder, bool enabled)
     {
-        //m_log.DebugFormat("[PROFILES]: Start PickInfoUpdate Name: {0} PickId: {1} SnapshotId: {2}", name, pickID.ToString(), snapshotID.ToString());
+        //m_log.LogDebug("[PROFILES]: Start PickInfoUpdate Name: {0} PickId: {1} SnapshotId: {2}", name, pickID.ToString(), snapshotID.ToString());
 
         GetUserProfileServerURI(remoteClient.AgentId, out string serverURI);
         if(string.IsNullOrWhiteSpace(serverURI))
@@ -1280,7 +1280,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
             }
             else
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[PROFILES]: PickInfoUpdate found no parcel info at {0},{1} in {2}",
                     avaPos.X, avaPos.Y, p.Scene.Name);
             }
@@ -1337,7 +1337,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
                                        pick.Desc,pick.SnapshotId,pick.ParcelName,pick.OriginalName,pick.SimName,
                                        posGlobal,pick.SortOrder,pick.Enabled);
 
-        //m_log.DebugFormat("[PROFILES]: Finish PickInfoUpdate {0} {1}", pick.Name, pick.PickId.ToString());
+        //m_log.LogDebug("[PROFILES]: Finish PickInfoUpdate {0} {1}", pick.Name, pick.PickId.ToString());
     }
 
     /// <summary>
@@ -1500,7 +1500,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
         object Pref = pref;
         if(!rpc.JsonRpcRequest(ref Pref, "user_preferences_update", serverURI, UUID.Random().ToString()))
         {
-            m_log.InfoFormat("[PROFILES]: UserPreferences update error");
+            m_log.LogInformation("[PROFILES]: UserPreferences update error");
             remoteClient.SendAgentAlertMessage("Error updating preferences", false);
             return;
         }
@@ -1523,7 +1523,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
         object Pref = (object)pref;
         if(!rpc.JsonRpcRequest(ref Pref, "user_preferences_request", serverURI, UUID.Random().ToString()))
         {
-            //m_log.InfoFormat("[PROFILES]: UserPreferences request error");
+            //m_log.LogInformation("[PROFILES]: UserPreferences request error");
             //remoteClient.SendAgentAlertMessage("Error requesting preferences", false);
             return;
         }
@@ -1595,7 +1595,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
         if (avatarID.IsZero())
         {
             // Looking for a reason that some viewers are sending null Id's
-            m_log.Debug("[PROFILES]: got request of null ID");
+            m_log.LogDebug("[PROFILES]: got request of null ID");
             return;
         }
 
@@ -1778,7 +1778,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
                 }
                 catch (Exception e)
                 {
-                    m_log.Debug(
+                    m_log.LogDebug(
                             $"[PROFILES]: Request using the OpenProfile API for user {properties.UserId} to {serverURI} failed: {e.Message}");
 
                     // Allow the return 'message' to say "JsonRpcRequest" and not "OpenProfile", because
@@ -1790,7 +1790,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
             if (!secondChanceSuccess)
             {
                 message = $"JsonRpcRequest for user {properties.UserId} to {serverURI} failed";
-                m_log.Debug($"[PROFILES]: {message}");
+                m_log.LogDebug($"[PROFILES]: {message}");
                 return false;
             }
         }
@@ -1847,7 +1847,7 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
             }
             catch (Exception e)
             {
-                m_log.Debug("[PROFILES]: GetUserInfo call failed ", e);
+                m_log.LogDebug(e, "[PROFILES]: GetUserInfo call failed ");
                 m_userManagementModule.UserWebFailed(userID);
                 return false;
             }

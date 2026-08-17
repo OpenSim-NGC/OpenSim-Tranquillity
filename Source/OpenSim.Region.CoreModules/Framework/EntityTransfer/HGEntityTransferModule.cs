@@ -35,9 +35,9 @@ using OpenSim.Services.Connectors.Hypergrid;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
 
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 
@@ -45,7 +45,7 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer;
 
 public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificationModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private int m_levelHGTeleport = 0;
 
@@ -74,18 +74,18 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
                 string[] parts = name.Trim().Split();
                 if (parts.Length != 2)
                 {
-                    m_log.WarnFormat("[HG ENTITY TRANSFER MODULE]: Wrong user account name format {0}. Specify 'First Last'", name);
+                    m_log.LogWarning("[HG ENTITY TRANSFER MODULE]: Wrong user account name format {0}. Specify 'First Last'", name);
                     return null;
                 }
                 UserAccount account = m_scene.UserAccountService.GetUserAccount(UUID.Zero, parts[0], parts[1]);
                 if (account == null)
                 {
-                    m_log.WarnFormat("[HG ENTITY TRANSFER MODULE]: Unknown account {0}", m_AccountName);
+                    m_log.LogWarning("[HG ENTITY TRANSFER MODULE]: Unknown account {0}", m_AccountName);
                     return null;
                 }
                 AvatarAppearance a = m_scene.AvatarService.GetAppearance(account.PrincipalID);
                 if (a != null)
-                    m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Successfully retrieved appearance for {0}", name);
+                    m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Successfully retrieved appearance for {0}", name);
 
                 foreach (AvatarAttachment att in a.GetAttachments())
                 {
@@ -93,7 +93,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
                     if (item != null)
                         a.SetAttachment(att.AttachPoint, att.ItemID, item.AssetID);
                     else
-                        m_log.WarnFormat("[HG ENTITY TRANSFER MODULE]: Unable to retrieve item {0} from inventory {1}", att.ItemID, name);
+                        m_log.LogWarning("[HG ENTITY TRANSFER MODULE]: Unable to retrieve item {0} from inventory {1}", att.ItemID, name);
                 }
 
                 m_ExportedAppearances.Add(a);
@@ -135,12 +135,12 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
                     {
                         m_AccountName = transferConfig.GetString("AccountForAppearance", string.Empty);
                         if (m_AccountName.Length == 0)
-                            m_log.WarnFormat("[HG ENTITY TRANSFER MODULE]: RestrictAppearanceAbroad is on, but no account has been given for avatar appearance!");
+                            m_log.LogWarning("[HG ENTITY TRANSFER MODULE]: RestrictAppearanceAbroad is on, but no account has been given for avatar appearance!");
                     }
                 }
 
                 InitialiseCommon(source);
-                m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: {0} enabled.", Name);
+                m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: {0} enabled.", Name);
             }
         }
     }
@@ -208,17 +208,17 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
     protected override GridRegion GetFinalDestination(GridRegion region, UUID agentID, string agentHomeURI, out string message)
     {
         int flags = m_scene.GridService.GetRegionFlags(m_sceneRegionInfo.ScopeID, region.RegionID);
-        m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: region {0} flags: {1}", region.RegionName, flags);
+        m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: region {0} flags: {1}", region.RegionName, flags);
         message = null;
 
         if ((flags & (int)OpenSim.Framework.RegionFlags.Hyperlink) != 0)
         {
-            m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Destination region is hyperlink");
+            m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Destination region is hyperlink");
             GridRegion real_destination = m_GatekeeperConnector.GetHyperlinkRegion(region, region.RegionID, agentID, agentHomeURI, out message);
             if (real_destination != null)
-                m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: GetFinalDestination: ServerURI={0}", real_destination.ServerURI);
+                m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: GetFinalDestination: ServerURI={0}", real_destination.ServerURI);
             else
-                m_log.WarnFormat("[HG ENTITY TRANSFER MODULE]: GetHyperlinkRegion of region {0} from Gatekeeper {1} failed: {2}", region.RegionID, region.ServerURI, message);
+                m_log.LogWarning("[HG ENTITY TRANSFER MODULE]: GetHyperlinkRegion of region {0} from Gatekeeper {1} failed: {2}", region.RegionID, region.ServerURI, message);
             return real_destination;
         }
 
@@ -251,7 +251,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
 
     protected override bool CreateAgent(ScenePresence sp, GridRegion reg, GridRegion finalDestination, AgentCircuitData agentCircuit, uint teleportFlags, EntityTransferContext ctx, out string reason, out bool logout)
     {
-        m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: CreateAgent {0} {1}", reg.ServerURI, finalDestination.ServerURI);
+        m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: CreateAgent {0} {1}", reg.ServerURI, finalDestination.ServerURI);
         reason = string.Empty;
         logout = false;
         int flags = Scene.GridService.GetRegionFlags(m_sceneRegionInfo.ScopeID, reg.RegionID);
@@ -262,7 +262,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
             bool isLocal = m_scene.UserManagementModule.IsLocalGridUser(sp.UUID);
             if (isLocal && sp.GodController.UserLevel < m_levelHGTeleport)
             {
-                m_log.WarnFormat("[HG ENTITY TRANSFER MODULE]: Unable to HG teleport agent due to insufficient UserLevel.");
+                m_log.LogWarning("[HG ENTITY TRANSFER MODULE]: Unable to HG teleport agent due to insufficient UserLevel.");
                 reason = "Hypergrid teleport not allowed";
                 return false;
             }
@@ -293,7 +293,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
             }
             else
             {
-                m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Agent does not have a HomeURI address");
+                m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Agent does not have a HomeURI address");
                 return false;
             }
         }
@@ -320,7 +320,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
             // this user is going to another grid
             if (m_scene.UserManagementModule.IsLocalGridUser(sp.UUID))
             {
-                m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: RestrictAppearanceAbroad is ON. Checking generic appearance");
+                m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: RestrictAppearanceAbroad is ON. Checking generic appearance");
 
                 // Check wearables
                 for (int i = 0; i < sp.Appearance.Wearables.Length ; i++)
@@ -340,7 +340,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
 
                         if (!found)
                         {
-                           m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Wearable not allowed to go outside {0}", i);
+                           m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Wearable not allowed to go outside {0}", i);
                            return false;
                         }
 
@@ -354,7 +354,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
 
                         if (!found)
                         {
-                            m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Wearable not allowed to go outside {0}", i);
+                            m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Wearable not allowed to go outside {0}", i);
                             return false;
                         }
                     }
@@ -374,7 +374,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
                     }
                     if (!found)
                     {
-                        m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Attachment not allowed to go outside {0}", att.AttachPoint);
+                        m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Attachment not allowed to go outside {0}", att.AttachPoint);
                         return false;
                     }
                 }
@@ -395,7 +395,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
     //        if (m_RestrictAppearanceAbroad && Scene.UserManagementModule.IsLocalGridUser(agentData.AgentID))
     //        {
     //            // We need to strip the agent off its appearance
-    //            m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: RestrictAppearanceAbroad is ON. Sending generic appearance");
+    //            m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: RestrictAppearanceAbroad is ON. Sending generic appearance");
 
     //            // Delete existing npc attachments
     //            Scene.AttachmentsModule.DeleteAttachmentsFromScene(sp, false);
@@ -418,7 +418,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
     //    }
 
     //    foreach (AvatarAttachment a in agentData.Appearance.GetAttachments())
-    //        m_log.DebugFormat("[XXX]: {0}-{1}", a.ItemID, a.AssetID);
+    //        m_log.LogDebug("[XXX]: {0}-{1}", a.ItemID, a.AssetID);
 
 
     //    return base.UpdateAgent(reg, finalDestination, agentData, sp);
@@ -438,20 +438,20 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
         bool notsame = false;
         if (client == null)
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[HG ENTITY TRANSFER MODULE]: Request to teleport {0} home", id);
         }
         else
         {
             if (id == client.AgentId)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[HG ENTITY TRANSFER MODULE]: Request to teleport {0} {1} home", client.Name, id);
             }
             else
             {
                 notsame = true;
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[HG ENTITY TRANSFER MODULE]: Request to teleport {0} home by {1} {2}", id, client.Name, client.AgentId);
             }
         }
@@ -461,7 +461,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
         {
             if (notsame)
                 client.SendAlertMessage("TeleportHome: Agent not found in the scene");
-            m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Agent not found in the scene");
+            m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Agent not found in the scene");
             return false;
         }
 
@@ -472,7 +472,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
             if (notsame)
                 client.SendAlertMessage("TeleportHome: Agent already processing a teleport");
             targetClient.SendTeleportFailed("Already processing a teleport");
-            m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Agent still in teleport");
+            m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Agent still in teleport");
             return false;
         }
 
@@ -484,7 +484,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
             if (notsame)
                 client.SendAlertMessage("TeleportHome: Agent information not found");
             targetClient.SendTeleportFailed("Home information not found");
-            m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Unable to locate agent's gateway information");
+            m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Unable to locate agent's gateway information");
             return false;
         }
         if (!aCircuit.ServiceURLs.ContainsKey("HomeURI"))
@@ -492,7 +492,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
             if (notsame)
                 client.SendAlertMessage("TeleportHome: Agent home not set");
             targetClient.SendTeleportFailed("Home not set");
-            m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Agent home not set");
+            m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Agent home not set");
             return false;
         }
 
@@ -508,7 +508,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
         }
         catch (Exception e)
         {
-            m_log.Debug("[HG ENTITY TRANSFER MODULE]: GetHomeRegion call failed ", e);
+            m_log.LogDebug(e, "[HG ENTITY TRANSFER MODULE]: GetHomeRegion call failed ");
         }
 
         if (finalDestination == null)
@@ -516,13 +516,13 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
             if (notsame)
                 client.SendAlertMessage("TeleportHome: Agent Home region not found");
             targetClient.SendTeleportFailed("Home region not found");
-            m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Agent's home region not found");
+            m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Agent's home region not found");
             return false;
         }
 
         GridRegion homeGatekeeper = MakeGateKeeperRegion(homeURI);
 
-        m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: teleporting user {0} {1} home to {2} via {3}:{4}",
+        m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: teleporting user {0} {1} home to {2} via {3}:{4}",
             aCircuit.firstname, aCircuit.lastname, finalDestination.RegionName, homeGatekeeper.ServerURI, homeGatekeeper.RegionName);
 
         DoTeleport(sp, homeGatekeeper, finalDestination, position, lookAt, (uint)(Constants.TeleportFlags.SetLastToTarget | Constants.TeleportFlags.ViaHome));
@@ -540,7 +540,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
         if (lm == null || lm.Data == null || lm.Data.Length == 0)
             return;
 
-        m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Teleporting agent via landmark to {0} region {1} position {2}",
+        m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Teleporting agent via landmark to {0} region {1} position {2}",
             (string.IsNullOrEmpty(lm.Gatekeeper)) ? "local" : lm.Gatekeeper, lm.RegionID, lm.Position);
 
         ScenePresence sp = m_scene.GetScenePresence(remoteClient.AgentId);
@@ -628,7 +628,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
                 jobsRemoved++;
         }
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[HG ENTITY TRANSFER]: Removing {0} jobs with common ID {1} and reinserting {2} other jobs",
             jobsRemoved, commonIdToRemove, jobsToReinsert.Count);
 
@@ -644,7 +644,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
         UUID OwnerID = so.OwnerID;
         if (OwnerID.IsZero())
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[HG TRANSFER MODULE]: Denied object {0}({1}) entry into {2} because ownerID is zero",
                     so.Name, so.UUID, m_sceneName);
             return false;
@@ -652,7 +652,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
 
         if (m_sceneRegionInfo.EstateSettings.IsBanned(OwnerID))
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[HG TRANSFER MODULE]: Denied prim crossing of {0} {1} into {2} for banned avatar {3}",
                 so.Name, so.UUID, m_sceneName, so.OwnerID);
 
@@ -669,7 +669,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
 
         if (m_scene.GetScenePresence(OwnerID) == null)
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
             "[HG TRANSFER MODULE]: Denied attachment {0}({1}) owner {2} not in region {3}",
                 so.Name, so.UUID, OwnerID, m_sceneName);
             return false;
@@ -677,7 +677,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
 
         if (!m_scene.AddSceneObject(so))
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Problem adding scene object {0} {1} into {2} ",
                 so.Name, so.UUID, m_sceneName);
             return false;
@@ -702,7 +702,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
                         () =>
                         {
                             string url = aCircuit.ServiceURLs["AssetServerURI"].ToString();
-                            //m_log.DebugFormat(
+                            //m_log.LogDebug(
                             //    "[HG ENTITY TRANSFER MODULE]: Incoming attachment {0} for HG user {1} with asset service {2}",
                             //    so.Name, so.AttachedAvatar, url);
 
@@ -715,7 +715,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
                                 int tickStart = Util.EnvironmentTickCount();
                                 uuidGatherer.GatherNext();
 
-                                //m_log.DebugFormat(
+                                //m_log.LogDebug(
                                 //    "[HG ENTITY TRANSFER]: Gathered attachment asset uuid {0} for object {1} for HG user {2} took {3} ms with asset service {4}",
                                 //    nextUuid, so.Name, so.OwnerID, Util.EnvironmentTickCountSubtract(tickStart), url);
 
@@ -723,7 +723,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
 
                                 if (ticksElapsed > 30000)
                                 {
-                                    m_log.WarnFormat(
+                                    m_log.LogWarning(
                                         "[HG ENTITY TRANSFER]: Removing incoming scene object jobs for HG user {0} as gather of {1} from {2} took {3} ms to respond (> {4} ms)",
                                         so.OwnerID, so.Name, url, ticksElapsed, 30000);
 
@@ -732,7 +732,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
                                 }
                             }
 
-                            //m_log.DebugFormat(
+                            //m_log.LogDebug(
                             //    "[HG ENTITY TRANSFER]: Fetching {0} assets for attachment {1} for HG user {2} with asset service {3}",
                             //    ids.Count, so.Name, so.OwnerID, url);
 
@@ -746,7 +746,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
 
                                 if (ticksElapsed > 30000)
                                 {
-                                    m_log.WarnFormat(
+                                    m_log.LogWarning(
                                         "[HG ENTITY TRANSFER]: Removing incoming scene object jobs for HG user {0} as fetch of {1} from {2} took {3} ms to respond (> {4} ms)",
                                         so.OwnerID, id, url, ticksElapsed, 30000);
 
@@ -761,7 +761,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
                             aCircuit = null;
                             uuidGatherer = null;
 
-                            //m_log.DebugFormat(
+                            //m_log.LogDebug(
                             //    "[HG ENTITY TRANSFER MODULE]: Completed incoming attachment {0} for HG user {1} with asset server {2}",
                             //    so.Name, so.OwnerID, url);
                         },
@@ -778,7 +778,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
         UUID OwnerID = sp.UUID;
         if (m_sceneRegionInfo.EstateSettings.IsBanned(OwnerID))
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[HG TRANSFER MODULE]: Attachments of banned avatar {0} into {1}", sp.Name, m_sceneName);
             return false;
         }
@@ -813,7 +813,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
                             {
                                 if(defso.OwnerID.NotEqual(defsp.UUID))
                                 {
-                                    m_log.ErrorFormat(
+                                    m_log.LogError(
                                         "[HG TRANSFER MODULE] attachment {0}({1} owner {2} does not match HG avatarID {3}",
                                             defso.Name, defso.UUID, defso.OwnerID, defsp.UUID);
                                     continue;
@@ -845,7 +845,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
 
                                 if (sp.IsDeleted || ticksElapsed > 30000)
                                 {
-                                    m_log.WarnFormat(
+                                    m_log.LogWarning(
                                         "[HG ENTITY TRANSFER]: Aborting fetch attachments assets for HG user {0}", sp.Name);
 
                                     defsp = null;
@@ -883,7 +883,7 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
         }
         else
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[HG ENTITY TRANSFER MODULE]: Agent {0} {1} does not have a HomeURI OH NO!",
                 aCircuit.firstname, aCircuit.lastname);
         }
@@ -913,11 +913,11 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
             string url = aCircuit.ServiceURLs["HomeURI"].ToString();
             IUserAgentService security = new UserAgentServiceConnector(url);
             security.LogoutAgent(obj.AgentId, obj.SessionId);
-            //m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Sent logout call to UserAgentService @ {0}", url);
+            //m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: Sent logout call to UserAgentService @ {0}", url);
         }
         else
         {
-                m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: HomeURI not found for agent {0} logout", obj.AgentId);
+                m_log.LogDebug("[HG ENTITY TRANSFER MODULE]: HomeURI not found for agent {0} logout", obj.AgentId);
         }
         base.OnConnectionClosed(obj);
     }

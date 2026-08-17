@@ -29,12 +29,13 @@
 using System.Net;
 using System.Reflection;
 using System.Xml;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.DataSnapshot;
 
@@ -42,7 +43,7 @@ public class DataRequestHandler
 {
 //        private Scene m_scene = null;
     private DataSnapshotManager m_externalData = null;
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private ExpiringCache<string, int> throotleGen = new ExpiringCache<string, int>();
 
     public DataRequestHandler(Scene scene, DataSnapshotManager externalData)
@@ -55,7 +56,7 @@ public class DataRequestHandler
         // Register validation callback handler
         MainServer.Instance.DefaultServer.AddGlobalMethodHandler("validate", OnValidate);
 
-        m_log.Info("[DATASNAPSHOT]: Set up snapshot service");
+        m_log.LogInformation("[DATASNAPSHOT]: Set up snapshot service");
     }
 
     public void OnGetSnapshot(IOSHttpRequest req, IOSHttpResponse resp)
@@ -73,7 +74,7 @@ public class DataRequestHandler
                 resp.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
                 resp.StatusDescription = "Please try again later";
                 resp.ContentType = "text/plain";
-                m_log.Debug("[DATASNAPSHOT] Collection request spam. reply try later");
+                m_log.LogDebug("[DATASNAPSHOT] Collection request spam. reply try later");
                 return;
             }
 
@@ -81,16 +82,16 @@ public class DataRequestHandler
         }
 
         if(string.IsNullOrWhiteSpace(snapObj))
-            m_log.DebugFormat("[DATASNAPSHOT] Received collection request for all");
+            m_log.LogDebug("[DATASNAPSHOT] Received collection request for all");
         else
-           m_log.DebugFormat("[DATASNAPSHOT] Received collection request for {0}", snapObj);
+           m_log.LogDebug("[DATASNAPSHOT] Received collection request for {0}", snapObj);
 
         XmlDocument response = m_externalData.GetSnapshot(snapObj);
         if(response == null)
         {
             resp.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
             resp.ContentType = "text/plain";
-            m_log.Debug("[DATASNAPSHOT] Collection request spam. reply try later");
+            m_log.LogDebug("[DATASNAPSHOT] Collection request spam. reply try later");
             return;
         }
 
@@ -101,7 +102,7 @@ public class DataRequestHandler
 
     public void OnValidate(IOSHttpRequest req, IOSHttpResponse resp)
     {
-        m_log.Debug("[DATASNAPSHOT] Received validation request");
+        m_log.LogDebug("[DATASNAPSHOT] Received validation request");
         resp.ContentType = "text/xml";
         resp.StatusCode = (int)HttpStatusCode.Forbidden;
 

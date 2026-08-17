@@ -34,9 +34,9 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
-using log4net;
 using Nini.Config;
 
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
@@ -47,7 +47,7 @@ namespace OpenSim.Region.CoreModules.World.LightShare;
 
 public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_scene = null;
     private UUID regionID = UUID.Zero;
@@ -82,13 +82,13 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
 
         if (!config.GetString("Cap_EnvironmentSettings", string.Empty).Equals("localhost"))
         {
-            m_log.InfoFormat("[{0}]: Module is disabled.", Name);
+            m_log.LogInformation("[{0}]: Module is disabled.", Name);
             return;
         }
 
         Enabled = true;
 
-        m_log.InfoFormat("[{0}]: Module is enabled.", Name);
+        m_log.LogInformation("[{0}]: Module is enabled.", Name);
     }
 
     public void Close()
@@ -163,7 +163,7 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
                 catch (Exception e)
                 {
                     m_DefaultEnv = null;
-                    m_log.Warn(string.Format("[Environment {0}] failed to decode default environment asset ", m_scene.Name), e);
+                    m_log.LogWarning(e, string.Format("[Environment {0}] failed to decode default environment asset ", m_scene.Name));
                 }
             }
         }
@@ -180,7 +180,7 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
                 {
                     VEnv.FromWLOSD(oenv);
                     StoreOnRegion(VEnv);
-                    m_log.Info($"[Environment {m_scene.Name}] migrated WindLight environment settings to EEP");
+                    m_log.LogInformation($"[Environment {m_scene.Name}] migrated WindLight environment settings to EEP");
                 }
                 else
                 {
@@ -191,7 +191,7 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
             }
             catch (Exception e)
             {
-                m_log.Error($"[Environment {m_scene.Name}] failed to load initial Environment {e.Message}");
+                m_log.LogError($"[Environment {m_scene.Name}] failed to load initial Environment {e.Message}");
                 scene.RegionEnvironment = null;
                 m_regionEnvVersion = -1;
             }
@@ -243,7 +243,7 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
         }
         catch (Exception e)
         {
-            m_log.Error($"[Environment {m_scene.Name}] failed to store Environment {e.Message}");
+            m_log.LogError($"[Environment {m_scene.Name}] failed to store Environment {e.Message}");
         }
     }
 
@@ -341,7 +341,7 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[{0}]: Unable to convert environment to lightShare, Exception: {1} - {2}",
+            m_log.LogError("[{0}]: Unable to convert environment to lightShare, Exception: {1} - {2}",
                 Name, e.Message, e.StackTrace);
         }
         return ls ?? new RegionLightShareData();
@@ -351,7 +351,7 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
     #region Events
     private void OnRegisterCaps(UUID agentID, Caps caps)
     {
-        // m_log.DebugFormat("[{0}]: Register capability for agentID {1} in region {2}",
+        // m_log.LogDebug("[{0}]: Register capability for agentID {1} in region {2}",
         //       Name, agentID, caps.RegionName);
 
         caps.RegisterSimpleHandler("EnvironmentSettings",
@@ -617,13 +617,13 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
                     if(lchannel is null)
                     {
                         StoreOnRegion(VEnv);
-                        m_log.InfoFormat("[{0}]: ExtEnvironment region {1} settings from agentID {2} saved",
+                        m_log.LogInformation("[{0}]: ExtEnvironment region {1} settings from agentID {2} saved",
                             Name, caps.RegionName, agentID);
                     }
                     else
                     {
                         lchannel.StoreEnvironment(VEnv);
-                        m_log.InfoFormat("[{0}]: ExtEnvironment parcel {1} of region {2}  settings from agentID {3} saved",
+                        m_log.LogInformation("[{0}]: ExtEnvironment parcel {1} of region {2}  settings from agentID {3} saved",
                             Name, parcel, caps.RegionName, agentID);
                     }
 
@@ -640,7 +640,7 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
 
                 WindlightRefresh(0);
 
-                m_log.InfoFormat("[{0}]: ExtEnvironment region {1} settings from agentID {2} saved",
+                m_log.LogInformation("[{0}]: ExtEnvironment region {1} settings from agentID {2} saved",
                                                 Name, caps.RegionName, agentID);
 
                 LLSDxmlEncode2.AddMap(sb);
@@ -655,7 +655,7 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[{0}]: ExtEnvironment settings not saved for region {1}, Exception: {2} - {3}",
+            m_log.LogError("[{0}]: ExtEnvironment settings not saved for region {1}, Exception: {2} - {3}",
                 Name, caps.RegionName, e.Message, e.StackTrace);
 
             success = false;
@@ -675,7 +675,7 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
 
     private void GetEnvironmentSettings(IOSHttpResponse response, UUID agentID)
     {
-        // m_log.DebugFormat("[{0}]: Environment GET handle for agentID {1} in region {2}",
+        // m_log.LogDebug("[{0}]: Environment GET handle for agentID {1} in region {2}",
         //      Name, agentID, caps.RegionName);
 
         ViewerEnvironment VEnv = null;
@@ -720,7 +720,7 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
 
     private void SetEnvironmentSettings(IOSHttpRequest request, IOSHttpResponse response, UUID agentID)
     {
-        // m_log.DebugFormat("[{0}]: Environment SET handle from agentID {1} in region {2}",
+        // m_log.LogDebug("[{0}]: Environment SET handle from agentID {1} in region {2}",
         //       Name, agentID, caps.RegionName);
 
         bool success = false;
@@ -761,13 +761,13 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
 
             WindlightRefresh(0);
 
-            m_log.InfoFormat("[{0}]: New Environment settings has been saved from agentID {1} in region {2}",
+            m_log.LogInformation("[{0}]: New Environment settings has been saved from agentID {1} in region {2}",
                 Name, agentID, m_scene.Name);
             success = true;
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[{0}]: Environment settings has not been saved for region {1}, Exception: {2} - {3}",
+            m_log.LogError("[{0}]: Environment settings has not been saved for region {1}, Exception: {2} - {3}",
                 Name, m_scene.Name, e.Message, e.StackTrace);
 
             success = false;
@@ -924,7 +924,7 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
         if(m_scene.GetNumberOfClients() == 0)
             return;
 
-        //m_log.DebugFormat("{0} {1} {2} {3}", dayFrac, eepDayFrac, wldayFrac, Util.UnixTimeSinceEpoch_uS());
+        //m_log.LogDebug("{0} {1} {2} {3}", dayFrac, eepDayFrac, wldayFrac, Util.UnixTimeSinceEpoch_uS());
 
         m_scene.ForEachRootScenePresence(delegate (ScenePresence sp)
         {

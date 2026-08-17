@@ -37,6 +37,8 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.World.Objects.Commands;
 
 /// <summary>
@@ -44,7 +46,7 @@ namespace OpenSim.Region.CoreModules.World.Objects.Commands;
 /// </summary>
 public class ObjectCommandsModule : INonSharedRegionModule
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_scene;
     private ICommandConsole m_console;
@@ -55,22 +57,22 @@ public class ObjectCommandsModule : INonSharedRegionModule
 
     public void Initialise(IConfigSource source)
     {
-//            m_log.DebugFormat("[OBJECT COMMANDS MODULE]: INITIALIZED MODULE");
+//            m_log.LogDebug("[OBJECT COMMANDS MODULE]: INITIALIZED MODULE");
     }
 
     public void PostInitialise()
     {
-//            m_log.DebugFormat("[OBJECT COMMANDS MODULE]: POST INITIALIZED MODULE");
+//            m_log.LogDebug("[OBJECT COMMANDS MODULE]: POST INITIALIZED MODULE");
     }
 
     public void Close()
     {
-//            m_log.DebugFormat("[OBJECT COMMANDS MODULE]: CLOSED MODULE");
+//            m_log.LogDebug("[OBJECT COMMANDS MODULE]: CLOSED MODULE");
     }
 
     public void AddRegion(Scene scene)
     {
-//            m_log.DebugFormat("[OBJECT COMMANDS MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[OBJECT COMMANDS MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
 
         m_scene = scene;
         m_console = MainConsole.Instance;
@@ -199,12 +201,12 @@ public class ObjectCommandsModule : INonSharedRegionModule
 
     public void RemoveRegion(Scene scene)
     {
-//            m_log.DebugFormat("[OBJECTS COMMANDS MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[OBJECTS COMMANDS MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
     }
 
     public void RegionLoaded(Scene scene)
     {
-//            m_log.DebugFormat("[OBJECTS COMMANDS MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[OBJECTS COMMANDS MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
     }
 
     /// <summary>

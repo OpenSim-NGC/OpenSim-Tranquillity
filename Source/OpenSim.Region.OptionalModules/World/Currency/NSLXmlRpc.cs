@@ -10,14 +10,16 @@ using System.Net;
 using System.Text;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
-using log4net;
 using Nwc.XmlRpc;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.OptionalModules.World.Currency;
 
 public class NSLXmlRpcRequest : XmlRpcRequest
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Encoding _encoding = new UTF8Encoding();
     private XmlRpcRequestSerializer _serializer = new XmlRpcRequestSerializer();
@@ -39,7 +41,7 @@ public class NSLXmlRpcRequest : XmlRpcRequest
 
     public XmlRpcResponse certSend(String url, X509Certificate2 myClientCert, bool checkServerCert, Int32 timeout)
     {
-        m_log.InfoFormat("[MONEY NSL RPC]: XmlRpcResponse certSend: connect to {0}", url);
+        m_log.LogInformation("[MONEY NSL RPC]: XmlRpcResponse certSend: connect to {0}", url);
 
         HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
         if (request == null)
@@ -56,7 +58,7 @@ public class NSLXmlRpcRequest : XmlRpcRequest
         if (myClientCert != null)
         {
             request.ClientCertificates.Add(myClientCert);   // Own certificate
-            m_log.ErrorFormat("[MONEY NSL RPC]: 111111111111111111111111111");
+            m_log.LogError("[MONEY NSL RPC]: 111111111111111111111111111");
         }
         if (!checkServerCert) request.Headers.Add("NoVerifyCert", "true");    // Do not verify the certificate of the other party
 
@@ -67,7 +69,7 @@ public class NSLXmlRpcRequest : XmlRpcRequest
         }
         catch (Exception ex)
         {
-            m_log.ErrorFormat("[MONEY NSL RPC]: GetRequestStream Error: {0}", ex);
+            m_log.LogError("[MONEY NSL RPC]: GetRequestStream Error: {0}", ex);
             stream = null;
         }
         if (stream == null) return null;
@@ -85,7 +87,7 @@ public class NSLXmlRpcRequest : XmlRpcRequest
         }
         catch (Exception ex)
         {
-            m_log.ErrorFormat("[MONEY NSL RPC]: XmlRpcResponse certSend: GetResponse Error: {0}", ex.ToString());
+            m_log.LogError("[MONEY NSL RPC]: XmlRpcResponse certSend: GetResponse Error: {0}", ex.ToString());
         }
         StreamReader input = new StreamReader(response.GetResponseStream());
 

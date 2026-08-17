@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.ScriptEngine.Yengine;
 
 
@@ -68,7 +70,7 @@ public partial class XMRInstance
         // Resume script from captured stack.
         if (stackFrames is null)
         {
-            m_log.Error($"ResumeEx: eventcode: None, stackFrame is null");
+            m_log.LogError($"ResumeEx: eventcode: None, stackFrame is null");
             throw new Exception("ResumeEx: stackFrame is null");
         }
 

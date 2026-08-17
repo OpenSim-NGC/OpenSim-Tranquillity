@@ -29,6 +29,8 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.CoreModules.Scripting.HttpRequest;
 using OpenSim.Region.ScriptEngine.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
 
 public class HttpRequest
@@ -52,7 +54,7 @@ public class HttpRequest
         HttpRequestClass httpInfo = (HttpRequestClass)iHttpReq.GetNextCompletedRequest();
         while (httpInfo != null)
         {
-            //m_log.Debug("[AsyncLSL]:" + httpInfo.response_body + httpInfo.status);
+            //m_log.LogDebug("[AsyncLSL]:" + httpInfo.response_body + httpInfo.status);
 
             // Deliver data to prim's remote_data handler
             //
