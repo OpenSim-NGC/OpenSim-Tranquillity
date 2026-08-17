@@ -28,7 +28,6 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
@@ -45,15 +44,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 {
     public class ScenePresenceCrossingTests : OpenSimTestCase
     {
-        [OneTimeSetUp]
-        public void FixtureInit()
+        public ScenePresenceCrossingTests()
         {
             // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
             Util.FireAndForgetMethod = FireAndForgetMethod.RegressionTest;
         }
 
-        [OneTimeTearDown]
-        public void TearDown()
+        public override void Dispose()
         {
             // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple
             // threads.  Possibly, later tests should be rewritten so none of them require async stuff (which regression
@@ -130,13 +127,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             // messages
 //            Dictionary<UUID, List<TestEventQueueGetModule.Event>> eqmEvents = eqmA.Events;
 //
-//            Assert.Equal(,);
+//            Assert.Equal(1, eqmEvents.Count);
 //            Assert.True(eqmEvents.ContainsKey(originalSp.UUID));
 //
 //            List<TestEventQueueGetModule.Event> spEqmEvents = eqmEvents[originalSp.UUID];
 //
-//            Assert.Equal(,);
-//            Assert.Equal(,);
+//            Assert.Equal(1, spEqmEvents.Count);
+//            Assert.Equal("CrossRegion", spEqmEvents[0].Name);
 
             // sceneA should now only have a child agent
             ScenePresence spAfterCrossSceneA = sceneA.GetScenePresence(originalSp.UUID);
@@ -154,8 +151,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             sceneBTc.CompleteMovement();
 
-            Assert.Equal(,);
-            Assert.True(spAfterCrossSceneB.IsChildAgent);
+            Assert.Equal(1, agentMovementCompleteReceived);
+            Assert.False(spAfterCrossSceneB.IsChildAgent);
         }
 
         /// <summary>
@@ -223,7 +220,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // sceneA agent should still be root
             ScenePresence spAfterCrossSceneA = sceneA.GetScenePresence(originalSp.UUID);
-            Assert.True(spAfterCrossSceneA.IsChildAgent);
+            Assert.False(spAfterCrossSceneA.IsChildAgent);
 
             ScenePresence spAfterCrossSceneB = sceneB.GetScenePresence(originalSp.UUID);
 
@@ -238,7 +235,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             sceneBTc.CompleteMovement();
 
-            Assert.Equal(,);
+            Assert.Equal(0, agentMovementCompleteReceived);
             Assert.True(spAfterCrossSceneB.IsChildAgent);
         }
     }

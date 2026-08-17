@@ -28,7 +28,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using Xunit;
+using Mono.Addins;
 using OpenMetaverse;
 using OpenSim;
 using OpenSim.ApplicationPlugins.RegionModulesController;
@@ -41,7 +41,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 {
     public class SharedRegionModuleTests : OpenSimTestCase
     {
-//        [Fact]
+//        [Test]
         public void TestLifecycle()
         {
             TestHelpers.InMethod();

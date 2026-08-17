@@ -177,10 +177,18 @@ class Program
         {
             loggingBuilder.ClearProviders();
             loggingBuilder.AddLog4Net(log4NetConfigFile: effectiveLogConfig);
-            loggingBuilder.AddConsole();
+            loggingBuilder.AddSimpleConsole(options =>
+            {
+                options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] "; // Custom timestamp
+                options.SingleLine = true; // Single-line output
+                options.IncludeScopes = true; // Enable scopes if needed
+            });
+            
+            LoggerProvider.LoggerFactory = loggingBuilder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
         })
         .ConfigureServices(services =>
         {
+
             // GridServer currently serves all HTTP through the legacy BaseHttpServer
             // (via service connectors), not ASP.NET controllers, so Kestrel/MVC is
             // disabled to avoid a port clash on the [Network] port. Re-enable together

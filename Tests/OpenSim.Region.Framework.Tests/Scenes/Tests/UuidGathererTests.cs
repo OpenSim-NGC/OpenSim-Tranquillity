@@ -27,7 +27,6 @@
 
 using System.Collections.Generic;
 using System.Text;
-using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -43,7 +42,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
         protected static string noteBase = @"Linden text version 2\n{\nLLEmbeddedItems version 1\n
 {\ncount 0\n}\nText length xxx\n"; // len does not matter on this test
-        public void Init()
+        public UuidGathererTests()
         {
             // FIXME: We don't need a full scene here - it would be enough to set up the asset service.
             Scene scene = new SceneHelpers().SetupScene();
@@ -65,7 +64,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_uuidGatherer.GatherAll();
 
             // We count the uuid as gathered even if the asset itself is corrupt.
-            Assert.Equal(,);
+            Assert.Equal(1, m_uuidGatherer.GatheredUuids.Count);
         }
 
         /// <summary>
@@ -81,7 +80,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_uuidGatherer.AddForInspection(missingAssetUuid);
             m_uuidGatherer.GatherAll();
 
-            Assert.Equal(,);
+            Assert.Equal(0, m_uuidGatherer.GatheredUuids.Count);
         }
 
         [Fact]
@@ -115,10 +114,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             // foreach (UUID key in m_uuidGatherer.GatheredUuids.Keys)
             // System.Console.WriteLine("key : {0}", key);
 
-            Assert.Equal(,);
-            Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(ncAssetId));
-            Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(embeddedId));
-            Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(secondLevelEmbeddedId));
+            Assert.Equal(3, m_uuidGatherer.GatheredUuids.Count);
+            Assert.True(m_uuidGatherer.GatheredUuids.ContainsKey(ncAssetId));
+            Assert.True(m_uuidGatherer.GatheredUuids.ContainsKey(embeddedId));
+            Assert.True(m_uuidGatherer.GatheredUuids.ContainsKey(secondLevelEmbeddedId));
         }
 
         [Fact]
@@ -148,11 +147,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 //                            System.Console.WriteLine("key : {0}", key);
 
             // We expect to see the default prim texture and the assets of the contained task items
-            Assert.Equal(,);
-            Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(new UUID(Constants.DefaultTexture)));
-            Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(TestHelpers.ParseTail(0x41)));
-            Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(TestHelpers.ParseTail(0x42)));
-            Assert.That(m_uuidGatherer.GatheredUuids.ContainsKey(TestHelpers.ParseTail(0x43)));
+            Assert.Equal(4, m_uuidGatherer.GatheredUuids.Count);
+            Assert.True(m_uuidGatherer.GatheredUuids.ContainsKey(new UUID(Constants.DefaultTexture)));
+            Assert.True(m_uuidGatherer.GatheredUuids.ContainsKey(TestHelpers.ParseTail(0x41)));
+            Assert.True(m_uuidGatherer.GatheredUuids.ContainsKey(TestHelpers.ParseTail(0x42)));
+            Assert.True(m_uuidGatherer.GatheredUuids.ContainsKey(TestHelpers.ParseTail(0x43)));
         }
     }
 }

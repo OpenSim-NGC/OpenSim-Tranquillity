@@ -52,11 +52,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             SceneObjectGroup g1Post = scene.GetSceneObjectGroup(g1.UUID);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(2, g1Post.RootPart.Scale.X);
+            Assert.Equal(3, g1Post.RootPart.Scale.Y);
+            Assert.Equal(4, g1Post.RootPart.Scale.Z);
 
-//            Assert.Equal(,);
+//            Assert.Equal(1, g1Post.RootPart.UndoCount);
         }
 
         /// <summary>
@@ -85,13 +85,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneObjectPart g1RootPart = g1PostPost.RootPart;
             SceneObjectPart g1ChildPart = g1PostPost.Parts[1];
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(2, g1RootPart.Scale.X);
+            Assert.Equal(3, g1RootPart.Scale.Y);
+            Assert.Equal(4, g1RootPart.Scale.Z);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(8, g1ChildPart.Scale.X);
+            Assert.Equal(9, g1ChildPart.Scale.Y);
+            Assert.Equal(10, g1ChildPart.Scale.Z);
         }
     }
 }

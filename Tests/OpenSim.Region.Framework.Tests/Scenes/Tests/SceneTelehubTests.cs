@@ -23,7 +23,6 @@
  */
 
 using System;
-using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.Estate;
@@ -73,7 +72,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             SceneHelpers.AddScenePresence(scene, ua);
 
-            Assert.True(scene.GetScenePresence(loggingInUserId));
+            Assert.NotNull(scene.GetScenePresence(loggingInUserId));
         }
 
         /// <summary>
@@ -110,7 +109,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             SceneHelpers.AddScenePresence(scene, ua);
 
-            Assert.True(scene.GetScenePresence(loggingInUserId));
+            Assert.NotNull(scene.GetScenePresence(loggingInUserId));
         }
     }
 }

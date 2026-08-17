@@ -45,7 +45,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             sp.Flying = true;
             sp.Animator.UpdateMovementAnimations();
 
-            Assert.Equal(,);
+            Assert.Equal("HOVER", sp.Animator.CurrentMovementAnimation);
         }
     }
 }

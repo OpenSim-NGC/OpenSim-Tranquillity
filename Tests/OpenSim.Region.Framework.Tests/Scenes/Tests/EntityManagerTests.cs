@@ -58,19 +58,19 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             found = (SceneObjectGroup)entman[obj1];
             found.UUID.Should().Be(obj1);
-            //Assert.Equal(,);
+            //Assert.Equal(obj1, found.UUID);
 
             found = (SceneObjectGroup)entman[li1];
             found.UUID.Should().Be(obj1);
-            //Assert.Equal(,);
+            //Assert.Equal(obj1, found.UUID);
 
             found = (SceneObjectGroup)entman[obj2];
             found.UUID.Should().Be(obj2);
-            //Assert.Equal(,);
+            //Assert.Equal(obj2, found.UUID);
 
             found = (SceneObjectGroup)entman[li2];
             found.UUID.Should().Be(obj2);
-            //Assert.Equal(,);
+            //Assert.Equal(obj2, found.UUID);
 
             entman.Remove(obj1);
             entman.Remove(li2);
@@ -79,10 +79,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             entman.ContainsKey(li1).Should().BeFalse();
             entman.ContainsKey(obj2).Should().BeFalse();
             entman.ContainsKey(li2).Should().BeFalse();
-            // Assert.True(entman.ContainsKey(obj1));
-            // Assert.True(entman.ContainsKey(li1));
-            // Assert.True(entman.ContainsKey(obj2));
-            // Assert.True(entman.ContainsKey(li2));
+            // Assert.False(entman.ContainsKey(obj1));
+            // Assert.False(entman.ContainsKey(li1));
+            // Assert.False(entman.ContainsKey(obj2));
+            // Assert.False(entman.ContainsKey(li2));
         }
 
         [Fact]
@@ -121,10 +121,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 if (entman.ContainsKey(sog.UUID) || entman.ContainsKey(sog.LocalId)) {
                     found = (SceneObjectGroup)entman[sog.UUID];
                     found.UUID.Should().Be(sog.UUID);
-                    //Assert.Equal(,);
+                    //Assert.Equal(sog.UUID, found.UUID);
                     found = (SceneObjectGroup)entman[sog.LocalId];
                     found.UUID.Should().Be(sog.UUID);
-                    //Assert.Equal(,);
+                    //Assert.Equal(sog.UUID, found.UUID);
                 }
             }
         }

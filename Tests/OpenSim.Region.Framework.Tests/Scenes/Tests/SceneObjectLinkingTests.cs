@@ -53,7 +53,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             scene.LinkObjects(ownerId, sog1.LocalId, new List<uint>() { sog1.Parts[1].LocalId });
 //            sog1.LinkToGroup(sog1);
 
-            Assert.Equal(,);
+            Assert.Equal(nParts, sog1.Parts.Length);
         }
 
         [Fact]
@@ -92,9 +92,9 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // FIXME: Can't do this test yet since group 2 still has its root part!  We can't yet null this since
             // it might cause SOG.ProcessBackup() to fail due to the race condition.  This really needs to be fixed.
-            Assert.That(grp2.IsDeleted, "SOG 2 was not registered as deleted after link.");
-            Assert.True(grp2.Parts.Length), "Group 2 still contained children after delink.");
-            Assert.That(grp1.Parts.Length == 2);
+            Assert.True(grp2.IsDeleted);
+            Assert.Equal(0, grp2.Parts.Length);
+            Assert.True(grp1.Parts.Length == 2);
 
             if (debugtest)
             {
@@ -105,12 +105,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             }
 
             // root part should have no offset position or rotation
-            Assert.That(part1.OffsetPosition == Vector3.Zero && part1.RotationOffset == Quaternion.Identity,
-                "root part should have no offset position or rotation");
+            Assert.True(part1.OffsetPosition == Vector3.Zero && part1.RotationOffset == Quaternion.Identity);
 
             // offset position should be root part position - part2.absolute position.
-            Assert.That(part2.OffsetPosition == new Vector3(-10, -10, -10),
-                "offset position should be root part position - part2.absolute position.");
+            Assert.True(part2.OffsetPosition == new Vector3(-10, -10, -10));
 
             float roll = 0;
             float pitch = 0;
@@ -121,16 +119,15 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Vector3 rotEuler1 = new Vector3(roll * Utils.RAD_TO_DEG, pitch * Utils.RAD_TO_DEG, yaw * Utils.RAD_TO_DEG);
 
             if (debugtest)
-                m_logger?.LogDebug(rotEuler1);
+                m_logger?.LogDebug(rotEuler1.ToString());
 
             part2.RotationOffset.GetEulerAngles(out roll, out pitch, out yaw);
             Vector3 rotEuler2 = new Vector3(roll * Utils.RAD_TO_DEG, pitch * Utils.RAD_TO_DEG, yaw * Utils.RAD_TO_DEG);
 
             if (debugtest)
-                m_logger?.LogDebug(rotEuler2);
+                m_logger?.LogDebug(rotEuler2.ToString());
 
-            Assert.That(rotEuler2.ApproxEquals(new Vector3(-180, 0, 0), 0.001f) || rotEuler2.ApproxEquals(new Vector3(180, 0, 0), 0.001f),
-                "Not exactly sure what this is asserting...");
+            Assert.True(rotEuler2.ApproxEquals(new Vector3(-180, 0, 0), 0.001f) || rotEuler2.ApproxEquals(new Vector3(180, 0, 0), 0.001f));
 
             // Delink part 2
             SceneObjectGroup grp3 = grp1.DelinkFromGroup(part2.LocalId);
@@ -138,8 +135,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             if (debugtest)
                 m_logger?.LogDebug("Group2: Prim2: OffsetPosition:" + part2.AbsolutePosition + ", OffsetRotation:" + part2.RotationOffset);
 
-            Assert.True(grp1.Parts.Length), "Group 1 still contained part2 after delink.");
-            Assert.That(part2.AbsolutePosition == Vector3.Zero, "The absolute position should be zero");
+            Assert.Equal(1, grp1.Parts.Length);
+            Assert.True(part2.AbsolutePosition == Vector3.Zero);
             Assert.NotNull(grp3);
         }
 
@@ -190,12 +187,12 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             grp3.LinkToGroup(grp4);
 
             // At this point we should have 4 parts total in two groups.
-            Assert.That(grp1.Parts.Length == 2, "Group1 children count should be 2");
-            Assert.That(grp2.IsDeleted, "Group 2 was not registered as deleted after link.");
-            Assert.True(grp2.Parts.Length), "Group 2 still contained parts after delink.");
-            Assert.That(grp3.Parts.Length == 2, "Group3 children count should be 2");
-            Assert.That(grp4.IsDeleted, "Group 4 was not registered as deleted after link.");
-            Assert.True(grp4.Parts.Length), "Group 4 still contained parts after delink.");
+            Assert.True(grp1.Parts.Length == 2);
+            Assert.True(grp2.IsDeleted);
+            Assert.Equal(0, grp2.Parts.Length);
+            Assert.True(grp3.Parts.Length == 2);
+            Assert.True(grp4.IsDeleted);
+            Assert.Equal(0, grp4.Parts.Length);
 
             if (debugtest)
             {
@@ -216,12 +213,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             grp3.RootPart.ClearUpdateSchedule();
 
             // root part should have no offset position or rotation
-            Assert.That(part1.OffsetPosition == Vector3.Zero && part1.RotationOffset == Quaternion.Identity,
-                "root part should have no offset position or rotation (again)");
+            Assert.True(part1.OffsetPosition == Vector3.Zero && part1.RotationOffset == Quaternion.Identity);
 
             // offset position should be root part position - part2.absolute position.
-            Assert.That(part2.OffsetPosition == new Vector3(-10, -10, -10),
-                "offset position should be root part position - part2.absolute position (again)");
+            Assert.True(part2.OffsetPosition == new Vector3(-10, -10, -10));
 
             float roll = 0;
             float pitch = 0;
@@ -232,16 +227,15 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Vector3 rotEuler1 = new Vector3(roll * Utils.RAD_TO_DEG, pitch * Utils.RAD_TO_DEG, yaw * Utils.RAD_TO_DEG);
 
             if (debugtest)
-                m_logger?.LogDebug(rotEuler1);
+                m_logger?.LogDebug(rotEuler1.ToString());
 
             part2.RotationOffset.GetEulerAngles(out roll, out pitch, out yaw);
             Vector3 rotEuler2 = new Vector3(roll * Utils.RAD_TO_DEG, pitch * Utils.RAD_TO_DEG, yaw * Utils.RAD_TO_DEG);
 
             if (debugtest)
-                m_logger?.LogDebug(rotEuler2);
+                m_logger?.LogDebug(rotEuler2.ToString());
 
-            Assert.That(rotEuler2.ApproxEquals(new Vector3(-180, 0, 0), 0.001f) || rotEuler2.ApproxEquals(new Vector3(180, 0, 0), 0.001f),
-                "Not sure what this assertion is all about...");
+            Assert.True(rotEuler2.ApproxEquals(new Vector3(-180, 0, 0), 0.001f) || rotEuler2.ApproxEquals(new Vector3(180, 0, 0), 0.001f));
 
             // Now we're linking the first group to the third group.  This will make the first group child parts of the third one.
             grp3.LinkToGroup(grp1);
@@ -264,14 +258,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 m_logger?.LogDebug("Group3: Prim2: OffsetPosition:" + part4.OffsetPosition + ", OffsetRotation:" + part4.RotationOffset);
             }
 
-            Assert.That(part2.AbsolutePosition == Vector3.Zero, "Badness 1");
-            Assert.That(part4.OffsetPosition == new Vector3(20, 20, 20), "Badness 2");
+            Assert.True(part2.AbsolutePosition == Vector3.Zero);
+            Assert.True(part4.OffsetPosition == new Vector3(20, 20, 20));
             Quaternion compareQuaternion = new Quaternion(0, 0.7071068f, 0, 0.7071068f);
-            Assert.That((part4.RotationOffset.X - compareQuaternion.X < 0.00003)
-                && (part4.RotationOffset.Y - compareQuaternion.Y < 0.00003)
-                && (part4.RotationOffset.Z - compareQuaternion.Z < 0.00003)
-                && (part4.RotationOffset.W - compareQuaternion.W < 0.00003),
-                "Badness 3");
+            Assert.True((part4.RotationOffset.X - compareQuaternion.X < 0.00003) && (part4.RotationOffset.Y - compareQuaternion.Y < 0.00003) && (part4.RotationOffset.Z - compareQuaternion.Z < 0.00003) && (part4.RotationOffset.W - compareQuaternion.W < 0.00003));
         }
 
         /// <summary>
@@ -307,10 +297,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             List<SceneObjectGroup> storedObjects = scene.SimulationDataService.LoadObjects(scene.RegionInfo.RegionID);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.That(storedObjects[0].ContainsPart(rootPartUuid));
-            Assert.That(storedObjects[0].ContainsPart(linkPartUuid));
+            Assert.Equal(1, storedObjects.Count);
+            Assert.Equal(2, storedObjects[0].Parts.Length);
+            Assert.True(storedObjects[0].ContainsPart(rootPartUuid));
+            Assert.True(storedObjects[0].ContainsPart(linkPartUuid));
         }
 
         /// <summary>
@@ -347,7 +337,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.True(sog.GroupContainsForeignPrims);
 
             scene.Backup(true);
-            Assert.Single(scene.SimulationDataService.LoadObjects(scene.RegionInfo.RegionID));
+            Assert.Equal(1, scene.SimulationDataService.LoadObjects(scene.RegionInfo.RegionID).Count);
 
             // These changes should occur immediately without waiting for a backup pass
             SceneObjectGroup groupToDelete = sog.DelinkFromGroup(linkPart, false);
