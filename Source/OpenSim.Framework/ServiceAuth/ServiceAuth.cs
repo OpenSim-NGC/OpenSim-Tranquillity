@@ -29,6 +29,7 @@ using Nini.Config;
 
 using Microsoft.Extensions.Logging;
 using OpenSim.Framework;
+
 namespace OpenSim.Framework.ServiceAuth;
 
 public class ServiceAuth

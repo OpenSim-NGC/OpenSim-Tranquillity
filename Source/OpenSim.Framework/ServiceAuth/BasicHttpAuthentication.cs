@@ -33,6 +33,7 @@ using System.Net.Http.Headers;
 
 using Microsoft.Extensions.Logging;
 using OpenSim.Framework;
+
 namespace OpenSim.Framework.ServiceAuth;
 
 public class BasicHttpAuthentication : IServiceAuth
