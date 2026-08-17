@@ -32,12 +32,11 @@ using System.Text;
 using System.Threading;
 using System.Timers;
 using Timer = System.Timers.Timer;
-using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
-using OpenSim.Region.ClientStack.Linden;
+using OpenSim.Region.ClientStack.LindenCaps;
 using OpenSim.Region.CoreModules.Framework;
 using OpenSim.Region.CoreModules.Framework.EntityTransfer;
 using OpenSim.Region.CoreModules.World.Serialiser;
@@ -63,22 +62,21 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             // any subsequent test.
             // XXX: May replace with a mock IHttpServer later.
             BaseHttpServer httpServer = new BaseHttpServer(99999);
-            MainServer.AddHttpServer(httpServer);
-            MainServer.Instance = httpServer;
+            MainServer.Instance.AddHttpServer(httpServer);
 
             CapabilitiesModule capsMod = new CapabilitiesModule();
             TestScene scene = new SceneHelpers().SetupScene();
             SceneHelpers.SetupSceneModules(scene, capsMod);
 
             ScenePresence sp = SceneHelpers.AddChildScenePresence(scene, spUuid);
-            //Assert.True(capsMod.GetCapsForUser(spUuid));
+            //Assert.NotNull(capsMod.GetCapsForUser(spUuid));
 
             // TODO: Need to add tests for other ICapabiltiesModule methods.
 
 //            scene.IncomingCloseAgent(sp.UUID, false);
-//            //Assert.True(capsMod.GetCapsForUser(spUuid));
+//            //Assert.Null(capsMod.GetCapsForUser(spUuid));
             scene.CloseAgent(sp.UUID, false);
-//            Assert.True(capsMod.GetCapsForUser(spUuid));
+//            Assert.Null(capsMod.GetCapsForUser(spUuid));
 
             // TODO: Need to add tests for other ICapabiltiesModule methods.
         }

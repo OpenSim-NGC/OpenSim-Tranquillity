@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Ported from Halcyon/InWorldz to Legion Grid (dotnet8-modernization)
+// Ported from Halcyon/InWorldz to Legion Grid (dotnet10-modernization)
 // Adaptations:
 //   - ThreadTracker removed (not present in modern OpenSim)
 //   - IScriptEngine is PhloxEngine which already implements the interface

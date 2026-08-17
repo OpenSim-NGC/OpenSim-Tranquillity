@@ -45,6 +45,7 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Framework.ServiceAuth;
 using System.Security.Authentication;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 

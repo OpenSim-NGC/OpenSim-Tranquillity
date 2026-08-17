@@ -32,7 +32,6 @@ using System.Text;
 using System.Threading;
 using System.Timers;
 using Timer=System.Timers.Timer;
-using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -82,7 +81,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Scene scene = new SceneHelpers().SetupScene();
             scene.Update(1);
 
-            Assert.Equal(,);
+            Assert.Equal(1u, scene.Frame);
         }
 
         [Fact]
@@ -94,12 +93,12 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             scene.Close();
 
             Assert.True(scene.ShuttingDown);
-            Assert.True(scene.Active);
+            Assert.False(scene.Active);
 
             // Trying to update a shutdown scene should result in no update
             scene.Update(1);
 
-            Assert.Equal(,);
+            Assert.Equal(0u, scene.Frame);
         }
     }
 }

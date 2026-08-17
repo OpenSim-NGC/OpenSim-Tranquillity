@@ -40,7 +40,7 @@ public class OpenSimTestCase : IDisposable
 
         // This is an unfortunate bit of clean up we have to do because MainServer manages things through static
         // variables and the VM is not restarted between tests.
-        if (MainServer.Instance != null)
+        if (MainServer.Instance?.DefaultServer != null)
         {
             MainServer.Instance.RemoveHttpServer(MainServer.Instance.DefaultServer.Port);
             // MainServer.Instance = null;

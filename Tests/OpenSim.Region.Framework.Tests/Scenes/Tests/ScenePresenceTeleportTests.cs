@@ -41,15 +41,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// </summary>
     public class ScenePresenceTeleportTests : OpenSimTestCase
     {
-        [OneTimeSetUp]
-        public void FixtureInit()
+        public ScenePresenceTeleportTests()
         {
             // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
             Util.FireAndForgetMethod = FireAndForgetMethod.RegressionTest;
         }
 
-        [OneTimeTearDown]
-        public void TearDown()
+        public override void Dispose()
         {
             // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple
             // threads.  Possibly, later tests should be rewritten so none of them require async stuff (which regression
@@ -85,14 +83,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 teleportLookAt,
                 (uint)TeleportFlags.ViaLocation);
 
-            Assert.Equal(,);
+            Assert.Equal(teleportPosition, sp.AbsolutePosition);
 
-            Assert.True(scene.GetRootAgentCount()));
-            Assert.True(scene.GetChildAgentCount()));
+            Assert.Equal(1, scene.GetRootAgentCount());
+            Assert.Equal(0, scene.GetChildAgentCount());
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.Equal(,);
+//            Assert.Equal(teleportLookAt, sp.Lookat);
         }
 
 /*
@@ -151,23 +149,23 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             // from child to root.
             destinationTestClients[0].CompleteMovement();
 
-            Assert.True(sceneA.GetScenePresence(userId));
+            Assert.Null(sceneA.GetScenePresence(userId));
 
             ScenePresence sceneBSp = sceneB.GetScenePresence(userId);
-            // TODO: Fix this assertion
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.NotNull(sceneBSp);
+            Assert.Equal(sceneB.RegionInfo.RegionName, sceneBSp.Scene.RegionInfo.RegionName);
+            Assert.Equal(teleportPosition, sceneBSp.AbsolutePosition);
 
-            Assert.True(sceneA.GetRootAgentCount()));
-            Assert.True(sceneA.GetChildAgentCount()));
-            Assert.True(sceneB.GetRootAgentCount()));
-            Assert.True(sceneB.GetChildAgentCount()));
+            Assert.Equal(0, sceneA.GetRootAgentCount());
+            Assert.Equal(0, sceneA.GetChildAgentCount());
+            Assert.Equal(1, sceneB.GetRootAgentCount());
+            Assert.Equal(0, sceneB.GetChildAgentCount());
 
             // TODO: Add assertions to check correct circuit details in both scenes.
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.Equal(,);
+//            Assert.Equal(teleportLookAt, sp.Lookat);
         }
 */
 
@@ -216,26 +214,26 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 teleportLookAt,
                 (uint)TeleportFlags.ViaLocation);
 
-            // Assert.True(sceneA.GetScenePresence(userId));
+            // Assert.Null(sceneA.GetScenePresence(userId));
             sceneA.Update(4);
             sceneB.Update(4);
 
             ScenePresence sceneBSp = sceneB.GetScenePresence(userId);
-            // TODO: Fix this assertion
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.NotNull(sceneBSp);
+            Assert.Equal(sceneB.RegionInfo.RegionName, sceneBSp.Scene.RegionInfo.RegionName);
+            Assert.Equal(teleportPosition.X, sceneBSp.AbsolutePosition.X);
+            Assert.Equal(teleportPosition.Y, sceneBSp.AbsolutePosition.Y);
 
-            //Assert.True(sceneA.GetRootAgentCount()));
-            //Assert.True(sceneA.GetChildAgentCount()));
-            //Assert.True(sceneB.GetRootAgentCount()));
-            //Assert.True(sceneB.GetChildAgentCount()));
+            //Assert.Equal(0, sceneA.GetRootAgentCount());
+            //Assert.Equal(0, sceneA.GetChildAgentCount());
+            //Assert.Equal(1, sceneB.GetRootAgentCount());
+            //Assert.Equal(0, sceneB.GetChildAgentCount());
 
             // TODO: Add assertions to check correct circuit details in both scenes.
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-            //            Assert.Equal(,);
+            //            Assert.Equal(teleportLookAt, sp.Lookat);
         }
 
         /// <summary>
@@ -301,24 +299,24 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
 //            ((TestClient)sp.ControllingClient).CompleteTeleportClientSide();
 
-            Assert.True(sceneB.GetScenePresence(userId));
+            Assert.Null(sceneB.GetScenePresence(userId));
 
             ScenePresence sceneASp = sceneA.GetScenePresence(userId);
-            // TODO: Fix this assertion
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.NotNull(sceneASp);
+            Assert.Equal(sceneA.RegionInfo.RegionName, sceneASp.Scene.RegionInfo.RegionName);
+            Assert.Equal(preTeleportPosition.X, sceneASp.AbsolutePosition.X);
+            Assert.Equal(preTeleportPosition.Y, sceneASp.AbsolutePosition.Y);
 
-            Assert.True(sceneA.GetRootAgentCount()));
-            Assert.True(sceneA.GetChildAgentCount()));
-            Assert.True(sceneB.GetRootAgentCount()));
-            Assert.True(sceneB.GetChildAgentCount()));
+            Assert.Equal(1, sceneA.GetRootAgentCount());
+            Assert.Equal(0, sceneA.GetChildAgentCount());
+            Assert.Equal(0, sceneB.GetRootAgentCount());
+            Assert.Equal(0, sceneB.GetChildAgentCount());
 
             // TODO: Add assertions to check correct circuit details in both scenes.
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.Equal(,);
+//            Assert.Equal(teleportLookAt, sp.Lookat);
 
 //            TestHelpers.DisableLogging();
         }
@@ -384,24 +382,24 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             sceneA.Update(4);
             sceneB.Update(4);
 
-            Assert.True(sceneB.GetScenePresence(userId));
+            Assert.Null(sceneB.GetScenePresence(userId));
 
             ScenePresence sceneASp = sceneA.GetScenePresence(userId);
-            // TODO: Fix this assertion
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.NotNull(sceneASp);
+            Assert.Equal(sceneA.RegionInfo.RegionName, sceneASp.Scene.RegionInfo.RegionName);
+            Assert.Equal(preTeleportPosition.X, sceneASp.AbsolutePosition.X);
+            Assert.Equal(preTeleportPosition.Y, sceneASp.AbsolutePosition.Y);
 
-            Assert.True(sceneA.GetRootAgentCount()));
-            Assert.True(sceneA.GetChildAgentCount()));
-            Assert.True(sceneB.GetRootAgentCount()));
-            Assert.True(sceneB.GetChildAgentCount()));
+            Assert.Equal(1, sceneA.GetRootAgentCount());
+            Assert.Equal(0, sceneA.GetChildAgentCount());
+            Assert.Equal(0, sceneB.GetRootAgentCount());
+            Assert.Equal(0, sceneB.GetChildAgentCount());
 
             // TODO: Add assertions to check correct circuit details in both scenes.
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.Equal(,);
+//            Assert.Equal(teleportLookAt, sp.Lookat);
 
 //            TestHelpers.DisableLogging();
         }
@@ -478,26 +476,26 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             sceneA.Update(4);
             sceneB.Update(4);
 
-            Assert.True(sceneB.GetScenePresence(userId));
+            Assert.Null(sceneB.GetScenePresence(userId));
 
             ScenePresence sceneASp = sceneA.GetScenePresence(userId);
-            // TODO: Fix this assertion
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.NotNull(sceneASp);
+            Assert.Equal(sceneA.RegionInfo.RegionName, sceneASp.Scene.RegionInfo.RegionName);
+            Assert.Equal(preTeleportPosition.X, sceneASp.AbsolutePosition.X);
+            Assert.Equal(preTeleportPosition.Y, sceneASp.AbsolutePosition.Y);
 
             sceneA.SceneGraph.RecalculateStats();
             sceneB.SceneGraph.RecalculateStats();
-            Assert.True(sceneA.GetRootAgentCount()));
-            Assert.True(sceneA.GetChildAgentCount()));
-            Assert.True(sceneB.GetRootAgentCount()));
-            Assert.True(sceneB.GetChildAgentCount()));
+            Assert.Equal(1, sceneA.GetRootAgentCount());
+            Assert.Equal(0, sceneA.GetChildAgentCount());
+            Assert.Equal(0, sceneB.GetRootAgentCount());
+            Assert.Equal(0, sceneB.GetChildAgentCount());
 
             // TODO: Add assertions to check correct circuit details in both scenes.
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.Equal(,);
+//            Assert.Equal(teleportLookAt, sp.Lookat);
 
 //            TestHelpers.DisableLogging();
         }
@@ -547,11 +545,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             ScenePresence beforeSceneASp = SceneHelpers.AddScenePresence(sceneA, tc, acd);
             beforeSceneASp.AbsolutePosition = new Vector3(30, 31, 32);
 
-            // TODO: Fix this assertion
-            Assert.True(beforeSceneASp.IsChildAgent);
+            Assert.NotNull(beforeSceneASp);
+            Assert.False(beforeSceneASp.IsChildAgent);
 
             ScenePresence beforeSceneBSp = sceneB.GetScenePresence(userId);
-            // TODO: Fix this assertion
+            Assert.NotNull(beforeSceneBSp);
             Assert.True(beforeSceneBSp.IsChildAgent);
 
             // In this case, we will not receieve a second InformClientOfNeighbour since the viewer already knows
@@ -566,25 +564,25 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             destinationTestClients[0].CompleteMovement();
 
             ScenePresence afterSceneASp = sceneA.GetScenePresence(userId);
-            // TODO: Fix this assertion
+            Assert.NotNull(afterSceneASp);
             Assert.True(afterSceneASp.IsChildAgent);
 
             ScenePresence afterSceneBSp = sceneB.GetScenePresence(userId);
-            // TODO: Fix this assertion
-            Assert.True(afterSceneBSp.IsChildAgent);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.NotNull(afterSceneBSp);
+            Assert.False(afterSceneBSp.IsChildAgent);
+            Assert.Equal(sceneB.RegionInfo.RegionName, afterSceneBSp.Scene.RegionInfo.RegionName);
+            Assert.Equal(teleportPosition, afterSceneBSp.AbsolutePosition);
 
-            Assert.True(sceneA.GetRootAgentCount()));
-            Assert.True(sceneA.GetChildAgentCount()));
-            Assert.True(sceneB.GetRootAgentCount()));
-            Assert.True(sceneB.GetChildAgentCount()));
+            Assert.Equal(0, sceneA.GetRootAgentCount());
+            Assert.Equal(1, sceneA.GetChildAgentCount());
+            Assert.Equal(1, sceneB.GetRootAgentCount());
+            Assert.Equal(0, sceneB.GetChildAgentCount());
 
             // TODO: Add assertions to check correct circuit details in both scenes.
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.Equal(,);
+//            Assert.Equal(teleportLookAt, sp.Lookat);
 
 //            TestHelpers.DisableLogging();
         }
@@ -629,11 +627,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             sceneA.Update(4);
             sceneB.Update(4);
 
-            // TODO: Fix this assertion
-            Assert.True(beforeSceneASp.IsChildAgent);
+            Assert.NotNull(beforeSceneASp);
+            Assert.False(beforeSceneASp.IsChildAgent);
 
             ScenePresence beforeSceneBSp = sceneB.GetScenePresence(userId);
-            // TODO: Fix this assertion
+            Assert.NotNull(beforeSceneBSp);
             Assert.True(beforeSceneBSp.IsChildAgent);
 
             // Here, we need to make clientA's receipt of SendRegionTeleport trigger clientB's CompleteMovement().  This
@@ -657,26 +655,26 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             sceneB.Update(4);
 
             ScenePresence afterSceneASp = sceneA.GetScenePresence(userId);
-            // TODO: Fix this assertion
+            Assert.NotNull(afterSceneASp);
             Assert.True(afterSceneASp.IsChildAgent);
 
             ScenePresence afterSceneBSp = sceneB.GetScenePresence(userId);
-            // TODO: Fix this assertion
-            Assert.True(afterSceneBSp.IsChildAgent);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.NotNull(afterSceneBSp);
+            Assert.False(afterSceneBSp.IsChildAgent);
+            Assert.Equal(sceneB.RegionInfo.RegionName, afterSceneBSp.Scene.RegionInfo.RegionName);
+            Assert.Equal(teleportPosition.X, afterSceneBSp.AbsolutePosition.X);
+            Assert.Equal(teleportPosition.Y, afterSceneBSp.AbsolutePosition.Y);
 
-            Assert.True(sceneA.GetRootAgentCount()));
-            Assert.True(sceneA.GetChildAgentCount()));
-            Assert.True(sceneB.GetRootAgentCount()));
-            Assert.True(sceneB.GetChildAgentCount()));
+            Assert.Equal(0, sceneA.GetRootAgentCount());
+            Assert.Equal(1, sceneA.GetChildAgentCount());
+            Assert.Equal(1, sceneB.GetRootAgentCount());
+            Assert.Equal(0, sceneB.GetChildAgentCount());
 
             // TODO: Add assertions to check correct circuit details in both scenes.
 
             // Lookat is sent to the client only - sp.Lookat does not yield the same thing (calculation from camera
             // position instead).
-//            Assert.Equal(,);
+//            Assert.Equal(teleportLookAt, sp.Lookat);
 
 //            TestHelpers.DisableLogging();
         }

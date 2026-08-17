@@ -30,6 +30,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Nini.Config;
 using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework.Console;
 
@@ -39,6 +40,7 @@ namespace OpenSim.Framework.Console;
 public class LocalConsole : CommandConsole
 {
     private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger _logger = LoggerProvider.CreateLogger(nameof(LocalConsole));
     private string m_historyPath;
     private bool m_historyEnable;
     private bool m_historytimestamps;
@@ -80,6 +82,8 @@ public class LocalConsole : CommandConsole
 
     public LocalConsole(string defaultPrompt, IConfig startupConfig = null) : base(defaultPrompt)
     {
+        _logger.LogInformation("[LOCAL CONSOLE]: Initializing LocalConsole.");
+        
         if (startupConfig == null) return;
 
         m_historyEnable = startupConfig.GetBoolean("ConsoleHistoryFileEnabled", false);

@@ -27,6 +27,14 @@
 
   <ItemGroup>
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Loaded at runtime by DefaultAvatarAnimations via the relative path "data/avataranimations.xml".
+         Copied here so it lands in the output directory of every test project that builds scenes. -->
+    <None Include="..\..\Source\OpenSim.Server.RegionServer\AppData\data\avataranimations.xml" Link="data\avataranimations.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
   
   <ItemGroup>
     <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
@@ -41,5 +49,13 @@
     <ProjectReference Include="..\..\Source\OpenSim.Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj" />
+    <!-- Concrete service assemblies loaded dynamically by SceneHelpers via ServerUtils.LoadPlugin.
+         Referenced so the DLLs are copied to each test project's output directory. -->
+    <ProjectReference Include="..\..\Source\OpenSim.Services.AssetService\OpenSim.Services.AssetService.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.AuthenticationService\OpenSim.Services.AuthenticationService.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.InventoryService\OpenSim.Services.InventoryService.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.GridService\OpenSim.Services.GridService.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.UserAccountService\OpenSim.Services.UserAccountService.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.PresenceService\OpenSim.Services.PresenceService.csproj" />
   </ItemGroup>
 </Project>

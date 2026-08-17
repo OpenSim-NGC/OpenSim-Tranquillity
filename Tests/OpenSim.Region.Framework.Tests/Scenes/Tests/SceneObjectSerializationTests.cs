@@ -31,7 +31,6 @@ using System.Reflection;
 using System.Threading;
 using System.Xml;
 using System.Linq;
-using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization.External;
@@ -66,17 +65,17 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             so.Description = "xpto";
 
             string xml = SceneObjectSerializer.ToXml2Format(so);
-            Assert.That(!string.IsNullOrEmpty(xml), "SOG serialization resulted in empty or null string");
+            Assert.True(!string.IsNullOrEmpty(xml));
 
             XmlDocument doc = new XmlDocument();
             doc.LoadXml(xml);
             XmlNodeList nodes = doc.GetElementsByTagName("SceneObjectPart");
-            Assert.True(nodes.Count), "SOG serialization resulted in wrong number of SOPs");
+            Assert.Equal(3, nodes.Count);
 
             SceneObjectGroup so2 = SceneObjectSerializer.FromXml2Format(xml);
-            Assert.NotNull(so2, "SOG deserialization resulted in null object");
-            Assert.That(so2.Name == so.Name, "Name of deserialized object does not match original name");
-            Assert.That(so2.Description == so.Description, "Description of deserialized object does not match original name");
+            Assert.NotNull(so2);
+            Assert.True(so2.Name == so.Name);
+            Assert.True(so2.Description == so.Description);
         }
 
         /// <summary>
@@ -101,7 +100,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             so.RootPart.CreatorID = so.OwnerID;
 
             string xml = SceneObjectSerializer.ToXml2Format(so);
-            Assert.That(!string.IsNullOrEmpty(xml), "SOG serialization resulted in empty or null string");
+            Assert.True(!string.IsNullOrEmpty(xml));
 
             xml = ExternalRepresentationUtils.RewriteSOP(xml, "Test Scene", "http://localhost", scene.UserAccountService, UUID.Zero);
             //Console.WriteLine(xml);
@@ -110,24 +109,24 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             doc.LoadXml(xml);
 
             XmlNodeList nodes = doc.GetElementsByTagName("SceneObjectPart");
-            Assert.True(nodes.Count), "SOG serialization resulted in no SOPs");
+            Assert.True(nodes.Count > 0);
             foreach (XmlAttribute a in nodes[0].Attributes)
             {
                 int count = a.Name.Count(c => c == ':');
-                Assert.True(count), "Cannot have multiple ':' in attribute name in SOP");
+                Assert.Equal(1, count);
             }
             nodes = doc.GetElementsByTagName("CreatorData");
-            Assert.True(nodes.Count), "SOG serialization resulted in no CreatorData");
+            Assert.True(nodes.Count > 0);
             foreach (XmlAttribute a in nodes[0].Attributes)
             {
                 int count = a.Name.Count(c => c == ':');
-                Assert.True(count), "Cannot have multiple ':' in attribute name in CreatorData");
+                Assert.Equal(1, count);
             }
 
             SceneObjectGroup so2 = SceneObjectSerializer.FromXml2Format(xml);
-            Assert.NotNull(so2, "SOG deserialization resulted in null object");
-            Assert.NotEqual(so.RootPart.CreatorIdentification, so2.RootPart.CreatorIdentification, "RewriteSOP failed to transform CreatorData.");
-            Assert.That(so2.RootPart.CreatorIdentification.Contains("http://"), "RewriteSOP failed to add the homeURL to CreatorData");
+            Assert.NotNull(so2);
+            Assert.NotEqual(so.RootPart.CreatorIdentification, so2.RootPart.CreatorIdentification);
+            Assert.True(so2.RootPart.CreatorIdentification.Contains("http://"));
         }
     }
 }

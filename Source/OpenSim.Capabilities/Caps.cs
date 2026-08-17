@@ -150,15 +150,13 @@ public class Caps : IDisposable
         m_regionName = regionName;
         Flags = CapsFlags.None;
         m_capsActive.Reset();
-        if (MainServer.Instance.DefaultServer.UseSSL)
-            m_baseCapsURL = $"https://{MainServer.Instance.DefaultServer.SSLCommonName}:{MainServer.Instance.DefaultServer.SSLPort}";
+        IHttpServer defaultServer = MainServer.Instance?.DefaultServer;
+        if (defaultServer is null)
+            m_baseCapsURL = $"http://{m_httpListenerHostName}:0";
+        else if (defaultServer.UseSSL)
+            m_baseCapsURL = $"https://{defaultServer.SSLCommonName}:{defaultServer.SSLPort}";
         else
-        {
-            if (MainServer.Instance is null)
-                m_baseCapsURL = $"http://{m_httpListenerHostName}:0";
-            else
-                m_baseCapsURL = $"http://{m_httpListenerHostName}:{MainServer.Instance.DefaultServer.Port}";
-        }
+            m_baseCapsURL = $"http://{m_httpListenerHostName}:{defaultServer.Port}";
     }
 
     ~Caps()

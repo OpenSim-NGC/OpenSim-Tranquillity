@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Ported from Halcyon/InWorldz to Legion Grid (dotnet8-modernization)
+// Ported from Halcyon/InWorldz to Legion Grid (dotnet10-modernization)
 // Adaptations:
 //   - HttpRequestObject replaced with HttpRequestClass (IServiceRequest cast)
 //   - Uses PostObjectEvent by LocalID instead of iterating all engines
