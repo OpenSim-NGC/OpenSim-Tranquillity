@@ -101,7 +101,8 @@ class Program
         var logPath = Environment.GetEnvironmentVariable("LOGDIR");
         if (string.IsNullOrWhiteSpace(logPath) is false)
             log4NetBootstrapper.LogPath = logPath;
-        string effectiveLogConfig = log4NetBootstrapper.Configure(options.LogConfig, "OpenSim.Server.MoneyServer.dll.config");
+        // Still required while unconverted log4net ILog call sites remain; remove with log4net.
+        log4NetBootstrapper.Configure(options.LogConfig, "OpenSim.Server.MoneyServer.dll.config");
 
         IHostBuilder builder = Host.CreateDefaultBuilder();
 
@@ -151,14 +152,8 @@ class Program
         .ConfigureLogging(loggingBuilder =>
         {
             loggingBuilder.ClearProviders();
-            loggingBuilder.AddLog4Net(log4NetConfigFile: effectiveLogConfig);
-            loggingBuilder.AddSimpleConsole(options =>
-            {
-                options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] "; // Custom timestamp
-                options.SingleLine = true; // Single-line output
-                options.IncludeScopes = true; // Enable scopes if needed
-            });
-                        
+            loggingBuilder.AddOpenSimLogging("OpenSim.Server.MoneyServer", log4NetBootstrapper.LogPath);
+
             LoggerProvider.LoggerFactory = loggingBuilder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
         })
         .ConfigureServices(services =>

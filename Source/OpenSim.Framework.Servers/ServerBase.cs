@@ -176,6 +176,10 @@ public class ServerBase : IServerBase
 
     public void RegisterCommonAppenders(IConfig startupConfig)
     {
+        // Routes ILogger output through the interactive console. During the log4net migration this
+        // runs alongside OpenSimAppender below; remove the appender half once no ILog call sites remain.
+        OpenSimConsoleLogSink.Console = m_console as ConsoleBase;
+
         ILoggerRepository repository = LogManager.GetRepository();
         IAppender[] appenders = repository.GetAppenders();
 
@@ -683,35 +687,35 @@ public class ServerBase : IServerBase
             return;
         }
 
-        if (null == m_consoleAppender)
-        {
-            Notice("No appender named Console found (see the log4net config file for this executable)!");
-            return;
-        }
-
         string rawLevel = cmd[3];
 
-        ILoggerRepository repository = LogManager.GetRepository();
-        Level consoleLevel = repository.LevelMap[rawLevel];
-
-        if (consoleLevel != null)
-            m_consoleAppender.Threshold = consoleLevel;
-        else
+        if (!OpenSimConsoleLogSink.TryParseLevel(rawLevel, out Microsoft.Extensions.Logging.LogLevel consoleLogLevel))
+        {
             Notice(
                 "{0} is not a valid logging level.  Valid logging levels are ALL, DEBUG, INFO, WARN, ERROR, FATAL, OFF",
                 rawLevel);
+
+            ShowLogLevel();
+            return;
+        }
+
+        OpenSimConsoleLogSink.MinimumLevel = consoleLogLevel;
+
+        if (m_consoleAppender is not null)
+        {
+            ILoggerRepository repository = LogManager.GetRepository();
+            Level appenderLevel = repository.LevelMap[rawLevel];
+
+            if (appenderLevel is not null)
+                m_consoleAppender.Threshold = appenderLevel;
+        }
 
         ShowLogLevel();
     }
 
     private void ShowLogLevel()
     {
-        if (null == m_consoleAppender)
-        {
-            Notice("No appender named Console found (see the log4net config file for this executable)!");
-            return;
-        }
-        Notice("Console log level is {0}", m_consoleAppender.Threshold);
+        Notice("Console log level is {0}", OpenSimConsoleLogSink.MinimumLevel);
     }
 
     protected virtual void HandleScript(string module, string[] parms)
@@ -774,8 +778,7 @@ public class ServerBase : IServerBase
     {
         Notice(GetVersionText());
         Notice("Startup directory: " + m_startupDirectory);
-        if (null != m_consoleAppender)
-            Notice(String.Format("Console log level: {0}", m_consoleAppender.Threshold));
+        Notice(String.Format("Console log level: {0}", OpenSimConsoleLogSink.MinimumLevel));
     }
 
     /// <summary>
