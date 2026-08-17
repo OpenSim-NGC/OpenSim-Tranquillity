@@ -22,14 +22,6 @@ namespace OpenSim.Server.Base.Hosting;
 public static class OpenSimLoggingBuilderExtensions
 {
     /// <summary>
-    /// Approximates the log4net PatternLayout "%date %-5level %message%newline" used by the
-    /// appenders this replaces. Serilog abbreviates level names (INF/WRN/ERR) rather than padding
-    /// them, so log-scraping tools keyed on the old full names need updating.
-    /// </summary>
-    private const string FileOutputTemplate =
-        "{Timestamp:yyyy-MM-dd HH:mm:ss,fff} {Level:u3} {Message:lj}{NewLine}{Exception}";
-
-    /// <summary>
     /// Registers the interactive console sink and a daily rolling file sink.
     /// </summary>
     /// <param name="builder">Logging builder being configured.</param>
@@ -47,10 +39,10 @@ public static class OpenSimLoggingBuilderExtensions
         Serilog.Core.Logger fileLogger = new LoggerConfiguration()
             .MinimumLevel.Verbose()
             .WriteTo.File(
+                new OpenSimLog4NetStyleFormatter(),
                 Path.Combine(logPath, $"{serviceName}.log"),
                 restrictedToMinimumLevel: LogEventLevel.Debug,
                 rollingInterval: RollingInterval.Day,
-                outputTemplate: FileOutputTemplate,
                 shared: true)
             .CreateLogger();
 
