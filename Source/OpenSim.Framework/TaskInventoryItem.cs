@@ -27,6 +27,8 @@
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Framework;
 
 /// <summary>
@@ -34,7 +36,7 @@ namespace OpenSim.Framework;
 /// </summary>
 public class TaskInventoryItem : ICloneable
 {
-    // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    // private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private const uint FULL_MASK_PERMISSIONS_GENERAL = 2147483647;
 
     public UUID AssetID { get; set; }
@@ -129,7 +131,7 @@ public class TaskInventoryItem : ICloneable
         set
         {
             _ownerChanged = value;
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[TASK INVENTORY ITEM]: Owner changed set {0} for {1} {2} owned by {3}",
             //    _ownerChanged, Name, ItemID, OwnerID);
         }
