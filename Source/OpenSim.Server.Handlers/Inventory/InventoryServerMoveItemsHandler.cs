@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using System.Xml.Serialization;
 using OpenSim.Server.Base;
@@ -34,11 +33,13 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Inventory;
 
 public class InventoryServerMoveItemsHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IInventoryService m_InventoryService;
 
@@ -64,7 +65,7 @@ public class InventoryServerMoveItemsHandler : BaseStreamHandler
             result = m_InventoryService.MoveItems(ownerID, items);
         }
         else
-            m_log.WarnFormat("[MOVEITEMS HANDLER]: ownerID not provided in request. Unable to serve.");
+            m_log.LogWarning("[MOVEITEMS HANDLER]: ownerID not provided in request. Unable to serve.");
 
         xs = new XmlSerializer(typeof(bool));
         return ServerUtils.SerializeResult(xs, result);

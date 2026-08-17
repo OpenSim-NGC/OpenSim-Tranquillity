@@ -32,6 +32,7 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Base.Hosting;
 using OpenSim.Server.MoneyServer.Controllers;
 
+using Microsoft.Extensions.Logging;
 using Timer = System.Timers.Timer;
 
 namespace OpenSim.Server.MoneyServer;

@@ -27,9 +27,10 @@
 
 using System.Reflection;
 using System.Xml;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.RegionServer;
 
@@ -38,7 +39,7 @@ namespace OpenSim.Server.RegionServer;
 /// </summary>
 public class ConfigurationLoader
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Various Config settings the region needs to start
@@ -102,7 +103,7 @@ public class ConfigurationLoader
                 }
                 else
                 {
-                    m_log.ErrorFormat("Master ini file {0} not found", Path.GetFullPath(masterFilePath));
+                    m_log.LogError("Master ini file {0} not found", Path.GetFullPath(masterFilePath));
                     Environment.Exit(1);
                 }
             }
@@ -144,7 +145,7 @@ public class ConfigurationLoader
 
         m_config = new IniConfigSource();
 
-        m_log.Info("[CONFIG]: Reading configuration settings");
+        m_log.LogInformation("[CONFIG]: Reading configuration settings");
 
         for (int i = 0 ; i < sources.Count ; i++)
         {
@@ -161,7 +162,7 @@ public class ConfigurationLoader
 
         if (Directory.Exists(iniDirPath))
         {
-            m_log.InfoFormat("[CONFIG]: Searching folder {0} for config ini files", iniDirPath);
+            m_log.LogInformation("[CONFIG]: Searching folder {0} for config ini files", iniDirPath);
             List<string> overrideSources = new List<string>();
 
             string[] fileEntries = Directory.GetFiles(iniDirName);
@@ -197,18 +198,18 @@ public class ConfigurationLoader
 
         if (sources.Count == 0)
         {
-            m_log.FatalFormat("[CONFIG]: Could not load any configuration");
+            m_log.LogCritical("[CONFIG]: Could not load any configuration");
             Environment.Exit(1);
         }
         else if (!iniFileExists)
         {
-            m_log.FatalFormat("[CONFIG]: Could not load any configuration");
-            m_log.FatalFormat("[CONFIG]: Configuration exists, but there was an error loading it!");
+            m_log.LogCritical("[CONFIG]: Could not load any configuration");
+            m_log.LogCritical("[CONFIG]: Configuration exists, but there was an error loading it!");
             Environment.Exit(1);
         }
 
         // Merge OpSys env vars
-        m_log.Info("[CONFIG]: Loading environment variables for Config");
+        m_log.LogInformation("[CONFIG]: Loading environment variables for Config");
         Util.MergeEnvironmentToConfig(m_config);
 
         // Make sure command line options take precedence
@@ -262,7 +263,7 @@ public class ConfigurationLoader
                         // If the include path contains no wildcards, then warn the user that it wasn't found.
                         if (wildcardIndex == -1 && paths.Length == 0)
                         {
-                            m_log.WarnFormat("[CONFIG]: Could not find include file {0}", path);
+                            m_log.LogWarning("[CONFIG]: Could not find include file {0}", path);
                         }
                         else
                         {
@@ -301,14 +302,14 @@ public class ConfigurationLoader
 
         if (!IsUri(iniPath))
         {
-            m_log.InfoFormat("[CONFIG]: Reading configuration file {0}", Path.GetFullPath(iniPath));
+            m_log.LogInformation("[CONFIG]: Reading configuration file {0}", Path.GetFullPath(iniPath));
 
             configSource.Merge(new IniConfigSource(iniPath));
             success = true;
         }
         else
         {
-            m_log.InfoFormat("[CONFIG]: {0} is a http:// URI, fetching ...", iniPath);
+            m_log.LogInformation("[CONFIG]: {0} is a http:// URI, fetching ...", iniPath);
 
             // The ini file path is a http URI
             // Try to read it
@@ -322,7 +323,7 @@ public class ConfigurationLoader
             }
             catch (Exception e)
             {
-                m_log.FatalFormat("[CONFIG]: Exception reading config from URI {0}\n" + e.ToString(), iniPath);
+                m_log.LogCritical("[CONFIG]: Exception reading config from URI {0}\n" + e.ToString(), iniPath);
                 Environment.Exit(1);
             }
         }

@@ -34,14 +34,15 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
-using log4net;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Inventory;
 
 public class XInventoryInConnector : ServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IInventoryService m_InventoryService;
     private string m_ConfigName = "InventoryService";
@@ -52,7 +53,7 @@ public class XInventoryInConnector : ServiceConnector
         if (configName != String.Empty)
             m_ConfigName = configName;
 
-        m_log.DebugFormat("[XInventoryInConnector]: Starting with config name {0}", m_ConfigName);
+        m_log.LogDebug("[XInventoryInConnector]: Starting with config name {0}", m_ConfigName);
 
         IConfig serverConfig = config.Configs[m_ConfigName];
         if (serverConfig == null)
@@ -76,7 +77,7 @@ public class XInventoryInConnector : ServiceConnector
 
 public class XInventoryConnectorPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IInventoryService m_InventoryService;
 
@@ -94,7 +95,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
             body = sr.ReadToEnd();
         body = body.Trim();
 
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
 
         try
         {
@@ -152,11 +153,11 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
                 case "GETASSETPERMISSIONS":
                     return HandleGetAssetPermissions(request);
             }
-            m_log.DebugFormat("[XINVENTORY HANDLER]: unknown method request: {0}", method);
+            m_log.LogDebug("[XINVENTORY HANDLER]: unknown method request: {0}", method);
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("[XINVENTORY HANDLER]: Exception {0} ", e.Message), e);
+            m_log.LogError(e, string.Format("[XINVENTORY HANDLER]: Exception {0} ", e.Message));
         }
 
         return FailureResult();
@@ -208,7 +209,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -236,7 +237,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -252,7 +253,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -269,7 +270,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -312,7 +313,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -370,13 +371,13 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
                 }
 
                 resultSet["F_" + fids[count++]] = result;
-                //m_log.DebugFormat("[XXX]: Sending {0} {1}", fids[count-1], icoll.FolderID);
+                //m_log.LogDebug("[XXX]: Sending {0} {1}", fids[count-1], icoll.FolderID);
             }
         }
 
         string xmlString = ServerUtils.BuildXmlResponse(resultSet);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -404,7 +405,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -525,7 +526,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[XINVENTORY IN CONNECTOR]: Exception in HandleMoveItems: {0}", e.Message);
+            m_log.LogDebug("[XINVENTORY IN CONNECTOR]: Exception in HandleMoveItems: {0}", e.Message);
             return FailureResult();
         }
 
@@ -570,7 +571,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -609,7 +610,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(resultSet);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -628,7 +629,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -653,7 +654,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -670,7 +671,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
         result["RESULT"] = perms.ToString();
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 

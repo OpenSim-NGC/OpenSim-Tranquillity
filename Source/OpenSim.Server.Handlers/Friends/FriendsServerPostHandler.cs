@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using System.Xml;
 using OpenSim.Server.Base;
@@ -36,11 +35,13 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Friends;
 
 public class FriendsServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IFriendsService m_FriendsService;
 
@@ -58,7 +59,7 @@ public class FriendsServerPostHandler : BaseStreamHandler
             body = sr.ReadToEnd();
         body = body.Trim();
 
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
 
         try
         {
@@ -89,11 +90,11 @@ public class FriendsServerPostHandler : BaseStreamHandler
 
             }
 
-            m_log.DebugFormat("[FRIENDS HANDLER]: unknown method request {0}", method);
+            m_log.LogDebug("[FRIENDS HANDLER]: unknown method request {0}", method);
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[FRIENDS HANDLER]: Exception {0}", e);
+            m_log.LogDebug("[FRIENDS HANDLER]: Exception {0}", e);
         }
 
         return FailureResult();
@@ -107,7 +108,7 @@ public class FriendsServerPostHandler : BaseStreamHandler
         if (request.ContainsKey("PRINCIPALID"))
             UUID.TryParse(request["PRINCIPALID"].ToString(), out principalID);
         else
-            m_log.WarnFormat("[FRIENDS HANDLER]: no principalID in request to get friends");
+            m_log.LogWarning("[FRIENDS HANDLER]: no principalID in request to get friends");
 
         FriendInfo[] finfos = m_FriendsService.GetFriends(principalID);
 
@@ -120,7 +121,7 @@ public class FriendsServerPostHandler : BaseStreamHandler
         if (request.ContainsKey("PRINCIPALID"))
             principalID = request["PRINCIPALID"].ToString();
         else
-            m_log.WarnFormat("[FRIENDS HANDLER]: no principalID in request to get friends");
+            m_log.LogWarning("[FRIENDS HANDLER]: no principalID in request to get friends");
 
         FriendInfo[] finfos = m_FriendsService.GetFriends(principalID);
 
@@ -146,7 +147,7 @@ public class FriendsServerPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[FRIENDS HANDLER]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[FRIENDS HANDLER]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -168,7 +169,7 @@ public class FriendsServerPostHandler : BaseStreamHandler
         if (request.ContainsKey("PRINCIPALID"))
             UUID.TryParse(request["PRINCIPALID"].ToString(), out principalID);
         else
-            m_log.WarnFormat("[FRIENDS HANDLER]: no principalID in request to delete friend");
+            m_log.LogWarning("[FRIENDS HANDLER]: no principalID in request to delete friend");
         string friend = string.Empty;
         if (request.ContainsKey("FRIEND"))
             friend = request["FRIEND"].ToString();
@@ -186,7 +187,7 @@ public class FriendsServerPostHandler : BaseStreamHandler
         if (request.ContainsKey("PRINCIPALID"))
             principalID = request["PRINCIPALID"].ToString();
         else
-            m_log.WarnFormat("[FRIENDS HANDLER]: no principalID in request to delete friend");
+            m_log.LogWarning("[FRIENDS HANDLER]: no principalID in request to delete friend");
         string friend = string.Empty;
         if (request.ContainsKey("FRIEND"))
             friend = request["FRIEND"].ToString();

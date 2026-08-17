@@ -27,10 +27,11 @@
 
 using System.Net;
 using System.Reflection;
-using log4net;
 using log4net.Config;
 using Nini.Config;
 using OpenSim.Framework;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.RegionServer;
 
@@ -42,7 +43,7 @@ public class Application
     /// <summary>
     /// Text Console Logger
     /// </summary>
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Path to the main ini Configuration file
@@ -76,7 +77,7 @@ public class Application
     /*
     private static void LegacyConfigurationBootstrap()
     {
-        m_log.Info("Checking for reguired configuration...\n");
+        m_log.LogInformation("Checking for reguired configuration...\n");
 
         bool OpenSim_Ini = (File.Exists(Path.Combine(Util.configDir(), "OpenSim.ini")))
                            || (File.Exists(Path.Combine(Util.configDir(), "opensim.ini")))
@@ -96,7 +97,7 @@ public class Application
             || GridCommon_lowerCased
             )))
         {
-            m_log.Info("Required Configuration Files Found\n");
+            m_log.LogInformation("Required Configuration Files Found\n");
         }
         else
         {
@@ -227,7 +228,7 @@ public class Application
                 }
                 catch (Exception e)
                 {
-                    m_log.Error($"Command error: {e}");
+                    m_log.LogError($"Command error: {e}");
                 }
             }
         }
@@ -264,7 +265,7 @@ public class Application
 
         msg += $"\r\nApplication is terminating: {e.IsTerminating}\r\n";
 
-        m_log.Error($"[APPLICATION]: {msg}");
+        m_log.LogError($"[APPLICATION]: {msg}");
 
         if (m_saveCrashDumps)
         {
@@ -285,7 +286,7 @@ public class Application
             }
             catch (Exception e2)
             {
-                m_log.Error($"[CRASH LOGGER CRASHED]: {e2}");
+                m_log.LogError($"[CRASH LOGGER CRASHED]: {e2}");
             }
         }
 

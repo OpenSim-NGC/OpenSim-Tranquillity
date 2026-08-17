@@ -33,13 +33,14 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.Handlers.Freeswitch;
 
 public class FreeswitchServerConnector : ServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IFreeswitchService m_FreeswitchService;
     private string m_ConfigName = "FreeswitchService";
@@ -86,7 +87,7 @@ public class FreeswitchServerConnector : ServiceConnector
         else if (section == "dialplan")
             response = m_FreeswitchService.HandleDialplanRequest(requestBody);
         else
-            m_log.WarnFormat("[FreeSwitchVoice]: section was {0}", section);
+            m_log.LogWarning("[FreeSwitchVoice]: section was {0}", section);
 
         return response;
     }

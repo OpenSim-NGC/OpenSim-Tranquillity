@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 /*
  * Copyright (c) Contributors, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
@@ -29,7 +32,7 @@ namespace OpenSim.Framework.Monitoring;
 
 public class Check
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public static readonly char[] DisallowedShortNameCharacters = { '.' };
 

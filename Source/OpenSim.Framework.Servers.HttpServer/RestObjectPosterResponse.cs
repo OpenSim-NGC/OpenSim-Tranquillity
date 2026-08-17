@@ -30,6 +30,8 @@ using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Framework.Servers.HttpServer;
 
 public delegate void ReturnResponse<T>(T reponse);
@@ -92,7 +94,7 @@ public class RestObjectPosterResponse<TResponse>
 
             // This is currently a bad debug stanza since it gobbles us the response...
 //                StreamReader reader = new StreamReader(stream);
-//                m_log.DebugFormat("[REST OBJECT POSTER RESPONSE]: Received {0}", reader.ReadToEnd());
+//                m_log.LogDebug("[REST OBJECT POSTER RESPONSE]: Received {0}", reader.ReadToEnd());
 
             deserial = (TResponse) deserializer.Deserialize(stream);
 

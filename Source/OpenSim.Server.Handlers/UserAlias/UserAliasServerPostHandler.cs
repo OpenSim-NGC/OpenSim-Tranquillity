@@ -26,7 +26,6 @@
  */
 
 using Nini.Config;
-using log4net;
 using System.Reflection;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
@@ -35,11 +34,13 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.UserAlias;
 
 public class UserAliasServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IUserAliasService m_UserAliasService;
 
@@ -81,11 +82,11 @@ public class UserAliasServerPostHandler : BaseStreamHandler
                     return GetUserAliases(request);
             }
 
-            m_log.DebugFormat("[USER SERVICE HANDLER]: unknown method request: {0}", method);
+            m_log.LogDebug("[USER SERVICE HANDLER]: unknown method request: {0}", method);
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[USER SERVICE HANDLER]: Exception in method {0}: {1}", method, e);
+            m_log.LogDebug("[USER SERVICE HANDLER]: Exception in method {0}: {1}", method, e);
         }
 
         return FailureResult();

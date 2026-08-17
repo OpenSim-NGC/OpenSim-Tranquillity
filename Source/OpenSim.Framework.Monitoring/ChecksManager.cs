@@ -26,7 +26,8 @@
  */
 
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Monitoring;
 
@@ -35,7 +36,7 @@ namespace OpenSim.Framework.Monitoring;
 /// </summary>
 public static class ChecksManager
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // Subcommand used to list other stats.
     public const string ListSubCommand = "list";
@@ -219,7 +220,7 @@ public static class ChecksManager
                     foreach (Check check in container.Values)
                     {
                         if (!check.CheckIt())
-                            m_log.WarnFormat(
+                            m_log.LogWarning(
                                 "[CHECKS MANAGER]: Check {0}.{1}.{2} failed with message {3}", check.Category, check.Container, check.ShortName, check.LastFailureMessage);
                     }
                 }

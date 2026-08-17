@@ -36,11 +36,13 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Shared.Api;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
 {
     public class HttpRequest
     {
-        private static readonly log4net.ILog m_log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         public AsyncCommandManager m_CmdManager;
 
@@ -84,8 +86,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
                 bool posted = m_CmdManager.m_ScriptEngine.PostObjectEvent(req.LocalID,
                     new EventParams("http_response", resobj, Array.Empty<DetectParams>()));
 
-                if (m_log.IsDebugEnabled)
-                    m_log.DebugFormat("[Phlox HTTP]: http_response {0} status {1} -> prim {2} (accepted={3})",
+                if (m_log.IsEnabled(LogLevel.Debug))
+                    m_log.LogDebug("[Phlox HTTP]: http_response {0} status {1} -> prim {2} (accepted={3})",
                         req.ReqID, resobj[1], req.LocalID, posted);
 
                 req = iHttpReq.GetNextCompletedRequest();
