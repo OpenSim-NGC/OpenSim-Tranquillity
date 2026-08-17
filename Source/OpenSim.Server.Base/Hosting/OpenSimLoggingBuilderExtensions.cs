@@ -22,11 +22,12 @@ namespace OpenSim.Server.Base.Hosting;
 public static class OpenSimLoggingBuilderExtensions
 {
     /// <summary>
-    /// Matches the log4net PatternLayout "%date %-5level %message%newline" used by the appenders
-    /// this replaces, so log files stay greppable across the migration.
+    /// Approximates the log4net PatternLayout "%date %-5level %message%newline" used by the
+    /// appenders this replaces. Serilog abbreviates level names (INF/WRN/ERR) rather than padding
+    /// them, so log-scraping tools keyed on the old full names need updating.
     /// </summary>
     private const string FileOutputTemplate =
-        "{Timestamp:yyyy-MM-dd HH:mm:ss,fff} {Level:u5} {Message:lj}{NewLine}{Exception}";
+        "{Timestamp:yyyy-MM-dd HH:mm:ss,fff} {Level:u3} {Message:lj}{NewLine}{Exception}";
 
     /// <summary>
     /// Registers the interactive console sink and a daily rolling file sink.
