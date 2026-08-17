@@ -26,10 +26,11 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using MySqlConnector;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.MySQL;
 
@@ -38,8 +39,7 @@ namespace OpenSim.Data.MySQL;
 /// </summary>
 public class MySQLInventoryData : IInventoryDataPlugin
 {
-    private static readonly ILog m_log
-        = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_connectionString;
     private object m_dbLock = new object();
@@ -48,7 +48,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
 
     public void Initialise()
     {
-        m_log.Info("[MySQLInventoryData]: " + Name + " cannot be default-initialized!");
+        m_log.LogInformation("[MySQLInventoryData]: " + Name + " cannot be default-initialized!");
         throw new PluginNotInitialisedException (Name);
     }
 
@@ -137,7 +137,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (Exception e)
         {
-            m_log.Error(e.Message, e);
+            m_log.LogError(e, e.Message);
             return null;
         }
     }
@@ -178,7 +178,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (Exception e)
         {
-            m_log.Error(e.Message, e);
+            m_log.LogError(e, e.Message);
             return null;
         }
     }
@@ -230,7 +230,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (Exception e)
         {
-            m_log.Error(e.Message, e);
+            m_log.LogError(e, e.Message);
             return null;
         }
     }
@@ -271,7 +271,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (Exception e)
         {
-            m_log.Error(e.Message, e);
+            m_log.LogError(e, e.Message);
             return null;
         }
     }
@@ -323,7 +323,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (MySqlException e)
         {
-            m_log.Error(e.ToString());
+            m_log.LogError(e.ToString());
         }
 
         return null;
@@ -363,7 +363,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (Exception e)
         {
-            m_log.Error(e.Message, e);
+            m_log.LogError(e, e.Message);
         }
         return null;
     }
@@ -388,7 +388,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (Exception e)
         {
-            m_log.Error(e.Message, e);
+            m_log.LogError(e, e.Message);
         }
 
         return null;
@@ -429,7 +429,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (Exception e)
         {
-            m_log.Error(e.Message, e);
+            m_log.LogError(e, e.Message);
             return null;
         }
     }
@@ -455,14 +455,14 @@ public class MySQLInventoryData : IInventoryDataPlugin
         if (item.Name.Length > 64)
         {
             itemName = item.Name.Substring(0, 64);
-            m_log.Warn("[INVENTORY DB]: Name field truncated from " + item.Name.Length + " to " + itemName.Length + " characters on add item");
+            m_log.LogWarning("[INVENTORY DB]: Name field truncated from " + item.Name.Length + " to " + itemName.Length + " characters on add item");
         }
 
         string itemDesc = item.Description;
         if (item.Description.Length > 128)
         {
             itemDesc = item.Description.Substring(0, 128);
-            m_log.Warn("[INVENTORY DB]: Description field truncated from " + item.Description.Length + " to " + itemDesc.Length + " characters on add item");
+            m_log.LogWarning("[INVENTORY DB]: Description field truncated from " + item.Description.Length + " to " + itemDesc.Length + " characters on add item");
         }
 
         try
@@ -513,7 +513,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (MySqlException e)
         {
-            m_log.Error(e.ToString());
+            m_log.LogError(e.ToString());
         }
     }
 
@@ -550,7 +550,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (MySqlException e)
         {
-            m_log.Error(e.Message, e);
+            m_log.LogError(e, e.Message);
         }
     }
 
@@ -578,7 +578,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         if (folderName.Length > 64)
         {
             folderName = folderName.Substring(0, 64);
-            m_log.Warn("[INVENTORY DB]: Name field truncated from " + folder.Name.Length + " to " + folderName.Length + " characters on add folder");
+            m_log.LogWarning("[INVENTORY DB]: Name field truncated from " + folder.Name.Length + " to " + folderName.Length + " characters on add folder");
         }
 
         using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
@@ -603,7 +603,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
                 }
                 catch (Exception e)
                 {
-                    m_log.Error(e.ToString());
+                    m_log.LogError(e.ToString());
                 }
             }
             dbcon.Close();
@@ -647,7 +647,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
                 }
                 catch (Exception e)
                 {
-                    m_log.Error(e.ToString());
+                    m_log.LogError(e.ToString());
                 }
             }
             dbcon.Close();
@@ -789,7 +789,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (Exception e)
         {
-            m_log.Error(e.Message, e);
+            m_log.LogError(e, e.Message);
             return null;
         }
     }
@@ -819,7 +819,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (MySqlException e)
         {
-            m_log.Error(e.Message, e);
+            m_log.LogError(e, e.Message);
         }
     }
 
@@ -847,7 +847,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
         }
         catch (MySqlException e)
         {
-            m_log.Error(e.ToString());
+            m_log.LogError(e.ToString());
         }
     }
 
@@ -904,7 +904,7 @@ public class MySQLInventoryData : IInventoryDataPlugin
             }
             catch (Exception e)
             {
-                m_log.Error(e.Message, e);
+                m_log.LogError(e, e.Message);
                 return null;
             }
         }

@@ -1,4 +1,3 @@
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
@@ -6,11 +5,13 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class ExperienceServicesConnector : BaseServiceConnector, IExperienceService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = String.Empty;
 
@@ -33,7 +34,7 @@ public class ExperienceServicesConnector : BaseServiceConnector, IExperienceServ
         IConfig gridConfig = source.Configs["ExperienceService"];
         if (gridConfig == null)
         {
-            m_log.Error("[EXPERIENCE CONNECTOR]: ExperienceService missing from configuration");
+            m_log.LogError("[EXPERIENCE CONNECTOR]: ExperienceService missing from configuration");
             throw new Exception("Experience connector init error");
         }
 
@@ -42,7 +43,7 @@ public class ExperienceServicesConnector : BaseServiceConnector, IExperienceServ
 
         if (serviceURI == String.Empty)
         {
-            m_log.Error("[EXPERIENCE CONNECTOR]: No Server URI named in section GridUserService");
+            m_log.LogError("[EXPERIENCE CONNECTOR]: No Server URI named in section GridUserService");
             throw new Exception("Experience connector init error");
         }
         m_ServerURI = serviceURI + "/experience";
@@ -53,7 +54,7 @@ public class ExperienceServicesConnector : BaseServiceConnector, IExperienceServ
     
     public Dictionary<UUID, bool> FetchExperiencePermissions(UUID agent_id)
     {
-        //m_log.InfoFormat("[ExperienceServiceConnector]: FetchExperiencePermissions for {0}", agent_id);
+        //m_log.LogInformation("[ExperienceServiceConnector]: FetchExperiencePermissions for {0}", agent_id);
 
         Dictionary<string, object> sendData = new Dictionary<string, object>();
         sendData["METHOD"] = "getpermissions";
@@ -83,7 +84,7 @@ public class ExperienceServicesConnector : BaseServiceConnector, IExperienceServ
 
                         experiences.Add(experience_id, allow);
 
-                        //m_log.InfoFormat("[EXPERIENCE SERVICE CONNECTOR]: {0} = {1}", experience_id, allow);
+                        //m_log.LogInformation("[EXPERIENCE SERVICE CONNECTOR]: {0} = {1}", experience_id, allow);
                     }
                 }
                 else break;
@@ -125,7 +126,7 @@ public class ExperienceServicesConnector : BaseServiceConnector, IExperienceServ
 
         string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI, request_str, m_Auth);
 
-        //m_log.InfoFormat("[EXPERIENCE SERVICE CONNECTOR]: Reply: {0}", reply);
+        //m_log.LogInformation("[EXPERIENCE SERVICE CONNECTOR]: Reply: {0}", reply);
 
         if (reply != string.Empty)
         {
@@ -165,14 +166,14 @@ public class ExperienceServicesConnector : BaseServiceConnector, IExperienceServ
                         return false;
                 }
                 else
-                    m_log.DebugFormat("[EXPERIENCE CONNECTOR]: {0} reply data does not contain result field", meth);
+                    m_log.LogDebug("[EXPERIENCE CONNECTOR]: {0} reply data does not contain result field", meth);
             }
             else
-                m_log.DebugFormat("[EXPERIENCE CONNECTOR]: {0} received empty reply", meth);
+                m_log.LogDebug("[EXPERIENCE CONNECTOR]: {0} received empty reply", meth);
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[EXPERIENCE CONNECTOR]: Exception when contacting server at {0}: {1}", m_ServerURI, e.Message);
+            m_log.LogDebug("[EXPERIENCE CONNECTOR]: Exception when contacting server at {0}: {1}", m_ServerURI, e.Message);
         }
 
         return false;
@@ -190,7 +191,7 @@ public class ExperienceServicesConnector : BaseServiceConnector, IExperienceServ
 
         string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI, request_str, m_Auth);
 
-        //m_log.InfoFormat("[EXPERIENCE SERVICE CONNECTOR]: Reply: {0}", reply);
+        //m_log.LogInformation("[EXPERIENCE SERVICE CONNECTOR]: Reply: {0}", reply);
 
         if (reply != string.Empty)
         {
@@ -216,7 +217,7 @@ public class ExperienceServicesConnector : BaseServiceConnector, IExperienceServ
 
         string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI, request_str, m_Auth);
 
-        //m_log.InfoFormat("[EXPERIENCE SERVICE CONNECTOR]: UpdateExperienceInfo Reply: {0}", reply);
+        //m_log.LogInformation("[EXPERIENCE SERVICE CONNECTOR]: UpdateExperienceInfo Reply: {0}", reply);
 
         if (reply != string.Empty)
         {

@@ -27,7 +27,6 @@
 using System.Reflection;
 
 using Nini.Config;
-using log4net;
 using OpenMetaverse;
 
 using OpenSim.Framework;
@@ -35,6 +34,8 @@ using OpenSim.Framework.Serialization.External;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Base;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.HypergridService;
 
@@ -45,8 +46,7 @@ namespace OpenSim.Services.HypergridService;
 /// </summary>
 public class HGAssetService : ServiceBase, IAssetService
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
         MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_HomeURL;
@@ -60,7 +60,7 @@ public class HGAssetService : ServiceBase, IAssetService
 
     public HGAssetService(IConfigSource config, string configName) : base(config)
     {
-        m_log.Debug("[HGAsset Service]: Starting");
+        m_log.LogDebug("[HGAsset Service]: Starting");
         IConfig assetConfig = config.Configs[configName];
         if (assetConfig == null)
             throw new Exception("No HGAssetService configuration");
@@ -92,11 +92,11 @@ public class HGAssetService : ServiceBase, IAssetService
             m_assetService = LoadPlugin<IAssetService>(str, args);
             if (m_assetService != null)
             {
-                m_log.InfoFormat("[HGASSETS]: Backing service loaded: {0}", str);
+                m_log.LogInformation("[HGASSETS]: Backing service loaded: {0}", str);
             }
             else
             {
-                m_log.ErrorFormat("[HGASSETS]: Failed to load backing service {0}", str);
+                m_log.LogError("[HGASSETS]: Failed to load backing service {0}", str);
             }
         }
     }

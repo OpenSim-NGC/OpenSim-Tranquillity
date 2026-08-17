@@ -28,6 +28,9 @@
 using OpenMetaverse;
 using Npgsql;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.PGSQL;
 
 /// <summary>
@@ -35,7 +38,7 @@ namespace OpenSim.Data.PGSQL;
 /// </summary>
 public class PGSQLHGTravelData : PGSQLGenericTableHandler<HGTravelingData>, IHGTravelingData
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public PGSQLHGTravelData(string connectionString, string realm) : base(connectionString, realm, "HGTravelStore") { }
 

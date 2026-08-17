@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
@@ -33,12 +32,13 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class UserAliasServicesConnector : BaseServiceConnector, IUserAliasService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = String.Empty;
@@ -62,7 +62,7 @@ public class UserAliasServicesConnector : BaseServiceConnector, IUserAliasServic
         IConfig aliasConfig = source.Configs["UserAliasService"];
         if (aliasConfig == null)
         {
-            m_log.Error("[ALIAS CONNECTOR]: UserAliasService missing from OpenSim.ini");
+            m_log.LogError("[ALIAS CONNECTOR]: UserAliasService missing from OpenSim.ini");
             throw new Exception("User Alias connector init error");
         }
 
@@ -70,14 +70,14 @@ public class UserAliasServicesConnector : BaseServiceConnector, IUserAliasServic
 
         if (string.IsNullOrWhiteSpace(serviceURI))
         {
-            m_log.Error("[ACCOUNT CONNECTOR]: UserAliasServerURI not found in section UserAliasService");
+            m_log.LogError("[ACCOUNT CONNECTOR]: UserAliasServerURI not found in section UserAliasService");
             throw new Exception("User Alias connector init error");
         }
 
         OSHHTPHost tmp = new OSHHTPHost(serviceURI, true);
         if (!tmp.IsResolvedHost)
         {
-            m_log.ErrorFormat("[ALIAS CONNECTOR]: {0}", tmp.IsValidHost ? "Could not resolve UserAliasServerURI" : "UserAliasServerURI is a invalid host");
+            m_log.LogError("[ALIAS CONNECTOR]: {0}", tmp.IsValidHost ? "Could not resolve UserAliasServerURI" : "UserAliasServerURI is a invalid host");
             throw new Exception("User Alias connector init error");
         }
 
@@ -105,13 +105,13 @@ public class UserAliasServicesConnector : BaseServiceConnector, IUserAliasServic
 
             if (string.IsNullOrEmpty(reply))
             {
-                m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: GetUserForAlias received null or empty reply");
+                m_log.LogDebug("[ACCOUNT ALIAS CONNECTOR]: GetUserForAlias received null or empty reply");
                 return null;
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
         }
 
         Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -147,13 +147,13 @@ public class UserAliasServicesConnector : BaseServiceConnector, IUserAliasServic
 
             if (string.IsNullOrEmpty(reply))
             {
-                m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: GetUserLiases received null or empty reply");
+                m_log.LogDebug("[ACCOUNT ALIAS CONNECTOR]: GetUserLiases received null or empty reply");
                 return null;
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
         }
 
         Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -176,7 +176,7 @@ public class UserAliasServicesConnector : BaseServiceConnector, IUserAliasServic
             }
             else
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[USER ALIAS CONNECTOR]: GetUserAliases received invalid response type {0}",
                     elements.GetType());
             }
@@ -206,13 +206,13 @@ public class UserAliasServicesConnector : BaseServiceConnector, IUserAliasServic
 
             if (string.IsNullOrEmpty(reply))
             {
-                m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: CreateAlias received null or empty reply");
+                m_log.LogDebug("[ACCOUNT ALIAS CONNECTOR]: CreateAlias received null or empty reply");
                 return null;
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
             return null;
         }
 
@@ -249,13 +249,13 @@ public class UserAliasServicesConnector : BaseServiceConnector, IUserAliasServic
 
             if (string.IsNullOrEmpty(reply))
             {
-                m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: DeleteAlias received null or empty reply");
+                m_log.LogDebug("[ACCOUNT ALIAS CONNECTOR]: DeleteAlias received null or empty reply");
                 return false;
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
             return false;
         }
 

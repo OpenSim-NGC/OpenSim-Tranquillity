@@ -27,6 +27,9 @@
 
 using Npgsql;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.PGSQL;
 
 /// <summary>
@@ -34,7 +37,7 @@ namespace OpenSim.Data.PGSQL;
 /// </summary>
 public class PGSqlFramework
 {
-    private static readonly log4net.ILog m_log = log4net.LogManager.GetLogger( System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger( System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
     protected string m_connectionString;
     protected object m_dbLock = new object();
@@ -64,7 +67,7 @@ public class PGSqlFramework
                 }
                 catch (Exception e)
                 {
-                    m_log.Error(e.Message, e);
+                    m_log.LogError(e, e.Message);
                     return 0;
                 }
             }

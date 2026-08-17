@@ -34,15 +34,16 @@ using OpenSim.Services.Connectors.Simulation;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
 using Nwc.XmlRpc;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.Connectors.Hypergrid;
 
 public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURL;
     private GridRegion m_Gatekeeper;
@@ -60,7 +61,7 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
 
         if (String.IsNullOrWhiteSpace(serviceURI))
         {
-            m_log.Error("[USER AGENT CONNECTOR]: No Home URI named in configuration");
+            m_log.LogError("[USER AGENT CONNECTOR]: No Home URI named in configuration");
             throw new Exception("UserAgent connector init error");
         }
 
@@ -80,7 +81,7 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[USER AGENT CONNECTOR]: Malformed Uri {0}: {1}", url, e.Message);
+            m_log.LogDebug("[USER AGENT CONNECTOR]: Malformed Uri {0}: {1}", url, e.Message);
             return false;
         }
 
@@ -106,7 +107,7 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
         if (destination == null)
         {
             reason = "Destination is null";
-            m_log.Debug("[USER AGENT CONNECTOR]: Given destination is null");
+            m_log.LogDebug("[USER AGENT CONNECTOR]: Given destination is null");
             return false;
         }
 
@@ -163,7 +164,7 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[USER AGENT CONNECTOR]: {0} call to {1} failed: {2}", methodName, m_ServerURL, e.Message);
+            m_log.LogDebug("[USER AGENT CONNECTOR]: {0} call to {1} failed: {2}", methodName, m_ServerURL, e.Message);
             throw;
         }
 
@@ -196,36 +197,36 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
         GridRegion region = new GridRegion();
 
         UUID.TryParse((string)hash["uuid"], out region.RegionID);
-        //m_log.Debug(">> HERE, uuid: " + region.RegionID);
+        //m_log.LogDebug(">> HERE, uuid: " + region.RegionID);
         int n = 0;
         if (hash["x"] != null)
         {
             Int32.TryParse((string)hash["x"], out n);
             region.RegionLocX = n;
-            //m_log.Debug(">> HERE, x: " + region.RegionLocX);
+            //m_log.LogDebug(">> HERE, x: " + region.RegionLocX);
         }
         if (hash["y"] != null)
         {
             Int32.TryParse((string)hash["y"], out n);
             region.RegionLocY = n;
-            //m_log.Debug(">> HERE, y: " + region.RegionLocY);
+            //m_log.LogDebug(">> HERE, y: " + region.RegionLocY);
         }
         if (hash["size_x"] != null)
         {
             Int32.TryParse((string)hash["size_x"], out n);
             region.RegionSizeX = n;
-            //m_log.Debug(">> HERE, x: " + region.RegionLocX);
+            //m_log.LogDebug(">> HERE, x: " + region.RegionLocX);
         }
         if (hash["size_y"] != null)
         {
             Int32.TryParse((string)hash["size_y"], out n);
             region.RegionSizeY = n;
-            //m_log.Debug(">> HERE, y: " + region.RegionLocY);
+            //m_log.LogDebug(">> HERE, y: " + region.RegionLocY);
         }
         if (hash["region_name"] != null)
         {
             region.RegionName = (string)hash["region_name"];
-            //m_log.Debug(">> HERE, name: " + region.RegionName);
+            //m_log.LogDebug(">> HERE, name: " + region.RegionName);
         }
         if (hash["hostname"] != null)
             region.ExternalHostName = (string)hash["hostname"];
@@ -338,26 +339,26 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
         }
         catch
         {
-            m_log.DebugFormat("[USER AGENT CONNECTOR]: Unable to contact remote server {0} for StatusNotification", m_ServerURL);
+            m_log.LogDebug("[USER AGENT CONNECTOR]: Unable to contact remote server {0} for StatusNotification", m_ServerURL);
 //                reason = "Exception: " + e.Message;
             return friendsOnline;
         }
 
         if (response.IsFault)
         {
-            m_log.ErrorFormat("[USER AGENT CONNECTOR]: remote call to {0} for StatusNotification returned an error: {1}", m_ServerURL, response.FaultString);
+            m_log.LogError("[USER AGENT CONNECTOR]: remote call to {0} for StatusNotification returned an error: {1}", m_ServerURL, response.FaultString);
 //                reason = "XMLRPC Fault";
             return friendsOnline;
         }
 
         hash = (Hashtable)response.Value;
         //foreach (Object o in hash)
-        //    m_log.Debug(">> " + ((DictionaryEntry)o).Key + ":" + ((DictionaryEntry)o).Value);
+        //    m_log.LogDebug(">> " + ((DictionaryEntry)o).Key + ":" + ((DictionaryEntry)o).Value);
         try
         {
             if (hash == null)
             {
-                m_log.ErrorFormat("[USER AGENT CONNECTOR]: GetOnlineFriends Got null response from {0}! THIS IS BAAAAD", m_ServerURL);
+                m_log.LogError("[USER AGENT CONNECTOR]: GetOnlineFriends Got null response from {0}! THIS IS BAAAAD", m_ServerURL);
 //                    reason = "Internal error 1";
                 return friendsOnline;
             }
@@ -376,7 +377,7 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
         }
         catch
         {
-            m_log.ErrorFormat("[USER AGENT CONNECTOR]: Got exception on GetOnlineFriends response.");
+            m_log.LogError("[USER AGENT CONNECTOR]: Got exception on GetOnlineFriends response.");
 //                reason = "Exception: " + e.Message;
         }
 
@@ -411,26 +412,26 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
         }
         catch
         {
-            m_log.DebugFormat("[USER AGENT CONNECTOR]: Unable to contact remote server {0} for GetOnlineFriends", m_ServerURL);
+            m_log.LogDebug("[USER AGENT CONNECTOR]: Unable to contact remote server {0} for GetOnlineFriends", m_ServerURL);
 //                reason = "Exception: " + e.Message;
             return online;
         }
 
         if (response.IsFault)
         {
-            m_log.ErrorFormat("[USER AGENT CONNECTOR]: remote call to {0} for GetOnlineFriends returned an error: {1}", m_ServerURL, response.FaultString);
+            m_log.LogError("[USER AGENT CONNECTOR]: remote call to {0} for GetOnlineFriends returned an error: {1}", m_ServerURL, response.FaultString);
 //                reason = "XMLRPC Fault";
             return online;
         }
 
         hash = (Hashtable)response.Value;
         //foreach (Object o in hash)
-        //    m_log.Debug(">> " + ((DictionaryEntry)o).Key + ":" + ((DictionaryEntry)o).Value);
+        //    m_log.LogDebug(">> " + ((DictionaryEntry)o).Key + ":" + ((DictionaryEntry)o).Value);
         try
         {
             if (hash == null)
             {
-                m_log.ErrorFormat("[USER AGENT CONNECTOR]: GetOnlineFriends Got null response from {0}! THIS IS BAAAAD", m_ServerURL);
+                m_log.LogError("[USER AGENT CONNECTOR]: GetOnlineFriends Got null response from {0}! THIS IS BAAAAD", m_ServerURL);
 //                    reason = "Internal error 1";
                 return online;
             }
@@ -449,7 +450,7 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
         }
         catch
         {
-            m_log.ErrorFormat("[USER AGENT CONNECTOR]: Got exception on GetOnlineFriends response.");
+            m_log.LogError("[USER AGENT CONNECTOR]: Got exception on GetOnlineFriends response.");
 //                reason = "Exception: " + e.Message;
         }
 
@@ -553,7 +554,7 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
 
     private bool GetBoolResponse(XmlRpcRequest request, out string reason)
     {
-        //m_log.Debug("[USER AGENT CONNECTOR]: GetBoolResponse from/to " + m_ServerURL);
+        //m_log.LogDebug("[USER AGENT CONNECTOR]: GetBoolResponse from/to " + m_ServerURL);
         XmlRpcResponse response = null;
         try
         {
@@ -562,26 +563,26 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[USER AGENT CONNECTOR]: Unable to contact remote server {0} for GetBoolResponse", m_ServerURL);
+            m_log.LogDebug("[USER AGENT CONNECTOR]: Unable to contact remote server {0} for GetBoolResponse", m_ServerURL);
             reason = "Exception: " + e.Message;
             return false;
         }
 
         if (response.IsFault)
         {
-            m_log.ErrorFormat("[USER AGENT CONNECTOR]: remote call to {0} for GetBoolResponse returned an error: {1}", m_ServerURL, response.FaultString);
+            m_log.LogError("[USER AGENT CONNECTOR]: remote call to {0} for GetBoolResponse returned an error: {1}", m_ServerURL, response.FaultString);
             reason = "XMLRPC Fault";
             return false;
         }
 
         Hashtable hash = (Hashtable)response.Value;
         //foreach (Object o in hash)
-        //    m_log.Debug(">> " + ((DictionaryEntry)o).Key + ":" + ((DictionaryEntry)o).Value);
+        //    m_log.LogDebug(">> " + ((DictionaryEntry)o).Key + ":" + ((DictionaryEntry)o).Value);
         try
         {
             if (hash == null)
             {
-                m_log.ErrorFormat("[USER AGENT CONNECTOR]: Got null response from {0}! THIS IS BAAAAD", m_ServerURL);
+                m_log.LogError("[USER AGENT CONNECTOR]: Got null response from {0}! THIS IS BAAAAD", m_ServerURL);
                 reason = "Internal error 1";
                 return false;
             }
@@ -592,16 +593,16 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
             else
             {
                 reason = "Internal error 2";
-                m_log.WarnFormat("[USER AGENT CONNECTOR]: response from {0} does not have expected key 'result'", m_ServerURL);
+                m_log.LogWarning("[USER AGENT CONNECTOR]: response from {0} does not have expected key 'result'", m_ServerURL);
             }
 
             return success;
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[USER AGENT CONNECTOR]: Got exception on GetBoolResponse response.");
+            m_log.LogError("[USER AGENT CONNECTOR]: Got exception on GetBoolResponse response.");
             if (hash.ContainsKey("result") && hash["result"] != null)
-                m_log.ErrorFormat("Reply was ", (string)hash["result"]);
+                m_log.LogError("Reply was ", (string)hash["result"]);
             reason = "Exception: " + e.Message;
             return false;
         }

@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Collections;
 using System.Reflection;
 using Nini.Config;
@@ -33,12 +32,13 @@ using OpenSim.Framework;
 
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class RemoteFreeswitchConnector : IFreeswitchService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = String.Empty;
@@ -62,7 +62,7 @@ public class RemoteFreeswitchConnector : IFreeswitchService
         IConfig freeswitchConfig = source.Configs["FreeSwitchVoice"];
         if (freeswitchConfig == null)
         {
-            m_log.Error("[FREESWITCH CONNECTOR]: FreeSwitchVoice missing from OpenSim.ini");
+            m_log.LogError("[FREESWITCH CONNECTOR]: FreeSwitchVoice missing from OpenSim.ini");
             throw new Exception("Freeswitch connector init error");
         }
 
@@ -71,7 +71,7 @@ public class RemoteFreeswitchConnector : IFreeswitchService
 
         if (serviceURI.Length == 0)
         {
-            m_log.Error("[FREESWITCH CONNECTOR]: No FreeswitchServiceURL named in section FreeSwitchVoice");
+            m_log.LogError("[FREESWITCH CONNECTOR]: No FreeswitchServiceURL named in section FreeSwitchVoice");
             throw new Exception("Freeswitch connector init error");
         }
         m_ServerURI = serviceURI.TrimEnd('/') + "/region-config";
@@ -91,7 +91,7 @@ public class RemoteFreeswitchConnector : IFreeswitchService
 
     public string GetJsonConfig()
     {
-        m_log.DebugFormat("[FREESWITCH CONNECTOR]: Requesting config from {0}", m_ServerURI);
+        m_log.LogDebug("[FREESWITCH CONNECTOR]: Requesting config from {0}", m_ServerURI);
         return SynchronousRestFormsRequester.MakeRequest("GET",
                 m_ServerURI, String.Empty);
     }

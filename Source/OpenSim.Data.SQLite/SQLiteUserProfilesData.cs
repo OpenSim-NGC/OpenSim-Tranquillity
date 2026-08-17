@@ -27,19 +27,19 @@
 
 using System.Data;
 using System.Reflection;
-using log4net;
 using System.Data.SQLite;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Data.SQLite;
 
 public class SQLiteUserProfilesData: IProfilesData
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private SQLiteConnection m_connection;
     private string m_connectionString;
@@ -67,7 +67,7 @@ public class SQLiteUserProfilesData: IProfilesData
 
         m_connectionString = connectionString;
 
-        m_log.Info("[PROFILES_DATA]: Sqlite - connecting: "+m_connectionString);
+        m_log.LogInformation("[PROFILES_DATA]: Sqlite - connecting: "+m_connectionString);
 
         m_connection = new SQLiteConnection(m_connectionString);
         m_connection.Open();
@@ -107,7 +107,7 @@ public class SQLiteUserProfilesData: IProfilesData
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PROFILES_DATA]" +
+                m_log.LogError("[PROFILES_DATA]" +
                                   ": UserAccount exception {0}", e.Message);
             }
             n.Add("classifieduuid", OSD.FromUUID(Id));
@@ -208,7 +208,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": ClassifiedesUpdate exception {0}", e.Message);
             result = e.Message;
             return false;
@@ -234,7 +234,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": DeleteClassifiedRecord exception {0}", e.Message);
             return false;
         }
@@ -280,7 +280,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": GetPickInfo exception {0}", e.Message);
         }
         return true;
@@ -317,7 +317,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": GetAvatarPicks exception {0}", e.Message);
         }
         return data;
@@ -369,7 +369,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": GetPickInfo exception {0}", e.Message);
         }
         return pick;
@@ -437,7 +437,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": UpdateAvatarNotes exception {0}", e.Message);
             return false;
         }
@@ -462,7 +462,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": DeleteUserPickRecord exception {0}", e.Message);
             return false;
         }
@@ -498,7 +498,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": GetAvatarNotes exception {0}", e.Message);
         }
         return true;
@@ -541,7 +541,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": UpdateAvatarNotes exception {0}", e.Message);
             return false;
         }
@@ -568,7 +568,7 @@ public class SQLiteUserProfilesData: IProfilesData
                 }
                 catch(Exception e)
                 {
-                    m_log.ErrorFormat("[PROFILES_DATA]" +
+                    m_log.LogError("[PROFILES_DATA]" +
                                       ": GetAvatarProperties exception {0}", e.Message);
                     result = e.Message;
                     return false;
@@ -687,7 +687,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": AgentPropertiesUpdate exception {0}", e.Message);
 
             return false;
@@ -724,7 +724,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": AgentInterestsUpdate exception {0}", e.Message);
             result = e.Message;
             return false;
@@ -758,7 +758,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": AgentInterestsUpdate exception {0}", e.Message);
             result = e.Message;
             return false;
@@ -810,7 +810,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": Get preferences exception {0}", e.Message);
             result = e.Message;
             return false;
@@ -865,7 +865,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": Requst application data exception {0}", e.Message);
             result = e.Message;
             return false;
@@ -898,7 +898,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": SetUserData exception {0}", e.Message);
             return false;
         }
@@ -962,7 +962,7 @@ public class SQLiteUserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]" +
+            m_log.LogError("[PROFILES_DATA]" +
                               ": GetAvatarNotes exception {0}", e.Message);
         }
         return data;

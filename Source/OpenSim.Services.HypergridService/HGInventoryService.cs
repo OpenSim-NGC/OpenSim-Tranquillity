@@ -26,7 +26,6 @@
  */
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Services.Interfaces;
@@ -34,6 +33,8 @@ using OpenSim.Services.InventoryService;
 using OpenSim.Data;
 using OpenSim.Framework;
 using OpenSim.Server.Base;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.HypergridService;
 
@@ -46,8 +47,7 @@ namespace OpenSim.Services.HypergridService;
 /// </summary>
 public class HGInventoryService : XInventoryService, IInventoryService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_HomeURL;
@@ -58,7 +58,7 @@ public class HGInventoryService : XInventoryService, IInventoryService
     public HGInventoryService(IConfigSource config, string configName)
         : base(config, configName)
     {
-        m_log.Debug("[HGInventory Service]: Starting");
+        m_log.LogDebug("[HGInventory Service]: Starting");
         if (configName != string.Empty)
             m_ConfigName = configName;
 
@@ -84,7 +84,7 @@ public class HGInventoryService : XInventoryService, IInventoryService
             m_Cache = UserAccountCache.CreateUserAccountCache(m_UserAccountService);
         }
 
-        m_log.Debug("[HG INVENTORY SERVICE]: Starting...");
+        m_log.LogDebug("[HG INVENTORY SERVICE]: Starting...");
     }
 
     public override bool CreateUserInventory(UUID principalID)
@@ -102,7 +102,7 @@ public class HGInventoryService : XInventoryService, IInventoryService
 
     public override InventoryFolderBase GetRootFolder(UUID principalID)
     {
-        //m_log.DebugFormat("[HG INVENTORY SERVICE]: GetRootFolder for {0}", principalID);
+        //m_log.LogDebug("[HG INVENTORY SERVICE]: GetRootFolder for {0}", principalID);
         // Warp! Root folder for travelers
         XInventoryFolder[] folders = m_Database.GetFolders(
                 new string[] { "agentID", "folderName"},
@@ -140,7 +140,7 @@ public class HGInventoryService : XInventoryService, IInventoryService
 
     public override InventoryFolderBase GetFolderForType(UUID principalID, FolderType type)
     {
-        //m_log.DebugFormat("[HG INVENTORY SERVICE]: GetFolderForType for {0} {0}", principalID, type);
+        //m_log.LogDebug("[HG INVENTORY SERVICE]: GetFolderForType for {0} {0}", principalID, type);
         return GetRootFolder(principalID);
     }
 

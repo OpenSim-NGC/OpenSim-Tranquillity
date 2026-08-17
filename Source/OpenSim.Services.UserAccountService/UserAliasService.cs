@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Data;
@@ -34,11 +33,13 @@ using OpenSim.Framework;
 using OpenSim.Services.Base;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.UserAccountService;
 
 public class UserAliasService : ServiceBase, IUserAliasService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected IUserAliasData m_Database = null;
 
@@ -178,7 +179,7 @@ public class UserAliasService : ServiceBase, IUserAliasService
     /// <returns>List<UserAlias>() - A list of aliases or null if none are defined</UUID></returns>
     public List<UserAlias> GetUserAliases(UUID userID)
     {
-//           m_log.DebugFormat("[USER ALIAS SERVICE] Retrieving aliases for user by userid {0}", userID);
+//           m_log.LogDebug("[USER ALIAS SERVICE] Retrieving aliases for user by userid {0}", userID);
 
         var aliases = m_Database.GetUserAliases(userID);
 
@@ -203,7 +204,7 @@ public class UserAliasService : ServiceBase, IUserAliasService
 
     public UserAlias GetUserForAlias(UUID aliasID)
     {
-//            m_log.DebugFormat("[USER ALIAS SERVICE]: Retrieving userID for alias by aliasId ", aliasID);
+//            m_log.LogDebug("[USER ALIAS SERVICE]: Retrieving userID for alias by aliasId ", aliasID);
 
         var alias = m_Database.GetUserForAlias(aliasID);
 

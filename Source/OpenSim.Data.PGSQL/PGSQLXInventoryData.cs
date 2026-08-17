@@ -28,11 +28,14 @@
 using OpenMetaverse;
 using Npgsql;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.PGSQL;
 
 public class PGSQLXInventoryData : IXInventoryData
 {
-    // private static readonly ILog m_log = LogManager.GetLogger(
+    // private static readonly ILogger m_log = LoggerProvider.CreateLogger(
     //   MethodBase.GetCurrentMethod().DeclaringType);
 
     private PGSQLFolderHandler m_Folders;
@@ -298,7 +301,7 @@ public class PGSQLInventoryHandler<T> : PGSQLGenericTableHandler<T> where T: cla
 
     protected bool IncrementFolderVersion(string folderID)
     {
-        //m_log.DebugFormat("[PGSQL ITEM HANDLER]: Incrementing version on folder {0}", folderID);
+        //m_log.LogDebug("[PGSQL ITEM HANDLER]: Incrementing version on folder {0}", folderID);
         //Util.PrintCallStack();
 
         if(!UUID.TryParse(folderID, out UUID foldID))

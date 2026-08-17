@@ -27,17 +27,18 @@
 
 using System.Data;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using System.Text;
 using Npgsql;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Data.PGSQL;
 
 public class PGSQLGenericTableHandler<T> : PGSqlFramework where T : class, new()
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected string m_ConnectionString;
     protected PGSQLManager m_database; //used for parameter type translation
@@ -338,7 +339,7 @@ public class PGSQLGenericTableHandler<T> : PGSqlFramework where T : class, new()
                     m_Realm, where);
             cmd.Connection = conn;
             cmd.CommandText = query;
-            //m_log.WarnFormat("[PGSQLGenericTable]: SELECT {0} WHERE {1}", m_Realm, where);
+            //m_log.LogWarning("[PGSQLGenericTable]: SELECT {0} WHERE {1}", m_Realm, where);
 
             conn.Open();
             return DoQuery(cmd);
@@ -355,7 +356,7 @@ public class PGSQLGenericTableHandler<T> : PGSqlFramework where T : class, new()
                                          m_Realm, where);
             cmd.Connection = conn;
             cmd.CommandText = query;
-            //m_log.WarnFormat("[PGSQLGenericTable]: SELECT {0} WHERE {1}", m_Realm, where);
+            //m_log.LogWarning("[PGSQLGenericTable]: SELECT {0} WHERE {1}", m_Realm, where);
 
             cmd.Parameters.Add(parameter);
 
@@ -447,7 +448,7 @@ public class PGSQLGenericTableHandler<T> : PGSqlFramework where T : class, new()
             conn.Open();
             if (cmd.ExecuteNonQuery() > 0)
             {
-                //m_log.WarnFormat("[PGSQLGenericTable]: Updating {0}", m_Realm);
+                //m_log.LogWarning("[PGSQLGenericTable]: Updating {0}", m_Realm);
                 return true;
             }
             else
@@ -461,7 +462,7 @@ public class PGSQLGenericTableHandler<T> : PGSqlFramework where T : class, new()
                 cmd.Connection = conn;
                 cmd.CommandText = query.ToString();
 
-                // m_log.WarnFormat("[PGSQLGenericTable]: Inserting into {0} sql {1}", m_Realm, cmd.CommandText);
+                // m_log.LogWarning("[PGSQLGenericTable]: Inserting into {0} sql {1}", m_Realm, cmd.CommandText);
 
                 if (conn.State != ConnectionState.Open)
                     conn.Open();
@@ -508,7 +509,7 @@ public class PGSQLGenericTableHandler<T> : PGSqlFramework where T : class, new()
 
             if (cmd.ExecuteNonQuery() > 0)
             {
-                //m_log.Warn("[PGSQLGenericTable]: " + deleteCommand);
+                //m_log.LogWarning("[PGSQLGenericTable]: " + deleteCommand);
                 return true;
             }
             return false;

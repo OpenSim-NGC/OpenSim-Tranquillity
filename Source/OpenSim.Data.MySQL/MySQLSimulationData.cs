@@ -28,12 +28,13 @@
 using System.Data;
 using System.Reflection;
 using System.Text;
-using log4net;
 using MySqlConnector;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.MySQL;
 
@@ -42,7 +43,7 @@ namespace OpenSim.Data.MySQL;
 /// </summary>
 public class MySQLSimulationData : ISimulationDataStore
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static string LogHeader = "[REGION DB MYSQL]";
 
     private string m_connectionString;
@@ -95,7 +96,7 @@ public class MySQLSimulationData : ISimulationDataStore
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("{0} MySQL error in ExecuteReader: {1}", LogHeader, e);
+            m_log.LogError("{0} MySQL error in ExecuteReader: {1}", LogHeader, e);
             throw;
         }
     }
@@ -108,7 +109,7 @@ public class MySQLSimulationData : ISimulationDataStore
         }
         catch (Exception e)
         {
-            m_log.Error("[REGION DB]: MySQL error in ExecuteNonQuery: " + e.Message);
+            m_log.LogError("[REGION DB]: MySQL error in ExecuteNonQuery: " + e.Message);
             throw;
         }
     }
@@ -247,7 +248,7 @@ public class MySQLSimulationData : ISimulationDataStore
 
     public virtual void RemoveObject(UUID obj, UUID regionUUID)
     {
-//            m_log.DebugFormat("[REGION DB]: Deleting scene object {0} from {1} in database", obj, regionUUID);
+//            m_log.LogDebug("[REGION DB]: Deleting scene object {0} from {1} in database", obj, regionUUID);
 
         List<string> uuids = new List<string>();
         lock (m_dbLock)
@@ -361,12 +362,12 @@ public class MySQLSimulationData : ISimulationDataStore
                                     }
                                 }
                                 else
-                                    m_log.Warn($"[REGION DB]: duplicated SOG with root prim \"{prim.Name}\" {prim.UUID} in region {regionID}");
+                                    m_log.LogWarning($"[REGION DB]: duplicated SOG with root prim \"{prim.Name}\" {prim.UUID} in region {regionID}");
                             }
 
                             ++count;
                             if (count % ROWS_PER_QUERY == 0)
-                                m_log.Debug("[REGION DB]: Loaded " + count + " prims...");
+                                m_log.LogDebug("[REGION DB]: Loaded " + count + " prims...");
                         }
                     }
                 }
@@ -394,13 +395,13 @@ public class MySQLSimulationData : ISimulationDataStore
                 }
                 else
                 {
-                    m_log.Warn(
+                    m_log.LogWarning(
                         $"[REGION DB]: orphan child prim {prim.Name} {prim.UUID} in region {regionID} with missing parent {prim.ParentUUID}. Prim not loaded.");
                 }
             }
         }
 
-        m_log.Debug($"[REGION DB]: Loaded {objects.Count} objects using {prims.Count} prims");
+        m_log.LogDebug($"[REGION DB]: Loaded {objects.Count} objects using {prims.Count} prims");
 
         #region Prim Inventory Loading
 
@@ -442,7 +443,7 @@ public class MySQLSimulationData : ISimulationDataStore
 
         #endregion Prim Inventory Loading
 
-        m_log.DebugFormat("[REGION DB]: Loaded inventory from {0} objects", primsWithInventory.Count);
+        m_log.LogDebug("[REGION DB]: Loaded inventory from {0} objects", primsWithInventory.Count);
 
         return new List<SceneObjectGroup>(objects.Values);
     }
@@ -494,7 +495,7 @@ public class MySQLSimulationData : ISimulationDataStore
     {
         Util.FireAndForget(delegate(object x)
         {
-            m_log.Info("[REGION DB]: Storing terrain");
+            m_log.LogInformation("[REGION DB]: Storing terrain");
 
             int terrainDBRevision;
             Array terrainDBblob;
@@ -528,7 +529,7 @@ public class MySQLSimulationData : ISimulationDataStore
                             }
                             catch (Exception e)
                             {
-                                m_log.ErrorFormat(e.ToString());
+                                m_log.LogError(e.ToString());
                             }
                         }
                     }
@@ -542,7 +543,7 @@ public class MySQLSimulationData : ISimulationDataStore
     {
         Util.FireAndForget(delegate(object x)
         {
-            m_log.Info("[REGION DB]: Storing Baked terrain");
+            m_log.LogInformation("[REGION DB]: Storing Baked terrain");
 
             int terrainDBRevision;
             Array terrainDBblob;
@@ -576,7 +577,7 @@ public class MySQLSimulationData : ISimulationDataStore
                             }
                             catch (Exception e)
                             {
-                                m_log.ErrorFormat(e.ToString());
+                                m_log.LogError(e.ToString());
                             }
                         }
                     }
@@ -1242,7 +1243,7 @@ public class MySQLSimulationData : ISimulationDataStore
         }
         catch
         {
-            m_log.ErrorFormat("[MYSQL DB]: Error reading task inventory: itemID was {0}, primID was {1}", row["itemID"].ToString(), row["primID"].ToString());
+            m_log.LogError("[MYSQL DB]: Error reading task inventory: itemID was {0}, primID was {1}", row["itemID"].ToString(), row["primID"].ToString());
             throw;
         }
     }
@@ -1375,7 +1376,7 @@ public class MySQLSimulationData : ISimulationDataStore
         {
             newData.UserLocation = Vector3.Zero;
             newData.UserLookAt = Vector3.Zero;
-            m_log.ErrorFormat("[PARCEL]: unable to get parcel telehub settings for {1}", newData.Name);
+            m_log.LogError("[PARCEL]: unable to get parcel telehub settings for {1}", newData.Name);
         }
 
         newData.MediaDescription = (string) row["MediaDescription"];

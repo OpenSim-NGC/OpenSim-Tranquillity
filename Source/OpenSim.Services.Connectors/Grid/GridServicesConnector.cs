@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
@@ -35,11 +34,13 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class GridServicesConnector : BaseServiceConnector, IGridService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private string m_ServerURI = string.Empty;
     private string m_ServerGridURI = string.Empty;
 
@@ -63,7 +64,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
         IConfig gridConfig = source.Configs["GridService"];
         if (gridConfig is null)
         {
-            m_log.Error("[GRID CONNECTOR]: GridService missing from OpenSim.ini");
+            m_log.LogError("[GRID CONNECTOR]: GridService missing from OpenSim.ini");
             throw new Exception("Grid connector init error");
         }
 
@@ -71,7 +72,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
 
         if (serviceURI.Length == 0)
         {
-            m_log.Error("[GRID CONNECTOR]: No Server URI named in section GridService");
+            m_log.LogError("[GRID CONNECTOR]: No Server URI named in section GridService");
             throw new Exception("Grid connector init error");
         }
         m_ServerURI = serviceURI.TrimEnd('/');
@@ -97,7 +98,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
             sendData[kvp.Key] = (string)kvp.Value;
 
         string reqString = ServerUtils.BuildQueryString(sendData);
-        // m_log.DebugFormat("[GRID CONNECTOR]: queryString = {0}", reqString);
+        // m_log.LogDebug("[GRID CONNECTOR]: queryString = {0}", reqString);
         try
         {
             string reply = SynchronousRestFormsRequester.MakePostRequest(m_ServerGridURI, reqString, m_Auth);
@@ -110,32 +111,32 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                         return string.Empty;
                     if (tmps.Equals("failure", StringComparison.CurrentCultureIgnoreCase))
                     {
-                        m_log.Error(
+                        m_log.LogError(
                             $"[GRID CONNECTOR]: Registration failed: {replyData["Message"]} when contacting {m_ServerGridURI}");
                         return replyData["Message"].ToString();
                     }
                     else
                     {
-                        m_log.Error(
+                        m_log.LogError(
                             $"[GRID CONNECTOR]: unexpected result {tmps} when contacting {m_ServerGridURI}");
                         return "Unexpected result " + tmps;
                     }
                 }
                 else
                 {
-                    m_log.Error(
+                    m_log.LogError(
                         $"[GRID CONNECTOR]: reply data does not contain result field when contacting {m_ServerGridURI}");
                 }
             }
             else
             {
-                m_log.Error(
+                m_log.LogError(
                     $"[GRID CONNECTOR]: RegisterRegion received null reply when contacting grid server at {m_ServerGridURI}");
             }
         }
         catch (Exception e)
         {
-            m_log.Error($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogError($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return "Error communicating with the grid service at " + m_ServerGridURI;
@@ -162,11 +163,11 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                         rs.Equals("success", StringComparison.InvariantCultureIgnoreCase);
             }
             else
-                m_log.Debug("[GRID CONNECTOR]: DeregisterRegion received empty reply");
+                m_log.LogDebug("[GRID CONNECTOR]: DeregisterRegion received empty reply");
         }
         catch (Exception e)
         {
-            m_log.Error($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogError($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return false;
@@ -190,7 +191,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
 
             Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
 
-            //m_log.DebugFormat("[GRID CONNECTOR]: get neighbours returned {0} elements", replyData.Values.Count);
+            //m_log.LogDebug("[GRID CONNECTOR]: get neighbours returned {0} elements", replyData.Values.Count);
             if (replyData.Count > 0)
             {
                 List<GridRegion> rinfos = [];
@@ -208,7 +209,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
         }
         catch (Exception e)
         {
-            m_log.Error($"[GRID CONNECTOR]: GetNeighbours Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogError($"[GRID CONNECTOR]: GetNeighbours Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
             
         }
 
@@ -234,14 +235,14 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                 if(replyData.TryGetValue("result", out object tmpo) && tmpo is Dictionary<string, object> td)
                     return new GridRegion(td);
                 //else
-                //    m_log.Debug($"[GRID CONNECTOR]: GetRegionByUUID {scopeID}, {regionID} received empty result response");
+                //    m_log.LogDebug($"[GRID CONNECTOR]: GetRegionByUUID {scopeID}, {regionID} received empty result response");
             }
             else
-                m_log.Debug($"[GRID CONNECTOR]: GetRegionByUUID received empty reply for {scopeID}, {regionID}");
+                m_log.LogDebug($"[GRID CONNECTOR]: GetRegionByUUID received empty reply for {scopeID}, {regionID}");
         }
         catch (Exception e)
         {
-            m_log.Debug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogDebug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return null;
@@ -276,14 +277,14 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                 if(replyData.TryGetValue("result", out object tmpo) && tmpo is Dictionary<string, object> td)
                     return new GridRegion(td);
                 //else
-                //    m_log.Debug($"[GRID CONNECTOR]: GetRegionByPosition {scopeID}, {x}-{y} received empty result response");
+                //    m_log.LogDebug($"[GRID CONNECTOR]: GetRegionByPosition {scopeID}, {x}-{y} received empty result response");
             }
             else
-                m_log.Debug($"[GRID CONNECTOR]: GetRegionByPosition {scopeID}, {x}-{y} received empty response");
+                m_log.LogDebug($"[GRID CONNECTOR]: GetRegionByPosition {scopeID}, {x}-{y} received empty response");
         }
         catch (Exception e)
         {
-            m_log.Debug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogDebug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return null;
@@ -311,14 +312,14 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                 if(replyData.TryGetValue("result", out object tmpo) && tmpo is Dictionary<string, object> td)
                     return new GridRegion(td);
                 //else
-                //    m_log.DebugFormat("$[GRID CONNECTOR]: GetRegionByName {scopeID}, {regionName} received empty result");
+                //    m_log.LogDebug("$[GRID CONNECTOR]: GetRegionByName {scopeID}, {regionName} received empty result");
             }
             else
-                 m_log.DebugFormat("$[GRID CONNECTOR]: GetRegionByName {scopeID}, {regionName} received empty reply");
+                 m_log.LogDebug("$[GRID CONNECTOR]: GetRegionByName {scopeID}, {regionName} received empty reply");
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[GRID CONNECTOR]: GetRegionByName, Exception when contacting grid server at {0}: {1}", m_ServerGridURI, e.Message);
+            m_log.LogDebug("[GRID CONNECTOR]: GetRegionByName, Exception when contacting grid server at {0}: {1}", m_ServerGridURI, e.Message);
         }
 
         return null;
@@ -346,14 +347,14 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                 if(replyData.TryGetValue("result", out object tmpo) && tmpo is Dictionary<string, object> td)
                     return new GridRegion(td);
                 //else
-                //    m_log.DebugFormat("$[GRID CONNECTOR]: GetLocalRegionByName {scopeID}, {regionName} received empty result");
+                //    m_log.LogDebug("$[GRID CONNECTOR]: GetLocalRegionByName {scopeID}, {regionName} received empty result");
             }
             else
-                 m_log.DebugFormat("$[GRID CONNECTOR]: GetLocalRegionByName {scopeID}, {regionName} received empty reply");
+                 m_log.LogDebug("$[GRID CONNECTOR]: GetLocalRegionByName {scopeID}, {regionName} received empty reply");
         }
         catch (Exception e)
         {
-            m_log.Debug($"[GRID CONNECTOR]: GetLocalRegionByName, Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogDebug($"[GRID CONNECTOR]: GetLocalRegionByName, Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return null;
@@ -403,14 +404,14 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                     return rinfos;
                 }
                 else
-                    m_log.Debug($"[GRID CONNECTOR]: GetRegionsByName {scopeID}, {name}, {maxNumber} received empty reply data");
+                    m_log.LogDebug($"[GRID CONNECTOR]: GetRegionsByName {scopeID}, {name}, {maxNumber} received empty reply data");
             }
             else
-                m_log.Debug($"[GRID CONNECTOR]: GetRegionsByName {scopeID}, {name}, {maxNumber} received empty reply");
+                m_log.LogDebug($"[GRID CONNECTOR]: GetRegionsByName {scopeID}, {name}, {maxNumber} received empty reply");
         }
         catch (Exception e)
         {
-            m_log.Debug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogDebug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return [];
@@ -440,7 +441,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                     m_ServerGridURI,
                     ServerUtils.BuildQueryString(sendData), m_Auth);
 
-            //m_log.DebugFormat("[GRID CONNECTOR]: GetRegionRange reply was {0}", reply);
+            //m_log.LogDebug("[GRID CONNECTOR]: GetRegionRange reply was {0}", reply);
             if (reply.Length > 0)
             {
                 Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -458,15 +459,15 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                     return rinfos;
                 }
                 else
-                    m_log.Debug($"[GRID CONNECTOR]: GetRegionRange {scopeID}, {xmin}-{xmax} {ymin}-{ymax} received null response");
+                    m_log.LogDebug($"[GRID CONNECTOR]: GetRegionRange {scopeID}, {xmin}-{xmax} {ymin}-{ymax} received null response");
             }
             else
-                m_log.Debug("[GRID CONNECTOR]: GetRegionRange received empty reply");
+                m_log.LogDebug("[GRID CONNECTOR]: GetRegionRange received empty reply");
 
         }
         catch (Exception e)
         {
-            m_log.Debug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogDebug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return [];
@@ -487,7 +488,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                     m_ServerGridURI,
                     ServerUtils.BuildQueryString(sendData), m_Auth);
 
-            //m_log.DebugFormat("[GRID CONNECTOR]: reply was {0}", reply);
+            //m_log.LogDebug("[GRID CONNECTOR]: reply was {0}", reply);
             if (reply.Length > 0)
             {
                 Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -507,15 +508,15 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                     return rinfos;
                 }
                 else
-                    m_log.Debug($"[GRID CONNECTOR]: GetDefaultRegions {scopeID} received empty response");
+                    m_log.LogDebug($"[GRID CONNECTOR]: GetDefaultRegions {scopeID} received empty response");
             }
             else
-                m_log.Debug("[GRID CONNECTOR]: GetDefaultRegions received empty reply");
+                m_log.LogDebug("[GRID CONNECTOR]: GetDefaultRegions received empty reply");
 
         }
         catch (Exception e)
         {
-            m_log.Debug($"[GRID CONNECTOR]: GetDefaultRegions Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogDebug($"[GRID CONNECTOR]: GetDefaultRegions Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return [];
@@ -536,7 +537,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                     m_ServerGridURI,
                     ServerUtils.BuildQueryString(sendData), m_Auth);
 
-            //m_log.DebugFormat("[GRID CONNECTOR]: reply was {0}", reply);
+            //m_log.LogDebug("[GRID CONNECTOR]: reply was {0}", reply);
             if (reply.Length > 0)
             {
                 Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -555,15 +556,15 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                     return rinfos;
                 }
                 else
-                    m_log.Debug($"[GRID CONNECTOR]: GetDefaultHypergridRegions {scopeID} received empty response");
+                    m_log.LogDebug($"[GRID CONNECTOR]: GetDefaultHypergridRegions {scopeID} received empty response");
             }
             else
-                m_log.Debug("[GRID CONNECTOR]: GetDefaultHypergridRegions received empty reply");
+                m_log.LogDebug("[GRID CONNECTOR]: GetDefaultHypergridRegions received empty reply");
 
         }
         catch (Exception e)
         {
-            m_log.Debug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogDebug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return [];
@@ -586,7 +587,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                     m_ServerGridURI,
                     ServerUtils.BuildQueryString(sendData), m_Auth);
 
-            //m_log.DebugFormat("[GRID CONNECTOR]: reply was {0}", reply);
+            //m_log.LogDebug("[GRID CONNECTOR]: reply was {0}", reply);
             if (reply.Length > 0)
             {
                 Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -605,14 +606,14 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                     return rinfos;
                 }
                 else
-                    m_log.Debug($"[GRID CONNECTOR]: GetFallbackRegions {scopeID}, {x}-{y} received empty response");
+                    m_log.LogDebug($"[GRID CONNECTOR]: GetFallbackRegions {scopeID}, {x}-{y} received empty response");
             }
             else
-                m_log.Debug("[GRID CONNECTOR]: GetFallbackRegions received empty reply");
+                m_log.LogDebug("[GRID CONNECTOR]: GetFallbackRegions received empty reply");
         }
         catch (Exception e)
         {
-            m_log.Debug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogDebug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return [];
@@ -634,7 +635,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
         {
             string reply = SynchronousRestFormsRequester.MakePostRequest(m_ServerGridURI, ServerUtils.BuildQueryString(sendData), m_Auth);
 
-            //m_log.DebugFormat("[GRID CONNECTOR]: reply was {0}", reply);
+            //m_log.LogDebug("[GRID CONNECTOR]: reply was {0}", reply);
             if (reply.Length > 0)
             {
                 Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -653,14 +654,14 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                     return rinfos;
                 }
                 else
-                    m_log.Debug($"[GRID CONNECTOR]: GetOnlineRegions {scopeID}, {x}-{y} received empty response");
+                    m_log.LogDebug($"[GRID CONNECTOR]: GetOnlineRegions {scopeID}, {x}-{y} received empty response");
             }
             else
-                m_log.Debug("[GRID CONNECTOR]: GetOnlineRegions received empty reply");
+                m_log.LogDebug("[GRID CONNECTOR]: GetOnlineRegions received empty reply");
         }
         catch (Exception e)
         {
-            m_log.Debug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogDebug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return [];
@@ -681,7 +682,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                     m_ServerGridURI,
                     ServerUtils.BuildQueryString(sendData), m_Auth);
 
-            //m_log.DebugFormat("[GRID CONNECTOR]: reply was {0}", reply);
+            //m_log.LogDebug("[GRID CONNECTOR]: reply was {0}", reply);
             if (reply.Length > 0)
             {
                 Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -700,14 +701,14 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                     return rinfos;
                 }
                 else
-                    m_log.Debug($"[GRID CONNECTOR]: GetHyperlinks {scopeID} received empty response");
+                    m_log.LogDebug($"[GRID CONNECTOR]: GetHyperlinks {scopeID} received empty response");
             }
             else
-                m_log.Debug("[GRID CONNECTOR]: GetHyperlinks received empty reply");
+                m_log.LogDebug("[GRID CONNECTOR]: GetHyperlinks received empty reply");
         }
         catch (Exception e)
         {
-            m_log.Debug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogDebug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return [];
@@ -737,15 +738,15 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                         Int32.TryParse(tmps, out int flags))
                     return flags;
                  else
-                    m_log.Debug($"[GRID CONNECTOR]: GetRegionFlags {scopeID}, {regionID} received invalid response");
+                    m_log.LogDebug($"[GRID CONNECTOR]: GetRegionFlags {scopeID}, {regionID} received invalid response");
             }
             else
-                m_log.Debug("[GRID CONNECTOR]: GetRegionFlags received empty reply");
+                m_log.LogDebug("[GRID CONNECTOR]: GetRegionFlags received empty reply");
 
         }
         catch (Exception e)
         {
-            m_log.Debug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogDebug($"[GRID CONNECTOR]: Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return -1;
@@ -777,11 +778,11 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                 }
             }
             else
-                m_log.Debug("[GRID CONNECTOR]: GetExtraServiceURLs received empty reply");
+                m_log.LogDebug("[GRID CONNECTOR]: GetExtraServiceURLs received empty reply");
         }
         catch (Exception e)
         {
-            m_log.Debug($"[GRID CONNECTOR]: GetExtraFeatures - Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
+            m_log.LogDebug($"[GRID CONNECTOR]: GetExtraFeatures - Exception when contacting grid server at {m_ServerGridURI}: {e.Message}");
         }
 
         return [];

@@ -28,6 +28,9 @@
 using MySqlConnector;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.MySQL;
 
 /// <summary>
@@ -35,7 +38,7 @@ namespace OpenSim.Data.MySQL;
 /// </summary>
 public class MySQLHGTravelData : MySQLGenericTableHandler<HGTravelingData>, IHGTravelingData
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public MySQLHGTravelData(string connectionString, string realm) : base(connectionString, realm, "HGTravelStore") { }
 
