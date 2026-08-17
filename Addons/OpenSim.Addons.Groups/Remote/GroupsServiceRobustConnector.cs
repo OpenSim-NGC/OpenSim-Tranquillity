@@ -32,14 +32,15 @@ using OpenSim.Server.Base;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Handlers.Base;
-using log4net;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Groups;
 
 public class GroupsServiceRobustConnector : ServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private GroupsService m_GroupsService;
     private string m_ConfigName = "Groups";
@@ -51,16 +52,16 @@ public class GroupsServiceRobustConnector : ServiceConnector
         if (configName != String.Empty)
             m_ConfigName = configName;
 
-        m_log.DebugFormat("[Groups.RobustConnector]: Starting with config name {0}", m_ConfigName);
+        m_log.LogDebug("[Groups.RobustConnector]: Starting with config name {0}", m_ConfigName);
 
         IConfig groupsConfig = config.Configs[m_ConfigName];
         if (groupsConfig != null)
         {
             key = groupsConfig.GetString("SecretKey", string.Empty);
-            m_log.DebugFormat("[Groups.RobustConnector]: Starting with secret key {0}", key);
+            m_log.LogDebug("[Groups.RobustConnector]: Starting with secret key {0}", key);
         }
 //            else
-//                m_log.DebugFormat("[Groups.RobustConnector]: Unable to find {0} section in configuration", m_ConfigName);
+//                m_log.LogDebug("[Groups.RobustConnector]: Unable to find {0} section in configuration", m_ConfigName);
 
         m_GroupsService = new GroupsService(config);
 
@@ -72,7 +73,7 @@ public class GroupsServiceRobustConnector : ServiceConnector
 
 public class GroupsServicePostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private GroupsService m_GroupsService;
 
@@ -91,7 +92,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
         body = body.Trim();
 
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
 
         try
         {
@@ -104,7 +105,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
             string method = request["METHOD"].ToString();
             request.Remove("METHOD");
 
-//                m_log.DebugFormat("[Groups.Handler]: {0}", method);
+//                m_log.LogDebug("[Groups.Handler]: {0}", method);
             switch (method)
             {
                 case "PUTGROUP":
@@ -144,11 +145,11 @@ public class GroupsServicePostHandler : BaseStreamHandler
                 case "FINDGROUPS":
                     return HandleFindGroups(request);
             }
-            m_log.DebugFormat("[GROUPS HANDLER]: unknown method request: {0}", method);
+            m_log.LogDebug("[GROUPS HANDLER]: unknown method request: {0}", method);
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("[GROUPS HANDLER]: Exception {0} ", e.Message), e);
+            m_log.LogError(e, string.Format("[GROUPS HANDLER]: Exception {0} ", e.Message));
         }
 
         return FailureResult();
@@ -194,7 +195,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -227,7 +228,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -264,7 +265,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -286,7 +287,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
                 result["RESULT"] = "true";
         }
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
     }
 
@@ -343,7 +344,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -378,7 +379,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -412,7 +413,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -430,7 +431,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
             result["RESULT"] = "true";
         }
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
     }
 
@@ -463,7 +464,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -496,7 +497,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -526,7 +527,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -560,7 +561,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -591,7 +592,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
                 string xmlString = ServerUtils.BuildXmlResponse(result);
 
-                //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+                //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
                 return Util.UTF8NoBomEncoding.GetBytes(xmlString);
 
             }
@@ -623,7 +624,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
             result["RESULT"] = "true";
         }
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
     }
 
@@ -711,7 +712,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 

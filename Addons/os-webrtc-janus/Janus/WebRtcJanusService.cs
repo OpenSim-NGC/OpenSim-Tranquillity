@@ -34,13 +34,13 @@ using OpenMetaverse.StructuredData;
 using OpenMetaverse;
 
 using Nini.Config;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace osWebRtcVoice;
 
 public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
 {
-    private static readonly ILog _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger _log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[JANUS WEBRTC SERVICE]";
 
     private readonly IConfigSource _Config;
@@ -62,7 +62,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
         Assembly assembly = Assembly.GetExecutingAssembly();
         string version = assembly.GetName().Version?.ToString() ?? "unknown";
 
-        _log.DebugFormat("{0} WebRtcJanusService version {1}", LogHeader, version);
+        _log.LogDebug("{0} WebRtcJanusService version {1}", LogHeader, version);
         _Config = pConfig;
         IConfig webRtcVoiceConfig = _Config.Configs["WebRtcVoice"];
 
@@ -82,7 +82,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 if (string.IsNullOrEmpty(_JanusServerURI) || string.IsNullOrEmpty(_JanusAPIToken) ||
                     string.IsNullOrEmpty(_JanusAdminURI) || string.IsNullOrEmpty(_JanusAdminToken))
                 {
-                    _log.Error($"{LogHeader} JanusWebRtcVoice configuration section missing required fields");
+                    _log.LogError($"{LogHeader} JanusWebRtcVoice configuration section missing required fields");
                     _Enabled = false;
                 }
 
@@ -90,23 +90,23 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 {
                     if(!StartConnectionToJanus())
                     {
-                        _log.Error($"{LogHeader} failed connection to Janus Gateway. Disabled");
+                        _log.LogError($"{LogHeader} failed connection to Janus Gateway. Disabled");
                         _Enabled=false;
                         return;
                     }
                     RegisterConsoleCommands();
-                    _log.Info($"{LogHeader} Enabled");
+                    _log.LogInformation($"{LogHeader} Enabled");
                 }
             }
             else
             {
-                _log.Error($"{LogHeader} No JanusWebRtcVoice configuration section");
+                _log.LogError($"{LogHeader} No JanusWebRtcVoice configuration section");
                 _Enabled = false;
             }
         }
         else
         {
-            _log.Error($"{LogHeader} No WebRtcVoice configuration section");
+            _log.LogError($"{LogHeader} No WebRtcVoice configuration section");
             _Enabled = false;
         }
     }
@@ -116,7 +116,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
     //    my Janus are per-session, the other sessions will be created by the viewer requests.
     private bool StartConnectionToJanus()
     {
-        _log.DebugFormat("{0} StartConnectionToJanus", LogHeader);
+        _log.LogDebug("{0} StartConnectionToJanus", LogHeader);
             _ViewerSession = new JanusViewerSession(this);
         //bad
         return ConnectToSessionAndAudioBridge(_ViewerSession).Result;
@@ -127,14 +127,14 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
         JanusSession janusSession = new JanusSession(_JanusServerURI, _JanusAPIToken, _JanusAdminURI, _JanusAdminToken, _MessageDetails);
         if (await janusSession.CreateSession().ConfigureAwait(false))
         {
-            _log.DebugFormat("{0} JanusSession created", LogHeader);
+            _log.LogDebug("{0} JanusSession created", LogHeader);
 
             // Once the session is created, create a handle to the plugin for rooms
             JanusAudioBridge audioBridge = new JanusAudioBridge(janusSession);
 
             if (await audioBridge.Activate(_Config).ConfigureAwait(false))
             {
-                _log.Debug($"{LogHeader} AudioBridgePluginHandle created");
+                _log.LogDebug($"{LogHeader} AudioBridgePluginHandle created");
                 // Requests through the capabilities will create rooms
 
                 janusSession.AddPlugin(audioBridge);
@@ -146,9 +146,9 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 janusSession.OnHangup += Handle_Hangup;
                 return true;
             }
-            _log.Error($"{LogHeader} JanusPluginHandle not created");
+            _log.LogError($"{LogHeader} JanusPluginHandle not created");
         }
-        _log.Error($"{LogHeader} JanusSession not created");
+        _log.LogError($"{LogHeader} JanusSession not created");
         return false;
     }
 
@@ -157,7 +157,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
         if (pResp is not null)
         {
             var sessionId = pResp.sessionId;
-            _log.Debug($"{LogHeader} Handle_Hangup: {pResp.RawBody}, sessionId={sessionId}");
+            _log.LogDebug($"{LogHeader} Handle_Hangup: {pResp.RawBody}, sessionId={sessionId}");
             if (VoiceViewerSession.TryGetViewerSessionByVSSessionId(sessionId, out IVoiceViewerSession viewerSession))
             {
                 // There is a viewer session associated with this session
@@ -165,7 +165,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
             }
             else
             {
-                _log.Debug($"{LogHeader} Handle_Hangup: no session found. SessionId={sessionId}");
+                _log.LogDebug($"{LogHeader} Handle_Hangup: no session found. SessionId={sessionId}");
             }
         }
     }
@@ -231,7 +231,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
             bool isSpatial = channel_type == "local";
             string voice_server_type = pRequest["voice_server_type"].AsString();
 
-            _log.DebugFormat("{0} ProvisionVoiceAccountRequest: parcel_id={1} channel_id={2} channel_type={3} voice_server_type={4}", LogHeader, parcel_local_id, channel_id, channel_type, voice_server_type); 
+            _log.LogDebug("{0} ProvisionVoiceAccountRequest: parcel_id={1} channel_id={2} channel_type={3} voice_server_type={4}", LogHeader, parcel_local_id, channel_id, channel_type, voice_server_type); 
 
             if (pRequest.TryGetOSDMap("jsep", out OSDMap jsep))
             {
@@ -241,13 +241,13 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 if (jsepType == "offer")
                 {
                     // The client is sending an offer. Find the right room and join it.
-                    // _log.DebugFormat("{0} ProvisionVoiceAccountRequest: jsep type={1} sdp={2}", LogHeader, jsepType, jsepSdp);
+                    // _log.LogDebug("{0} ProvisionVoiceAccountRequest: jsep type={1} sdp={2}", LogHeader, jsepType, jsepSdp);
                     viewerSession.Room = await viewerSession.AudioBridge.SelectRoom(pSceneID.ToString(),
                                                         channel_type, isSpatial, parcel_local_id, channel_id).ConfigureAwait(false);
                     if (viewerSession.Room is null)
                     {
                         errorMsg = "room selection failed";
-                        _log.Error($"{LogHeader} ProvisionVoiceAccountRequest: room selection failed");
+                        _log.LogError($"{LogHeader} ProvisionVoiceAccountRequest: room selection failed");
                     }
                     else {
                         viewerSession.Offer = jsepSdp;
@@ -264,26 +264,26 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                         else
                         {
                             errorMsg = "JoinRoom failed";
-                            _log.Error($"{LogHeader} ProvisionVoiceAccountRequest: JoinRoom failed");
+                            _log.LogError($"{LogHeader} ProvisionVoiceAccountRequest: JoinRoom failed");
                         }
                     }
                 }
                 else
                 {
                     errorMsg = "jsep type not offer";
-                    _log.Error($"{LogHeader} ProvisionVoiceAccountRequest: jsep type={jsepType} not offer");
+                    _log.LogError($"{LogHeader} ProvisionVoiceAccountRequest: jsep type={jsepType} not offer");
                 }
             }
             else
             {
                 errorMsg = "no jsep";
-                _log.Debug($"{LogHeader} ProvisionVoiceAccountRequest: no jsep. req={pRequest}");
+                _log.LogDebug($"{LogHeader} ProvisionVoiceAccountRequest: no jsep. req={pRequest}");
             }
         }
         else
         {
             errorMsg = "viewersession not JanusViewerSession";
-            _log.Error("{LogHeader} ProvisionVoiceAccountRequest: viewersession not JanusViewerSession");
+            _log.LogError("{LogHeader} ProvisionVoiceAccountRequest: viewersession not JanusViewerSession");
         }
 
         if (!string.IsNullOrEmpty(errorMsg) && ret is null)
@@ -319,7 +319,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 {
                     // The client has finished sending candidates
                     resp = await viewerSession.Session.TrickleCompleted(viewerSession).ConfigureAwait(false);
-                    _log.DebugFormat($"{LogHeader} VoiceSignalingRequest: candidate completed");
+                    _log.LogDebug($"{LogHeader} VoiceSignalingRequest: candidate completed");
                 }
                 else
                 {
@@ -337,16 +337,16 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                     });
                 }
                 resp = await viewerSession.Session.TrickleCandidates(viewerSession, candidatesArray).ConfigureAwait(false);
-                _log.Debug($"{LogHeader} VoiceSignalingRequest: {candidatesArray.Count} candidates");
+                _log.LogDebug($"{LogHeader} VoiceSignalingRequest: {candidatesArray.Count} candidates");
             }
             else
             {
-                _log.Error($"{LogHeader} VoiceSignalingRequest: no 'candidate' or 'candidates'");
+                _log.LogError($"{LogHeader} VoiceSignalingRequest: no 'candidate' or 'candidates'");
             }
         }
         if (resp is null)
         {
-            _log.ErrorFormat($"{LogHeader} VoiceSignalingRequest: no response so returning error");
+            _log.LogError($"{LogHeader} VoiceSignalingRequest: no response so returning error");
             ret = new OSDMap
             {
                 { "response", "error" }
@@ -467,7 +467,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
 
     private void WriteOut(string msg, params object[] args)
     {
-        // m_log.InfoFormat(msg, args);
+        // m_log.LogInformation(msg, args);
         MainConsole.Instance.Output(msg, args);
     }
 
