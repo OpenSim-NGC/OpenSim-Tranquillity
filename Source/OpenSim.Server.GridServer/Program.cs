@@ -32,11 +32,6 @@ class Program
 
     public static int Main(string[] args)
     {
-        var logconfigOption = new Option<string>("--logconfig")
-        {
-            Description = "Instruct log4net to use this file as configuration file.",
-            DefaultValueFactory = ParseResult => "OpenSim.Server.GridServer.dll.config",
-        };
         var inifileOption = new Option<List<string>>("--inifile")
         {
             Description = "Specify the location of zero or more .ini file(s) to read."
@@ -62,7 +57,6 @@ class Program
 
         RootCommand rootCommand = new RootCommand("Launch the OpenSim Grid Server");
 
-        rootCommand.Options.Add(logconfigOption);
         rootCommand.Options.Add(inifileOption);
         rootCommand.Options.Add(inimasterOption);
         rootCommand.Options.Add(inidirectoryOption);
@@ -82,7 +76,6 @@ class Program
         else
         {
             rootCommand.SetAction(parseResult => Configure( 
-                logConfig: parseResult.GetValue(logconfigOption), 
                 iniFile: parseResult.GetValue(inifileOption), 
                 iniMaster: parseResult.GetValue(inimasterOption), 
                 iniDirectory: parseResult.GetValue(inidirectoryOption), 
@@ -97,19 +90,15 @@ class Program
     }
 
     static void Configure(
-        string logConfig, 
         List<string> iniFile, 
         string iniMaster, 
         string iniDirectory, 
         string consoleType
         )
     {
-        ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
-        var logPath = Environment.GetEnvironmentVariable("LOGDIR");
-        if (string.IsNullOrWhiteSpace(logPath) is false)
-            log4NetBootstrapper.LogPath = logPath;
-        // Still required while unconverted log4net ILog call sites remain; remove with log4net.
-        log4NetBootstrapper.Configure(logConfig, "OpenSim.Server.GridServer.dll.config");
+        string logPath = Environment.GetEnvironmentVariable("LOGDIR");
+        if (string.IsNullOrWhiteSpace(logPath))
+            logPath = ".";
 
         IHostBuilder builder = Host.CreateDefaultBuilder();
 
@@ -177,7 +166,7 @@ class Program
         .ConfigureLogging(loggingBuilder =>
         {
             loggingBuilder.ClearProviders();
-            loggingBuilder.AddOpenSimLogging("OpenSim.Server.GridServer", log4NetBootstrapper.LogPath);
+            loggingBuilder.AddOpenSimLogging("OpenSim.Server.GridServer", logPath);
 
             LoggerProvider.LoggerFactory = loggingBuilder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
         })

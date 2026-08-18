@@ -21,8 +21,8 @@ namespace OpenSim.Server.Base.Hosting;
 public class ServerStartupOptions
 {
     /// <summary>
-    /// Path to the log4net configuration file.
-    /// Defaults to the assembly name with a <c>.dll.config</c> extension when empty.
+    /// Legacy compatibility for older callers that still track a log4net config path.
+    /// Startup now uses the shared ILogger/Serilog configuration and ignores this value.
     /// </summary>
     public string LogConfig { get; init; } = string.Empty;
 

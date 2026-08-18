@@ -26,14 +26,12 @@ public sealed class RegionHostOptions
         string iniMaster,
         string iniDirectory,
         string consoleType,
-        string logConfig,
         bool background)
     {
         IniFiles = iniFiles ?? Array.Empty<string>();
         IniMaster = iniMaster;
         IniDirectory = iniDirectory;
         ConsoleType = consoleType;
-        LogConfig = logConfig;
         Background = background;
     }
 
@@ -48,9 +46,6 @@ public sealed class RegionHostOptions
 
     /// <summary>Console type (<c>--console</c>).</summary>
     public string ConsoleType { get; }
-
-    /// <summary>log4net configuration file (<c>--logconfig</c>).</summary>
-    public string LogConfig { get; }
 
     /// <summary>
     /// True when the server runs without an interactive console prompt loop.
