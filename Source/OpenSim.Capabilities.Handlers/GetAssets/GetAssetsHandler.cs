@@ -65,10 +65,12 @@ public class GetAssetsHandler
     };
 
     private IAssetService m_assetService;
+    private string m_externalURL;
 
-    public GetAssetsHandler(IAssetService assService)
+    public GetAssetsHandler(IAssetService assService, string external_url = "")
     {
         m_assetService = assService;
+        m_externalURL = external_url;
     }
 
     public void Handle(OSHttpRequest req, OSHttpResponse response, string serviceURL = null)
@@ -91,44 +93,65 @@ public class GetAssetsHandler
 
         AssetType type = AssetType.Unknown;
         string assetStr = string.Empty;
+        string asset_type_str = string.Empty;
         foreach (KeyValuePair<string,string> kvp in queries)
         {
             if (queryTypes.TryGetValue(kvp.Key, out type))
             {
+                asset_type_str = kvp.Key;
                 assetStr = kvp.Value;
                 break;
             }
         }
 
-        if(type == AssetType.Unknown)
+        if(type == AssetType.Unknown || string.IsNullOrEmpty(assetStr))
         {
             //m_log.Warn("[GETASSET]: Unknown type: " + query);
             m_log.Warn("[GETASSET]: Unknown type");
+            response.RawBuffer = Util.StringToBytesNoTerm("Incorrect Syntax", 20);
             response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
 
-        if (string.IsNullOrEmpty(assetStr))
+        if (!UUID.TryParse(assetStr, out UUID assetID))
+        {
+            response.RawBuffer = Util.StringToBytesNoTerm("Incorrect Syntax", 20);
+            response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
+        }
 
-        if(!UUID.TryParse(assetStr, out UUID assetID))
-            return;
+        // Try cache first
+        AssetBase asset = m_assetService.GetCached(assetID.ToString());
 
-        ManualResetEventSlim done = new ManualResetEventSlim(false);
-        AssetBase asset = null;
-        m_assetService.Get(assetID.ToString(), serviceURL, false, (AssetBase a) =>
+        if (asset == null)
+        {
+            // Not in cache - redirect to external ViewerAsset service if configured
+            // (only for local requests, not HG asset fetches which already have a serviceURL)
+            if (!string.IsNullOrEmpty(m_externalURL) && string.IsNullOrWhiteSpace(serviceURL))
             {
-                asset = a;
-                done.Set();
-            });
+                response.StatusCode = (int)HttpStatusCode.Redirect;
+                response.AddHeader("Location", string.Format("{0}/?{1}={2}", m_externalURL, asset_type_str, assetID));
+                response.KeepAlive = false;
+                return;
+            }
 
-        done.Wait();
-        done.Dispose();
-        done = null;
+            // Fall back to full async fetch
+            ManualResetEventSlim done = new ManualResetEventSlim(false);
+            m_assetService.Get(assetID.ToString(), serviceURL, false, (AssetBase a) =>
+                {
+                    asset = a;
+                    done.Set();
+                });
+
+            done.Wait();
+            done.Dispose();
+            done = null;
+        }
 
         if (asset == null)
         {
             // m_log.Warn("[GETASSET]: not found: " + query + " " + assetStr);
+            response.RawBuffer = Util.StringToBytesNoTerm("Not found!", 20);
             response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
