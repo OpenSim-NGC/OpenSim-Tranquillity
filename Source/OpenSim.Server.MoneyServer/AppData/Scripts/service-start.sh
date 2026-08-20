@@ -26,13 +26,13 @@ if [ ! -d $BINDIR ]; then
     exit 1
 fi
 
-if [ ! -f $CONFIGDIR ]; then
+if [ ! -d $CONFIGDIR ]; then
     echo "Cannot find configuration directory $CONFIGDIR to"
     exit 2
 fi
 
 export CONFIGFILE="${CONFIGFILE:-$CONFIGDIR/${SERVICENAME}.ini}"
-export LOGCONFIG="${LOGCONFIG:-$BINDIR/OpenSim.Server.${SERVICENAME}.dll.config}"
+export LOGCONFIG="${LOGCONFIG:-$BINDIR/${SERVICENAME}.dll.config}"
 
 if [ ! -f $CONFIGFILE ]; then
     echo "Cannot find configuration $CONFIGFILE to run!"

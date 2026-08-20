@@ -184,7 +184,7 @@ public SKBitmap CreateMapTile()
         List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
         if (renderers.Count > 0)
         {
-            m_primMesher = RenderingLoader.LoadRenderer(renderers[0]);
+            m_primMesher = RenderingLoader.LoadRenderer(renderers[1]);
         }
 
         viewWidth = (int)m_scene.RegionInfo.RegionSizeX;
@@ -489,7 +489,10 @@ private SKBitmap GenImage()
             {
                 foreach (SceneObjectPart child in group.Parts)
                 {
-                    try { CreatePrim(renderer, child); }
+                    try 
+                    { 
+                        CreatePrim(renderer, child); 
+                    }
                     catch (Exception e)
                     {
                         m_log.Warn($"[Warp3D] failed to render prim {child.Name} at {child.GetWorldPosition()}: {e.Message}");
