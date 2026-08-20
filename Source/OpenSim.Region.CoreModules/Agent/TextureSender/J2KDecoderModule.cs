@@ -173,19 +173,19 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
         // Decode to SKImage using CoreJ2K
         try
         {
-            // Try to decode using CoreJ2K
+            // Try to decode using CoreJ2K. It only registers an image creator for SKBitmap, not SKImage.
             var j2k = J2kImage.FromBytes(j2kData);
             if (j2k != null)
             {
-                // Convert J2kImage to SKImage using the As<T>() method
-                SKImage skImage = j2k.As<SKImage>();
-                if (skImage != null)
+                SKBitmap bitmap = j2k.As<SKBitmap>();
+                if (bitmap != null)
                 {
-                    return skImage;
+                    using (bitmap)
+                        return SKImage.FromBitmap(bitmap);
                 }
                 else
                 {
-                    m_log.Warn("[J2KDecoderModule]: CoreJ2K conversion to SKImage failed");
+                    m_log.Warn("[J2KDecoderModule]: CoreJ2K conversion to SKBitmap failed");
                     return null;
                 }
             }

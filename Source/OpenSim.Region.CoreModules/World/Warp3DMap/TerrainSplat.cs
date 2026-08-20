@@ -146,15 +146,8 @@ public static SKBitmap Splat(ITerrainChannel terrain, UUID[] textureIDs,
                                 var j2k = J2kImage.FromBytes(asset.Data);
                                 if (j2k != null)
                                 {
-                                    SKImage skImg = j2k.As<SKImage>();
-                                    if (skImg != null)
-                                    {
-                                        using (SKData png = skImg.Encode(SKEncodedImageFormat.Png, 100))
-                                        using (var ms = new MemoryStream(png.ToArray()))
-                                        {
-                                            detailTexture[i] = SKBitmap.Decode(ms);
-                                        }
-                                    }
+                                    // CoreJ2K.Skia only registers an image creator for SKBitmap, not SKImage.
+                                    detailTexture[i] = j2k.As<SKBitmap>();
                                 }
                             }
                             catch(Exception ex)

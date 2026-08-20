@@ -314,23 +314,24 @@ public class GetTextureRobustHandler : BaseStreamHandler
     {
         m_log.DebugFormat("[GETTEXTURE]: Converting texture {0} to {1}", texture.ID, format);
         byte[] data = Array.Empty<byte>();
-        // Try CoreJ2K first to get an SKImage
+        // Try CoreJ2K first to get an SKBitmap
         try
         {
-            SKImage skImage = null;
+            SKBitmap mTexture = null;
 
             try
             {
+                // CoreJ2K.Skia only registers an image creator for SKBitmap, not SKImage.
                 var j2k = J2kImage.FromBytes(texture.Data);
-                skImage = j2k?.As<SKImage>();
+                mTexture = j2k?.As<SKBitmap>();
             }
             catch (Exception)
             {
                 // CoreJ2K not available or failed, fall back to OpenJPEG
-                skImage = null;
+                mTexture = null;
             }
 
-            if (skImage != null)
+            if (mTexture != null)
             {
                 SKEncodedImageFormat encFormat = SKEncodedImageFormat.Jpeg;
                 int quality = 95;
@@ -357,6 +358,7 @@ public class GetTextureRobustHandler : BaseStreamHandler
                         break;
                 }
 
+                using (var skImage = SKImage.FromBitmap(mTexture))
                 using (var encoded = skImage.Encode(encFormat, quality))
                 {
                     if (encoded != null)

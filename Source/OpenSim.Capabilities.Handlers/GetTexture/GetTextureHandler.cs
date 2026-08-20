@@ -296,22 +296,16 @@ public class GetTextureHandler
         {
             // Taking our jpeg2000 data, decoding it, then saving it to a byte array with regular data
             // Decode image to SKBitmap
-            SKImage skImage = null;
 
             try
             {
-                // Try CoreJ2K first
+                // Try CoreJ2K first. It only registers an image creator for SKBitmap, not SKImage.
                 var j2k = J2kImage.FromBytes(texture.Data);
-                skImage = j2k?.As<SKImage>();
+                mTexture = j2k?.As<SKBitmap>();
             }
             catch
             {
-                skImage = null;
-            }
-
-            if (skImage != null)
-            {
-                mTexture = SKBitmap.FromImage(skImage);
+                mTexture = null;
             }
 
             if (mTexture != null)
