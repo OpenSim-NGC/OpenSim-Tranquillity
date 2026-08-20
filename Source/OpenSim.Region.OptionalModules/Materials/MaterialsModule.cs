@@ -791,35 +791,24 @@ public class MaterialsModule : INonSharedRegionModule, IMaterialsModule
             return "ZippedOsdBytesToString caught an exception: " + e.ToString();
         }
     }
-
+    
     public static OSD ZCompressOSD(OSD inOsd, bool useHeader)
     {
         byte[] data = OSDParser.SerializeLLSDBinary(inOsd, useHeader);
-        using (MemoryStream msSinkCompressed = new())
-        {
-            using (DeflateStream zOut = new DeflateStream(msSinkCompressed,
-                CompressionMode.Compress, true))
-            {
-                zOut.Write(data, 0, data.Length);
-            }
-
-            msSinkCompressed.Seek(0L, SeekOrigin.Begin);
-            return OSD.FromBinary(msSinkCompressed.ToArray());
-        }
+        using MemoryStream msSinkCompressed = new();
+        using (ZLibStream zOut = new(msSinkCompressed, CompressionLevel.SmallestSize, true))
+            zOut.Write(data, 0, data.Length);
+        return OSD.FromBinary(msSinkCompressed.ToArray());
     }
 
     public static OSD ZDecompressBytesToOsd(byte[] input)
     {
-        using (MemoryStream msSinkUnCompressed = new())
-        {
-            using (DeflateStream zOut = new(msSinkUnCompressed, CompressionMode.Decompress, true))
-            {
-                zOut.Write(input, 0, input.Length);
-            }
-
-            msSinkUnCompressed.Seek(0L, SeekOrigin.Begin);
-            return OSDParser.DeserializeLLSDBinary(msSinkUnCompressed.ToArray());
-        }
+        using MemoryStream inMs = new(input);
+        using ZLibStream zIn = new(inMs, CompressionMode.Decompress);
+        using MemoryStream outMs = new();
+        zIn.CopyTo(outMs);                       // read, not write
+        outMs.Seek(0, SeekOrigin.Begin);
+        return OSDParser.DeserializeLLSDBinary(outMs);
     }
 
     public FaceMaterial GetMaterial(UUID ID)
