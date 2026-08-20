@@ -32,7 +32,7 @@ if [ ! -d $CONFIGDIR ]; then
 fi
 
 export CONFIGFILE="${CONFIGFILE:-$CONFIGDIR/${SERVICENAME}.ini}"
-export LOGCONFIG="${LOGCONFIG:-$BINDIR/${SERVICENAME}.dll.config}"
+export LOGCONFIG="${LOGCONFIG:-$CONFIGDIR/${SERVICENAME}.dll.config}"
 
 if [ ! -f $CONFIGFILE ]; then
     echo "Cannot find configuration $CONFIGFILE to run!"

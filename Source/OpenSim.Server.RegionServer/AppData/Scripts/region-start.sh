@@ -37,7 +37,7 @@ if [ ! -d $REGIONCONFIG ]; then
     exit 2
 fi
 
-export CONFIGFILE="${CONFIGFILE:-${CONFIGDIR}/OpenSim.Server.RegionServer.ini}"
+export CONFIGFILE="${CONFIGFILE:-${CONFIGDIR}/RegionServer.ini}"
 export LOGCONFIG="${LOGCONFIG:-${REGIONCONFIG}/RegionServer.dll.config}"
 export DEFAULTCONFIG="${DEFAULTCONFIG:-${BINDIR}/OpenSimDefaults.ini}"
 
