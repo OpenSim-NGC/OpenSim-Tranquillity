@@ -595,11 +595,17 @@ private SKBitmap GenImage()
                     }
                     else // It's sculptie
                     {
-                        // Note: Sculpt mesh rendering via GenerateFacetedSculptMesh requires System.Drawing.Bitmap.
-                        // Since we're migrating away from System.Drawing, sculpt rendering is temporarily disabled.
-                        // TODO: Update OpenMetaverse library to accept SkiaSharp bitmaps or find alternative approach.
-                        m_log.WarnFormat("[Warp3D] Sculpt rendering for prim {0} at {1} is not supported in SkiaSharp-only mode",
-                            prim.Name, prim.GetWorldPosition().ToString());
+                        SKBitmap sculptBitmap = J2kBytesToSKBitmap(sculptAsset.Data);
+                        if (sculptBitmap is not null)
+                        {
+                            using (sculptBitmap)
+                                renderMesh = m_primMesher.GenerateFacetedSculptMesh(omvPrim, sculptBitmap, lod);
+                        }
+                        else
+                        {
+                            m_log.WarnFormat("[Warp3D] failed to decode sculpt texture {0} of prim {1} at {2}",
+                                omvPrim.Sculpt.SculptTexture.ToString(), prim.Name, prim.GetWorldPosition().ToString());
+                        }
                     }
                 }
                 else
