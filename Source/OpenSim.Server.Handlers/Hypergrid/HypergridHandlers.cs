@@ -28,6 +28,7 @@ using System.Collections;
 using System.Net;
 using System.Reflection;
 
+using OpenSim.Framework.TrustedHypergrid;
 using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
@@ -59,6 +60,9 @@ public class HypergridHandlers
     public XmlRpcResponse LinkRegionRequest(XmlRpcRequest request, IPEndPoint remoteClient)
     {
         Hashtable requestData = (Hashtable)request.Params[0];
+        // Trusted Hypergrid: classify the caller (verify + log tier). No enforcement — the
+        // context is only logged in this slice; the request proceeds identically regardless.
+        TrustedHypergridHooks.ClassifyInbound(requestData, "link_region");
         //string host = (string)requestData["host"];
         //string portstr = (string)requestData["port"];
         string name = (string)requestData["region_name"];
@@ -86,6 +90,8 @@ public class HypergridHandlers
     public XmlRpcResponse GetRegion(XmlRpcRequest request, IPEndPoint remoteClient)
     {
         Hashtable requestData = (Hashtable)request.Params[0];
+        // Trusted Hypergrid: classify the caller (verify + log tier). No enforcement.
+        TrustedHypergridHooks.ClassifyInbound(requestData, "get_region");
         //string host = (string)requestData["host"];
         //string portstr = (string)requestData["port"];
         string regionID_str = (string)requestData["region_uuid"];

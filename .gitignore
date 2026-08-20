@@ -267,3 +267,8 @@ packages/
 Source/OpenSim.Server.RegionServer/AppData/config-include/GridCommon.ini
 Source/OpenSim.Server.RegionServer/AppData/config-include/StandaloneCommon.ini
 Source/OpenSim.Server.RegionServer/AppData/config-include/storage/SQLiteStandalone.ini
+
+# Trusted Hypergrid grid-identity private key — never commit (Design Brief §4; ADR-010).
+# Generated on first run when [TrustedHypergrid] Enabled=true; holds the Ed25519 private key as hex.
+TrustedHypergridSecret.ini
+**/TrustedHypergridSecret.ini

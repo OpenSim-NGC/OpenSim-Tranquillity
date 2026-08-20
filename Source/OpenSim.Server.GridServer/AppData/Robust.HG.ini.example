@@ -231,6 +231,24 @@
     ;; entries can be unsecure url (host:port) if using ssl, direct login url if different, old grid url, etc
     ; GatekeeperURIAlias = "login.osgrid.org"
 
+[TrustedHypergrid]
+    ;# {Enabled} {} {Enable Trusted Hypergrid grid-to-grid trust?} {true false} false
+    ;; Trusted Hypergrid adds a signed identity to outbound Hypergrid calls and classifies
+    ;; inbound ones. It produces attribution and revocation, NOT prevention (ADR-008): a modified
+    ;; viewer defeats all server-side control for anything rendered on screen.
+    ;; When false (the default), no signing, no verification and no key load happen — behaviour is
+    ;; byte-identical to stock OpenSimulator. Unsigned and unverifiable callers are always accepted
+    ;; (Open tier); this never refuses a stock grid (ADR-005).
+    ; Enabled = false
+
+    ;# {PrivateKeyFile} {Enabled} {File holding this grid's Ed25519 private key (hex)} {} TrustedHypergridSecret.ini
+    ;; Stored OUTSIDE version control (see .gitignore) following the DirectDeliverySecret.ini pattern,
+    ;; as [TrustedHypergrid] PrivateKey = <hex>. Auto-generated on first run when Enabled=true and the
+    ;; file is absent; the fingerprint is logged at INFO on generation and on load. Never in the
+    ;; database, never committed. To share the file via config include, add an Include- line, e.g.:
+    ;;   Include-TrustedHypergrid = "TrustedHypergridSecret.ini"
+    ; PrivateKeyFile = "TrustedHypergridSecret.ini"
+
 [AccessControl]
     ;# {AllowedClients} {} {Bar (|) separated list of allowed clients} {}
     ;; Bar (|) separated list of viewers which may gain access to the regions.

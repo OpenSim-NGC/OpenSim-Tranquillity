@@ -14,6 +14,7 @@ Running record of what shipped, what is known-broken, and what was deliberately 
 |---|---|---|---|
 | 1 | Trust registry persistence + grid keypair | **DONE** | `82b8cec4ac` |
 | 2 | Signature production + verification (`GridSignatureVerifier`, `TrustedGridAuthentication`) | **Built, tests green — uncommitted** | — |
+| 2b | Operationalise keypair + wire gatekeeper XML-RPC pair | **Built, tests green — uncommitted** | — |
 | 3 | Policy engine and region access | Not started | — |
 | 4 | Export-bit enforcement | Not started, see D-4 | — |
 | 5 | Warnings and admin surface | Not started | — |
@@ -106,3 +107,50 @@ Slice 1 tests were consequently placed in a new `Tests/OpenSim.TrustedHypergrid.
 The signer is not yet invoked on outbound Gatekeeper/UserAgent/HGFriends (XML-RPC) or HGAsset/HGInventory (HTTP) calls, and the verifier is not yet invoked inbound to populate `GridTrustContext.Current`. Why: (1) the signer needs the local private key, which Slice 1 deliberately left unwired, and the config surface to load it is an explicit ADR open decision ("Config surface shape … undecided") — wiring it now would invent frozen-adjacent config; (2) inbound classification needs a concrete `IGridTrustLookup` over `ITrustedGridData` plus DI at each service, which belongs with that config work; (3) the done-when is component/test-scoped, and touching many HG services without integration coverage is the exact interop risk ADR-005 guards. The machinery is transport-ready (the `SignatureMaterial` adapters and `AddAuthorization` are the seams). `AddAuthorization` currently no-ops (no signer configured); when a signer is present it binds only a freshness envelope (key+ts+nonce) because `IServiceAuth.AddAuthorization(NameValueCollection)` cannot see the request body — full parameter binding rides the XML-RPC transport.
 
 **To close:** wire signer/verifier at the HG call sites in the slice that decides the config surface and operationalises the keypair, with a live stock-grid interop pass (ADR-005 acceptance).
+
+---
+
+## Slice 2b — 20 Aug 2026
+
+**Delivered.** The keypair is operationalised and the first transport pair — the gatekeeper XML-RPC path — is wired. Still no enforcement.
+
+- `TrustedHypergridRuntime` (new) — built from `[TrustedHypergrid]` in `Robust.HG.ini`. `Enabled=false` (default) loads nothing (no key file read or written), so behaviour is byte-identical to `a115734ff`. `Enabled=true` loads the keypair from `PrivateKeyFile` or generates+saves it on first run, logging the fingerprint at INFO (distinct "generated" vs "loaded" lines).
+- `TrustedHypergridHooks` (new) — process-wide ambient entry points: `EnsureInitialized(config)` (idempotent), `SignOutbound(Hashtable, method)`, `ClassifyInbound(Hashtable, method)` (verify + log tier at DEBUG). All safe no-ops until enabled.
+- Gatekeeper outbound signing and inbound classification wired (see diff surface below).
+
+**ADR-010 (config surface), as decided in the slice brief.** `[TrustedHypergrid]` in `Robust.HG.ini`: `Enabled` (bool, default false) and `PrivateKeyFile` (default `TrustedHypergridSecret.ini`). Private key stored as hex under `[TrustedHypergrid] PrivateKey`, outside version control, following the `DirectDeliverySecret.ini` pattern; filename added to `.gitignore`. Generated on first run; fingerprint logged on generate and load; never in the database, never committed. Template documented in `Robust.HG.ini.example`. Should be promoted to a real ADR-010 record.
+
+**Verified.** Solution builds 0 errors on net10.0. `dotnet test Tests/OpenSim.TrustedHypergrid.Tests --no-restore` → 25 passed, 3 skipped. New `TrustedHypergridWiringTests` cover all five done-when cases: Enabled=false → nothing signed/verified, no key file, Hashtable byte-identical; Enabled=true first run → keypair generated; second run → same fingerprint loaded, not regenerated; round-trip sign→classify from the same Hashtable → Verified + Trusted-eligible; unsigned inbound → Open, no throw.
+
+**Diff surface — every existing file touched (Slice 2b):**
+- `Source/OpenSim.Services.Connectors/Hypergrid/GatekeeperServiceConnector.cs` — +1 using (L32); `SignOutbound(hash,"link_region")` before the `link_region` request (L88–91); `SignOutbound(hash,"get_region")` before the `get_region` request (L232–234). HttpClient untouched.
+- `Source/OpenSim.Server.Handlers/Hypergrid/HypergridHandlers.cs` — +1 using (L31); `ClassifyInbound(requestData,"link_region")` in `LinkRegionRequest` (L61–63); `ClassifyInbound(requestData,"get_region")` in `GetRegion` (L91–92).
+- `Source/OpenSim.Server.Handlers/Hypergrid/GatekeeperServerConnector.cs` — +1 using (L29); `EnsureInitialized(config)` in the inbound connector ctor (L67–71).
+- `.gitignore` — `TrustedHypergridSecret.ini` entries (L270–274).
+- `Source/OpenSim.Server.GridServer/AppData/Robust.HG.ini.example` — `[TrustedHypergrid]` template section (L234–251).
+New files: `TrustedHypergridRuntime.cs`, `TrustedHypergridHooks.cs` (both `Source/OpenSim.Framework/TrustedHypergrid/`), `Tests/OpenSim.TrustedHypergrid.Tests/TrustedHypergridWiringTests.cs`.
+
+**D-2 partially closed.** The gatekeeper XML-RPC path (`link_region`, `get_region`) now signs outbound and classifies inbound. Still open under D-2's spirit: the UserAgent XML-RPC calls and the HTTP transport (HGAsset/HGInventory), explicitly deferred by this slice's NOT.
+
+### D-3 — runtime init point is the inbound gatekeeper connector only
+**Type:** deviation from the 4-file scope + a topology limit. **Opened:** Slice 2b.
+
+The four scoped call-site files have no `IConfigSource`, so `TrustedHypergridHooks.EnsureInitialized(config)` had to be placed in the one config-bearing owner of the gatekeeper path: `GatekeeperServiceInConnector` (a fifth file). Consequence: the runtime initialises only in a process that stands up the inbound gatekeeper service (Robust HG). A pure region simulator that makes *outbound* gatekeeper calls does not init the runtime, so its outbound calls stay unsigned → the far grid classifies it Open (ADR-005 safe, but no attribution from region-origin calls yet). **To close:** add a region-side init in the slice that wires region-origin HG signing.
+
+### D-4 — inbound tier resolution is not registry-backed yet
+**Type:** deferral. **Opened:** Slice 2b.
+
+The production verifier is built with a null `IGridTrustLookup`, so a cryptographically verified caller is logged `outcome=Verified tier=Open` regardless of its registry entry — the concrete adapter over `ITrustedGridData` is deferred (it belongs with enforcement, and stacks on G-1/R-1 for MySQL). The round-trip test injects a lookup to prove Trusted-eligibility is reachable. **To close:** wire the `ITrustedGridData` adapter when tier actually influences a decision.
+
+### Manual acceptance — live stock-grid interop (ADR-005), for the operator to run
+Not executed here. This is the interop proof ADR-005 has asserted since day one and which has never been run.
+
+**Setup.** On the Tranquillity grid's Robust, set `[TrustedHypergrid] Enabled = true` in `Robust.HG.ini`; leave `PrivateKeyFile` default; restart Robust.
+- Expect at startup, INFO: `[TRUSTED HG]: generated new grid identity at TrustedHypergridSecret.ini, fingerprint <64-hex>`. Confirm `bin/TrustedHypergridSecret.ini` exists and that `git status` shows it ignored.
+- Restart again; expect INFO: `[TRUSTED HG]: loaded grid identity from TrustedHypergridSecret.ini, fingerprint <same hex>` (NOT "generated").
+
+**Exercise.** From the Tranquillity grid, hyperlink to and teleport to/from a live stock grid (e.g. OSGrid, `http://login.osgrid.org:80`). Separately, have the stock grid resolve/link INTO a Tranquillity region (drives inbound `link_region`/`get_region`).
+
+**Pass.** Every hyperlink and teleport that worked with `Enabled=false` still works. On the Tranquillity gatekeeper, DEBUG shows `[TRUSTED HG]: inbound get_region classified tier=1 outcome=Unverified` for the unsigned stock caller, and the call still returns a valid region. No 500s, no faults, no teleport failures.
+
+**Fail (revert `Enabled=false` and report).** Any previously-working hyperlink/teleport to or from the stock grid now faults, times out, or is refused (HTTP 403/Unauthorized, or `result=false` where it was true); any `[TRUSTED HG]`-tagged exception on the request path (the verifier must never throw); or an unsigned stock caller classified as anything other than tier=1 Open.

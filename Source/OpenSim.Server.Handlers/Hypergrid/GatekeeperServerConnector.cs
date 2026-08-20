@@ -26,6 +26,7 @@
  */
 
 using Nini.Config;
+using OpenSim.Framework.TrustedHypergrid;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
@@ -62,6 +63,11 @@ public class GatekeeperServiceInConnector : ServiceConnector
             throw new Exception("Gatekeeper server connector cannot proceed because of missing service");
 
         m_Proxy = gridConfig.GetBoolean("HasProxy", false);
+
+        // Trusted Hypergrid (ADR-010): initialise the process identity from [TrustedHypergrid] in
+        // Robust.HG.ini. Inert when Enabled=false. This inbound connector is the config-bearing
+        // owner of the gatekeeper path; the sign/verify call sites themselves have no IConfigSource.
+        TrustedHypergridHooks.EnsureInitialized(config);
 
         HypergridHandlers hghandlers = new HypergridHandlers(m_GatekeeperService);
         server.AddXmlRPCHandler("link_region", hghandlers.LinkRegionRequest, false);
