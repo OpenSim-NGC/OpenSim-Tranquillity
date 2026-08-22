@@ -10,7 +10,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
@@ -18,6 +17,7 @@ using OpenSim.Region.ScriptEngine.Interfaces;
 using InWorldz.Phlox.VM;
 using InWorldz.Phlox.Glue;
 using InWorldz.Phlox.Types;
+using Microsoft.Extensions.Logging;
 using PhloxEventInfo = InWorldz.Phlox.VM.EventInfo;
 using SysLinkedList = System.Collections.Generic.LinkedList<InWorldz.Phlox.VM.Interpreter>;
 using SysLinkedListNode = System.Collections.Generic.LinkedListNode<InWorldz.Phlox.VM.Interpreter>;
@@ -26,7 +26,7 @@ namespace Phlox.ScriptEngine
 {
     internal class PhloxExecutionScheduler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         // How many total Tick() calls per DoWork() pass
         private const int INSTRUCTION_FREQUENCY = 48;
@@ -125,12 +125,12 @@ namespace Phlox.ScriptEngine
         {
             if (m_AllScripts.ContainsKey(req.ItemID))
             {
-                m_log.DebugFormat("[PhloxExe]: Skipping duplicate OnRezScript for {0} (already loaded)", req.ItemID);
+                m_log.LogDebug("[PhloxExe]: Skipping duplicate OnRezScript for {0} (already loaded)", req.ItemID);
                 return;
             }
             if (req.Prim == null)
             {
-                m_log.ErrorFormat("[PhloxExe]: Prim is null for item {0}", req.ItemID);
+                m_log.LogError("[PhloxExe]: Prim is null for item {0}", req.ItemID);
                 return;
             }
 
@@ -151,11 +151,11 @@ namespace Phlox.ScriptEngine
                         var restoredRuntimeState = savedState.ToRuntimeState();
                         interp = new Interpreter(compiled, restoredRuntimeState, shim);
                         freshStart = false;
-                        m_log.DebugFormat("[PhloxExe]: Restored state for {0}", req.ItemID);
+                        m_log.LogDebug("[PhloxExe]: Restored state for {0}", req.ItemID);
                     }
                     catch (Exception e)
                     {
-                        m_log.WarnFormat("[PhloxExe]: State restore failed for {0}: {1}", req.ItemID, e.Message);
+                        m_log.LogWarning("[PhloxExe]: State restore failed for {0}: {1}", req.ItemID, e.Message);
                         interp = new Interpreter(compiled, shim);
                         freshStart = true;
                     }
@@ -171,7 +171,7 @@ namespace Phlox.ScriptEngine
             }
             catch (VMException e)
             {
-                m_log.ErrorFormat("[PhloxExe]: VM error starting {0}: {1}", req.ItemID, e);
+                m_log.LogError("[PhloxExe]: VM error starting {0}: {1}", req.ItemID, e);
                 return;
             }
 
@@ -513,7 +513,7 @@ namespace Phlox.ScriptEngine
                     m_NextScript.Value.AddExecutionTime(m_SliceWatch.Elapsed.TotalMilliseconds);
 
                     if (m_SliceWatch.Elapsed.TotalMilliseconds >= SLOW_THRESH_MS)
-                        m_log.WarnFormat("[PhloxExe]: Slow timeslice for {0} ({1:F1}ms)",
+                        m_log.LogWarning("[PhloxExe]: Slow timeslice for {0} ({1:F1}ms)",
                             m_NextScript.Value.Script.AssetId, m_SliceWatch.Elapsed.TotalMilliseconds);
                 }
 
@@ -662,7 +662,7 @@ namespace Phlox.ScriptEngine
                 int queueDepth = script.ScriptState.EventQueue.Count;
                 if (queueDepth >= MAX_EVENT_QUEUE_DEPTH)
                 {
-                    m_log.WarnFormat("[PhloxExe]: Event queue full ({0} events) for script {1}, dropping {2} event",
+                    m_log.LogWarning("[PhloxExe]: Event queue full ({0} events) for script {1}, dropping {2} event",
                         queueDepth, pe.ItemId, pe.Evt.EventType);
                     continue;
                 }
@@ -1003,7 +1003,7 @@ namespace Phlox.ScriptEngine
         private void TerminateWithError(Interpreter script, Exception e)
         {
             script.ScriptState.RunState = RuntimeState.Status.Killed;
-            m_log.ErrorFormat("[PhloxExe]: Script {0} asset {1} terminated: {2}",
+            m_log.LogError("[PhloxExe]: Script {0} asset {1} terminated: {2}",
                 script.ItemId, script.Script.AssetId, e);
             try
             {
@@ -1044,7 +1044,7 @@ namespace Phlox.ScriptEngine
                     try { call(); }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat("[PhloxExe]: Async syscall exception: {0}", e);
+                        m_log.LogError("[PhloxExe]: Async syscall exception: {0}", e);
                     }
                 }
             }

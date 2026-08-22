@@ -30,16 +30,16 @@ using System.Xml;
 using System.Collections;
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.Framework.Scenes;
 
 public class SceneObjectPartInventory : IEntityInventory , IDisposable
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private byte[] m_inventoryFileData = Array.Empty<byte>();
     private byte[] m_inventoryFileNameBytes = Array.Empty<byte>();
@@ -453,7 +453,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
     /// <returns>true if the script instance was created, false otherwise</returns>
     public bool CreateScriptInstance(TaskInventoryItem item, int startParam, bool postOnRez, string engine, int stateSource)
     {
-        //m_log.DebugFormat("[PRIM INVENTORY]: Starting script {0} {1} in prim {2} {3} in {4}",
+        //m_log.LogDebug("[PRIM INVENTORY]: Starting script {0} {1} in prim {2} {3} in {4}",
         //    item.Name, item.ItemID, m_part.Name, m_part.UUID, m_part.ParentGroup.Scene.RegionInfo.RegionName);
 
         if (!m_part.ParentGroup.Scene.Permissions.CanRunScript(item, m_part))
@@ -475,7 +475,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             m_items.LockItemsForRead(false);
 
             StoreScriptError(itemID, String.Format("TaskItem ID {0} could not be found", item.ItemID));
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: Couldn't start script {0}, {1} at {2} in {3} since taskitem ID {4} could not be found",
                 item.Name, item.ItemID, m_part.AbsolutePosition,
                 m_part.ParentGroup.Scene.RegionInfo.RegionName, item.ItemID);
@@ -503,7 +503,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         if (asset == null)
         {
             StoreScriptError(itemID, String.Format("asset ID {0} could not be found", item.AssetID));
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: Couldn't start script {0}, {1} at {2} in {3} since asset ID {4} could not be found",
                 item.Name, item.ItemID, m_part.AbsolutePosition,
                 m_part.ParentGroup.Scene.RegionInfo.RegionName, item.AssetID);
@@ -532,7 +532,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
 
     private UUID RestoreSavedScriptState(UUID loadedID, UUID oldID, UUID newID)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[PRIM INVENTORY]: Restoring scripted state for item {0}, oldID {1}, loadedID {2}",
         //     newID, oldID, loadedID);
         IScriptModule[] scriptEngines = m_part.ParentGroup.Scene.RequestModuleInterfaces<IScriptModule>();
@@ -576,7 +576,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                 // This created document has only the minimun data
                 // necessary for XEngine to parse it successfully
 
-                //m_log.DebugFormat("[PRIM INVENTORY]: Adding legacy state {0} in {1}", stateID, newID);
+                //m_log.LogDebug("[PRIM INVENTORY]: Adding legacy state {0} in {1}", stateID, newID);
 
                 m_part.ParentGroup.m_savedScriptState[stateID] = newDoc.OuterXml;
             }
@@ -629,7 +629,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             string msg = String.Format("couldn't be found for prim {0}, {1} at {2} in {3}", m_part.Name, m_part.UUID,
                 m_part.AbsolutePosition, m_part.ParentGroup.Scene.RegionInfo.RegionName);
             StoreScriptError(itemId, msg);
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: " +
                 "Couldn't start script with ID {0} since it {1}", itemId, msg);
         }
@@ -662,7 +662,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             {
                 if (!System.Threading.Monitor.Wait(m_scriptErrors, 15000))
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[PRIM INVENTORY]: " +
                         "timedout waiting for script {0} errors", itemId);
                     errors = m_scriptErrors[itemId];
@@ -748,7 +748,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         }
         else
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[PRIM INVENTORY]: " +
                 "Couldn't stop script with ID {0} since it couldn't be found for prim {1}, {2} at {3} in {4}",
                 itemId, m_part.Name, m_part.UUID,
@@ -776,7 +776,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         }
         else
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[PRIM INVENTORY]: " +
                 "Couldn't stop script with ID {0} since it couldn't be found for prim {1}, {2} at {3} in {4}",
                 itemId, m_part.Name, m_part.UUID,
@@ -1172,7 +1172,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
 
         if (null == rezAsset)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[PRIM INVENTORY]: Could not find asset {0} for inventory item {1} in {2}",
                 item.AssetID, item.Name, m_part.Name);
             objlist = null;
@@ -1260,7 +1260,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         AssetBase rezAsset = m_part.ParentGroup.Scene.AssetService.Get(item.AssetID.ToString());
         if (rezAsset is null)
         {
-            m_log.Warn($"[PRIM INVENTORY]: Could not find asset {item.AssetID} for inventory item {item.Name} in {m_part.Name}");
+            m_log.LogWarning($"[PRIM INVENTORY]: Could not find asset {item.AssetID} for inventory item {item.Name} in {m_part.Name}");
             return null;
         }
 
@@ -1343,7 +1343,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
 
         if (m_items.TryGetValue(item.ItemID, out TaskInventoryItem olditem))
         {
-            //m_log.DebugFormat("[PRIM INVENTORY]: Updating item {0} in {1}", item.Name, m_part.Name);
+            //m_log.LogDebug("[PRIM INVENTORY]: Updating item {0} in {1}", item.Name, m_part.Name);
 
             item.ParentID = m_part.UUID;
             item.ParentPartID = m_part.UUID;
@@ -1382,7 +1382,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         }
         else
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: " +
                 "Tried to retrieve item ID {0} from prim {1}, {2} at {3} in {4} but the item does not exist in this inventory",
                 item.ItemID, m_part.Name, m_part.UUID,
@@ -1431,7 +1431,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             }
             else
             {
-                m_log.Error(
+                m_log.LogError(
                     "[PRIM INVENTORY]: Tried to remove item ID " +
                     $"{itemID} from prim {m_part.Name}, {m_part.UUID} but the item does not exist in this inventory");
             }
@@ -1895,7 +1895,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             {
                 if (e != null)
                 {
-                    //m_log.DebugFormat(
+                    //m_log.LogDebug(
                     //    "[PRIM INVENTORY]: Getting script state from engine {0} for {1} in part {2} in group {3} in {4}",
                     //    e.Name, item.Name, m_part.Name, m_part.ParentGroup.Name, m_part.ParentGroup.Scene.Name);
 
@@ -1941,7 +1941,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             {
                 if (engine != null)
                 {
-                    //m_log.DebugFormat(
+                    //m_log.LogDebug(
                     //    "[PRIM INVENTORY]: Resuming script {0} {1} for {2}, OwnerChanged {3}",
                     //     item.Name, item.ItemID, item.OwnerID, item.OwnerChanged);
 

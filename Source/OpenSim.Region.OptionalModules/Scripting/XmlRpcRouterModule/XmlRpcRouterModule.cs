@@ -31,11 +31,14 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.OptionalModules.Scripting.XmlRpcRouterModule;
 
 public class XmlRpcRouter : INonSharedRegionModule, IXmlRpcRouter
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled;
 

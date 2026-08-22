@@ -28,7 +28,7 @@
 using System.Reflection;
 using System.Text.Json;
 using Nini.Config;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -99,7 +99,7 @@ public class PluginDescriptor
 /// </summary>
 public class PluginRegistry
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly Dictionary<string, List<PluginDescriptor>> m_registry = 
         new Dictionary<string, List<PluginDescriptor>>(StringComparer.OrdinalIgnoreCase);
@@ -116,7 +116,7 @@ public class PluginRegistry
             m_registry[extensionPath] = new List<PluginDescriptor>();
 
         m_registry[extensionPath].Add(descriptor);
-        m_log.DebugFormat("[PLUGIN-REGISTRY]: Registered {0} for {1}", descriptor.Id, extensionPath);
+        m_log.LogDebug("[PLUGIN-REGISTRY]: Registered {0} for {1}", descriptor.Id, extensionPath);
     }
 
     /// <summary>
@@ -173,7 +173,7 @@ public class PluginRegistry
     /// <summary>
     /// Load plugin registrations from INI configuration
     /// </summary>
-    public static PluginRegistry FromIniConfig(IConfigSource config, ILog log = null)
+    public static PluginRegistry FromIniConfig(IConfigSource config, ILogger log = null)
     {
         var registry = new PluginRegistry();
         var logger = log ?? m_log;
@@ -181,7 +181,7 @@ public class PluginRegistry
         var pluginConfig = config.Configs["PluginRegistry"];
         if (pluginConfig == null)
         {
-            logger.Warn("[PLUGIN-REGISTRY]: No [PluginRegistry] section in config");
+            logger.LogWarning("[PLUGIN-REGISTRY]: No [PluginRegistry] section in config");
             return registry;
         }
 
@@ -201,7 +201,7 @@ public class PluginRegistry
 
             if (string.IsNullOrWhiteSpace(assemblyList))
             {
-                logger.WarnFormat("[PLUGIN-REGISTRY]: Empty assembly list for {0}", extensionPath);
+                logger.LogWarning("[PLUGIN-REGISTRY]: Empty assembly list for {0}", extensionPath);
                 continue;
             }
 
@@ -213,11 +213,11 @@ public class PluginRegistry
                 try
                 {
                     // This will be handled by plugin loader discovery
-                    logger.DebugFormat("[PLUGIN-REGISTRY]: Noted assembly {0} for {1}", assemblyName, extensionPath);
+                    logger.LogDebug("[PLUGIN-REGISTRY]: Noted assembly {0} for {1}", assemblyName, extensionPath);
                 }
                 catch (Exception e)
                 {
-                    logger.WarnFormat("[PLUGIN-REGISTRY]: Failed to process assembly {0} for {1}: {2}",
+                    logger.LogWarning("[PLUGIN-REGISTRY]: Failed to process assembly {0} for {1}: {2}",
                         assemblyName, extensionPath, e.Message);
                 }
             }
@@ -241,14 +241,14 @@ public class PluginRegistry
     ///   ]
     /// }
     /// </summary>
-    public static PluginRegistry FromJsonFile(string jsonPath, ILog log = null)
+    public static PluginRegistry FromJsonFile(string jsonPath, ILogger log = null)
     {
         var registry = new PluginRegistry();
         var logger = log ?? m_log;
 
         if (!File.Exists(jsonPath))
         {
-            logger.WarnFormat("[PLUGIN-REGISTRY]: JSON config file not found: {0}", jsonPath);
+            logger.LogWarning("[PLUGIN-REGISTRY]: JSON config file not found: {0}", jsonPath);
             return registry;
         }
 
@@ -260,7 +260,7 @@ public class PluginRegistry
 
             if (config?.ExtensionPoints == null)
             {
-                logger.Warn("[PLUGIN-REGISTRY]: Invalid JSON structure in " + jsonPath);
+                logger.LogWarning("[PLUGIN-REGISTRY]: Invalid JSON structure in " + jsonPath);
                 return registry;
             }
 
@@ -293,23 +293,23 @@ public class PluginRegistry
                         }
                         else
                         {
-                            logger.WarnFormat("[PLUGIN-REGISTRY]: Type not found: {0}", plugin.Type);
+                            logger.LogWarning("[PLUGIN-REGISTRY]: Type not found: {0}", plugin.Type);
                         }
                     }
                     catch (Exception e)
                     {
-                        logger.WarnFormat("[PLUGIN-REGISTRY]: Failed to register {0}: {1}",
+                        logger.LogWarning("[PLUGIN-REGISTRY]: Failed to register {0}: {1}",
                             plugin.Type, e.Message);
                     }
                 }
             }
 
-            logger.InfoFormat("[PLUGIN-REGISTRY]: Loaded {0} extension points from {1}",
+            logger.LogInformation("[PLUGIN-REGISTRY]: Loaded {0} extension points from {1}",
                 config.ExtensionPoints.Count, jsonPath);
         }
         catch (Exception e)
         {
-            logger.ErrorFormat("[PLUGIN-REGISTRY]: Error loading JSON from {0}: {1}", jsonPath, e.Message);
+            logger.LogError("[PLUGIN-REGISTRY]: Error loading JSON from {0}: {1}", jsonPath, e.Message);
         }
 
         return registry;
@@ -318,7 +318,7 @@ public class PluginRegistry
     /// <summary>
     /// Build a registry from in-assembly code providers.
     /// </summary>
-    public static PluginRegistry FromProviders(IEnumerable<Assembly> assemblies, ILog log = null)
+    public static PluginRegistry FromProviders(IEnumerable<Assembly> assemblies, ILogger log = null)
     {
         var registry = new PluginRegistry();
         var logger = log ?? m_log;
@@ -340,12 +340,12 @@ public class PluginRegistry
                 {
                     var provider = (IPluginRegistryProvider)Activator.CreateInstance(type, true);
                     provider.RegisterPlugins(registry);
-                    logger.DebugFormat("[PLUGIN-REGISTRY]: Loaded provider {0} from {1}",
+                    logger.LogDebug("[PLUGIN-REGISTRY]: Loaded provider {0} from {1}",
                         type.FullName, assembly.GetName().Name);
                 }
                 catch (Exception e)
                 {
-                    logger.WarnFormat("[PLUGIN-REGISTRY]: Failed to run provider {0} from {1}: {2}",
+                    logger.LogWarning("[PLUGIN-REGISTRY]: Failed to run provider {0} from {1}: {2}",
                         type.FullName,
                         assembly.GetName().Name,
                         e.Message);

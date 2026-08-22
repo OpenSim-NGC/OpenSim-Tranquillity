@@ -35,11 +35,14 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Server.Handlers.MapImage;
 
 public class MapGetServiceConnector : ServiceConnector
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private IMapImageService m_MapService;
 
     private string m_ConfigName = "MapImageService";
@@ -67,7 +70,7 @@ class MapServerGetHandler : BaseStreamHandler
 {
     public static readonly object ev = new object();
 
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IMapImageService m_MapService;
 

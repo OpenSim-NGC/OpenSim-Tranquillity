@@ -30,14 +30,15 @@ using System.Reflection;
 using OpenMetaverse.StructuredData;
 
 using Nini.Config;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace osWebRtcVoice;
 
 // Encapsulization of a Session to the Janus server
 public class JanusPlugin : IDisposable
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[JANUS PLUGIN]";
 
     protected IConfigSource _Config;
@@ -91,7 +92,7 @@ public class JanusPlugin : IDisposable
                 var handleResp = new AttachPluginResp(resp);
                 PluginId = handleResp.pluginId;
                 PluginUri = _JanusSession.SessionUri + "/" + PluginId;
-                m_log.DebugFormat("{0} Activate. Plugin attached. ID={1}, URL={2}", LogHeader, PluginId, PluginUri);
+                m_log.LogDebug("{0} Activate. Plugin attached. ID={1}, URL={2}", LogHeader, PluginId, PluginUri);
                 _JanusSession.PluginId = PluginId;
                 _JanusSession.OnEvent += Handle_Event;
                 _JanusSession.OnMessage += Handle_Message;
@@ -99,12 +100,12 @@ public class JanusPlugin : IDisposable
             }
             else
             {
-                m_log.ErrorFormat("{0} Activate: failed to attach to plugin {1}", LogHeader, PluginName);
+                m_log.LogError("{0} Activate: failed to attach to plugin {1}", LogHeader, PluginName);
             }
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("{0} Activate: exception attaching to plugin {1}: {2}", LogHeader, PluginName, e);
+            m_log.LogError("{0} Activate: exception attaching to plugin {1}: {2}", LogHeader, PluginName, e);
         }
 
         return ret;
@@ -115,7 +116,7 @@ public class JanusPlugin : IDisposable
         bool ret = false;
         if (!IsConnected || _JanusSession is null)
         {
-            m_log.WarnFormat("{0} Detach. Not connected", LogHeader);
+            m_log.LogWarning("{0} Detach. Not connected", LogHeader);
             return ret;
         }
         try
@@ -126,17 +127,17 @@ public class JanusPlugin : IDisposable
             var resp = await _JanusSession.SendToJanus(new DetachPluginReq(), PluginUri);
             if (resp is not null && resp.isSuccess)
             {
-                m_log.DebugFormat("{0} Detach. Detached", LogHeader);
+                m_log.LogDebug("{0} Detach. Detached", LogHeader);
                 ret = true;
             }
             else
             {
-                m_log.ErrorFormat("{0} Detach: failed", LogHeader);
+                m_log.LogError("{0} Detach: failed", LogHeader);
             }
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("{0} Detach: exception {1}", LogHeader, e);
+            m_log.LogError("{0} Detach: exception {1}", LogHeader, e);
         }
 
         return ret;
@@ -144,10 +145,10 @@ public class JanusPlugin : IDisposable
 
     public virtual void Handle_Event(JanusMessageResp pResp)
     {
-        m_log.DebugFormat("{0} Handle_Event: {1}", LogHeader, pResp.ToString());
+        m_log.LogDebug("{0} Handle_Event: {1}", LogHeader, pResp.ToString());
     }
     public virtual void Handle_Message(JanusMessageResp pResp)
     {
-        m_log.DebugFormat("{0} Handle_Message: {1}", LogHeader, pResp.ToString());
+        m_log.LogDebug("{0} Handle_Message: {1}", LogHeader, pResp.ToString());
     }
 }

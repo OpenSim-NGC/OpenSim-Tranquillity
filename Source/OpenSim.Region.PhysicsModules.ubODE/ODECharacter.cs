@@ -33,7 +33,7 @@ using System.Runtime.CompilerServices;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModules.ubODE;
 
@@ -68,7 +68,7 @@ public enum dParam : int
 
 public class OdeCharacter : PhysicsActor
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     internal AABB2D _AABB2D;
     internal Vector3 _position;
@@ -194,7 +194,7 @@ public class OdeCharacter : PhysicsActor
         else
         {
             _position = new Vector3(((float)m_parent_scene.WorldExtents.X * 0.5f), ((float)m_parent_scene.WorldExtents.Y * 0.5f), parent_scene.GetTerrainHeightAtXY(128f, 128f) + 10f);
-            m_log.Warn("[PHYSICS]: Got NaN Position on Character Create");
+            m_log.LogWarning("[PHYSICS]: Got NaN Position on Character Create");
         }
 
         m_size.X = pSize.X > 0.01f ? 0.5f * pSize.X : 0.01f;
@@ -370,7 +370,7 @@ public class OdeCharacter : PhysicsActor
         set
         {
             m_flying = value;
-            //m_log.DebugFormat("[PHYSICS]: Set OdeCharacter Flying to {0}", flying);
+            //m_log.LogDebug("[PHYSICS]: Set OdeCharacter Flying to {0}", flying);
         }
     }
 
@@ -532,7 +532,7 @@ public class OdeCharacter : PhysicsActor
             }
             else
             {
-                m_log.Warn("[PHYSICS]: Got a NaN Position from Scene on a Character");
+                m_log.LogWarning("[PHYSICS]: Got a NaN Position from Scene on a Character");
             }
         }
     }
@@ -578,7 +578,7 @@ public class OdeCharacter : PhysicsActor
             }
             else
             {
-                m_log.Warn("[PHYSICS]: Got a NaN Size from Scene on a Character");
+                m_log.LogWarning("[PHYSICS]: Got a NaN Size from Scene on a Character");
             }
         }
     }
@@ -603,7 +603,7 @@ public class OdeCharacter : PhysicsActor
         }
         else
         {
-            m_log.Warn("[PHYSICS]: Got a NaN AvatarSize from Scene on a Character");
+            m_log.LogWarning("[PHYSICS]: Got a NaN AvatarSize from Scene on a Character");
         }
 
     }
@@ -732,7 +732,7 @@ public class OdeCharacter : PhysicsActor
             }
             else
             {
-                m_log.Warn("[PHYSICS]: Got a NaN velocity from Scene in a Character");
+                m_log.LogWarning("[PHYSICS]: Got a NaN velocity from Scene in a Character");
             }
         }
     }
@@ -753,7 +753,7 @@ public class OdeCharacter : PhysicsActor
             }
             else
             {
-                m_log.Warn("[PHYSICS]: Got a NaN velocity from Scene in a Character");
+                m_log.LogWarning("[PHYSICS]: Got a NaN velocity from Scene in a Character");
             }
         }
     }
@@ -855,7 +855,7 @@ public class OdeCharacter : PhysicsActor
         }
         else
         {
-            m_log.Warn("[PHYSICS]: Got a NaN force applied to a Character");
+            m_log.LogWarning("[PHYSICS]: Got a NaN force applied to a Character");
         }
         //m_lastUpdateSent = false;
     }
@@ -1914,7 +1914,7 @@ public class OdeCharacter : PhysicsActor
         }
         else
         {
-            m_log.Warn("[PHYSICS]: Got a NaN Size from Scene on a Character");
+            m_log.LogWarning("[PHYSICS]: Got a NaN Size from Scene on a Character");
         }
     }
 

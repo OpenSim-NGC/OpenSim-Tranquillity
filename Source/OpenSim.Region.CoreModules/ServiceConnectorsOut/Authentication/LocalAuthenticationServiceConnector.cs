@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -35,12 +34,14 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication;
 
 public class LocalAuthenticationServicesConnector : ISharedRegionModule, IAuthenticationService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAuthenticationService m_AuthenticationService;
@@ -70,7 +71,7 @@ public class LocalAuthenticationServicesConnector : ISharedRegionModule, IAuthen
                 IConfig userConfig = source.Configs["AuthenticationService"];
                 if (userConfig == null)
                 {
-                    m_log.Error("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
+                    m_log.LogError("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
                     return;
                 }
 
@@ -79,7 +80,7 @@ public class LocalAuthenticationServicesConnector : ISharedRegionModule, IAuthen
 
                 if (serviceDll.Length == 0)
                 {
-                    m_log.Error("[AUTH CONNECTOR]: No LocalServiceModule named in section AuthenticationService");
+                    m_log.LogError("[AUTH CONNECTOR]: No LocalServiceModule named in section AuthenticationService");
                     return;
                 }
 
@@ -90,11 +91,11 @@ public class LocalAuthenticationServicesConnector : ISharedRegionModule, IAuthen
 
                 if (m_AuthenticationService == null)
                 {
-                    m_log.Error("[AUTH CONNECTOR]: Can't load Authentication service");
+                    m_log.LogError("[AUTH CONNECTOR]: Can't load Authentication service");
                     return;
                 }
                 m_Enabled = true;
-                m_log.Info("[AUTH CONNECTOR]: Local Authentication connector enabled");
+                m_log.LogInformation("[AUTH CONNECTOR]: Local Authentication connector enabled");
             }
         }
     }

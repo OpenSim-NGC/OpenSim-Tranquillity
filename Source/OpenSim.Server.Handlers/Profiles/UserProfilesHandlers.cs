@@ -28,10 +28,11 @@
 using System.Reflection;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers;
 
@@ -44,8 +45,7 @@ public class UserProfilesHandlers
 
 public class JsonRpcProfileHandlers
 {
-    static readonly ILog m_log =
-        LogManager.GetLogger(
+    static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     public IUserProfilesService Service
@@ -76,7 +76,7 @@ public class JsonRpcProfileHandlers
         if(!json.ContainsKey("params"))
         {
             response.Error.Code = ErrorCode.ParseError;
-            m_log.DebugFormat ("Classified Request");
+            m_log.LogDebug("Classified Request");
             return false;
         }
 
@@ -97,7 +97,7 @@ public class JsonRpcProfileHandlers
         {
             response.Error.Code = ErrorCode.ParseError;
             response.Error.Message = "Error parsing classified update request";
-            m_log.DebugFormat ("Classified Update Request");
+            m_log.LogDebug("Classified Update Request");
             return false;
         }
 
@@ -127,7 +127,7 @@ public class JsonRpcProfileHandlers
         if(!json.ContainsKey("params"))
         {
             response.Error.Code = ErrorCode.ParseError;
-            m_log.DebugFormat ("Classified Delete Request");
+            m_log.LogDebug("Classified Delete Request");
             return false;
         }
 
@@ -149,7 +149,7 @@ public class JsonRpcProfileHandlers
         {
             response.Error.Code = ErrorCode.ParseError;
             response.Error.Message = "no parameters supplied";
-            m_log.DebugFormat ("Classified Info Request");
+            m_log.LogDebug("Classified Info Request");
             return false;
         }
 
@@ -181,7 +181,7 @@ public class JsonRpcProfileHandlers
         if (!json.TryGetValue("params", out tmpParams) || !(tmpParams is OSDMap))
         {
             response.Error.Code = ErrorCode.ParseError;
-            m_log.DebugFormat ("Avatar Picks Request");
+            m_log.LogDebug("Avatar Picks Request");
             return false;
         }
 
@@ -201,7 +201,7 @@ public class JsonRpcProfileHandlers
         {
             response.Error.Code = ErrorCode.ParseError;
             response.Error.Message = "no parameters supplied";
-            m_log.DebugFormat ("Avatar Picks Info Request");
+            m_log.LogDebug("Avatar Picks Info Request");
             return false;
         }
 
@@ -227,7 +227,7 @@ public class JsonRpcProfileHandlers
         {
             response.Error.Code = ErrorCode.ParseError;
             response.Error.Message = "no parameters supplied";
-            m_log.DebugFormat ("Avatar Picks Update Request");
+            m_log.LogDebug("Avatar Picks Update Request");
             return false;
         }
 
@@ -253,7 +253,7 @@ public class JsonRpcProfileHandlers
         if (!json.TryGetValue("params", out tmpParams) || !(tmpParams is OSDMap))
         {
             response.Error.Code = ErrorCode.ParseError;
-            m_log.DebugFormat ("Avatar Picks Delete Request");
+            m_log.LogDebug("Avatar Picks Delete Request");
             return false;
         }
 
@@ -276,7 +276,7 @@ public class JsonRpcProfileHandlers
         {
             response.Error.Code = ErrorCode.ParseError;
             response.Error.Message = "Params missing";
-            m_log.DebugFormat ("Avatar Notes Request");
+            m_log.LogDebug("Avatar Notes Request");
             return false;
         }
 
@@ -301,7 +301,7 @@ public class JsonRpcProfileHandlers
         {
             response.Error.Code = ErrorCode.ParseError;
             response.Error.Message = "No parameters";
-            m_log.DebugFormat ("Avatar Notes Update Request");
+            m_log.LogDebug("Avatar Notes Update Request");
             return false;
         }
 
@@ -325,7 +325,7 @@ public class JsonRpcProfileHandlers
         {
             response.Error.Code = ErrorCode.ParseError;
             response.Error.Message = "no parameters supplied";
-            m_log.DebugFormat ("Avatar Properties Request");
+            m_log.LogDebug("Avatar Properties Request");
             return false;
         }
 
@@ -350,7 +350,7 @@ public class JsonRpcProfileHandlers
         {
             response.Error.Code = ErrorCode.ParseError;
             response.Error.Message = "no parameters supplied";
-            m_log.DebugFormat ("Avatar Properties Update Request");
+            m_log.LogDebug("Avatar Properties Update Request");
             return false;
         }
 
@@ -377,7 +377,7 @@ public class JsonRpcProfileHandlers
         {
             response.Error.Code = ErrorCode.ParseError;
             response.Error.Message = "no parameters supplied";
-            m_log.DebugFormat ("Avatar Interests Update Request");
+            m_log.LogDebug("Avatar Interests Update Request");
             return false;
         }
 
@@ -403,7 +403,7 @@ public class JsonRpcProfileHandlers
         if(!json.ContainsKey("params"))
         {
             response.Error.Code = ErrorCode.ParseError;
-            m_log.DebugFormat ("User Preferences Request");
+            m_log.LogDebug("User Preferences Request");
             return false;
         }
 
@@ -419,7 +419,7 @@ public class JsonRpcProfileHandlers
 
         response.Error.Code = ErrorCode.InternalError;
         response.Error.Message = string.Format("{0}", result);
-//            m_log.InfoFormat("[PROFILES]: User preferences request error - {0}", response.Error.Message);
+//            m_log.LogInformation("[PROFILES]: User preferences request error - {0}", response.Error.Message);
         return false;
     }
 
@@ -429,7 +429,7 @@ public class JsonRpcProfileHandlers
         {
             response.Error.Code = ErrorCode.ParseError;
             response.Error.Message = "no parameters supplied";
-            m_log.DebugFormat ("User Preferences Update Request");
+            m_log.LogDebug("User Preferences Update Request");
             return false;
         }
 
@@ -445,7 +445,7 @@ public class JsonRpcProfileHandlers
 
         response.Error.Code = ErrorCode.InternalError;
         response.Error.Message = string.Format("{0}", result);
-        m_log.InfoFormat("[PROFILES]: User preferences update error - {0}", response.Error.Message);
+        m_log.LogInformation("[PROFILES]: User preferences update error - {0}", response.Error.Message);
         return false;
     }
     #endregion User Preferences
@@ -457,7 +457,7 @@ public class JsonRpcProfileHandlers
         if(!json.ContainsKey("params"))
         {
             response.Error.Code = ErrorCode.ParseError;
-            m_log.DebugFormat ("Avatar Image Assets Request");
+            m_log.LogDebug("Avatar Image Assets Request");
             return false;
         }
 
@@ -478,7 +478,7 @@ public class JsonRpcProfileHandlers
         {
             response.Error.Code = ErrorCode.ParseError;
             response.Error.Message = "no parameters supplied";
-            m_log.DebugFormat ("User Application Service URL Request: No Parameters!");
+            m_log.LogDebug("User Application Service URL Request: No Parameters!");
             return false;
         }
 
@@ -507,7 +507,7 @@ public class JsonRpcProfileHandlers
         {
             response.Error.Code = ErrorCode.ParseError;
             response.Error.Message = "no parameters supplied";
-            m_log.DebugFormat ("User App Data Update Request");
+            m_log.LogDebug("User App Data Update Request");
             return false;
         }
 

@@ -32,14 +32,13 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Framework;
 using OpenSim.Server.Handlers.Simulation;
 using OpenMetaverse.StructuredData;
-using log4net;
-
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Hypergrid;
 
 public class HomeAgentHandler : AgentPostHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private IUserAgentService m_UserAgentService;
 
     private string m_LoginServerIP;
@@ -75,7 +74,7 @@ public class HomeAgentHandler : AgentPostHandler
         }
         catch (InvalidCastException)
         {
-            m_log.ErrorFormat("[HOME AGENT HANDLER]: Bad cast in UnpackData");
+            m_log.LogError("[HOME AGENT HANDLER]: Bad cast in UnpackData");
         }
 
         // Verify if this call came from the login server
@@ -98,7 +97,7 @@ public class HomeAgentHandler : AgentPostHandler
             return gatekeeper;
         }
         else
-            m_log.WarnFormat("[HOME AGENT HANDLER]: Wrong data type");
+            m_log.LogWarning("[HOME AGENT HANDLER]: Wrong data type");
 
         return null;
     }

@@ -27,7 +27,6 @@
 using System.Reflection;
 using System.Net;
 
-using log4net;
 using Nini.Config;
 
 using OpenMetaverse;
@@ -41,6 +40,8 @@ using OpenSim.Region.CoreModules.World.Terrain.FloodBrushes;
 using OpenSim.Region.CoreModules.World.Terrain.PaintBrushes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.World.Terrain;
 
@@ -63,7 +64,7 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
 
     #endregion
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private object _modifyLock = new();
 
@@ -368,33 +369,33 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
                             throw new ArgumentException(String.Format("wrong size, use a file with size {0} x {1}",
                                                                       m_scene.RegionInfo.RegionSizeX, m_scene.RegionInfo.RegionSizeY));
                         }
-                        m_log.Debug($"{LogHeader}Loaded terrain, wd/ht: {channel.Width}/{channel.Height}");
+                        m_log.LogDebug($"{LogHeader}Loaded terrain, wd/ht: {channel.Width}/{channel.Height}");
                         m_scene.Heightmap = channel;
                         m_channel = channel;
                         UpdateBakedMap();
                     }
                     catch(NotImplementedException)
                     {
-                        m_log.ErrorFormat($"{LogHeader}Unable to load heightmap, the {loader.Value} parser does not support file loading. (May be save only)");
+                        m_log.LogError($"{LogHeader}Unable to load heightmap, the {loader.Value} parser does not support file loading. (May be save only)");
                         throw new TerrainException($"unable to load heightmap: parser {loader.Value} does not support loading");
                     }
                     catch(FileNotFoundException)
                     {
-                        m_log.ErrorFormat($"{LogHeader}Unable to load heightmap, file not found. (A directory permissions error may also cause this)");
+                        m_log.LogError($"{LogHeader}Unable to load heightmap, file not found. (A directory permissions error may also cause this)");
                         throw new TerrainException($"unable to load heightmap: file {filename} not found (or permissions do not allow access");
                     }
                     catch(ArgumentException e)
                     {
-                        m_log.Error($"{LogHeader}Unable to load heightmap: {e.Message}");
+                        m_log.LogError($"{LogHeader}Unable to load heightmap: {e.Message}");
                         throw new TerrainException($"Unable to load heightmap: {e.Message}");
                     }
                 }
-                m_log.Info($"{LogHeader}File ({filename}) loaded successfully");
+                m_log.LogInformation($"{LogHeader}File ({filename}) loaded successfully");
                 return;
             }
         }
 
-        m_log.Error($"{LogHeader}Unable to load heightmap, no file loader available for that format.");
+        m_log.LogError($"{LogHeader}Unable to load heightmap, no file loader available for that format.");
         throw new TerrainException($"unable to load heightmap from file {filename}: no loader available for that format");
     }
 
@@ -411,17 +412,17 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
                 if (filename.EndsWith(loader.Key) && loader.Value.SupportedHeight > m_channel.MaxHeight())
                 {
                     loader.Value.SaveFile(filename, m_channel);
-                    m_log.Info($"{LogHeader}Saved terrain from {m_scene.RegionInfo.RegionName} to {filename}");
+                    m_log.LogInformation($"{LogHeader}Saved terrain from {m_scene.RegionInfo.RegionName} to {filename}");
                     return;
                 }
             }
         }
         catch(IOException ioe)
         {
-            m_log.Error($"{LogHeader}Unable to save to {filename}, {ioe.Message}");
+            m_log.LogError($"{LogHeader}Unable to save to {filename}, {ioe.Message}");
         }
 
-        m_log.Error(
+        m_log.LogError(
             $"{LogHeader}Could not save terrain from {m_scene.RegionInfo.RegionName} to {filename}. Valid file extensions are {m_supportedFileExtensions}");
     }
 
@@ -462,16 +463,16 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
                     }
                     catch(NotImplementedException)
                     {
-                        m_log.Error($"{LogHeader}Unable to load heightmap, the {loader.Value} parser does not support file loading. (May be save only)");
+                        m_log.LogError($"{LogHeader}Unable to load heightmap, the {loader.Value} parser does not support file loading. (May be save only)");
                         throw new TerrainException($"unable to load heightmap: parser {loader.Value} does not support loading");
                     }
                 }
 
-                m_log.Info($"{LogHeader}File ({filename}) loaded successfully");
+                m_log.LogInformation($"{LogHeader}File ({filename}) loaded successfully");
                 return;
             }
         }
-        m_log.Error($"{LogHeader}Unable to load heightmap, no file loader available for that format.");
+        m_log.LogError($"{LogHeader}Unable to load heightmap, no file loader available for that format.");
         throw new TerrainException($"unable to load heightmap from file {filename}: no loader available for that format");
     }
 
@@ -492,16 +493,16 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
                     }
                     catch (NotImplementedException)
                     {
-                        m_log.ErrorFormat($"{LogHeader}Unable to load heightmap, the { loader.Value} parser does not support file loading. (May be save only)");
+                        m_log.LogError($"{LogHeader}Unable to load heightmap, the { loader.Value} parser does not support file loading. (May be save only)");
                         throw new TerrainException("unable to load heightmap: parser {loader.Value} does not support loading");
                     }
                 }
 
-                m_log.Info($"{LogHeader}File ({filename}) loaded successfully");
+                m_log.LogInformation($"{LogHeader}File ({filename}) loaded successfully");
                 return;
             }
         }
-        m_log.Error(LogHeader + "Unable to load heightmap, no file loader available for that format.");
+        m_log.LogError(LogHeader + "Unable to load heightmap, no file loader available for that format.");
         throw new TerrainException(String.Format("unable to load heightmap from file {0}: no loader available for that format", filename));
     }
 
@@ -586,7 +587,7 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
         }
         catch(NotImplementedException)
         {
-            m_log.Error($"{LogHeader}Unable to save to {filename}, saving of this file format has not been implemented.");
+            m_log.LogError($"{LogHeader}Unable to save to {filename}, saving of this file format has not been implemented.");
             throw new TerrainException("Unable to save heightmap: saving of this file format not implemented");
         }
     }
@@ -649,7 +650,7 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
         string[] files = Directory.GetFiles(plugineffectsPath);
         foreach(string file in files)
         {
-            m_log.Info($"{LogHeader}Loading effects in {file}");
+            m_log.LogInformation($"{LogHeader}Loading effects in {file}");
             try
             {
                 Assembly library = Assembly.LoadFrom(file);
@@ -682,7 +683,7 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
                 {
                     ITerrainLoader terLoader = (ITerrainLoader)Activator.CreateInstance(library.GetType(pluginType.ToString()));
                     m_loaders[terLoader.FileExtension] = terLoader;
-                    m_log.Info("L ... " + typeName);
+                    m_log.LogInformation("L ... " + typeName);
                 }
             }
             catch(AmbiguousMatchException)
@@ -698,12 +699,12 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
             if (!m_plugineffects.ContainsKey(pluginName))
             {
                 m_plugineffects.Add(pluginName, effect);
-                m_log.Info("E ... " + pluginName);
+                m_log.LogInformation("E ... " + pluginName);
             }
             else
             {
                 m_plugineffects[pluginName] = effect;
-                m_log.Info("E ... " + pluginName + " (Replaced)");
+                m_log.LogInformation("E ... " + pluginName + " (Replaced)");
             }
         }
     }
@@ -1199,7 +1200,7 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
                     List<PatchesToSend> toSend = GetModifiedPatchesInViewDistance(pups);
                     if (toSend.Count > 0)
                     {
-                        // m_log.DebugFormat("{0} CheckSendingPatchesToClient: sending {1} patches to {2} in region {3}",
+                        // m_log.LogDebug("{0} CheckSendingPatchesToClient: sending {1} patches to {2} in region {3}",
                         //                     LogHeader, toSend.Count, pups.Presence.Name, m_scene.RegionInfo.RegionName);
                         // Sort the patches to send by the distance from the presence
                         toSend.Sort();
@@ -1375,7 +1376,7 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
             {
                 NextModifyTerrainTime = double.MaxValue; // block it
 
-                //m_log.DebugFormat("brushs {0} seconds {1} height {2}, parcel {3}", brushSize, seconds, height, parcelLocalID);
+                //m_log.LogDebug("brushs {0} seconds {1} height {2}, parcel {3}", brushSize, seconds, height, parcelLocalID);
                 bool god = m_scene.Permissions.IsGod(user);
                 bool allowed = false;
                 if (north == south && east == west)
@@ -1428,7 +1429,7 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
                     }
                     else
                     {
-                        m_log.Debug("Unknown terrain brush type " + action);
+                        m_log.LogDebug("Unknown terrain brush type " + action);
                     }
                 }
                 else
@@ -1520,7 +1521,7 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
                     }
                     else
                     {
-                        m_log.Debug("Unknown terrain flood type " + action);
+                        m_log.LogDebug("Unknown terrain flood type " + action);
                     }
                 }
             }
@@ -1545,7 +1546,7 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
 
     protected void client_OnUnackedTerrain(IClientAPI client, int patchX, int patchY)
     {
-        //m_log.Debug("Terrain packet unacked, resending patch: " + patchX + " , " + patchY);
+        //m_log.LogDebug("Terrain packet unacked, resending patch: " + patchX + " , " + patchY);
         // SendLayerData does not use the heightmap parameter. This kludge is so as to not change IClientAPI.
         client.SendLayerData([patchX, patchY]);
     }
@@ -1656,7 +1657,7 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
 
         // determine desired scaling factor
         float desiredRange = desiredMax - desiredMin;
-        //m_log.InfoFormat("Desired {0}, {1} = {2}", new Object[] { desiredMin, desiredMax, desiredRange });
+        //m_log.LogInformation("Desired {0}, {1} = {2}", new Object[] { desiredMin, desiredMax, desiredRange });
 
         if (desiredRange == 0d)
         {
@@ -1691,8 +1692,8 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
             float currRange = currMax - currMin;
             float scale = desiredRange / currRange;
 
-            //m_log.InfoFormat("Current {0}, {1} = {2}", new Object[] { currMin, currMax, currRange });
-            //m_log.InfoFormat("Scale = {0}", scale);
+            //m_log.LogInformation("Current {0}, {1} = {2}", new Object[] { currMin, currMax, currRange });
+            //m_log.LogInformation("Scale = {0}", scale);
 
             // scale the heightmap accordingly
             for(int x = 0; x < width; x++)
@@ -2017,7 +2018,7 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
             if (result.Length == 0)
             {
                 result = "Modified terrain";
-                m_log.DebugFormat("Performed terrain operation {0}", operationType);
+                m_log.LogDebug("Performed terrain operation {0}", operationType);
             }
         }
         else

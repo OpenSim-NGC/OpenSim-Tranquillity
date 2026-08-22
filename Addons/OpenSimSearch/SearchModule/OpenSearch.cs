@@ -1,4 +1,3 @@
-using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;
@@ -11,6 +10,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Xml;
 
+using Microsoft.Extensions.Logging;
 using DirFindFlags = OpenMetaverse.DirectoryManager.DirFindFlags;
 
 namespace OpenSimSearch.Modules.OpenSearch;
@@ -20,7 +20,7 @@ public class OpenSearchModule : ISearchModule, ISharedRegionModule
     //
     // Log module
     //
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     //
     // Module vars
@@ -48,12 +48,12 @@ public class OpenSearchModule : ISearchModule, ISharedRegionModule
         m_SearchServer = searchConfig.GetString("SearchURL", "");
         if (m_SearchServer == "")
         {
-            m_log.Error("[SEARCH] No search server, disabling search");
+            m_log.LogError("[SEARCH] No search server, disabling search");
             m_Enabled = false;
             return;
         }
 
-        m_log.Info("[SEARCH] OpenSimSearch module is active");
+        m_log.LogInformation("[SEARCH] OpenSimSearch module is active");
         m_Enabled = true;
     }
 
@@ -144,7 +144,7 @@ public class OpenSearchModule : ISearchModule, ISharedRegionModule
         }
         catch (WebException ex)
         {
-            m_log.ErrorFormat("[SEARCH]: Unable to connect to Search " +
+            m_log.LogError("[SEARCH]: Unable to connect to Search " +
                     "Server {0}.  Exception {1}", m_SearchServer, ex);
 
             Hashtable ErrorHash = new Hashtable();
@@ -156,7 +156,7 @@ public class OpenSearchModule : ISearchModule, ISharedRegionModule
         }
         catch (SocketException ex)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                     "[SEARCH]: Unable to connect to Search Server {0}. " +
                     "Exception {1}", m_SearchServer, ex);
 
@@ -169,7 +169,7 @@ public class OpenSearchModule : ISearchModule, ISharedRegionModule
         }
         catch (XmlException ex)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                     "[SEARCH]: Unable to connect to Search Server {0}. " +
                     "Exception {1}", m_SearchServer, ex);
 

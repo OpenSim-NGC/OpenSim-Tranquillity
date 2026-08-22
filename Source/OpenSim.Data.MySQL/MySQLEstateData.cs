@@ -27,17 +27,17 @@
 
 using System.Data;
 using System.Reflection;
-using log4net;
 using MySqlConnector;
 using OpenMetaverse;
 using OpenSim.Framework;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.MySQL;
 
 public class MySQLEstateStore : IEstateDataStore
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_connectionString;
 
@@ -64,11 +64,11 @@ public class MySQLEstateStore : IEstateDataStore
 
         try
         {
-            m_log.Info("[REGION DB]: MySql - connecting: " + Util.GetDisplayConnectionString(m_connectionString));
+            m_log.LogInformation("[REGION DB]: MySql - connecting: " + Util.GetDisplayConnectionString(m_connectionString));
         }
         catch (Exception e)
         {
-            m_log.Debug("Exception: password not found in connection string\n" + e.ToString());
+            m_log.LogDebug("Exception: password not found in connection string\n" + e.ToString());
         }
 
         using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
@@ -560,7 +560,7 @@ public class MySQLEstateStore : IEstateDataStore
             }
             catch (MySqlException ex)
             {
-                m_log.Error("[REGION DB]: LinkRegion failed: " + ex.Message);
+                m_log.LogError("[REGION DB]: LinkRegion failed: " + ex.Message);
                 transaction.Rollback();
             }
 
@@ -595,7 +595,7 @@ public class MySQLEstateStore : IEstateDataStore
             }
             catch (Exception e)
             {
-                m_log.Error("[REGION DB]: Error reading estate map. " + e.ToString());
+                m_log.LogError("[REGION DB]: Error reading estate map. " + e.ToString());
                 return result;
             }
             dbcon.Close();

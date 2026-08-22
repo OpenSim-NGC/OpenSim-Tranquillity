@@ -28,15 +28,17 @@
 using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Text;
-using log4net;
 using Nini.Config;
 using OpenMetaverse.StructuredData;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Monitoring;
 
 public class ServerStatsCollector
 {
-    private readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    private readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
     private readonly string LogHeader = "[SERVER STATS]";
 
     public bool Enabled = false;
@@ -165,7 +167,7 @@ public class ServerStatsCollector
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("{0} Exception creating 'Process': {1}", LogHeader, e);
+            m_log.LogError("{0} Exception creating 'Process': {1}", LogHeader, e);
         }
 
         MakeStat("BuiltinThreadpoolWorkerThreadsAvailable", null, "threads", ContainerThreadpool,
@@ -205,9 +207,9 @@ public class ServerStatsCollector
                 string nicInterfaceType = nic.NetworkInterfaceType.ToString();
                 if (!okInterfaceTypes.Contains(nicInterfaceType))
                 {
-                    m_log.DebugFormat("{0} Not including stats for network interface '{1}' of type '{2}'.",
+                    m_log.LogDebug("{0} Not including stats for network interface '{1}' of type '{2}'.",
                                             LogHeader, nic.Name, nicInterfaceType);
-                    m_log.DebugFormat("{0}     To include, add to comma separated list in [Monitoring]NetworkInterfaceTypes={1}",
+                    m_log.LogDebug("{0}     To include, add to comma separated list in [Monitoring]NetworkInterfaceTypes={1}",
                                             LogHeader, NetworkInterfaceTypes);
                     continue;
                 }
@@ -230,7 +232,7 @@ public class ServerStatsCollector
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("{0} Exception creating 'Network Interface': {1}", LogHeader, e);
+            m_log.LogError("{0} Exception creating 'Network Interface': {1}", LogHeader, e);
         }
 
         MakeStat("ProcessMemory", null, "MB", ContainerMemory,
@@ -305,7 +307,7 @@ public class ServerStatsCollector
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("{0} Exception on NextValue fetching {1}: {2}", LogHeader, stat.Name, e);
+                    m_log.LogError("{0} Exception on NextValue fetching {1}: {2}", LogHeader, stat.Name, e);
                 }
 
                 perfControl.lastFetch = Util.EnvironmentTickCount();
@@ -338,7 +340,7 @@ public class ServerStatsCollector
         catch
         {
             // There are times interfaces go away so we just won't update the stat for this
-            m_log.ErrorFormat("{0} Exception fetching stat on interface '{1}'", LogHeader, stat.Description);
+            m_log.LogError("{0} Exception fetching stat on interface '{1}'", LogHeader, stat.Description);
         }
     }
 }

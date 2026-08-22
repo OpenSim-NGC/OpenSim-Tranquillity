@@ -27,11 +27,14 @@
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.Null;
 
 public class NullXGroupData : IXGroupData
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Dictionary<UUID, XGroup> m_groups = new Dictionary<UUID, XGroup>();
 

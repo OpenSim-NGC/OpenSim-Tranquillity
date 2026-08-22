@@ -28,7 +28,6 @@
 using System.Collections;
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -36,6 +35,7 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
@@ -48,7 +48,7 @@ public struct QueueItem
 
 public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[EVENT QUEUE GET MODULE]";
 
     private const int KEEPALIVE = 60; // this could be larger now, but viewers expect it on opensim
@@ -172,7 +172,7 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
                 return queue;
 
             if (DebugLevel > 0)
-                m_log.DebugFormat(
+                m_log.LogDebug(
                    "[EVENTQUEUE]: Adding new queue for agent {0} in region {1}",
                    agentId, m_scene.RegionInfo.RegionName);
 
@@ -201,7 +201,7 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
     //legacy 
     public bool Enqueue(OSD data, UUID avatarID)
     {
-        //m_log.DebugFormat("[EVENTQUEUE]: Enqueuing event for {0} in region {1}", avatarID, m_scene.RegionInfo.RegionName);
+        //m_log.LogDebug("[EVENTQUEUE]: Enqueuing event for {0} in region {1}", avatarID, m_scene.RegionInfo.RegionName);
         try
         {
             Queue<byte[]> queue = GetQueue(avatarID);
@@ -213,12 +213,12 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
             }
             else
             {
-                m_log.Warn($"[EVENTQUEUE]: (Enqueue) No queue found for agent {avatarID} in region {m_scene.Name}");
+                m_log.LogWarning($"[EVENTQUEUE]: (Enqueue) No queue found for agent {avatarID} in region {m_scene.Name}");
             }
         }
         catch (NullReferenceException e)
         {
-            m_log.Error($"[EVENTQUEUE] Caught exception: {e.Message}");
+            m_log.LogError($"[EVENTQUEUE] Caught exception: {e.Message}");
             return false;
         }
         return true;
@@ -226,7 +226,7 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
 
     public bool Enqueue(byte[] evData, UUID avatarID)
     {
-        //m_log.DebugFormat("[EVENTQUEUE]: Enqueuing event for {0} in region {1}", avatarID, m_scene.RegionInfo.RegionName);
+        //m_log.LogDebug("[EVENTQUEUE]: Enqueuing event for {0} in region {1}", avatarID, m_scene.RegionInfo.RegionName);
         try
         {
             Queue<byte[]> queue = GetQueue(avatarID);
@@ -237,14 +237,14 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
             }
             else
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                         "[EVENTQUEUE]: (Enqueue) No queue found for agent {0} in region {1}",
                         avatarID, m_scene.Name);
             }
         }
         catch (NullReferenceException e)
         {
-            m_log.Error("[EVENTQUEUE] Caught exception: " + e);
+            m_log.LogError("[EVENTQUEUE] Caught exception: " + e);
             return false;
         }
         return true;
@@ -252,7 +252,7 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
 
     public bool Enqueue(osUTF8 o, UUID avatarID)
     {
-        //m_log.DebugFormat("[EVENTQUEUE]: Enqueuing event for {0} in region {1}", avatarID, m_scene.RegionInfo.RegionName);
+        //m_log.LogDebug("[EVENTQUEUE]: Enqueuing event for {0} in region {1}", avatarID, m_scene.RegionInfo.RegionName);
         try
         {
             Queue<byte[]> queue = GetQueue(avatarID);
@@ -263,14 +263,14 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
             }
             else
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                         "[EVENTQUEUE]: (Enqueue) No queue found for agent {0} in region {1}",
                         avatarID, m_scene.Name);
             }
         }
         catch (NullReferenceException e)
         {
-            m_log.Error("[EVENTQUEUE] Caught exception: " + e);
+            m_log.LogError("[EVENTQUEUE] Caught exception: " + e);
             return false;
         }
         return true;
@@ -280,7 +280,7 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
 
     private void ClientClosed(UUID agentID, Scene scene)
     {
-        //m_log.DebugFormat("[EVENTQUEUE]: Closed client {0} in region {1}", agentID, m_scene.RegionInfo.RegionName);
+        //m_log.LogDebug("[EVENTQUEUE]: Closed client {0} in region {1}", agentID, m_scene.RegionInfo.RegionName);
 
         lock (queues)
         {
@@ -293,7 +293,7 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
                 m_ids.Remove(agentID);
         }
 
-        // m_log.DebugFormat("[EVENTQUEUE]: Deleted queues for {0} in region {1}", agentID, m_scene.RegionInfo.RegionName);
+        // m_log.LogDebug("[EVENTQUEUE]: Deleted queues for {0} in region {1}", agentID, m_scene.RegionInfo.RegionName);
 
     }
 
@@ -311,7 +311,7 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
         // Register an event queue for the client
 
         if (DebugLevel > 0)
-            m_log.Debug(
+            m_log.LogDebug(
                 $"[EVENTQUEUE]: OnRegisterCaps: agentID {agentID} caps {caps} region {m_scene.Name}");
 
         UUID eventQueueGetUUID;
@@ -349,7 +349,7 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
                     // Its reuse caps path not queues those are been reused already
                     if (m_AvatarQueueUUIDMapping.TryGetValue(agentID, out eventQueueGetUUID))
                     {
-                        m_log.DebugFormat("[EVENTQUEUE]: Found Existing UUID!");
+                        m_log.LogDebug("[EVENTQUEUE]: Found Existing UUID!");
                         lock (m_ids)
                         {
                             // change to negative numbers so they are changed at end of sending first marker
@@ -393,11 +393,11 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
         {
             lock (queue)
             {
-                //m_log.WarnFormat("POLLED FOR EVENTS BY {0} in {1} -- {2}", agentID, m_scene.RegionInfo.RegionName, queue.Count);
+                //m_log.LogWarning("POLLED FOR EVENTS BY {0} in {1} -- {2}", agentID, m_scene.RegionInfo.RegionName, queue.Count);
                 return queue.Count > 0;
             }
         }
-        //m_log.WarnFormat("POLLED FOR EVENTS BY {0} unknown agent", agentID);
+        //m_log.LogWarning("POLLED FOR EVENTS BY {0} unknown agent", agentID);
         return true;
     }
 
@@ -409,7 +409,7 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
     {
         if (element is OSDMap ev)
         {
-            m_log.Debug($"Eq OUT {ev["message"],-30} to {m_scene.GetScenePresence(agentId).Name,-20} {m_scene.Name,-20}");
+            m_log.LogDebug($"Eq OUT {ev["message"],-30} to {m_scene.GetScenePresence(agentId).Name,-20} {m_scene.Name,-20}");
         }
     }
 
@@ -423,7 +423,7 @@ public partial class  EventQueueGetModule : IEventQueue, INonSharedRegionModule
     public Hashtable GetEvents(UUID requestID, UUID pAgentId)
     {
         if (DebugLevel >= 2)
-            m_log.Warn($"POLLED FOR EQ MESSAGES BY {pAgentId} in {m_scene.Name}");
+            m_log.LogWarning($"POLLED FOR EQ MESSAGES BY {pAgentId} in {m_scene.Name}");
 
         Queue<byte[]> queue = GetQueue(pAgentId);
         if (queue is null)

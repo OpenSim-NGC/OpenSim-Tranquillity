@@ -36,6 +36,7 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
 // using log4net;
 // using System.Reflection;
 
@@ -89,7 +90,7 @@ namespace OpenSim.Region.CoreModules.Scripting.WorldComm;
 
 public class WorldCommModule : IWorldComm, INonSharedRegionModule
 {
-    // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    // private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private const int DEBUG_CHANNEL = 0x7fffffff;
 
@@ -372,7 +373,7 @@ public class WorldCommModule : IWorldComm, INonSharedRegionModule
     public void DeliverMessage(ChatTypeEnum type, int channel,
             string name, UUID id, string msg, Vector3 position)
     {
-        // m_log.DebugFormat("[WorldComm] got[2] type {0}, channel {1}, name {2}, id {3}, msg {4}",
+        // m_log.LogDebug("[WorldComm] got[2] type {0}, channel {1}, name {2}, id {3}, msg {4}",
         //                   type, channel, name, id, msg);
 
         // validate type and set range

@@ -30,6 +30,8 @@ using OpenMetaverse;
 using OpenMetaverse.Packets;
 using OpenSim.Framework;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.Framework.Scenes;
 
 public partial class Scene
@@ -73,7 +75,7 @@ public partial class Scene
             args.SenderObject = obj;
         }
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENE]: Sending message {0} on channel {1}, type {2} from {3}, broadcast {4}",
         //    args.Message.Replace("\n", "\\n"), args.Channel, args.Type, fromName, broadcast);
 
@@ -243,7 +245,7 @@ public partial class Scene
 
             if (gmd == null)
             {
-//                    m_log.WarnFormat(
+//                    m_log.LogWarning(
 //                        "[GROUPS]: User {0} is not a member of group {1} so they can't update {2} to this group",
 //                        remoteClient.Name, GroupID, objectLocalID);
 
@@ -507,7 +509,7 @@ public partial class Scene
             if ((EffectType)effect.Type != EffectType.LookAt && (EffectType)effect.Type != EffectType.Beam)
                 discardableEffects = false;
 
-            //m_log.DebugFormat("[YYY]: VE {0} {1} {2}", effect.AgentID, effect.Duration, (EffectType)effect.Type);
+            //m_log.LogDebug("[YYY]: VE {0} {1} {2}", effect.AgentID, effect.Duration, (EffectType)effect.Type);
         }
 
         ForEachScenePresence(sp =>
@@ -517,11 +519,11 @@ public partial class Scene
                     if (!discardableEffects ||
                        (discardableEffects && ShouldSendDiscardableEffect(remoteClient, sp)))
                     {
-                        //m_log.DebugFormat("[YYY]: Sending to {0}", sp.UUID);
+                        //m_log.LogDebug("[YYY]: Sending to {0}", sp.UUID);
                         sp.ControllingClient.SendViewerEffect(effectBlockArray);
                     }
                     //else
-                    //    m_log.DebugFormat("[YYY]: Not sending to {0}", sp.UUID);
+                    //    m_log.LogDebug("[YYY]: Not sending to {0}", sp.UUID);
                 }
             });
     }
@@ -557,7 +559,7 @@ public partial class Scene
     public void HandleFetchInventoryDescendents(IClientAPI remoteClient, UUID folderID, UUID ownerID,
                                                 bool fetchFolders, bool fetchItems, int sortOrder)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[USER INVENTORY]: HandleFetchInventoryDescendents() for {0}, folder={1}, fetchFolders={2}, fetchItems={3}, sortOrder={4}",
 //                remoteClient.Name, folderID, fetchFolders, fetchItems, sortOrder);
 
@@ -620,7 +622,7 @@ public partial class Scene
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[AGENT INVENTORY]: Error in SendInventoryAsync(). Exception {0}", e);
+                m_log.LogError("[AGENT INVENTORY]: Error in SendInventoryAsync(). Exception {0}", e);
             }
             m_descendentsRequestProcessing = false;
         }
@@ -640,7 +642,7 @@ public partial class Scene
         InventoryFolderBase folder = new InventoryFolderBase(folderID, folderName, remoteClient.AgentId, (short)folderType, parentID, 1);
         if (!InventoryService.AddFolder(folder))
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                  "[AGENT INVENTORY]: Failed to create folder for user {0} {1}",
                  remoteClient.Name, remoteClient.AgentId);
         }
@@ -658,7 +660,7 @@ public partial class Scene
     public void HandleUpdateInventoryFolder(IClientAPI remoteClient, UUID folderID, ushort type, string name,
                                             UUID parentID)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[AGENT INVENTORY]: Updating inventory folder {0} {1} for {2} {3}", folderID, name, remoteClient.Name, remoteClient.AgentId);
 
         InventoryFolderBase folder = InventoryService.GetFolder(remoteClient.AgentId, folderID);
@@ -669,7 +671,7 @@ public partial class Scene
             folder.ParentID = parentID;
             if (!InventoryService.UpdateFolder(folder))
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                      "[AGENT INVENTORY]: Failed to update folder for user {0} {1}",
                      remoteClient.Name, remoteClient.AgentId);
             }
@@ -683,13 +685,13 @@ public partial class Scene
         {
             folder.ParentID = parentID;
             if (!InventoryService.MoveFolder(folder))
-                m_log.WarnFormat("[AGENT INVENTORY]: could not move folder {0}", folderID);
+                m_log.LogWarning("[AGENT INVENTORY]: could not move folder {0}", folderID);
             else
-                m_log.DebugFormat("[AGENT INVENTORY]: folder {0} moved to parent {1}", folderID, parentID);
+                m_log.LogDebug("[AGENT INVENTORY]: folder {0} moved to parent {1}", folderID, parentID);
         }
         else
         {
-            m_log.WarnFormat("[AGENT INVENTORY]: request to move folder {0} but folder not found", folderID);
+            m_log.LogWarning("[AGENT INVENTORY]: request to move folder {0} but folder not found", folderID);
         }
     }
 
@@ -711,7 +713,7 @@ public partial class Scene
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[AGENT INVENTORY]: Exception on purge folder for user {0}: {1}", remoteClient.AgentId, e.Message);
+            m_log.LogWarning("[AGENT INVENTORY]: Exception on purge folder for user {0}: {1}", remoteClient.AgentId, e.Message);
         }
     }
 
@@ -722,13 +724,13 @@ public partial class Scene
        try
         {
             if (InventoryService.PurgeFolder(folder))
-                m_log.DebugFormat("[AGENT INVENTORY]: folder {0} purged successfully", folderID);
+                m_log.LogDebug("[AGENT INVENTORY]: folder {0} purged successfully", folderID);
             else
-                m_log.WarnFormat("[AGENT INVENTORY]: could not purge folder {0}", folderID);
+                m_log.LogWarning("[AGENT INVENTORY]: could not purge folder {0}", folderID);
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[AGENT INVENTORY]: Exception on async purge folder for user {0}: {1}", userID, e.Message);
+            m_log.LogWarning("[AGENT INVENTORY]: Exception on async purge folder for user {0}: {1}", userID, e.Message);
         }
     }
 }

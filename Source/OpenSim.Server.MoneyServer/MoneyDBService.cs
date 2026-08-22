@@ -30,6 +30,8 @@ using MySqlConnector;
 using OpenSim.Region.OptionalModules.World.Currency;
 using OpenSim.Data.MySQL.MoneyData;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.MoneyServer;
 
 class MoneyDBService : IMoneyDBService
@@ -607,12 +609,12 @@ class MoneyDBService : IMoneyDBService
         {
             if (userInfo != null)
             {
-                //m_log.InfoFormat("[MONEY DB]: Found user \"{0}\", now update information", user.Avatar);
+                //m_log.LogInformation("[MONEY DB]: Found user \"{0}\", now update information", user.Avatar);
                 if (dbm.Manager.updateUserInfo(user)) return true;
             }
             else if (dbm.Manager.addUserInfo(user))
             {
-                //m_log.InfoFormat("[MONEY DB]: Unable to find user \"{0}\", add it to DB successfully", user.Avatar);
+                //m_log.LogInformation("[MONEY DB]: Unable to find user \"{0}\", add it to DB successfully", user.Avatar);
                 return true;
             }
             _logger.LogInformation("[MONEY DB]: WARNNING: TryAddUserInfo: Unable to TryAddUserInfo.");

@@ -33,16 +33,17 @@ using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenMetaverse;
 using Nwc.XmlRpc;
-using log4net;
 using SkiaSharp;
 
 using OpenSim.Services.Connectors.Simulation;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.Connectors.Hypergrid;
 
 public class GatekeeperServiceConnector : SimulationServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static UUID m_HGMapImage = new UUID("00000000-0000-1111-9999-000000000013");
 
@@ -85,7 +86,7 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
         paramList.Add(hash);
 
         XmlRpcRequest request = new XmlRpcRequest("link_region", paramList);
-        m_log.Debug("[GATEKEEPER SERVICE CONNECTOR]: Linking to " + info.ServerURI);
+        m_log.LogDebug("[GATEKEEPER SERVICE CONNECTOR]: Linking to " + info.ServerURI);
         XmlRpcResponse response = null;
         try
         {
@@ -94,7 +95,7 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
         }
         catch (Exception e)
         {
-            m_log.Debug("[GATEKEEPER SERVICE CONNECTOR]: Exception " + e.Message);
+            m_log.LogDebug("[GATEKEEPER SERVICE CONNECTOR]: Exception " + e.Message);
             reason = "Error contacting remote server";
             return false;
         }
@@ -102,13 +103,13 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
         if (response.IsFault)
         {
             reason = response.FaultString;
-            m_log.ErrorFormat("[GATEKEEPER SERVICE CONNECTOR]: remote call returned an error: {0}", response.FaultString);
+            m_log.LogError("[GATEKEEPER SERVICE CONNECTOR]: remote call returned an error: {0}", response.FaultString);
             return false;
         }
 
         hash = (Hashtable)response.Value;
         //foreach (Object o in hash)
-        //    m_log.Debug(">> " + ((DictionaryEntry)o).Key + ":" + ((DictionaryEntry)o).Value);
+        //    m_log.LogDebug(">> " + ((DictionaryEntry)o).Key + ":" + ((DictionaryEntry)o).Value);
         try
         {
             bool success = false;
@@ -116,21 +117,21 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
             if (success)
             {
                 UUID.TryParse((string)hash["uuid"], out regionID);
-                //m_log.Debug(">> HERE, uuid: " + regionID);
+                //m_log.LogDebug(">> HERE, uuid: " + regionID);
                 if ((string)hash["handle"] != null)
                 {
                     realHandle = Convert.ToUInt64((string)hash["handle"]);
-                    //m_log.Debug(">> HERE, realHandle: " + realHandle);
+                    //m_log.LogDebug(">> HERE, realHandle: " + realHandle);
                 }
                 if (hash["region_image"] != null)
                 {
                     imageURL = (string)hash["region_image"];
-                    //m_log.Debug(">> HERE, imageURL: " + imageURL);
+                    //m_log.LogDebug(">> HERE, imageURL: " + imageURL);
                 }
                 if (hash["external_name"] != null)
                 {
                     externalName = (string)hash["external_name"];
-                    //m_log.Debug(">> HERE, externalName: " + externalName);
+                    //m_log.LogDebug(">> HERE, externalName: " + externalName);
                 }
                 if (hash["size_x"] != null)
                 {
@@ -145,7 +146,7 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
         catch (Exception e)
         {
             reason = "Error parsing return arguments";
-            m_log.Error("[GATEKEEPER SERVICE CONNECTOR]: Got exception while parsing hyperlink response " + e.StackTrace);
+            m_log.LogError("[GATEKEEPER SERVICE CONNECTOR]: Got exception while parsing hyperlink response " + e.StackTrace);
             return false;
         }
 
@@ -156,7 +157,7 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
     {
         if (m_AssetService == null)
         {
-            m_log.DebugFormat("[GATEKEEPER SERVICE CONNECTOR]: No AssetService defined. Map tile not retrieved.");
+            m_log.LogDebug("[GATEKEEPER SERVICE CONNECTOR]: No AssetService defined. Map tile not retrieved.");
             return m_HGMapImage;
         }
 
@@ -165,26 +166,26 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
 
         try
         {
-            //m_log.Debug("JPEG: " + imageURL);
+            //m_log.LogDebug("JPEG: " + imageURL);
             string name = regionID.ToString();
             filename = Path.Combine(storagePath, name + ".jpg");
-            m_log.DebugFormat("[GATEKEEPER SERVICE CONNECTOR]: Map image at {0}, cached at {1}", imageURL, filename);
+            m_log.LogDebug("[GATEKEEPER SERVICE CONNECTOR]: Map image at {0}, cached at {1}", imageURL, filename);
             if (!File.Exists(filename))
             {
-                m_log.DebugFormat("[GATEKEEPER SERVICE CONNECTOR]: downloading...");
+                m_log.LogDebug("[GATEKEEPER SERVICE CONNECTOR]: downloading...");
                 using(WebClient c = new WebClient())
                     c.DownloadFile(imageURL, filename);
             }
             else
             {
-                m_log.DebugFormat("[GATEKEEPER SERVICE CONNECTOR]: using cached image");
+                m_log.LogDebug("[GATEKEEPER SERVICE CONNECTOR]: using cached image");
             }
 
             byte[] imageData = null;
 
             using (SKBitmap bitmap = SKBitmap.Decode(filename))
             {
-                //m_log.Debug("Size: " + m.PhysicalDimension.Height + "-" + m.PhysicalDimension.Width);
+                //m_log.LogDebug("Size: " + m.PhysicalDimension.Height + "-" + m.PhysicalDimension.Width);
                 // Encode using SkiaSharp (produce a JPEG). OpenJPEG produced JPEG2000; here we use JPEG via Skia.
                 using SKImage image = SKImage.FromBitmap(bitmap);
                 using SKData encoded = image.Encode(SKEncodedImageFormat.Jpeg, 80);
@@ -205,7 +206,7 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
         }
         catch // LEGIT: Catching problems caused by OpenJPEG p/invoke
         {
-            m_log.Info("[GATEKEEPER SERVICE CONNECTOR]: Failed getting/storing map image, because it is probably already in the cache");
+            m_log.LogInformation("[GATEKEEPER SERVICE CONNECTOR]: Failed getting/storing map image, because it is probably already in the cache");
         }
         return mapTile;
     }
@@ -225,7 +226,7 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
         paramList.Add(hash);
 
         XmlRpcRequest request = new XmlRpcRequest("get_region", paramList);
-        m_log.Debug("[GATEKEEPER SERVICE CONNECTOR]: contacting " + gatekeeper.ServerURI);
+        m_log.LogDebug("[GATEKEEPER SERVICE CONNECTOR]: contacting " + gatekeeper.ServerURI);
         XmlRpcResponse response = null;
         try
         {
@@ -235,20 +236,20 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
         catch (Exception e)
         {
             message = "Error contacting grid.";
-            m_log.Debug("[GATEKEEPER SERVICE CONNECTOR]: Exception " + e.Message);
+            m_log.LogDebug("[GATEKEEPER SERVICE CONNECTOR]: Exception " + e.Message);
             return null;
         }
 
         if (response.IsFault)
         {
             message = "Error contacting grid.";
-            m_log.ErrorFormat("[GATEKEEPER SERVICE CONNECTOR]: remote call returned an error: {0}", response.FaultString);
+            m_log.LogError("[GATEKEEPER SERVICE CONNECTOR]: remote call returned an error: {0}", response.FaultString);
             return null;
         }
 
         hash = (Hashtable)response.Value;
         //foreach (Object o in hash)
-        //    m_log.Debug(">> " + ((DictionaryEntry)o).Key + ":" + ((DictionaryEntry)o).Value);
+        //    m_log.LogDebug(">> " + ((DictionaryEntry)o).Key + ":" + ((DictionaryEntry)o).Value);
         try
         {
             bool success = false;
@@ -266,61 +267,61 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
                 GridRegion region = new GridRegion();
 
                 UUID.TryParse((string)hash["uuid"], out region.RegionID);
-                //m_log.Debug(">> HERE, uuid: " + region.RegionID);
+                //m_log.LogDebug(">> HERE, uuid: " + region.RegionID);
                 int n = 0;
                 if (hash["x"] != null)
                 {
                     Int32.TryParse((string)hash["x"], out n);
                     region.RegionLocX = n;
-                    //m_log.Debug(">> HERE, x: " + region.RegionLocX);
+                    //m_log.LogDebug(">> HERE, x: " + region.RegionLocX);
                 }
                 if (hash["y"] != null)
                 {
                     Int32.TryParse((string)hash["y"], out n);
                     region.RegionLocY = n;
-                    //m_log.Debug(">> HERE, y: " + region.RegionLocY);
+                    //m_log.LogDebug(">> HERE, y: " + region.RegionLocY);
                 }
                 if (hash["size_x"] != null)
                 {
                     Int32.TryParse((string)hash["size_x"], out n);
                     region.RegionSizeX = n;
-                    //m_log.Debug(">> HERE, x: " + region.RegionLocX);
+                    //m_log.LogDebug(">> HERE, x: " + region.RegionLocX);
                 }
                 if (hash["size_y"] != null)
                 {
                     Int32.TryParse((string)hash["size_y"], out n);
                     region.RegionSizeY = n;
-                    //m_log.Debug(">> HERE, y: " + region.RegionLocY);
+                    //m_log.LogDebug(">> HERE, y: " + region.RegionLocY);
                 }
                 if (hash["region_name"] != null)
                 {
                     region.RegionName = (string)hash["region_name"];
-                    //m_log.Debug(">> HERE, region_name: " + region.RegionName);
+                    //m_log.LogDebug(">> HERE, region_name: " + region.RegionName);
                 }
                 if (hash["hostname"] != null)
                 {
                     region.ExternalHostName = (string)hash["hostname"];
-                    //m_log.Debug(">> HERE, hostname: " + region.ExternalHostName);
+                    //m_log.LogDebug(">> HERE, hostname: " + region.ExternalHostName);
                 }
                 if (hash["http_port"] != null)
                 {
                     uint p = 0;
                     UInt32.TryParse((string)hash["http_port"], out p);
                     region.HttpPort = p;
-                    //m_log.Debug(">> HERE, http_port: " + region.HttpPort);
+                    //m_log.LogDebug(">> HERE, http_port: " + region.HttpPort);
                 }
                 if (hash["internal_port"] != null)
                 {
                     int p = 0;
                     Int32.TryParse((string)hash["internal_port"], out p);
                     region.InternalEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), p);
-                    //m_log.Debug(">> HERE, internal_port: " + region.InternalEndPoint);
+                    //m_log.LogDebug(">> HERE, internal_port: " + region.InternalEndPoint);
                 }
 
                 if (hash["server_uri"] != null)
                 {
                     region.ServerURI = (string)hash["server_uri"];
-                    //m_log.Debug(">> HERE, server_uri: " + region.ServerURI);
+                    //m_log.LogDebug(">> HERE, server_uri: " + region.ServerURI);
                 }
 
                 // Successful return
@@ -331,7 +332,7 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
         catch (Exception e)
         {
             message = "Error parsing response from grid.";
-            m_log.Error("[GATEKEEPER SERVICE CONNECTOR]: Got exception while parsing hyperlink response " + e.StackTrace);
+            m_log.LogError("[GATEKEEPER SERVICE CONNECTOR]: Got exception while parsing hyperlink response " + e.StackTrace);
             return null;
         }
 

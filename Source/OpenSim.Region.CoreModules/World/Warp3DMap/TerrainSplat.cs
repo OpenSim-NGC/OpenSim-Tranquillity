@@ -27,11 +27,12 @@
 
 using SkiaSharp;
 using CoreJ2K;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Services.Interfaces;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.World.Warp3DMap;
 
@@ -64,7 +65,7 @@ public static class TerrainSplat
 
     #endregion Constants
 
-    private static readonly ILog m_log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType.Name);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType.Name);
     private static string LogHeader = "[WARP3D TERRAIN SPLAT]";
 
     /// <summary>
@@ -131,7 +132,7 @@ public static SKBitmap Splat(ITerrainChannel terrain, UUID[] textureIDs,
                         }
                         catch(Exception ex)
                         {
-                            m_log.Warn("Failed to decode cached terrain patch texture " + textureIDs[i] + "): " + ex.Message);
+                            m_log.LogWarning("Failed to decode cached terrain patch texture " + textureIDs[i] + "): " + ex.Message);
                         }
                     }
 
@@ -159,7 +160,7 @@ public static SKBitmap Splat(ITerrainChannel terrain, UUID[] textureIDs,
                             }
                             catch(Exception ex)
                             {
-                                m_log.Warn("Failed to decode terrain texture " + asset.ID + ": " + ex.Message);
+                                m_log.LogWarning("Failed to decode terrain texture " + asset.ID + ": " + ex.Message);
                             }
                         }
 
@@ -248,7 +249,7 @@ public static SKBitmap Splat(ITerrainChannel terrain, UUID[] textureIDs,
                 {
                     if (detailTexture[i] == null)
                     {
-                        m_log.DebugFormat("{0} Missing terrain texture for layer {1}. Filling with solid default color", LogHeader, i);
+                        m_log.LogDebug("{0} Missing terrain texture for layer {1}. Filling with solid default color", LogHeader, i);
 
                         // Create a solid color texture for this layer
                         detailTexture[i] = new SKBitmap(16, 16, SKColorType.Rgb888x, SKAlphaType.Opaque);

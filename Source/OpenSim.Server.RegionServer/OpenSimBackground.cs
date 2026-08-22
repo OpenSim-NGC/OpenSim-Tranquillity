@@ -27,8 +27,10 @@
 
 using System.Reflection;
 
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.RegionServer;
 
@@ -37,7 +39,7 @@ namespace OpenSim.Server.RegionServer;
 /// </summary>
 public class OpenSimBackground : OpenSim
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private ManualResetEvent WorldHasComeToAnEnd = new ManualResetEvent(false);
 
@@ -54,7 +56,7 @@ public class OpenSimBackground : OpenSim
 
         base.Startup();
 
-        m_log.InfoFormat("[OPENSIM MAIN]: Startup complete, serving {0} region{1}",
+        m_log.LogInformation("[OPENSIM MAIN]: Startup complete, serving {0} region{1}",
                          SceneManager.Scenes.Count, SceneManager.Scenes.Count > 1 ? "s" : "");
 
         WorldHasComeToAnEnd.WaitOne();
@@ -67,7 +69,7 @@ public class OpenSimBackground : OpenSim
     public override void Shutdown()
     {
         WorldHasComeToAnEnd.Set();
-        m_log.Info("[OPENSIM MAIN]: World has come to an end");
+        m_log.LogInformation("[OPENSIM MAIN]: World has come to an end");
         base.Shutdown();
     }
 }

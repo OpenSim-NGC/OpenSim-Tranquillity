@@ -26,6 +26,8 @@
  */
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 public abstract class BSConstraint : IDisposable
@@ -131,7 +133,7 @@ public abstract class BSConstraint : IDisposable
             }
             else
             {
-                m_world.physicsScene.Logger.ErrorFormat("{0} CalculateTransforms failed. A={1}, B={2}", LogHeader, Body1.ID, Body2.ID);
+                m_world.physicsScene.Logger.LogError("{0} CalculateTransforms failed. A={1}, B={2}", LogHeader, Body1.ID, Body2.ID);
             }
         }
         return ret;

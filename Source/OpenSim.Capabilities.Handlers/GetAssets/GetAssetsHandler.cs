@@ -27,18 +27,18 @@
 
 using System.Net;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Capabilities.Handlers;
 
 public class GetAssetsHandler
 {
-    private static readonly ILog m_log =
-               LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static readonly Dictionary<string, AssetType> queryTypes = new()
     {
@@ -77,7 +77,7 @@ public class GetAssetsHandler
 
         if (m_assetService == null)
         {
-            //m_log.Warn("[GETASSET]: no service"); 
+            //m_log.LogWarning("[GETASSET]: no service"); 
             response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
             response.KeepAlive = false;
             return;
@@ -102,8 +102,8 @@ public class GetAssetsHandler
 
         if(type == AssetType.Unknown)
         {
-            //m_log.Warn("[GETASSET]: Unknown type: " + query);
-            m_log.Warn("[GETASSET]: Unknown type");
+            //m_log.LogWarning("[GETASSET]: Unknown type: " + query);
+            m_log.LogWarning("[GETASSET]: Unknown type");
             response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
@@ -128,7 +128,7 @@ public class GetAssetsHandler
 
         if (asset == null)
         {
-            // m_log.Warn("[GETASSET]: not found: " + query + " " + assetStr);
+            // m_log.LogWarning("[GETASSET]: not found: " + query + " " + assetStr);
             response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
@@ -137,14 +137,14 @@ public class GetAssetsHandler
 
         if (len == 0)
         {
-            m_log.Warn("[GETASSET]: asset with empty data: " + assetStr + " type " + asset.Type.ToString());
+            m_log.LogWarning("[GETASSET]: asset with empty data: " + assetStr + " type " + asset.Type.ToString());
             response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
 
         if (asset.Type != (sbyte)type)
         {
-            m_log.Warn("[GETASSET]: asset with wrong type: " + assetStr + " " + asset.Type.ToString() + " != " + ((sbyte)type).ToString());
+            m_log.LogWarning("[GETASSET]: asset with wrong type: " + assetStr + " " + asset.Type.ToString() + " != " + ((sbyte)type).ToString());
             //response.StatusCode = (int)HttpStatusCode.NotFound;
             //return;
         }
@@ -155,7 +155,7 @@ public class GetAssetsHandler
             // viewers do send broken start, then flag good assets as bad
             if (start >= len)
             {
-                //m_log.Warn("[GETASSET]: bad start: " + range);
+                //m_log.LogWarning("[GETASSET]: bad start: " + range);
                 response.StatusCode = (int)HttpStatusCode.OK;
             }
             else
@@ -168,7 +168,7 @@ public class GetAssetsHandler
                 start = Utils.Clamp(start, 0, end);
                 len = end - start + 1;
 
-                //m_log.Debug("Serving " + start + " to " + end + " of " + texture.Data.Length + " bytes for texture " + texture.ID);
+                //m_log.LogDebug("Serving " + start + " to " + end + " of " + texture.Data.Length + " bytes for texture " + texture.ID);
                 response.AddHeader("Content-Range", string.Format("bytes {0}-{1}/{2}", start, end, asset.Data.Length));
                 response.StatusCode = (int)HttpStatusCode.PartialContent;
                 response.RawBufferStart = start;

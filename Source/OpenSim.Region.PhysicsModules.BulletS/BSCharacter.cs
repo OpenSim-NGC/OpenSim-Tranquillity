@@ -25,16 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 using System.Reflection;
-using log4net;
 using OMV = OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 public sealed class BSCharacter : BSPhysObject
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[BULLETS CHAR]";
 
     // private bool _stopped;
@@ -427,7 +428,7 @@ public sealed class BSCharacter : BSPhysObject
         get { return RawForce; }
         set {
             RawForce = value;
-            // m_log.DebugFormat("{0}: Force = {1}", LogHeader, _force);
+            // m_log.LogDebug("{0}: Force = {1}", LogHeader, _force);
             PhysScene.TaintedObject(LocalID, "BSCharacter.SetForce", delegate()
             {
                 DetailLog("{0},BSCharacter.setForce,taint,force={1}", LocalID, RawForce);
@@ -731,7 +732,7 @@ public sealed class BSCharacter : BSPhysObject
         }
         else
         {
-            m_log.WarnFormat("{0}: Got a NaN force applied to a character. LocalID={1}", LogHeader, LocalID);
+            m_log.LogWarning("{0}: Got a NaN force applied to a character. LocalID={1}", LogHeader, LocalID);
             return;
         }
     }
@@ -790,7 +791,7 @@ public sealed class BSCharacter : BSPhysObject
             {
                 newScale.Z = size.Z + heightAdjust;
             }
-            // m_log.DebugFormat("{0} ComputeAvatarScale: size={1},adj={2},scale={3}", LogHeader, size, heightAdjust, newScale);
+            // m_log.LogDebug("{0} ComputeAvatarScale: size={1},adj={2},scale={3}", LogHeader, size, heightAdjust, newScale);
 
             // If smaller than the endcaps, just fake like we're almost that small
             if (newScale.Z < 0)

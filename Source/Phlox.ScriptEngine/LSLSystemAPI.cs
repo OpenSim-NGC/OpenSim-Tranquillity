@@ -13,7 +13,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -32,11 +31,13 @@ using System.Drawing;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Region.OptionalModules.World.NPC;
 
+using Microsoft.Extensions.Logging;
+
 namespace Phlox.ScriptEngine
 {
     public class LSLSystemAPI : ISystemAPI
     {
-        private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         protected PhloxEngine m_ScriptEngine;
         protected SceneObjectPart m_host;
@@ -65,7 +66,7 @@ namespace Phlox.ScriptEngine
         // ── Helpers ────────────────────────────────────────────────────────────
 
         private void Stub(string name) =>
-            m_log.WarnFormat("[PhloxAPI]: STUB {0} called from {1}", name, m_itemID);
+            m_log.LogWarning("[PhloxAPI]: STUB {0} called from {1}", name, m_itemID);
 
         protected void ScriptSleep(int ms)
         {
@@ -1122,7 +1123,7 @@ namespace Phlox.ScriptEngine
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: llSetKeyframedMotion exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: llSetKeyframedMotion exception: {0}", e.Message);
             }
         }
 
@@ -1274,7 +1275,7 @@ namespace Phlox.ScriptEngine
                 }
                 else
                 {
-                    m_log.WarnFormat("[PhloxAPI]: RemoteLoadScriptPin failed: {0}", msg);
+                    m_log.LogWarning("[PhloxAPI]: RemoteLoadScriptPin failed: {0}", msg);
                     if (doShout) ShoutError("llRemoteLoadScriptPin: " + msg);
                     ret = 0;
                 }
@@ -2188,7 +2189,7 @@ namespace Phlox.ScriptEngine
 
             sp.Overrides.SetOverride(anim_state, animID);
 
-            m_log.DebugFormat("[PhloxAPI]: llSetAnimationOverride: {0} -> {1} for {2}",
+            m_log.LogDebug("[PhloxAPI]: llSetAnimationOverride: {0} -> {1} for {2}",
                 anim_state, animID, sp.Name);
         }
         public void llResetAnimationOverride(string anim_state)
@@ -2212,7 +2213,7 @@ namespace Phlox.ScriptEngine
 
             sp.Overrides.SetOverride(anim_state, UUID.Zero);
 
-            m_log.DebugFormat("[PhloxAPI]: llResetAnimationOverride: cleared {0} for {1}",
+            m_log.LogDebug("[PhloxAPI]: llResetAnimationOverride: cleared {0} for {1}",
                 anim_state, sp.Name);
         }
         public string llGetDisplayName(string id)
@@ -2803,7 +2804,7 @@ namespace Phlox.ScriptEngine
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: iwMakeNotecard exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: iwMakeNotecard exception: {0}", e.Message);
             }
             ScriptSleep(5000);
         }
@@ -2824,7 +2825,7 @@ namespace Phlox.ScriptEngine
                     int count = body.Length == 0 ? 0 : body.Split('\n').Length;
                     PostDataserverEvent(queryID, count.ToString());
                 }
-                catch (Exception ex) { m_log.ErrorFormat("[PhloxAPI]: llGetNumberOfNotecardLines ex: {0}", ex.Message); PostDataserverEvent(queryID, "0"); }
+                catch (Exception ex) { m_log.LogError("[PhloxAPI]: llGetNumberOfNotecardLines ex: {0}", ex.Message); PostDataserverEvent(queryID, "0"); }
             });
             return queryID.ToString();
         }
@@ -2848,7 +2849,7 @@ namespace Phlox.ScriptEngine
                     if (lineNum < 0 || lineNum >= lines.Length) PostDataserverEvent(queryID, "\n\n\n");
                     else PostDataserverEvent(queryID, lines[lineNum].TrimEnd('\r'));
                 }
-                catch (Exception ex) { m_log.ErrorFormat("[PhloxAPI]: llGetNotecardLine ex: {0}", ex.Message); PostDataserverEvent(queryID, "\n\n\n"); }
+                catch (Exception ex) { m_log.LogError("[PhloxAPI]: llGetNotecardLine ex: {0}", ex.Message); PostDataserverEvent(queryID, "\n\n\n"); }
             });
             return queryID.ToString();
         }
@@ -2879,7 +2880,7 @@ namespace Phlox.ScriptEngine
                         result = result.Substring(0, maxLength);
                     PostDataserverEvent(queryID, result);
                 }
-                catch (Exception ex) { m_log.ErrorFormat("[PhloxAPI]: iwGetNotecardSegment ex: {0}", ex.Message); PostDataserverEvent(queryID, "\n\n\n"); }
+                catch (Exception ex) { m_log.LogError("[PhloxAPI]: iwGetNotecardSegment ex: {0}", ex.Message); PostDataserverEvent(queryID, "\n\n\n"); }
             });
             return queryID.ToString();
         }
@@ -3523,7 +3524,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("[PhloxAPI]: llModifyLand exception: {0}", e.Message);
+                    m_log.LogWarning("[PhloxAPI]: llModifyLand exception: {0}", e.Message);
                 }
             }
         }
@@ -4429,7 +4430,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     }
 
                     default:
-                        m_log.WarnFormat("[PhloxAPI]: llSetPrimitiveParams unknown code {0}, stopping", code);
+                        m_log.LogWarning("[PhloxAPI]: llSetPrimitiveParams unknown code {0}, stopping", code);
                         idx = data.Length;
                         break;
                 }
@@ -6557,13 +6558,13 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         try { World.DeleteSceneObject(sog, false); }
                         catch { }
                     }
-                    m_log.InfoFormat("[PhloxAPI]: llReturnObjectsByOwner returned {0} objects owned by {1}", toReturn.Count, targetAgentID);
+                    m_log.LogInformation("[PhloxAPI]: llReturnObjectsByOwner returned {0} objects owned by {1}", toReturn.Count, targetAgentID);
                 }
                 return toReturn.Count;
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: llReturnObjectsByOwner exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: llReturnObjectsByOwner exception: {0}", e.Message);
                 return ERR_GENERIC;
             }
         }
@@ -6618,12 +6619,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     catch { }
                 }
                 if (count > 0)
-                    m_log.InfoFormat("[PhloxAPI]: llReturnObjectsByID returned {0} objects", count);
+                    m_log.LogInformation("[PhloxAPI]: llReturnObjectsByID returned {0} objects", count);
                 return count;
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: llReturnObjectsByID exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: llReturnObjectsByID exception: {0}", e.Message);
                 return ERR_GENERIC;
             }
         }
@@ -6986,7 +6987,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: llEmail exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: llEmail exception: {0}", e.Message);
             }
             ScriptSleep(20000);
         }
@@ -7013,7 +7014,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: llGetNextEmail exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: llGetNextEmail exception: {0}", e.Message);
             }
         }
         public void llOpenRemoteDataChannel()
@@ -7035,7 +7036,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: llOpenRemoteDataChannel exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: llOpenRemoteDataChannel exception: {0}", e.Message);
             }
             ScriptSleep(1000);
         }
@@ -7051,7 +7052,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: llSendRemoteData exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: llSendRemoteData exception: {0}", e.Message);
                 ScriptSleep(3000);
                 return UUID.Zero.ToString();
             }
@@ -7067,7 +7068,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: llRemoteDataReply exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: llRemoteDataReply exception: {0}", e.Message);
             }
             ScriptSleep(3000);
         }
@@ -7082,7 +7083,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: llCloseRemoteDataChannel exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: llCloseRemoteDataChannel exception: {0}", e.Message);
             }
             ScriptSleep(1000);
         }
@@ -8196,7 +8197,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 }
                 catch (Exception ex)
                 {
-                    m_log.ErrorFormat("[PhloxAPI]: llRequestAgentData ex: {0}", ex.Message);
+                    m_log.LogError("[PhloxAPI]: llRequestAgentData ex: {0}", ex.Message);
                     PostDataserverEvent(capturedQuery, string.Empty);
                 }
             });
@@ -8805,7 +8806,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: llCastRay exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: llCastRay exception: {0}", e.Message);
                 results.Clear();
                 results.Add(-3); // RCERR_CAST_TIME_EXCEEDED as generic error
             }
@@ -9380,7 +9381,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: iwGroupInvite exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: iwGroupInvite exception: {0}", e.Message);
                 return -1;
             }
         }
@@ -9399,7 +9400,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: iwGroupEject exception: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: iwGroupEject exception: {0}", e.Message);
                 return -1;
             }
         }
@@ -11403,7 +11404,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[PhloxAPI]: llCreateKeyValue failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llCreateKeyValue failed: {0}", ex.Message);
                 return -1;
             }
         }
@@ -11422,7 +11423,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[PhloxAPI]: llReadKeyValue failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llReadKeyValue failed: {0}", ex.Message);
                 return string.Empty;
             }
         }
@@ -11448,7 +11449,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[PhloxAPI]: llUpdateKeyValue failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llUpdateKeyValue failed: {0}", ex.Message);
                 return -1;
             }
         }
@@ -11469,7 +11470,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[PhloxAPI]: llDeleteKeyValue failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llDeleteKeyValue failed: {0}", ex.Message);
                 return -1;
             }
         }
@@ -11486,7 +11487,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[PhloxAPI]: llKeyCountKeyValue failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llKeyCountKeyValue failed: {0}", ex.Message);
                 return 0;
             }
         }
@@ -11508,7 +11509,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[PhloxAPI]: llKeysKeyValue failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llKeysKeyValue failed: {0}", ex.Message);
                 return new LSLList();
             }
         }
@@ -11525,7 +11526,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[PhloxAPI]: llDataSizeKeyValue failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llDataSizeKeyValue failed: {0}", ex.Message);
                 return 0;
             }
         }
@@ -11549,7 +11550,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[PhloxAPI]: llClearKeyValue failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llClearKeyValue failed: {0}", ex.Message);
                 return -1;
             }
         }
@@ -11612,7 +11613,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[PhloxAPI]: llSignRSA failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llSignRSA failed: {0}", ex.Message);
                 return string.Empty;
             }
         }
@@ -11639,7 +11640,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[PhloxAPI]: llVerifyRSA failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llVerifyRSA failed: {0}", ex.Message);
                 return 0;
             }
         }
@@ -11853,7 +11854,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             // day_length and day_offset changes are applied.
             if (!string.IsNullOrEmpty(environment))
             {
-                m_log.InfoFormat("[PhloxAPI]: llReplaceEnvironment: EEP asset '{0}' load not yet implemented, day_length/offset applied", environment);
+                m_log.LogInformation("[PhloxAPI]: llReplaceEnvironment: EEP asset '{0}' load not yet implemented, day_length/offset applied", environment);
             }
 
             return 1; // ENV_OK
@@ -11893,7 +11894,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 }
                 catch (Exception ex)
                 {
-                    m_log.WarnFormat("[PhloxAPI]: llRequestUserKey failed for '{0}': {1}", username, ex.Message);
+                    m_log.LogWarning("[PhloxAPI]: llRequestUserKey failed for '{0}': {1}", username, ex.Message);
                     m_ScriptEngine.PostScriptEvent(m_itemID, "dataserver",
                         new object[] { reqID.ToString(), UUID.Zero.ToString() });
                 }
@@ -11920,7 +11921,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             // Per-agent EEP requires viewer/region support for GenericMessage or
             // EnvironmentUpdate per-agent caps. Most OpenSim builds don't support this yet.
             // Log the attempt and return success so scripts don't break.
-            m_log.InfoFormat("[PhloxAPI]: llSetAgentEnvironment called for agent {0} with {1} params (transition={2}s). Per-agent EEP not yet implemented in viewer protocol.",
+            m_log.LogInformation("[PhloxAPI]: llSetAgentEnvironment called for agent {0} with {1} params (transition={2}s). Per-agent EEP not yet implemented in viewer protocol.",
                 targetAgent, paramList.Length, transition);
             return 0; // Report success so scripts proceed
         }
@@ -11941,7 +11942,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             if (sp == null || sp.IsChildAgent) return -1;
 
             // Per-agent EEP replace requires viewer protocol support.
-            m_log.InfoFormat("[PhloxAPI]: llReplaceAgentEnvironment called for agent {0} environment='{1}' (transition={2}s). Per-agent EEP not yet implemented in viewer protocol.",
+            m_log.LogInformation("[PhloxAPI]: llReplaceAgentEnvironment called for agent {0} environment='{1}' (transition={2}s). Per-agent EEP not yet implemented in viewer protocol.",
                 targetAgent, environment, transition);
             return 0; // Report success so scripts proceed
         }
@@ -12077,13 +12078,13 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                     sitPart.UUID, sitPart.SitTargetPosition);
                 sp.HandleAgentSit(sp.ControllingClient, targetAgent);
 
-                m_log.InfoFormat("[PhloxAPI]: llSitOnLink: sat {0} on link {1} ({2})",
+                m_log.LogInformation("[PhloxAPI]: llSitOnLink: sat {0} on link {1} ({2})",
                     targetAgent, link, sitPart.Name);
                 return 0;
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[PhloxAPI]: llSitOnLink failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llSitOnLink failed: {0}", ex.Message);
                 return -1;
             }
         }
@@ -12295,7 +12296,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             // Notify the agent about the beacon location via region say
             // Full viewer beacon rendering requires viewer-specific protocol support
             Vector3 pos = m_host.AbsolutePosition;
-            m_log.InfoFormat("[PhloxAPI]: llMapBeacon: beacon for {0} at {1} text='{2}'",
+            m_log.LogInformation("[PhloxAPI]: llMapBeacon: beacon for {0} at {1} text='{2}'",
                 agentId, pos, text ?? "");
         }
 
@@ -12399,7 +12400,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: llTransferOwnership error: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: llTransferOwnership error: {0}", e.Message);
                 return 0;
             }
         }
@@ -12439,7 +12440,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxAPI]: llDamage error: {0}", e.Message);
+                m_log.LogWarning("[PhloxAPI]: llDamage error: {0}", e.Message);
             }
         }
 
@@ -12469,7 +12470,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("[PhloxAPI]: llSetLinkRenderMaterial error: {0}", e.Message);
+                    m_log.LogWarning("[PhloxAPI]: llSetLinkRenderMaterial error: {0}", e.Message);
                 }
             }
         }
@@ -12699,7 +12700,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                 "experience_permissions", new object[] { agent }, new DetectParams[0]));
             var expInfo = expService.GetExperience(experienceId);
-            m_log.InfoFormat("[PhloxAPI]: Experience permission granted: agent={0} experience={1}",
+            m_log.LogInformation("[PhloxAPI]: Experience permission granted: agent={0} experience={1}",
                 agentId, expInfo?.Name ?? experienceId.ToString());
         }
 

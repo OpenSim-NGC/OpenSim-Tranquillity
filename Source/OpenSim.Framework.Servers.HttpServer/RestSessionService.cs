@@ -30,7 +30,8 @@ using System.Reflection;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Servers.HttpServer;
 
@@ -164,7 +165,7 @@ public class RestSessionObjectPosterResponse<TRequest, TResponse>
 
             // This is currently a bad debug stanza since it gobbles us the response...
             //                StreamReader reader = new StreamReader(stream);
-            //                m_log.DebugFormat("[REST OBJECT POSTER RESPONSE]: Received {0}", reader.ReadToEnd());
+            //                m_log.LogDebug("[REST OBJECT POSTER RESPONSE]: Received {0}", reader.ReadToEnd());
 
             deserial = (TResponse)deserializer.Deserialize(stream);
             if (stream != null)
@@ -183,8 +184,7 @@ public delegate bool CheckIdentityMethod(string sid, string aid);
 public class RestDeserialiseSecureHandler<TRequest, TResponse> : BaseOutputStreamHandler, IStreamHandler
     where TRequest : new()
 {
-    private static readonly ILog m_log
-        = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private RestDeserialiseMethod<TRequest, TResponse> m_method;
     private CheckIdentityMethod m_smethod;
@@ -214,7 +214,7 @@ public class RestDeserialiseSecureHandler<TRequest, TResponse> : BaseOutputStrea
             }
             catch (Exception e)
             {
-                m_log.Error("[REST]: Deserialization problem. Ignoring request. " + e);
+                m_log.LogError("[REST]: Deserialization problem. Ignoring request. " + e);
                 fail = true;
             }
         }
@@ -238,8 +238,7 @@ public delegate bool CheckTrustedSourceMethod(IPEndPoint peer);
 public class RestDeserialiseTrustedHandler<TRequest, TResponse> : BaseOutputStreamHandler, IStreamHandler
     where TRequest : new()
 {
-    private static readonly ILog m_log
-        = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// The operation to perform once trust has been established.
@@ -274,7 +273,7 @@ public class RestDeserialiseTrustedHandler<TRequest, TResponse> : BaseOutputStre
             }
             catch (Exception e)
             {
-                m_log.Error("[REST]: Deserialization problem. Ignoring request. " + e);
+                m_log.LogError("[REST]: Deserialization problem. Ignoring request. " + e);
                 fail = true;
             }
         }

@@ -31,13 +31,13 @@
 
 using System.Collections.Concurrent;
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
 public class ObjectJobEngine : IDisposable
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly object m_mainLock = new object();
     private readonly string m_name;
@@ -183,7 +183,7 @@ public class ObjectJobEngine : IDisposable
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[ObjectJob {0}]: Job failed, continuing.  Exception {1}", m_name, e);
+                m_log.LogError("[ObjectJob {0}]: Job failed, continuing.  Exception {1}", m_name, e);
             }
         }
         lock (m_mainLock)

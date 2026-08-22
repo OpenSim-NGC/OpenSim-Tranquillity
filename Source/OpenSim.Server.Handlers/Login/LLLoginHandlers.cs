@@ -34,14 +34,13 @@ using OpenSim.Framework;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using Nwc.XmlRpc;
-using log4net;
-
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Login;
 
 public class LLLoginHandlers
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private ILoginService m_LocalService;
     private bool m_Proxy;
@@ -96,7 +95,7 @@ public class LLLoginHandlers
                 else if (requestData.ContainsKey("web_login_key"))
                 {
                     passwd = "$1$" + requestData["web_login_key"].ToString();
-                    m_log.InfoFormat("[LOGIN]: XMLRPC Login Req key {0}", passwd);
+                    m_log.LogInformation("[LOGIN]: XMLRPC Login Req key {0}", passwd);
                 }
                 string startLocation = string.Empty;
                 UUID scopeID = UUID.Zero;
@@ -122,7 +121,7 @@ public class LLLoginHandlers
                 if (requestData.Contains("id0") && requestData["id0"] != null)
                     id0 = requestData["id0"].ToString();
 
-                //m_log.InfoFormat("[LOGIN]: XMLRPC Login Requested for {0} {1}, starting in {2}, using {3}", first, last, startLocation, clientVersion);
+                //m_log.LogInformation("[LOGIN]: XMLRPC Login Requested for {0} {1}, starting in {2}, using {3}", first, last, startLocation, clientVersion);
 
                 LoginResponse reply = null;
                 reply = m_LocalService.Login(first, last, passwd, startLocation, scopeID, clientVersion, channel, mac, id0, remoteClient);
@@ -165,7 +164,7 @@ public class LLLoginHandlers
                 string passwd = requestData["passwd"].ToString();
                 int level = Int32.Parse(requestData["level"].ToString());
 
-                m_log.InfoFormat("[LOGIN]: XMLRPC Set Level to {2} Requested by {0} {1}", first, last, level);
+                m_log.LogInformation("[LOGIN]: XMLRPC Set Level to {2} Requested by {0} {1}", first, last, level);
 
                 Hashtable reply = m_LocalService.SetLevel(first, last, passwd, level, remoteClient);
 
@@ -208,7 +207,7 @@ public class LLLoginHandlers
                 if (map.TryGetValue("scope_id", out otmp))
                     scopeID = new UUID(otmp.AsString());
 
-                m_log.Info("[LOGIN]: LLSD Login Requested for: '" + first + "' '" + last + "' / " + startLocation);
+                m_log.LogInformation("[LOGIN]: LLSD Login Requested for: '" + first + "' '" + last + "' / " + startLocation);
 
                 LoginResponse reply = null;
                 reply = m_LocalService.Login(first, last, passwd, startLocation, scopeID,

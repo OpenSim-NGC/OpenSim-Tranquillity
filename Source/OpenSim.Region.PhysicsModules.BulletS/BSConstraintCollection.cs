@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 ﻿/*
  * Copyright (c) Contributors, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
@@ -28,7 +31,7 @@ namespace OpenSim.Region.PhysicsModules.BulletS;
 
 public sealed class BSConstraintCollection : IDisposable
 {
-    // private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    // private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
     // private static readonly string LogHeader = "[CONSTRAINT COLLECTION]";
 
     delegate bool ConstraintAction(BSConstraint constrain);

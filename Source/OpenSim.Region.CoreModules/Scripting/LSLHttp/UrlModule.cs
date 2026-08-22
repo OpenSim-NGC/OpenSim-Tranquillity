@@ -30,7 +30,6 @@ using System.Collections.Specialized;
 using System.Reflection;
 using System.Text;
 using System.Net;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -38,6 +37,8 @@ using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Scripting.LSLHttp;
 
@@ -77,7 +78,7 @@ public class RequestData
 /// </summary>
 public class UrlModule : ISharedRegionModule, IUrlModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected readonly Dictionary<UUID, UrlData> m_RequestMap = new();
     protected readonly Dictionary<string, UrlData> m_UrlMap = new();
@@ -137,14 +138,14 @@ public class UrlModule : ISharedRegionModule, IUrlModule
         else
         {
             m_ErrorStr = "[Network] configuration missing, HTTP listener for LSL disabled";
-            m_log.Warn("[URL MODULE]: " + m_ErrorStr);
+            m_log.LogWarning("[URL MODULE]: " + m_ErrorStr);
             return;
         }
 
         if (string.IsNullOrWhiteSpace(ExternalHostNameForLSL))
         {
             m_ErrorStr = "ExternalHostNameForLSL not defined in configuration, HTTP listener for LSL disabled";
-            m_log.Warn("[URL MODULE]: " + m_ErrorStr);
+            m_log.LogWarning("[URL MODULE]: " + m_ErrorStr);
             return;
         }
 
@@ -152,7 +153,7 @@ public class UrlModule : ISharedRegionModule, IUrlModule
         if (ia == null)
         {
             m_ErrorStr = "Could not resolve ExternalHostNameForLSL, HTTP listener for LSL disabled";
-            m_log.Warn("[URL MODULE]: " + m_ErrorStr);
+            m_log.LogWarning("[URL MODULE]: " + m_ErrorStr);
             return;
         }
 
@@ -272,7 +273,7 @@ public class UrlModule : ISharedRegionModule, IUrlModule
 
             m_HttpServer.AddPollServiceHTTPHandlerVarPath(args);
 
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[URL MODULE]: Set up incoming request url {0} for {1} in {2} {3}",
             //     uri, itemID, host.Name, host.LocalId);
 
@@ -339,7 +340,7 @@ public class UrlModule : ISharedRegionModule, IUrlModule
             PollServiceEventArgs args = new(HttpRequestHandler, uri, HasEvents, GetEvents, NoEvents, Drop, urlcode, 25000);
             m_HttpsServer.AddPollServiceHTTPHandlerVarPath(args);
 
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[URL MODULE]: Set up incoming secure request url {0} for {1} in {2} {3}",
             //     uri, itemID, host.Name, host.LocalId);
             // keep ending / because legacy
@@ -365,7 +366,7 @@ public class UrlModule : ISharedRegionModule, IUrlModule
                     m_RequestMap.Remove(req);
             }
 
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[URL MODULE]: Releasing url {0} for {1} in {2}",
 //                    url, data.itemID, data.hostID);
 
@@ -384,7 +385,7 @@ public class UrlModule : ISharedRegionModule, IUrlModule
             }
             else
             {
-                m_log.Info("[HttpRequestHandler] There is no http-in request with id " + request.ToString());
+                m_log.LogInformation("[HttpRequestHandler] There is no http-in request with id " + request.ToString());
             }
         }
     }
@@ -427,7 +428,7 @@ public class UrlModule : ISharedRegionModule, IUrlModule
             }
             else
             {
-                m_log.Info("[HttpRequestHandler] There is no http-in request with id " + request.ToString());
+                m_log.LogInformation("[HttpRequestHandler] There is no http-in request with id " + request.ToString());
             }
         }
     }
@@ -443,7 +444,7 @@ public class UrlModule : ISharedRegionModule, IUrlModule
             }
             else
             {
-                m_log.Warn("[HttpRequestHandler] There was no http-in request with id " + requestId);
+                m_log.LogWarning("[HttpRequestHandler] There was no http-in request with id " + requestId);
             }
         }
         return string.Empty;
@@ -457,7 +458,7 @@ public class UrlModule : ISharedRegionModule, IUrlModule
 
     public void ScriptRemoved(UUID itemID)
     {
-//            m_log.DebugFormat("[URL MODULE]: Removing script {0}", itemID);
+//            m_log.LogDebug("[URL MODULE]: Removing script {0}", itemID);
 
         lock (m_UrlMap)
         {
@@ -726,7 +727,7 @@ public class UrlModule : ISharedRegionModule, IUrlModule
 
                 if (!m_UrlMap.TryGetValue(urlkey, out UrlData url))
                 {
-                        //m_log.Warn("[HttpRequestHandler]: http-in request failed; no such url: "+urlkey.ToString());
+                        //m_log.LogWarning("[HttpRequestHandler]: http-in request failed; no such url: "+urlkey.ToString());
                         request.InputStream.Dispose();
                         return errorResponse(request, (int)HttpStatusCode.NotFound);
                 }
@@ -811,9 +812,9 @@ public class UrlModule : ISharedRegionModule, IUrlModule
             catch (Exception we)
             {
                 //Hashtable response = new Hashtable();
-                m_log.Warn("[HttpRequestHandler]: http-in request failed");
-                m_log.Warn(we.Message);
-                m_log.Warn(we.StackTrace);
+                m_log.LogWarning("[HttpRequestHandler]: http-in request failed");
+                m_log.LogWarning(we.Message);
+                m_log.LogWarning(we.StackTrace);
             }
 
             return errorResponse(request, (int)HttpStatusCode.BadRequest);

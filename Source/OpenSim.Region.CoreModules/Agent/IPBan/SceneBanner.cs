@@ -29,12 +29,13 @@ using System.Net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Agent.IPBan;
 
 internal class SceneBanner
 {
-    private static readonly log4net.ILog m_log
-                = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
     private List<string> bans;
     // private SceneBase m_scene;
@@ -61,7 +62,7 @@ internal class SceneBanner
             }
             catch (System.Net.Sockets.SocketException)
             {
-                //m_log.WarnFormat("[IPBAN] IP address \"{0}\" cannot be resolved via DNS", end);
+                //m_log.LogWarning("[IPBAN] IP address \"{0}\" cannot be resolved via DNS", end);
                 hostName = null;
             }
 
@@ -73,7 +74,7 @@ internal class SceneBanner
                     if (endstr.StartsWith(ban))
                     {
                         client.Disconnect("Banned - network \"" + ban + "\" is not allowed to connect to this server.");
-                        m_log.Warn("[IPBAN] Disconnected '" + end + "' due to '" + ban + "' ban.");
+                        m_log.LogWarning("[IPBAN] Disconnected '" + end + "' due to '" + ban + "' ban.");
                         return;
                     }
                 }
@@ -85,12 +86,12 @@ internal class SceneBanner
                     if (hostName.Contains(ban) || end.ToString().StartsWith(ban))
                     {
                         client.Disconnect("Banned - network \"" + ban + "\" is not allowed to connect to this server.");
-                        m_log.Warn("[IPBAN] Disconnected '" + end + "' due to '" + ban + "' ban.");
+                        m_log.LogWarning("[IPBAN] Disconnected '" + end + "' due to '" + ban + "' ban.");
                         return;
                     }
                 }
             }
         }
-        // m_log.DebugFormat("[IPBAN] User \"{0}\" not in any ban lists. Allowing connection.", end);
+        // m_log.LogDebug("[IPBAN] User \"{0}\" not in any ban lists. Allowing connection.", end);
     }
 }

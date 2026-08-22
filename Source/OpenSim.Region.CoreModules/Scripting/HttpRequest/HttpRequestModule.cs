@@ -37,6 +37,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using System.Security.Authentication;
 
+using Microsoft.Extensions.Logging;
 /*****************************************************
  *
  * ScriptsHttpRequests
@@ -57,7 +58,7 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
         public float control;
     }
 
-    // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    // private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static HttpClient VeriFyCertClient = null;
     private static HttpClient VeriFyNoCertClient = null;
@@ -726,7 +727,7 @@ public class HttpRequestClass : IServiceRequest
                                     Redirects++;
                                     ResponseBody = null;
 
-                                    //m_log.DebugFormat("Redirecting to [{0}]", Url);
+                                    //m_log.LogDebug("Redirecting to [{0}]", Url);
 
                                     Process();
                                 }

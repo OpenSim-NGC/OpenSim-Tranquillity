@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -36,11 +35,13 @@ using System.Reflection;
 using System.Text;
 using System.Web;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class XInventoryServicesConnector : BaseServiceConnector, IInventoryService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Number of requests made to the remote inventory service.
@@ -92,14 +93,14 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
         IConfig config = source.Configs[m_configName];
         if (config is null)
         {
-            m_log.ErrorFormat("[INVENTORY CONNECTOR]: {0} missing from OpenSim.ini", m_configName);
+            m_log.LogError("[INVENTORY CONNECTOR]: {0} missing from OpenSim.ini", m_configName);
             throw new Exception("Inventory connector init error");
         }
 
         string serviceURI = config.GetString("InventoryServerURI", string.Empty);
         if (serviceURI.Length == 0)
         {
-            m_log.Error("[INVENTORY CONNECTOR]: No Server URI named in section InventoryService");
+            m_log.LogError("[INVENTORY CONNECTOR]: No Server URI named in section InventoryService");
             throw new Exception("Inventory connector init error");
         }
         if (serviceURI.EndsWith('/'))
@@ -166,7 +167,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
         }
         catch (Exception e)
         {
-            m_log.Error("[XINVENTORY SERVICES CONNECTOR]: Exception unwrapping folder list: " + e.Message);
+            m_log.LogError("[XINVENTORY SERVICES CONNECTOR]: Exception unwrapping folder list: " + e.Message);
         }
 
         return fldrs;
@@ -225,7 +226,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
         }
         catch (Exception e)
         {
-            m_log.Warn("[XINVENTORY SERVICES CONNECTOR]: Exception in GetFolderContent: " + e.Message);
+            m_log.LogWarning("[XINVENTORY SERVICES CONNECTOR]: Exception in GetFolderContent: " + e.Message);
         }
 
         return inventory;
@@ -234,7 +235,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
     public virtual InventoryCollection[] GetMultipleFoldersContent(UUID principalID, UUID[] folderIDs)
     {
         InventoryCollection[] inventoryArr = new InventoryCollection[folderIDs.Length];
-        // m_log.DebugFormat("[XXX]: In GetMultipleFoldersContent {0}", String.Join(",", folderIDs));
+        // m_log.LogDebug("[XXX]: In GetMultipleFoldersContent {0}", String.Join(",", folderIDs));
         try
         {
             Dictionary<string, object> resultSet = MakeRequest(
@@ -253,7 +254,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
                     {
                         if (!UUID.TryParse((string)retFID, out inventoryFolderID))
                         {
-                            m_log.WarnFormat("[XINVENTORY SERVICES CONNECTOR]: Could not parse folder id {0}", retFID.ToString());
+                            m_log.LogWarning("[XINVENTORY SERVICES CONNECTOR]: Could not parse folder id {0}", retFID.ToString());
                             inventoryArr[i] = null;
                             continue;
                         }
@@ -261,7 +262,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
                     else
                     {
                         inventoryArr[i] = null;
-                        m_log.WarnFormat("[XINVENTORY SERVICES CONNECTOR]: FID key not present in response");
+                        m_log.LogWarning("[XINVENTORY SERVICES CONNECTOR]: FID key not present in response");
                         continue;
                     }
 
@@ -269,7 +270,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
                         !UUID.TryParse((string)retOwner, out UUID inventoryOwnerID))
                     {
                         inventoryArr[i] = null;
-                        m_log.Warn($"[XINVENTORY SERVICES CONNECTOR]: Could not parse folder {retFID} owner id");
+                        m_log.LogWarning($"[XINVENTORY SERVICES CONNECTOR]: Could not parse folder {retFID} owner id");
                         continue;
                     }
 
@@ -285,7 +286,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
                             !Int32.TryParse((string)retVer, out inventory.Version))
                         inventory.Version = -1;
 
-                    //m_log.DebugFormat("[XXX]: Received {0} ({1}) {2} {3}", inventory.FolderID, fid, inventory.Version, inventory.OwnerID);
+                    //m_log.LogDebug("[XXX]: Received {0} ({1}) {2} {3}", inventory.FolderID, fid, inventory.Version, inventory.OwnerID);
 
                     if (ret.TryGetValue("FOLDERS", out object ofolders) && ofolders is Dictionary<string, object> folders)
                     {
@@ -307,14 +308,14 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
                 else
                 {
                     inventoryArr[i] = null;
-                    //m_log.Warn($"[XINVENTORY SERVICES CONNECTOR]: Folder {folderIDs[i]} not on reply");,
+                    //m_log.LogWarning($"[XINVENTORY SERVICES CONNECTOR]: Folder {folderIDs[i]} not on reply");,
                 }
                 i++;
             }
         }
         catch (Exception e)
         {
-            m_log.Warn("[XINVENTORY SERVICES CONNECTOR]: Exception in GetMultipleFoldersContent: {0}" + e.Message);
+            m_log.LogWarning("[XINVENTORY SERVICES CONNECTOR]: Exception in GetMultipleFoldersContent: {0}" + e.Message);
         }
 
         return inventoryArr;
@@ -521,7 +522,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
         }
         catch (Exception e)
         {
-            m_log.Error("[XINVENTORY SERVICES CONNECTOR]: Exception in GetItem: " + e.Message);
+            m_log.LogError("[XINVENTORY SERVICES CONNECTOR]: Exception in GetItem: " + e.Message);
         }
 
         m_ItemCache.AddOrUpdate(itemID, retrieved, CACHE_EXPIRATION_SECONDS);
@@ -531,7 +532,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
 
     public virtual InventoryItemBase[] GetMultipleItems(UUID principalID, UUID[] itemIDs)
     {
-        //m_log.DebugFormat("[XXX]: In GetMultipleItems {0}", String.Join(",", itemIDs));
+        //m_log.LogDebug("[XXX]: In GetMultipleItems {0}", String.Join(",", itemIDs));
 
         InventoryItemBase[] itemArr = new InventoryItemBase[itemIDs.Length];
 
@@ -588,7 +589,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[XINVENTORY SERVICES CONNECTOR]: Exception in GetMultipleItems: {0}", e.Message);
+            m_log.LogWarning("[XINVENTORY SERVICES CONNECTOR]: Exception in GetMultipleItems: {0}", e.Message);
         }
 
         return itemArr;
@@ -608,7 +609,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
         }
         catch (Exception e)
         {
-            m_log.Error("[XINVENTORY SERVICES CONNECTOR]: Exception in GetFolder: " + e.Message);
+            m_log.LogError("[XINVENTORY SERVICES CONNECTOR]: Exception in GetFolder: " + e.Message);
         }
 
         return null;
@@ -694,7 +695,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
         }
         catch (Exception e)
         {
-            m_log.Error($"[XINVENTORY SERVICES CONNECTOR]: Exception building folder: {e.Message}");
+            m_log.LogError($"[XINVENTORY SERVICES CONNECTOR]: Exception building folder: {e.Message}");
         }
 
         return new InventoryFolderBase();
@@ -733,17 +734,17 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
         }
         catch (Exception e)
         {
-            m_log.Error($"[XINVENTORY CONNECTOR]: Exception building item: {e.Message}");
+            m_log.LogError($"[XINVENTORY CONNECTOR]: Exception building item: {e.Message}");
         }
         return new InventoryItemBase();
     }
     public Dictionary<string, object> MakePostDicRequest(string obj)
     {
         if (WebUtil.DebugLevel >= 3)
-            m_log.Debug($"[XInventory]: HTTP OUT SynchronousRestForms POST to {m_InventoryURL}");
+            m_log.LogDebug($"[XInventory]: HTTP OUT SynchronousRestForms POST to {m_InventoryURL}");
         if (string.IsNullOrEmpty(obj))
         {
-            m_log.Warn($"[XInventory]: empty post data");
+            m_log.LogWarning($"[XInventory]: empty post data");
             return new Dictionary<string, object>();
         }
 
@@ -792,7 +793,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
         }
         catch (Exception e)
         {
-            m_log.Info($"[XInventory]: Error receiving response from {m_InventoryURL}: {e.Message}");
+            m_log.LogInformation($"[XInventory]: Error receiving response from {m_InventoryURL}: {e.Message}");
             throw;
         }
         finally
@@ -805,7 +806,7 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
         ticks = Util.EnvironmentTickCountSubtract(ticks);
         if (ticks > WebUtil.LongCallTime)
         {
-            m_log.Info($"[XInventory]: POST {m_InventoryURL} took {ticks}ms {sendlen}/{rcvlen}bytes");
+            m_log.LogInformation($"[XInventory]: POST {m_InventoryURL} took {ticks}ms {sendlen}/{rcvlen}bytes");
         }
 
         return respDic ?? new Dictionary<string, object>();

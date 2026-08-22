@@ -33,18 +33,18 @@ using OpenSim.Framework;
 using OpenSim.Framework.Console;
 
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.UserAccountService;
 
 public class GridUserService : GridUserServiceBase, IGridUserService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static bool m_Initialized;
 
     public GridUserService(IConfigSource config) : base(config)
     {
-        m_log.Debug("[GRID USER SERVICE]: Starting user grid service");
+        m_log.LogDebug("[GRID USER SERVICE]: Starting user grid service");
 
         if (!m_Initialized)
         {
@@ -232,7 +232,7 @@ public class GridUserService : GridUserServiceBase, IGridUserService
 
     public GridUserInfo LoggedIn(string userID)
     {
-        m_log.DebugFormat("[GRID USER SERVICE]: User {0} is online", userID);
+        m_log.LogDebug("[GRID USER SERVICE]: User {0} is online", userID);
 
         GridUserData d = GetGridUserData(userID);
 
@@ -254,7 +254,7 @@ public class GridUserService : GridUserServiceBase, IGridUserService
 
     public bool LoggedOut(string userID, UUID sessionID, UUID regionID, Vector3 lastPosition, Vector3 lastLookAt)
     {
-        m_log.DebugFormat("[GRID USER SERVICE]: User {0} is offline", userID);
+        m_log.LogDebug("[GRID USER SERVICE]: User {0} is offline", userID);
 
         GridUserData d = GetGridUserData(userID);
 
@@ -304,7 +304,7 @@ public class GridUserService : GridUserServiceBase, IGridUserService
 
     public bool SetLastPosition(string userID, UUID sessionID, UUID regionID, Vector3 lastPosition, Vector3 lastLookAt)
     {
-//            m_log.DebugFormat("[GRID USER SERVICE]: SetLastPosition for {0}", userID);
+//            m_log.LogDebug("[GRID USER SERVICE]: SetLastPosition for {0}", userID);
 
         GridUserData d = GetGridUserData(userID);
 

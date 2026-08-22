@@ -30,7 +30,6 @@ using System.Reflection;
 using System.Net;
 using System.Web;
 
-using log4net;
 using OpenMetaverse;
 using CoreJ2K;
 using SkiaSharp;
@@ -39,12 +38,13 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Capabilities.Handlers;
 
 public class GetTextureRobustHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private IAssetService m_assetService;
 
     public const string DefaultFormat = "x-j2c";
@@ -68,11 +68,11 @@ public class GetTextureRobustHandler : BaseStreamHandler
         string textureStr = query.GetOne("texture_id");
         string format = query.GetOne("format");
 
-        //m_log.DebugFormat("[GETTEXTURE]: called {0}", textureStr);
+        //m_log.LogDebug("[GETTEXTURE]: called {0}", textureStr);
 
         if (m_assetService == null)
         {
-            m_log.Error("[GETTEXTURE]: Cannot fetch texture " + textureStr + " without an asset service");
+            m_log.LogError("[GETTEXTURE]: Cannot fetch texture " + textureStr + " without an asset service");
             httpResponse.StatusCode = (int)System.Net.HttpStatusCode.NotFound;
             return null;
         }
@@ -80,7 +80,7 @@ public class GetTextureRobustHandler : BaseStreamHandler
         UUID textureID;
         if (!String.IsNullOrEmpty(textureStr) && UUID.TryParse(textureStr, out textureID))
         {
-//                m_log.DebugFormat("[GETTEXTURE]: Received request for texture id {0}", textureID);
+//                m_log.LogDebug("[GETTEXTURE]: Received request for texture id {0}", textureID);
 
             string[] formats;
             if (!string.IsNullOrEmpty(format))
@@ -105,10 +105,10 @@ public class GetTextureRobustHandler : BaseStreamHandler
         }
         else
         {
-            m_log.Warn("[GETTEXTURE]: Failed to parse a texture_id from GetTexture request: " + httpRequest.Url);
+            m_log.LogWarning("[GETTEXTURE]: Failed to parse a texture_id from GetTexture request: " + httpRequest.Url);
         }
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[GETTEXTURE]: For texture {0} sending back response {1}, data length {2}",
 //                textureID, httpResponse.StatusCode, httpResponse.ContentLength);
 
@@ -125,12 +125,12 @@ public class GetTextureRobustHandler : BaseStreamHandler
     /// <returns>False for "caller try another codec"; true otherwise</returns>
     private bool FetchTexture(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID textureID, string format)
     {
-        // m_log.DebugFormat("[GETTEXTURE]: {0} with requested format {1}", textureID, format);
+        // m_log.LogDebug("[GETTEXTURE]: {0} with requested format {1}", textureID, format);
         if(!String.IsNullOrEmpty(m_RedirectURL))
         {
             string textureUrl = m_RedirectURL + "?texture_id=" + textureID.ToString();
             httpResponse.Redirect(textureUrl, HttpStatusCode.Moved);
-            m_log.Debug("[GETTEXTURE]: Redirecting texture request to " + textureUrl);
+            m_log.LogDebug("[GETTEXTURE]: Redirecting texture request to " + textureUrl);
             return true;
         }
 
@@ -163,7 +163,7 @@ public class GetTextureRobustHandler : BaseStreamHandler
         }
 
         // not found
-        // m_log.Warn("[GETTEXTURE]: Texture " + textureID + " not found");
+        // m_log.LogWarning("[GETTEXTURE]: Texture " + textureID + " not found");
         httpResponse.StatusCode = (int)System.Net.HttpStatusCode.NotFound;
         return true;
     }
@@ -182,7 +182,7 @@ public class GetTextureRobustHandler : BaseStreamHandler
                 // sending back the last byte instead of an error status
                 if (start >= texture.Data.Length)
                 {
-//                        m_log.DebugFormat(
+//                        m_log.LogDebug(
 //                            "[GETTEXTURE]: Client requested range for texture {0} starting at {1} but texture has end of {2}",
 //                            texture.ID, start, texture.Data.Length);
 
@@ -214,7 +214,7 @@ public class GetTextureRobustHandler : BaseStreamHandler
                     start = Utils.Clamp(start, 0, end);
                     int len = end - start + 1;
 
-//                        m_log.Debug("Serving " + start + " to " + end + " of " + texture.Data.Length + " bytes for texture " + texture.ID);
+//                        m_log.LogDebug("Serving " + start + " to " + end + " of " + texture.Data.Length + " bytes for texture " + texture.ID);
 
                     // Always return PartialContent, even if the range covered the entire data length
                     // We were accidentally sending back 404 before in this situation
@@ -238,7 +238,7 @@ public class GetTextureRobustHandler : BaseStreamHandler
             }
             else
             {
-                m_log.Warn("[GETTEXTURE]: Malformed Range header: " + range);
+                m_log.LogWarning("[GETTEXTURE]: Malformed Range header: " + range);
                 response.StatusCode = (int)System.Net.HttpStatusCode.BadRequest;
             }
         }
@@ -257,11 +257,11 @@ public class GetTextureRobustHandler : BaseStreamHandler
         }
 
         //            if (response.StatusCode < 200 || response.StatusCode > 299)
-        //                m_log.WarnFormat(
+        //                m_log.LogWarning(
         //                    "[GETTEXTURE]: For texture {0} requested range {1} responded {2} with content length {3} (actual {4})",
         //                    texture.FullID, range, response.StatusCode, response.ContentLength, texture.Data.Length);
         //            else
-        //                m_log.DebugFormat(
+        //                m_log.LogDebug(
         //                    "[GETTEXTURE]: For texture {0} requested range {1} responded {2} with content length {3} (actual {4})",
         //                    texture.FullID, range, response.StatusCode, response.ContentLength, texture.Data.Length);
     }
@@ -312,7 +312,7 @@ public class GetTextureRobustHandler : BaseStreamHandler
 
     private byte[] ConvertTextureData(AssetBase texture, string format)
     {
-        m_log.DebugFormat("[GETTEXTURE]: Converting texture {0} to {1}", texture.ID, format);
+        m_log.LogDebug("[GETTEXTURE]: Converting texture {0} to {1}", texture.ID, format);
         byte[] data = Array.Empty<byte>();
         // Try CoreJ2K first to get an SKImage
         try
@@ -366,7 +366,7 @@ public class GetTextureRobustHandler : BaseStreamHandler
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[GETTEXTURE]: Unable to convert texture {0} to {1}: {2}", texture.ID, format, e.Message);
+            m_log.LogWarning("[GETTEXTURE]: Unable to convert texture {0} to {1}: {2}", texture.ID, format, e.Message);
         }
 
         return data;

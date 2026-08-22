@@ -32,14 +32,15 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Groups;
 
 public class GroupsServiceRemoteConnectorModule : ISharedRegionModule, IGroupsServicesConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled = false;
     private GroupsServiceRemoteConnector m_GroupsService;
@@ -86,7 +87,7 @@ public class GroupsServiceRemoteConnectorModule : ISharedRegionModule, IGroupsSe
         Init(config);
 
         m_Enabled = true;
-        m_log.DebugFormat("[Groups.RemoteConnector]: Initializing {0}", this.Name);
+        m_log.LogDebug("[Groups.RemoteConnector]: Initializing {0}", this.Name);
     }
 
     public string Name
@@ -104,7 +105,7 @@ public class GroupsServiceRemoteConnectorModule : ISharedRegionModule, IGroupsSe
         if (!m_Enabled)
             return;
 
-        m_log.DebugFormat("[Groups.RemoteConnector]: Registering {0} with {1}", this.Name, scene.RegionInfo.RegionName);
+        m_log.LogDebug("[Groups.RemoteConnector]: Registering {0} with {1}", this.Name, scene.RegionInfo.RegionName);
         scene.RegisterModuleInterface<IGroupsServicesConnector>(this);
         m_Scenes.Add(scene);
     }
@@ -145,7 +146,7 @@ public class GroupsServiceRemoteConnectorModule : ISharedRegionModule, IGroupsSe
     public UUID CreateGroup(UUID RequestingAgentID, string name, string charter, bool showInList, UUID insigniaID, int membershipFee, bool openEnrollment,
         bool allowPublish, bool maturePublish, UUID founderID, out string reason)
     {
-        m_log.DebugFormat("[Groups.RemoteConnector]: Creating group {0}", name);
+        m_log.LogDebug("[Groups.RemoteConnector]: Creating group {0}", name);
         string r = string.Empty;
 
         UUID groupID = m_CacheWrapper.CreateGroup(RequestingAgentID, delegate
@@ -192,7 +193,7 @@ public class GroupsServiceRemoteConnectorModule : ISharedRegionModule, IGroupsSe
     public bool AddAgentToGroup(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID, string token, out string reason)
     {
         string agentFullID = AgentID;
-        m_log.DebugFormat("[Groups.RemoteConnector]: Add agent {0} to group {1}", agentFullID, GroupID);
+        m_log.LogDebug("[Groups.RemoteConnector]: Add agent {0} to group {1}", agentFullID, GroupID);
         string r = string.Empty;
 
         bool success = m_CacheWrapper.AddAgentToGroup(RequestingAgentID, AgentID, GroupID, delegate

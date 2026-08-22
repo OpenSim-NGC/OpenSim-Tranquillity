@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using SkiaSharp;
@@ -35,12 +34,14 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Servers.HttpServer;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.OptionalModules.World.WorldView;
 
 public class WorldViewModule : INonSharedRegionModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
 
     private bool m_Enabled = false;
@@ -74,7 +75,7 @@ public class WorldViewModule : INonSharedRegionModule
             return;
         }
 
-        m_log.Info("[WORLDVIEW]: Configured and enabled");
+        m_log.LogInformation("[WORLDVIEW]: Configured and enabled");
 
         IHttpServer server = MainServer.Instance.GetHttpServer(0);
         server.AddStreamHandler(new WorldViewRequestHandler(this,

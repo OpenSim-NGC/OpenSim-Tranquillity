@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using System.Reflection;
 
@@ -37,11 +36,13 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset;
 
 public class RegionAssetConnector : ISharedRegionModule, IAssetService
 {
-    private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger( MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled = false;
 
@@ -93,14 +94,14 @@ public class RegionAssetConnector : ISharedRegionModule, IAssetService
                 IConfig assetConfig = source.Configs["AssetService"];
                 if (assetConfig == null)
                 {
-                    m_log.Error("[REGIONASSETCONNECTOR]: AssetService missing from configuration files");
+                    m_log.LogError("[REGIONASSETCONNECTOR]: AssetService missing from configuration files");
                     throw new Exception("Region asset connector init error");
                 }
 
                 string localGridConnector = assetConfig.GetString("LocalGridAssetService", string.Empty);
                 if(string.IsNullOrEmpty(localGridConnector))
                 {
-                    m_log.Error("[REGIONASSETCONNECTOR]: LocalGridAssetService missing from configuration files");
+                    m_log.LogError("[REGIONASSETCONNECTOR]: LocalGridAssetService missing from configuration files");
                     throw new Exception("Region asset connector init error");
                 }
 
@@ -109,7 +110,7 @@ public class RegionAssetConnector : ISharedRegionModule, IAssetService
                 m_localConnector = ServerUtils.LoadPlugin<IAssetService>(localGridConnector, args);
                 if (m_localConnector == null)
                 {
-                    m_log.Error("[REGIONASSETCONNECTOR]: Fail to load local asset service " + localGridConnector);
+                    m_log.LogError("[REGIONASSETCONNECTOR]: Fail to load local asset service " + localGridConnector);
                     throw new Exception("Region asset connector init error");
                 }
 
@@ -119,7 +120,7 @@ public class RegionAssetConnector : ISharedRegionModule, IAssetService
                     m_HGConnector = ServerUtils.LoadPlugin<IAssetService>(HGConnector, args);
                     if (m_HGConnector == null)
                     {
-                        m_log.Error("[REGIONASSETCONNECTOR]: Fail to load HG asset service " + HGConnector);
+                        m_log.LogError("[REGIONASSETCONNECTOR]: Fail to load HG asset service " + HGConnector);
                         throw new Exception("Region asset connector init error");
                     }
                     IConfig hgConfig = source.Configs["HGAssetService"];
@@ -130,7 +131,7 @@ public class RegionAssetConnector : ISharedRegionModule, IAssetService
                 m_localRequestsQueue = new ObjectJobEngine(AssetRequestProcessor, "GetAssetsWorkers", 2000, 2);
                 m_remoteRequestsQueue = new ObjectJobEngine(AssetRequestProcessor, "GetRemoteAssetsWorkers", 2000, 2);
                 m_Enabled = true;
-                m_log.Info("[REGIONASSETCONNECTOR]: enabled");
+                m_log.LogInformation("[REGIONASSETCONNECTOR]: enabled");
             }
         }
     }
@@ -181,16 +182,16 @@ public class RegionAssetConnector : ISharedRegionModule, IAssetService
         if(m_HGConnector == null)
         {
             if (m_Cache != null)
-                m_log.InfoFormat("[REGIONASSETCONNECTOR]: active with cache for region {0}", scene.RegionInfo.RegionName);
+                m_log.LogInformation("[REGIONASSETCONNECTOR]: active with cache for region {0}", scene.RegionInfo.RegionName);
             else
-                m_log.InfoFormat("[REGIONASSETCONNECTOR]: active  without cache for region {0}", scene.RegionInfo.RegionName);
+                m_log.LogInformation("[REGIONASSETCONNECTOR]: active  without cache for region {0}", scene.RegionInfo.RegionName);
         }
         else
         {
             if (m_Cache != null)
-                m_log.InfoFormat("[REGIONASSETCONNECTOR]: active with HG and cache for region {0}", scene.RegionInfo.RegionName);
+                m_log.LogInformation("[REGIONASSETCONNECTOR]: active with HG and cache for region {0}", scene.RegionInfo.RegionName);
             else
-                m_log.InfoFormat("[REGIONASSETCONNECTOR]: active with HG and without cache for region {0}", scene.RegionInfo.RegionName);
+                m_log.LogInformation("[REGIONASSETCONNECTOR]: active with HG and without cache for region {0}", scene.RegionInfo.RegionName);
         }
     }
 
@@ -244,7 +245,7 @@ public class RegionAssetConnector : ISharedRegionModule, IAssetService
 
     public AssetBase Get(string id)
     {
-        //m_log.DebugFormat("[HG ASSET CONNECTOR]: Get {0}", id);
+        //m_log.LogDebug("[HG ASSET CONNECTOR]: Get {0}", id);
         AssetBase asset = null;
         if (IsHG(id))
         {

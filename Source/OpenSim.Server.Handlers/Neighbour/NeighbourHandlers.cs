@@ -35,14 +35,13 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
-
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Neighbour;
 
 public class NeighbourSimpleHandler : SimpleStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private INeighbourService m_NeighbourService;
     private IAuthenticationService m_AuthenticationService;
 
@@ -78,7 +77,7 @@ public class NeighbourSimpleHandler : SimpleStreamHandler
                 if (!RestHandlerUtils.GetParams(httpRequest.UriPath, out UUID regionID, out ulong regionHandle, out string action)
                     || regionID.IsZero())
                 {
-                    m_log.InfoFormat("[RegionPostHandler]: Invalid parameters for neighbour message {0}", httpRequest.UriPath);
+                    m_log.LogInformation("[RegionPostHandler]: Invalid parameters for neighbour message {0}", httpRequest.UriPath);
                     httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
                     return;
                 }
@@ -108,18 +107,18 @@ public class NeighbourSimpleHandler : SimpleStreamHandler
             string authToken = string.Empty;
             if (!RestHandlerUtils.GetAuthentication(httpRequest, out authority, out authToken))
             {
-                m_log.InfoFormat("[RegionPostHandler]: Authentication failed for neighbour message");
+                m_log.LogInformation("[RegionPostHandler]: Authentication failed for neighbour message");
                 httpResponse.StatusCode = (int)HttpStatusCode.Unauthorized;
                 return;
             }
             // TODO: Rethink this
             //if (!m_AuthenticationService.VerifyKey(regionID, authToken))
             //{
-            //    m_log.InfoFormat("[RegionPostHandler]: Authentication failed for neighbour message {0}", path);
+            //    m_log.LogInformation("[RegionPostHandler]: Authentication failed for neighbour message {0}", path);
             //    httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
             //    return result;
             //}
-            m_log.DebugFormat("[RegionPostHandler]: Authentication succeeded for {0}", regionID);
+            m_log.LogDebug("[RegionPostHandler]: Authentication succeeded for {0}", regionID);
         }
 
         // retrieve the regionhandle
@@ -134,7 +133,7 @@ public class NeighbourSimpleHandler : SimpleStreamHandler
         }
         catch (Exception ex)
         {
-            m_log.InfoFormat("[RegionPostHandler]: exception on unpacking region info {0}", ex.Message);
+            m_log.LogInformation("[RegionPostHandler]: exception on unpacking region info {0}", ex.Message);
             httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
             return;
         }

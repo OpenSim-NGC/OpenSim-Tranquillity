@@ -26,20 +26,20 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.CoreModules.World.Objects.BuySell;
 
 public class BuySellModule : IBuySellModule, INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected Scene m_scene = null;
     protected IDialogModule m_dialogModule;

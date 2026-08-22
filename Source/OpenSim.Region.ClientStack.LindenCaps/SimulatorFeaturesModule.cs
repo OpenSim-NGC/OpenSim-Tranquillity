@@ -28,7 +28,6 @@
 using System.Net;
 using System.Reflection;
 using System.Text;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -37,6 +36,7 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
@@ -54,7 +54,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps;
 /// </remarks>
 public class SimulatorFeaturesModule : INonSharedRegionModule, ISimulatorFeaturesModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public event SimulatorFeaturesRequestDelegate OnSimulatorFeaturesRequest;
 
@@ -271,7 +271,7 @@ public class SimulatorFeaturesModule : INonSharedRegionModule, ISimulatorFeature
 
     private void HandleSimulatorFeaturesRequest(IOSHttpRequest request, IOSHttpResponse response, Caps caps)
     {
-        // m_log.DebugFormat("[SIMULATOR FEATURES MODULE]: SimulatorFeatures request");
+        // m_log.LogDebug("[SIMULATOR FEATURES MODULE]: SimulatorFeatures request");
 
         if (request.HttpMethod != "GET")
         {
@@ -334,7 +334,7 @@ public class SimulatorFeaturesModule : INonSharedRegionModule, ISimulatorFeature
         Dictionary<string, object> extraFeatures = scene.GridService.GetExtraFeatures();
         if (extraFeatures.ContainsKey("Result") && extraFeatures["Result"] != null && extraFeatures["Result"].ToString() == "Failure")
         {
-            m_log.WarnFormat("[SIMULATOR FEATURES MODULE]: Unable to retrieve grid-wide features");
+            m_log.LogWarning("[SIMULATOR FEATURES MODULE]: Unable to retrieve grid-wide features");
             return;
         }
 
@@ -439,7 +439,7 @@ public class SimulatorFeaturesModule : INonSharedRegionModule, ISimulatorFeature
             }
             catch
             {
-                m_log.Error("[SIMULATOR FEATURES MODULE] fail read ScriptSyntax.xml file");
+                m_log.LogError("[SIMULATOR FEATURES MODULE] fail read ScriptSyntax.xml file");
                 m_scriptSyntaxID = UUID.Zero;
                 m_scriptSyntaxXML = null;
             }

@@ -36,11 +36,13 @@ using OpenSim.Framework;
 using OpenSim.Services.Base;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.OfflineIM;
 
 public class OfflineIMService : ServiceBase, IOfflineIMService
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private IOfflineIMData m_Database = null;
     private int m_MaxOfflineIMs = 25;
     private XmlSerializer m_serializer;

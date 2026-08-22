@@ -26,18 +26,19 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.World.Wind;
 
 public class WindModule : IWindModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private IPluginDiscovery m_pluginDiscovery;
 
     private uint m_frame = 0;
@@ -80,7 +81,7 @@ public class WindModule : IWindModule
 
         if (m_enabled)
         {
-            m_log.InfoFormat("[WIND] Enabled with an update rate of {0} frames.", m_frameUpdateRate);
+            m_log.LogInformation("[WIND] Enabled with an update rate of {0} frames.", m_frameUpdateRate);
             m_pluginDiscovery = PluginDiscoveryFactory.Create(m_log);
 
         }
@@ -110,11 +111,11 @@ public class WindModule : IWindModule
             if (windPlugin == null)
                 continue;
 
-            m_log.InfoFormat("[WIND] Found Plugin: {0}", windPlugin.Name);
+            m_log.LogInformation("[WIND] Found Plugin: {0}", windPlugin.Name);
             m_availableWindPlugins.Add(windPlugin.Name, windPlugin);
         }
 
-        m_log.InfoFormat(
+        m_log.LogInformation(
             "[WIND] Discovery summary path=/OpenSim/WindModule backend={0} discovered={1} loaded={2}",
             m_pluginDiscovery.GetType().Name,
             discoveredNodes.Count,
@@ -125,7 +126,7 @@ public class WindModule : IWindModule
         {
             m_activeWindPlugin = m_availableWindPlugins[m_dWindPluginName];
 
-            m_log.InfoFormat("[WIND] {0} plugin found, initializing.", m_dWindPluginName);
+            m_log.LogInformation("[WIND] {0} plugin found, initializing.", m_dWindPluginName);
 
             if (m_windConfig != null)
             {
@@ -137,8 +138,8 @@ public class WindModule : IWindModule
         // if the plug-in wasn't found, default to no wind.
         if (m_activeWindPlugin == null)
         {
-            m_log.ErrorFormat("[WIND] Could not find specified wind plug-in: {0}", m_dWindPluginName);
-            m_log.ErrorFormat("[WIND] Defaulting to no wind.");
+            m_log.LogError("[WIND] Could not find specified wind plug-in: {0}", m_dWindPluginName);
+            m_log.LogError("[WIND] Defaulting to no wind.");
         }
 
         // This one puts an entry in the main help screen

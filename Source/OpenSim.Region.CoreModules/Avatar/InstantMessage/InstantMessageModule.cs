@@ -25,18 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage;
 
 public class InstantMessageModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <value>
@@ -83,7 +84,7 @@ public class InstantMessageModule : ISharedRegionModule
 
             if (m_TransferModule == null)
             {
-                m_log.Error("[INSTANT MESSAGE]: No message transfer module, IM will not work!");
+                m_log.LogError("[INSTANT MESSAGE]: No message transfer module, IM will not work!");
                 scene.EventManager.OnNewClient -= OnClientConnect;
                 scene.EventManager.OnIncomingInstantMessage -= OnGridInstantMessage;
 

@@ -26,7 +26,7 @@
  */
 
 using System.Text;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -53,7 +53,7 @@ public class LogWriter : IDisposable
     private readonly bool m_flushWrite;
 
     // set externally when debugging. If let 'null', this does not write any error messages.
-    public ILog ErrorLogger = null;
+    public ILogger ErrorLogger = null;
     private readonly string LogHeader = "[LOG WRITER]";
 
     /// <summary>
@@ -166,7 +166,7 @@ public class LogWriter : IDisposable
         }
         catch (Exception e)
         {
-            ErrorLogger?.ErrorFormat("{0}: FAILURE WRITING TO LOGFILE: {1}", LogHeader, e);
+            ErrorLogger?.LogError("{0}: FAILURE WRITING TO LOGFILE: {1}", LogHeader, e);
             Enabled = false;
         }
         return;

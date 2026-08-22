@@ -32,8 +32,9 @@ using OpenSim.Framework;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace osWebRtcVoice;
 
@@ -41,7 +42,7 @@ namespace osWebRtcVoice;
 //     server. This is used by the region servers to talk to the Robust server.
 public class WebRtcVoiceServiceConnector : IWebRtcVoiceService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[WEBRTC VOICE SERVICE CONNECTOR]";
     private bool m_Enabled = false;
     private bool m_MessageDetails = false;
@@ -62,12 +63,12 @@ public class WebRtcVoiceServiceConnector : IWebRtcVoiceService
                 m_serverURI = moduleConfig.GetString("WebRtcVoiceServerURI", string.Empty);
                 if (string.IsNullOrWhiteSpace(m_serverURI))
                 {
-                    m_log.Error($"{LogHeader} WebRtcVoiceServiceConnector enabled but no WebRtcVoiceServerURI specified");
+                    m_log.LogError($"{LogHeader} WebRtcVoiceServiceConnector enabled but no WebRtcVoiceServerURI specified");
                     m_Enabled = false;
                 }
                 else
                 {
-                    m_log.Info($"{LogHeader} WebRtcVoiceServiceConnector enabled");
+                    m_log.LogInformation($"{LogHeader} WebRtcVoiceServiceConnector enabled");
                 }
 
                 m_MessageDetails = moduleConfig.GetBoolean("MessageDetails", false);
@@ -80,20 +81,20 @@ public class WebRtcVoiceServiceConnector : IWebRtcVoiceService
     //    so that the viewer session ID is the same here as from the WebRTC service.
     public IVoiceViewerSession CreateViewerSession(OSDMap pRequest, UUID pUserID, UUID pSceneID)
     {
-        m_log.Debug($"{LogHeader} CreateViewerSession");
+        m_log.LogDebug($"{LogHeader} CreateViewerSession");
         return new VoiceViewerSession(this, pUserID, pSceneID);   
     }
 
     public OSDMap ProvisionVoiceAccountRequest(OSDMap pRequest, UUID pUserID, UUID pSceneID)
     {
-        m_log.Debug($"{LogHeader} ProvisionVoiceAccountRequest without ViewerSession. uID={pUserID}, sID={pSceneID}");
+        m_log.LogDebug($"{LogHeader} ProvisionVoiceAccountRequest without ViewerSession. uID={pUserID}, sID={pSceneID}");
         return null;
     }
 
     // Received a ProvisionVoiceAccountRequest from a viewer. Forward it to the WebRTC service.
     public OSDMap ProvisionVoiceAccountRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pSceneID)
     {
-        m_log.Debug($"{LogHeader} VoiceSignalingRequest. uID={pUserID}, sID={pSceneID}");
+        m_log.LogDebug($"{LogHeader} VoiceSignalingRequest. uID={pUserID}, sID={pSceneID}");
         OSDMap req = new()
         {
             { "request", pRequest },
@@ -105,7 +106,7 @@ public class WebRtcVoiceServiceConnector : IWebRtcVoiceService
         // Kludge to sync the viewer session number in our IVoiceViewerSession with the one from the WebRTC service.
         if (resp.TryGetString("viewer_session", out string otherViewerSessionId))
         {
-            m_log.Debug(
+            m_log.LogDebug(
                 $"{LogHeader} ProvisionVoiceAccountRequest: syncing viewSessionID. old={pVSession.ViewerSessionID}, new={otherViewerSessionId}");
             VoiceViewerSession.UpdateViewerSessionId(pVSession, otherViewerSessionId);
         }
@@ -115,13 +116,13 @@ public class WebRtcVoiceServiceConnector : IWebRtcVoiceService
 
     public OSDMap VoiceSignalingRequest(OSDMap pRequest, UUID pUserID, UUID pSceneID)
     {
-        m_log.Debug($"{LogHeader} VoiceSignalingRequest without ViewerSession. uID={pUserID}, sID={pSceneID}");
+        m_log.LogDebug($"{LogHeader} VoiceSignalingRequest without ViewerSession. uID={pUserID}, sID={pSceneID}");
         return null;
     }
 
     public OSDMap VoiceSignalingRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pSceneID)
     {
-        m_log.DebugFormat("{0} VoiceSignalingRequest. uID={1}, sID={2}", LogHeader, pUserID, pSceneID);
+        m_log.LogDebug("{0} VoiceSignalingRequest. uID={1}, sID={2}", LogHeader, pUserID, pSceneID);
         OSDMap req = new()
         {
             { "request", pRequest },
@@ -149,16 +150,16 @@ public class WebRtcVoiceServiceConnector : IWebRtcVoiceService
             OSDMap outerResponse = null;
             try
             {
-                if (m_MessageDetails) m_log.Debug($"{LogHeader}: request: {request}");
+                if (m_MessageDetails) m_log.LogDebug($"{LogHeader}: request: {request}");
 
                 outerResponse = WebUtil.PostToService(uri, request, 10000, true);
 
-                if (m_MessageDetails) m_log.Debug($"{LogHeader}: response: {outerResponse}");
+                if (m_MessageDetails) m_log.LogDebug($"{LogHeader}: response: {outerResponse}");
             }
             catch (Exception e)
             {
-                m_log.Error($"{LogHeader}: JsonRpc request '{method}' to {uri} failed: {e.Message}");
-                m_log.Debug($"{LogHeader}: request: {request}");
+                m_log.LogError($"{LogHeader}: JsonRpc request '{method}' to {uri} failed: {e.Message}");
+                m_log.LogDebug($"{LogHeader}: request: {request}");
                 return new OSDMap()
                 {
                     { "error", OSD.FromString(e.Message) }
@@ -168,7 +169,7 @@ public class WebRtcVoiceServiceConnector : IWebRtcVoiceService
             if (!outerResponse.TryGetOSDMap("_Result", out OSDMap response))
             {
                 string errm = $"JsonRpc request '{method}' to {1} returned an invalid response: {OSDParser.SerializeJsonString(outerResponse)}";
-                m_log.Error(errm);
+                m_log.LogError(errm);
                 return new OSDMap()
                 {
                     { "error", errm }
@@ -179,7 +180,7 @@ public class WebRtcVoiceServiceConnector : IWebRtcVoiceService
             if (response.TryGetValue("error", out osdtmp))
             {
                 string errm = $"JsonRpc request '{method}' to {uri} returned an error: {OSDParser.SerializeJsonString(osdtmp)}";
-                m_log.Error(errm);
+                m_log.LogError(errm);
                 return new OSDMap()
                 {
                     { "error", errm }
@@ -189,7 +190,7 @@ public class WebRtcVoiceServiceConnector : IWebRtcVoiceService
             if (!response.TryGetOSDMap("result", out OSDMap resultmap ))
             {
                 string errm = $"JsonRpc request '{method}' to {uri} returned result as non-OSDMap: {OSDParser.SerializeJsonString(outerResponse)}";
-                m_log.Error(errm);
+                m_log.LogError(errm);
                 return new OSDMap()
                 {
                     { "error", errm }

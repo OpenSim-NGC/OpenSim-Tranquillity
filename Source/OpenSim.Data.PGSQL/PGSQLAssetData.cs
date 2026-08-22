@@ -27,9 +27,10 @@
 
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
 using OpenSim.Framework;
 using Npgsql;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.PGSQL;
 
@@ -40,7 +41,7 @@ public class PGSQLAssetData : AssetDataBase
 {
     private const string _migrationStore = "AssetStore";
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private long m_ticksToEpoch;
     /// <summary>
     /// Database manager
@@ -63,7 +64,7 @@ public class PGSQLAssetData : AssetDataBase
     // [Obsolete("Cannot be default-initialized!")]
     override public void Initialise()
     {
-        m_log.Info("[PGSQLAssetData]: " + Name + " cannot be default-initialized!");
+        m_log.LogInformation("[PGSQLAssetData]: " + Name + " cannot be default-initialized!");
         throw new PluginNotInitialisedException(Name);
     }
 
@@ -165,7 +166,7 @@ public class PGSQLAssetData : AssetDataBase
         if (asset.Name.Length > AssetBase.MAX_ASSET_NAME)
         {
             assetName = asset.Name.Substring(0, AssetBase.MAX_ASSET_NAME);
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[ASSET DB]: Name '{0}' for asset {1} truncated from {2} to {3} characters on add",
                 asset.Name, asset.ID, asset.Name.Length, assetName.Length);
         }
@@ -174,7 +175,7 @@ public class PGSQLAssetData : AssetDataBase
         if (asset.Description.Length > AssetBase.MAX_ASSET_DESC)
         {
             assetDescription = asset.Description.Substring(0, AssetBase.MAX_ASSET_DESC);
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[ASSET DB]: Description '{0}' for asset {1} truncated from {2} to {3} characters on add",
                 asset.Description, asset.ID, asset.Description.Length, assetDescription.Length);
         }
@@ -201,7 +202,7 @@ public class PGSQLAssetData : AssetDataBase
             }
             catch(Exception e)
             {
-                m_log.Error("[ASSET DB]: Error storing item :" + e.Message + " sql "+sql);
+                m_log.LogError("[ASSET DB]: Error storing item :" + e.Message + " sql "+sql);
             }
         }
         return true;
@@ -222,7 +223,7 @@ public class PGSQLAssetData : AssetDataBase
 //                }
 //                catch (Exception e)
 //                {
-//                    m_log.Error(e.ToString());
+//                    m_log.LogError(e.ToString());
 //                }
 //            }
 //        }

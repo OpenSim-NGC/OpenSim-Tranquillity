@@ -32,8 +32,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenMetaverse;
 using Nini.Config;
-using log4net;
-
+using Microsoft.Extensions.Logging;
 /*
  * This is the zero mesher.
  * Whatever you want him to mesh, he can't, telling you that by responding with a null pointer.
@@ -49,7 +48,7 @@ namespace OpenSim.Region.PhysicsModules.Meshing;
 
 public class ZeroMesher : IMesher, INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private bool m_Enabled = false;
 
     #region INonSharedRegionModule

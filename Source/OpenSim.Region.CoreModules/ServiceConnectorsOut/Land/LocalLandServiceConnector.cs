@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Framework;
@@ -34,12 +33,13 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land;
 
 public class LocalLandServicesConnector : ISharedRegionModule, ILandService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private List<Scene> m_Scenes = new List<Scene>();
@@ -76,7 +76,7 @@ public class LocalLandServicesConnector : ISharedRegionModule, ILandService
             if (name == Name)
             {
                 m_Enabled = true;
-                m_log.Info("[LAND CONNECTOR]: Local land connector enabled");
+                m_log.LogInformation("[LAND CONNECTOR]: Local land connector enabled");
             }
         }
     }
@@ -116,7 +116,7 @@ public class LocalLandServicesConnector : ISharedRegionModule, ILandService
     public LandData GetLandData(UUID scopeID, ulong regionHandle, uint x, uint y, out byte regionAccess)
     {
         regionAccess = 2;
-//            m_log.DebugFormat("[LAND CONNECTOR]: request for land data in {0} at {1}, {2}",
+//            m_log.LogDebug("[LAND CONNECTOR]: request for land data in {0} at {1}, {2}",
 //                  regionHandle, x, y);
 
         uint rx = 0, ry = 0;
@@ -146,7 +146,7 @@ public class LocalLandServicesConnector : ISharedRegionModule, ILandService
             }
         }
 
-        //m_log.Debug("[LAND CONNECTOR]: didn't find land data locally.");
+        //m_log.LogDebug("[LAND CONNECTOR]: didn't find land data locally.");
         return null;
 
     }

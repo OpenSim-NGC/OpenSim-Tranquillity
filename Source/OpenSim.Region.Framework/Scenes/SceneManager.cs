@@ -28,9 +28,10 @@
 using System.Net;
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes;
 
@@ -41,7 +42,7 @@ public delegate void RestartSim(RegionInfo thisregion);
 /// </summary>
 public class SceneManager
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public event RestartSim OnRestartSim;
 
@@ -77,7 +78,7 @@ public class SceneManager
                         }
                         catch (Exception e)
                         {
-                            m_log.ErrorFormat("[SCENE MANAGER]: Delegate for OnRegionsReadyStatusChange failed - continuing {0} - {1}",
+                            m_log.LogError("[SCENE MANAGER]: Delegate for OnRegionsReadyStatusChange failed - continuing {0} - {1}",
                                 e.Message, e.StackTrace);
                         }
                     }
@@ -212,7 +213,7 @@ public class SceneManager
         }
         else
         {
-            m_log.Error("[REGION]: Unable to notify Other regions of this Region coming up");
+            m_log.LogError("[REGION]: Unable to notify Other regions of this Region coming up");
         }
     }
 
@@ -346,7 +347,7 @@ public class SceneManager
 
     public bool TrySetCurrentScene(UUID regionID)
     {
-//            m_log.Debug("Searching for Region: '" + regionID + "'");
+//            m_log.LogDebug("Searching for Region: '" + regionID + "'");
 
         Scene s;
 

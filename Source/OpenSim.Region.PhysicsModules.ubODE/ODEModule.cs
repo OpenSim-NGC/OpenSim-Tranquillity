@@ -1,15 +1,17 @@
 ﻿using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.PhysicsModules.ubODE;
 
 class ubODEModule : INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     ODEScene m_odeScene = null;
 
@@ -47,7 +49,7 @@ class ubODEModule : INonSharedRegionModule
                 
                 if (string.IsNullOrEmpty(mesher) || !mesher.Equals("ubODEMeshmerizer"))
                 {
-                    m_log.Error("[ubODE] Opensim.ini meshing option must be set to \"ubODEMeshmerizer\"");
+                    m_log.LogError("[ubODE] Opensim.ini meshing option must be set to \"ubODEMeshmerizer\"");
                     //throw new Exception("Invalid physics meshing option");
                 }
 
@@ -58,33 +60,33 @@ class ubODEModule : INonSharedRegionModule
                 string ode_config = UBOdeNative.GetConfiguration();
                 if (string.IsNullOrEmpty(ode_config))
                 {
-                    m_log.Error("[ubODE] Native ode library version not supported");
+                    m_log.LogError("[ubODE] Native ode library version not supported");
                     return;
                 }
 
                 int indx = ode_config.IndexOf("ODE_OPENSIM");
                 if (indx < 0)
                 {
-                    m_log.Error("[ubODE] Native ode library version not supported");
+                    m_log.LogError("[ubODE] Native ode library version not supported");
                     return;
                 }
                 indx += 12;
                 if (indx >= ode_config.Length)
                 {
-                    m_log.Error("[ubODE] Native ode library version not supported");
+                    m_log.LogError("[ubODE] Native ode library version not supported");
                     return;
                 }
                 m_libVersion = ode_config.Substring(indx);
                 if (string.IsNullOrEmpty(m_libVersion))
                 {
-                    m_log.Error("[ubODE] Native ode library version not supported");
+                    m_log.LogError("[ubODE] Native ode library version not supported");
                     return;
                 }
                 m_libVersion.Trim();
                 if(m_libVersion.StartsWith("OS"))
                     m_libVersion = m_libVersion.Substring(2);
 
-                m_log.InfoFormat("[ubODE] ode library configuration: {0}", ode_config);
+                m_log.LogInformation("[ubODE] ode library configuration: {0}", ode_config);
                 m_Enabled = true;
             }
         }

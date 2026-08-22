@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -33,11 +32,13 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage;
 
 public class MuteListModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     protected bool m_Enabled = false;
@@ -69,7 +70,7 @@ public class MuteListModule : ISharedRegionModule
         IXfer xfer = scene.RequestModuleInterface<IXfer>();
         if (xfer == null)
         {
-            m_log.ErrorFormat("[MuteListModule]: Xfer not available in region {0}. Module Disabled", scene.Name);
+            m_log.LogError("[MuteListModule]: Xfer not available in region {0}. Module Disabled", scene.Name);
             m_Enabled = false;
             return;
         }
@@ -77,7 +78,7 @@ public class MuteListModule : ISharedRegionModule
         IMuteListService srv = scene.RequestModuleInterface<IMuteListService>();
         if(srv == null)
         {
-            m_log.ErrorFormat("[MuteListModule]: MuteListService not available in region {0}. Module Disabled", scene.Name);
+            m_log.LogError("[MuteListModule]: MuteListService not available in region {0}. Module Disabled", scene.Name);
             m_Enabled = false;
             return;
         }
@@ -110,7 +111,7 @@ public class MuteListModule : ISharedRegionModule
         if (!m_Enabled)
             return;
 
-        m_log.Debug("[MuteListModule]: enabled");
+        m_log.LogDebug("[MuteListModule]: enabled");
     }
 
     public string Name

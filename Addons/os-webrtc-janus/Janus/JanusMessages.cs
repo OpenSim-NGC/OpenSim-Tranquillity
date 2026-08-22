@@ -30,7 +30,8 @@ using System.Reflection;
 using OpenMetaverse.StructuredData;
 using OpenMetaverse;
 
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace osWebRtcVoice;
 
@@ -43,7 +44,7 @@ namespace osWebRtcVoice;
 /// </summary>
 public class JanusMessage
 {
-    protected static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    protected static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     protected static readonly string LogHeader = "[JANUS MESSAGE]";
 
     protected OSDMap m_message = new OSDMap();
@@ -437,7 +438,7 @@ public class PluginMsgResp : JanusMessageResp
             if (m_pluginData is not null && m_pluginData.ContainsKey("data"))
             {
                 m_data = m_pluginData["data"] as OSDMap;
-                // m_log.DebugFormat("{0} AudioBridgeResp. Found both plugindata and data: data={1}", LogHeader, m_data.ToString());
+                // m_log.LogDebug("{0} AudioBridgeResp. Found both plugindata and data: data={1}", LogHeader, m_data.ToString());
             }
         }
     }

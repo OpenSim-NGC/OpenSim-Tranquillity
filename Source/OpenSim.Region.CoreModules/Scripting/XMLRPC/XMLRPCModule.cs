@@ -28,7 +28,6 @@
 using System.Collections;
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;
@@ -39,6 +38,7 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
 /*****************************************************
  *
  * XMLRPCModule
@@ -76,7 +76,7 @@ namespace OpenSim.Region.CoreModules.Scripting.XMLRPC;
 
 public class XMLRPCModule : ISharedRegionModule, IXMLRPC
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_name = "XMLRPCModule";
 
@@ -125,7 +125,7 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
         {
             // Start http server
             // Attach xmlrpc handlers
-            //                m_log.InfoFormat(
+            //                m_log.LogInformation(
             //                    "[XML RPC MODULE]: Starting up XMLRPC Server on port {0} for llRemoteData commands.",
             //                    m_remoteDataPort);
 
@@ -211,7 +211,7 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
         // This should no longer happen, but the check is reasonable anyway
         if (null == m_openChannels)
         {
-            m_log.Warn("[XML RPC MODULE]: Attempt to open channel before initialization is complete");
+            m_log.LogWarning("[XML RPC MODULE]: Attempt to open channel before initialization is complete");
             return newChannel;
         }
 
@@ -298,7 +298,7 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
         }
         else
         {
-            m_log.Warn("[XML RPC MODULE]: Channel or message_id not found");
+            m_log.LogWarning("[XML RPC MODULE]: Channel or message_id not found");
         }
     }
 
@@ -359,7 +359,7 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
             }
             else
             {
-                m_log.Error("[XML RPC MODULE]: UNABLE TO REMOVE COMPLETED REQUEST");
+                m_log.LogError("[XML RPC MODULE]: UNABLE TO REMOVE COMPLETED REQUEST");
             }
         }
     }
@@ -603,7 +603,7 @@ public class RPCChannelInfo
 
 public class SendRemoteDataRequest: IServiceRequest
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public string Channel;
     public string DestURL;
@@ -722,8 +722,8 @@ public class SendRemoteDataRequest: IServiceRequest
         catch (Exception we)
         {
             Sdata = we.Message;
-            m_log.Warn("[SendRemoteDataRequest]: Request failed");
-            m_log.Warn(we.StackTrace);
+            m_log.LogWarning("[SendRemoteDataRequest]: Request failed");
+            m_log.LogWarning(we.StackTrace);
         }
         finally
         {

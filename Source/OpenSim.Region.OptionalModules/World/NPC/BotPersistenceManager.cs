@@ -12,13 +12,14 @@ using System.Timers;
 // Tranquillity has ImplicitUsings=enable (auto-imports System.Threading), so alias
 // Timer to System.Timers.Timer to resolve the System.Threading.Timer ambiguity.
 using Timer = System.Timers.Timer;
-using log4net;
 using System.Data.SQLite;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules.World.NPC
 {
@@ -74,8 +75,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
     /// </summary>
     public class BotPersistenceManager
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         // ── Configuration ──
         private bool m_gridEnabled;
@@ -118,14 +118,14 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             if (config == null)
             {
                 m_gridEnabled = false;
-                m_log.Info("[BotPersistence] No [BotPersistence] section in config — disabled.");
+                m_log.LogInformation("[BotPersistence] No [BotPersistence] section in config — disabled.");
                 return;
             }
 
             m_gridEnabled = config.GetBoolean("Enabled", false);
             if (!m_gridEnabled)
             {
-                m_log.Info("[BotPersistence] Disabled in config.");
+                m_log.LogInformation("[BotPersistence] Disabled in config.");
                 return;
             }
 
@@ -152,12 +152,12 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 InitializeDatabase(regionDbPath);
                 m_initialized = true;
 
-                m_log.InfoFormat("[BotPersistence] Initialized for region {0} — db: {1}",
+                m_log.LogInformation("[BotPersistence] Initialized for region {0} — db: {1}",
                     scene.RegionInfo.RegionName, regionDbPath);
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] Failed to initialize database: {0}", ex.Message);
+                m_log.LogError("[BotPersistence] Failed to initialize database: {0}", ex.Message);
                 m_gridEnabled = false;
             }
         }
@@ -300,7 +300,7 @@ CREATE INDEX IF NOT EXISTS idx_pb_parcel ON persistent_bots(parcel_id, active);
                 }
                 catch (Exception ex)
                 {
-                    m_log.WarnFormat("[BotPersistence] Failed to serialize appearance for {0}: {1}",
+                    m_log.LogWarning("[BotPersistence] Failed to serialize appearance for {0}: {1}",
                         botID, ex.Message);
                 }
             }
@@ -362,14 +362,14 @@ VALUES
                 lock (m_lock)
                     m_persistentBotIDs.Add(botID);
 
-                m_log.InfoFormat("[BotPersistence] Bot {0} persisted (owner {1}, TTL {2}s)",
+                m_log.LogInformation("[BotPersistence] Bot {0} persisted (owner {1}, TTL {2}s)",
                     botID, ownerID, effectiveTTL);
 
                 return BotPersistError.OK;
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] Failed to persist bot {0}: {1}",
+                m_log.LogError("[BotPersistence] Failed to persist bot {0}: {1}",
                     botID, ex.Message);
                 return BotPersistError.NOT_FOUND;
             }
@@ -406,12 +406,12 @@ VALUES
                 lock (m_dirtyAppearance)
                     m_dirtyAppearance.Remove(botID);
 
-                m_log.InfoFormat("[BotPersistence] Bot {0} persistence removed", botID);
+                m_log.LogInformation("[BotPersistence] Bot {0} persistence removed", botID);
                 return BotPersistError.OK;
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] Failed to remove persistence for {0}: {1}",
+                m_log.LogError("[BotPersistence] Failed to remove persistence for {0}: {1}",
                     botID, ex.Message);
                 return BotPersistError.NOT_FOUND;
             }
@@ -507,7 +507,7 @@ WHERE bot_id = @id";
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] SetPersistentData failed for {0}: {1}",
+                m_log.LogError("[BotPersistence] SetPersistentData failed for {0}: {1}",
                     botID, ex.Message);
                 return BotPersistError.NOT_FOUND;
             }
@@ -545,7 +545,7 @@ WHERE bot_id = @id AND active = 1";
             }
             catch (Exception ex)
             {
-                m_log.DebugFormat("[BotPersistence] Heartbeat update failed for {0}: {1}",
+                m_log.LogDebug("[BotPersistence] Heartbeat update failed for {0}: {1}",
                     botID, ex.Message);
             }
         }
@@ -637,7 +637,7 @@ WHERE parcel_id = @pid AND active = 1";
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] Capacity check failed: {0}", ex.Message);
+                m_log.LogError("[BotPersistence] Capacity check failed: {0}", ex.Message);
                 return BotPersistError.REGION_CAP; // fail safe — deny
             }
         }
@@ -665,7 +665,7 @@ WHERE parcel_id = @pid AND active = 1";
             m_cleanupTimer.AutoReset = true;
             m_cleanupTimer.Start();
 
-            m_log.InfoFormat("[BotPersistence] Timers started — save every {0}s, cleanup every {1}s",
+            m_log.LogInformation("[BotPersistence] Timers started — save every {0}s, cleanup every {1}s",
                 m_positionSaveInterval, m_cleanupInterval);
         }
 
@@ -755,7 +755,7 @@ WHERE bot_id = @id AND active = 1";
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] Position save failed: {0}", ex.Message);
+                m_log.LogError("[BotPersistence] Position save failed: {0}", ex.Message);
             }
         }
 
@@ -838,13 +838,13 @@ WHERE bot_id = @id AND active = 1";
 
                 if (expiredCount > 0 || orphanedCount > 0)
                 {
-                    m_log.InfoFormat("[BotPersistence] Cleanup: {0} expired, {1} orphaned in {2}",
+                    m_log.LogInformation("[BotPersistence] Cleanup: {0} expired, {1} orphaned in {2}",
                         expiredCount, orphanedCount, m_scene.RegionInfo.RegionName);
                 }
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] Cleanup failed: {0}", ex.Message);
+                m_log.LogError("[BotPersistence] Cleanup failed: {0}", ex.Message);
             }
         }
 
@@ -884,7 +884,7 @@ WHERE bot_id = @id AND active = 1";
             m_db?.Close();
             m_db?.Dispose();
 
-            m_log.InfoFormat("[BotPersistence] Shutdown complete for {0}",
+            m_log.LogInformation("[BotPersistence] Shutdown complete for {0}",
                 m_scene.RegionInfo.RegionName);
         }
 
@@ -900,7 +900,7 @@ WHERE bot_id = @id AND active = 1";
         {
             if (!IsEnabled())
             {
-                m_log.Info("[BotPersistence] Bot persistence disabled — skipping respawn.");
+                m_log.LogInformation("[BotPersistence] Bot persistence disabled — skipping respawn.");
                 return;
             }
 
@@ -970,7 +970,7 @@ ORDER BY created_at ASC";
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] Failed to load persistent bots: {0}", ex.Message);
+                m_log.LogError("[BotPersistence] Failed to load persistent bots: {0}", ex.Message);
                 return;
             }
 
@@ -995,13 +995,13 @@ ORDER BY created_at ASC";
 
             if (toSpawn == 0)
             {
-                m_log.InfoFormat("[BotPersistence] No bots to respawn in {0} ({1} deactivated)",
+                m_log.LogInformation("[BotPersistence] No bots to respawn in {0} ({1} deactivated)",
                     m_scene.RegionInfo.RegionName, deactivated);
                 return;
             }
 
             // 4. Start staggered spawn timer
-            m_log.InfoFormat("[BotPersistence] Queued {0} bots for respawn in {1} ({2} deactivated) — rate: {3}/sec",
+            m_log.LogInformation("[BotPersistence] Queued {0} bots for respawn in {1} ({2} deactivated) — rate: {3}/sec",
                 toSpawn, m_scene.RegionInfo.RegionName, deactivated, m_respawnRate);
 
             double intervalMs = 1000.0 / Math.Max(1, m_respawnRate);
@@ -1048,7 +1048,7 @@ ORDER BY created_at ASC";
                 m_respawnTimer?.Stop();
                 m_respawnTimer?.Dispose();
                 m_respawnTimer = null;
-                m_log.InfoFormat("[BotPersistence] Respawn complete for {0}",
+                m_log.LogInformation("[BotPersistence] Respawn complete for {0}",
                     m_scene.RegionInfo.RegionName);
                 return;
             }
@@ -1079,7 +1079,7 @@ ORDER BY created_at ASC";
                     }
                     catch (Exception ex)
                     {
-                        m_log.WarnFormat("[BotPersistence] Failed to deserialize appearance for {0}: {1}",
+                        m_log.LogWarning("[BotPersistence] Failed to deserialize appearance for {0}: {1}",
                             rec.BotID, ex.Message);
                     }
                 }
@@ -1096,7 +1096,7 @@ ORDER BY created_at ASC";
 
                 if (newBotID == UUID.Zero)
                 {
-                    m_log.WarnFormat("[BotPersistence] Failed to respawn bot {0}: {1}",
+                    m_log.LogWarning("[BotPersistence] Failed to respawn bot {0}: {1}",
                         rec.BotID, reason ?? "unknown");
                     DeactivateRecord(rec.BotID, "spawn_failed");
                     return;
@@ -1137,12 +1137,12 @@ ORDER BY created_at ASC";
                     m_persistentBotIDs.Add(newBotID);
                 }
 
-                m_log.InfoFormat("[BotPersistence] Respawned bot {0} -> {1} ({2} {3})",
+                m_log.LogInformation("[BotPersistence] Respawned bot {0} -> {1} ({2} {3})",
                     rec.BotID, newBotID, rec.BotFirstName, rec.BotLastName);
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] SpawnBot exception for {0}: {1}",
+                m_log.LogError("[BotPersistence] SpawnBot exception for {0}: {1}",
                     rec.BotID, ex.Message);
                 DeactivateRecord(rec.BotID, "spawn_exception");
             }
@@ -1165,7 +1165,7 @@ WHERE bot_id = @oldID";
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] Failed to update bot ID {0} -> {1}: {2}",
+                m_log.LogError("[BotPersistence] Failed to update bot ID {0} -> {1}: {2}",
                     oldID, newID, ex.Message);
             }
         }
@@ -1197,7 +1197,7 @@ WHERE bot_id = @id AND active = 1";
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] Failed to deactivate {0}: {1}",
+                m_log.LogError("[BotPersistence] Failed to deactivate {0}: {1}",
                     botID, ex.Message);
             }
         }
@@ -1224,13 +1224,13 @@ WHERE region_id = @rid AND active = 1";
                 lock (m_lock)
                     m_persistentBotIDs.Clear();
 
-                m_log.InfoFormat("[BotPersistence] Admin cleared {0} persistent bots in {1}",
+                m_log.LogInformation("[BotPersistence] Admin cleared {0} persistent bots in {1}",
                     count, m_scene.RegionInfo.RegionName);
                 return count;
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] ClearAll failed: {0}", ex.Message);
+                m_log.LogError("[BotPersistence] ClearAll failed: {0}", ex.Message);
                 return 0;
             }
         }
@@ -1272,7 +1272,7 @@ WHERE region_id = @rid AND owner_id = @oid AND active = 1";
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] ClearOwner failed: {0}", ex.Message);
+                m_log.LogError("[BotPersistence] ClearOwner failed: {0}", ex.Message);
                 return 0;
             }
         }
@@ -1319,7 +1319,7 @@ ORDER BY created_at ASC";
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[BotPersistence] ListActiveBots failed: {0}", ex.Message);
+                m_log.LogError("[BotPersistence] ListActiveBots failed: {0}", ex.Message);
             }
 
             return result;

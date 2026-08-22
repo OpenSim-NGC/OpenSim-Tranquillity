@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -35,12 +34,14 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts;
 
 public class LocalUserAccountServicesConnector : ISharedRegionModule, IUserAccountService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
@@ -76,7 +77,7 @@ public class LocalUserAccountServicesConnector : ISharedRegionModule, IUserAccou
                 IConfig userConfig = source.Configs["UserAccountService"];
                 if (userConfig == null)
                 {
-                    m_log.Error("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: UserAccountService missing from OpenSim.ini");
+                    m_log.LogError("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: UserAccountService missing from OpenSim.ini");
                     return;
                 }
 
@@ -84,7 +85,7 @@ public class LocalUserAccountServicesConnector : ISharedRegionModule, IUserAccou
 
                 if (serviceDll.Length == 0)
                 {
-                    m_log.Error("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: No LocalServiceModule named in section UserService");
+                    m_log.LogError("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: No LocalServiceModule named in section UserService");
                     return;
                 }
 
@@ -93,14 +94,14 @@ public class LocalUserAccountServicesConnector : ISharedRegionModule, IUserAccou
 
                 if (UserAccountService == null)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Cannot load user account service specified as {0}", serviceDll);
                     return;
                 }
                 m_Enabled = true;
                 m_Cache = new UserAccountCache();
 
-                m_log.Info("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Local user connector enabled");
+                m_log.LogInformation("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Local user connector enabled");
             }
         }
     }
@@ -139,7 +140,7 @@ public class LocalUserAccountServicesConnector : ISharedRegionModule, IUserAccou
         if (!m_Enabled)
             return;
 
-        m_log.InfoFormat("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Enabled local user accounts for region {0}", scene.RegionInfo.RegionName);
+        m_log.LogInformation("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Enabled local user accounts for region {0}", scene.RegionInfo.RegionName);
     }
 
     #endregion

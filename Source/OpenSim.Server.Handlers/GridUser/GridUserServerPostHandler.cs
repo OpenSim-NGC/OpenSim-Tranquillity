@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using System.Xml;
 using OpenSim.Server.Base;
@@ -35,11 +34,13 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.GridUser;
 
 public class GridUserServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IGridUserService m_GridUserService;
 
@@ -57,7 +58,7 @@ public class GridUserServerPostHandler : BaseStreamHandler
             body = sr.ReadToEnd();
         body = body.Trim();
 
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
         string method = string.Empty;
         try
         {
@@ -84,11 +85,11 @@ public class GridUserServerPostHandler : BaseStreamHandler
                 case "getgriduserinfos":
                     return GetGridUserInfos(request);
             }
-            m_log.DebugFormat("[GRID USER HANDLER]: unknown method request: {0}", method);
+            m_log.LogDebug("[GRID USER HANDLER]: unknown method request: {0}", method);
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[GRID USER HANDLER]: Exception in method {0}: {1}", method, e);
+            m_log.LogDebug("[GRID USER HANDLER]: Exception in method {0}: {1}", method, e);
         }
 
         return FailureResult();
@@ -111,7 +112,7 @@ public class GridUserServerPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[GRID USER HANDLER]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[GRID USER HANDLER]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -187,7 +188,7 @@ public class GridUserServerPostHandler : BaseStreamHandler
             result["result"] = "null";
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
-        //m_log.DebugFormat("[GRID USER HANDLER]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[GRID USER HANDLER]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -198,13 +199,13 @@ public class GridUserServerPostHandler : BaseStreamHandler
 
         if (!request.ContainsKey("AgentIDs"))
         {
-            m_log.DebugFormat("[GRID USER HANDLER]: GetGridUserInfos called without required uuids argument");
+            m_log.LogDebug("[GRID USER HANDLER]: GetGridUserInfos called without required uuids argument");
             return FailureResult();
         }
 
         if (!(request["AgentIDs"] is List<string>))
         {
-            m_log.DebugFormat("[GRID USER HANDLER]: GetGridUserInfos input argument was of unexpected type {0}", request["uuids"].GetType().ToString());
+            m_log.LogDebug("[GRID USER HANDLER]: GetGridUserInfos input argument was of unexpected type {0}", request["uuids"].GetType().ToString());
             return FailureResult();
         }
 

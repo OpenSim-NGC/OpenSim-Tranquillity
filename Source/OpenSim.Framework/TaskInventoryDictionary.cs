@@ -29,8 +29,9 @@ using System.Reflection;
 using System.Xml;
 using System.Xml.Schema;
 using System.Xml.Serialization;
-using log4net;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -43,10 +44,10 @@ namespace OpenSim.Framework;
 /// </remarks>
 public class TaskInventoryDictionary : Dictionary<UUID, TaskInventoryItem>, ICloneable, IXmlSerializable, IDisposable
 {
-    // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    // private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static XmlSerializer tiiSerializer = new XmlSerializer(typeof (TaskInventoryItem));
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Thread LockedByThread;
 //        private string WriterStack;
@@ -115,7 +116,7 @@ public class TaskInventoryDictionary : Dictionary<UUID, TaskInventoryItem>, IClo
 
             if (m_itemLock.RecursiveReadCount > 0)
             {
-                m_log.Error("[TaskInventoryDictionary] Recursive read lock requested. This should not happen and means something needs to be fixed. For now though, it's safe to continue.");
+                m_log.LogError("[TaskInventoryDictionary] Recursive read lock requested. This should not happen and means something needs to be fixed. For now though, it's safe to continue.");
                 try
                 {
                     // That call stack is useful for end users only. RealProgrammers need a full dump. Commented.
@@ -125,7 +126,7 @@ public class TaskInventoryDictionary : Dictionary<UUID, TaskInventoryItem>, IClo
                     // // write call stack method names
                     // foreach (StackFrame stackFrame in stackFrames)
                     // {
-                    //     m_log.Error("[SceneObjectGroup.m_parts]  "+(stackFrame.GetMethod().Name));   // write method name
+                    //     m_log.LogError("[SceneObjectGroup.m_parts]  "+(stackFrame.GetMethod().Name));   // write method name
                     // }
 
                     // The below is far more useful
@@ -144,7 +145,7 @@ public class TaskInventoryDictionary : Dictionary<UUID, TaskInventoryItem>, IClo
             }
             if (m_itemLock.RecursiveWriteCount > 0)
             {
-                m_log.Error("[TaskInventoryDictionary] Recursive write lock requested. This should not happen and means something needs to be fixed.");
+                m_log.LogError("[TaskInventoryDictionary] Recursive write lock requested. This should not happen and means something needs to be fixed.");
 //                    try
 //                    {
 //                        System.Console.WriteLine("------------------------------------------");
@@ -160,7 +161,7 @@ public class TaskInventoryDictionary : Dictionary<UUID, TaskInventoryItem>, IClo
 
             while (!m_itemLock.TryEnterReadLock(60000))
             {
-                m_log.Error("Thread lock detected while trying to aquire READ lock in TaskInventoryDictionary. Locked by thread " + LockedByThread.Name + ". I'm going to try to solve the thread lock automatically to preserve region stability, but this needs to be fixed.");
+                m_log.LogError("Thread lock detected while trying to aquire READ lock in TaskInventoryDictionary. Locked by thread " + LockedByThread.Name + ". I'm going to try to solve the thread lock automatically to preserve region stability, but this needs to be fixed.");
                 //if (m_itemLock.IsWriteLockHeld)
                 //{
                     m_itemLock = new System.Threading.ReaderWriterLockSlim();
@@ -196,12 +197,12 @@ public class TaskInventoryDictionary : Dictionary<UUID, TaskInventoryItem>, IClo
             //Enter a write lock, wait indefinately for one to open.
             if (m_itemLock.RecursiveReadCount > 0)
             {
-                m_log.Error("[TaskInventoryDictionary] Recursive read lock requested. This should not happen and means something needs to be fixed. For now though, it's safe to continue.");
+                m_log.LogError("[TaskInventoryDictionary] Recursive read lock requested. This should not happen and means something needs to be fixed. For now though, it's safe to continue.");
                 m_itemLock.ExitReadLock();
             }
             if (m_itemLock.RecursiveWriteCount > 0)
             {
-                m_log.Error("[TaskInventoryDictionary] Recursive write lock requested. This should not happen and means something needs to be fixed.");
+                m_log.LogError("[TaskInventoryDictionary] Recursive write lock requested. This should not happen and means something needs to be fixed.");
 
                 m_itemLock.ExitWriteLock();
             }
@@ -209,7 +210,7 @@ public class TaskInventoryDictionary : Dictionary<UUID, TaskInventoryItem>, IClo
             {
                 if (m_itemLock.IsWriteLockHeld)
                 {
-                    m_log.Error("Thread lock detected while trying to aquire WRITE lock in TaskInventoryDictionary. Locked by thread " + LockedByThread.Name + ". I'm going to try to solve the thread lock automatically to preserve region stability, but this needs to be fixed.");
+                    m_log.LogError("Thread lock detected while trying to aquire WRITE lock in TaskInventoryDictionary. Locked by thread " + LockedByThread.Name + ". I'm going to try to solve the thread lock automatically to preserve region stability, but this needs to be fixed.");
 //                        System.Console.WriteLine("------------------------------------------");
 //                        System.Console.WriteLine("My call stack:\n" + Environment.StackTrace);
 //                        System.Console.WriteLine("------------------------------------------");
@@ -218,7 +219,7 @@ public class TaskInventoryDictionary : Dictionary<UUID, TaskInventoryItem>, IClo
                 }
                 else
                 {
-                    m_log.Error("Thread lock detected while trying to aquire WRITE lock in TaskInventoryDictionary. Locked by a reader. I'm going to try to solve the thread lock automatically to preserve region stability, but this needs to be fixed.");
+                    m_log.LogError("Thread lock detected while trying to aquire WRITE lock in TaskInventoryDictionary. Locked by a reader. I'm going to try to solve the thread lock automatically to preserve region stability, but this needs to be fixed.");
 //                        System.Console.WriteLine("------------------------------------------");
 //                        System.Console.WriteLine("My call stack:\n" + Environment.StackTrace);
 //                        System.Console.WriteLine("------------------------------------------");
@@ -279,7 +280,7 @@ public class TaskInventoryDictionary : Dictionary<UUID, TaskInventoryItem>, IClo
     // see IXmlSerializable
     public void ReadXml(XmlReader reader)
     {
-        // m_log.DebugFormat("[TASK INVENTORY]: ReadXml current node before actions, {0}", reader.Name);
+        // m_log.LogDebug("[TASK INVENTORY]: ReadXml current node before actions, {0}", reader.Name);
 
         if (!reader.IsEmptyElement)
         {
@@ -289,21 +290,21 @@ public class TaskInventoryDictionary : Dictionary<UUID, TaskInventoryItem>, IClo
                 TaskInventoryItem item = (TaskInventoryItem) tiiSerializer.Deserialize(reader);
                 Add(item.ItemID, item);
 
-                //m_log.DebugFormat("[TASK INVENTORY]: Instanted prim item {0}, {1} from xml", item.Name, item.ItemID);
+                //m_log.LogDebug("[TASK INVENTORY]: Instanted prim item {0}, {1} from xml", item.Name, item.ItemID);
             }
 
-           // m_log.DebugFormat("[TASK INVENTORY]: Instantiated {0} prim items in total from xml", Count);
+           // m_log.LogDebug("[TASK INVENTORY]: Instantiated {0} prim items in total from xml", Count);
         }
         // else
         // {
-        //     m_log.DebugFormat("[TASK INVENTORY]: Skipping empty element {0}", reader.Name);
+        //     m_log.LogDebug("[TASK INVENTORY]: Skipping empty element {0}", reader.Name);
         // }
 
         // For some .net implementations, this last read is necessary so that we advance beyond the end tag
         // of the element wrapping this object so that the rest of the serialization can complete normally.
         reader.Read();
 
-        // m_log.DebugFormat("[TASK INVENTORY]: ReadXml current node after actions, {0}", reader.Name);
+        // m_log.LogDebug("[TASK INVENTORY]: ReadXml current node after actions, {0}", reader.Name);
     }
 
     // see IXmlSerializable

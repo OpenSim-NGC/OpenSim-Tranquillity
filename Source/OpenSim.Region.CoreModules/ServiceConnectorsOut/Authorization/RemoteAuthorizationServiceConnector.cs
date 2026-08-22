@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Services.Connectors;
@@ -34,13 +33,15 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization;
 
 public class RemoteAuthorizationServicesConnector :
         AuthorizationServicesConnector, ISharedRegionModule, IAuthorizationService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled = false;
@@ -67,7 +68,7 @@ public class RemoteAuthorizationServicesConnector :
                 IConfig authorizationConfig = source.Configs["AuthorizationService"];
                 if (authorizationConfig == null)
                 {
-                    m_log.Info("[REMOTE AUTHORIZATION CONNECTOR]: AuthorizationService missing from OpenSim.ini");
+                    m_log.LogInformation("[REMOTE AUTHORIZATION CONNECTOR]: AuthorizationService missing from OpenSim.ini");
                     return;
                 }
 
@@ -75,7 +76,7 @@ public class RemoteAuthorizationServicesConnector :
 
                 base.Initialise(source);
 
-                m_log.Info("[REMOTE AUTHORIZATION CONNECTOR]: Remote authorization enabled");
+                m_log.LogInformation("[REMOTE AUTHORIZATION CONNECTOR]: Remote authorization enabled");
             }
         }
     }
@@ -110,14 +111,14 @@ public class RemoteAuthorizationServicesConnector :
         if (!m_Enabled)
             return;
 
-        m_log.InfoFormat("[REMOTE AUTHORIZATION CONNECTOR]: Enabled remote authorization for region {0}", scene.RegionInfo.RegionName);
+        m_log.LogInformation("[REMOTE AUTHORIZATION CONNECTOR]: Enabled remote authorization for region {0}", scene.RegionInfo.RegionName);
 
     }
 
     public bool IsAuthorizedForRegion(
          string userID, string firstName, string lastName, string regionID, out string message)
     {
-        m_log.InfoFormat(
+        m_log.LogInformation(
             "[REMOTE AUTHORIZATION CONNECTOR]: IsAuthorizedForRegion checking {0} for region {1}", userID, regionID);
 
         bool isAuthorized = true;
@@ -156,7 +157,7 @@ public class RemoteAuthorizationServicesConnector :
         }
         else
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[REMOTE AUTHORIZATION CONNECTOR] IsAuthorizedForRegion, can't find scene to match region id of {0}",
                 regionID);
         }

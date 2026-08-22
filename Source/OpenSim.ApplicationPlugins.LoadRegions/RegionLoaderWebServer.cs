@@ -28,15 +28,16 @@
 using System.Net;
 using System.Reflection;
 using System.Xml;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.ApplicationPlugins.LoadRegions;
 
 public class RegionLoaderWebServer : IRegionLoader
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IConfigSource m_configSource;
 
@@ -52,7 +53,7 @@ public class RegionLoaderWebServer : IRegionLoader
 
         if (m_configSource == null)
         {
-            m_log.Error("[WEBLOADER]: Unable to load configuration source!");
+            m_log.LogError("[WEBLOADER]: Unable to load configuration source!");
             return null;
         }
         else
@@ -63,7 +64,7 @@ public class RegionLoaderWebServer : IRegionLoader
 
             if (url.Length == 0)
             {
-                m_log.Error("[WEBLOADER]: Unable to load webserver URL - URL was empty.");
+                m_log.LogError("[WEBLOADER]: Unable to load webserver URL - URL was empty.");
                 return null;
             }
             else
@@ -74,12 +75,12 @@ public class RegionLoaderWebServer : IRegionLoader
                     int regionCount = 0;
                     HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(url);
                     webRequest.Timeout = 30000; //30 Second Timeout
-                    m_log.DebugFormat("[WEBLOADER]: Sending download request to {0}", url);
+                    m_log.LogDebug("[WEBLOADER]: Sending download request to {0}", url);
 
                     try
                     {
                         string xmlSource = String.Empty;
-                        m_log.Debug("[WEBLOADER]: Downloading region information...");
+                        m_log.LogDebug("[WEBLOADER]: Downloading region information...");
                         using (HttpWebResponse webResponse = (HttpWebResponse)webRequest.GetResponse())
                         using (StreamReader reader = new StreamReader(webResponse.GetResponseStream()))
                         {
@@ -90,7 +91,7 @@ public class RegionLoaderWebServer : IRegionLoader
                             }
                         }
 
-                        m_log.Debug("[WEBLOADER]: Done downloading region information from server. Total Bytes: " +
+                        m_log.LogDebug("[WEBLOADER]: Done downloading region information from server. Total Bytes: " +
                                     xmlSource.Length);
                         XmlDocument xmlDoc = new XmlDocument();
                         xmlDoc.LoadXml(xmlSource);
@@ -104,7 +105,7 @@ public class RegionLoaderWebServer : IRegionLoader
                                 int i;
                                 for (i = 0; i < xmlDoc.FirstChild.ChildNodes.Count; i++)
                                 {
-                                    m_log.Debug(xmlDoc.FirstChild.ChildNodes[i].OuterXml);
+                                    m_log.LogDebug(xmlDoc.FirstChild.ChildNodes[i].OuterXml);
                                     regionInfos[i] =
                                         new RegionInfo("REGION CONFIG #" + (i + 1), xmlDoc.FirstChild.ChildNodes[i], false, m_configSource);
                                 }
@@ -125,16 +126,16 @@ public class RegionLoaderWebServer : IRegionLoader
                     if (regionCount > 0 || allowRegionless)
                         return regionInfos;
 
-                    m_log.Debug("[WEBLOADER]: Request yielded no regions.");
+                    m_log.LogDebug("[WEBLOADER]: Request yielded no regions.");
                     tries--;
                     if (tries > 0)
                     {
-                        m_log.Debug("[WEBLOADER]: Retrying");
+                        m_log.LogDebug("[WEBLOADER]: Retrying");
                         System.Threading.Thread.Sleep(wait);
                     }
                 }
 
-                m_log.Error("[WEBLOADER]: No region configs were available.");
+                m_log.LogError("[WEBLOADER]: No region configs were available.");
                 return null;
             }
         }

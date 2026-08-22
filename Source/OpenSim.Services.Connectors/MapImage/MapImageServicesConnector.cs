@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 
 using Nini.Config;
@@ -34,12 +33,13 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class MapImageServicesConnector : BaseServiceConnector, IMapImageService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = String.Empty;
@@ -63,7 +63,7 @@ public class MapImageServicesConnector : BaseServiceConnector, IMapImageService
         IConfig config = source.Configs["MapImageService"];
         if (config == null)
         {
-            m_log.Error("[MAP IMAGE CONNECTOR]: MapImageService missing");
+            m_log.LogError("[MAP IMAGE CONNECTOR]: MapImageService missing");
             throw new Exception("MapImage connector init error");
         }
 
@@ -72,7 +72,7 @@ public class MapImageServicesConnector : BaseServiceConnector, IMapImageService
 
         if (serviceURI.Length == 0)
         {
-            m_log.Error("[MAP IMAGE CONNECTOR]: No Server URI named in section MapImageService");
+            m_log.LogError("[MAP IMAGE CONNECTOR]: No Server URI named in section MapImageService");
             throw new Exception("MapImage connector init error");
         }
         m_ServerURI = serviceURI;
@@ -118,7 +118,7 @@ public class MapImageServicesConnector : BaseServiceConnector, IMapImageService
                     string res = resultobj as string;
                     if(string.IsNullOrEmpty(res))
                     {
-                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: unknown result field");
+                        m_log.LogDebug("[MAP IMAGE CONNECTOR]: unknown result field");
                         return false;
                     }
                     else if (res.Equals("success", StringComparison.InvariantCultureIgnoreCase))
@@ -126,21 +126,21 @@ public class MapImageServicesConnector : BaseServiceConnector, IMapImageService
                     else if (res.Equals("failure", StringComparison.InvariantCultureIgnoreCase))
                     {
                         reason = replyData.TryGetValue("Message", out var value) ? value.ToString() : "";
-                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile failed: {0}", reason);
+                        m_log.LogDebug("[MAP IMAGE CONNECTOR]: RemoveMapTile failed: {0}", reason);
                         return false;
                     }
-                    m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile unknown result field contents");
+                    m_log.LogDebug("[MAP IMAGE CONNECTOR]: RemoveMapTile unknown result field contents");
                     return false;
                 }
                 else
                 {
-                    m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile reply data does not contain result field");
+                    m_log.LogDebug("[MAP IMAGE CONNECTOR]: RemoveMapTile reply data does not contain result field");
                 }
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: RemoveMapTile Exception at {0}/map: {1}", m_ServerURI, e.Message);
+            m_log.LogDebug("[MAP IMAGE CONNECTOR]: RemoveMapTile Exception at {0}/map: {1}", m_ServerURI, e.Message);
         }
         return false;
     }
@@ -188,7 +188,7 @@ public class MapImageServicesConnector : BaseServiceConnector, IMapImageService
                     string res = resultobj as string;
                     if (string.IsNullOrEmpty(res))
                     {
-                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile unknown result field");
+                        m_log.LogDebug("[MAP IMAGE CONNECTOR]: AddMapTile unknown result field");
                         return false;
                     }
                     else if (res.Equals("success", StringComparison.InvariantCultureIgnoreCase))
@@ -196,27 +196,27 @@ public class MapImageServicesConnector : BaseServiceConnector, IMapImageService
                     else if (res.Equals("failure", StringComparison.InvariantCultureIgnoreCase))
                     {
                         reason = replyData.TryGetValue("Message", out var value) ? value.ToString() : "";
-                        m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile failed: {0}", reason);
+                        m_log.LogDebug("[MAP IMAGE CONNECTOR]: AddMapTile failed: {0}", reason);
                         return false;
                     }
-                    m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile unknown result field contents");
+                    m_log.LogDebug("[MAP IMAGE CONNECTOR]: AddMapTile unknown result field contents");
                     return false;
                 }
             }
             else
             {
-                m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile reply data does not contain result field");
+                m_log.LogDebug("[MAP IMAGE CONNECTOR]: AddMapTile reply data does not contain result field");
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile Exception at {0}/map: {1}", m_ServerURI, e.Message);
+            m_log.LogDebug("[MAP IMAGE CONNECTOR]: AddMapTile Exception at {0}/map: {1}", m_ServerURI, e.Message);
         }
         finally
         {
             // This just dumps a warning for any operation that takes more than 100 ms
             int tickdiff = Util.EnvironmentTickCountSubtract(tickstart);
-            m_log.DebugFormat("[MAP IMAGE CONNECTOR]: AddMapTile {1} Bytes in {0}ms", tickdiff, jpgData.Length);
+            m_log.LogDebug("[MAP IMAGE CONNECTOR]: AddMapTile {1} Bytes in {0}ms", tickdiff, jpgData.Length);
         }
         return false;
     }

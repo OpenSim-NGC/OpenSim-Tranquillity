@@ -27,7 +27,6 @@
 using System.Reflection;
 
 using Nini.Config;
-using log4net;
 using OpenMetaverse;
 
 using OpenSim.Framework;
@@ -35,6 +34,8 @@ using OpenSim.Framework.Serialization.External;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.FSAssetService;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.HypergridService;
 
@@ -45,8 +46,7 @@ namespace OpenSim.Services.HypergridService;
 /// </summary>
 public class HGFSAssetService : FSAssetConnector, IAssetService
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
         MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_HomeURL;
@@ -58,7 +58,7 @@ public class HGFSAssetService : FSAssetConnector, IAssetService
 
     public HGFSAssetService(IConfigSource config, string configName) : base(config, "AssetService")
     {
-        m_log.Debug("[HGAsset Service]: Starting in FSAsset mode");
+        m_log.LogDebug("[HGAsset Service]: Starting in FSAsset mode");
         IConfig assetConfig = config.Configs[configName];
         if (assetConfig == null)
             throw new Exception("No HGAssetService configuration");

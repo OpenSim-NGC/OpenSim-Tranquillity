@@ -28,7 +28,6 @@ using System.Reflection;
 using System.Net;
 
 using Nini.Config;
-using log4net;
 using OpenMetaverse;
 
 using OpenSim.Server.Base;
@@ -37,6 +36,8 @@ using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers;
 
@@ -70,7 +71,7 @@ public class EstateDataRobustConnector : ServiceConnector
 
 public class EstateServerGetHandler : BaseStreamHandler
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     IEstateDataService m_EstateService;
 
@@ -247,7 +248,7 @@ public class EstateServerGetHandler : BaseStreamHandler
 
 public class EstateServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     IEstateDataService m_EstateService;
 
@@ -312,7 +313,7 @@ public class EstateServerPostHandler : BaseStreamHandler
             // /estates/estate/
             EstateSettings es = new EstateSettings(requestData);
             m_EstateService.StoreEstateSettings(es);
-            //m_log.DebugFormat("[EstateServerPostHandler]: Store estate {0}", es.ToString());
+            //m_log.LogDebug("[EstateServerPostHandler]: Store estate {0}", es.ToString());
             httpResponse.StatusCode = (int)HttpStatusCode.OK;
             result["Result"] = true;
         }
@@ -323,13 +324,13 @@ public class EstateServerPostHandler : BaseStreamHandler
             UUID regionID = UUID.Zero;
             if (UUID.TryParse(region, out regionID) && Int32.TryParse(eid, out id))
             {
-                m_log.DebugFormat("[EstateServerPostHandler]: Link region {0} to estate {1}", regionID, id);
+                m_log.LogDebug("[EstateServerPostHandler]: Link region {0} to estate {1}", regionID, id);
                 httpResponse.StatusCode = (int)HttpStatusCode.OK;
                 result["Result"] = m_EstateService.LinkRegion(regionID, id);
             }
         }
         else
-            m_log.WarnFormat("[EstateServerPostHandler]: something wrong with POST request {0}", httpRequest.RawUrl);
+            m_log.LogWarning("[EstateServerPostHandler]: something wrong with POST request {0}", httpRequest.RawUrl);
 
         return result;
     }

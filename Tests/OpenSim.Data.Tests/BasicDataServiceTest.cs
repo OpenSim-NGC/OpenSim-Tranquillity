@@ -56,7 +56,7 @@ namespace OpenSim.Data.Tests
 
         // TODO: Is this in the right place here?
         // Later:  apparently it's not, but does it matter here?
-//        protected static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        protected static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         protected ILogger m_logger;  // doesn't matter here that it's not static, init to correct type in instance .ctor
 
@@ -106,7 +106,7 @@ namespace OpenSim.Data.Tests
             if (String.IsNullOrEmpty(m_connStr))
             {
                 string msg = String.Format("Connection string for {0} is not defined, ignoring tests", typeof(TConn).Name);
-                m_logger?.LogWarning(msg);
+                m_logger?.LogWarning(msg, msg.Message);
                 Assert.Ignore(msg);
             }
 
@@ -122,7 +122,7 @@ namespace OpenSim.Data.Tests
                 catch
                 {
                     string msg = String.Format("{0} is unable to connect to the database, ignoring tests", typeof(TConn).Name);
-                    m_logger?.LogWarning(msg);
+                    m_logger?.LogWarning(msg, msg.Message);
                     Assert.Ignore(msg);
                 }
             }

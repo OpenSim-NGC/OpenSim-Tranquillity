@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
@@ -34,11 +33,13 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Login;
 
 public class LLLoginServiceInConnector : ServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private ILoginService m_LoginService;
     private bool m_Proxy;
@@ -47,7 +48,7 @@ public class LLLoginServiceInConnector : ServiceConnector
     public LLLoginServiceInConnector(IConfigSource config, IHttpServer server, IScene scene) :
             base(config, server, String.Empty)
     {
-        m_log.Debug("[LLLOGIN IN CONNECTOR]: Starting...");
+        m_log.LogDebug("[LLLOGIN IN CONNECTOR]: Starting...");
         string loginService = ReadLocalServiceFromConfig(config);
 
         ISimulationService simService = scene.RequestModuleInterface<ISimulationService>();

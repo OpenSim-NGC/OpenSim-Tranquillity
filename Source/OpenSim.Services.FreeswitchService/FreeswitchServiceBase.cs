@@ -28,13 +28,14 @@
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Services.Base;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Services.FreeswitchService;
 
 public class FreeswitchServiceBase : ServiceBase
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected string m_freeSwitchRealm;
     protected string m_freeSwitchSIPProxy;
@@ -61,7 +62,7 @@ public class FreeswitchServiceBase : ServiceBase
             m_freeSwitchDefaultWellKnownIP = freeswitchConfig.GetString("ServerAddress", String.Empty);
             if (m_freeSwitchDefaultWellKnownIP.Length == 0)
             {
-                m_log.Error("[FREESWITCH]: No ServerAddress given, cannot start service.");
+                m_log.LogError("[FREESWITCH]: No ServerAddress given, cannot start service.");
                 return;
             }
 

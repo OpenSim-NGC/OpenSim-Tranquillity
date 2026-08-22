@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using System.Net;
 using System.Xml.Serialization;
@@ -35,11 +34,13 @@ using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Asset;
 
 public class AssetServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAssetService m_AssetService;
 
@@ -71,7 +72,7 @@ public class AssetServerPostHandler : BaseStreamHandler
             return null;
         }
 
-        m_log.Info($"[AssetServerPost]: From {httpRequest.RemoteIPEndPoint} Asset {asset.ID}: " +
+        m_log.LogInformation($"[AssetServerPost]: From {httpRequest.RemoteIPEndPoint} Asset {asset.ID}: " +
             $"Name = {asset.Metadata.Name},Type = {(OpenMetaverse.AssetType)asset.Metadata.Type}, " +
             $"CreatorID = {asset.Metadata.CreatorID}, Description = {asset.Metadata.Description}");
 

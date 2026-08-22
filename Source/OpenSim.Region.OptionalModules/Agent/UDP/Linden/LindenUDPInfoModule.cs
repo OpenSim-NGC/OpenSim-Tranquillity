@@ -27,7 +27,6 @@
 
 using System.Reflection;
 using System.Text;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -35,6 +34,8 @@ using OpenSim.Framework.Monitoring;
 using OpenSim.Region.ClientStack.LindenUDP;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules.UDP.Linden;
 
@@ -46,7 +47,7 @@ namespace OpenSim.Region.OptionalModules.UDP.Linden;
 /// </remarks>
 public class LindenUDPInfoModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected Dictionary<UUID, Scene> m_scenes = new();
 
@@ -68,7 +69,7 @@ public class LindenUDPInfoModule : ISharedRegionModule
 
     public void AddRegion(Scene scene)
     {
-        //m_log.DebugFormat("[LINDEN UDP INFO MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
+        //m_log.LogDebug("[LINDEN UDP INFO MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
 
         lock (m_scenes)
             m_scenes[scene.RegionInfo.RegionID] = scene;
@@ -119,7 +120,7 @@ public class LindenUDPInfoModule : ISharedRegionModule
 
     public void RemoveRegion(Scene scene)
     {
-        //m_log.DebugFormat("[LINDEN UDP INFO MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
+        //m_log.LogDebug("[LINDEN UDP INFO MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
 
         lock (m_scenes)
             m_scenes.Remove(scene.RegionInfo.RegionID);
@@ -507,11 +508,11 @@ public class LindenUDPInfoModule : ISharedRegionModule
 
     private void PrintRequests(string type, Dictionary<string, int> sortedDict, int sum)
     {
-        m_log.InfoFormat("[INFO]:");
-        m_log.InfoFormat("[INFO]: {0,25}", type);
+        m_log.LogInformation("[INFO]:");
+        m_log.LogInformation("[INFO]: {0,25}", type);
         foreach (KeyValuePair<string, int> kvp in sortedDict.Take(12))
-            m_log.InfoFormat("[INFO]: {0,25} {1,-6}", kvp.Key, kvp.Value);
-        m_log.InfoFormat("[INFO]: {0,25}", "...");
-        m_log.InfoFormat("[INFO]: {0,25} {1,-6}", "Total", sum);
+            m_log.LogInformation("[INFO]: {0,25} {1,-6}", kvp.Key, kvp.Value);
+        m_log.LogInformation("[INFO]: {0,25}", "...");
+        m_log.LogInformation("[INFO]: {0,25} {1,-6}", "Total", sum);
     }
 }

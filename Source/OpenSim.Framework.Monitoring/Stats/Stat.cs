@@ -28,6 +28,9 @@
 using System.Text;
 using OpenMetaverse.StructuredData;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Framework.Monitoring;
 
 /// <summary>
@@ -35,7 +38,7 @@ namespace OpenSim.Framework.Monitoring;
 /// </summary>
 public class Stat: IDisposable
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public static readonly char[] DisallowedShortNameCharacters = { '.' };
 
@@ -229,7 +232,7 @@ public class Stat: IDisposable
             if (m_samples.Count >= m_maxSamples)
                 m_samples.Dequeue();
 
-//                m_log.DebugFormat("[STAT]: Recording value {0} for {1}", newValue, Name);
+//                m_log.LogDebug("[STAT]: Recording value {0} for {1}", newValue, Name);
 
             m_samples.Enqueue(newValue);
         }
@@ -310,7 +313,7 @@ public class Stat: IDisposable
 
             lock (m_samples)
             {
-                //m_log.DebugFormat(
+                //m_log.LogDebug(
                 //  "[STAT]: Samples for {0} are {1}",
                 //  Name, string.Join(",", m_samples.Select(s => s.ToString()).ToArray()));
 

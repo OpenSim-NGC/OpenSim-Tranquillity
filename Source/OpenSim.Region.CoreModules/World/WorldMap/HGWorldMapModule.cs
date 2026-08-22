@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -36,11 +35,13 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.World.Land;
 
 public class HGWorldMapModule : WorldMapModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // Remember the map area that each client has been exposed to in this region
     private Dictionary<UUID, List<MapBlockData>> m_SeenMapBlocks = new Dictionary<UUID, List<MapBlockData>>();
@@ -136,7 +137,7 @@ public class HGWorldMapModule : WorldMapModule
                     b.Access = (byte)SimAccess.Down;
                 }
 
-                m_log.DebugFormat("[HG MAP]: Resetting {0} blocks", mapBlocks.Count);
+                m_log.LogDebug("[HG MAP]: Resetting {0} blocks", mapBlocks.Count);
                 sp.ControllingClient.SendMapBlock(mapBlocks, 0);
                 m_SeenMapBlocks.Remove(clientID);
             }

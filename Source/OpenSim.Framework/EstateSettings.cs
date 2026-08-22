@@ -28,11 +28,13 @@
 using System.Reflection;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Framework;
 
 public class EstateSettings
 {
-    // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    // private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public delegate void SaveDelegate(EstateSettings rs);
 

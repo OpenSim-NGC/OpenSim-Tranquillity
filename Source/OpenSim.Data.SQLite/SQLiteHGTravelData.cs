@@ -28,6 +28,9 @@
 using OpenMetaverse;
 using System.Data.SQLite;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.SQLite;
 
 /// <summary>
@@ -35,7 +38,7 @@ namespace OpenSim.Data.SQLite;
 /// </summary>
 public class SQLiteHGTravelData : SQLiteGenericTableHandler<HGTravelingData>, IHGTravelingData
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public SQLiteHGTravelData(string connectionString, string realm)
         : base(connectionString, realm, "HGTravelStore") {}

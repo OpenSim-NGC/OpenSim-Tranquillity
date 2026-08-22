@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using System.Xml;
 using OpenSim.Server.Base;
@@ -35,11 +34,13 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.GridUser;
 
 public class MuteListServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IMuteListService m_service;
 
@@ -57,7 +58,7 @@ public class MuteListServerPostHandler : BaseStreamHandler
             body = sr.ReadToEnd();
         body = body.Trim();
 
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
         string method = string.Empty;
 
         try
@@ -79,11 +80,11 @@ public class MuteListServerPostHandler : BaseStreamHandler
                 case "delete":
                     return deletemute(request);
             }
-            m_log.DebugFormat("[MUTELIST HANDLER]: unknown method request: {0}", method);
+            m_log.LogDebug("[MUTELIST HANDLER]: unknown method request: {0}", method);
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[MUTELIST HANDLER]: Exception in method {0}: {1}", method, e);
+            m_log.LogDebug("[MUTELIST HANDLER]: Exception in method {0}: {1}", method, e);
         }
 
         return FailureResult();
@@ -109,7 +110,7 @@ public class MuteListServerPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[GRID USER HANDLER]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[GRID USER HANDLER]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 

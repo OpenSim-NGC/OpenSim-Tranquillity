@@ -31,13 +31,13 @@ using OpenSim.Server.Base;
 using OpenSim.Framework;
 
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.Connectors.Friends;
 
 public class FriendsSimConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected virtual string ServicePath()
     {
@@ -142,7 +142,7 @@ public class FriendsSimConnector
     {
         Util.FireAndForget(x => {
             string reqString = ServerUtils.BuildQueryString(sendData);
-            //m_log.DebugFormat("[FRIENDS SIM CONNECTOR]: queryString = {0}", reqString);
+            //m_log.LogDebug("[FRIENDS SIM CONNECTOR]: queryString = {0}", reqString);
             if (region == null)
                 return;
 
@@ -150,7 +150,7 @@ public class FriendsSimConnector
             if (!region.ServerURI.EndsWith("/"))
                 path = "/" + path;
             string uri = region.ServerURI + path;
-            // m_log.DebugFormat("[FRIENDS SIM CONNECTOR]: calling {0}", uri);
+            // m_log.LogDebug("[FRIENDS SIM CONNECTOR]: calling {0}", uri);
 
             try
             {
@@ -167,15 +167,15 @@ public class FriendsSimConnector
                         return;
                     }
                     else
-                        m_log.DebugFormat("[FRIENDS SIM CONNECTOR]: reply data does not contain result field");
+                        m_log.LogDebug("[FRIENDS SIM CONNECTOR]: reply data does not contain result field");
 
                 }
                 else
-                    m_log.DebugFormat("[FRIENDS SIM CONNECTOR]: received empty reply");
+                    m_log.LogDebug("[FRIENDS SIM CONNECTOR]: received empty reply");
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[FRIENDS SIM CONNECTOR]: Exception when contacting remote sim at {0}: {1}", uri, e.Message);
+                m_log.LogDebug("[FRIENDS SIM CONNECTOR]: Exception when contacting remote sim at {0}: {1}", uri, e.Message);
             }
 
             return;

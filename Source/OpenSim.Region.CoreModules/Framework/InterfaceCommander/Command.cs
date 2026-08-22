@@ -28,6 +28,9 @@
 using OpenSim.Region.Framework.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.Framework.InterfaceCommander;
 
 /// <summary>
@@ -36,7 +39,7 @@ namespace OpenSim.Region.CoreModules.Framework.InterfaceCommander;
 /// </summary>
 public class Command : ICommand
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private List<CommandArgument> m_args = new List<CommandArgument>();
 
     private Action<object[]> m_command;

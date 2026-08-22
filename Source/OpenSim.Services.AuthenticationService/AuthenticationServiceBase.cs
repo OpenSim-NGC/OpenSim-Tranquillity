@@ -26,13 +26,14 @@
  */
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Services.Interfaces;
 using OpenSim.Data;
 using OpenSim.Framework;
 using OpenSim.Services.Base;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.AuthenticationService;
 
@@ -44,8 +45,7 @@ namespace OpenSim.Services.AuthenticationService;
 //
 public class AuthenticationServiceBase : ServiceBase
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     protected IAuthenticationData m_Database;
@@ -125,11 +125,11 @@ public class AuthenticationServiceBase : ServiceBase
         auth.Data["passwordSalt"] = passwordSalt;
         if (!m_Database.Store(auth))
         {
-            m_log.DebugFormat("[AUTHENTICATION DB]: Failed to store authentication data");
+            m_log.LogDebug("[AUTHENTICATION DB]: Failed to store authentication data");
             return false;
         }
 
-        m_log.InfoFormat("[AUTHENTICATION DB]: Set password for principalID {0}", principalID);
+        m_log.LogInformation("[AUTHENTICATION DB]: Set password for principalID {0}", principalID);
         return true;
     }
 
@@ -169,11 +169,11 @@ public class AuthenticationServiceBase : ServiceBase
 
         if (!m_Database.Store(auth))
         {
-            m_log.ErrorFormat("[AUTHENTICATION DB]: Failed to store authentication info.");
+            m_log.LogError("[AUTHENTICATION DB]: Failed to store authentication info.");
             return false;
         }
 
-        m_log.DebugFormat("[AUTHENTICATION DB]: Set authentication info for principalID {0}", info.PrincipalID);
+        m_log.LogDebug("[AUTHENTICATION DB]: Set authentication info for principalID {0}", info.PrincipalID);
         return true;
     }
 

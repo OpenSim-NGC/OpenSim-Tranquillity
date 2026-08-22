@@ -26,11 +26,12 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using System.Data;
 using Npgsql;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.PGSQL;
 
@@ -38,7 +39,7 @@ public class PGSQLEstateStore : IEstateDataStore
 {
     private const string _migrationStore = "EstateStore";
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private PGSQLManager _Database;
     private string m_connectionString;
@@ -565,7 +566,7 @@ public class PGSQLEstateStore : IEstateDataStore
             }
             catch (Exception ex)
             {
-                m_log.Error("[REGION DB]: LinkRegion failed: " + ex.Message);
+                m_log.LogError("[REGION DB]: LinkRegion failed: " + ex.Message);
                 transaction.Rollback();
             }
         }

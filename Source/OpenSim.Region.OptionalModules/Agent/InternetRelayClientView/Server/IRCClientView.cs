@@ -28,13 +28,14 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
 using OpenSim.Framework;
 using OpenSim.Framework.Client;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server;
 
@@ -44,7 +45,7 @@ public class IRCClientView : IClientAPI, IClientCore
 {
     public event OnIRCClientReadyDelegate OnIRCReady;
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly TcpClient m_client;
     private readonly Scene m_scene;
@@ -81,7 +82,7 @@ public class IRCClientView : IClientAPI, IClientCore
 
     private void SendCommand(string command)
     {
-        m_log.Info("[IRCd] Sending >>> " + command);
+        m_log.LogInformation("[IRCd] Sending >>> " + command);
 
         byte[] buf = Util.UTF8.GetBytes(command + "\r\n");
 
@@ -90,7 +91,7 @@ public class IRCClientView : IClientAPI, IClientCore
 
     private void SendComplete(IAsyncResult result)
     {
-        m_log.Info("[IRCd] Send Complete.");
+        m_log.LogInformation("[IRCd] Send Complete.");
     }
 
     private string IrcRegionName
@@ -121,7 +122,7 @@ public class IRCClientView : IClientAPI, IClientCore
                     // Remove from buffer
                     strbuf = strbuf.Remove(0, message.Length);
 
-                    m_log.Info("[IRCd] Recieving <<< " + message);
+                    m_log.LogInformation("[IRCd] Recieving <<< " + message);
                     message = message.Trim();
 
                     // Extract command sequence
@@ -130,12 +131,12 @@ public class IRCClientView : IClientAPI, IClientCore
                 }
                 else
                 {
-                    //m_log.Info("[IRCd] Recieved data, but not enough to make a message. BufLen is " + strbuf.Length +
+                    //m_log.LogInformation("[IRCd] Recieved data, but not enough to make a message. BufLen is " + strbuf.Length +
                     //           "[" + strbuf + "]");
                     if (strbuf.Length == 0)
                     {
                         m_connected = false;
-                        m_log.Info("[IRCd] Buffer zero, closing...");
+                        m_log.LogInformation("[IRCd] Buffer zero, closing...");
                         if (OnDisconnectUser != null)
                             OnDisconnectUser();
                     }
@@ -150,14 +151,14 @@ public class IRCClientView : IClientAPI, IClientCore
             if (OnDisconnectUser != null)
                 OnDisconnectUser();
 
-            m_log.Warn("[IRCd] Disconnected client.");
+            m_log.LogWarning("[IRCd] Disconnected client.");
         }
         catch (SocketException)
         {
             if (OnDisconnectUser != null)
                 OnDisconnectUser();
 
-            m_log.Warn("[IRCd] Disconnected client.");
+            m_log.LogWarning("[IRCd] Disconnected client.");
         }
 
         Watchdog.RemoveThread();
@@ -165,7 +166,7 @@ public class IRCClientView : IClientAPI, IClientCore
 
     private void ProcessInMessage(string message, string command)
     {
-        m_log.Info("[IRCd] Processing [MSG:" + message + "] [COM:" + command + "]");
+        m_log.LogInformation("[IRCd] Processing [MSG:" + message + "] [COM:" + command + "]");
         if (command != null)
         {
             switch (command)
@@ -465,7 +466,7 @@ public class IRCClientView : IClientAPI, IClientCore
 
         if (msgs.Length < 2)
         {
-            m_log.Warn("[IRCd] Dropped msg: " + msg);
+            m_log.LogWarning("[IRCd] Dropped msg: " + msg);
             return null;
         }
 
@@ -937,7 +938,7 @@ public class IRCClientView : IClientAPI, IClientCore
 
     public void SendRegionHandshake()
     {
-        m_log.Info("[IRCd ClientStack] Completing Handshake to Region");
+        m_log.LogInformation("[IRCd ClientStack] Completing Handshake to Region");
 
         if (OnRegionHandShakeReply != null)
         {

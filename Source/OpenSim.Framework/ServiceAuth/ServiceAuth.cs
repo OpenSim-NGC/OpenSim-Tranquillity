@@ -27,11 +27,14 @@
 
 using Nini.Config;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Framework.ServiceAuth;
 
 public class ServiceAuth
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public static IServiceAuth Create(IConfigSource config, string section)
     {
@@ -53,7 +56,7 @@ public class ServiceAuth
         }
 
 //            foreach (IServiceAuth auth in compoundAuth.GetAuthentors())
-//                m_log.DebugFormat("[SERVICE AUTH]: Configured authenticator {0}", auth.Name);
+//                m_log.LogDebug("[SERVICE AUTH]: Configured authenticator {0}", auth.Name);
 
         if (compoundAuth.Count > 0)
             return compoundAuth;

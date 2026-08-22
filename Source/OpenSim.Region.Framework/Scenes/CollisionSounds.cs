@@ -28,7 +28,8 @@
 
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.Framework.Scenes;
 
@@ -41,7 +42,7 @@ public struct CollisionForSoundInfo
 
 public static class CollisionSounds
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private const int MaxMaterials = 7;
     // part part
@@ -304,7 +305,7 @@ public static class CollisionSounds
                     // should never be heard.
                     if (volume < 3.2f)
                         continue;
-//                        m_log.DebugFormat("Collision speed was {0}", volume);
+//                        m_log.LogDebug("Collision speed was {0}", volume);
 
                     // Cap to 0.2 times volume because climbing stairs should not be noisy
                     // Also changed scaling

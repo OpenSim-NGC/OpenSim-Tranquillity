@@ -27,13 +27,14 @@
 
 using System.Collections.Concurrent;
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Monitoring;
 
 public class JobEngine
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public int LogLevel { get; set; }
 
@@ -101,7 +102,7 @@ public class JobEngine
                 if (!IsRunning)
                     return;
 
-                m_log.DebugFormat("[JobEngine] Stopping {0}", Name);
+                m_log.LogDebug("[JobEngine] Stopping {0}", Name);
 
                 IsRunning = false;
                 if(m_numberThreads > 0)
@@ -204,7 +205,7 @@ public class JobEngine
         {
             if (m_warnOverMaxQueue)
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[{0}]: Job queue at maximum capacity, not recording job from {1} in {2}",
                     LoggingName, job.Name, Name);
 
@@ -238,7 +239,7 @@ public class JobEngine
             }
 
             if(LogLevel >= 1)
-                m_log.DebugFormat("[{0}]: Processing job {1}",LoggingName,currentJob.Name);
+                m_log.LogDebug("[{0}]: Processing job {1}",LoggingName,currentJob.Name);
 
             try
             {
@@ -246,12 +247,12 @@ public class JobEngine
             }
             catch(Exception e)
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[{0}]: Job {1} failed, continuing.  Exception {2}",LoggingName, currentJob.Name, e);
             }
 
             if(LogLevel >= 1)
-                m_log.DebugFormat("[{0}]: Processed job {1}",LoggingName,currentJob.Name);
+                m_log.LogDebug("[{0}]: Processed job {1}",LoggingName,currentJob.Name);
 
             currentJob.Action = null;
         }

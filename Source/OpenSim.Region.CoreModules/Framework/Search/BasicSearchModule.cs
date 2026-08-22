@@ -32,16 +32,16 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
 
+using Microsoft.Extensions.Logging;
 using DirFindFlags = OpenMetaverse.DirectoryManager.DirFindFlags;
 
 namespace OpenSim.Region.CoreModules.Framework.Search;
 
 public class BasicSearchModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected bool m_Enabled;
     protected List<Scene> m_Scenes = new List<Scene>();
@@ -59,7 +59,7 @@ public class BasicSearchModule : ISharedRegionModule
         if (umanmod == Name)
         {
             m_Enabled = true;
-            m_log.DebugFormat("[BASIC SEARCH MODULE]: {0} is enabled", Name);
+            m_log.LogDebug("[BASIC SEARCH MODULE]: {0} is enabled", Name);
         }
     }
 
@@ -111,7 +111,7 @@ public class BasicSearchModule : ISharedRegionModule
 
             // No Groups Service Connector, then group search won't work...
             if (m_GroupsService == null)
-                m_log.Warn("[BASIC SEARCH MODULE]: Could not get IGroupsModule");
+                m_log.LogWarning("[BASIC SEARCH MODULE]: Could not get IGroupsModule");
         }
     }
 
@@ -200,7 +200,7 @@ public class BasicSearchModule : ISharedRegionModule
         {
             if (m_GroupsService == null)
             {
-                m_log.Warn("[BASIC SEARCH MODULE]: Groups service is not available. Unable to search groups.");
+                m_log.LogWarning("[BASIC SEARCH MODULE]: Groups service is not available. Unable to search groups.");
                 remoteClient.SendAlertMessage("Groups search is not enabled");
                 return;
             }

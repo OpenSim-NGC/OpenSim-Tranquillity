@@ -8,9 +8,11 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Framework.Servers.HttpServer;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.RegionServer;
 
@@ -22,7 +24,7 @@ namespace OpenSim.Server.RegionServer;
 /// </summary>
 public sealed class RegionStatusHandlerRegistrar : IRegionStatusHandlerRegistrar
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public void Register(IHttpServer defaultServer, OpenSimBase app)
     {
@@ -38,7 +40,7 @@ public sealed class RegionStatusHandlerRegistrar : IRegionStatusHandlerRegistrar
             string urlBase = $"/{app.managedStatsURI}/";
             StatsManager.StatsPassword = app.managedStatsPassword;
             defaultServer.AddHTTPHandler(urlBase, StatsManager.HandleStatsRequest);
-            m_log.InfoFormat("[OPENSIM] Enabling remote managed stats fetch. URL = {0}", urlBase);
+            m_log.LogInformation("[OPENSIM] Enabling remote managed stats fetch. URL = {0}", urlBase);
         }
     }
 }

@@ -9,7 +9,8 @@
 
 using System;
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.RegionServer;
 
@@ -22,7 +23,7 @@ namespace OpenSim.Server.RegionServer;
 /// </summary>
 public sealed class RegionStartupScriptService : IRegionStartupScriptService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly Action<string> _runCommandScript;
 
@@ -38,7 +39,7 @@ public sealed class RegionStartupScriptService : IRegionStartupScriptService
     {
         if (String.IsNullOrEmpty(startupCommandsFile))
         {
-            m_log.Info("[STARTUP]: No startup command script specified. Moving on...");
+            m_log.LogInformation("[STARTUP]: No startup command script specified. Moving on...");
         }
         else
         {

@@ -6,6 +6,8 @@ using Nwc.XmlRpc;
 using OpenSim.Data.MySQL.MoneyData;
 using OpenSim.Server.MoneyServer.Models;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.MoneyServer.Controllers;
 
 public class MoneyWebXmlRpcController

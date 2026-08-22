@@ -30,14 +30,15 @@ using System.Reflection;
 using OpenSim.Framework;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
 using MySqlConnector;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.MySQL;
 
 public class UserProfilesData: IProfilesData
 {
-    static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     #region Properites
     string ConnectionString
@@ -110,7 +111,7 @@ public class UserProfilesData: IProfilesData
                             }
                             catch (Exception e)
                             {
-                                m_log.ErrorFormat("[PROFILES_DATA] GetClassifiedRecords exception {0}", e.Message);
+                                m_log.LogError("[PROFILES_DATA] GetClassifiedRecords exception {0}", e.Message);
                             }
                             n.Add("classifieduuid", OSD.FromUUID(Id));
                             n.Add("name", OSD.FromString(Name));
@@ -229,7 +230,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: UpdateClassifiedRecord exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: UpdateClassifiedRecord exception {0}", e.Message);
             result = e.Message;
             return false;
         }
@@ -256,7 +257,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: DeleteClassifiedRecord exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: DeleteClassifiedRecord exception {0}", e.Message);
             return false;
         }
         return true;
@@ -302,7 +303,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: GetClassifiedInfo exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: GetClassifiedInfo exception {0}", e.Message);
         }
         return true;
     }
@@ -344,7 +345,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: GetAvatarPicks exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: GetAvatarPicks exception {0}", e.Message);
         }
         return data;
     }
@@ -397,7 +398,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: GetPickInfo exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: GetPickInfo exception {0}", e.Message);
         }
         return pick;
     }
@@ -461,7 +462,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: UpdatePicksRecord exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: UpdatePicksRecord exception {0}", e.Message);
             return false;
         }
         return true;
@@ -488,7 +489,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: DeletePicksRecord exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: DeletePicksRecord exception {0}", e.Message);
             return false;
         }
         return true;
@@ -528,7 +529,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: GetAvatarNotes exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: GetAvatarNotes exception {0}", e.Message);
         }
         return true;
     }
@@ -575,7 +576,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: UpdateAvatarNotes exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: UpdateAvatarNotes exception {0}", e.Message);
             return false;
         }
         return true;
@@ -601,7 +602,7 @@ public class UserProfilesData: IProfilesData
                     {
                         if(reader.HasRows)
                         {
-                            m_log.DebugFormat("[PROFILES_DATA]" +
+                            m_log.LogDebug("[PROFILES_DATA]" +
                                               ": Getting data for {0}.", props.UserId);
                             reader.Read();
                             props.WebUrl = (string)reader["profileURL"];
@@ -618,7 +619,7 @@ public class UserProfilesData: IProfilesData
                         }
                         else
                         {
-                            m_log.DebugFormat("[PROFILES_DATA]" +
+                            m_log.LogDebug("[PROFILES_DATA]" +
                                              ": No data for {0}", props.UserId);
 
                             props.WebUrl = string.Empty;
@@ -696,7 +697,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: GetAvatarProperties exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: GetAvatarProperties exception {0}", e.Message);
             result = e.Message;
             return false;
         }
@@ -731,7 +732,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: UpdateAvatarProperties exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: UpdateAvatarProperties exception {0}", e.Message);
 
             return false;
         }
@@ -770,7 +771,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: UpdateAvatarInterests exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: UpdateAvatarInterests exception {0}", e.Message);
             result = e.Message;
             return false;
         }
@@ -852,7 +853,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: GetUserImageAssets exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: GetUserImageAssets exception {0}", e.Message);
         }
         return data;
     }
@@ -902,7 +903,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: GetUserPreferences exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: GetUserPreferences exception {0}", e.Message);
             result = e.Message;
             return false;
         }
@@ -934,7 +935,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: UpdateUserPreferences exception {0} {1}", e.Message, e.InnerException);
+            m_log.LogError("[PROFILES_DATA]: UpdateUserPreferences exception {0} {1}", e.Message, e.InnerException);
             result = e.Message;
             return false;
         }
@@ -985,7 +986,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: GetUserAppData exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: GetUserAppData exception {0}", e.Message);
             result = e.Message;
             return false;
         }
@@ -1015,7 +1016,7 @@ public class UserProfilesData: IProfilesData
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PROFILES_DATA]: SetUserAppData exception {0}", e.Message);
+            m_log.LogError("[PROFILES_DATA]: SetUserAppData exception {0}", e.Message);
             return false;
         }
         return true;

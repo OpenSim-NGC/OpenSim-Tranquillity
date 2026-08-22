@@ -27,9 +27,9 @@
 
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.Framework.Scenes;
@@ -41,7 +41,7 @@ public delegate void RemoveKnownRegionsFromAvatarList(UUID avatarID, List<ulong>
 /// </summary>
 public class SceneCommunicationService //one instance per region
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[SCENE COMM]";
 
     protected RegionInfo m_regionInfo;
@@ -55,10 +55,10 @@ public class SceneCommunicationService //one instance per region
 
     public void InformNeighborsThatRegionisUp(INeighbourService neighbourService, RegionInfo region)
     {
-        //m_log.Info("[INTER]: " + debugRegionName + ": SceneCommunicationService: Sending InterRegion Notification that region is up " + region.RegionName);
+        //m_log.LogInformation("[INTER]: " + debugRegionName + ": SceneCommunicationService: Sending InterRegion Notification that region is up " + region.RegionName);
         if (neighbourService == null)
         {
-            m_log.ErrorFormat("{0} No neighbour service provided for region {1} to inform neigbhours of status", LogHeader, m_scene.Name);
+            m_log.LogError("{0} No neighbour service provided for region {1} to inform neigbhours of status", LogHeader, m_scene.Name);
             return;
         }
 
@@ -69,7 +69,7 @@ public class SceneCommunicationService //one instance per region
 
         foreach (GridRegion n in neighbours)
         {
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //   "{0}: Region flags for {1} as seen by {2} are {3}",
             //    LogHeader, n.RegionName, m_scene.Name, regionFlags != null ? regionFlags.ToString() : "not present");
 
@@ -96,14 +96,14 @@ public class SceneCommunicationService //one instance per region
                     GridRegion neighbour = neighbourService.HelloNeighbour(regionhandle, region);
                     if (neighbour != null)
                     {
-                        m_log.DebugFormat("{0} Region {1} successfully informed neighbour {2} at {3}-{4} that it is up",
+                        m_log.LogDebug("{0} Region {1} successfully informed neighbour {2} at {3}-{4} that it is up",
                             LogHeader, m_scene.Name, neighbour.RegionName, rx, ry);
 
                         m_scene.EventManager.TriggerOnRegionUp(neighbour);
                     }
                     else
                     {
-                        m_log.WarnFormat("{0} Region {1} failed to inform neighbour at {2}-{3} that it is up.",
+                        m_log.LogWarning("{0} Region {1} failed to inform neighbour at {2}-{3} that it is up.",
                             LogHeader, m_scene.Name, rx, ry);
                     }
                 }
@@ -118,7 +118,7 @@ public class SceneCommunicationService //one instance per region
 
     public void SendChildAgentDataUpdate(AgentPosition cAgentData, ScenePresence presence)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //   "[SCENE COMMUNICATION SERVICE]: Sending child agent position updates for {0} in {1}",
         //   presence.Name, m_scene.Name);
 
@@ -173,12 +173,12 @@ public class SceneCommunicationService //one instance per region
                 GridRegion destination = m_scene.GridService.GetRegionByHandle(m_regionInfo.ScopeID, regionHandle);
                 if (destination == null)
                 {
-                    m_log.DebugFormat(
+                    m_log.LogDebug(
                         "[SCENE COMMUNICATION SERVICE]: Sending close agent ID {0} FAIL, region with handle {1} not found", agentID, regionHandle);
                     return;
                 }
 
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[SCENE COMMUNICATION SERVICE]: Sending close agent ID {0} to {1}", agentID, destination.RegionName);
 
                 m_scene.SimulationService.CloseAgent(destination, agentID, auth_code);

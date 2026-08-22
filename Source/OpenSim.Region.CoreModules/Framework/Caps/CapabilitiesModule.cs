@@ -27,7 +27,6 @@
 
 using System.Reflection;
 using System.Text;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -35,13 +34,14 @@ using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.CoreModules.Framework;
 
 public class CapabilitiesModule : INonSharedRegionModule, ICapabilitiesModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static readonly string m_showCapsCommandFormat = "   {0,-38} {1,-60}\n";
 
@@ -118,7 +118,7 @@ public class CapabilitiesModule : INonSharedRegionModule, ICapabilitiesModule
             {
                 if (capsObjectPath == oldCaps.CapsObjectPath)
                 {
-                    //m_log.WarnFormat(
+                    //m_log.LogWarning(
                     //    "[CAPS]: Reusing caps for agent {0} in region {1}.  Old caps path {2}, new caps path {3}. ",
                     //    agentId, m_scene.RegionInfo.RegionName, oldCaps.CapsObjectPath, capsObjectPath);
                     return;
@@ -136,7 +136,7 @@ public class CapabilitiesModule : INonSharedRegionModule, ICapabilitiesModule
                 }
             }
 
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[CAPS]: Adding capabilities for agent {0} in {1} with path {2}",
             //    agentId, m_scene.RegionInfo.RegionName, capsObjectPath);
 
@@ -144,7 +144,7 @@ public class CapabilitiesModule : INonSharedRegionModule, ICapabilitiesModule
                     (MainServer.Instance.DefaultServer is null) ? 0: MainServer.Instance.DefaultServer.Port,
                     capsObjectPath, agentId, m_scene.RegionInfo.RegionName);
 
-            m_log.Debug($"[CreateCaps]: new caps agent {agentId}, circuit {circuitCode}, path {caps.CapsObjectPath}");
+            m_log.LogDebug($"[CreateCaps]: new caps agent {agentId}, circuit {circuitCode}, path {caps.CapsObjectPath}");
 
             m_capsObjects[circuitCode] = caps;
         }
@@ -153,7 +153,7 @@ public class CapabilitiesModule : INonSharedRegionModule, ICapabilitiesModule
 
     public void RemoveCaps(UUID agentId, uint circuitCode)
     {
-        m_log.DebugFormat("[CAPS]: Remove caps for agent {0} in region {1}", agentId, m_scene.RegionInfo.RegionName);
+        m_log.LogDebug("[CAPS]: Remove caps for agent {0} in region {1}", agentId, m_scene.RegionInfo.RegionName);
         lock (m_childrenSeeds)
         {
             m_childrenSeeds.Remove(agentId);
@@ -179,7 +179,7 @@ public class CapabilitiesModule : INonSharedRegionModule, ICapabilitiesModule
                         return;
                     }
                 }
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[CAPS]: Received request to remove CAPS handler for root agent {0} in {1}, but no such CAPS handler found!",
                     agentId, m_scene.RegionInfo.RegionName);
             }
@@ -261,7 +261,7 @@ public class CapabilitiesModule : INonSharedRegionModule, ICapabilitiesModule
 
     public void SetChildrenSeed(UUID agentID, Dictionary<ulong, string> seeds)
     {
-        //m_log.DebugFormat(" !!! Setting child seeds in {0} to {1}", m_scene.RegionInfo.RegionName, seeds.Count);
+        //m_log.LogDebug(" !!! Setting child seeds in {0} to {1}", m_scene.RegionInfo.RegionName, seeds.Count);
 
         lock (m_childrenSeeds)
             m_childrenSeeds[agentID] = seeds;
@@ -269,14 +269,14 @@ public class CapabilitiesModule : INonSharedRegionModule, ICapabilitiesModule
 
     public void DumpChildrenSeeds(UUID agentID)
     {
-        m_log.Info("================ ChildrenSeed "+m_scene.RegionInfo.RegionName+" ================");
+        m_log.LogInformation("================ ChildrenSeed "+m_scene.RegionInfo.RegionName+" ================");
 
         lock (m_childrenSeeds)
         {
             foreach (KeyValuePair<ulong, string> kvp in m_childrenSeeds[agentID])
             {
                 Util.RegionHandleToRegionLoc(kvp.Key, out uint x, out uint y);
-                m_log.Info(" >> "+x+", "+y+": "+kvp.Value);
+                m_log.LogInformation(" >> "+x+", "+y+": "+kvp.Value);
             }
         }
     }

@@ -27,7 +27,6 @@
 
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -41,6 +40,8 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.UserAccountService;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.RegionServer;
 
 
@@ -49,7 +50,7 @@ namespace OpenSim.Server.RegionServer;
 /// </summary>
 public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // These are the names of the plugin-points extended by this
     // class during system startup.
@@ -208,7 +209,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
             // refuse to run MegaRegions
             if (startupConfig.GetBoolean("CombineContiguousRegions", false))
             {
-                m_log.Fatal("CombineContiguousRegions (MegaRegions) option is no longer suported. Use a older version to save region contents as OAR, then import into a fresh install of this new version");
+                m_log.LogCritical("CombineContiguousRegions (MegaRegions) option is no longer suported. Use a older version to save region contents as OAR, then import into a fresh install of this new version");
                 throw new Exception("CombineContiguousRegions not suported");
             }
 
@@ -391,7 +392,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
         IRegionModulesController controller;
         if (!ApplicationRegistry.TryGet(out controller))
         {
-            m_log.Fatal("REGIONMODULES]: The new RegionModulesController is missing...");
+            m_log.LogCritical("REGIONMODULES]: The new RegionModulesController is missing...");
             Environment.Exit(0);
         }
 
@@ -430,7 +431,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
         Scene scene = SetupScene(regionInfo, proxyOffset, Config);
 
-        m_log.Info("[REGIONMODULES]: Loading Region's modules");
+        m_log.LogInformation("[REGIONMODULES]: Loading Region's modules");
 
         if (controller != null)
             controller.AddRegionToModules(scene);
@@ -441,12 +442,12 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
             {
                 if (!scene.RegionModules.ContainsKey(s))
                 {
-                    m_log.Fatal("[MODULES]: Required module " + s + " not found.");
+                    m_log.LogCritical("[MODULES]: Required module " + s + " not found.");
                     Environment.Exit(0);
                 }
             }
 
-            m_log.InfoFormat("[SCENE]: Secure permissions loading enabled, modules loaded: {0}", String.Join(" ", m_permsModules.ToArray()));
+            m_log.LogInformation("[SCENE]: Secure permissions loading enabled, modules loaded: {0}", String.Join(" ", m_permsModules.ToArray()));
         }
 
         scene.SetModuleInterfaces();
@@ -484,7 +485,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[STARTUP]: Registration of region with grid failed, aborting startup due to {0} {1}",
                 e.Message, e.StackTrace);
 
@@ -597,7 +598,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
             //                        IUserAccountService innerUas
             //                            = ((LocalUserAccountServicesConnector)scene.UserAccountService).UserAccountService;
             //
-            //                        m_log.DebugFormat("B {0}", innerUas.GetType());
+            //                        m_log.LogDebug("B {0}", innerUas.GetType());
             //
             //                        if (innerUas is UserAccountService)
             //                        {
@@ -616,7 +617,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
                 UUID estateOwnerUuid = UUID.Zero;
                 if (!UUID.TryParse(rawEstateOwnerUuid, out estateOwnerUuid))
                 {
-                    m_log.ErrorFormat("[OPENSIM]: ID {0} is not a valid UUID", rawEstateOwnerUuid);
+                    m_log.LogError("[OPENSIM]: ID {0} is not a valid UUID", rawEstateOwnerUuid);
                     return;
                 }
 
@@ -637,7 +638,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
         if (account == null)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[OPENSIM]: Unable to store account. If this simulator is connected to a grid, you must create the estate owner account first at the grid level.");
         }
         else
@@ -649,7 +650,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
     private void ShutdownRegion(Scene scene)
     {
-        m_log.DebugFormat("[SHUTDOWN]: Shutting down region {0}", scene.RegionInfo.RegionName);
+        m_log.LogDebug("[SHUTDOWN]: Shutting down region {0}", scene.RegionInfo.RegionName);
         if (scene.SnmpService != null)
         {
             scene.SnmpService.BootInfo("The region is shutting down", scene);
@@ -684,7 +685,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
             if (scene.RegionInfo.RegionFile.ToLower().EndsWith(".xml"))
             {
                 File.Delete(scene.RegionInfo.RegionFile);
-                m_log.InfoFormat("[OPENSIM]: deleting region file \"{0}\"", scene.RegionInfo.RegionFile);
+                m_log.LogInformation("[OPENSIM]: deleting region file \"{0}\"", scene.RegionInfo.RegionFile);
             }
             if (scene.RegionInfo.RegionFile.ToLower().EndsWith(".ini"))
             {
@@ -792,7 +793,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
     protected virtual void HandleRestartRegion(RegionInfo whichRegion)
     {
-        m_log.InfoFormat(
+        m_log.LogInformation(
             "[OPENSIM]: Got restart signal from SceneManager for region {0} ({1},{2})",
             whichRegion.RegionName, whichRegion.RegionLocX, whichRegion.RegionLocY);
 
@@ -955,10 +956,10 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
             Util.XmlRpcCommand(proxyUrl, "Stop");
         }
 
-        m_log.Info("[SHUTDOWN]: Closing all threads");
-        m_log.Info("[SHUTDOWN]: Killing listener thread");
-        m_log.Info("[SHUTDOWN]: Killing clients");
-        m_log.Info("[SHUTDOWN]: Closing console and terminating");
+        m_log.LogInformation("[SHUTDOWN]: Closing all threads");
+        m_log.LogInformation("[SHUTDOWN]: Killing listener thread");
+        m_log.LogInformation("[SHUTDOWN]: Killing clients");
+        m_log.LogInformation("[SHUTDOWN]: Closing console and terminating");
 
         try
         {
@@ -968,7 +969,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
         }
         catch (Exception e)
         {
-            m_log.Error("[SHUTDOWN]: Ignoring failure during shutdown - ", e);
+            m_log.LogError(e, "[SHUTDOWN]: Ignoring failure during shutdown - ");
         }
 
         base.ShutdownSpecific();
@@ -1054,7 +1055,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
         if (regInfo.EstateSettings.EstateID != 0)
             return false;    // estate info in the database did not change
 
-        m_log.WarnFormat("[ESTATE] Region {0} is not part of an estate.", regInfo.RegionName);
+        m_log.LogWarning("[ESTATE] Region {0} is not part of an estate.", regInfo.RegionName);
 
         List<EstateSettings> estates = EstateDataService.LoadEstateSettingsAll();
         Dictionary<string, EstateSettings> estatesByName = [];
@@ -1097,7 +1098,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
             if (targetEstateJoined)
                 return true; // need to update the database
             else
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[OPENSIM BASE]: Joining target estate specified in region config {0} failed", targetEstateIDstr);
         }
         //##
@@ -1124,7 +1125,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
                 if (defaultEstateJoined)
                     return true; // need to update the database
                 else
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[OPENSIM BASE]: Joining default estate {0} failed", defaultEstateName);
             }
         }
@@ -1134,7 +1135,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
         {
             if (estates.Count == 0)
             {
-                m_log.Info("[ESTATE]: No existing estates found.  You must create a new one.");
+                m_log.LogInformation("[ESTATE]: No existing estates found.  You must create a new one.");
 
                 if (CreateEstate(regInfo, estatesByName, null))
                     break;

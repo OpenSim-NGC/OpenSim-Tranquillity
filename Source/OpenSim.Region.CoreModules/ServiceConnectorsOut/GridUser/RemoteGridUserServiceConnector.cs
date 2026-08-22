@@ -33,14 +33,15 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser;
 
 public class RemoteGridUserServicesConnector : ISharedRegionModule, IGridUserService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private const int KEEPTIME = 30; // 30 secs
     private ExpiringCacheOS<string, GridUserInfo> m_Infos = new ExpiringCacheOS<string, GridUserInfo>(10000);
@@ -98,7 +99,7 @@ public class RemoteGridUserServicesConnector : ISharedRegionModule, IGridUserSer
 
                 m_ActivityDetector = new ActivityDetector(this);
 
-                m_log.Info("[REMOTE GRID USER CONNECTOR]: Remote grid user enabled");
+                m_log.LogInformation("[REMOTE GRID USER CONNECTOR]: Remote grid user enabled");
             }
         }
     }
@@ -119,7 +120,7 @@ public class RemoteGridUserServicesConnector : ISharedRegionModule, IGridUserSer
         scene.RegisterModuleInterface<IGridUserService>(this);
         m_ActivityDetector.AddRegion(scene);
 
-        m_log.InfoFormat("[REMOTE GRID USER CONNECTOR]: Enabled remote grid user for region {0}", scene.RegionInfo.RegionName);
+        m_log.LogInformation("[REMOTE GRID USER CONNECTOR]: Enabled remote grid user for region {0}", scene.RegionInfo.RegionName);
 
     }
 
@@ -144,7 +145,7 @@ public class RemoteGridUserServicesConnector : ISharedRegionModule, IGridUserSer
 
     public GridUserInfo LoggedIn(string userID)
     {
-        m_log.Warn("[REMOTE GRID USER CONNECTOR]: LoggedIn not implemented at the simulators");
+        m_log.LogWarning("[REMOTE GRID USER CONNECTOR]: LoggedIn not implemented at the simulators");
         return null;
     }
 

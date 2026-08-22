@@ -29,15 +29,15 @@ using System.Reflection;
 
 using OpenMetaverse;
 using Nwc.XmlRpc;
-using log4net;
-
 using OpenSim.Framework;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.Connectors.InstantMessage;
 
 public class InstantMessageServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// This actually does the XMLRPC Request
@@ -64,13 +64,13 @@ public class InstantMessageServiceConnector
             }
             else
             {
-                m_log.DebugFormat("[GRID INSTANT MESSAGE]: No response from {0}", url);
+                m_log.LogDebug("[GRID INSTANT MESSAGE]: No response from {0}", url);
                 return false;
             }
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[GRID INSTANT MESSAGE]: Error sending message to {0} : {1}", url, e.Message);
+            m_log.LogError("[GRID INSTANT MESSAGE]: Error sending message to {0} : {1}", url, e.Message);
         }
 
         return false;

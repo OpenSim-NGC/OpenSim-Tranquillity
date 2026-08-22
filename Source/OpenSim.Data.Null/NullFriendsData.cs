@@ -27,11 +27,14 @@
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.Null;
 
 public class NullFriendsData : IFriendsData
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static List<FriendsData> m_Data = new List<FriendsData>();
 
@@ -80,12 +83,12 @@ public class NullFriendsData : IFriendsData
                     if (f2 != null)
                         f.Data["TheirFlags"] = f2.Data["Flags"];
 
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[NULL FRIENDS DATA]: Got {0} {1} {2} for {3}",
 //                        f.Friend, f.Data["Flags"], f2 != null ? f.Data["TheirFlags"] : "not found!", f.PrincipalID);
                 });
 
-//                m_log.DebugFormat("[NULL FRIENDS DATA]: Got {0} friends for {1}", lst.Count, userID);
+//                m_log.LogDebug("[NULL FRIENDS DATA]: Got {0} friends for {1}", lst.Count, userID);
 
                 return lst.ToArray();
             }
@@ -99,7 +102,7 @@ public class NullFriendsData : IFriendsData
         if (data == null)
             return false;
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[NULL FRIENDS DATA]: Storing {0} {1} {2}", data.PrincipalID, data.Friend, data.Data["Flags"]);
 
         lock (m_Data)
@@ -123,7 +126,7 @@ public class NullFriendsData : IFriendsData
                 FriendsData friend = lst.Find(delegate(FriendsData fdata) { return fdata.Friend == friendID; });
                 if (friendID != null)
                 {
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[NULL FRIENDS DATA]: Deleting friend {0} {1} for {2}",
 //                        friend.Friend, friend.Data["Flags"], friend.PrincipalID);
 

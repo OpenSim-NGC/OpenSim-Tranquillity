@@ -27,17 +27,19 @@
 
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.OptionalModules.Agent.InternetRelayClientView.Server;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.OptionalModules.Agent.InternetRelayClientView;
 
 public class IRCStackModule : INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IRCServer m_server;
     private int m_Port;
@@ -96,9 +98,9 @@ public class IRCStackModule : INonSharedRegionModule
 
     void user_OnIRCReady(IRCClientView cv)
     {
-        m_log.Info("[IRCd] Adding user...");
+        m_log.LogInformation("[IRCd] Adding user...");
         cv.Start();
-        m_log.Info("[IRCd] Added user to Scene");
+        m_log.LogInformation("[IRCd] Added user to Scene");
     }
 
 }

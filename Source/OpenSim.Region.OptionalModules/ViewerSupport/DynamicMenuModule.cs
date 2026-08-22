@@ -34,8 +34,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using Nini.Config;
-using log4net;
-
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
@@ -43,7 +42,7 @@ namespace OpenSim.Region.OptionalModules.ViewerSupport;
 
 public class DynamicMenuModule : INonSharedRegionModule, IDynamicMenuModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled = false;
     private class MenuItemData
@@ -268,8 +267,7 @@ public class DynamicMenuModule : INonSharedRegionModule, IDynamicMenuModule
 
 public class MenuActionHandler : SimpleOSDMapHandler
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_agentID;
     private Scene m_scene;

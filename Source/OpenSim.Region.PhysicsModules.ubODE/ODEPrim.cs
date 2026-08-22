@@ -27,16 +27,17 @@
 
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModules.ubODE;
 
 public class OdePrim : PhysicsActor
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_isphysical;
     private bool m_fakeisphysical;
@@ -418,7 +419,7 @@ public class OdePrim : PhysicsActor
             }
             else
             {
-                m_log.WarnFormat("[PHYSICS]: Got NaN Size on object {0}", Name);
+                m_log.LogWarning("[PHYSICS]: Got NaN Size on object {0}", Name);
             }
         }
     }
@@ -442,7 +443,7 @@ public class OdePrim : PhysicsActor
             }
             else
             {
-                m_log.WarnFormat("[PHYSICS]: NaN in Force Applied to an Object {0}", Name);
+                m_log.LogWarning("[PHYSICS]: NaN in Force Applied to an Object {0}", Name);
             }
         }
     }
@@ -658,7 +659,7 @@ public class OdePrim : PhysicsActor
             }
             else
             {
-                m_log.WarnFormat("[PHYSICS]: Got NaN Velocity in Object {0}", Name);
+                m_log.LogWarning("[PHYSICS]: Got NaN Velocity in Object {0}", Name);
             }
         }
     }
@@ -679,7 +680,7 @@ public class OdePrim : PhysicsActor
             }
             else
             {
-                m_log.WarnFormat("[PHYSICS]: Got NaN Torque in Object {0}", Name);
+                m_log.LogWarning("[PHYSICS]: Got NaN Torque in Object {0}", Name);
             }
         }
     }
@@ -718,7 +719,7 @@ public class OdePrim : PhysicsActor
                 AddChange(Changes.Orientation, value);
             }
             else
-                m_log.WarnFormat("[PHYSICS]: Got NaN quaternion Orientation from Scene in Object {0}", Name);
+                m_log.LogWarning("[PHYSICS]: Got NaN quaternion Orientation from Scene in Object {0}", Name);
 
         }
     }
@@ -754,7 +755,7 @@ public class OdePrim : PhysicsActor
             }
             else
             {
-                m_log.WarnFormat("[PHYSICS]: Got NaN RotationalVelocity in Object {0}", Name);
+                m_log.LogWarning("[PHYSICS]: Got NaN RotationalVelocity in Object {0}", Name);
             }
         }
     }
@@ -780,7 +781,7 @@ public class OdePrim : PhysicsActor
                 AddChange(Changes.PIDTarget,value);
             }
             else
-                m_log.WarnFormat("[PHYSICS]: Got NaN PIDTarget from Scene on Object {0}", Name);
+                m_log.LogWarning("[PHYSICS]: Got NaN PIDTarget from Scene on Object {0}", Name);
         }
     }
 
@@ -959,9 +960,9 @@ public class OdePrim : PhysicsActor
         }
         else
         {
-            m_log.WarnFormat("[PHYSICS]: Got Invalid linear force vector from Scene in Object {0}", Name);
+            m_log.LogWarning("[PHYSICS]: Got Invalid linear force vector from Scene in Object {0}", Name);
         }
-        //m_log.Info("[PHYSICS]: Added Force:" + force.ToString() +  " to prim at " + Position.ToString());
+        //m_log.LogInformation("[PHYSICS]: Added Force:" + force.ToString() +  " to prim at " + Position.ToString());
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -976,7 +977,7 @@ public class OdePrim : PhysicsActor
         }
         else
         {
-            m_log.WarnFormat("[PHYSICS]: Got Invalid Angular force vector from Scene in Object {0}", Name);
+            m_log.LogWarning("[PHYSICS]: Got Invalid Angular force vector from Scene in Object {0}", Name);
         }
     }
 
@@ -1131,7 +1132,7 @@ public class OdePrim : PhysicsActor
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override void LockAngularMotion(byte axislock)
     {
-        //m_log.DebugFormat("[axislock]: <{0},{1},{2}>", axis.X, axis.Y, axis.Z);
+        //m_log.LogDebug("[axislock]: <{0},{1},{2}>", axis.X, axis.Y, axis.Z);
         AddChange(Changes.AngLock, axislock);
     }
 
@@ -1274,7 +1275,7 @@ public class OdePrim : PhysicsActor
         {
             pos = new Vector3(((float)Constants.RegionSize * 0.5f), ((float)Constants.RegionSize * 0.5f),
                 parent_scene.GetTerrainHeightAtXY(((float)Constants.RegionSize * 0.5f), ((float)Constants.RegionSize * 0.5f)) + 0.5f);
-            m_log.WarnFormat("[PHYSICS]: Got nonFinite Object create Position for {0}", Name);
+            m_log.LogWarning("[PHYSICS]: Got nonFinite Object create Position for {0}", Name);
         }
         m_position = pos;
         m_givefakepos = 0;
@@ -1292,7 +1293,7 @@ public class OdePrim : PhysicsActor
         if (!size.IsFinite())
         {
             size = new Vector3(0.5f, 0.5f, 0.5f);
-            m_log.WarnFormat("[PHYSICS]: Got nonFinite Object create Size for {0}", Name);
+            m_log.LogWarning("[PHYSICS]: Got nonFinite Object create Size for {0}", Name);
         }
 
         m_size.X = (size.X <= 0) ? 0.01f : size.X;
@@ -1302,7 +1303,7 @@ public class OdePrim : PhysicsActor
         if (!QuaternionIsFinite(rotation))
         {
             rotation = Quaternion.Identity;
-            m_log.WarnFormat("[PHYSICS]: Got nonFinite Object create Rotation for {0}", Name);
+            m_log.LogWarning("[PHYSICS]: Got nonFinite Object create Rotation for {0}", Name);
         }
 
         m_orientation = rotation;
@@ -1626,16 +1627,16 @@ public class OdePrim : PhysicsActor
             float y = aabb.MaxY - aabb.MinY;
             float z = aabb.MaxZ - aabb.MinZ;
             if( x > 60.0f || y > 60.0f || z > 60.0f)
-                m_log.WarnFormat("[PHYSICS]: large prim geo {0},size {1}, AABBsize <{2},{3},{4}, mesh {5} at {6}",
+                m_log.LogWarning("[PHYSICS]: large prim geo {0},size {1}, AABBsize <{2},{3},{4}, mesh {5} at {6}",
                     Name, _size.ToString(), x, y, z, _pbs.SculptEntry ? _pbs.SculptTexture.ToString() : "primMesh", _position.ToString());
             else if (x < 0.001f || y < 0.001f || z < 0.001f)
-                m_log.WarnFormat("[PHYSICS]: small prim geo {0},size {1}, AABBsize <{2},{3},{4}, mesh {5} at {6}",
+                m_log.LogWarning("[PHYSICS]: small prim geo {0},size {1}, AABBsize <{2},{3},{4}, mesh {5} at {6}",
                     Name, _size.ToString(), x, y, z, _pbs.SculptEntry ? _pbs.SculptTexture.ToString() : "primMesh", _position.ToString());
             */
 
         }
         else
-            m_log.Warn("Setting bad Geom");
+            m_log.LogWarning("Setting bad Geom");
     }
 
     private bool GetMeshGeom()
@@ -1649,7 +1650,7 @@ public class OdePrim : PhysicsActor
 
         if (vertexCount == 0 || indexCount == 0)
         {
-            m_log.WarnFormat("[PHYSICS]: Invalid mesh data on OdePrim {0}, mesh {1} at {2}",
+            m_log.LogWarning("[PHYSICS]: Invalid mesh data on OdePrim {0}, mesh {1} at {2}",
                 Name, m_pbs.SculptEntry ? m_pbs.SculptTexture.ToString() : "primMesh", m_position.ToString());
 
             //m_hasOBB = false;
@@ -1667,7 +1668,7 @@ public class OdePrim : PhysicsActor
 
         if (vertexCount > 64000 || indexCount > 64000)
         {
-            m_log.WarnFormat("[PHYSICS]: large mesh data on OdePrim {0}, mesh {1} at {2}, {3} vertices, {4} indexes",
+            m_log.LogWarning("[PHYSICS]: large mesh data on OdePrim {0}, mesh {1} at {2}, {3} vertices, {4} indexes",
                 Name, m_pbs.SculptEntry ? m_pbs.SculptTexture.ToString() : "primMesh",
                 m_position.ToString() ,vertexCount , indexCount );
         }
@@ -1685,7 +1686,7 @@ public class OdePrim : PhysicsActor
 
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PHYSICS]: SetGeom Mesh failed for {0} exception: {1}", Name, e);
+            m_log.LogError("[PHYSICS]: SetGeom Mesh failed for {0} exception: {1}", Name, e);
             if (_triMeshData != IntPtr.Zero)
             {
                 try
@@ -1750,7 +1751,7 @@ public class OdePrim : PhysicsActor
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("[PHYSICS]: Create sphere failed: {0}", e);
+                    m_log.LogWarning("[PHYSICS]: Create sphere failed: {0}", e);
                     return;
                 }
             }
@@ -1762,7 +1763,7 @@ public class OdePrim : PhysicsActor
                 }
                 catch (Exception e)
                 {
-                    m_log.Warn("[PHYSICS]: Create box failed: {0}", e);
+                    m_log.LogWarning(e, "[PHYSICS]: Create box failed: {0}");
                     return;
                 }
             }
@@ -1789,7 +1790,7 @@ public class OdePrim : PhysicsActor
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PHYSICS]: PrimGeom destruction failed for {0} exception {1}", Name, e);
+                m_log.LogError("[PHYSICS]: PrimGeom destruction failed for {0} exception {1}", Name, e);
             }
 
             m_prim_geom = IntPtr.Zero;
@@ -1798,7 +1799,7 @@ public class OdePrim : PhysicsActor
         }
         else
         {
-            m_log.ErrorFormat("[PHYSICS]: PrimGeom destruction BAD {0}", Name);
+            m_log.LogError("[PHYSICS]: PrimGeom destruction BAD {0}", Name);
         }
 
         lock (m_meshlock)
@@ -1873,20 +1874,20 @@ public class OdePrim : PhysicsActor
 
         if (m_prim_geom == IntPtr.Zero)
         {
-            m_log.Warn("[PHYSICS]: Unable to link the linkset.  Root has no geom yet");
+            m_log.LogWarning("[PHYSICS]: Unable to link the linkset.  Root has no geom yet");
             return;
         }
 
         if (Body != IntPtr.Zero)
         {
             DestroyBody();
-            m_log.Warn("[PHYSICS]: MakeBody called having a body");
+            m_log.LogWarning("[PHYSICS]: MakeBody called having a body");
         }
 
         if (UBOdeNative.GeomGetBody(m_prim_geom) != IntPtr.Zero)
         {
             UBOdeNative.GeomSetBody(m_prim_geom, IntPtr.Zero);
-            m_log.Warn("[PHYSICS]: MakeBody root geom already had a body");
+            m_log.LogWarning("[PHYSICS]: MakeBody root geom already had a body");
         }
 
         bool noInertiaOverride = (m_InertiaOverride == null);
@@ -1922,7 +1923,7 @@ public class OdePrim : PhysicsActor
                 {
                     if (prm.m_prim_geom == IntPtr.Zero)
                     {
-                        m_log.Warn("[PHYSICS]: Unable to link one of the linkset elements, skipping it.  No geom yet");
+                        m_log.LogWarning("[PHYSICS]: Unable to link one of the linkset elements, skipping it.  No geom yet");
                         continue;
                     }
 
@@ -1933,7 +1934,7 @@ public class OdePrim : PhysicsActor
                     if (UBOdeNative.GeomGetBody(prm.m_prim_geom) != IntPtr.Zero)
                     {
                         UBOdeNative.GeomSetBody(prm.m_prim_geom, IntPtr.Zero);
-                        m_log.Warn("[PHYSICS]: MakeBody child geom already had a body");
+                        m_log.LogWarning("[PHYSICS]: MakeBody child geom already had a body");
                     }
 
                     UBOdeNative.GeomClearOffset(prm.m_prim_geom);
@@ -2048,7 +2049,7 @@ public class OdePrim : PhysicsActor
         }
 
         if (UBOdeNative.SpaceQuery(m_targetSpace, m_prim_geom))
-            m_log.Debug("[PRIM]: parent already in target space");
+            m_log.LogDebug("[PRIM]: parent already in target space");
         else
             UBOdeNative.SpaceAdd(m_targetSpace, m_prim_geom);
 
@@ -2087,7 +2088,7 @@ public class OdePrim : PhysicsActor
                     }
                     prm.m_targetSpace = m_targetSpace;
                     if (UBOdeNative.SpaceQuery(m_targetSpace, prmgeom))
-                        m_log.Debug("[PRIM]: child already in target space");
+                        m_log.LogDebug("[PRIM]: child already in target space");
                     else
                         UBOdeNative.SpaceAdd(m_targetSpace, prmgeom);
                 }
@@ -2537,7 +2538,7 @@ public class OdePrim : PhysicsActor
             // Debug
             float qlen = _orientation.Length();
             if (qlen > 1.01f || qlen < 0.99)
-                m_log.WarnFormat("[PHYSICS]: Got nonnorm quaternion from geom in Object {0} norm {1}", Name, qlen);
+                m_log.LogWarning("[PHYSICS]: Got nonnorm quaternion from geom in Object {0} norm {1}", Name, qlen);
             */
             m_orientation.Normalize();
             m_position = UBOdeNative.GeomGetPositionOMV(m_prim_geom);
@@ -3300,7 +3301,7 @@ public class OdePrim : PhysicsActor
         {
             lock (this)
             {
-                //m_log.Info("[PHYSICS]: dequeing forcelist");
+                //m_log.LogInformation("[PHYSICS]: dequeing forcelist");
                 if (m_isphysical && Body != IntPtr.Zero)
                 {
                     if (m_disabled)
@@ -3763,7 +3764,7 @@ public class OdePrim : PhysicsActor
 
             m_forceacc = Vector3.Zero;
 
-            //m_log.Info("[OBJPID]: X:" + fx.ToString() + " Y:" + fy.ToString() + " Z:" + fz.ToString());
+            //m_log.LogInformation("[OBJPID]: X:" + fx.ToString() + " Y:" + fy.ToString() + " Z:" + fz.ToString());
             if (fz != 0 || fx != 0 || fy != 0)
             {
                 UBOdeNative.BodyAddForce(Body, fx, fy, fz);

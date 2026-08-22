@@ -29,13 +29,14 @@
 using System.Reflection;
 using System.Text;
 using System.Xml;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.DataSnapshot.Interfaces;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.DataSnapshot;
 
@@ -55,7 +56,7 @@ public class DataSnapshotManager : ISharedRegionModule, IDataSnapshot
     private List<IDataSnapshotProvider> m_dataproviders = new List<IDataSnapshotProvider>();
 
     //Various internal objects
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     internal object m_syncInit = new object();
     private object m_serializeGen = new object();
 
@@ -98,7 +99,7 @@ public class DataSnapshotManager : ISharedRegionModule, IDataSnapshot
         if (!m_configLoaded)
         {
             m_configLoaded = true;
-            //m_log.Debug("[DATASNAPSHOT]: Loading configuration");
+            //m_log.LogDebug("[DATASNAPSHOT]: Loading configuration");
             //Read from the config for options
             lock (m_syncInit)
             {
@@ -124,7 +125,7 @@ public class DataSnapshotManager : ISharedRegionModule, IDataSnapshot
                     m_exposure_level = m_exposure_level.ToLower();
                     if(m_exposure_level !="all" && m_exposure_level != "minimum")
                     {
-                        m_log.ErrorFormat("[DATASNAPSHOT]: unknown data_exposure option: '{0}'. defaulting to minimum",m_exposure_level);
+                        m_log.LogError("[DATASNAPSHOT]: unknown data_exposure option: '{0}'. defaulting to minimum",m_exposure_level);
                         m_exposure_level = "minimum";
                     }
 
@@ -141,7 +142,7 @@ public class DataSnapshotManager : ISharedRegionModule, IDataSnapshot
                 }
                 catch (Exception)
                 {
-                    m_log.Warn("[DATASNAPSHOT]: Could not load configuration. DataSnapshot will be disabled.");
+                    m_log.LogWarning("[DATASNAPSHOT]: Could not load configuration. DataSnapshot will be disabled.");
                     m_enabled = false;
                     return;
                 }
@@ -181,12 +182,12 @@ public class DataSnapshotManager : ISharedRegionModule, IDataSnapshot
                         m_dataproviders.Add(module);
                         m_snapStore.AddProvider(module);
 
-                        m_log.Debug("[DATASNAPSHOT]: Added new data provider type: " + pluginType.Name);
+                        m_log.LogDebug("[DATASNAPSHOT]: Added new data provider type: " + pluginType.Name);
                     }
                 }
             }
         }
-        m_log.DebugFormat("[DATASNAPSHOT]: Module added to Scene {0}.", scene.RegionInfo.RegionName);
+        m_log.LogDebug("[DATASNAPSHOT]: Module added to Scene {0}.", scene.RegionInfo.RegionName);
     }
 
     public void RemoveRegion(Scene scene)
@@ -194,7 +195,7 @@ public class DataSnapshotManager : ISharedRegionModule, IDataSnapshot
         if (!m_enabled)
             return;
 
-        m_log.Info("[DATASNAPSHOT]: Region " + scene.RegionInfo.RegionName + " is being removed, removing from indexing");
+        m_log.LogInformation("[DATASNAPSHOT]: Region " + scene.RegionInfo.RegionName + " is being removed, removing from indexing");
         Scene restartedScene = SceneForUUID(scene.RegionInfo.RegionID);
 
         m_scenes.Remove(restartedScene);
@@ -350,12 +351,12 @@ public class DataSnapshotManager : ISharedRegionModule, IDataSnapshot
         }
         catch (XmlException e)
         {
-            m_log.Warn("[DATASNAPSHOT]: XmlException while trying to load snapshot: " + e.Message);
+            m_log.LogWarning("[DATASNAPSHOT]: XmlException while trying to load snapshot: " + e.Message);
             requestedSnap = GetErrorMessage(regionName, e);
         }
         catch (Exception e)
         {
-            m_log.Warn("[DATASNAPSHOT]: Caught unknown exception while trying to load snapshot: " + e.StackTrace);
+            m_log.LogWarning("[DATASNAPSHOT]: Caught unknown exception while trying to load snapshot: " + e.StackTrace);
             requestedSnap = GetErrorMessage(regionName, e);
         }
         finally
@@ -415,16 +416,16 @@ public class DataSnapshotManager : ISharedRegionModule, IDataSnapshot
                 }
                 catch (HttpRequestException)
                 {
-                    m_log.Warn("[DATASNAPSHOT]: Unable to notify " + url);
+                    m_log.LogWarning("[DATASNAPSHOT]: Unable to notify " + url);
                 }
                 catch (Exception e)
                 {
-                    m_log.Warn("[DATASNAPSHOT]: Ignoring unknown exception " + e.Message);
+                    m_log.LogWarning("[DATASNAPSHOT]: Ignoring unknown exception " + e.Message);
                 }
 
                 // This is not quite working, so...
                 // string responseStr = Util.UTF8.GetString(response);
-                m_log.Info("[DATASNAPSHOT]: data service " + url + " notified. Secret: " + m_Secret);
+                m_log.LogInformation("[DATASNAPSHOT]: data service " + url + " notified. Secret: " + m_Secret);
             }
         }
     }
@@ -469,7 +470,7 @@ public class DataSnapshotManager : ISharedRegionModule, IDataSnapshot
 
     public void MakeEverythingStale()
     {
-        m_log.Debug("[DATASNAPSHOT]: Marking all scenes as stale.");
+        m_log.LogDebug("[DATASNAPSHOT]: Marking all scenes as stale.");
         foreach (Scene scene in m_scenes)
         {
             m_snapStore.ForceSceneStale(scene);

@@ -30,6 +30,8 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver;
 
 /// <summary>
@@ -37,7 +39,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver;
 /// </summary>
 public static class InventoryArchiveUtils
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // Character used for escaping the path delimter ("\/") and itself ("\\") in human escaped strings
     public static readonly char ESCAPE_CHARACTER = '\\';
@@ -189,7 +191,7 @@ public static class InventoryArchiveUtils
         // If the path isn't just / then trim any starting extraneous slashes
         path = path.TrimStart(new char[] { PATH_DELIMITER });
 
-//            m_log.DebugFormat("[INVENTORY ARCHIVE UTILS]: Adjusted path in FindFolderByPath() is [{0}]", path);
+//            m_log.LogDebug("[INVENTORY ARCHIVE UTILS]: Adjusted path in FindFolderByPath() is [{0}]", path);
 
         string[] components = SplitEscapedPath(path);
         components[0] = UnescapePath(components[0]);
@@ -198,7 +200,7 @@ public static class InventoryArchiveUtils
 
         InventoryCollection contents = inventoryService.GetFolderContent(startFolder.Owner, startFolder.ID);
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "Found {0} folders in {1} for {2}", contents.Folders.Count, startFolder.Name, startFolder.Owner);
 
         foreach (InventoryFolderBase folder in contents.Folders)
@@ -317,17 +319,17 @@ public static class InventoryArchiveUtils
 
         if (components.Length == 1)
         {
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "FOUND SINGLE COMPONENT [{0}].  Looking for this in [{1}] {2}",
 //                    components[0], startFolder.Name, startFolder.ID);
 
             List<InventoryItemBase> items = inventoryService.GetFolderItems(startFolder.Owner, startFolder.ID);
 
-//                m_log.DebugFormat("[INVENTORY ARCHIVE UTILS]: Found {0} items in FindItemByPath()", items.Count);
+//                m_log.LogDebug("[INVENTORY ARCHIVE UTILS]: Found {0} items in FindItemByPath()", items.Count);
 
             foreach (InventoryItemBase item in items)
             {
-//                    m_log.DebugFormat("[INVENTORY ARCHIVE UTILS]: Inspecting item {0} {1}", item.Name, item.ID);
+//                    m_log.LogDebug("[INVENTORY ARCHIVE UTILS]: Inspecting item {0} {1}", item.Name, item.ID);
 
                 if (item.Name == components[0])
                     foundItems.Add(item);
@@ -335,7 +337,7 @@ public static class InventoryArchiveUtils
         }
         else
         {
-//                m_log.DebugFormat("FOUND COMPONENTS [{0}] and [{1}]", components[0], components[1]);
+//                m_log.LogDebug("FOUND COMPONENTS [{0}] and [{1}]", components[0], components[1]);
 
             InventoryCollection contents = inventoryService.GetFolderContent(startFolder.Owner, startFolder.ID);
 
@@ -360,7 +362,7 @@ public static class InventoryArchiveUtils
     /// </returns>
     public static string[] SplitEscapedPath(string path)
     {
-//            m_log.DebugFormat("SPLITTING PATH {0}", path);
+//            m_log.LogDebug("SPLITTING PATH {0}", path);
 
         bool singleEscapeChar = false;
 
@@ -390,7 +392,7 @@ public static class InventoryArchiveUtils
     /// <returns></returns>
     public static string UnescapePath(string path)
     {
-//            m_log.DebugFormat("ESCAPING PATH {0}", path);
+//            m_log.LogDebug("ESCAPING PATH {0}", path);
 
         StringBuilder sb = new StringBuilder();
 
@@ -413,7 +415,7 @@ public static class InventoryArchiveUtils
             }
         }
 
-//            m_log.DebugFormat("ESCAPED PATH TO {0}", sb);
+//            m_log.LogDebug("ESCAPED PATH TO {0}", sb);
 
         return sb.ToString();
     }

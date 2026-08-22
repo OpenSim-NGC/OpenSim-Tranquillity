@@ -26,17 +26,18 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence;
 
 public class BasePresenceServiceConnector : IPresenceService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected bool m_Enabled;
 
@@ -57,13 +58,13 @@ public class BasePresenceServiceConnector : IPresenceService
         if (!m_Enabled)
             return;
 
-        //            m_log.DebugFormat(
+        //            m_log.LogDebug(
         //                "[LOCAL PRESENCE CONNECTOR]: Registering IPresenceService to scene {0}", scene.RegionInfo.RegionName);
 
         scene.RegisterModuleInterface<IPresenceService>(this);
         m_PresenceDetector.AddRegion(scene);
 
-        m_log.InfoFormat("[BASE PRESENCE SERVICE CONNECTOR]: Enabled for region {0}", scene.Name);
+        m_log.LogInformation("[BASE PRESENCE SERVICE CONNECTOR]: Enabled for region {0}", scene.Name);
     }
 
     public void RemoveRegion(Scene scene)
@@ -93,7 +94,7 @@ public class BasePresenceServiceConnector : IPresenceService
 
     public bool LoginAgent(string userID, UUID sessionID, UUID secureSessionID)
     {
-        m_log.Warn("[BASE PRESENCE SERVICE CONNECTOR]: LoginAgent connector not implemented at the simulators");
+        m_log.LogWarning("[BASE PRESENCE SERVICE CONNECTOR]: LoginAgent connector not implemented at the simulators");
         return false;
     }
 

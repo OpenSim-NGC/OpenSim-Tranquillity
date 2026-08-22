@@ -34,6 +34,7 @@ using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Shared.Api;
 
+using Microsoft.Extensions.Logging;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
 using LSL_Key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
@@ -289,7 +290,7 @@ public partial class XMRInstance
      */
     private string FetchSource(string cameFrom)
     {
-        m_log.Debug("[YEngine]: fetching source " + cameFrom);
+        m_log.LogDebug("[YEngine]: fetching source " + cameFrom);
         if(!cameFrom.StartsWith("asset://"))
             throw new Exception("unable to retrieve source from " + cameFrom);
 
@@ -376,14 +377,14 @@ public partial class XMRInstance
             catch(ScriptStateLoadException ssle)
             {
                 RecordStateLoadFailure(ssle.Reason);
-                m_log.WarnFormat("[YEngine]: unable to restore state for {0} ({1}) from {2}: {3}",
+                m_log.LogWarning("[YEngine]: unable to restore state for {0} ({1}) from {2}: {3}",
                     m_ItemID, ssle.Reason, m_StateFileName, ssle.Message);
                 ResetToDefaultStateAfterLoadFailure();
             }
             catch(Exception e)
             {
                 RecordStateLoadFailure(ScriptStateLoadFailureReason.Unknown);
-                m_log.WarnFormat("[YEngine]: unable to restore state for {0} ({1}) from {2}: {3}",
+                m_log.LogWarning("[YEngine]: unable to restore state for {0} ({1}) from {2}: {3}",
                     m_ItemID, ScriptStateLoadFailureReason.Unknown, m_StateFileName, e.Message);
                 ResetToDefaultStateAfterLoadFailure();
             }
@@ -430,7 +431,7 @@ public partial class XMRInstance
         }
         catch(Exception e)
         {
-            m_log.WarnFormat("[YEngine]: unable to delete bad state file {0}: {1}", m_StateFileName, e.Message);
+            m_log.LogWarning("[YEngine]: unable to delete bad state file {0}: {1}", m_StateFileName, e.Message);
         }
 
         eventCode = ScriptEventCode.None;  // not processing any event
@@ -715,12 +716,12 @@ public partial class XMRInstance
         {
             if(int.TryParse(schemaVersion, out int stateSchema) && stateSchema != stateSchemaVersion)
             {
-                m_log.WarnFormat("[YEngine]: state schema version mismatch for {0}: saved={1}, current={2}",
+                m_log.LogWarning("[YEngine]: state schema version mismatch for {0}: saved={1}, current={2}",
                     m_ItemID, stateSchema, stateSchemaVersion);
             }
             else if(!int.TryParse(schemaVersion, out _))
             {
-                m_log.WarnFormat("[YEngine]: state schema version malformed for {0}: {1}",
+                m_log.LogWarning("[YEngine]: state schema version malformed for {0}: {1}",
                     m_ItemID, schemaVersion);
             }
         }
@@ -728,7 +729,7 @@ public partial class XMRInstance
         string migration = scriptStateN.GetAttribute("MigrationVersion");
         if(!string.IsNullOrEmpty(migration) && int.TryParse(migration, out int stateMigration) && stateMigration != migrationVersion)
         {
-            m_log.WarnFormat("[YEngine]: state migration version mismatch for {0}: saved={1}, current={2}",
+            m_log.LogWarning("[YEngine]: state migration version mismatch for {0}: saved={1}, current={2}",
                 m_ItemID, stateMigration, migrationVersion);
         }
 
@@ -738,7 +739,7 @@ public partial class XMRInstance
             string currentGlobalsSig = BuildGlobalsSignature();
             if(globalsSig != currentGlobalsSig)
             {
-                m_log.WarnFormat("[YEngine]: globals signature mismatch for {0}", m_ItemID);
+                m_log.LogWarning("[YEngine]: globals signature mismatch for {0}", m_ItemID);
             }
         }
 
@@ -748,7 +749,7 @@ public partial class XMRInstance
             string currentApiFingerprint = BuildApiFingerprint();
             if(apiFingerprint != currentApiFingerprint)
             {
-                m_log.WarnFormat("[YEngine]: API fingerprint mismatch for {0}: saved={1}, current={2}",
+                m_log.LogWarning("[YEngine]: API fingerprint mismatch for {0}: saved={1}, current={2}",
                     m_ItemID, apiFingerprint, currentApiFingerprint);
             }
         }
@@ -1258,8 +1259,8 @@ private LinkedList<EventParams> RestoreEventQueue(XmlNode eventsN)
             }
             catch(Exception e)
             {
-                m_log.Warn("[YEngine]: RestoreDetectParams bad XML: " + detxml.ToString());
-                m_log.Warn("[YEngine]: ... " + e.ToString());
+                m_log.LogWarning("[YEngine]: RestoreDetectParams bad XML: " + detxml.ToString());
+                m_log.LogWarning("[YEngine]: ... " + e.ToString());
             }
         }
 

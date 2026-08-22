@@ -34,13 +34,13 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.World.Estate;
 
 public class EstateConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected EstateModule m_EstateModule;
     private string token;
@@ -184,7 +184,7 @@ public class EstateConnector
     private bool Call(GridRegion region, Dictionary<string, object> sendData)
     {
         string reqString = ServerUtils.BuildQueryString(sendData);
-        // m_log.DebugFormat("[ESTATE CONNECTOR]: queryString = {0}", reqString);
+        // m_log.LogDebug("[ESTATE CONNECTOR]: queryString = {0}", reqString);
         try
         {
             //string url = "";
@@ -204,11 +204,11 @@ public class EstateConnector
                     return indx > 0;
             }
             else
-                m_log.DebugFormat("[ESTATE CONNECTOR]: received empty reply");
+                m_log.LogDebug("[ESTATE CONNECTOR]: received empty reply");
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[ESTATE CONNECTOR]: Exception when contacting remote sim: {0}", e.Message);
+            m_log.LogDebug("[ESTATE CONNECTOR]: Exception when contacting remote sim: {0}", e.Message);
         }
 
         return false;

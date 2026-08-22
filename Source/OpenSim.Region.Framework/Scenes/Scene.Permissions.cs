@@ -28,6 +28,8 @@
 using OpenMetaverse;
 using OpenSim.Framework;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.Framework.Scenes;
 
 #region Delegates
@@ -100,7 +102,7 @@ public delegate bool InteractWithPrimMediaHandler(UUID userID, UUID primID, int 
 
 public class ScenePermissions
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly Scene m_scene;
     public ScenePermissions(Scene scene)
@@ -325,7 +327,7 @@ public class ScenePermissions
                     return false;
             }
         }
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //   "[SCENE PERMISSIONS]: CanTakeObject() fired for object {0}, taker {1}, result {2}",
         //    objectID, AvatarTakingUUID, result);
         return true;
@@ -345,7 +347,7 @@ public class ScenePermissions
                     return false;
             }
         }
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENE PERMISSIONS]: CanSellGroupObject() fired for user {0}, group {1}, result {2}",
         //    userID, groupID, result);
         return true;
@@ -406,7 +408,7 @@ public class ScenePermissions
                     return false;
             }
         }
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //   "[SCENE PERMISSIONS]: CanTakeCopyObject() fired for object {0}, user {1}, result {2}",
         //   objectID, userID, result);
         return true;
@@ -589,7 +591,7 @@ public class ScenePermissions
                     return false;
             }
         }
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //   "[SCENE PERMISSIONS]: CanReturnObjects() fired for user {0} for {1} objects on {2}, result {3}",
         //    user, objects.Count, land.LandData.Name, result);
 

@@ -31,6 +31,8 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using System.Text;
 using System.Xml;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.Framework.Scenes;
 
 public class SOPVehicle
@@ -537,12 +539,12 @@ public class SOPVehicle
         {
             nodeName = xtr.Name;
 
-            // m_log.DebugFormat("[ExternalRepresentationUtils]: Processing: {0}", nodeName);
+            // m_log.LogDebug("[ExternalRepresentationUtils]: Processing: {0}", nodeName);
 
             Action p = null;
             if (processors.TryGetValue(xtr.Name, out p))
             {
-                // m_log.DebugFormat("[ExternalRepresentationUtils]: Found {0} processor, nodeName);
+                // m_log.LogDebug("[ExternalRepresentationUtils]: Found {0} processor, nodeName);
 
                 try
                 {
@@ -557,7 +559,7 @@ public class SOPVehicle
             }
             else
             {
-                // m_log.DebugFormat("[LandDataSerializer]: caught unknown element {0}", nodeName);
+                // m_log.LogDebug("[LandDataSerializer]: caught unknown element {0}", nodeName);
                 xtr.ReadOuterXml(); // ignore
             }
         }

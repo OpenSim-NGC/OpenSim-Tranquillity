@@ -33,11 +33,14 @@ using OSHttpServer;
 
 using System.Runtime.CompilerServices;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Framework.Servers.HttpServer;
 
 public class OSHttpRequest : IOSHttpRequest
 {
-    //private static readonly ILog _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger _log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected readonly IHttpRequest m_request = null;
 
@@ -248,7 +251,7 @@ public class OSHttpRequest : IOSHttpRequest
         //Form = new Hashtable();
         //foreach (HttpInputItem item in req.Form)
         //{
-        //    _log.DebugFormat("[OSHttpRequest]: Got form item {0}={1}", item.Name, item.Value);
+        //    _log.LogDebug("[OSHttpRequest]: Got form item {0}={1}", item.Name, item.Value);
         //   Form.Add(item.Name, item.Value);
         //}
     }

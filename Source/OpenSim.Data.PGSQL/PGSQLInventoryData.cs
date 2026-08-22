@@ -27,10 +27,11 @@
 
 using System.Data;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using Npgsql;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.PGSQL;
 
@@ -41,7 +42,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
 {
     private const string _migrationStore = "InventoryStore";
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// The database manager
@@ -54,7 +55,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
     [Obsolete("Cannot be default-initialized!")]
     public void Initialise()
     {
-        m_log.Info("[PGSQLInventoryData]: " + Name + " cannot be default-initialized!");
+        m_log.LogInformation("[PGSQLInventoryData]: " + Name + " cannot be default-initialized!");
         throw new PluginNotInitialisedException(Name);
     }
 
@@ -170,7 +171,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
                 }
             }
         }
-        m_log.InfoFormat("[INVENTORY DB] : Found no inventory folder with ID : {0}", folderID);
+        m_log.LogInformation("[INVENTORY DB] : Found no inventory folder with ID : {0}", folderID);
         return null;
     }
 
@@ -233,7 +234,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
         if (folderName.Length > 64)
         {
             folderName = folderName.Substring(0, 64);
-            m_log.Warn("[INVENTORY DB]: Name field truncated from " + folder.Name.Length.ToString() + " to " + folderName.Length + " characters on add");
+            m_log.LogWarning("[INVENTORY DB]: Name field truncated from " + folder.Name.Length.ToString() + " to " + folderName.Length + " characters on add");
         }
         using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
         using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
@@ -251,7 +252,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[INVENTORY DB]: Error : {0}", e.Message);
+                m_log.LogError("[INVENTORY DB]: Error : {0}", e.Message);
             }
         }
     }
@@ -273,7 +274,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
         if (folderName.Length > 64)
         {
             folderName = folderName.Substring(0, 64);
-            m_log.Warn("[INVENTORY DB]: Name field truncated from " + folder.Name.Length.ToString() + " to " + folderName.Length + " characters on update");
+            m_log.LogWarning("[INVENTORY DB]: Name field truncated from " + folder.Name.Length.ToString() + " to " + folderName.Length + " characters on update");
         }
         using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
         using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
@@ -291,7 +292,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[INVENTORY DB]: Error : {0}", e.Message);
+                m_log.LogError("[INVENTORY DB]: Error : {0}", e.Message);
             }
         }
     }
@@ -315,7 +316,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[INVENTORY DB]: Error : {0}", e.Message);
+                m_log.LogError("[INVENTORY DB]: Error : {0}", e.Message);
             }
         }
     }
@@ -402,7 +403,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
             }
         }
 
-        m_log.InfoFormat("[INVENTORY DB]: Found no inventory item with ID : {0}", itemID);
+        m_log.LogInformation("[INVENTORY DB]: Found no inventory item with ID : {0}", itemID);
         return null;
     }
 
@@ -433,14 +434,14 @@ public class PGSQLInventoryData : IInventoryDataPlugin
         if (item.Name.Length > 64)
         {
             itemName = item.Name.Substring(0, 64);
-            m_log.Warn("[INVENTORY DB]: Name field truncated from " + item.Name.Length.ToString() + " to " + itemName.Length.ToString() + " characters");
+            m_log.LogWarning("[INVENTORY DB]: Name field truncated from " + item.Name.Length.ToString() + " to " + itemName.Length.ToString() + " characters");
         }
 
         string itemDesc = item.Description;
         if (item.Description.Length > 128)
         {
             itemDesc = item.Description.Substring(0, 128);
-            m_log.Warn("[INVENTORY DB]: Description field truncated from " + item.Description.Length.ToString() + " to " + itemDesc.Length.ToString() + " characters");
+            m_log.LogWarning("[INVENTORY DB]: Description field truncated from " + item.Description.Length.ToString() + " to " + itemDesc.Length.ToString() + " characters");
         }
 
         using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
@@ -473,7 +474,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
             }
             catch (Exception e)
             {
-                m_log.Error("[INVENTORY DB]: Error inserting item :" + e.Message);
+                m_log.LogError("[INVENTORY DB]: Error inserting item :" + e.Message);
             }
         }
 
@@ -489,7 +490,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
             }
             catch (Exception e)
             {
-                m_log.Error("[INVENTORY DB] Error updating inventory folder for new item :" + e.Message);
+                m_log.LogError("[INVENTORY DB] Error updating inventory folder for new item :" + e.Message);
             }
         }
     }
@@ -525,14 +526,14 @@ public class PGSQLInventoryData : IInventoryDataPlugin
         if (item.Name.Length > 64)
         {
             itemName = item.Name.Substring(0, 64);
-            m_log.Warn("[INVENTORY DB]: Name field truncated from " + item.Name.Length.ToString() + " to " + itemName.Length.ToString() + " characters on update");
+            m_log.LogWarning("[INVENTORY DB]: Name field truncated from " + item.Name.Length.ToString() + " to " + itemName.Length.ToString() + " characters on update");
         }
 
         string itemDesc = item.Description;
         if (item.Description.Length > 128)
         {
             itemDesc = item.Description.Substring(0, 128);
-            m_log.Warn("[INVENTORY DB]: Description field truncated from " + item.Description.Length.ToString() + " to " + itemDesc.Length.ToString() + " characters on update");
+            m_log.LogWarning("[INVENTORY DB]: Description field truncated from " + item.Description.Length.ToString() + " to " + itemDesc.Length.ToString() + " characters on update");
         }
 
         using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
@@ -565,7 +566,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
             }
             catch (Exception e)
             {
-                m_log.Error("[INVENTORY DB]: Error updating item :" + e.Message);
+                m_log.LogError("[INVENTORY DB]: Error updating item :" + e.Message);
             }
         }
     }
@@ -590,7 +591,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
             }
             catch (Exception e)
             {
-                m_log.Error("[INVENTORY DB]: Error deleting item :" + e.Message);
+                m_log.LogError("[INVENTORY DB]: Error deleting item :" + e.Message);
             }
         }
     }
@@ -654,7 +655,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
             }
             catch (Exception e)
             {
-                m_log.Error("[INVENTORY DB] Error deleting item :" + e.Message);
+                m_log.LogError("[INVENTORY DB] Error deleting item :" + e.Message);
             }
         }
     }
@@ -754,7 +755,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
         }
         catch (Exception e)
         {
-            m_log.Error("[INVENTORY DB] Error reading inventory folder :" + e.Message);
+            m_log.LogError("[INVENTORY DB] Error reading inventory folder :" + e.Message);
         }
 
         return null;
@@ -796,7 +797,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
         }
         catch (NpgsqlException e)
         {
-            m_log.Error("[INVENTORY DB]: Error reading inventory item :" + e.Message);
+            m_log.LogError("[INVENTORY DB]: Error reading inventory item :" + e.Message);
         }
 
         return null;
@@ -820,7 +821,7 @@ public class PGSQLInventoryData : IInventoryDataPlugin
         }
         catch (NpgsqlException e)
         {
-            m_log.Error("[INVENTORY DB]: Error deleting folder :" + e.Message);
+            m_log.LogError("[INVENTORY DB]: Error deleting folder :" + e.Message);
         }
     }
 

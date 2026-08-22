@@ -27,17 +27,18 @@
 
 using System.Reflection;
 using Nini.Config;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Data;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.PresenceService;
 
 public class PresenceService : PresenceServiceBase, IPresenceService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected bool m_allowDuplicatePresences = false;
     const int EXPIREMS = 300000;
@@ -47,7 +48,7 @@ public class PresenceService : PresenceServiceBase, IPresenceService
     public PresenceService(IConfigSource config)
         : base(config)
     {
-        m_log.Debug("[PRESENCE SERVICE]: Starting presence service");
+        m_log.LogDebug("[PRESENCE SERVICE]: Starting presence service");
 
         IConfig presenceConfig = config.Configs["PresenceService"];
         if (presenceConfig != null)
@@ -92,7 +93,7 @@ public class PresenceService : PresenceServiceBase, IPresenceService
         if (prevUser != null)
             prevUserStr = string.Format(". This user was already logged-in: session {0}, region {1}", prevUser.SessionID, prevUser.RegionID);
 
-        m_log.DebugFormat("[PRESENCE SERVICE]: LoginAgent: session {0}, user {1}, region {2}, secure session {3}{4}",
+        m_log.LogDebug("[PRESENCE SERVICE]: LoginAgent: session {0}, user {1}, region {2}, secure session {3}{4}",
             data.SessionID, data.UserID, data.RegionID, secureSessionID, prevUserStr);
 
         return true;
@@ -104,7 +105,7 @@ public class PresenceService : PresenceServiceBase, IPresenceService
          if(!inCache)
             presence = m_Database.Get(sessionID);
 
-        m_log.DebugFormat("[PRESENCE SERVICE]: LogoutAgent: session {0}, user {1}, region {2}",
+        m_log.LogDebug("[PRESENCE SERVICE]: LogoutAgent: session {0}, user {1}, region {2}",
             sessionID,
             (presence == null) ? null : presence.UserID,
             (presence == null) ? null : presence.RegionID.ToString());
@@ -125,7 +126,7 @@ public class PresenceService : PresenceServiceBase, IPresenceService
         if ((prevSessions is null) || (prevSessions.Length == 0))
             return true;
 
-        m_log.DebugFormat("[PRESENCE SERVICE]: Logout users in region {0}", regionID);
+        m_log.LogDebug("[PRESENCE SERVICE]: Logout users in region {0}", regionID);
         for (int i = 0; i < prevSessions.Length; ++i)
         {
             PresenceData pd = prevSessions[i];
@@ -155,7 +156,7 @@ public class PresenceService : PresenceServiceBase, IPresenceService
             else
                 success = m_Database.ReportAgent(sessionID, regionID);
 
-            m_log.DebugFormat("[PRESENCE SERVICE]: ReportAgent{0}: session {1}, user {2}, region {3}. Previously: {4}",
+            m_log.LogDebug("[PRESENCE SERVICE]: ReportAgent{0}: session {1}, user {2}, region {3}. Previously: {4}",
                 success ? "" : " failed",
                 sessionID, (presence == null) ? null : presence.UserID, regionID,
                 (presence == null) ? "not logged-in" : "region " + presence.RegionID);
@@ -176,7 +177,7 @@ public class PresenceService : PresenceServiceBase, IPresenceService
         }
         catch (Exception e)
         {
-            m_log.Debug(string.Format("[PRESENCE SERVICE]: ReportAgent for session {0} threw exception ", sessionID), e);
+            m_log.LogDebug(e, string.Format("[PRESENCE SERVICE]: ReportAgent for session {0} threw exception ", sessionID));
             return false;
         }
     }
@@ -232,7 +233,7 @@ public class PresenceService : PresenceServiceBase, IPresenceService
                 };
                 info.Add(ret);
             }
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[PRESENCE SERVICE]: GetAgents for {0} found {1} presences", userIDStr, data.Length);
         }
 

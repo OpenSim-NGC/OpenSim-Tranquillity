@@ -33,6 +33,7 @@ using System.Runtime.InteropServices;
 using OpenSim.Server.MoneyServer.Models;
 using OpenSim.Server.Base.Hosting;
 
+using Microsoft.Extensions.Logging;
 /// <summary>
 /// OpenSim Server MoneyServer
 /// </summary>

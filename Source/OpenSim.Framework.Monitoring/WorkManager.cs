@@ -26,7 +26,8 @@
  */
 
 using System.Runtime.CompilerServices;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Monitoring;
 
@@ -47,7 +48,7 @@ namespace OpenSim.Framework.Monitoring;
 /// </remarks>
 public static class WorkManager
 {
-    private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
     public static JobEngine JobEngine { get; private set; }
 
@@ -221,7 +222,7 @@ public static class WorkManager
             }
             catch (Exception e)
             {
-                m_log.Error(string.Format("[WATCHDOG]: Exception in thread {0}.", name), e);
+                m_log.LogError(e, string.Format("[WATCHDOG]: Exception in thread {0}.", name));
             }
             finally
             {

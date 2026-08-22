@@ -37,13 +37,13 @@ using OpenSim.Services.Connectors.Hypergrid;
 using OpenMetaverse;
 
 using Nini.Config;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.HypergridService;
 
 public class GatekeeperService : IGatekeeperService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static bool m_Initialized = false;
 
@@ -108,7 +108,7 @@ public class GatekeeperService : IGatekeeperService
             m_gatekeeperHost = new OSHHTPHost(externalName, true);
             if (!m_gatekeeperHost.IsResolvedHost)
             {
-                m_log.Error((m_gatekeeperHost.IsValidHost ? "Could not resolve GatekeeperURI" : "GatekeeperURI is a invalid host ") + externalName ?? "");
+                m_log.LogError((m_gatekeeperHost.IsValidHost ? "Could not resolve GatekeeperURI" : "GatekeeperURI is a invalid host ") + externalName ?? "");
                 throw new Exception("GatekeeperURI is invalid");
             }
             m_gatekeeperURL = m_gatekeeperHost.URIwEndSlash;
@@ -158,7 +158,7 @@ public class GatekeeperService : IGatekeeperService
                 catch
                 {
                     m_AllowedClientsRegex = null;
-                    m_log.Error("[GATEKEEPER SERVICE]: failed to parse AllowedClients");
+                    m_log.LogError("[GATEKEEPER SERVICE]: failed to parse AllowedClients");
                 }
             }
 
@@ -172,7 +172,7 @@ public class GatekeeperService : IGatekeeperService
                 catch
                 {
                     m_DeniedClientsRegex = null;
-                    m_log.Error("[GATEKEEPER SERVICE]: failed to parse DeniedClients");
+                    m_log.LogError("[GATEKEEPER SERVICE]: failed to parse DeniedClients");
                 }
             }
 
@@ -196,7 +196,7 @@ public class GatekeeperService : IGatekeeperService
             IConfig messagingConfig = config.Configs["Messaging"];
             if (messagingConfig is not null)
                 m_messageKey = messagingConfig.GetString("MessageKey", String.Empty);
-            m_log.Debug("[GATEKEEPER SERVICE]: Starting...");
+            m_log.LogDebug("[GATEKEEPER SERVICE]: Starting...");
         }
     }
 
@@ -230,7 +230,7 @@ public class GatekeeperService : IGatekeeperService
         reason = string.Empty;
         GridRegion region;
 
-        //m_log.DebugFormat("[GATEKEEPER SERVICE]: Request to link to {0}", (regionName.Length == 0)? "default region" : regionName);
+        //m_log.LogDebug("[GATEKEEPER SERVICE]: Request to link to {0}", (regionName.Length == 0)? "default region" : regionName);
         if (!m_AllowTeleportsToAnyRegion || regionName.Length == 0)
         {
             List<GridRegion> defs = m_GridService.GetDefaultHypergridRegions(m_ScopeID);
@@ -242,7 +242,7 @@ public class GatekeeperService : IGatekeeperService
             else
             {
                 reason = "Grid setup problem. Try specifying a particular region here.";
-                m_log.Debug("[GATEKEEPER SERVICE]: Unable to send information. Please specify a default region for this grid!");
+                m_log.LogDebug("[GATEKEEPER SERVICE]: Unable to send information. Please specify a default region for this grid!");
                 return false;
             }
         }
@@ -251,7 +251,7 @@ public class GatekeeperService : IGatekeeperService
             region = m_GridService.GetLocalRegionByName(m_ScopeID, regionName);
             if (region is null)
             {
-                m_log.DebugFormat($"[GATEKEEPER SERVICE]: LinkLocalRegion could not find local region {regionName}");
+                m_log.LogDebug($"[GATEKEEPER SERVICE]: LinkLocalRegion could not find local region {regionName}");
                 reason = "Region not found";
                 return false;
             }
@@ -276,7 +276,7 @@ public class GatekeeperService : IGatekeeperService
         if (!m_AllowTeleportsToAnyRegion)
         {
             // Don't even check the given regionID
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[GATEKEEPER SERVICE]: Returning gateway region {0} {1} @ {2} to user {3}{4} as teleporting to arbitrary regions is not allowed.",
                 m_DefaultGatewayRegion.RegionName,
                 m_DefaultGatewayRegion.RegionID,
@@ -292,7 +292,7 @@ public class GatekeeperService : IGatekeeperService
 
         if (region == null)
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[GATEKEEPER SERVICE]: Could not find region with ID {0} as requested by user {1}{2}.  Returning null.",
                 regionID, agentID, (agentHomeURI is null) ? "" : " @ " + agentHomeURI);
 
@@ -300,7 +300,7 @@ public class GatekeeperService : IGatekeeperService
             return null;
         }
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[GATEKEEPER SERVICE]: Returning region {0} {1} @ {2} to user {3}{4}.",
             region.RegionName,
             region.RegionID,
@@ -318,7 +318,7 @@ public class GatekeeperService : IGatekeeperService
 
         string authURL = aCircuit.ServiceURLs.TryGetValue("HomeURI", out object value) ? value.ToString() : string.Empty;
 
-        m_log.InfoFormat("[GATEKEEPER SERVICE]: Login request for {0} {1} @ {2} ({3}) at {4} using viewer {5}, channel {6}, IP {7}, Mac {8}, Id0 {9}, Teleport Flags: {10}. From region {11}",
+        m_log.LogInformation("[GATEKEEPER SERVICE]: Login request for {0} {1} @ {2} ({3}) at {4} using viewer {5}, channel {6}, IP {7}, Mac {8}, Id0 {9}, Teleport Flags: {10}. From region {11}",
             aCircuit.firstname, aCircuit.lastname, authURL, aCircuit.AgentID, destination.RegionID,
             aCircuit.Viewer, aCircuit.Channel, aCircuit.IPAddress, aCircuit.Mac, aCircuit.Id0, (TeleportFlags)aCircuit.teleportFlags,
             (source == null) ? "Unknown" : string.Format("{0} ({1}){2}", source.RegionName, source.RegionID, (source.RawServerURI == null) ? "" : " @ " + source.ServerURI));
@@ -339,7 +339,7 @@ public class GatekeeperService : IGatekeeperService
                 if (!am.Success)
                 {
                     reason = "Login failed: client " + curViewer + " is not allowed";
-                    m_log.InfoFormat("[GATEKEEPER SERVICE]: Login failed, reason: client {0} is not allowed", curViewer);
+                    m_log.LogInformation("[GATEKEEPER SERVICE]: Login failed, reason: client {0} is not allowed", curViewer);
                     return false;
                 }
             }
@@ -354,7 +354,7 @@ public class GatekeeperService : IGatekeeperService
                 if (dm.Success)
                 {
                     reason = "Login failed: client " + curViewer + " is denied";
-                    m_log.InfoFormat("[GATEKEEPER SERVICE]: Login failed, reason: client {0} is denied", curViewer);
+                    m_log.LogInformation("[GATEKEEPER SERVICE]: Login failed, reason: client {0} is denied", curViewer);
                     return false;
                 }
             }
@@ -362,22 +362,22 @@ public class GatekeeperService : IGatekeeperService
 
         if (!string.IsNullOrWhiteSpace(m_DeniedMacs))
         {
-            //m_log.InfoFormat("[GATEKEEPER SERVICE]: Checking users Mac {0} against list of denied macs {1} ...", curMac, m_DeniedMacs);
+            //m_log.LogInformation("[GATEKEEPER SERVICE]: Checking users Mac {0} against list of denied macs {1} ...", curMac, m_DeniedMacs);
             if (m_DeniedMacs.Contains(curMac, StringComparison.InvariantCultureIgnoreCase))
             {
                 reason = "Login failed: client with Mac " + curMac + " is denied";
-                m_log.InfoFormat("[GATEKEEPER SERVICE]: Login failed, reason: client with mac {0} is denied", curMac);
+                m_log.LogInformation("[GATEKEEPER SERVICE]: Login failed, reason: client with mac {0} is denied", curMac);
                 return false;
             }
         }
 
         if (!string.IsNullOrWhiteSpace(m_DeniedID0s))
         {
-            //m_log.InfoFormat("[GATEKEEPER SERVICE]: Checking users Mac {0} against list of denied macs {1} ...", curMac, m_DeniedMacs);
+            //m_log.LogInformation("[GATEKEEPER SERVICE]: Checking users Mac {0} against list of denied macs {1} ...", curMac, m_DeniedMacs);
             if (m_DeniedID0s.Contains(aCircuit.Id0, StringComparison.InvariantCultureIgnoreCase))
             {
                 reason = "Login failed: client with id0 " + aCircuit.Id0 + " is denied";
-                m_log.InfoFormat("[GATEKEEPER SERVICE]: Login failed, reason: client with mac {0} is denied", aCircuit.Id0);
+                m_log.LogInformation("[GATEKEEPER SERVICE]: Login failed, reason: client with mac {0} is denied", aCircuit.Id0);
                 return false;
             }
         }
@@ -388,10 +388,10 @@ public class GatekeeperService : IGatekeeperService
         if (!Authenticate(aCircuit))
         {
             reason = "Unable to verify identity";
-            m_log.InfoFormat("[GATEKEEPER SERVICE]: Unable to verify identity of agent {0} {1}. Refusing service.", aCircuit.firstname, aCircuit.lastname);
+            m_log.LogInformation("[GATEKEEPER SERVICE]: Unable to verify identity of agent {0} {1}. Refusing service.", aCircuit.firstname, aCircuit.lastname);
             return false;
         }
-        m_log.DebugFormat("[GATEKEEPER SERVICE]: Identity verified for {0} {1} @ {2}", aCircuit.firstname, aCircuit.lastname, authURL);
+        m_log.LogDebug("[GATEKEEPER SERVICE]: Identity verified for {0} {1} @ {2}", aCircuit.firstname, aCircuit.lastname, authURL);
 
         //
         // Check for impersonations
@@ -410,7 +410,7 @@ public class GatekeeperService : IGatekeeperService
                     {
                         // Can't do, sorry
                         reason = "Unauthorized";
-                        m_log.InfoFormat("[GATEKEEPER SERVICE]: Foreign agent {0} {1} has same ID as local user. Refusing service.",
+                        m_log.LogInformation("[GATEKEEPER SERVICE]: Foreign agent {0} {1} has same ID as local user. Refusing service.",
                             aCircuit.firstname, aCircuit.lastname);
                         return false;
 
@@ -435,7 +435,7 @@ public class GatekeeperService : IGatekeeperService
             if (!allowed)
             {
                 reason = "Destination does not allow visitors from your world";
-                m_log.InfoFormat("[GATEKEEPER SERVICE]: Foreign agents are not permitted {0} {1} @ {2}. Refusing service.",
+                m_log.LogInformation("[GATEKEEPER SERVICE]: Foreign agents are not permitted {0} {1} @ {2}. Refusing service.",
                     aCircuit.firstname, aCircuit.lastname, aCircuit.ServiceURLs["HomeURI"]);
                 return false;
             }
@@ -449,7 +449,7 @@ public class GatekeeperService : IGatekeeperService
         if (m_BansService is not null && m_BansService.IsBanned(uui, aCircuit.IPAddress, aCircuit.Id0, authURL))
         {
             reason = "You are banned from this world";
-            m_log.InfoFormat("[GATEKEEPER SERVICE]: Login failed, reason: user {0} is banned", uui);
+            m_log.LogInformation("[GATEKEEPER SERVICE]: Login failed, reason: user {0} is banned", uui);
             return false;
         }
 
@@ -473,7 +473,7 @@ public class GatekeeperService : IGatekeeperService
                         if (SendAgentGodKillToRegion(UUID.Zero, agentID, uui, guinfo))
                         {
                             if (account is not null)
-                                m_log.InfoFormat(
+                                m_log.LogInformation(
                                     "[GATEKEEPER SERVICE]: Login failed for {0} {1}, reason: already logged in",
                                     account.FirstName, account.LastName);
                             reason = "You appear to be already logged in on the destination grid " +
@@ -486,7 +486,7 @@ public class GatekeeperService : IGatekeeperService
             }
         }
 
-        m_log.DebugFormat("[GATEKEEPER SERVICE]: User {0} is ok", aCircuit.Name);
+        m_log.LogDebug("[GATEKEEPER SERVICE]: User {0} is ok", aCircuit.Name);
 
         bool isFirstLogin = false;
         //
@@ -501,7 +501,7 @@ public class GatekeeperService : IGatekeeperService
             if (!m_PresenceService.LoginAgent(aCircuit.AgentID.ToString(), aCircuit.SessionID, aCircuit.SecureSessionID))
             {
                 reason = "Unable to login presence";
-                m_log.InfoFormat("[GATEKEEPER SERVICE]: Presence login failed for foreign agent {0} {1}. Refusing service.",
+                m_log.LogInformation("[GATEKEEPER SERVICE]: Presence login failed for foreign agent {0} {1}. Refusing service.",
                     aCircuit.firstname, aCircuit.lastname);
                 return false;
             }
@@ -518,7 +518,7 @@ public class GatekeeperService : IGatekeeperService
             return false;
         }
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[GATEKEEPER SERVICE]: Destination {0} is ok for {1}", destination.RegionName, aCircuit.Name);
 
         //
@@ -540,7 +540,7 @@ public class GatekeeperService : IGatekeeperService
             }
             catch
             {
-                m_log.WarnFormat("[GATEKEEPER SERVICE]: Malformed HomeURI (this should never happen): {0}", aCircuit.ServiceURLs["HomeURI"]);
+                m_log.LogWarning("[GATEKEEPER SERVICE]: Malformed HomeURI (this should never happen): {0}", aCircuit.ServiceURLs["HomeURI"]);
                 aCircuit.lastname = "@" + aCircuit.ServiceURLs["HomeURI"].ToString();
             }
         }
@@ -553,7 +553,7 @@ public class GatekeeperService : IGatekeeperService
         // Preserve our TeleportFlags we have gathered so-far
         loginFlag |= (Constants.TeleportFlags) aCircuit.teleportFlags;
 
-        m_log.DebugFormat("[GATEKEEPER SERVICE]: Launching {0}, Teleport Flags: {1}", aCircuit.Name, loginFlag);
+        m_log.LogDebug("[GATEKEEPER SERVICE]: Launching {0}, Teleport Flags: {1}", aCircuit.Name, loginFlag);
 
         EntityTransferContext ctx = new();
 
@@ -566,7 +566,7 @@ public class GatekeeperService : IGatekeeperService
 
         if(didit)
         {
-            m_log.DebugFormat("[GATEKEEPER SERVICE]: Login presence {0} is ok", aCircuit.Name);
+            m_log.LogDebug("[GATEKEEPER SERVICE]: Login presence {0} is ok", aCircuit.Name);
 
             if(!isFirstLogin && m_GridUserService is not null && account is null) 
             {
@@ -598,7 +598,7 @@ public class GatekeeperService : IGatekeeperService
 
         if (string.IsNullOrEmpty(aCircuit.IPAddress))
         {
-            m_log.DebugFormat("[GATEKEEPER SERVICE]: Agent did not provide a client IP address.");
+            m_log.LogDebug("[GATEKEEPER SERVICE]: Agent did not provide a client IP address.");
             return false;
         }
 
@@ -609,7 +609,7 @@ public class GatekeeperService : IGatekeeperService
         OSHHTPHost userHomeHost = new(userURL, true);
         if(!userHomeHost.IsResolvedHost)
         {
-            m_log.DebugFormat("[GATEKEEPER SERVICE]: Agent did not provide an authentication server URL");
+            m_log.LogDebug("[GATEKEEPER SERVICE]: Agent did not provide an authentication server URL");
             return false;
         }
 
@@ -627,7 +627,7 @@ public class GatekeeperService : IGatekeeperService
             }
             catch
             {
-                m_log.DebugFormat("[GATEKEEPER SERVICE]: Unable to contact authentication service at {0}", userURL);
+                m_log.LogDebug("[GATEKEEPER SERVICE]: Unable to contact authentication service at {0}", userURL);
                 return false;
             }
         }
@@ -644,11 +644,11 @@ public class GatekeeperService : IGatekeeperService
         OSHHTPHost reqGrid = new(parts[0], false);
         if(!reqGrid.IsValidHost)
         {
-            m_log.DebugFormat("[GATEKEEPER SERVICE]: Visitor provided malformed gird address {0}", parts[0]);
+            m_log.LogDebug("[GATEKEEPER SERVICE]: Visitor provided malformed gird address {0}", parts[0]);
             return false;
         }
 
-        m_log.DebugFormat("[GATEKEEPER SERVICE]: Verifying grid {0} against {1}", reqGrid.URI, m_gatekeeperHost.URI);
+        m_log.LogDebug("[GATEKEEPER SERVICE]: Verifying grid {0} against {1}", reqGrid.URI, m_gatekeeperHost.URI);
 
         if(m_gatekeeperHost.Equals(reqGrid))
             return true;

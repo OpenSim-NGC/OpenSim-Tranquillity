@@ -31,6 +31,7 @@ using OpenSim.Framework;
 using OpenSim.Framework.Console;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.CoreModules.World.Objects.Commands;
@@ -49,22 +50,22 @@ public class RegionCommandsModule : INonSharedRegionModule
 
     public void Initialise(IConfigSource source)
     {
-//            m_log.DebugFormat("[REGION COMMANDS MODULE]: INITIALIZED MODULE");
+//            m_log.LogDebug("[REGION COMMANDS MODULE]: INITIALIZED MODULE");
     }
 
     public void PostInitialise()
     {
-//            m_log.DebugFormat("[REGION COMMANDS MODULE]: POST INITIALIZED MODULE");
+//            m_log.LogDebug("[REGION COMMANDS MODULE]: POST INITIALIZED MODULE");
     }
 
     public void Close()
     {
-//            m_log.DebugFormat("[REGION COMMANDS MODULE]: CLOSED MODULE");
+//            m_log.LogDebug("[REGION COMMANDS MODULE]: CLOSED MODULE");
     }
 
     public void AddRegion(Scene scene)
     {
-//            m_log.DebugFormat("[REGION COMMANDS MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[REGION COMMANDS MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
 
         m_scene = scene;
         m_console = MainConsole.Instance;
@@ -111,12 +112,12 @@ public class RegionCommandsModule : INonSharedRegionModule
 
     public void RemoveRegion(Scene scene)
     {
-//            m_log.DebugFormat("[REGION COMMANDS MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[REGION COMMANDS MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
     }
 
     public void RegionLoaded(Scene scene)
     {
-//            m_log.DebugFormat("[REGION COMMANDS MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[REGION COMMANDS MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
     }
 
     private void HandleShowRegion(string module, string[] cmd)

@@ -27,8 +27,9 @@
 
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -351,7 +352,7 @@ public struct OSHHTPHost : IComparable<OSHHTPHost>, IEquatable<OSHHTPHost>
 
 public class GridInfo
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_hasHGconfig;
     private OSHHTPHost m_gateKeeperURL;
@@ -399,7 +400,7 @@ public class GridInfo
 
         if (!m_gateKeeperURL.IsResolvedHost)
         {
-            m_log.Error(m_gateKeeperURL.IsValidHost ?  "Could not resolve GatekeeperURI" : "GatekeeperURI is a invalid host");
+            m_log.LogError(m_gateKeeperURL.IsValidHost ?  "Could not resolve GatekeeperURI" : "GatekeeperURI is a invalid host");
             throw new Exception("GatekeeperURI configuration error");
         }
 
@@ -444,7 +445,7 @@ public class GridInfo
 
         if (!m_homeURL.IsResolvedHost)
         {
-            m_log.Error(m_homeURL.IsValidHost ?  "Could not resolve HomeURI" : "HomeURI is a invalid host");
+            m_log.LogError(m_homeURL.IsValidHost ?  "Could not resolve HomeURI" : "HomeURI is a invalid host");
             throw new Exception("HomeURI configuration error");
         }
 
@@ -480,7 +481,7 @@ public class GridInfo
             tmpuri = new OSHTTPURI(m_SearchURL.Trim(), true);
             if (!tmpuri.IsResolvedHost)
             {
-                m_log.Error(tmpuri.IsValidHost ? "Could not resolve SearchServerURI" : "SearchServerURI is a invalid host");
+                m_log.LogError(tmpuri.IsValidHost ? "Could not resolve SearchServerURI" : "SearchServerURI is a invalid host");
                 throw new Exception("SearchServerURI configuration error");
             }
             m_SearchURL = tmpuri.URI;
@@ -496,7 +497,7 @@ public class GridInfo
             tmpuri = new OSHTTPURI(m_DestinationGuideURL.Trim(), true);
             if (!tmpuri.IsResolvedHost)
             {
-                m_log.Error(tmpuri.IsValidHost ? "Could not resolve DestinationGuideURL" : "DestinationGuideURL is a invalid host");
+                m_log.LogError(tmpuri.IsValidHost ? "Could not resolve DestinationGuideURL" : "DestinationGuideURL is a invalid host");
                 throw new Exception("DestinationGuideURL configuration error");
             }
             m_DestinationGuideURL = tmpuri.URI;
@@ -509,7 +510,7 @@ public class GridInfo
             tmpuri = new OSHTTPURI(m_economyURL.Trim(), true);
             if (!tmpuri.IsResolvedHost)
             {
-                m_log.Error(tmpuri.IsValidHost ? "Could not resolve economyURL" : "economyURL is a invalid host");
+                m_log.LogError(tmpuri.IsValidHost ? "Could not resolve economyURL" : "economyURL is a invalid host");
                 throw new Exception("economyURL configuration error");
             }
             m_economyURL = tmpuri.URI;
@@ -728,7 +729,7 @@ public class GridInfo
             if (tmp.IsResolvedHost)
                 m_gridUrl = tmp.URI;
             else
-                m_log.Error((tmp.IsValidHost ? "Could not resolve GridUrl" : "GridUrl is a invalid host ") + value ?? "");
+                m_log.LogError((tmp.IsValidHost ? "Could not resolve GridUrl" : "GridUrl is a invalid host ") + value ?? "");
         }
     }
 
@@ -741,7 +742,7 @@ public class GridInfo
             if (tmp.IsResolvedHost)
                 m_SearchURL = tmp.URI;
             else
-                m_log.Error((tmp.IsValidHost ? "Could not resolve SearchURL" : "SearchURL is a invalid host ") + value??"");
+                m_log.LogError((tmp.IsValidHost ? "Could not resolve SearchURL" : "SearchURL is a invalid host ") + value??"");
         }
     }
 
@@ -754,7 +755,7 @@ public class GridInfo
             if (tmp.IsResolvedHost)
                 m_DestinationGuideURL = tmp.URI;
             else
-                m_log.Error((tmp.IsValidHost ? "Could not resolve DestinationGuideURL" : "DestinationGuideURL is a invalid host ") + value ?? "");
+                m_log.LogError((tmp.IsValidHost ? "Could not resolve DestinationGuideURL" : "DestinationGuideURL is a invalid host ") + value ?? "");
         }
     }
 
@@ -767,7 +768,7 @@ public class GridInfo
             if (tmp.IsResolvedHost)
                 m_economyURL = tmp.URI;
             else
-                m_log.Error((tmp.IsValidHost ? "Could not resolve EconomyURL" : "EconomyURL is a invalid host ") + value ?? "");
+                m_log.LogError((tmp.IsValidHost ? "Could not resolve EconomyURL" : "EconomyURL is a invalid host ") + value ?? "");
         }
     }
 

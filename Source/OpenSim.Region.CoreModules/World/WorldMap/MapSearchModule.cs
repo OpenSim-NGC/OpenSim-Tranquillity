@@ -25,20 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.CoreModules.World.WorldMap;
 
 public class MapSearchModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     IGridService m_gridservice = null;
     UUID m_stupidScope = UUID.Zero;
@@ -113,7 +113,7 @@ public class MapSearchModule : ISharedRegionModule
                 return;
             }
 
-            //m_log.DebugFormat("MAP NAME=({0})", mapName);
+            //m_log.LogDebug("MAP NAME=({0})", mapName);
             string mapNameOrig = mapName;
             int indx = mapName.IndexOfAny(new char[] {'.', '!','+','|',':','%'});
             bool needOriginalName = indx >= 0;
@@ -124,7 +124,7 @@ public class MapSearchModule : ISharedRegionModule
             if (!remoteClient.IsActive)
                 return;
 
-            //m_log.DebugFormat("[MAPSEARCHMODULE]: search {0} returned {1} regions", mapName, regionInfos.Count);
+            //m_log.LogDebug("[MAPSEARCHMODULE]: search {0} returned {1} regions", mapName, regionInfos.Count);
 
             MapBlockData data;
             if (regionInfos != null && regionInfos.Count > 0)

@@ -28,7 +28,6 @@
 using System.Net.Security;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
-using log4net;
 using MailKit.Net.Smtp;
 using MimeKit;
 using Nini.Config;
@@ -36,6 +35,8 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Scripting.EmailModules;
 
@@ -50,7 +51,7 @@ public class EmailModule : ISharedRegionModule, IEmailModule
     //
     // Log
     //
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     //
     // Module vars
@@ -155,7 +156,7 @@ public class EmailModule : ISharedRegionModule, IEmailModule
                 OSHHTPHost hosttmp = new OSHHTPHost(SMTP_SERVER_HOSTNAME, true);
                 if(!hosttmp.IsResolvedHost)
                 {
-                    m_log.ErrorFormat("[EMAIL]: could not resolve SMTP_SERVER_HOSTNAME {0}", SMTP_SERVER_HOSTNAME);
+                    m_log.LogError("[EMAIL]: could not resolve SMTP_SERVER_HOSTNAME {0}", SMTP_SERVER_HOSTNAME);
                     return;
                 }
 
@@ -166,7 +167,7 @@ public class EmailModule : ISharedRegionModule, IEmailModule
                 m_HostName = SMTPConfig.GetString("host_domain_header_from", m_HostName);
                 if (!string.IsNullOrEmpty(smtpfrom) && !MailboxAddress.TryParse(m_mailParseOptions, smtpfrom, out SMTP_MAIL_FROM))
                 {
-                    m_log.ErrorFormat("[EMAIL]: Invalid SMTP_SERVER_FROM {0}", smtpfrom);
+                    m_log.LogError("[EMAIL]: Invalid SMTP_SERVER_FROM {0}", smtpfrom);
                     return;
                 }
 
@@ -183,20 +184,20 @@ public class EmailModule : ISharedRegionModule, IEmailModule
             else
             {
                 m_SMTP_SslPolicyErrorsMask = ~SslPolicyErrors.None;
-                m_log.Warn("[EMAIL]: SMTP disabled, set enableEmailSMTP to enable");
+                m_log.LogWarning("[EMAIL]: SMTP disabled, set enableEmailSMTP to enable");
             }
 
             m_MaxEmailSize = SMTPConfig.GetInt("email_max_size", m_MaxEmailSize);
             if(m_MaxEmailSize < 256 || m_MaxEmailSize > 1000000)
             {
-                m_log.Warn("[EMAIL]: email_max_size out of range [256, 1000000], Changed to default 4096");
+                m_log.LogWarning("[EMAIL]: email_max_size out of range [256, 1000000], Changed to default 4096");
                 m_MaxEmailSize = 4096;
             }
 
         }
         catch (Exception e)
         {
-            m_log.Error("[EMAIL]: DefaultEmailModule not configured: " + e.Message);
+            m_log.LogError("[EMAIL]: DefaultEmailModule not configured: " + e.Message);
             return;
         }
 
@@ -227,7 +228,7 @@ public class EmailModule : ISharedRegionModule, IEmailModule
             m_Scenes[scene.RegionInfo.RegionHandle] = scene;
         }
 
-        m_log.Info("[EMAIL]: Activated DefaultEmailModule");
+        m_log.LogInformation("[EMAIL]: Activated DefaultEmailModule");
     }
 
     public void RemoveRegion(Scene scene)
@@ -410,13 +411,13 @@ public class EmailModule : ISharedRegionModule, IEmailModule
 
         if (!MailboxAddress.TryParse(address, out MailboxAddress mailTo))
         {
-            m_log.ErrorFormat("[EMAIL]: invalid TO email address {0}",address);
+            m_log.LogError("[EMAIL]: invalid TO email address {0}",address);
             return;
         }
 
         if ((subject.Length + body.Length) > m_MaxEmailSize)
         {
-            m_log.Error("[EMAIL]: subject + body larger than limit of " + m_MaxEmailSize + " bytes");
+            m_log.LogError("[EMAIL]: subject + body larger than limit of " + m_MaxEmailSize + " bytes");
             return;
         }
 
@@ -505,11 +506,11 @@ public class EmailModule : ISharedRegionModule, IEmailModule
                 }
 
                 //Log
-                m_log.Info("[EMAIL]: EMail sent to: " + address + " from object: " + objectID.ToString() + "@" + m_HostName);
+                m_log.LogInformation("[EMAIL]: EMail sent to: " + address + " from object: " + objectID.ToString() + "@" + m_HostName);
             }
             catch (Exception e)
             {
-                m_log.Error("[EMAIL]: DefaultEmailModule Exception: " + e.Message);
+                m_log.LogError("[EMAIL]: DefaultEmailModule Exception: " + e.Message);
             }
         }
         else

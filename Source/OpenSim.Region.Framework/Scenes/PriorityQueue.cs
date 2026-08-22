@@ -29,11 +29,13 @@ using System.Collections.Concurrent;
 
 using OpenSim.Framework;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.Framework.Scenes;
 
 public class PriorityQueue
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public delegate bool UpdatePriorityHandler(ref int priority, ISceneEntity entity);
 

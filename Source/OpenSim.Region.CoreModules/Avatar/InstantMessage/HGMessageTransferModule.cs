@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -37,11 +36,13 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Hypergrid;
 using OpenSim.Server.Handlers.Hypergrid;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage;
 
 public class HGMessageTransferModule : ISharedRegionModule, IMessageTransferModule, IInstantMessageSimConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected bool m_Enabled = false;
     protected List<Scene> m_Scenes = [];
@@ -66,7 +67,7 @@ public class HGMessageTransferModule : ISharedRegionModule, IMessageTransferModu
         IConfig cnf = config.Configs["Messaging"];
         if (cnf != null && cnf.GetString("MessageTransferModule", "MessageTransferModule") != Name)
         {
-            m_log.Debug("[HG MESSAGE TRANSFER]: Disabled by configuration");
+            m_log.LogDebug("[HG MESSAGE TRANSFER]: Disabled by configuration");
             return;
         }
 
@@ -82,7 +83,7 @@ public class HGMessageTransferModule : ISharedRegionModule, IMessageTransferModu
 
         lock (m_Scenes)
         {
-            m_log.Debug($"[HG MESSAGE TRANSFER]: Message transfer module {Name} active");
+            m_log.LogDebug($"[HG MESSAGE TRANSFER]: Message transfer module {Name} active");
             scene.RegisterModuleInterface<IMessageTransferModule>(this);
             m_Scenes.Add(scene);
         }
@@ -131,7 +132,7 @@ public class HGMessageTransferModule : ISharedRegionModule, IMessageTransferModu
         // Try root avatar first
         foreach (Scene scene in m_Scenes)
         {
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[HG INSTANT MESSAGE]: Looking for root agent {0} in {1}",
             //     toAgentID.ToString(), scene.RegionInfo.RegionName);
             ScenePresence sp = scene.GetScenePresence(toAgentID);
@@ -141,7 +142,7 @@ public class HGMessageTransferModule : ISharedRegionModule, IMessageTransferModu
                     achildsp = sp;
                 else
                 {
-                    // m_log.DebugFormat("[HG INSTANT MESSAGE]: Delivering IM to root agent {0} {1}", user.Name, toAgentID);
+                    // m_log.LogDebug("[HG INSTANT MESSAGE]: Delivering IM to root agent {0} {1}", user.Name, toAgentID);
                     sp.ControllingClient.SendInstantMessage(im);
                     result(true);
                     return;
@@ -150,13 +151,13 @@ public class HGMessageTransferModule : ISharedRegionModule, IMessageTransferModu
         }
         if (!ToRootOnly && achildsp != null)
         {
-            // m_log.DebugFormat("[HG INSTANT MESSAGE]: Delivering IM to child agent {0} {1}", user.Name, toAgentID);
+            // m_log.LogDebug("[HG INSTANT MESSAGE]: Delivering IM to child agent {0} {1}", user.Name, toAgentID);
             achildsp.ControllingClient.SendInstantMessage(im);
             result(true);
             return;
         }
 
-        // m_log.DebugFormat("[HG INSTANT MESSAGE]: Delivering IM to {0} via XMLRPC", im.toAgentID);
+        // m_log.LogDebug("[HG INSTANT MESSAGE]: Delivering IM to {0} via XMLRPC", im.toAgentID);
         // Is the user a local user?
         string url = string.Empty;
         bool foreigner = false;
@@ -173,7 +174,7 @@ public class HGMessageTransferModule : ISharedRegionModule, IMessageTransferModu
                 if (foreigner && url.Length == 0) // we don't know about this user
                 {
                     string recipientUUI = TryGetRecipientUUI(new UUID(im.fromAgentID), toDelAgentID);
-                    //m_log.DebugFormat("[HG MESSAGE TRANSFER]: Got UUI {0}", recipientUUI);
+                    //m_log.LogDebug("[HG MESSAGE TRANSFER]: Got UUI {0}", recipientUUI);
                     if (recipientUUI.Length > 0)
                     {
                         if (Util.ParseFullUniversalUserIdentifier(recipientUUI, out UUID id, out string tourl,
@@ -247,7 +248,7 @@ public class HGMessageTransferModule : ISharedRegionModule, IMessageTransferModu
             return;
         }
 
-        //m_log.DebugFormat("[INSTANT MESSAGE]: Undeliverable");
+        //m_log.LogDebug("[INSTANT MESSAGE]: Undeliverable");
         result(false);
     }
 
@@ -262,7 +263,7 @@ public class HGMessageTransferModule : ISharedRegionModule, IMessageTransferModu
             if (circuit.ServiceURLs.ContainsKey("HomeURI"))
             {
                 string uasURL = circuit.ServiceURLs["HomeURI"].ToString();
-                m_log.DebugFormat("[HG MESSAGE TRANSFER]: getting UUI of user {0} from {1}", toAgent, uasURL);
+                m_log.LogDebug("[HG MESSAGE TRANSFER]: getting UUI of user {0} from {1}", toAgent, uasURL);
                 UserAgentServiceConnector uasConn = new UserAgentServiceConnector(uasURL);
 
                 string agentUUI = string.Empty;
@@ -271,7 +272,7 @@ public class HGMessageTransferModule : ISharedRegionModule, IMessageTransferModu
                     agentUUI = uasConn.GetUUI(fromAgent, toAgent);
                 }
                 catch (Exception e) {
-                    m_log.Debug("[HG MESSAGE TRANSFER]: GetUUI call failed ", e);
+                    m_log.LogDebug(e, "[HG MESSAGE TRANSFER]: GetUUI call failed ");
                 }
 
                 return agentUUI;
@@ -302,7 +303,7 @@ public class HGMessageTransferModule : ISharedRegionModule, IMessageTransferModu
     #region IInstantMessageSimConnector
     public bool SendInstantMessage(GridInstantMessage im)
     {
-        //m_log.DebugFormat("[XXX] Hook SendInstantMessage {0}", im.message);
+        //m_log.LogDebug("[XXX] Hook SendInstantMessage {0}", im.message);
         UUID agentID = new UUID(im.toAgentID);
         return SendIMToScene(im, agentID);
     }

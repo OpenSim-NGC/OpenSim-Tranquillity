@@ -1,5 +1,4 @@
 ﻿using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -14,11 +13,13 @@ using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 using System.Net;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public class ExperienceModule : IExperienceModule, ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // Dictionary of Agent IDs, with a dictionary of experience permissions and their bools
     private Dictionary<UUID, Dictionary<UUID, bool>> m_ExperiencePermissions = new Dictionary<UUID, Dictionary<UUID, bool>>();
@@ -60,7 +61,7 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         // [Experience] ExperienceCreators key/values/default.
         m_AcquirePolicy = config.GetString("ExperienceCreators", "EstateManagersAndRegionOwners");
 
-        m_log.Info("[Experience] Plugin enabled!");
+        m_log.LogInformation("[Experience] Plugin enabled!");
     }
 
     #region ISharedRegionModule
@@ -98,7 +99,7 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         m_ExperienceService = scene.RequestModuleInterface<IExperienceService>();
         if (m_ExperienceService == null)
         {
-            m_log.Info("[EXPERIENCE]: Module disabled becuase IExperienceService was not found!");
+            m_log.LogInformation("[EXPERIENCE]: Module disabled becuase IExperienceService was not found!");
             return;
         }
 
@@ -299,17 +300,17 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
                 };
                 ExperienceInfo stored = UpdateExperienceInfo(created);
                 if (stored != null)
-                    m_log.InfoFormat("[EXPERIENCE]: agent {0} acquired experience {1} (policy={2})",
+                    m_log.LogInformation("[EXPERIENCE]: agent {0} acquired experience {1} (policy={2})",
                         agentID, created.public_id, m_AcquirePolicy);
                 else
-                    m_log.WarnFormat("[EXPERIENCE]: agent {0} acquire failed to persist (policy={1})",
+                    m_log.LogWarning("[EXPERIENCE]: agent {0} acquire failed to persist (policy={1})",
                         agentID, m_AcquirePolicy);
             }
             else
             {
                 // Defensive: a non-permitted POST creates nothing (the viewer already keeps the button
                 // disabled via the missing `purchase` key; this guards a hand-crafted request).
-                m_log.WarnFormat("[EXPERIENCE]: agent {0} not permitted to acquire an experience (policy={1}) — no create",
+                m_log.LogWarning("[EXPERIENCE]: agent {0} not permitted to acquire an experience (policy={1}) — no create",
                     agentID, m_AcquirePolicy);
             }
         }
@@ -755,7 +756,7 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
 
 public class FindExperienceByNameGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -774,7 +775,7 @@ public class FindExperienceByNameGetHandler : BaseStreamHandler
 
     protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.InfoFormat("[EXPERIENCE] FindExperienceByName path = {0}", path);
+        //m_log.LogInformation("[EXPERIENCE] FindExperienceByName path = {0}", path);
 
         NameValueCollection query = HttpUtility.ParseQueryString(httpRequest.Url.Query);
 
@@ -895,7 +896,7 @@ public class ExperienceQueryGetHandler : BaseStreamHandler
 
 public class GroupExperiencesGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -936,7 +937,7 @@ public class GroupExperiencesGetHandler : BaseStreamHandler
 
 public class GetMetadataPostHandler : ReadBaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -960,7 +961,7 @@ public class GetMetadataPostHandler : ReadBaseStreamHandler
     {
         byte[] data = ReadFully(request);
 
-        //m_log.InfoFormat("[EXPERIENCE] GetMetadata == {0}", Encoding.UTF8.GetString(data));
+        //m_log.LogInformation("[EXPERIENCE] GetMetadata == {0}", Encoding.UTF8.GetString(data));
 
         OSDMap map = (OSDMap)OSDParser.DeserializeLLSDXml(data);
 
@@ -1007,7 +1008,7 @@ public class GetMetadataPostHandler : ReadBaseStreamHandler
 
 public class UpdateExperiencePostHandler : ReadBaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -1122,7 +1123,7 @@ public class UpdateExperiencePostHandler : ReadBaseStreamHandler
 
 public class IsExperienceContributorGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -1196,7 +1197,7 @@ public class IsExperienceAdminGetHandler : BaseStreamHandler
 
 public class RegionExperiencesGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -1215,7 +1216,7 @@ public class RegionExperiencesGetHandler : BaseStreamHandler
 
     protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.InfoFormat("[EXPERIENCE] RegionExperiences request on {0}", path);
+        //m_log.LogInformation("[EXPERIENCE] RegionExperiences request on {0}", path);
 
         UUID[] allowed = m_ExperienceModule.GetEstateAllowedExperiences();
         UUID[] key = m_ExperienceModule.GetEstateKeyExperiences();
@@ -1273,7 +1274,7 @@ public class RegionExperiencesGetHandler : BaseStreamHandler
 
 public class GetExperienceInfoGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -1291,11 +1292,11 @@ public class GetExperienceInfoGetHandler : BaseStreamHandler
 
     protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.InfoFormat("[EXPERIENCE] GetExperienceInfo request on {0}", path);
+        //m_log.LogInformation("[EXPERIENCE] GetExperienceInfo request on {0}", path);
 
         NameValueCollection query = HttpUtility.ParseQueryString(httpRequest.Url.Query);
         string[] ids = query.GetValues("public_id");
-        //m_log.InfoFormat("[EXPERIENCE] GetExperienceInfo public_ids = {0}", string.Join(", ", ids));
+        //m_log.LogInformation("[EXPERIENCE] GetExperienceInfo public_ids = {0}", string.Join(", ", ids));
 
         string response_str = "<?xml version=\"1.0\" ?><llsd><map><key>experience_keys</key><array>";
 
@@ -1339,7 +1340,7 @@ public class GetExperienceInfoGetHandler : BaseStreamHandler
 
 public class GetCreatorExperiencesGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -1358,7 +1359,7 @@ public class GetCreatorExperiencesGetHandler : BaseStreamHandler
 
     protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.InfoFormat("[EXPERIENCE] GetCreatorExperiences request on {0}", path);
+        //m_log.LogInformation("[EXPERIENCE] GetCreatorExperiences request on {0}", path);
 
         string response_str = "<llsd><map><key>experience_ids</key>";
 
@@ -1386,7 +1387,7 @@ public class GetCreatorExperiencesGetHandler : BaseStreamHandler
 
 public class GetAdminExperiencesGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -1405,7 +1406,7 @@ public class GetAdminExperiencesGetHandler : BaseStreamHandler
 
     protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.InfoFormat("[EXPERIENCE] GetAdminExperiences request on {0}", path);
+        //m_log.LogInformation("[EXPERIENCE] GetAdminExperiences request on {0}", path);
 
         string response_str = "<llsd><map><key>experience_ids</key>";
 
@@ -1436,7 +1437,7 @@ public class GetAdminExperiencesGetHandler : BaseStreamHandler
 
 public class GetExperiencesGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -1455,7 +1456,7 @@ public class GetExperiencesGetHandler : BaseStreamHandler
 
     protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.InfoFormat("[EXPERIENCE] GetExperiences request on {0}", path);
+        //m_log.LogInformation("[EXPERIENCE] GetExperiences request on {0}", path);
 
         string response_str = "<llsd><map><key>blocked</key>";
 

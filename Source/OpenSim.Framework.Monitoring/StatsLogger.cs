@@ -26,7 +26,8 @@
  */
 
 using System.Timers;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Monitoring;
 
@@ -35,7 +36,7 @@ namespace OpenSim.Framework.Monitoring;
 /// </summary>
 public static class StatsLogger
 {
-    private static readonly ILog m_statsLog = LogManager.GetLogger("special.StatsLogger");
+    private static readonly ILogger m_statsLog = LoggerProvider.CreateLogger("special.StatsLogger");
 
     private static System.Timers.Timer m_loggingTimer;
     private static int m_statsLogIntervalMs = 5000;
@@ -126,7 +127,7 @@ public static class StatsLogger
     private static void Log(object sender, ElapsedEventArgs e)
     {
         foreach (string line in GetReport())
-            m_statsLog.Info(line);
+            m_statsLog.LogInformation(line);
 
         m_loggingTimer.Start();
     }

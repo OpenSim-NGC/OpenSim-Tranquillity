@@ -34,8 +34,10 @@ using OpenSim.Server.Base;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace osWebRtcVoice;
 
@@ -50,7 +52,7 @@ namespace osWebRtcVoice;
 /// </summary>
 public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static string LogHeader = "[WEBRTC VOICE SERVICE MODULE]";
 
     private static bool m_Enabled = false;
@@ -78,7 +80,7 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
                 string nonSpatialDllName = moduleConfig.GetString("NonSpatialVoiceService", string.Empty);
                 if (string.IsNullOrEmpty(spatialDllName) && string.IsNullOrEmpty(nonSpatialDllName))
                 {
-                    m_log.Error($"{LogHeader} No VoiceService specified in configuration");
+                    m_log.LogError($"{LogHeader} No VoiceService specified in configuration");
                     m_Enabled = false;
                     return;
                 }
@@ -86,34 +88,34 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
                 // Default non-spatial to spatial if not specified
                 if (string.IsNullOrEmpty(nonSpatialDllName))
                 {
-                    m_log.Debug($"{LogHeader} nonSpatialDllName not specified. Defaulting to spatialDllName");
+                    m_log.LogDebug($"{LogHeader} nonSpatialDllName not specified. Defaulting to spatialDllName");
                     nonSpatialDllName = spatialDllName;
                 }
 
                 // Load the two voice services
-                m_log.Debug($"{LogHeader} Loading SpatialVoiceService from {spatialDllName}");
+                m_log.LogDebug($"{LogHeader} Loading SpatialVoiceService from {spatialDllName}");
                 m_spatialVoiceService = ServerUtils.LoadPlugin<IWebRtcVoiceService>(spatialDllName, [m_Config]);
                 if (m_spatialVoiceService is null)
                 {
-                    m_log.Error($"{LogHeader} Could not load SpatialVoiceService from {spatialDllName}, module disabled");
+                    m_log.LogError($"{LogHeader} Could not load SpatialVoiceService from {spatialDllName}, module disabled");
                     m_Enabled = false;
                     return;
                 }
 
-                m_log.Debug($"{LogHeader} Loading NonSpatialVoiceService from {nonSpatialDllName}");
+                m_log.LogDebug($"{LogHeader} Loading NonSpatialVoiceService from {nonSpatialDllName}");
                 if (spatialDllName != nonSpatialDllName)
                 {
                     m_nonSpatialVoiceService = ServerUtils.LoadPlugin<IWebRtcVoiceService>(nonSpatialDllName, [ m_Config ]);
                     if (m_nonSpatialVoiceService is null)
                     {
-                        m_log.Error("{LogHeader} Could not load NonSpatialVoiceService from {nonSpatialDllName}");
+                        m_log.LogError("{LogHeader} Could not load NonSpatialVoiceService from {nonSpatialDllName}");
                         m_Enabled = false;
                     }
                 }
 
                 if (m_Enabled)
                 {
-                    m_log.Info($"{LogHeader} WebRtcVoiceService enabled");
+                    m_log.LogInformation($"{LogHeader} WebRtcVoiceService enabled");
                 }
             }
         }
@@ -146,7 +148,7 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
     {
         if (m_Enabled)
         {
-            m_log.Debug($"{LogHeader} Adding WebRtcVoiceService to region {scene.Name}");
+            m_log.LogDebug($"{LogHeader} Adding WebRtcVoiceService to region {scene.Name}");
             scene.RegisterModuleInterface<IWebRtcVoiceService>(this);
 
             // TODO: figure out what events we care about
@@ -190,7 +192,7 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
         {
             foreach(KeyValuePair<string, IVoiceViewerSession> v in vSessions)
             {
-                m_log.DebugFormat("{0} Event_OnRemovePresence: removing viewer session {1}", LogHeader, v.Key);
+                m_log.LogDebug("{0} Event_OnRemovePresence: removing viewer session {1}", LogHeader, v.Key);
                 VoiceViewerSession.RemoveViewerSession(v.Key);
                 v.Value.Shutdown();
             }
@@ -209,7 +211,7 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
             // request has a viewer session. Use that to find the voice service
             if (!VoiceViewerSession.TryGetViewerSession(viewerSessionId, out vSession))
             {
-                m_log.Error($"{0} ProvisionVoiceAccountRequest: viewer session {viewerSessionId} not found");
+                m_log.LogError($"{0} ProvisionVoiceAccountRequest: viewer session {viewerSessionId} not found");
             }
         }   
         else
@@ -232,7 +234,7 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
             }
             else
             {
-                m_log.Error($"{LogHeader} ProvisionVoiceAccountRequest: no channel_type in request");
+                m_log.LogError($"{LogHeader} ProvisionVoiceAccountRequest: no channel_type in request");
             }
         }
         if (vSession is not null)
@@ -256,12 +258,12 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
             }
             else
             {
-                m_log.ErrorFormat("{0} VoiceSignalingRequest: viewer session {1} not found", LogHeader, viewerSessionId);
+                m_log.LogError("{0} VoiceSignalingRequest: viewer session {1} not found", LogHeader, viewerSessionId);
             }
         }   
         else
         {
-            m_log.ErrorFormat("{0} VoiceSignalingRequest: no viewer_session in request", LogHeader);
+            m_log.LogError("{0} VoiceSignalingRequest: no viewer_session in request", LogHeader);
         }
         return response;
     }

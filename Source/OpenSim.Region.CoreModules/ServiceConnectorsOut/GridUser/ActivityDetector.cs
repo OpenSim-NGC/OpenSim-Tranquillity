@@ -31,20 +31,20 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.GridUser;
 
 public class ActivityDetector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IGridUserService m_GridUserService;
 
     public ActivityDetector(IGridUserService guservice)
     {
         m_GridUserService = guservice;
-        m_log.DebugFormat("[ACTIVITY DETECTOR]: starting ");
+        m_log.LogDebug("[ACTIVITY DETECTOR]: starting ");
     }
 
     public void AddRegion(Scene scene)
@@ -80,7 +80,7 @@ public class ActivityDetector
     public void DoOnMakeRootAgent(ScenePresence sp)
     {
         string userid;
-        //m_log.DebugFormat("[ACTIVITY DETECTOR]: Detected root presence {0} in {1}", userid, sp.Scene.RegionInfo.RegionName);
+        //m_log.LogDebug("[ACTIVITY DETECTOR]: Detected root presence {0} in {1}", userid, sp.Scene.RegionInfo.RegionName);
         if (sp.Scene.UserManagementModule.GetUserUUI(sp.UUID, out userid))
         {
             /* we only setposition on known agents that have a valid lookup */

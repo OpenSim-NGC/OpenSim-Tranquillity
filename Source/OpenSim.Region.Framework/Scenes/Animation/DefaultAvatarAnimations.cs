@@ -28,11 +28,14 @@
 using System.Xml;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.Framework.Scenes.Animation;
 
 public class DefaultAvatarAnimations
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public static readonly string DefaultAnimationsPath = "data/avataranimations.xml";
 
@@ -73,7 +76,7 @@ public class DefaultAvatarAnimations
                         if (animState != "")
                             AnimStateNames.Add(id, animState);
 
-//                            m_log.DebugFormat("[AVATAR ANIMATIONS]: Loaded {0} {1} {2}", id, name, animState);
+//                            m_log.LogDebug("[AVATAR ANIMATIONS]: Loaded {0} {1} {2}", id, name, animState);
                     }
                 }
 //                }
@@ -89,12 +92,12 @@ public class DefaultAvatarAnimations
     /// <returns></returns>
     public static UUID GetDefaultAnimation(string name)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[AVATAR ANIMATIONS]: Looking for default avatar animation with name {0}", name);
         UUID id;
         if (AnimsUUIDbyName.TryGetValue(name.ToUpper(), out id))
         {
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[AVATAR ANIMATIONS]: Found {0} {1} in GetDefaultAvatarAnimation()", AnimsUUID[name], name);
 
             return id;

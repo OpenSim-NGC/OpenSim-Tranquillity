@@ -25,13 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using System.Reflection;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization;
 
@@ -44,8 +45,7 @@ public class AuthorizationService : IAuthorizationService
         DisallowForeigners = 2, /* Only local people */
     }
 
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private IUserManagement m_UserManagement;
@@ -69,10 +69,10 @@ public class AuthorizationService : IAuthorizationService
                 }
                 catch (ArgumentException)
                 {
-                    m_log.WarnFormat("[AuthorizationService]: {0} is not a valid access flag", accessStr);
+                    m_log.LogWarning("[AuthorizationService]: {0} is not a valid access flag", accessStr);
                 }
             }
-            m_log.DebugFormat("[AuthorizationService]: Region {0} access restrictions: {1}", m_Scene.RegionInfo.RegionName, m_accessValue);
+            m_log.LogDebug("[AuthorizationService]: Region {0} access restrictions: {1}", m_Scene.RegionInfo.RegionName, m_accessValue);
         }
 
     }
@@ -83,7 +83,7 @@ public class AuthorizationService : IAuthorizationService
         // This should not happen
         if (m_Scene.RegionInfo.RegionID.ToString() != regionID)
         {
-            m_log.WarnFormat("[AuthorizationService]: Service for region {0} received request to authorize for region {1}",
+            m_log.LogWarning("[AuthorizationService]: Service for region {0} received request to authorize for region {1}",
                 m_Scene.RegionInfo.RegionID, regionID);
             message = string.Format("Region {0} received request to authorize for region {1}", m_Scene.RegionInfo.RegionID, regionID);
             return false;

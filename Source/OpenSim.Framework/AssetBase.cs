@@ -28,6 +28,8 @@
 using System.Xml.Serialization;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Framework;
 
 [Flags]
@@ -46,7 +48,7 @@ public enum AssetFlags : int
 [Serializable]
 public class AssetBase
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public static readonly int MAX_ASSET_NAME = 64;
     public static readonly int MAX_ASSET_DESC = 64;
@@ -82,7 +84,7 @@ public class AssetBase
         if (assetType == (sbyte)AssetType.Unknown)
         {
             System.Diagnostics.StackTrace trace = new System.Diagnostics.StackTrace(true);
-            m_log.ErrorFormat("[ASSETBASE]: Creating asset '{0}' ({1}) with an unknown asset type\n{2}",
+            m_log.LogError("[ASSETBASE]: Creating asset '{0}' ({1}) with an unknown asset type\n{2}",
                 name, assetID, trace.ToString());
         }
         */
@@ -102,7 +104,7 @@ public class AssetBase
         if (assetType == (sbyte)AssetType.Unknown)
         {
             System.Diagnostics.StackTrace trace = new System.Diagnostics.StackTrace(true);
-            m_log.ErrorFormat("[ASSETBASE]: Creating asset '{0}' ({1}) with an unknown asset type\n{2}",
+            m_log.LogError("[ASSETBASE]: Creating asset '{0}' ({1}) with an unknown asset type\n{2}",
                 name, assetID, trace.ToString());
         }
         */

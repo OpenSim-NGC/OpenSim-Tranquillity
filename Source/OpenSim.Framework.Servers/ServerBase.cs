@@ -38,6 +38,9 @@ using Nini.Config;
 using OpenSim.Framework.Console;
 using OpenSim.Framework.Monitoring;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Framework.Servers;
 
 public interface IServerBase
@@ -63,7 +66,8 @@ public interface IServerBase
 
 public class ServerBase : IServerBase
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    // Fully qualified: log4net.Core.ILogger is also in scope via the appender/repository usings below.
+    private static readonly Microsoft.Extensions.Logging.ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public IConfigSource Config { get; set; }
 
@@ -117,7 +121,7 @@ public class ServerBase : IServerBase
     public void CreatePIDFile(string path)
     {
         if (File.Exists(path))
-            m_log.Error($"[SERVER BASE]: Previous pid file {path} still exists on startup.  Possibly previously unclean shutdown.");
+            m_log.LogError($"[SERVER BASE]: Previous pid file {path} still exists on startup.  Possibly previously unclean shutdown.");
 
         try
         {
@@ -131,11 +135,11 @@ public class ServerBase : IServerBase
 
             m_pidFile = path;
 
-            m_log.InfoFormat("[SERVER BASE]: Created pid file {0}", m_pidFile);
+            m_log.LogInformation("[SERVER BASE]: Created pid file {0}", m_pidFile);
         }
         catch (Exception e)
         {
-            m_log.Warn(string.Format("[SERVER BASE]: Could not create PID file at {0} ", path), e);
+            m_log.LogWarning(e, string.Format("[SERVER BASE]: Could not create PID file at {0} ", path));
         }
     }
 
@@ -149,7 +153,7 @@ public class ServerBase : IServerBase
             }
             catch (Exception e)
             {
-                m_log.Error($"[SERVER BASE]: Error whilst removing {m_pidFile}", e);
+                m_log.LogError(e, $"[SERVER BASE]: Error whilst removing {m_pidFile}");
             }
             m_pidFile = string.Empty;
         }
@@ -163,19 +167,23 @@ public class ServerBase : IServerBase
     {
         // FIXME: This should be done down in ServerBase but we need to sort out and refactor the log4net
         // XmlConfigurator calls first accross servers.
-        m_log.Info($"[SERVER BASE]: Starting in {m_startupDirectory}");
+        m_log.LogInformation($"[SERVER BASE]: Starting in {m_startupDirectory}");
 
-        m_log.Info($"[SERVER BASE]: OpenSimulator version: {m_version}");
+        m_log.LogInformation($"[SERVER BASE]: OpenSimulator version: {m_version}");
 
         // clr version potentially is more confusing than helpful, since it doesn't tell us if we're running under Mono/MS .NET and
         // the clr version number doesn't match the project version number under Mono.
-        //m_log.Info("[STARTUP]: Virtual machine runtime version: " + Environment.Version + Environment.NewLine);
-        m_log.Info(
+        //m_log.LogInformation("[STARTUP]: Virtual machine runtime version: " + Environment.Version + Environment.NewLine);
+        m_log.LogInformation(
             $"[SERVER BASE]: Operating system version: {Environment.OSVersion}, .NET platform {Util.RuntimePlatformStr}, {(Environment.Is64BitProcess ? "64" : "32")}-bit");
     }
 
     public void RegisterCommonAppenders(IConfig startupConfig)
     {
+        // Routes ILogger output through the interactive console. During the log4net migration this
+        // runs alongside OpenSimAppender below; remove the appender half once no ILog call sites remain.
+        OpenSimConsoleLogSink.Console = m_console as ConsoleBase;
+
         ILoggerRepository repository = LogManager.GetRepository();
         IAppender[] appenders = repository.GetAppenders();
 
@@ -220,7 +228,7 @@ public class ServerBase : IServerBase
                 m_logFileAppender.ActivateOptions();
             }
 
-            m_log.InfoFormat("[SERVER BASE]: Logging started to file {0}", m_logFileAppender.File);
+            m_log.LogInformation("[SERVER BASE]: Logging started to file {0}", m_logFileAppender.File);
         }
 
         if (m_statsLogFileAppender != null && startupConfig != null)
@@ -232,7 +240,7 @@ public class ServerBase : IServerBase
                 m_statsLogFileAppender.ActivateOptions();
             }
 
-            m_log.InfoFormat("[SERVER BASE]: Stats Logging started to file {0}", m_statsLogFileAppender.File);
+            m_log.LogInformation("[SERVER BASE]: Stats Logging started to file {0}", m_statsLogFileAppender.File);
         }
     }
 
@@ -683,35 +691,35 @@ public class ServerBase : IServerBase
             return;
         }
 
-        if (null == m_consoleAppender)
-        {
-            Notice("No appender named Console found (see the log4net config file for this executable)!");
-            return;
-        }
-
         string rawLevel = cmd[3];
 
-        ILoggerRepository repository = LogManager.GetRepository();
-        Level consoleLevel = repository.LevelMap[rawLevel];
-
-        if (consoleLevel != null)
-            m_consoleAppender.Threshold = consoleLevel;
-        else
+        if (!OpenSimConsoleLogSink.TryParseLevel(rawLevel, out Microsoft.Extensions.Logging.LogLevel consoleLogLevel))
+        {
             Notice(
                 "{0} is not a valid logging level.  Valid logging levels are ALL, DEBUG, INFO, WARN, ERROR, FATAL, OFF",
                 rawLevel);
+
+            ShowLogLevel();
+            return;
+        }
+
+        OpenSimConsoleLogSink.MinimumLevel = consoleLogLevel;
+
+        if (m_consoleAppender is not null)
+        {
+            ILoggerRepository repository = LogManager.GetRepository();
+            Level appenderLevel = repository.LevelMap[rawLevel];
+
+            if (appenderLevel is not null)
+                m_consoleAppender.Threshold = appenderLevel;
+        }
 
         ShowLogLevel();
     }
 
     private void ShowLogLevel()
     {
-        if (null == m_consoleAppender)
-        {
-            Notice("No appender named Console found (see the log4net config file for this executable)!");
-            return;
-        }
-        Notice("Console log level is {0}", m_consoleAppender.Threshold);
+        Notice("Console log level is {0}", OpenSimConsoleLogSink.MinimumLevel);
     }
 
     protected virtual void HandleScript(string module, string[] parms)
@@ -736,7 +744,7 @@ public class ServerBase : IServerBase
 
         if (File.Exists(fileName))
         {
-            m_log.Info("[SERVER BASE]: Running " + fileName);
+            m_log.LogInformation("[SERVER BASE]: Running " + fileName);
 
             using (StreamReader readFile = File.OpenText(fileName))
             {
@@ -749,7 +757,7 @@ public class ServerBase : IServerBase
                         || currentCommand.StartsWith("//")
                         || currentCommand.StartsWith("#")))
                     {
-                        m_log.Info("[SERVER BASE]: Running '" + currentCommand + "'");
+                        m_log.LogInformation("[SERVER BASE]: Running '" + currentCommand + "'");
                         m_console.RunCommand(currentCommand);
                     }
                 }
@@ -774,8 +782,7 @@ public class ServerBase : IServerBase
     {
         Notice(GetVersionText());
         Notice("Startup directory: " + m_startupDirectory);
-        if (null != m_consoleAppender)
-            Notice(String.Format("Console log level: {0}", m_consoleAppender.Threshold));
+        Notice(String.Format("Console log level: {0}", OpenSimConsoleLogSink.MinimumLevel));
     }
 
     /// <summary>
@@ -802,26 +809,26 @@ public class ServerBase : IServerBase
         string gitRefPointerPath = Path.Combine(gitDir, "HEAD");
         if (File.Exists(gitRefPointerPath))
         {
-            //m_log.DebugFormat("[SERVER BASE]: Found {0}", gitRefPointerPath);
+            //m_log.LogDebug("[SERVER BASE]: Found {0}", gitRefPointerPath);
 
             string rawPointer = "";
 
             using (StreamReader pointerFile = File.OpenText(gitRefPointerPath))
                 rawPointer = pointerFile.ReadLine();
 
-            //m_log.DebugFormat("[SERVER BASE]: rawPointer [{0}]", rawPointer);
+            //m_log.LogDebug("[SERVER BASE]: rawPointer [{0}]", rawPointer);
 
             Match m = Regex.Match(rawPointer, "^ref: (.+)$");
 
             if (m.Success)
             {
-                //m_log.DebugFormat("[SERVER BASE]: Matched [{0}]", m.Groups[1].Value);
+                //m_log.LogDebug("[SERVER BASE]: Matched [{0}]", m.Groups[1].Value);
 
                 string gitRef = m.Groups[1].Value;
                 string gitRefPath = Path.Combine(gitDir, gitRef);
                 if (File.Exists(gitRefPath))
                 {
-                    //m_log.DebugFormat("[SERVER BASE]: Found gitRefPath [{0}]", gitRefPath);
+                    //m_log.LogDebug("[SERVER BASE]: Found gitRefPath [{0}]", gitRefPath);
                     using (StreamReader refFile = File.OpenText(gitRefPath))
                         buildVersion = refFile.ReadLine();
 

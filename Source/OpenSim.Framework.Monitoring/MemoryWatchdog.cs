@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 /*
  * Copyright (c) Contributors, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
@@ -32,7 +35,7 @@ namespace OpenSim.Framework.Monitoring;
 /// </summary>
 public static class MemoryWatchdog
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Is this watchdog active?
@@ -42,7 +45,7 @@ public static class MemoryWatchdog
         get { return m_enabled; }
         set
         {
-//                m_log.DebugFormat("[MEMORY WATCHDOG]: Setting MemoryWatchdog.Enabled to {0}", value);
+//                m_log.LogDebug("[MEMORY WATCHDOG]: Setting MemoryWatchdog.Enabled to {0}", value);
 
             if (value && !m_enabled)
                 UpdateLastRecord(GC.GetTotalMemory(false), Util.EnvironmentTickCount());

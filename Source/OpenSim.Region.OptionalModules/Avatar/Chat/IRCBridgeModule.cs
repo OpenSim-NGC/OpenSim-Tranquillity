@@ -28,18 +28,20 @@
 using System.Collections;
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.OptionalModules.Avatar.Chat;
 
 public class IRCBridgeModule : INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     internal static bool Enabled = false;
     internal static IConfig m_config = null;
@@ -67,13 +69,13 @@ public class IRCBridgeModule : INonSharedRegionModule
         m_config = config.Configs["IRC"];
         if (m_config == null)
         {
-            //                m_log.InfoFormat("[IRC-Bridge] module not configured");
+            //                m_log.LogInformation("[IRC-Bridge] module not configured");
             return;
         }
 
         if (!m_config.GetBoolean("enabled", false))
         {
-            //                m_log.InfoFormat("[IRC-Bridge] module disabled in configuration");
+            //                m_log.LogInformation("[IRC-Bridge] module disabled in configuration");
             m_config = null;
             return;
         }
@@ -85,7 +87,7 @@ public class IRCBridgeModule : INonSharedRegionModule
 
         Enabled = true;
 
-        m_log.InfoFormat("[IRC-Bridge]: Module is enabled");
+        m_log.LogInformation("[IRC-Bridge]: Module is enabled");
     }
 
     public void AddRegion(Scene scene)
@@ -94,7 +96,7 @@ public class IRCBridgeModule : INonSharedRegionModule
         {
             try
             {
-                m_log.InfoFormat("[IRC-Bridge] Connecting region {0}", scene.RegionInfo.RegionName);
+                m_log.LogInformation("[IRC-Bridge] Connecting region {0}", scene.RegionInfo.RegionName);
 
                 if (!String.IsNullOrEmpty(m_password))
                     MainServer.Instance.DefaultServer.AddXmlRPCHandler("irc_admin", XmlRpcAdminMethod, false);
@@ -106,13 +108,13 @@ public class IRCBridgeModule : INonSharedRegionModule
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[IRC-Bridge] Region {0} not connected to IRC : {1}", scene.RegionInfo.RegionName, e.Message);
-                m_log.Debug(e);
+                m_log.LogWarning("[IRC-Bridge] Region {0} not connected to IRC : {1}", scene.RegionInfo.RegionName, e.Message);
+                m_log.LogDebug(e, e.Message);
             }
         }
         else
         {
-            //m_log.DebugFormat("[IRC-Bridge] Not enabled. Connect for region {0} ignored", scene.RegionInfo.RegionName);
+            //m_log.LogDebug("[IRC-Bridge] Not enabled. Connect for region {0} ignored", scene.RegionInfo.RegionName);
         }
     }
 
@@ -147,7 +149,7 @@ public class IRCBridgeModule : INonSharedRegionModule
 
     public static XmlRpcResponse XmlRpcAdminMethod(XmlRpcRequest request, IPEndPoint remoteClient)
     {
-        m_log.Debug("[IRC-Bridge]: XML RPC Admin Entry");
+        m_log.LogDebug("[IRC-Bridge]: XML RPC Admin Entry");
 
         XmlRpcResponse response = new XmlRpcResponse();
         Hashtable responseData = new Hashtable();
@@ -192,7 +194,7 @@ public class IRCBridgeModule : INonSharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[IRC-Bridge] XML RPC Admin request failed : {0}", e.Message);
+            m_log.LogError("[IRC-Bridge] XML RPC Admin request failed : {0}", e.Message);
 
             responseData["success"] = "false";
             responseData["error"] = e.Message;
@@ -202,7 +204,7 @@ public class IRCBridgeModule : INonSharedRegionModule
             response.Value = responseData;
         }
 
-        m_log.Debug("[IRC-Bridge]: XML RPC Admin Exit");
+        m_log.LogDebug("[IRC-Bridge]: XML RPC Admin Exit");
 
         return response;
     }

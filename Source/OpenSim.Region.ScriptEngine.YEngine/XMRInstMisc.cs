@@ -30,6 +30,7 @@ using OpenMetaverse;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Shared.Api;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
 using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
@@ -103,7 +104,7 @@ public partial class XMRInstance
     public void Verbose(string format, params object[] args)
     {
         if(m_Engine.m_Verbose)
-            m_log.DebugFormat(format, args);
+            m_log.LogDebug(format, args);
     }
 
     // Called by 'xmr top' console command

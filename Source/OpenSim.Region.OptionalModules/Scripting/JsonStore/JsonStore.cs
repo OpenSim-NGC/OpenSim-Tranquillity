@@ -25,19 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using System.Text.RegularExpressions;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.OptionalModules.Scripting.JsonStore;
 
 public class JsonStore
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected virtual OSD ValueStore { get; set; }
 
@@ -467,7 +468,7 @@ public class JsonStore
         }
 
         // Shouldn't get here if the path was checked correctly
-        m_log.WarnFormat("[JsonStore] invalid path expression");
+        m_log.LogWarning("[JsonStore] invalid path expression");
         return false;
     }
 
@@ -562,7 +563,7 @@ public class JsonStore
         {
             if (rmap.Type != OSDType.Array)
             {
-                m_log.WarnFormat("[JsonStore] wrong type for key {2}, expecting {0}, got {1}",OSDType.Array,rmap.Type,pkey);
+                m_log.LogWarning("[JsonStore] wrong type for key {2}, expecting {0}, got {1}",OSDType.Array,rmap.Type,pkey);
                 return null;
             }
 
@@ -586,7 +587,7 @@ public class JsonStore
         {
             if (rmap.Type != OSDType.Map)
             {
-                m_log.WarnFormat("[JsonStore] wrong type for key {2}, expecting {0}, got {1}",OSDType.Map,rmap.Type,pkey);
+                m_log.LogWarning("[JsonStore] wrong type for key {2}, expecting {0}, got {1}",OSDType.Map,rmap.Type,pkey);
                 return null;
             }
 
@@ -603,7 +604,7 @@ public class JsonStore
         }
 
         // Shouldn't get here if the path was checked correctly
-        m_log.WarnFormat("[JsonStore] Path type (unknown) does not match the structure");
+        m_log.LogWarning("[JsonStore] Path type (unknown) does not match the structure");
         return null;
     }
 
@@ -715,8 +716,7 @@ public class JsonStore
 // -----------------------------------------------------------------
 public class JsonObjectStore : JsonStore
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_scene;
     private UUID m_objectID;
@@ -738,7 +738,7 @@ public class JsonObjectStore : JsonStore
         // cannot set the top level
         set
         {
-            m_log.InfoFormat("[JsonStore] cannot set top level value in object store");
+            m_log.LogInformation("[JsonStore] cannot set top level value in object store");
         }
     }
 

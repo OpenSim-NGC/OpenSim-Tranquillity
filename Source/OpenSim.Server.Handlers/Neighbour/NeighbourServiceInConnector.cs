@@ -26,18 +26,19 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Neighbour;
 
 public class NeighbourServiceInConnector : ServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private INeighbourService m_NeighbourService;
     private IAuthenticationService m_AuthenticationService = null;
@@ -49,7 +50,7 @@ public class NeighbourServiceInConnector : ServiceConnector
         m_NeighbourService = nService;
         if (m_NeighbourService == null)
         {
-            m_log.Error("[NEIGHBOUR IN CONNECTOR]: neighbour service was not provided");
+            m_log.LogError("[NEIGHBOUR IN CONNECTOR]: neighbour service was not provided");
             return;
         }
 

@@ -29,6 +29,8 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Tests.Common;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
     /// <summary>
@@ -92,7 +94,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneObjectGroup retrievedSo = scene.GetSceneObjectGroup(so.UUID);
             SceneObjectPart[] retrievedParts = retrievedSo.Parts;
 
-            //m_log.Debug("retrievedPart : {0}", retrievedPart);
+            //m_log.LogDebug(retrievedPart, "retrievedPart : {0}");
             // If the parts have the same UUID then we will consider them as one and the same
             retrievedSo.PrimCount.Should().Be(partsToTestCount);
             // Assert.Equal(partsToTestCount, retrievedSo.PrimCount);
@@ -134,7 +136,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(objUuid);
 
-            //m_log.Debug("retrievedPart : {0}", retrievedPart);
+            //m_log.LogDebug(retrievedPart, "retrievedPart : {0}");
             // If the parts have the same UUID then we will consider them as one and the same
             Assert.Equal(obj1Name, retrievedPart.Name);
             Assert.Equal(objUuid, retrievedPart.UUID);

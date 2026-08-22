@@ -25,18 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class HGAssetServiceConnector : IAssetService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private ExpiringCacheOS<string, AssetServicesConnector> m_connectors = new ExpiringCacheOS<string, AssetServicesConnector>(60000);
 
     public HGAssetServiceConnector(IConfigSource source)
@@ -49,11 +50,11 @@ public class HGAssetServiceConnector : IAssetService
             IConfig assetConfig = source.Configs["AssetService"];
             if (assetConfig == null)
             {
-                m_log.Error("[HG ASSET SERVICE]: AssetService missing from OpenSim.ini");
+                m_log.LogError("[HG ASSET SERVICE]: AssetService missing from OpenSim.ini");
                 return;
             }
 
-            m_log.Info("[HG ASSET SERVICE]: HG asset service enabled");
+            m_log.LogInformation("[HG ASSET SERVICE]: HG asset service enabled");
         }
     }
 

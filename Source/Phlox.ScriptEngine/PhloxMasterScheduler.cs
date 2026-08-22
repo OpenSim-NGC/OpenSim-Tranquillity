@@ -9,13 +9,13 @@ using System;
 using System.Reflection;
 using OpenSim.Framework;
 using System.Threading;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace Phlox.ScriptEngine
 {
     internal class PhloxMasterScheduler
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private readonly PhloxExecutionScheduler m_ExeScheduler;
         private readonly PhloxScriptLoader m_ScriptLoader;
@@ -117,14 +117,14 @@ namespace Phlox.ScriptEngine
                     crashCount++;
                     if (crashCount >= MAX_CRASHES)
                     {
-                        m_log.ErrorFormat(
+                        m_log.LogError(
                             "[PhloxMaster]: CRITICAL — master scheduler crashed {0} times, script engine disabled. {1}",
                             crashCount, e);
                         m_Stop = true;
                         break;
                     }
 
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[PhloxMaster]: Master scheduler exception (crash #{0}/{1}), restarting in 1s. {2}",
                         crashCount, MAX_CRASHES, e);
 

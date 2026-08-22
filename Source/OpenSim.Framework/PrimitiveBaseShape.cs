@@ -30,9 +30,10 @@ using System.Xml;
 using System.Xml.Schema;
 using System.Xml.Serialization;
 using System.Runtime.CompilerServices;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -75,7 +76,7 @@ public enum Extrusion : byte
 [Serializable]
 public class PrimitiveBaseShape
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static readonly byte[] DEFAULT_TEXTURE = new Primitive.TextureEntry(new UUID("89556747-24cb-43ed-920b-47caed15465f")).GetBytes();
 
@@ -193,7 +194,7 @@ public class PrimitiveBaseShape
 
             if (!Enum.IsDefined(typeof(HollowShape), hollowShapeByte))
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[SHAPE]: Attempt to set a ProfileCurve with a hollow shape value of {0}, which isn't a valid enum.  Replacing with default shape.",
                     hollowShapeByte);
 
@@ -209,7 +210,7 @@ public class PrimitiveBaseShape
 
             if (!Enum.IsDefined(typeof(ProfileShape), profileShapeByte))
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[SHAPE]: Attempt to set a ProfileCurve with a profile shape value of {0}, which isn't a valid enum.  Replacing with square.",
                     profileShapeByte);
 
@@ -241,7 +242,7 @@ public class PrimitiveBaseShape
     /// <param name="prim"></param>
     public PrimitiveBaseShape(Primitive prim)
     {
-        //m_log.DebugFormat("[PRIMITIVE BASE SHAPE]: Creating from {0}", prim.ID);
+        //m_log.LogDebug("[PRIMITIVE BASE SHAPE]: Creating from {0}", prim.ID);
 
         PCode = (byte)prim.PrimData.PCode;
 
@@ -287,11 +288,11 @@ public class PrimitiveBaseShape
     {
         get
         {
-            //m_log.DebugFormat("[SHAPE]: get m_textureEntry length {0}", m_textureEntry.Length);
+            //m_log.LogDebug("[SHAPE]: get m_textureEntry length {0}", m_textureEntry.Length);
             try { return new Primitive.TextureEntry(m_textureEntry, 0, m_textureEntry.Length); }
             catch { }
 
-            m_log.Warn("[SHAPE]: Failed to decode texture, length=" + ((m_textureEntry != null) ? m_textureEntry.Length : 0));
+            m_log.LogWarning("[SHAPE]: Failed to decode texture, length=" + ((m_textureEntry != null) ? m_textureEntry.Length : 0));
             return new Primitive.TextureEntry(UUID.Zero);
         }
 
@@ -915,7 +916,7 @@ public class PrimitiveBaseShape
 
     public unsafe byte[] ExtraParamsToBytes()
     {
-        //m_log.DebugFormat("[EXTRAPARAMS]: Called ExtraParamsToBytes()");
+        //m_log.LogDebug("[EXTRAPARAMS]: Called ExtraParamsToBytes()");
 
         const byte FlexiEP = 0x10;
         const byte LightEP = 0x20;
@@ -1647,7 +1648,7 @@ public class PrimitiveBaseShape
                         xtr.MoveToContent();
 
                         string type = xtr.GetAttribute("type");
-                        //m_log.DebugFormat("[MOAP]: Loaded media texture entry with type {0}", type);
+                        //m_log.LogDebug("[MOAP]: Loaded media texture entry with type {0}", type);
 
                         if (type != MEDIA_TEXTURE_TYPE)
                             return;
@@ -1670,7 +1671,7 @@ public class PrimitiveBaseShape
             }
             catch
             {
-                m_log.Debug("PrimitiveBaseShape] error decoding MOAP xml" );
+                m_log.LogDebug("PrimitiveBaseShape] error decoding MOAP xml" );
             }
         }
 

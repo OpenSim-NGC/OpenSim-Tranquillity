@@ -27,18 +27,19 @@
 
 using System.Reflection;
 using System.Timers;
-using log4net;
 using Nini.Config;
 
 using OpenMetaverse;
 using OpenSim.Data;
 using OpenSim.Framework;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Groups;
 
 public class GroupsService : GroupsServiceBase
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public const GroupPowers DefaultEveryonePowers =
         GroupPowers.AllowSetHome |
@@ -183,7 +184,7 @@ public class GroupsService : GroupsServiceBase
         // Check perms
         if (!HasPower(RequestingAgentID, groupID, GroupPowers.ChangeActions))
         {
-            m_log.DebugFormat("[Groups]: ({0}) Attempt at updating group {1} denied because of lack of permission", RequestingAgentID, groupID);
+            m_log.LogDebug("[Groups]: ({0}) Attempt at updating group {1} denied because of lack of permission", RequestingAgentID, groupID);
             return;
         }
 
@@ -238,7 +239,7 @@ public class GroupsService : GroupsServiceBase
                     g.groupName = d.Data["Name"];
                 else
                 {
-                    m_log.DebugFormat("[Groups]: Key Name not found");
+                    m_log.LogDebug("[Groups]: Key Name not found");
                     continue;
                 }
 
@@ -349,7 +350,7 @@ public class GroupsService : GroupsServiceBase
         // check that the requesting agent has permissions to add role
         if (!HasPower(RequestingAgentID, groupID, GroupPowers.CreateRole))
         {
-            m_log.DebugFormat("[Groups]: ({0}) Attempt at creating role in group {1} denied because of lack of permission", RequestingAgentID, groupID);
+            m_log.LogDebug("[Groups]: ({0}) Attempt at creating role in group {1} denied because of lack of permission", RequestingAgentID, groupID);
             reason = "Insufficient permission to create role";
             return false;
         }
@@ -363,7 +364,7 @@ public class GroupsService : GroupsServiceBase
         // check perms
         if (!HasPower(RequestingAgentID, groupID, GroupPowers.ChangeActions))
         {
-            m_log.DebugFormat("[Groups]: ({0}) Attempt at changing role in group {1} denied because of lack of permission", RequestingAgentID, groupID);
+            m_log.LogDebug("[Groups]: ({0}) Attempt at changing role in group {1} denied because of lack of permission", RequestingAgentID, groupID);
             return false;
         }
 
@@ -375,27 +376,27 @@ public class GroupsService : GroupsServiceBase
         // check perms
         if (!HasPower(RequestingAgentID, groupID, GroupPowers.DeleteRole))
         {
-            m_log.DebugFormat("[Groups]: ({0}) Attempt at deleting role from group {1} denied because of lack of permission", RequestingAgentID, groupID);
+            m_log.LogDebug("[Groups]: ({0}) Attempt at deleting role from group {1} denied because of lack of permission", RequestingAgentID, groupID);
             return;
         }
 
         // Can't delete Everyone and Owners roles
         if (roleID.IsZero())
         {
-            m_log.DebugFormat("[Groups]: Attempt at deleting Everyone role from group {0} denied", groupID);
+            m_log.LogDebug("[Groups]: Attempt at deleting Everyone role from group {0} denied", groupID);
             return;
         }
 
         GroupData group = m_Database.RetrieveGroup(groupID);
         if (group == null)
         {
-            m_log.DebugFormat("[Groups]: Attempt at deleting role from non-existing group {0}", groupID);
+            m_log.LogDebug("[Groups]: Attempt at deleting role from non-existing group {0}", groupID);
             return;
         }
 
         if (roleID == new UUID(group.Data["OwnerRoleID"]))
         {
-            m_log.DebugFormat("[Groups]: Attempt at deleting Owners role from group {0} denied", groupID);
+            m_log.LogDebug("[Groups]: Attempt at deleting Owners role from group {0} denied", groupID);
             return;
         }
 
@@ -450,7 +451,7 @@ public class GroupsService : GroupsServiceBase
         // Check permission to invite
         if (!HasPower(RequestingAgentID, groupID, GroupPowers.Invite))
         {
-            m_log.DebugFormat("[Groups]: ({0}) Attempt at inviting to group {1} denied because of lack of permission", RequestingAgentID, groupID);
+            m_log.LogDebug("[Groups]: ({0}) Attempt at inviting to group {1} denied because of lack of permission", RequestingAgentID, groupID);
             return false;
         }
 
@@ -500,7 +501,7 @@ public class GroupsService : GroupsServiceBase
         bool unlimited = HasPower(RequestingAgentID, GroupID, GroupPowers.AssignMember) || IsOwner(RequestingAgentID, GroupID);
         if (!limited && !unlimited)
         {
-            m_log.DebugFormat("[Groups]: ({0}) Attempt at assigning {1} to role {2} denied because of lack of permission", RequestingAgentID, AgentID, RoleID);
+            m_log.LogDebug("[Groups]: ({0}) Attempt at assigning {1} to role {2} denied because of lack of permission", RequestingAgentID, AgentID, RoleID);
             return false;
         }
 
@@ -511,7 +512,7 @@ public class GroupsService : GroupsServiceBase
             RoleMembershipData rolemembership = m_Database.RetrieveRoleMember(GroupID, RoleID, RequestingAgentID);
             if (rolemembership == null)
             {
-                m_log.DebugFormat("[Groups]: ({0}) Attempt at assigning {1} to role {2} denied because of limited permission", RequestingAgentID, AgentID, RoleID);
+                m_log.LogDebug("[Groups]: ({0}) Attempt at assigning {1} to role {2} denied because of limited permission", RequestingAgentID, AgentID, RoleID);
                 return false;
             }
         }
@@ -532,7 +533,7 @@ public class GroupsService : GroupsServiceBase
         bool unlimited = HasPower(RequestingAgentID, GroupID, GroupPowers.AssignMember) || IsOwner(RequestingAgentID, GroupID);
         if (!limited && !unlimited)
         {
-            m_log.DebugFormat("[Groups]: ({0}) Attempt at removing {1} from role {2} denied because of lack of permission", RequestingAgentID, AgentID, RoleID);
+            m_log.LogDebug("[Groups]: ({0}) Attempt at removing {1} from role {2} denied because of lack of permission", RequestingAgentID, AgentID, RoleID);
             return false;
         }
 
@@ -543,7 +544,7 @@ public class GroupsService : GroupsServiceBase
             RoleMembershipData rolemembership = m_Database.RetrieveRoleMember(GroupID, RoleID, RequestingAgentID);
             if (rolemembership == null)
             {
-                m_log.DebugFormat("[Groups]: ({0}) Attempt at removing {1} from role {2} denied because of limited permission", RequestingAgentID, AgentID, RoleID);
+                m_log.LogDebug("[Groups]: ({0}) Attempt at removing {1} from role {2} denied because of limited permission", RequestingAgentID, AgentID, RoleID);
                 return false;
             }
         }
@@ -692,7 +693,7 @@ public class GroupsService : GroupsServiceBase
             if (gmember != null)
             {
                 memberships.Add(gmember);
-                //m_log.DebugFormat("[XXX]: Member of {0} as {1}", gmember.GroupName, gmember.GroupTitle);
+                //m_log.LogDebug("[XXX]: Member of {0} as {1}", gmember.GroupName, gmember.GroupTitle);
                 //Util.PrintCallStack();
             }
         }
@@ -730,7 +731,7 @@ public class GroupsService : GroupsServiceBase
         // Check perms
         if (!HasPower(RequestingAgentID, groupID, GroupPowers.SendNotices))
         {
-            m_log.DebugFormat("[Groups]: ({0}) Attempt at sending notice to group {1} denied because of lack of permission", RequestingAgentID, groupID);
+            m_log.LogDebug("[Groups]: ({0}) Attempt at sending notice to group {1} denied because of lack of permission", RequestingAgentID, groupID);
             return false;
         }
 
@@ -851,13 +852,13 @@ public class GroupsService : GroupsServiceBase
 
         if (add && data != null) // it already exists, can't create
         {
-            m_log.DebugFormat("[Groups]: Group {0} already exists. Can't create it again", groupID);
+            m_log.LogDebug("[Groups]: Group {0} already exists. Can't create it again", groupID);
             return false;
         }
 
         if (!add && data == null) // it doesn't exist, can't update
         {
-            m_log.DebugFormat("[Groups]: Group {0} doesn't exist. Can't update it", groupID);
+            m_log.LogDebug("[Groups]: Group {0} doesn't exist. Can't update it", groupID);
             return false;
         }
 
@@ -896,7 +897,7 @@ public class GroupsService : GroupsServiceBase
         MembershipData membership = m_Database.RetrieveMember(GroupID, AgentID);
         if (membership == null)
         {
-            m_log.DebugFormat("[Groups]: ({0}) No such member {0} in group {1}", AgentID, GroupID);
+            m_log.LogDebug("[Groups]: ({0}) No such member {0} in group {1}", AgentID, GroupID);
             return;
         }
 
@@ -1062,13 +1063,13 @@ public class GroupsService : GroupsServiceBase
         {
             if(rdata is null)
             {
-                m_log.Warn($"[GROUPSERVICE] null membership  data entry in group {groupID} for agent {agentID}");
+                m_log.LogWarning($"[GROUPSERVICE] null membership  data entry in group {groupID} for agent {agentID}");
                 continue;
             }
             RoleData role = m_Database.RetrieveRole(groupID, rdata.RoleID);
             if (role is null)
             {
-                m_log.Warn($"[GROUPSERVICE] role with id {rdata.RoleID} is null");
+                m_log.LogWarning($"[GROUPSERVICE] role with id {rdata.RoleID} is null");
                 continue;
             }
 

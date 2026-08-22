@@ -28,9 +28,10 @@
 using System.Reflection;
 using System.Data;
 using OpenSim.Framework;
-using log4net;
 using OpenMetaverse;
 using Npgsql;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.PGSQL;
 
@@ -38,7 +39,7 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
 {
     private const string _migrationStore = "FSAssetStore";
     private static string m_Table = "fsassets";
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private long m_ticksToEpoch;
 
     private PGSQLManager m_database;
@@ -178,8 +179,8 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
         }
         catch(Exception e)
         {
-            m_log.Error("[PGSQL FSASSETS] Failed to store asset with ID " + meta.ID);
-            m_log.Error(e.ToString());
+            m_log.LogError("[PGSQL FSASSETS] Failed to store asset with ID " + meta.ID);
+            m_log.LogError(e.ToString());
             return false;
         }
     }
@@ -299,7 +300,7 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PGSQL FSASSETS]: Error importing assets: {0}",
+            m_log.LogError("[PGSQL FSASSETS]: Error importing assets: {0}",
                     e.Message.ToString());
             return;
         }

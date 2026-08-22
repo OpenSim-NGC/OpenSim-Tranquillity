@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Data;
@@ -34,11 +33,13 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Base;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.AssetService;
 
 public class XAssetServiceBase : ServiceBase
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected IXAssetDataPlugin m_Database;
     protected IAssetLoader m_AssetLoader;
@@ -87,7 +88,7 @@ public class XAssetServiceBase : ServiceBase
 
         if (chainedAssetServiceDesignator != null)
         {
-            m_log.InfoFormat(
+            m_log.LogInformation(
                 "[XASSET SERVICE BASE]: Loading chained asset service from {0}", chainedAssetServiceDesignator);
 
             Object[] args = new Object[] { config, configName };

@@ -28,13 +28,14 @@
 using System.Reflection;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.ClientStack.LindenUDP;
 
 public sealed class PacketPool
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static readonly PacketPool instance = new PacketPool();
 
@@ -121,14 +122,14 @@ public sealed class PacketPool
         {
             if (!pool.ContainsKey(type) || pool[type] == null || (pool[type]).Count == 0)
             {
-//                    m_log.DebugFormat("[PACKETPOOL]: Building {0} packet", type);
+//                    m_log.LogDebug("[PACKETPOOL]: Building {0} packet", type);
 
                 // Creating a new packet if we cannot reuse an old package
                 packet = Packet.BuildPacket(type);
             }
             else
             {
-//                    m_log.DebugFormat("[PACKETPOOL]: Pulling {0} packet", type);
+//                    m_log.LogDebug("[PACKETPOOL]: Pulling {0} packet", type);
 
                 // Recycle old packages
                 PacketsReused++;
@@ -180,7 +181,7 @@ public sealed class PacketPool
         int i = 0;
         Packet packet = GetPacket(type);
         if (packet == null)
-            m_log.WarnFormat("[PACKETPOOL]: Failed to get packet of type {0}", type);
+            m_log.LogWarning("[PACKETPOOL]: Failed to get packet of type {0}", type);
         else
             packet.FromBytes(bytes, ref i, ref packetEnd, zeroBuffer);
 
@@ -238,7 +239,7 @@ public sealed class PacketPool
 
             if ((pool[type]).Count < 50)
             {
-//                  m_log.DebugFormat("[PACKETPOOL]: Pushing {0} packet", type);
+//                  m_log.LogDebug("[PACKETPOOL]: Pushing {0} packet", type);
                 pool[type].Push(packet);
             }
         }

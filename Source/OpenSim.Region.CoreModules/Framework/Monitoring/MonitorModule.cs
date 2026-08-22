@@ -27,7 +27,6 @@
 
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
@@ -37,6 +36,8 @@ using OpenSim.Region.CoreModules.Framework.Monitoring.Alerts;
 using OpenSim.Region.CoreModules.Framework.Monitoring.Monitors;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Framework.Monitoring;
 
@@ -59,7 +60,7 @@ public class MonitorModule : INonSharedRegionModule
     private readonly List<IMonitor> m_staticMonitors = new List<IMonitor>();
 
     private readonly List<IAlert> m_alerts = new List<IAlert>();
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public MonitorModule()
     {
@@ -373,7 +374,7 @@ public class MonitorModule : INonSharedRegionModule
         {
             string elemName = monitor.GetName();
             xml += "<" + elemName + ">" + monitor.GetValue().ToString() + "</" + elemName + ">";
-//                m_log.DebugFormat("[MONITOR MODULE]: {0} = {1}", elemName, monitor.GetValue());
+//                m_log.LogDebug("[MONITOR MODULE]: {0} = {1}", elemName, monitor.GetValue());
         }
 
         foreach (KeyValuePair<string, float> tuple in m_scene.StatsReporter.GetExtraSimStats())
@@ -390,7 +391,7 @@ public class MonitorModule : INonSharedRegionModule
 
     void OnTriggerAlert(System.Type reporter, string reason, bool fatal)
     {
-        m_log.Error("[Monitor] " + reporter.Name + " for " + m_scene.RegionInfo.RegionName + " reports " + reason + " (Fatal: " + fatal + ")");
+        m_log.LogError("[Monitor] " + reporter.Name + " for " + m_scene.RegionInfo.RegionName + " reports " + reason + " (Fatal: " + fatal + ")");
     }
 
     private List<Stat> registeredStats = new List<Stat>();

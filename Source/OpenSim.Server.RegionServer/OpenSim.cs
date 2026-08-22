@@ -31,7 +31,6 @@ using System.Runtime;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Net;
-using log4net;
 using NDesk.Options;
 using Nini.Config;
 using OpenMetaverse;
@@ -44,6 +43,8 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.RegionServer;
 
 /// <summary>
@@ -51,7 +52,7 @@ namespace OpenSim.Server.RegionServer;
 /// </summary>
 public class OpenSim : OpenSimBase
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected string m_startupCommandsFile;
     protected string m_shutdownCommandsFile;
@@ -133,9 +134,9 @@ public class OpenSim : OpenSimBase
             try { ServicePointManager.DnsRefreshTimeout = dnsTimeout; } catch { }
         }
 
-        m_log.Info("[OPENSIM MAIN]: Using async_call_method " + Util.FireAndForgetMethod);
+        m_log.LogInformation("[OPENSIM MAIN]: Using async_call_method " + Util.FireAndForgetMethod);
 
-        m_log.InfoFormat("[OPENSIM MAIN] Running GC in {0} mode", GCSettings.IsServerGC ? "server":"workstation");
+        m_log.LogInformation("[OPENSIM MAIN] Running GC in {0} mode", GCSettings.IsServerGC ? "server":"workstation");
     }
 
     /// <summary>
@@ -143,14 +144,14 @@ public class OpenSim : OpenSimBase
     /// </summary>
     protected override void StartupSpecific()
     {
-        m_log.Info("====================================================================");
-        m_log.Info("========================= STARTING OPENSIM =========================");
-        m_log.Info("====================================================================");
+        m_log.LogInformation("====================================================================");
+        m_log.LogInformation("========================= STARTING OPENSIM =========================");
+        m_log.LogInformation("====================================================================");
 
-        //m_log.InfoFormat("[OPENSIM MAIN]: GC Is Server GC: {0}", GCSettings.IsServerGC.ToString());
+        //m_log.LogInformation("[OPENSIM MAIN]: GC Is Server GC: {0}", GCSettings.IsServerGC.ToString());
         // http://msdn.microsoft.com/en-us/library/bb384202.aspx
         //GCSettings.LatencyMode = GCLatencyMode.Batch;
-        //m_log.InfoFormat("[OPENSIM MAIN]: GC Latency Mode: {0}", GCSettings.LatencyMode.ToString());
+        //m_log.LogInformation("[OPENSIM MAIN]: GC Latency Mode: {0}", GCSettings.LatencyMode.ToString());
 
         if (m_gui) // Driven by external GUI
         {
@@ -451,7 +452,7 @@ public class OpenSim : OpenSimBase
     private void WatchdogTimeoutHandler(Watchdog.ThreadWatchdogInfo twi)
     {
         int now = Environment.TickCount & Int32.MaxValue;
-        m_log.ErrorFormat(
+        m_log.LogError(
             "[WATCHDOG]: Timeout detected for thread \"{0}\". ThreadState={1}. Last tick was {2}ms ago.  {3}",
             twi.Thread.Name,
             twi.Thread.ThreadState,
@@ -531,7 +532,7 @@ public class OpenSim : OpenSimBase
                 string currentLine;
                 while ((currentLine = readFile.ReadLine()) != null)
                 {
-                    m_log.Info("[!]" + currentLine);
+                    m_log.LogInformation("[!]" + currentLine);
                 }
             }
         }
@@ -823,14 +824,14 @@ public class OpenSim : OpenSimBase
         string regionName = (SceneManager.CurrentScene == null ? "root" : SceneManager.CurrentScene.RegionInfo.RegionName);
         MainConsole.Instance.Output(String.Format("Currently selected region is {0}", regionName));
 
-//            m_log.DebugFormat("Original prompt is {0}", m_consolePrompt);
+//            m_log.LogDebug("Original prompt is {0}", m_consolePrompt);
         string prompt = m_consolePrompt;
 
         // Replace "\R" with the region name
         // Replace "\\" with "\"
         prompt = m_consolePromptRegex.Replace(prompt, m =>
         {
-//                m_log.DebugFormat("Matched {0}", m.Groups[2].Value);
+//                m_log.LogDebug("Matched {0}", m.Groups[2].Value);
             if (m.Groups[2].Value == "R")
                 return m.Groups[1].Value + regionName;
             else

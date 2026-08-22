@@ -29,12 +29,15 @@ using System.Text;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.Framework.Scenes.Animation;
 
 [Serializable]
 public class AnimationSet
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private OpenSim.Framework.Animation m_implicitDefaultAnimation = new OpenSim.Framework.Animation();
     private OpenSim.Framework.Animation m_defaultAnimation = new OpenSim.Framework.Animation();
@@ -160,7 +163,7 @@ public class AnimationSet
     /// </summary>
     public bool TrySetDefaultAnimation(string anim, int sequenceNum, UUID objectID)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[ANIMATION SET]: Setting default animation {0}, sequence number {1}, object id {2}",
         //    anim, sequenceNum, objectID);
 

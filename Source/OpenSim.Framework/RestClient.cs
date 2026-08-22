@@ -30,9 +30,9 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Web;
-using log4net;
-
 using OpenSim.Framework.ServiceAuth;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -44,7 +44,7 @@ namespace OpenSim.Framework;
 /// </remarks>
 public class RestClient : IDisposable
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // private string realuri;
 
@@ -159,11 +159,11 @@ public class RestClient : IDisposable
         }
         catch (ArgumentException)
         {
-            m_log.Error("[REST]: Query parameter " + name + " is already added.");
+            m_log.LogError("[REST]: Query parameter " + name + " is already added.");
         }
         catch (Exception e)
         {
-            m_log.Error("[REST]: An exception was raised adding query parameter to dictionary. Exception: {0}",e);
+            m_log.LogError(e, "[REST]: An exception was raised adding query parameter to dictionary. Exception: {0}");
         }
     }
 
@@ -179,11 +179,11 @@ public class RestClient : IDisposable
         }
         catch (ArgumentException)
         {
-            m_log.Error("[REST]: Query parameter " + name + " is already added.");
+            m_log.LogError("[REST]: Query parameter " + name + " is already added.");
         }
         catch (Exception e)
         {
-            m_log.Error("[REST]: An exception was raised adding query parameter to dictionary. Exception: {0}",e);
+            m_log.LogError(e, "[REST]: An exception was raised adding query parameter to dictionary. Exception: {0}");
         }
     }
 
@@ -230,7 +230,7 @@ public class RestClient : IDisposable
             }
         }
         // realuri = sb.ToString();
-        //m_log.InfoFormat("[REST CLIENT]: RestURL: {0}", realuri);
+        //m_log.LogInformation("[REST CLIENT]: RestURL: {0}", realuri);
         return new Uri(sb.ToString());
     }
 
@@ -275,7 +275,7 @@ public class RestClient : IDisposable
 
 
                 if (WebUtil.DebugLevel >= 3)
-                    m_log.DebugFormat("[REST CLIENT] {0} to {1}", RequestMethod, uri);
+                    m_log.LogDebug("[REST CLIENT] {0} to {1}", RequestMethod, uri);
 
                 //_request.ContentType = "application/xml";
                 responseMessage = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
@@ -299,21 +299,21 @@ public class RestClient : IDisposable
                         if (status == HttpStatusCode.NotFound)
                         {
                             // This is often benign. E.g., requesting a missing asset will return 404.
-                            m_log.DebugFormat("[REST CLIENT] Resource not found (404): {0}", uri.ToString());
+                            m_log.LogDebug("[REST CLIENT] Resource not found (404): {0}", uri.ToString());
                         }
                         else
                         {
-                            m_log.Error($"[REST CLIENT] Error fetching resource from server: {uri} status: {status} {e.Message}");
+                            m_log.LogError($"[REST CLIENT] Error fetching resource from server: {uri} status: {status} {e.Message}");
                         }
                     }
                     else
                     {
-                        m_log.Error($"[REST CLIENT] Error fetching resource from server: {uri} {e.Message}");
+                        m_log.LogError($"[REST CLIENT] Error fetching resource from server: {uri} {e.Message}");
                     }
                 }
                 else
                 {
-                    m_log.Error($"[REST CLIENT] Error fetching null resource from server: {e.Message}");
+                    m_log.LogError($"[REST CLIENT] Error fetching null resource from server: {e.Message}");
                 }
                 return null;
             }
@@ -375,20 +375,20 @@ public class RestClient : IDisposable
             if(uri is not null)
             { 
                 if (e.StatusCode is HttpStatusCode status)
-                    m_log.Warn($"[REST]: POST {uri} failed with status {status} and message {e.Message}");
+                    m_log.LogWarning($"[REST]: POST {uri} failed with status {status} and message {e.Message}");
                 else
-                    m_log.Warn($"[REST]: POST {uri} failed with message {e.Message}");
+                    m_log.LogWarning($"[REST]: POST {uri} failed with message {e.Message}");
             }
             else
-                m_log.Warn($"[REST]: POST failed {e.Message}");
+                m_log.LogWarning($"[REST]: POST failed {e.Message}");
             return;
         }
         catch (Exception e)
         {
             if (uri is not null)
-                m_log.Warn($"[REST]: POST {uri} failed with message {e.Message}");
+                m_log.LogWarning($"[REST]: POST {uri} failed with message {e.Message}");
             else
-                m_log.Warn($"[REST]: POST failed {e.Message}");
+                m_log.LogWarning($"[REST]: POST failed {e.Message}");
             return;
         }
         finally

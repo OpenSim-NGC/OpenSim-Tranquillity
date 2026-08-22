@@ -32,14 +32,15 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Groups;
 
 public class GroupsServiceLocalConnectorModule : ISharedRegionModule, IGroupsServicesConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled = false;
     private GroupsService m_GroupsService;
@@ -83,7 +84,7 @@ public class GroupsServiceLocalConnectorModule : ISharedRegionModule, IGroupsSer
         Init(config);
         m_Enabled = true;
 
-        m_log.DebugFormat("[Groups]: Initializing {0}", this.Name);
+        m_log.LogDebug("[Groups]: Initializing {0}", this.Name);
     }
 
     public string Name
@@ -101,7 +102,7 @@ public class GroupsServiceLocalConnectorModule : ISharedRegionModule, IGroupsSer
         if (!m_Enabled)
             return;
 
-        m_log.DebugFormat("[Groups]: Registering {0} with {1}", this.Name, scene.RegionInfo.RegionName);
+        m_log.LogDebug("[Groups]: Registering {0} with {1}", this.Name, scene.RegionInfo.RegionName);
         scene.RegisterModuleInterface<IGroupsServicesConnector>(this);
         m_Scenes.Add(scene);
     }
@@ -142,7 +143,7 @@ public class GroupsServiceLocalConnectorModule : ISharedRegionModule, IGroupsSer
     public UUID CreateGroup(UUID RequestingAgentID, string name, string charter, bool showInList, UUID insigniaID, int membershipFee, bool openEnrollment,
         bool allowPublish, bool maturePublish, UUID founderID, out string reason)
     {
-        m_log.DebugFormat("[Groups]: Creating group {0}", name);
+        m_log.LogDebug("[Groups]: Creating group {0}", name);
         reason = string.Empty;
         return m_GroupsService.CreateGroup(RequestingAgentID.ToString(), name, charter, showInList, insigniaID,
                 membershipFee, openEnrollment, allowPublish, maturePublish, founderID, out reason);

@@ -31,14 +31,15 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Services.Connectors.Hypergrid;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Framework.UserManagement;
 
 public class HGUserManagementModule : UserManagementModule, ISharedRegionModule, IUserManagement
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     #region ISharedRegionModule
 
@@ -49,7 +50,7 @@ public class HGUserManagementModule : UserManagementModule, ISharedRegionModule,
         {
             m_Enabled = true;
             base.Init(config);
-            m_log.DebugFormat("[USER MANAGEMENT MODULE]: {0} is enabled", Name);
+            m_log.LogDebug("[USER MANAGEMENT MODULE]: {0} is enabled", Name);
         }
     }
 
@@ -67,7 +68,7 @@ public class HGUserManagementModule : UserManagementModule, ISharedRegionModule,
             string[] words = query.Split(new char[] { '@' });
             if (words.Length != 2)
             {
-                m_log.DebugFormat("[USER MANAGEMENT MODULE]: Malformed address {0}", query);
+                m_log.LogDebug("[USER MANAGEMENT MODULE]: Malformed address {0}", query);
                 return;
             }
 
@@ -118,7 +119,7 @@ public class HGUserManagementModule : UserManagementModule, ISharedRegionModule,
                     }
                     catch (UriFormatException)
                     {
-                        m_log.DebugFormat("[USER MANAGEMENT MODULE]: Malformed address {0}", uriStr);
+                        m_log.LogDebug("[USER MANAGEMENT MODULE]: Malformed address {0}", uriStr);
                         return;
                     }
 
@@ -133,7 +134,7 @@ public class HGUserManagementModule : UserManagementModule, ISharedRegionModule,
                         }
                         catch (Exception e)
                         {
-                            m_log.Debug("[USER MANAGEMENT MODULE]: GetUUID call failed ", e);
+                            m_log.LogDebug(e, "[USER MANAGEMENT MODULE]: GetUUID call failed ");
                         }
                     }
 
@@ -145,10 +146,10 @@ public class HGUserManagementModule : UserManagementModule, ISharedRegionModule,
                         ud.LastName = "@" + words[1];
                         users.Add(ud);
                         AddUser(userID, names[0], names[1], uriStr);
-                        m_log.DebugFormat("[USER MANAGEMENT MODULE]: User {0}@{1} found", words[0], words[1]);
+                        m_log.LogDebug("[USER MANAGEMENT MODULE]: User {0}@{1} found", words[0], words[1]);
                     }
                     else
-                        m_log.DebugFormat("[USER MANAGEMENT MODULE]: User {0}@{1} not found", words[0], words[1]);
+                        m_log.LogDebug("[USER MANAGEMENT MODULE]: User {0}@{1} not found", words[0], words[1]);
                 }
             }
         }

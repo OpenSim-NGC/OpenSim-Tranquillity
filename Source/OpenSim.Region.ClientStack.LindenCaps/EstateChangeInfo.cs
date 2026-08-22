@@ -28,7 +28,6 @@
 using System.Net;
 using System.Reflection;
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -36,14 +35,15 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public class EstateChangeInfoCapModule : INonSharedRegionModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_scene;
     private bool m_Enabled = false;
@@ -156,7 +156,7 @@ public class EstateChangeInfoCapModule : INonSharedRegionModule
         }
         catch (Exception ex)
         {
-            m_log.Error("[UPLOAD OBJECT ASSET MODULE]: Error deserializing message " + ex.ToString());
+            m_log.LogError("[UPLOAD OBJECT ASSET MODULE]: Error deserializing message " + ex.ToString());
             response.StatusCode = (int)HttpStatusCode.BadRequest;
             return;
         }

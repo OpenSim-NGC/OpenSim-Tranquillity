@@ -30,13 +30,14 @@ using System.Reflection;
 using OMV = OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace osWebRtcVoice;
 
 public class JanusViewerSession : IVoiceViewerSession
 {
-    protected static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    protected static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     protected static readonly string LogHeader = "[JANUS VIEWER SESSION]";
 
     // 'viewer_session' that is passed to and from the viewer
@@ -70,20 +71,20 @@ public class JanusViewerSession : IVoiceViewerSession
     {
         ViewerSessionID = OMV.UUID.Random().ToString();
         VoiceService = pVoiceService;
-        m_log.Debug($"{LogHeader} JanusViewerSession created {ViewerSessionID}");
+        m_log.LogDebug($"{LogHeader} JanusViewerSession created {ViewerSessionID}");
     }
     public JanusViewerSession(string pViewerSessionID, IWebRtcVoiceService pVoiceService)
     {
         ViewerSessionID = pViewerSessionID;
         VoiceService = pVoiceService;
-        m_log.Debug($"{LogHeader} JanusViewerSession created {ViewerSessionID}");
+        m_log.LogDebug($"{LogHeader} JanusViewerSession created {ViewerSessionID}");
     }
 
     // Send the messages to the voice service to try and get rid of the session
     // IVoiceViewerSession.Shutdown
     public async Task Shutdown()
     {
-        m_log.DebugFormat($"{LogHeader} JanusViewerSession shutdown {ViewerSessionID}");
+        m_log.LogDebug($"{LogHeader} JanusViewerSession shutdown {ViewerSessionID}");
         if (Room is not null)
         {
             var rm = Room;

@@ -36,13 +36,13 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.World.Estate;
 
 public class EstateSimpleRequestHandler :SimpleStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected EstateModule m_EstateModule;
     protected Object m_RequestLock = new Object();
@@ -65,7 +65,7 @@ public class EstateSimpleRequestHandler :SimpleStreamHandler
 
         httpResponse.StatusCode = (int)HttpStatusCode.OK;
 
-        // m_log.DebugFormat("[ESTATE HANDLER]: query String: {0}", body);
+        // m_log.LogDebug("[ESTATE HANDLER]: query String: {0}", body);
 
         try
         {
@@ -135,7 +135,7 @@ public class EstateSimpleRequestHandler :SimpleStreamHandler
         }
         catch (Exception e)
         {
-            m_log.Debug("[ESTATE]: Exception {0}" + e.ToString());
+            m_log.LogDebug("[ESTATE]: Exception {0}" + e.ToString());
         }
 
         httpResponse.RawBuffer = FailureResult();

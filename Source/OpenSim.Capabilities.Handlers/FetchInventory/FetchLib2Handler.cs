@@ -32,16 +32,15 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
-
-using log4net;
 
 namespace OpenSim.Capabilities.Handlers;
 
 public class FetchLib2Handler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IInventoryService m_inventoryService;
     private ILibraryService m_LibraryService;
@@ -59,7 +58,7 @@ public class FetchLib2Handler
 
     public void FetchLibSimpleRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap requestmap, ExpiringKey<UUID> BadRequests)
     {
-        //m_log.DebugFormat("[FETCH LIB INVENTORY HANDLER]: Received FetchInventory capability request {0}", request);
+        //m_log.LogDebug("[FETCH LIB INVENTORY HANDLER]: Received FetchInventory capability request {0}", request);
 
         if (BadRequests == null)
         {

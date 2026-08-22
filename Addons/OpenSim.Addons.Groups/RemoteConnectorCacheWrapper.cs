@@ -29,6 +29,8 @@ using OpenSim.Framework;
 //using OpenSim.Region.Framework.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Groups;
 
 public delegate ExtendedGroupRecord GroupRecordDelegate();
@@ -70,7 +72,7 @@ public class RemoteConnectorCacheWrapper
 
     public UUID CreateGroup(UUID RequestingAgentID, GroupRecordDelegate d)
     {
-        //m_log.DebugFormat("[Groups.RemoteConnector]: Creating group {0}", name);
+        //m_log.LogDebug("[Groups.RemoteConnector]: Creating group {0}", name);
         //reason = string.Empty;
 
         //ExtendedGroupRecord group = m_GroupsService.CreateGroup(RequestingAgentID.ToString(), name, charter, showInList, insigniaID,
@@ -113,7 +115,7 @@ public class RemoteConnectorCacheWrapper
         else
             cacheKey += GroupID.ToString();
 
-        //m_log.DebugFormat("[XXX]: GetGroupRecord {0}", cacheKey);
+        //m_log.LogDebug("[XXX]: GetGroupRecord {0}", cacheKey);
 
         while (true)
         {
@@ -121,7 +123,7 @@ public class RemoteConnectorCacheWrapper
             {
                 if (m_Cache.TryGetValue(cacheKey, out group))
                 {
-                    //m_log.DebugFormat("[XXX]: GetGroupRecord {0} cached!", cacheKey);
+                    //m_log.LogDebug("[XXX]: GetGroupRecord {0} cached!", cacheKey);
                     return (ExtendedGroupRecord)group;
                 }
 
@@ -208,7 +210,7 @@ public class RemoteConnectorCacheWrapper
         bool firstCall = false;
         string cacheKey = "active-" + AgentID.ToString();
 
-        //m_log.DebugFormat("[XXX]: GetAgentActiveMembership {0}", cacheKey);
+        //m_log.LogDebug("[XXX]: GetAgentActiveMembership {0}", cacheKey);
 
         while (true)
         {
@@ -216,7 +218,7 @@ public class RemoteConnectorCacheWrapper
             {
                 if (m_Cache.TryGetValue(cacheKey, out membership))
                 {
-                    //m_log.DebugFormat("[XXX]: GetAgentActiveMembership {0} cached!", cacheKey);
+                    //m_log.LogDebug("[XXX]: GetAgentActiveMembership {0} cached!", cacheKey);
                     return (ExtendedGroupMembershipData)membership;
                 }
 
@@ -253,7 +255,7 @@ public class RemoteConnectorCacheWrapper
         bool firstCall = false;
         string cacheKey = "membership-" + AgentID.ToString() + "-" + GroupID.ToString();
 
-        //m_log.DebugFormat("[XXX]: GetAgentGroupMembership {0}", cacheKey);
+        //m_log.LogDebug("[XXX]: GetAgentGroupMembership {0}", cacheKey);
 
         while (true)
         {
@@ -261,7 +263,7 @@ public class RemoteConnectorCacheWrapper
             {
                 if (m_Cache.TryGetValue(cacheKey, out membership))
                 {
-                    //m_log.DebugFormat("[XXX]: GetAgentGroupMembership {0}", cacheKey);
+                    //m_log.LogDebug("[XXX]: GetAgentGroupMembership {0}", cacheKey);
                     return (ExtendedGroupMembershipData)membership;
                 }
 
@@ -297,7 +299,7 @@ public class RemoteConnectorCacheWrapper
         bool firstCall = false;
         string cacheKey = "memberships-" + AgentID.ToString();
 
-        //m_log.DebugFormat("[XXX]: GetAgentGroupMemberships {0}", cacheKey);
+        //m_log.LogDebug("[XXX]: GetAgentGroupMemberships {0}", cacheKey);
 
         while (true)
         {
@@ -305,7 +307,7 @@ public class RemoteConnectorCacheWrapper
             {
                 if (m_Cache.TryGetValue(cacheKey, out memberships))
                 {
-                    //m_log.DebugFormat("[XXX]: GetAgentGroupMemberships {0} cached!", cacheKey);
+                    //m_log.LogDebug("[XXX]: GetAgentGroupMemberships {0} cached!", cacheKey);
                     return (List<GroupMembershipData>)memberships;
                 }
 
@@ -342,7 +344,7 @@ public class RemoteConnectorCacheWrapper
         // we need to key in also on the requester, because different ppl have different view privileges
         string cacheKey = "members-" + RequestingAgentID.ToString() + "-" + GroupID.ToString();
 
-        //m_log.DebugFormat("[XXX]: GetGroupMembers {0}", cacheKey);
+        //m_log.LogDebug("[XXX]: GetGroupMembers {0}", cacheKey);
 
         while (true)
         {
@@ -499,7 +501,7 @@ public class RemoteConnectorCacheWrapper
         // we need to key in also on the requester, because different ppl have different view privileges
         string cacheKey = "rolemembers-" + RequestingAgentID.ToString() + "-" + GroupID.ToString();
 
-        //m_log.DebugFormat("[XXX]: GetGroupRoleMembers {0}", cacheKey);
+        //m_log.LogDebug("[XXX]: GetGroupRoleMembers {0}", cacheKey);
         while (true)
         {
             lock (m_Cache)
@@ -624,7 +626,7 @@ public class RemoteConnectorCacheWrapper
         bool firstCall = false;
         string cacheKey = "roles-" + GroupID.ToString() + "-" + AgentID.ToString();
 
-        //m_log.DebugFormat("[XXX]: GetAgentGroupRoles {0}", cacheKey);
+        //m_log.LogDebug("[XXX]: GetAgentGroupRoles {0}", cacheKey);
 
         while (true)
         {
@@ -632,7 +634,7 @@ public class RemoteConnectorCacheWrapper
             {
                 if (m_Cache.TryGetValue(cacheKey, out roles))
                 {
-                    //m_log.DebugFormat("[XXX]: GetAgentGroupRoles {0} cached!", cacheKey);
+                    //m_log.LogDebug("[XXX]: GetAgentGroupRoles {0} cached!", cacheKey);
                     return (List<GroupRolesData>)roles;
                 }
 
@@ -721,7 +723,7 @@ public class RemoteConnectorCacheWrapper
         bool firstCall = false;
         string cacheKey = "notice-" + noticeID.ToString();
 
-        //m_log.DebugFormat("[XXX]: GetAgentGroupRoles {0}", cacheKey);
+        //m_log.LogDebug("[XXX]: GetAgentGroupRoles {0}", cacheKey);
 
         while (true)
         {
@@ -765,7 +767,7 @@ public class RemoteConnectorCacheWrapper
         bool firstCall = false;
         string cacheKey = "notices-" + GroupID.ToString();
 
-        //m_log.DebugFormat("[XXX]: GetGroupNotices {0}", cacheKey);
+        //m_log.LogDebug("[XXX]: GetGroupNotices {0}", cacheKey);
 
         while (true)
         {
@@ -773,7 +775,7 @@ public class RemoteConnectorCacheWrapper
             {
                 if (m_Cache.TryGetValue(cacheKey, out notices))
                 {
-                    //m_log.DebugFormat("[XXX]: GetGroupNotices {0} cached!", cacheKey);
+                    //m_log.LogDebug("[XXX]: GetGroupNotices {0} cached!", cacheKey);
                     return (List<ExtendedGroupNoticeData>)notices;
                 }
 

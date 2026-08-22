@@ -28,6 +28,8 @@
 using OpenSim.Framework;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.SharedBase;
 
 public delegate void physicsCrash();
@@ -85,7 +87,7 @@ public struct ContactResult
 
 public abstract class PhysicsScene
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// A unique identifying string for this instance of the physics engine.

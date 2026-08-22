@@ -25,11 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using Nini.Config;
-using log4net;
 using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework.Console;
@@ -39,8 +37,7 @@ namespace OpenSim.Framework.Console;
 /// </summary>
 public class LocalConsole : CommandConsole
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-    private static readonly ILogger _logger = LoggerProvider.CreateLogger(nameof(LocalConsole));
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger<LocalConsole>();
     private string m_historyPath;
     private bool m_historyEnable;
     private bool m_historytimestamps;
@@ -82,14 +79,14 @@ public class LocalConsole : CommandConsole
 
     public LocalConsole(string defaultPrompt, IConfig startupConfig = null) : base(defaultPrompt)
     {
-        _logger.LogInformation("[LOCAL CONSOLE]: Initializing LocalConsole.");
+        m_log.LogInformation("[LOCAL CONSOLE]: Initializing LocalConsole.");
         
         if (startupConfig == null) return;
 
         m_historyEnable = startupConfig.GetBoolean("ConsoleHistoryFileEnabled", false);
         if (!m_historyEnable)
         {
-            m_log.Info("[LOCAL CONSOLE]: Persistent command line history from file is Disabled");
+            m_log.LogInformation("[LOCAL CONSOLE]: Persistent command line history from file is Disabled");
             return;
         }
 
@@ -97,7 +94,7 @@ public class LocalConsole : CommandConsole
         int m_historySize = startupConfig.GetInt("ConsoleHistoryFileLines", 100);
         m_historyPath = Path.GetFullPath(Path.Combine(Util.configDir(), m_historyFile));
         m_historytimestamps = startupConfig.GetBoolean("ConsoleHistoryTimeStamp", false);
-        m_log.InfoFormat("[LOCAL CONSOLE]: Persistent command line history is Enabled, up to {0} lines from file {1} {2} timestamps",
+        m_log.LogInformation("[LOCAL CONSOLE]: Persistent command line history is Enabled, up to {0} lines from file {1} {2} timestamps",
             m_historySize, m_historyPath, m_historytimestamps?"with":"without");
 
         if (File.Exists(m_historyPath))
@@ -140,11 +137,11 @@ public class LocalConsole : CommandConsole
                     }
                 }
             }
-            m_log.InfoFormat("[LOCAL CONSOLE]: Read {0} lines of command line history from file {1}", m_history.Count, m_historyPath);
+            m_log.LogInformation("[LOCAL CONSOLE]: Read {0} lines of command line history from file {1}", m_history.Count, m_historyPath);
         }
         else
         {
-            m_log.InfoFormat("[LOCAL CONSOLE]: Creating new empty command line history file {0}", m_historyPath);
+            m_log.LogInformation("[LOCAL CONSOLE]: Creating new empty command line history file {0}", m_historyPath);
             File.Create(m_historyPath).Dispose();
         }
 

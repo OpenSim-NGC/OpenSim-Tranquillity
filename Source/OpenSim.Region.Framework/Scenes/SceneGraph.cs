@@ -29,10 +29,11 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using System.Runtime.InteropServices;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes;
 
@@ -47,7 +48,7 @@ public delegate void ChangedBackupDelegate(SceneObjectGroup sog);
 /// </summary>
 public class SceneGraph
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     #region Events
 
@@ -440,24 +441,24 @@ public class SceneGraph
     {
         if (sceneObject is null)
         {
-            m_log.Error("[SCENEGRAPH]: Tried to add null scene object");
+            m_log.LogError("[SCENEGRAPH]: Tried to add null scene object");
             return false;
         }
         if (sceneObject.UUID.IsZero())
         {
-            m_log.Error(
+            m_log.LogError(
                 $"[SCENEGRAPH]: Tried to add scene object {sceneObject.Name} to {m_parentScene.RegionInfo.RegionName} with Zero UUID");
             return false;
         }
 
         if (Entities.ContainsKey(sceneObject.UUID))
         {
-            m_log.Debug(
+            m_log.LogDebug(
                 $"[SCENEGRAPH]: Scene graph for {m_parentScene.RegionInfo.RegionName} already contains object {sceneObject.UUID} in AddSceneObject()");
             return false;
         }
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENEGRAPH]: Adding scene object {0} {1}, with {2} parts on {3}",
         //    sceneObject.Name, sceneObject.UUID, sceneObject.Parts.Length, m_parentScene.RegionInfo.RegionName);
 
@@ -530,7 +531,7 @@ public class SceneGraph
     /// <returns>true if the object was deleted, false if there was no object to delete</returns>
     public bool DeleteSceneObject(UUID uuid, bool resultOfObjectLinked)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[SCENE GRAPH]: Deleting scene object with uuid {0}, resultOfObjectLinked = {1}",
 //                uuid, resultOfObjectLinked);
 
@@ -656,7 +657,7 @@ public class SceneGraph
             }
             catch (Exception e)
             {
-                m_log.Error($"[INNER SCENE]: Failed to update {sog.Name}, {sog.UUID} - {e.Message}");
+                m_log.LogError($"[INNER SCENE]: Failed to update {sog.Name}, {sog.UUID} - {e.Message}");
             }
         }
     }
@@ -750,7 +751,7 @@ public class SceneGraph
     {
         if (!Entities.Remove(agentID))
         {
-            m_log.Warn($"[SCENE GRAPH]: Tried to remove non-existent scene presence with ID {agentID}");
+            m_log.LogWarning($"[SCENE GRAPH]: Tried to remove non-existent scene presence with ID {agentID}");
         }
 
         bool entered = false;
@@ -780,7 +781,7 @@ public class SceneGraph
             }
             else
             {
-                m_log.Warn($"[SCENE GRAPH]: Tried to remove non-existent scene presence with ID {agentID}");
+                m_log.LogWarning($"[SCENE GRAPH]: Tried to remove non-existent scene presence with ID {agentID}");
             }
         }
         finally
@@ -1426,7 +1427,7 @@ public class SceneGraph
                 }
                 catch (Exception e)
                 {
-                    m_log.Warn($"[SCENEGRAPH]: Problem processing action in ForEachSOG: {e.Message}");
+                    m_log.LogWarning($"[SCENEGRAPH]: Problem processing action in ForEachSOG: {e.Message}");
                 }
             }
         }
@@ -1451,7 +1452,7 @@ public class SceneGraph
             }
             catch (Exception e)
             {
-                m_log.Error($"[SCENEGRAPH]: Error in {m_parentScene.RegionInfo.RegionName}: {e.Message}");
+                m_log.LogError($"[SCENEGRAPH]: Error in {m_parentScene.RegionInfo.RegionName}: {e.Message}");
             }
         };
     }
@@ -1473,7 +1474,7 @@ public class SceneGraph
             }
             catch (Exception e)
             {
-                m_log.Error($"[SCENEGRAPH]: Error in {m_parentScene.RegionInfo.RegionName}: {e.Message}");
+                m_log.LogError($"[SCENEGRAPH]: Error in {m_parentScene.RegionInfo.RegionName}: {e.Message}");
             }
         }
     }
@@ -1834,7 +1835,7 @@ public class SceneGraph
     /// <param name="clickAction"></param>
     protected internal void PrimClickAction(IClientAPI remoteClient, uint primLocalID, string clickAction)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENEGRAPH]: User {0} set click action for {1} to {2}", remoteClient.Name, primLocalID, clickAction);
 
         SceneObjectGroup group = GetGroupByPrim(primLocalID);
@@ -2177,7 +2178,7 @@ public class SceneGraph
     /// <summary>
     public SceneObjectGroup DuplicateObject(uint originalPrimID, Vector3 offset, UUID AgentID, UUID GroupID, Quaternion rot, bool createSelected)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[SCENE]: Duplication of object {0} at offset {1} requested by agent {2}",
 //                originalPrimID, offset, AgentID);
 
@@ -2260,7 +2261,7 @@ public class SceneGraph
         }
         else
         {
-            m_log.Warn($"[SCENE]: Attempted to duplicate nonexistant prim id {GroupID}");
+            m_log.LogWarning($"[SCENE]: Attempted to duplicate nonexistant prim id {GroupID}");
         }
 
         return null;

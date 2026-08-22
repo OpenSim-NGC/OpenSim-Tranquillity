@@ -28,12 +28,13 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 // using OpenSim.Region.Framework.Interfaces;
 
 namespace OpenSim.Framework.Capabilities;
@@ -47,7 +48,7 @@ public delegate IClientAPI GetClientDelegate(UUID agentID);
 
 public class Caps : IDisposable
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly string m_httpListenerHostName;
     private readonly uint m_httpListenPort;
@@ -188,25 +189,25 @@ public class Caps : IDisposable
     /// <param name="handler"></param>
     public void RegisterHandler(string capName, IRequestHandler handler)
     {
-        //m_log.DebugFormat("[CAPS]: Registering handler for \"{0}\": path {1}", capName, handler.Path);
+        //m_log.LogDebug("[CAPS]: Registering handler for \"{0}\": path {1}", capName, handler.Path);
         m_capsHandlers[capName] = handler;
     }
 
     public void RegisterSimpleHandler(string capName, ISimpleStreamHandler handler, bool addToListener = true)
     {
-        //m_log.DebugFormat("[CAPS]: Registering handler for \"{0}\": path {1}", capName, handler.Path);
+        //m_log.LogDebug("[CAPS]: Registering handler for \"{0}\": path {1}", capName, handler.Path);
         m_capsHandlers.AddSimpleHandler(capName, handler, addToListener);
     }
 
     public void RegisterPollHandler(string capName, PollServiceEventArgs pollServiceHandler)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[CAPS]: Registering handler with name {0}, url {1} for {2}",
         //    capName, pollServiceHandler.Url, m_agentID, m_regionName);
 
         if(!m_pollServiceHandlers.TryAdd(capName, pollServiceHandler))
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[CAPS]: Handler with name {0} already registered (ulr {1}, agent {2}, region {3}",
                 capName, pollServiceHandler.Url, m_agentID, m_regionName);
             return;

@@ -34,6 +34,7 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
@@ -43,7 +44,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps;
 /// </summary>
 public class FetchInventory2Module : ISharedRegionModule
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public bool Enabled { get; private set; }
 
@@ -150,7 +151,7 @@ public class FetchInventory2Module : ISharedRegionModule
             caps.RegisterHandler("FetchInventory2", url);
         }
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[FETCH INVENTORY2 MODULE]: Registered capability FetchInventory2 at {0} in region {1} for {2}",
         //    capUrl, m_scene.RegionInfo.RegionName, agentID);
     }
@@ -171,7 +172,7 @@ public class FetchInventory2Module : ISharedRegionModule
         {
             caps.RegisterHandler("FetchLib2", url);
         }
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[FETCH INVENTORY2 MODULE]: Registered capability FetchLib2 at {0} in region {1} for {2}",
         //    capUrl, m_scene.RegionInfo.RegionName, agentID);
     }

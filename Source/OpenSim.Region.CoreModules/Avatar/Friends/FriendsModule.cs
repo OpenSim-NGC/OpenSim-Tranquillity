@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -37,6 +36,7 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Friends;
 using OpenSim.Server.Base;
+using Microsoft.Extensions.Logging;
 using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
@@ -45,7 +45,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends;
 
 public class FriendsModule : ISharedRegionModule, IFriendsModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected bool m_Enabled = false;
 
@@ -159,7 +159,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
                 InitModule(config);
 
                 m_Enabled = true;
-                m_log.DebugFormat("[FRIENDS MODULE]: {0} enabled.", Name);
+                m_log.LogDebug("[FRIENDS MODULE]: {0} enabled.", Name);
             }
         }
     }
@@ -185,7 +185,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
 
         if (m_FriendsService is null)
         {
-            m_log.Error("[FRIENDS]: No Connector defined in section Friends, or failed to load, cannot continue");
+            m_log.LogError("[FRIENDS]: No Connector defined in section Friends, or failed to load, cannot continue");
             throw new Exception("Connector load error");
         }
     }
@@ -203,7 +203,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
         if (!m_Enabled)
             return;
 
-        //m_log.DebugFormat("[FRIENDS MODULE]: AddRegion on {0}", Name);
+        //m_log.LogDebug("[FRIENDS MODULE]: AddRegion on {0}", Name);
 
         m_Scenes.Add(scene);
         scene.RegisterModuleInterface<IFriendsModule>(this);
@@ -410,7 +410,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
     {
         UUID agentID = client.AgentId;
 
-        //m_log.DebugFormat("[XXX]: OnClientLogin!");
+        //m_log.LogDebug("[XXX]: OnClientLogin!");
 
         // Register that we need to send this user's status to friends. This can only be done
         // once the client becomes a Root Agent, because as part of sending out the presence
@@ -463,7 +463,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
         {
             if (!GetAgentInfo(client.Scene.RegionInfo.ScopeID, fid, out UUID fromAgentID, out string firstname, out string lastname))
             {
-                m_log.DebugFormat("[FRIENDS MODULE]: skipping malformed friend {0}", fid);
+                m_log.LogDebug("[FRIENDS MODULE]: skipping malformed friend {0}", fid);
                 continue;
             }
 
@@ -517,7 +517,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
         if (friendList.Count > 0)
             GetOnlineFriends(userID, friendList, online);
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[FRIENDS MODULE]: User {0} has {1} friends online", userID, online.Count);
 
         return online;
@@ -525,7 +525,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
 
     protected virtual void GetOnlineFriends(UUID userID, List<string> friendList, List<UUID> online)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[FRIENDS MODULE]: Looking for online presence of {0} users for {1}", friendList.Count, userID);
 
         PresenceInfo[] presence = PresenceService.GetAgents(friendList.ToArray());
@@ -589,7 +589,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
             Util.FireAndForget(
                 delegate
                 {
-                    //m_log.DebugFormat(
+                    //m_log.LogDebug(
                     //    "[FRIENDS MODULE]: Notifying {0} friends of {1} of online status {2}",
                     //    friendList.Count, agentID, online);
 
@@ -602,7 +602,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
 
     protected virtual void StatusNotify(List<FriendInfo> friendList, UUID userID, bool online)
     {
-        //m_log.DebugFormat("[FRIENDS]: Entering StatusNotify for {0}", userID);
+        //m_log.LogDebug("[FRIENDS]: Entering StatusNotify for {0}", userID);
         List<string> remoteFriendStringIds = new(friendList.Count);
         foreach (FriendInfo friend in friendList)
         {
@@ -614,7 +614,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
             }
             else
             {
-                m_log.WarnFormat("[FRIENDS]: Error parsing friend ID {0}", friend.Friend);
+                m_log.LogWarning("[FRIENDS]: Error parsing friend ID {0}", friend.Friend);
             }
         }
 
@@ -632,7 +632,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
             // let's guard against sessions-gone-bad
             if (friendSession is not null && friendSession.RegionID.IsNotZero())
             {
-                //m_log.DebugFormat("[FRIENDS]: Get region {0}", friendSession.RegionID);
+                //m_log.LogDebug("[FRIENDS]: Get region {0}", friendSession.RegionID);
                 GridRegion region = GridService.GetRegionByUUID(m_Scenes[0].RegionInfo.ScopeID, friendSession.RegionID);
                 if (region is not null)
                 {
@@ -640,7 +640,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
                 }
             }
             //else
-            //    m_log.DebugFormat("[FRIENDS]: friend session is null or the region is UUID.Zero");
+            //    m_log.LogDebug("[FRIENDS]: friend session is null or the region is UUID.Zero");
         }
     }
 
@@ -652,7 +652,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
             UUID principalID = new(im.fromAgentID);
             UUID friendID = new(im.toAgentID);
 
-            m_log.DebugFormat("[FRIENDS]: {0} ({1}) offered friendship to {2} ({3})", principalID, client.FirstName + client.LastName, friendID, im.fromAgentName);
+            m_log.LogDebug("[FRIENDS]: {0} ({1}) offered friendship to {2} ({3})", principalID, client.FirstName + client.LastName, friendID, im.fromAgentName);
 
             // Check that the friendship doesn't exist yet
             FriendInfo[] finfos = GetFriendsFromCache(principalID);
@@ -713,7 +713,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
 
     protected virtual void OnApproveFriendRequest(IClientAPI client, UUID friendID, List<UUID> callingCardFolders)
     {
-        m_log.DebugFormat("[FRIENDS]: {0} accepted friendship from {1}", client.AgentId, friendID);
+        m_log.LogDebug("[FRIENDS]: {0} accepted friendship from {1}", client.AgentId, friendID);
         AddFriendship(client, friendID);
     }
 
@@ -754,7 +754,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
 
     private void OnDenyFriendRequest(IClientAPI client, UUID friendID, List<UUID> callingCardFolders)
     {
-        m_log.DebugFormat("[FRIENDS]: {0} denied friendship to {1}", client.AgentId, friendID);
+        m_log.LogDebug("[FRIENDS]: {0} denied friendship to {1}", client.AgentId, friendID);
 
         DeleteFriendship(client.AgentId, friendID);
 
@@ -776,7 +776,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
                 if (region is not null)
                     m_FriendsSimConnector.FriendshipDenied(region, client.AgentId, client.Name, friendID);
                 else
-                    m_log.WarnFormat("[FRIENDS]: Could not find region {0} in locating {1}", friendSession.RegionID, friendID);
+                    m_log.LogWarning("[FRIENDS]: Could not find region {0} in locating {1}", friendSession.RegionID, friendID);
             }
         }
     }
@@ -872,7 +872,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
     {
         UUID requester = remoteClient.AgentId;
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[FRIENDS MODULE]: User {0} changing rights to {1} for friend {2}",
             requester, rights, friendID);
 
@@ -921,7 +921,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
         }
         else
         {
-            m_log.DebugFormat("[FRIENDS MODULE]: friend {0} not found for {1}", friendID, requester);
+            m_log.LogDebug("[FRIENDS MODULE]: friend {0} not found for {1}", friendID, requester);
         }
     }
 
@@ -1035,7 +1035,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
 
     public bool LocalStatusNotification(UUID userID, UUID friendID, bool online)
     {
-        //m_log.DebugFormat("[FRIENDS]: Local Status Notify {0} that user {1} is {2}", friendID, userID, online);
+        //m_log.LogDebug("[FRIENDS]: Local Status Notify {0} that user {1} is {2}", friendID, userID, online);
         IClientAPI friendClient = LocateClientObject(friendID);
         if (friendClient is not null)
         {

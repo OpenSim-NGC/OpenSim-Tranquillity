@@ -37,9 +37,8 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Region.PhysicsModules.SharedBase;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
-
-using log4net;
 
 namespace OpenSim.Region.Framework.Scenes;
 
@@ -110,7 +109,7 @@ public class SceneObjectPart : EntityBase, IDisposable
                 scriptEvents.collision_start | scriptEvents.collision_end
                 );
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Dynamic attributes can be created and deleted as required.
@@ -383,7 +382,7 @@ public class SceneObjectPart : EntityBase, IDisposable
     //            Console.WriteLine(
     //                "[SCENE OBJECT PART]: Destructor called for {0}, local id {1}, parent {2} {3}",
     //                Name, LocalId, ParentGroup.Name, ParentGroup.LocalId);
-    //            m_log.DebugFormat(
+    //            m_log.LogDebug(
     //                "[SCENE OBJECT PART]: Destructor called for {0}, local id {1}, parent {2} {3}",
     //                Name, LocalId, ParentGroup.Name, ParentGroup.LocalId);
     //        }
@@ -842,7 +841,7 @@ public class SceneObjectPart : EntityBase, IDisposable
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[SCENEOBJECTPART]: GROUP POSITION. {0}", e);
+                    m_log.LogError("[SCENEOBJECTPART]: GROUP POSITION. {0}", e);
                 }
             }
         }
@@ -948,19 +947,19 @@ public class SceneObjectPart : EntityBase, IDisposable
                     if (_parentID == 0)
                     {
                         actor.Orientation = value;
-                        //m_log.Info("[PART]: RO1:" + actor.Orientation.ToString());
+                        //m_log.LogInformation("[PART]: RO1:" + actor.Orientation.ToString());
                     }
                     else
                     {
                         // Child prim we have to calculate it's world rotationwel
                         Quaternion resultingrotation = GetWorldRotation();
                         actor.Orientation = resultingrotation;
-                        //m_log.Info("[PART]: RO2:" + actor.Orientation.ToString());
+                        //m_log.LogInformation("[PART]: RO2:" + actor.Orientation.ToString());
                     }
                 }
                 catch (Exception ex)
                 {
-                    m_log.Error("[SCENEOBJECTPART]: ROTATIONOFFSET" + ex.Message);
+                    m_log.LogError("[SCENEOBJECTPART]: ROTATIONOFFSET" + ex.Message);
                 }
             }
         }
@@ -1124,7 +1123,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         {
             //                if (ParentGroup != null)
             //                {
-            //                    m_log.DebugFormat(
+            //                    m_log.LogDebug(
             //                        "[SCENE OBJECT PART]: Setting linknum of {0}@{1} to {2} from {3}",
             //                        Name, AbsolutePosition, value, m_linkNum);
             //                    Util.PrintCallStack();
@@ -1268,7 +1267,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set
         {
-            //                m_log.DebugFormat("[SOP]: Setting CreateSelected to {0} for {1} {2}", value, Name, UUID);
+            //                m_log.LogDebug("[SOP]: Setting CreateSelected to {0} for {1} {2}", value, Name, UUID);
             m_createSelected = value;
         }
     }
@@ -1309,7 +1308,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         set
         {
             m_sitTargetOrientation = value;
-            //                m_log.DebugFormat("[SCENE OBJECT PART]: Set sit target orientation {0} for {1} {2}", m_sitTargetOrientation, Name, LocalId);
+            //                m_log.LogDebug("[SCENE OBJECT PART]: Set sit target orientation {0} for {1} {2}", m_sitTargetOrientation, Name, LocalId);
         }
     }
 
@@ -1321,7 +1320,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         set
         {
             m_sitTargetPosition = value;
-            //                m_log.DebugFormat("[SCENE OBJECT PART]: Set sit target position to {0} for {1} {2}", m_sitTargetPosition, Name, LocalId);
+            //                m_log.LogDebug("[SCENE OBJECT PART]: Set sit target position to {0} for {1} {2}", m_sitTargetPosition, Name, LocalId);
         }
     }
 
@@ -1521,7 +1520,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         get { return m_flags; }
         set
         {
-            //m_log.DebugFormat("[SOP]: Setting flags for {0} {1} to {2}", UUID, Name, value);
+            //m_log.LogDebug("[SOP]: Setting flags for {0} {1} to {2}", UUID, Name, value);
             m_flags = value & ~(PrimFlags.Touch | PrimFlags.Money | PrimFlags.AllowInventoryDrop);
         }
     }
@@ -2042,13 +2041,13 @@ public class SceneObjectPart : EntityBase, IDisposable
     {
         if ((m_flags & flag) == 0)
         {
-            //m_log.Debug("Adding flag: " + ((PrimFlags) flag).ToString());
+            //m_log.LogDebug("Adding flag: " + ((PrimFlags) flag).ToString());
             m_flags |= flag;
 
             if (flag == PrimFlags.TemporaryOnRez)
                 ResetExpire();
         }
-        // m_log.Debug("Aprev: " + prevflag.ToString() + " curr: " + Flags.ToString());
+        // m_log.LogDebug("Aprev: " + prevflag.ToString() + " curr: " + Flags.ToString());
     }
 
     public void AddNewParticleSystem(Primitive.ParticleSystem pSystem, bool expire)
@@ -3031,7 +3030,7 @@ public class SceneObjectPart : EntityBase, IDisposable
     {
         // Note: This is only being called on the root prim at this time.
 
-        m_log.ErrorFormat(
+        m_log.LogError(
             "[SCENE OBJECT PART]: Physical object {0}, localID {1} went out of bounds at {2} in {3}.  Stopping at {4} and making non-physical.",
             Name, LocalId, pos, ParentGroup.Scene.Name, AbsolutePosition);
 
@@ -3173,7 +3172,7 @@ public class SceneObjectPart : EntityBase, IDisposable
             scale.Y = Utils.Clamp(scale.Y, minsize, maxsize);
             scale.Z = Utils.Clamp(scale.Z, minsize, maxsize);
         }
-        //            m_log.DebugFormat("[SCENE OBJECT PART]: Resizing {0} {1} to {2}", Name, LocalId, scale);
+        //            m_log.LogDebug("[SCENE OBJECT PART]: Resizing {0} {1} to {2}", Name, LocalId, scale);
 
         Scale = scale;
 
@@ -3203,7 +3202,7 @@ public class SceneObjectPart : EntityBase, IDisposable
 
         if (APIDStrength <= 0)
         {
-            m_log.WarnFormat("[SceneObjectPart] Invalid rotation strength {0}", APIDStrength);
+            m_log.LogWarning("[SceneObjectPart] Invalid rotation strength {0}", APIDStrength);
             return;
         }
 
@@ -4017,7 +4016,7 @@ public class SceneObjectPart : EntityBase, IDisposable
     public void SetGroup(UUID groupID, IClientAPI client)
     {
         // Scene.AddNewPrims() calls with client == null so can't use this.
-        // m_log.DebugFormat(
+        // m_log.LogDebug(
         //      "[SCENE OBJECT PART]: Setting group for {0} to {1} for {2}",
         //      Name, groupID, OwnerID);
 
@@ -4055,7 +4054,7 @@ public class SceneObjectPart : EntityBase, IDisposable
     /// <param name="events"></param>
     public void SetScriptEvents(UUID scriptid, ulong events)
     {
-        //            m_log.DebugFormat(
+        //            m_log.LogDebug(
         //                "[SCENE OBJECT PART]: Set script events for script with id {0} on {1}/{2} to {3} in {4}",
         //                scriptid, Name, ParentGroup.Name, events, ParentGroup.Scene.Name);
         // scriptEvents oldparts;
@@ -4382,7 +4381,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         // Get our plane normals
         for (int i = 0; i < 6; i++)
         {
-            //m_log.Info("[FACECALCULATION]: FaceA[" + i + "]=" + FaceA[i] + " FaceB[" + i + "]=" + FaceB[i] + " FaceC[" + i + "]=" + FaceC[i] + " FaceD[" + i + "]=" + FaceD[i]);
+            //m_log.LogInformation("[FACECALCULATION]: FaceA[" + i + "]=" + FaceA[i] + " FaceB[" + i + "]=" + FaceB[i] + " FaceC[" + i + "]=" + FaceC[i] + " FaceD[" + i + "]=" + FaceD[i]);
 
             // Our Plane direction
             AmBa = FaceA[i] - FaceB[i];
@@ -4393,7 +4392,7 @@ public class SceneObjectPart : EntityBase, IDisposable
             // normalize the cross product to get the normal.
             normals[i] = cross / cross.Length();
 
-            //m_log.Info("[NORMALS]: normals[ " + i + "]" + normals[i].ToString());
+            //m_log.LogInformation("[NORMALS]: normals[ " + i + "]" + normals[i].ToString());
             //distance[i] = (normals[i].X * AmBa.X + normals[i].Y * AmBa.Y + normals[i].Z * AmBa.Z) * -1;
         }
 
@@ -4509,9 +4508,9 @@ public class SceneObjectPart : EntityBase, IDisposable
                     result.HitTF = true;
                     result.ipoint = q;
                     result.face = i;
-                    //m_log.Info("[FACE]:" + i.ToString());
-                    //m_log.Info("[POINT]: " + q.ToString());
-                    //m_log.Info("[DIST]: " + distance2.ToString());
+                    //m_log.LogInformation("[FACE]:" + i.ToString());
+                    //m_log.LogInformation("[POINT]: " + q.ToString());
+                    //m_log.LogInformation("[DIST]: " + distance2.ToString());
                     if (faceCenters)
                     {
                         result.normal = AAfacenormals[i] * AXrot;
@@ -4825,7 +4824,7 @@ public class SceneObjectPart : EntityBase, IDisposable
             ScheduleFullUpdate();
         }
 
-        //            m_log.DebugFormat("[SCENE OBJECT PART]: Updated PrimFlags on {0} {1} to {2}", Name, LocalId, Flags);
+        //            m_log.LogDebug("[SCENE OBJECT PART]: Updated PrimFlags on {0} {1} to {2}", Name, LocalId, Flags);
     }
 
     /// <summary>
@@ -4860,7 +4859,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[SCENE]: caught exception meshing object {0}. Object set to phantom. e={1}", m_uuid, e);
+            m_log.LogError("[SCENE]: caught exception meshing object {0}. Object set to phantom. e={1}", m_uuid, e);
             pa = null;
         }
 
@@ -5281,7 +5280,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         }
         else
         {
-            //                m_log.DebugFormat(
+            //                m_log.LogDebug(
             //                    "[SCENE OBJECT PART]: Scheduling part {0} {1} for full update in aggregateScriptEvents()", Name, LocalId);
             UpdatePhysicsSubscribedEvents();
             ScheduleFullUpdate();
@@ -5480,7 +5479,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         }
         catch (Exception ex)
         {
-            m_log.Error("[Physics] " + ex);
+            m_log.LogError("[Physics] " + ex);
         }
     }
 

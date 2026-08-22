@@ -28,15 +28,16 @@
 using System.Reflection;
 using System.Data;
 using OpenSim.Framework;
-using log4net;
 using OpenMetaverse;
 using MySqlConnector;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.MySQL;
 
 public class MySQLFSAssetData : IFSAssetDataPlugin
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected string m_ConnectionString;
     protected string m_Table;
@@ -80,7 +81,7 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
         }
         catch (MySqlException e)
         {
-            m_log.ErrorFormat("[FSASSETS]: Can't connect to database: {0}", e.Message.ToString());
+            m_log.LogError("[FSASSETS]: Can't connect to database: {0}", e.Message.ToString());
         }
     }
 
@@ -108,7 +109,7 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
             }
             catch (MySqlException e)
             {
-                m_log.ErrorFormat("[FSASSETS]: Database open failed with {0}", e.ToString());
+                m_log.LogError("[FSASSETS]: Database open failed with {0}", e.ToString());
                 return false;
             }
 
@@ -121,7 +122,7 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
             {
                 cmd.Connection = null;
                 conn.Close();
-                m_log.ErrorFormat("[FSASSETS]: Query {0} failed with {1}", cmd.CommandText, e.ToString());
+                m_log.LogError("[FSASSETS]: Query {0} failed with {1}", cmd.CommandText, e.ToString());
                 return false;
             }
             conn.Close();
@@ -147,7 +148,7 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
             }
             catch (MySqlException e)
             {
-                m_log.ErrorFormat("[FSASSETS]: Database open failed with {0}", e.ToString());
+                m_log.LogError("[FSASSETS]: Database open failed with {0}", e.ToString());
                 return null;
             }
 
@@ -198,7 +199,7 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
             }
             catch (MySqlException e)
             {
-                m_log.ErrorFormat("[FSASSETS]: Database open failed with {0}", e.ToString());
+                m_log.LogError("[FSASSETS]: Database open failed with {0}", e.ToString());
                 return;
             }
 
@@ -252,8 +253,8 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
         }
         catch(Exception e)
         {
-            m_log.Error("[FSAssets] Failed to store asset with ID " + meta.ID);
-            m_log.Error(e.ToString());
+            m_log.LogError("[FSAssets] Failed to store asset with ID " + meta.ID);
+            m_log.LogError(e.ToString());
             return false;
         }
     }
@@ -285,7 +286,7 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
             }
             catch (MySqlException e)
             {
-                m_log.ErrorFormat("[FSASSETS]: Failed to open database: {0}", e.ToString());
+                m_log.LogError("[FSASSETS]: Failed to open database: {0}", e.ToString());
                 return results;
             }
 
@@ -322,7 +323,7 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
             }
             catch (MySqlException e)
             {
-                m_log.ErrorFormat("[FSASSETS]: Failed to open database: {0}", e.ToString());
+                m_log.LogError("[FSASSETS]: Failed to open database: {0}", e.ToString());
                 return 0;
             }
 
@@ -370,7 +371,7 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
             }
             catch (MySqlException e)
             {
-                m_log.ErrorFormat("[FSASSETS]: Can't connect to database: {0}",
+                m_log.LogError("[FSASSETS]: Can't connect to database: {0}",
                         e.Message.ToString());
 
                 return;

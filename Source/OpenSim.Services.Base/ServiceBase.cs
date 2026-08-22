@@ -26,14 +26,16 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Services.Base;
 
 public class ServiceBase
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public T LoadPlugin<T>(string dllName) where T:class
     {
@@ -69,11 +71,11 @@ public class ServiceBase
         {
             Assembly pluginAssembly = Assembly.LoadFrom(dllName);
 
-            //m_log.DebugFormat("[SERVICE BASE]: Found assembly {0}", dllName);
+            //m_log.LogDebug("[SERVICE BASE]: Found assembly {0}", dllName);
 
             foreach (Type pluginType in pluginAssembly.GetTypes())
             {
-                //m_log.DebugFormat("[SERVICE BASE]: Found type {0}", pluginType);
+                //m_log.LogDebug("[SERVICE BASE]: Found type {0}", pluginType);
 
                 if (pluginType.IsPublic)
                 {
@@ -97,11 +99,11 @@ public class ServiceBase
             foreach (Object arg in args)
                 strArgs.Add(arg.ToString());
 
-            m_log.ErrorFormat(
+            m_log.LogError(
                     "[SERVICE BASE]: Failed to load plugin {0} from {1} with args {2}",
                     interfaceName, dllName, string.Join(", ", strArgs.ToArray()), e);
             if (e.InnerException != null)
-                m_log.Error($"[SERVICE BASE]: inner exception {e.InnerException.Message}");
+                m_log.LogError($"[SERVICE BASE]: inner exception {e.InnerException.Message}");
 
             return null;
         }

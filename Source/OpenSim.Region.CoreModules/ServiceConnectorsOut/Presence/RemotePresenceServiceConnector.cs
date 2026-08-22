@@ -28,14 +28,16 @@ using System.Reflection;
 
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Services.Connectors;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Presence;
 
 public class RemotePresenceServicesConnector : BasePresenceServiceConnector, ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     #region ISharedRegionModule
 
@@ -58,7 +60,7 @@ public class RemotePresenceServicesConnector : BasePresenceServiceConnector, ISh
 
                 m_PresenceDetector = new PresenceDetector(this);
 
-                m_log.Info("[REMOTE PRESENCE CONNECTOR]: Remote presence enabled");
+                m_log.LogInformation("[REMOTE PRESENCE CONNECTOR]: Remote presence enabled");
             }
         }
     }

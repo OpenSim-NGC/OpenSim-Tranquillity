@@ -34,6 +34,7 @@ using OpenSim.Region.ScriptEngine.Shared.ScriptBase;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
 
+using Microsoft.Extensions.Logging;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
 using LSL_Key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
@@ -47,7 +48,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api;
 [Serializable]
 public class MOD_Api : IMOD_Api, IScriptApi
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     internal IScriptEngine m_ScriptEngine;
     internal SceneObjectPart m_host;
@@ -112,7 +113,7 @@ public class MOD_Api : IMOD_Api, IScriptApi
     /// <returns>string result of the invocation</returns>
     public void modInvokeN(string fname, params object[] parms)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -127,7 +128,7 @@ public class MOD_Api : IMOD_Api, IScriptApi
 
     public LSL_String modInvokeS(string fname, params object[] parms)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -143,7 +144,7 @@ public class MOD_Api : IMOD_Api, IScriptApi
 
     public LSL_Integer modInvokeI(string fname, params object[] parms)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -159,7 +160,7 @@ public class MOD_Api : IMOD_Api, IScriptApi
 
     public LSL_Float modInvokeF(string fname, params object[] parms)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -175,7 +176,7 @@ public class MOD_Api : IMOD_Api, IScriptApi
 
     public LSL_Key modInvokeK(string fname, params object[] parms)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -191,7 +192,7 @@ public class MOD_Api : IMOD_Api, IScriptApi
 
     public LSL_Vector modInvokeV(string fname, params object[] parms)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -207,7 +208,7 @@ public class MOD_Api : IMOD_Api, IScriptApi
 
     public LSL_Rotation modInvokeR(string fname, params object[] parms)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -223,7 +224,7 @@ public class MOD_Api : IMOD_Api, IScriptApi
 
     public LSL_List modInvokeL(string fname, params object[] parms)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),
@@ -290,7 +291,7 @@ public class MOD_Api : IMOD_Api, IScriptApi
             return "";
         }
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[MOD API]: Invoking dynamic function {0}, args '{1}' with {2} return type",
 //                fname,
 //                string.Join(",", Array.ConvertAll<object, string>(parms, o => o.ToString())),

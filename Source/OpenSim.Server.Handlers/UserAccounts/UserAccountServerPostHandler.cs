@@ -26,7 +26,6 @@
  */
 
 using Nini.Config;
-using log4net;
 using System.Reflection;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
@@ -36,11 +35,13 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.UserAccounts;
 
 public class UserAccountServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IUserAccountService m_UserAccountService;
     private bool m_AllowCreateUser = false;
@@ -72,7 +73,7 @@ public class UserAccountServerPostHandler : BaseStreamHandler
         // We need to check the authorization header
         //httpRequest.Headers["authorization"] ...
 
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
         string method = string.Empty;
         try
         {
@@ -105,11 +106,11 @@ public class UserAccountServerPostHandler : BaseStreamHandler
                         return FailureResult();
             }
 
-            m_log.DebugFormat("[USER SERVICE HANDLER]: unknown method request: {0}", method);
+            m_log.LogDebug("[USER SERVICE HANDLER]: unknown method request: {0}", method);
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[USER SERVICE HANDLER]: Exception in method {0}: {1}", method, e);
+            m_log.LogDebug("[USER SERVICE HANDLER]: Exception in method {0}: {1}", method, e);
         }
 
         return FailureResult();
@@ -192,7 +193,7 @@ public class UserAccountServerPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[GRID HANDLER]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -204,14 +205,14 @@ public class UserAccountServerPostHandler : BaseStreamHandler
 
         if (!request.TryGetValue("IDS", out object oids))
         {
-            m_log.DebugFormat("[USER SERVICE HANDLER]: GetMultiAccounts called without required uuids argument");
+            m_log.LogDebug("[USER SERVICE HANDLER]: GetMultiAccounts called without required uuids argument");
             return FailureResult();
         }
 
         List<string> lids = oids as List<string>;
         if (lids == null)
         {
-            m_log.DebugFormat("[USER SERVICE HANDLER]: GetMultiAccounts input argument was of unexpected type {0} or null", oids.GetType().ToString());
+            m_log.LogDebug("[USER SERVICE HANDLER]: GetMultiAccounts input argument was of unexpected type {0} or null", oids.GetType().ToString());
             return FailureResult();
         }
 
@@ -246,7 +247,7 @@ public class UserAccountServerPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[GRID HANDLER]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -316,7 +317,7 @@ public class UserAccountServerPostHandler : BaseStreamHandler
 
         if (!m_UserAccountService.StoreUserAccount(existingAccount))
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[USER ACCOUNT SERVER POST HANDLER]: Account store failed for account {0} {1} {2}",
                 existingAccount.FirstName, existingAccount.LastName, existingAccount.PrincipalID);
 

@@ -31,22 +31,24 @@ using System.Reflection;
 using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
-using log4net;
 using Nwc.XmlRpc;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.Handlers.Hypergrid;
 
 public class HypergridHandlers
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IGatekeeperService m_GatekeeperService;
 
     public HypergridHandlers(IGatekeeperService gatekeeper)
     {
         m_GatekeeperService = gatekeeper;
-        m_log.DebugFormat("[HYPERGRID HANDLERS]: Active");
+        m_log.LogDebug("[HYPERGRID HANDLERS]: Active");
     }
 
     /// <summary>
@@ -63,7 +65,7 @@ public class HypergridHandlers
         if (name == null)
             name = string.Empty;
 
-        m_log.DebugFormat("[HG Handler]: XMLRequest to link to {0} from {1}", (name.Length == 0) ? "default region" : name, remoteClient.Address.ToString());
+        m_log.LogDebug("[HG Handler]: XMLRequest to link to {0} from {1}", (name.Length == 0) ? "default region" : name, remoteClient.Address.ToString());
         bool success = m_GatekeeperService.LinkLocalRegion(name, out UUID regionID, out ulong regionHandle, out string externalName,
             out string imageURL, out string reason, out int sizeX, out int sizeY);
 

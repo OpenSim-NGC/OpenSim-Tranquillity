@@ -26,10 +26,11 @@
  */
 
 using System.Reflection;
-using log4net;
 using OMV = OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
@@ -37,7 +38,7 @@ namespace OpenSim.Region.PhysicsModules.BulletS;
 [Serializable]
 public class BSPrim : BSPhysObject
 {
-    protected static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    protected static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[BULLETS PRIM]";
 
     // _size is what the user passed. Scale is what we pass to the physics engine with the mesh.
@@ -77,7 +78,7 @@ public class BSPrim : BSPhysObject
                        OMV.Quaternion rotation, PrimitiveBaseShape pbs, bool pisPhysical)
             : base(parent_scene, localID, primName, "BSPrim")
     {
-        // m_log.DebugFormat("{0}: BSPrim creation of {1}, id={2}", LogHeader, primName, localID);
+        // m_log.LogDebug("{0}: BSPrim creation of {1}, id={2}", LogHeader, primName, localID);
         _physicsActorType = (int)ActorTypes.Prim;
         RawPosition = pos;
         _size = size;
@@ -111,7 +112,7 @@ public class BSPrim : BSPhysObject
     // called when this prim is being destroyed and we should free all the resources
     public override void Destroy()
     {
-        // m_log.DebugFormat("{0}: Destroy, id={1}", LogHeader, LocalID);
+        // m_log.LogDebug("{0}: Destroy, id={1}", LogHeader, LocalID);
         IsInitialized = false;
 
         base.Destroy();
@@ -230,7 +231,7 @@ public class BSPrim : BSPhysObject
         }
         else if (CrossingFailures == BSParam.CrossingFailuresBeforeOutOfBounds)
         {
-            m_log.WarnFormat("{0} Too many crossing failures for {1}", LogHeader, Name);
+            m_log.LogWarning("{0} Too many crossing failures for {1}", LogHeader, Name);
         }
         return;
     }
@@ -1040,7 +1041,7 @@ public class BSPrim : BSPhysObject
             // Verify the previous code created the correct shape for this type of thing.
             if ((bodyType & CollisionObjectTypes.CO_RIGID_BODY) == 0)
             {
-                m_log.ErrorFormat("{0} MakeSolid: physical body of wrong type for solidity. id={1}, type={2}", LogHeader, LocalID, bodyType);
+                m_log.LogError("{0} MakeSolid: physical body of wrong type for solidity. id={1}, type={2}", LogHeader, LocalID, bodyType);
             }
             CurrentCollisionFlags = PhysScene.PE.RemoveFromCollisionFlags(PhysBody, CollisionFlags.CF_NO_CONTACT_RESPONSE);
         }
@@ -1048,7 +1049,7 @@ public class BSPrim : BSPhysObject
         {
             if ((bodyType & CollisionObjectTypes.CO_GHOST_OBJECT) == 0)
             {
-                m_log.ErrorFormat("{0} MakeSolid: physical body of wrong type for non-solidness. id={1}, type={2}", LogHeader, LocalID, bodyType);
+                m_log.LogError("{0} MakeSolid: physical body of wrong type for non-solidness. id={1}, type={2}", LogHeader, LocalID, bodyType);
             }
             CurrentCollisionFlags = PhysScene.PE.AddToCollisionFlags(PhysBody, CollisionFlags.CF_NO_CONTACT_RESPONSE);
 
@@ -1081,7 +1082,7 @@ public class BSPrim : BSPhysObject
         }
         else
         {
-            m_log.ErrorFormat("{0} Attempt to add physical object without body. id={1}", LogHeader, LocalID);
+            m_log.LogError("{0} Attempt to add physical object without body. id={1}", LogHeader, LocalID);
             DetailLog("{0},BSPrim.AddObjectToPhysicalWorld,addObjectWithoutBody,cType={1}", LocalID, PhysBody.collisionType);
         }
     }
@@ -1124,7 +1125,7 @@ public class BSPrim : BSPhysObject
     public override bool Kinematic {
         get { return _kinematic; }
         set { _kinematic = value;
-            // m_log.DebugFormat("{0}: Kinematic={1}", LogHeader, _kinematic);
+            // m_log.LogDebug("{0}: Kinematic={1}", LogHeader, _kinematic);
         }
     }
     public override float Buoyancy {
@@ -1250,7 +1251,7 @@ public class BSPrim : BSPhysObject
             }
             else
             {
-                m_log.WarnFormat("{0}: AddForce: Got a NaN force applied to a prim. LocalID={1}", LogHeader, LocalID);
+                m_log.LogWarning("{0}: AddForce: Got a NaN force applied to a prim. LocalID={1}", LogHeader, LocalID);
                 return;
             }
         }
@@ -1278,7 +1279,7 @@ public class BSPrim : BSPhysObject
             }
             else
             {
-                m_log.WarnFormat("{0}: AddForceImpulse: Got a NaN impulse applied to a prim. LocalID={1}", LogHeader, LocalID);
+                m_log.LogWarning("{0}: AddForceImpulse: Got a NaN impulse applied to a prim. LocalID={1}", LogHeader, LocalID);
                 return;
             }
         }
@@ -1302,7 +1303,7 @@ public class BSPrim : BSPhysObject
         }
         else
         {
-            m_log.WarnFormat("{0}: Got a NaN force applied to a prim. LocalID={1}", LogHeader, LocalID);
+            m_log.LogWarning("{0}: Got a NaN force applied to a prim. LocalID={1}", LogHeader, LocalID);
             return;
         }
     }
@@ -1724,7 +1725,7 @@ public class BSPrim : BSPhysObject
                         index += 3;
                         break;
                     default:
-                        m_log.WarnFormat("{0} SetSxisLockLimitsExtension. Unknown op={1}", LogHeader, funct);
+                        m_log.LogWarning("{0} SetSxisLockLimitsExtension. Unknown op={1}", LogHeader, funct);
                         index += 1;
                         break;
                 }
@@ -1734,7 +1735,7 @@ public class BSPrim : BSPhysObject
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("{0} SetSxisLockLimitsExtension exception in object {1}: {2}", LogHeader, this.Name, e);
+            m_log.LogWarning("{0} SetSxisLockLimitsExtension exception in object {1}: {2}", LogHeader, this.Name, e);
             ret = null;
         }
         return ret;    // not implemented yet
@@ -1754,7 +1755,7 @@ public class BSPrim : BSPhysObject
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("{0} DisableDeactivationExtension exception in object {1}: {2}", LogHeader, this.Name, e);
+            m_log.LogWarning("{0} DisableDeactivationExtension exception in object {1}: {2}", LogHeader, this.Name, e);
             ret = null;
         }
         return ret;    // not implemented yet

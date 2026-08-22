@@ -27,13 +27,14 @@
 
 using System.Reflection;
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules.Scripting.XmlRpcGridRouterModule;
 
@@ -46,7 +47,7 @@ public class XmlRpcInfo
 
 public class XmlRpcGridRouter : INonSharedRegionModule, IXmlRpcRouter
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Dictionary<UUID, UUID> m_Channels =
             new Dictionary<UUID, UUID>();
@@ -68,7 +69,7 @@ public class XmlRpcGridRouter : INonSharedRegionModule, IXmlRpcRouter
             m_ServerURI = startupConfig.GetString("XmlRpcHubURI", String.Empty);
             if (m_ServerURI.Length == 0)
             {
-                m_log.Error("[XMLRPC GRID ROUTER] Module configured but no URI given. Disabling");
+                m_log.LogError("[XMLRPC GRID ROUTER] Module configured but no URI given. Disabling");
                 return;
             }
             m_Enabled = true;
@@ -124,7 +125,7 @@ public class XmlRpcGridRouter : INonSharedRegionModule, IXmlRpcRouter
         if (!m_Enabled)
             return;
 
-        m_log.InfoFormat("[XMLRPC GRID ROUTER]: New receiver Obj: {0} Ch: {1} ID: {2} URI: {3}",
+        m_log.LogInformation("[XMLRPC GRID ROUTER]: New receiver Obj: {0} Ch: {1} ID: {2} URI: {3}",
                             objectID.ToString(), channel.ToString(), itemID.ToString(), uri);
 
         XmlRpcInfo info = new XmlRpcInfo();
@@ -137,7 +138,7 @@ public class XmlRpcGridRouter : INonSharedRegionModule, IXmlRpcRouter
 
         if (!success)
         {
-            m_log.Error("[XMLRPC GRID ROUTER] Error contacting server");
+            m_log.LogError("[XMLRPC GRID ROUTER] Error contacting server");
         }
 
         m_Channels[itemID] = channel;
@@ -164,14 +165,14 @@ public class XmlRpcGridRouter : INonSharedRegionModule, IXmlRpcRouter
 
     public void ObjectRemoved(UUID objectID)
     {
-        // m_log.InfoFormat("[XMLRPC GRID ROUTER]: Object Removed {0}",objectID.ToString());
+        // m_log.LogInformation("[XMLRPC GRID ROUTER]: Object Removed {0}",objectID.ToString());
     }
 
     private bool RemoveChannel(UUID itemID)
     {
         if(!m_Channels.ContainsKey(itemID))
         {
-            //m_log.InfoFormat("[XMLRPC GRID ROUTER]: Attempted to unregister non-existing Item: {0}", itemID.ToString());
+            //m_log.LogInformation("[XMLRPC GRID ROUTER]: Attempted to unregister non-existing Item: {0}", itemID.ToString());
             return false;
         }
 
@@ -188,7 +189,7 @@ public class XmlRpcGridRouter : INonSharedRegionModule, IXmlRpcRouter
 
             if (!success)
             {
-                m_log.Error("[XMLRPC GRID ROUTER] Error contacting server");
+                m_log.LogError("[XMLRPC GRID ROUTER] Error contacting server");
             }
 
             m_Channels.Remove(itemID);

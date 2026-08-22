@@ -29,11 +29,13 @@ using OpenSim.Framework;
 using OpenMetaverse;
 using System.Runtime.CompilerServices;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.Framework.Scenes;
 
 public abstract class EntityBase : ISceneEntity
 {
-    // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    // private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// The scene to which this entity belongs
@@ -78,7 +80,7 @@ public abstract class EntityBase : ISceneEntity
         set
         {
             m_localId = value;
-            // m_log.DebugFormat("[ENTITY BASE]: Set part {0} to local id {1}", Name, m_localId);
+            // m_log.LogDebug("[ENTITY BASE]: Set part {0} to local id {1}", Name, m_localId);
         }
     }
 

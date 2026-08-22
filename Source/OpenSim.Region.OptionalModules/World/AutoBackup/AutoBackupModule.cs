@@ -29,11 +29,12 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Timers;
 using System.Text.RegularExpressions;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules.World.AutoBackup;
 
@@ -90,8 +91,7 @@ public enum NamingType
 /// </remarks>
 public class AutoBackupModule : ISharedRegionModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private readonly AutoBackupModuleState m_defaultState = new AutoBackupModuleState();
     private readonly Dictionary<IScene, AutoBackupModuleState> m_states =
         new Dictionary<IScene, AutoBackupModuleState>(1);
@@ -158,10 +158,10 @@ public class AutoBackupModule : ISharedRegionModule
         if(!m_enabled)
             return;
 
-        m_log.Debug("[AUTO BACKUP]: Default config:");
-        m_log.Debug(m_defaultState.ToString());
+        m_log.LogDebug("[AUTO BACKUP]: Default config:");
+        m_log.LogDebug(m_defaultState.ToString());
 
-        m_log.Info("[AUTO BACKUP]: AutoBackupModule enabled");
+        m_log.LogInformation("[AUTO BACKUP]: AutoBackupModule enabled");
         m_masterTimer = new System.Timers.Timer();
         m_masterTimer.Interval = m_baseInterval;
         m_masterTimer.Elapsed += HandleElapsed;
@@ -235,14 +235,14 @@ public class AutoBackupModule : ISharedRegionModule
         AutoBackupModuleState abms = ParseConfig(scene);
         if(abms == null)
         {
-            m_log.Debug("[AUTO BACKUP]: Config for " + scene.RegionInfo.RegionName);
-            m_log.Debug("DEFAULT");
+            m_log.LogDebug("[AUTO BACKUP]: Config for " + scene.RegionInfo.RegionName);
+            m_log.LogDebug("DEFAULT");
             abms = new AutoBackupModuleState(m_defaultState);
         }
         else
         {
-            m_log.Debug("[AUTO BACKUP]: Config for " + scene.RegionInfo.RegionName);
-            m_log.Debug(abms.ToString());
+            m_log.LogDebug("[AUTO BACKUP]: Config for " + scene.RegionInfo.RegionName);
+            m_log.LogDebug(abms.ToString());
         }
 
         m_states.Add(scene, abms);
@@ -341,7 +341,7 @@ public class AutoBackupModule : ISharedRegionModule
             catch (Exception e)
             {
                 m_enabled = false;
-                m_log.WarnFormat("[AUTO BACKUP]: Error accessing backup folder {0}. Module disabled. {1}",
+                m_log.LogWarning("[AUTO BACKUP]: Error accessing backup folder {0}. Module disabled. {1}",
                         backupDir, e);
                 return;
             }
@@ -370,7 +370,7 @@ public class AutoBackupModule : ISharedRegionModule
             tmpNamingType = NamingType.Overwrite;
         else
         {
-            m_log.Warn("Unknown naming type specified for Default");
+            m_log.LogWarning("Unknown naming type specified for Default");
             tmpNamingType = NamingType.Time;
         }
         m_defaultState.NamingType = tmpNamingType;
@@ -419,7 +419,7 @@ public class AutoBackupModule : ISharedRegionModule
             tmpNamingType = NamingType.Overwrite;
         else
         {
-            m_log.Warn("Unknown naming type specified for region " + sRegionName + ": " +
+            m_log.LogWarning("Unknown naming type specified for region " + sRegionName + ": " +
                        stmpNamingType);
             tmpNamingType = NamingType.Time;
         }
@@ -469,7 +469,7 @@ public class AutoBackupModule : ISharedRegionModule
         if (!scene.Ready)
         {
             // We won't backup a region that isn't operating normally.
-            m_log.Warn("[AUTO BACKUP]: Not backing up region " + scene.RegionInfo.RegionName +
+            m_log.LogWarning("[AUTO BACKUP]: Not backing up region " + scene.RegionInfo.RegionName +
                        " because its status is " + scene.RegionStatus);
             return;
         }
@@ -492,12 +492,12 @@ public class AutoBackupModule : ISharedRegionModule
                                             state.NamingType);
         if (savePath == null)
         {
-            m_log.Warn("[AUTO BACKUP]: savePath is null in HandleElapsed");
+            m_log.LogWarning("[AUTO BACKUP]: savePath is null in HandleElapsed");
             return;
         }
 
         Guid guid = Guid.NewGuid();
-        m_log.Info("[AUTO BACKUP]: Backing up region " + scene.RegionInfo.RegionName);
+        m_log.LogInformation("[AUTO BACKUP]: Backing up region " + scene.RegionInfo.RegionName);
 
         // Must pass options, even if dictionary is empty!
         Dictionary<string, object> options = new Dictionary<string, object>();
@@ -519,7 +519,7 @@ public class AutoBackupModule : ISharedRegionModule
         }
         catch (Exception Ex)
         {
-            m_log.Error("[AUTO BACKUP]: Error reading backup folder " + m_backupDir + ": " + Ex.Message);
+            m_log.LogError("[AUTO BACKUP]: Error reading backup folder " + m_backupDir + ": " + Ex.Message);
             return;
         }
 
@@ -535,7 +535,7 @@ public class AutoBackupModule : ISharedRegionModule
             }
             catch (Exception Ex)
             {
-                m_log.Error("[AUTO BACKUP]: Error deleting old backup file '" + file + "': " + Ex.Message);
+                m_log.LogError("[AUTO BACKUP]: Error deleting old backup file '" + file + "': " + Ex.Message);
             }
         }
     }
@@ -595,8 +595,7 @@ public class AutoBackupModule : ISharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.Warn(
-                "Exception encountered when trying to run script for oar backup " + savePath, e);
+            m_log.LogWarning(e, "Exception encountered when trying to run script for oar backup " + savePath);
         }
     }
 
@@ -607,7 +606,7 @@ public class AutoBackupModule : ISharedRegionModule
     /// <param name="e"></param>
     private static void HandleProcErrorDataReceived(object sender, DataReceivedEventArgs e)
     {
-        m_log.Warn("ExecuteScript hook " + ((Process) sender).ProcessName +
+        m_log.LogWarning("ExecuteScript hook " + ((Process) sender).ProcessName +
                    " is yacking on stderr: " + e.Data);
     }
 
@@ -654,7 +653,7 @@ public class AutoBackupModule : ISharedRegionModule
                 path = new FileInfo(GetNextFile(baseDir, regionName));
                 return path.FullName;
             default:
-                m_log.Warn("VERY BAD: Unhandled case element " + naming);
+                m_log.LogWarning("VERY BAD: Unhandled case element " + naming);
                 break;
         }
 
@@ -697,9 +696,7 @@ public class AutoBackupModule : ISharedRegionModule
                     }
                     catch (FormatException fe)
                     {
-                        m_log.Warn(
-                            "[AUTO BACKUP]: Error: Can't parse long value from file name to determine next OAR backup file number!",
-                            fe);
+                        m_log.LogWarning(fe, "[AUTO BACKUP]: Error: Can't parse long value from file name to determine next OAR backup file number!");
                         subtract++;
                     }
                 }

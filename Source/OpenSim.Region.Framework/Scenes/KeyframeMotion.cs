@@ -28,6 +28,7 @@
 using System.Timers;
 using OpenMetaverse;
 using OpenSim.Framework;
+using Microsoft.Extensions.Logging;
 using Timer = System.Timers.Timer;
 
 namespace OpenSim.Region.Framework.Scenes;
@@ -167,7 +168,7 @@ public class KeyframeTimer
 [Serializable]
 public class KeyframeMotion
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public enum PlayMode : int
     {

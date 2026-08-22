@@ -27,7 +27,6 @@
 
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
@@ -36,11 +35,13 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Inventory;
 
 public class InventoryServiceInConnector : ServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected IInventoryService m_InventoryService;
 
@@ -76,7 +77,7 @@ public class InventoryServiceInConnector : ServiceConnector
         m_doLookup = serverConfig.GetBoolean("SessionAuthentication", false);
 
         AddHttpHandlers(server);
-        m_log.Debug("[INVENTORY HANDLER]: handlers initialized");
+        m_log.LogDebug("[INVENTORY HANDLER]: handlers initialized");
     }
 
     protected virtual void AddHttpHandlers(IHttpServer m_httpServer)
@@ -197,7 +198,7 @@ public class InventoryServiceInConnector : ServiceConnector
                 return folders;
             }
         }
-        m_log.WarnFormat("[INVENTORY SERVICE]: System folders for {0} not found", userID);
+        m_log.LogWarning("[INVENTORY SERVICE]: System folders for {0} not found", userID);
         return new Dictionary<AssetType, InventoryFolderBase>();
     }
 
@@ -297,7 +298,7 @@ public class InventoryServiceInConnector : ServiceConnector
     {
         if (m_doLookup)
         {
-            m_log.InfoFormat("[INVENTORY IN CONNECTOR]: Checking trusted source {0}", peer);
+            m_log.LogInformation("[INVENTORY IN CONNECTOR]: Checking trusted source {0}", peer);
             UriBuilder ub = new UriBuilder(m_userserver_url);
             IPAddress[] uaddrs = Dns.GetHostAddresses(ub.Host);
             foreach (IPAddress uaddr in uaddrs)
@@ -308,7 +309,7 @@ public class InventoryServiceInConnector : ServiceConnector
                 }
             }
 
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[INVENTORY IN CONNECTOR]: Rejecting request since source {0} was not in the list of trusted sources",
                 peer);
 

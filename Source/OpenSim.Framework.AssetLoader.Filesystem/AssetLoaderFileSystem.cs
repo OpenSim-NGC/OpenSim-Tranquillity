@@ -27,10 +27,11 @@
 
 using System.Reflection;
 using System.Xml;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 /// <summary>
 /// Loads assets from the filesystem location.  Not yet a plugin, though it should be.
 /// </summary>
@@ -41,7 +42,7 @@ public class AssetLoaderFileSystem : IAssetLoader
     private const string LIBRARY_OWNER_IDstr = "11111111-1111-0000-0000-000100bba000";
     private static readonly UUID LIBRARY_OWNER_ID = new UUID(LIBRARY_OWNER_IDstr);
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected static AssetBase CreateAsset(string assetIdStr, string name, string path, sbyte type)
     {
@@ -49,14 +50,14 @@ public class AssetLoaderFileSystem : IAssetLoader
 
         if (!String.IsNullOrEmpty(path))
         {
-            //m_log.InfoFormat("[ASSETS]: Loading: [{0}][{1}]", name, path);
+            //m_log.LogInformation("[ASSETS]: Loading: [{0}][{1}]", name, path);
 
             LoadAsset(asset, path);
         }
         else
         {
             asset.Data = Array.Empty<byte>();
-            m_log.InfoFormat("[ASSETS]: Instantiated: [{0}]", name);
+            m_log.LogInformation("[ASSETS]: Instantiated: [{0}]", name);
         }
 
         return asset;
@@ -84,7 +85,7 @@ public class AssetLoaderFileSystem : IAssetLoader
         }
         else
         {
-            m_log.ErrorFormat("[ASSETS]: file: [{0}] not found !", path);
+            m_log.LogError("[ASSETS]: file: [{0}] not found !", path);
         }
     }
 
@@ -110,12 +111,12 @@ public class AssetLoaderFileSystem : IAssetLoader
             }
             catch (XmlException e)
             {
-                m_log.ErrorFormat("[ASSETS]: Error loading {0} : {1}", assetSetPath, e.Message);
+                m_log.LogError("[ASSETS]: Error loading {0} : {1}", assetSetPath, e.Message);
             }
         }
         else
         {
-            m_log.ErrorFormat("[ASSETS]: Asset set control file {0} does not exist! No assets loaded.", assetSetFilename);
+            m_log.LogError("[ASSETS]: Asset set control file {0} does not exist! No assets loaded.", assetSetFilename);
         }
 
         assets.ForEach(action);
@@ -128,7 +129,7 @@ public class AssetLoaderFileSystem : IAssetLoader
     /// <param name="assets"></param>
     protected static void LoadXmlAssetSet(string assetSetPath, List<AssetBase> assets)
     {
-        //m_log.InfoFormat("[ASSETS]: Loading asset set {0}", assetSetPath);
+        //m_log.LogInformation("[ASSETS]: Loading asset set {0}", assetSetPath);
 
         if (File.Exists(assetSetPath))
         {
@@ -156,12 +157,12 @@ public class AssetLoaderFileSystem : IAssetLoader
             }
             catch (XmlException e)
             {
-                m_log.ErrorFormat("[ASSETS]: Error loading {0} : {1}", assetSetPath, e.Message);
+                m_log.LogError("[ASSETS]: Error loading {0} : {1}", assetSetPath, e.Message);
             }
         }
         else
         {
-            m_log.ErrorFormat("[ASSETS]: Asset set file {0} does not exist!", assetSetPath);
+            m_log.LogError("[ASSETS]: Asset set file {0} does not exist!", assetSetPath);
         }
     }
 }

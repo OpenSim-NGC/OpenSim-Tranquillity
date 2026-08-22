@@ -27,17 +27,18 @@
 
 using SkiaSharp;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.World.LegacyMap;
 
 public class ShadedMapTileRenderer : IMapTileTerrainRenderer
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[SHADED MAPTILE RENDERER]";
 
     private Scene m_scene;
@@ -73,14 +74,14 @@ public class ShadedMapTileRenderer : IMapTileTerrainRenderer
 
     public void TerrainToBitmap(SKBitmap mapbmp)
     {
-        m_log.DebugFormat("{0} Generating Maptile Step 1: Terrain", LogHeader);
+        m_log.LogDebug("{0} Generating Maptile Step 1: Terrain", LogHeader);
         int tc = Environment.TickCount;
 
         ITerrainChannel hm = m_scene.Heightmap;
 
         if (mapbmp.Width != hm.Width || mapbmp.Height != hm.Height)
         {
-            m_log.ErrorFormat("{0} TerrainToBitmap. Passed bitmap wrong dimensions. passed=<{1},{2}>, size=<{3},{4}>",
+            m_log.LogError("{0} TerrainToBitmap. Passed bitmap wrong dimensions. passed=<{1},{2}>, size=<{3},{4}>",
                 LogHeader, mapbmp.Width, mapbmp.Height, hm.Width, hm.Height);
         }
 
@@ -176,7 +177,7 @@ public class ShadedMapTileRenderer : IMapTileTerrainRenderer
                             }
                             catch (OverflowException)
                             {
-                                m_log.Debug("[MAPTILE]: Shadow failed at value: " + hfdiff.ToString());
+                                m_log.LogDebug("[MAPTILE]: Shadow failed at value: " + hfdiff.ToString());
                                 ShadowDebugContinue = false;
                             }
 
@@ -228,7 +229,7 @@ public class ShadedMapTileRenderer : IMapTileTerrainRenderer
                     {
                         if (!terraincorruptedwarningsaid)
                         {
-                            m_log.WarnFormat("[SHADED MAP TILE RENDERER]: Your terrain is corrupted in region {0}, it might take a few minutes to generate the map image depending on the corruption level", m_scene.RegionInfo.RegionName);
+                            m_log.LogWarning("[SHADED MAP TILE RENDERER]: Your terrain is corrupted in region {0}, it might take a few minutes to generate the map image depending on the corruption level", m_scene.RegionInfo.RegionName);
                             terraincorruptedwarningsaid = true;
                         }
                         color = SKColors.Black;
@@ -258,7 +259,7 @@ public class ShadedMapTileRenderer : IMapTileTerrainRenderer
                     {
                         if (!terraincorruptedwarningsaid)
                         {
-                            m_log.WarnFormat("[SHADED MAP TILE RENDERER]: Your terrain is corrupted in region {0}, it might take a few minutes to generate the map image depending on the corruption level", m_scene.RegionInfo.RegionName);
+                            m_log.LogWarning("[SHADED MAP TILE RENDERER]: Your terrain is corrupted in region {0}, it might take a few minutes to generate the map image depending on the corruption level", m_scene.RegionInfo.RegionName);
                             terraincorruptedwarningsaid = true;
                         }
                         SKColor black = SKColors.Black;
@@ -268,6 +269,6 @@ public class ShadedMapTileRenderer : IMapTileTerrainRenderer
             }
         }
 
-        m_log.Debug("[SHADED MAP TILE RENDERER]: Generating Maptile Step 1: Done in " + (Environment.TickCount - tc) + " ms");
+        m_log.LogDebug("[SHADED MAP TILE RENDERER]: Generating Maptile Step 1: Done in " + (Environment.TickCount - tc) + " ms");
     }
 }

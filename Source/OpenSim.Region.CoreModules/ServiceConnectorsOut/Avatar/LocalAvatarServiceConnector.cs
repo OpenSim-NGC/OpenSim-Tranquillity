@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
@@ -36,12 +35,13 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Avatar;
 
 public class LocalAvatarServicesConnector : ISharedRegionModule, IAvatarService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAvatarService m_AvatarService;
@@ -71,7 +71,7 @@ public class LocalAvatarServicesConnector : ISharedRegionModule, IAvatarService
                 IConfig userConfig = source.Configs["AvatarService"];
                 if (userConfig == null)
                 {
-                    m_log.Error("[AVATAR CONNECTOR]: AvatarService missing from OpenSim.ini");
+                    m_log.LogError("[AVATAR CONNECTOR]: AvatarService missing from OpenSim.ini");
                     return;
                 }
 
@@ -80,7 +80,7 @@ public class LocalAvatarServicesConnector : ISharedRegionModule, IAvatarService
 
                 if (serviceDll.Length == 0)
                 {
-                    m_log.Error("[AVATAR CONNECTOR]: No LocalServiceModule named in section AvatarService");
+                    m_log.LogError("[AVATAR CONNECTOR]: No LocalServiceModule named in section AvatarService");
                     return;
                 }
 
@@ -91,11 +91,11 @@ public class LocalAvatarServicesConnector : ISharedRegionModule, IAvatarService
 
                 if (m_AvatarService == null)
                 {
-                    m_log.Error("[AVATAR CONNECTOR]: Can't load user account service");
+                    m_log.LogError("[AVATAR CONNECTOR]: Can't load user account service");
                     return;
                 }
                 m_Enabled = true;
-                m_log.Info("[AVATAR CONNECTOR]: Local avatar connector enabled");
+                m_log.LogInformation("[AVATAR CONNECTOR]: Local avatar connector enabled");
             }
         }
     }

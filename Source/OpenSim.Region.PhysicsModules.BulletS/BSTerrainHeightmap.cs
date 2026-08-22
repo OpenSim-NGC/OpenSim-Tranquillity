@@ -26,6 +26,8 @@
  */
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 public sealed class BSTerrainHeightmap : BSTerrainPhys
@@ -159,7 +161,7 @@ public sealed class BSTerrainHeightmap : BSTerrainPhys
         catch
         {
             // Sometimes they give us wonky values of X and Y. Give a warning and return something.
-            m_physicsScene.Logger.WarnFormat("{0} Bad request for terrain height. terrainBase={1}, pos={2}",
+            m_physicsScene.Logger.LogWarning("{0} Bad request for terrain height. terrainBase={1}, pos={2}",
                                 LogHeader, m_mapInfo.terrainRegionBase, pos);
             ret = BSTerrainManager.HEIGHT_GETHEIGHT_RET;
         }

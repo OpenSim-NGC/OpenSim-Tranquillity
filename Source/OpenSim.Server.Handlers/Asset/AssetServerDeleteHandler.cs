@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using System.Xml.Serialization;
 using OpenSim.Server.Base;
@@ -33,6 +32,8 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Asset;
 
@@ -48,7 +49,7 @@ public enum AllowedRemoteDeleteTypes
 
 public class AssetServerDeleteHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAssetService m_AssetService;
 
@@ -93,7 +94,7 @@ public class AssetServerDeleteHandler : BaseStreamHandler
                     }
                     else
                     {
-                        m_log.DebugFormat(
+                        m_log.LogDebug(
                             "[ASSET SERVER DELETE HANDLER]: Request to delete asset {0}, but type is {1} and allowed remote delete types are {2}",
                             assetID, (AssetFlags)asset.Flags, m_allowedTypes);
                     }

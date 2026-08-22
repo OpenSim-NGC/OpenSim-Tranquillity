@@ -31,11 +31,12 @@ using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using log4net;
 using System.Reflection;
 using CoreJ2K;
 using CoreJ2K.Configuration;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 //using Cairo;
 
 namespace OpenSim.Region.CoreModules.Scripting.VectorRender;
@@ -47,7 +48,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
 //        private static byte[] s_asset1Data;
 //        private static byte[] s_asset2Data;
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static object thisLock = new object();
     private static SKTypeface m_typeface = null; // SkiaSharp typeface for measurements
 
@@ -107,7 +108,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
     {
         if (m_textureManager == null)
         {
-            m_log.Warn("[VECTORRENDERMODULE]: No texture manager. Can't function");
+            m_log.LogWarning("[VECTORRENDERMODULE]: No texture manager. Can't function");
             return false;
         }
         // XXX: This isn't actually being done asynchronously!
@@ -170,7 +171,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
         {
             m_fontName = cfg.GetString("font_name", m_fontName);
         }
-        m_log.DebugFormat("[VECTORRENDERMODULE]: using font \"{0}\" for text rendering.", m_fontName);
+        m_log.LogDebug("[VECTORRENDERMODULE]: using font \"{0}\" for text rendering.", m_fontName);
 
         // We won't dispose of these explicitly since this module is only removed when the entire simulator
         // is shut down.
@@ -410,7 +411,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[VECTORRENDERMODULE]: Image Encoding Failed.  Exception {0}{1}",
                     e.Message, e.StackTrace);
             }
@@ -438,7 +439,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
         catch (Exception)
         {
             //Ckrinke: Add a WriteLine to remove the warning about 'e' defined but not used
-            // m_log.Debug("Problem with Draw. Please verify parameters." + e.ToString());
+            // m_log.LogDebug("Problem with Draw. Please verify parameters." + e.ToString());
             parsed = -1;
         }
 
@@ -529,7 +530,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
             {
                 string nextLine = line.TrimStart();
 
-//                    m_log.DebugFormat("[VECTOR RENDER MODULE]: Processing line '{0}'", nextLine);
+//                    m_log.LogDebug("[VECTOR RENDER MODULE]: Processing line '{0}'", nextLine);
 
                 if (nextLine.StartsWith("Text") && nextLine.Length > 5)
                 {
@@ -916,7 +917,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                 SKPoint point = new SKPoint(x, y);
                 points[i / 2] = point;
 
-//                    m_log.DebugFormat("[VECTOR RENDER MODULE]: Got point {0}", points[i / 2]);
+//                    m_log.LogDebug("[VECTOR RENDER MODULE]: Got point {0}", points[i / 2]);
             }
         }
     }

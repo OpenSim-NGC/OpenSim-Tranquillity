@@ -26,7 +26,7 @@
  */
 
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -53,16 +53,16 @@ public interface IPluginDiscovery : IDisposable
 
 public static class PluginDiscoveryFactory
 {
-    public static IPluginDiscovery Create(ILog log)
+    public static IPluginDiscovery Create(ILogger log)
     {
-        log.Info("[PLUGINS]: Using DotNetCorePlugins discovery backend");
+        log.LogInformation("[PLUGINS]: Using DotNetCorePlugins discovery backend");
         return new DotNetCorePluginsDiscovery(log);
     }
 }
 
 public class DotNetCorePluginsDiscovery : IPluginDiscovery
 {
-    private readonly ILog m_log;
+    private readonly ILogger m_log;
     private string m_pluginDirectory = ".";
     private Type m_cachedRequiredType;
     private List<Assembly> m_assemblies = new List<Assembly>();
@@ -103,7 +103,7 @@ public class DotNetCorePluginsDiscovery : IPluginDiscovery
     public PluginDiscoveryCapabilities Capabilities { get; } =
         new PluginDiscoveryCapabilities(supportsAddinRegistryMetadata: false);
 
-    public DotNetCorePluginsDiscovery(ILog log)
+    public DotNetCorePluginsDiscovery(ILogger log)
     {
         m_log = log;
     }
@@ -124,7 +124,7 @@ public class DotNetCorePluginsDiscovery : IPluginDiscovery
 
         if (requiredTypeHint == null)
         {
-            m_log.WarnFormat("[PLUGINS]: DotNetCorePlugins discovery for {0} requires a plugin type hint.", extensionPoint);
+            m_log.LogWarning("[PLUGINS]: DotNetCorePlugins discovery for {0} requires a plugin type hint.", extensionPoint);
             return nodes;
         }
 
@@ -195,7 +195,7 @@ public class DotNetCorePluginsDiscovery : IPluginDiscovery
             }
         }
 
-        m_log.InfoFormat(
+        m_log.LogInformation(
             "[PLUGINS]: Discovery summary [{0}] scanned={1}, skipped={2}, loadFailures={3}, code={4}, reflected={5}, candidates={6} using {7}",
             extensionPoint,
             m_lastScannedAssemblyCount,
@@ -236,7 +236,7 @@ public class DotNetCorePluginsDiscovery : IPluginDiscovery
 
         if (!Directory.Exists(m_pluginDirectory))
         {
-            m_log.WarnFormat("[PLUGINS]: Plugin discovery directory does not exist: {0}", m_pluginDirectory);
+            m_log.LogWarning("[PLUGINS]: Plugin discovery directory does not exist: {0}", m_pluginDirectory);
             return m_assemblies;
         }
 
@@ -275,7 +275,7 @@ public class DotNetCorePluginsDiscovery : IPluginDiscovery
             catch (Exception e)
             {
                 m_lastLoadFailureCount++;
-                m_log.WarnFormat("[PLUGINS]: Unable to load assembly {0}: {1}", dllPath, e.Message);
+                m_log.LogWarning("[PLUGINS]: Unable to load assembly {0}: {1}", dllPath, e.Message);
             }
         }
 

@@ -26,18 +26,19 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.OptionalModules.Scripting.JsonStore;
 
 public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IConfig m_config = null;
     private bool m_enabled = false;
@@ -76,7 +77,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
             if ((m_config = config.Configs["JsonStore"]) == null)
             {
                 // There is no configuration, the module is disabled
-                // m_log.InfoFormat("[JsonStore] no configuration info");
+                // m_log.LogInformation("[JsonStore] no configuration info");
                 return;
             }
 
@@ -88,12 +89,12 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         }
         catch (Exception e)
         {
-            m_log.Error("[JsonStore]: initialization error: {0}", e);
+            m_log.LogError(e, "[JsonStore]: initialization error: {0}");
             return;
         }
 
         if (m_enabled)
-            m_log.DebugFormat("[JsonStore]: module is enabled");
+            m_log.LogDebug("[JsonStore]: module is enabled");
     }
 
     // -----------------------------------------------------------------
@@ -215,7 +216,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         SceneObjectPart sop = m_scene.GetSceneObjectPart(objectID);
         if (sop == null)
         {
-            m_log.ErrorFormat("[JsonStore] unable to attach to unknown object; {0}", objectID);
+            m_log.LogError("[JsonStore] unable to attach to unknown object; {0}", objectID);
             return false;
         }
 
@@ -252,7 +253,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         }
         catch (Exception)
         {
-            m_log.ErrorFormat("[JsonStore]: Unable to initialize store from {0}", value);
+            m_log.LogError("[JsonStore]: Unable to initialize store from {0}", value);
             return false;
         }
 
@@ -302,7 +303,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         {
             if (! m_JsonValueStore.TryGetValue(storeID,out map))
             {
-                m_log.InfoFormat("[JsonStore] Missing store {0}",storeID);
+                m_log.LogInformation("[JsonStore] Missing store {0}",storeID);
                 return JsonStoreNodeType.Undefined;
             }
         }
@@ -314,7 +315,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("[JsonStore]: Path test failed for {0} in {1}", path, storeID), e);
+            m_log.LogError(e, string.Format("[JsonStore]: Path test failed for {0} in {1}", path, storeID));
         }
 
         return JsonStoreNodeType.Undefined;
@@ -334,7 +335,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         {
             if (! m_JsonValueStore.TryGetValue(storeID,out map))
             {
-                m_log.InfoFormat("[JsonStore] Missing store {0}",storeID);
+                m_log.LogInformation("[JsonStore] Missing store {0}",storeID);
                 return JsonStoreValueType.Undefined;
             }
         }
@@ -346,7 +347,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("[JsonStore]: Path test failed for {0} in {1}", path, storeID), e);
+            m_log.LogError(e, string.Format("[JsonStore]: Path test failed for {0} in {1}", path, storeID));
         }
 
         return JsonStoreValueType.Undefined;
@@ -366,7 +367,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         {
             if (! m_JsonValueStore.TryGetValue(storeID,out map))
             {
-                m_log.InfoFormat("[JsonStore] Missing store {0}",storeID);
+                m_log.LogInformation("[JsonStore] Missing store {0}",storeID);
                 return false;
             }
         }
@@ -377,7 +378,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
             {
                 if (map.StringSpace > m_maxStringSpace)
                 {
-                    m_log.WarnFormat("[JsonStore] {0} exceeded string size; {1} bytes used of {2} limit",
+                    m_log.LogWarning("[JsonStore] {0} exceeded string size; {1} bytes used of {2} limit",
                                      storeID,map.StringSpace,m_maxStringSpace);
                     return false;
                 }
@@ -387,7 +388,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("[JsonStore]: Unable to assign {0} to {1} in {2}", value, path, storeID), e);
+            m_log.LogError(e, string.Format("[JsonStore]: Unable to assign {0} to {1} in {2}", value, path, storeID));
         }
 
         return false;
@@ -407,7 +408,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         {
             if (! m_JsonValueStore.TryGetValue(storeID,out map))
             {
-                m_log.InfoFormat("[JsonStore] Missing store {0}",storeID);
+                m_log.LogInformation("[JsonStore] Missing store {0}",storeID);
                 return false;
             }
         }
@@ -419,7 +420,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("[JsonStore]: Unable to remove {0} in {1}", path, storeID), e);
+            m_log.LogError(e, string.Format("[JsonStore]: Unable to remove {0} in {1}", path, storeID));
         }
 
         return false;
@@ -450,7 +451,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         }
         catch (Exception e)
         {
-            m_log.Error("[JsonStore]: unable to retrieve value", e);
+            m_log.LogError(e, "[JsonStore]: unable to retrieve value");
         }
 
         return -1;
@@ -483,7 +484,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         }
         catch (Exception e)
         {
-            m_log.Error("[JsonStore]: unable to retrieve value", e);
+            m_log.LogError(e, "[JsonStore]: unable to retrieve value");
         }
 
         return false;
@@ -522,7 +523,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         }
         catch (Exception e)
         {
-            m_log.Error("[JsonStore] unable to retrieve value", e);
+            m_log.LogError(e, "[JsonStore] unable to retrieve value");
         }
 
         cback(String.Empty);
@@ -561,7 +562,7 @@ public class JsonStoreModule  : INonSharedRegionModule, IJsonStoreModule
         }
         catch (Exception e)
         {
-            m_log.Error("[JsonStore]: unable to retrieve value", e);
+            m_log.LogError(e, "[JsonStore]: unable to retrieve value");
         }
 
         cback(String.Empty);

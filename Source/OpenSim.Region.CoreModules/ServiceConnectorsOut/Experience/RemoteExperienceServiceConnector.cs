@@ -5,14 +5,16 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience;
 
 public class RemoteExperienceServicesConnector : ISharedRegionModule, IExperienceService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     #region ISharedRegionModule
 
@@ -42,7 +44,7 @@ public class RemoteExperienceServicesConnector : ISharedRegionModule, IExperienc
                 m_remoteConnector = new ExperienceServicesConnector(source);
                 m_Enabled = true;
 
-                m_log.Info("[EXPERIENCE CONNECTOR]: Remote ExperienceService enabled");
+                m_log.LogInformation("[EXPERIENCE CONNECTOR]: Remote ExperienceService enabled");
             }
         }
     }
@@ -61,7 +63,7 @@ public class RemoteExperienceServicesConnector : ISharedRegionModule, IExperienc
             return;
 
         scene.RegisterModuleInterface<IExperienceService>(this);
-        m_log.InfoFormat("[EXPERIENCE CONNECTOR]: Enabled for region {0}", scene.RegionInfo.RegionName);
+        m_log.LogInformation("[EXPERIENCE CONNECTOR]: Enabled for region {0}", scene.RegionInfo.RegionName);
     }
 
     public void RemoveRegion(Scene scene)

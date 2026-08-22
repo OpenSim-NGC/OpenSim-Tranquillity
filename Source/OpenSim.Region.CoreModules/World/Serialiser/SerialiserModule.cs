@@ -27,7 +27,6 @@
 
 using System.Reflection;
 
-using log4net;
 using Nini.Config;
 
 using OpenMetaverse;
@@ -35,12 +34,14 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.World.Serialiser;
 
 public class SerialiserModule : ISharedRegionModule, IRegionSerialiserModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
 //        private Commander m_commander = new Commander("export");
     private List<Scene> m_regions = new List<Scene>();
@@ -62,7 +63,7 @@ public class SerialiserModule : ISharedRegionModule, IRegionSerialiserModule
             m_savedir = config.GetString("save_dir", m_savedir);
         }
 
-        m_log.InfoFormat("[Serialiser] Enabled, using save dir \"{0}\"", m_savedir);
+        m_log.LogInformation("[Serialiser] Enabled, using save dir \"{0}\"", m_savedir);
     }
 
     public void PostInitialise()

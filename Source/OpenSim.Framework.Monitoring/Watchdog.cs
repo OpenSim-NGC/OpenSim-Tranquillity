@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 /*
  * Copyright (c) Contributors, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
@@ -25,8 +28,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
-
 namespace OpenSim.Framework.Monitoring;
 
 /// <summary>
@@ -34,7 +35,7 @@ namespace OpenSim.Framework.Monitoring;
 /// </summary>
 public static class Watchdog
 {
-    private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>Timer interval in milliseconds for the watchdog timer</summary>
     public const int WATCHDOG_INTERVAL_MS = 2500;
@@ -139,7 +140,7 @@ public static class Watchdog
         get { return m_enabled; }
         set
         {
-            //                m_log.DebugFormat("[MEMORY WATCHDOG]: Setting MemoryWatchdog.Enabled to {0}", value);
+            //                m_log.LogDebug("[MEMORY WATCHDOG]: Setting MemoryWatchdog.Enabled to {0}", value);
 
             if (value == m_enabled)
                 return;
@@ -190,7 +191,7 @@ public static class Watchdog
             foreach(ThreadWatchdogInfo twi in m_threads.Values)
             {
                 Thread t = twi.Thread;
-                // m_log.DebugFormat(
+                // m_log.LogDebug(
                 //    "[WATCHDOG]: Stop: Removing thread {0}, ID {1}", twi.Thread.Name, twi.Thread.ManagedThreadId);
 
                 //if(t.IsAlive)
@@ -209,7 +210,7 @@ public static class Watchdog
     public static void AddThread(ThreadWatchdogInfo info, string name, bool log = true)
     {
         if (log)
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[WATCHDOG]: Started tracking thread {0}, ID {1}", name, info.Thread.ManagedThreadId);
 
         lock (m_threads)
@@ -245,7 +246,7 @@ public static class Watchdog
             if (m_threads.TryGetValue(threadID, out twi))
             {
                 if (log)
-                    m_log.DebugFormat(
+                    m_log.LogDebug(
                         "[WATCHDOG]: Removing thread {0}, ID {1}", twi.Thread.Name, twi.Thread.ManagedThreadId);
 
                 twi.Cleanup();
@@ -254,7 +255,7 @@ public static class Watchdog
             }
             else
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[WATCHDOG]: Requested to remove thread with ID {0} but this is not being monitored", threadID);
                 return false;
             }
@@ -292,7 +293,7 @@ public static class Watchdog
             }
             else
             {
-                m_log.WarnFormat("[WATCHDOG]: Asked to update thread {0} which is not being monitored", threadID);
+                m_log.LogWarning("[WATCHDOG]: Asked to update thread {0} which is not being monitored", threadID);
             }
         }
         catch { }
@@ -333,7 +334,7 @@ public static class Watchdog
         int msElapsed = now - LastWatchdogThreadTick;
 
         if (msElapsed > WATCHDOG_INTERVAL_MS * 2)
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[WATCHDOG]: {0} ms since Watchdog last ran.  Interval should be approximately {1} ms",
                 msElapsed, WATCHDOG_INTERVAL_MS);
 

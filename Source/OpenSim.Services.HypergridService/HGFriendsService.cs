@@ -36,8 +36,9 @@ using OpenSim.Server.Base;
 using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.HypergridService;
 
@@ -46,8 +47,7 @@ namespace OpenSim.Services.HypergridService;
 /// </summary>
 public class HGFriendsService : IHGFriendsService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     static bool m_Initialized = false;
@@ -103,7 +103,7 @@ public class HGFriendsService : IHGFriendsService
 
             m_FriendsSimConnector = new FriendsSimConnector();
 
-            m_log.DebugFormat("[HGFRIENDS SERVICE]: Starting...");
+            m_log.LogDebug("[HGFRIENDS SERVICE]: Starting...");
 
         }
     }
@@ -128,7 +128,7 @@ public class HGFriendsService : IHGFriendsService
         if (!Util.ParseUniversalUserIdentifier(friend.Friend, out friendID, out url, out first, out last, out tmp))
             return false;
 
-        m_log.DebugFormat("[HGFRIENDS SERVICE]: New friendship {0} {1} ({2})", friend.PrincipalID, friend.Friend, verified);
+        m_log.LogDebug("[HGFRIENDS SERVICE]: New friendship {0} {1} ({2})", friend.PrincipalID, friend.Friend, verified);
 
         // Does the friendship already exist?
         FriendInfo[] finfos = m_FriendsService.GetFriends(friend.PrincipalID);
@@ -174,7 +174,7 @@ public class HGFriendsService : IHGFriendsService
             // We check the secret here. Or if the friendship request was initiated here, and was declined
             if (finfo.Friend.StartsWith(friend.Friend) && finfo.Friend.EndsWith(secret))
             {
-                m_log.DebugFormat("[HGFRIENDS SERVICE]: Delete friendship {0} {1}", friend.PrincipalID, friend.Friend);
+                m_log.LogDebug("[HGFRIENDS SERVICE]: Delete friendship {0} {1}", friend.PrincipalID, friend.Friend);
                 m_FriendsService.Delete(friend.PrincipalID, finfo.Friend);
                 m_FriendsService.Delete(finfo.Friend, friend.PrincipalID.ToString());
 
@@ -216,7 +216,7 @@ public class HGFriendsService : IHGFriendsService
     {
         if (m_FriendsService == null || m_PresenceService == null)
         {
-            m_log.WarnFormat("[HGFRIENDS SERVICE]: Unable to perform status notifications because friends or presence services are missing");
+            m_log.LogWarning("[HGFRIENDS SERVICE]: Unable to perform status notifications because friends or presence services are missing");
             return new List<UUID>();
         }
 
@@ -224,7 +224,7 @@ public class HGFriendsService : IHGFriendsService
 
         List<UUID> localFriendsOnline = new List<UUID>();
 
-        m_log.DebugFormat("[HGFRIENDS SERVICE]: Status notification: foreign user {0} wants to notify {1} local friends of {2} status",
+        m_log.LogDebug("[HGFRIENDS SERVICE]: Status notification: foreign user {0} wants to notify {1} local friends of {2} status",
             foreignUserID, friends.Count, (online ? "online" : "offline"));
 
         // First, let's double check that the reported friends are, indeed, friends of that user
@@ -248,7 +248,7 @@ public class HGFriendsService : IHGFriendsService
         }
 
         // Now, let's send the notifications
-        //m_log.DebugFormat("[HGFRIENDS SERVICE]: Status notification: user has {0} local friends", usersToBeNotified.Count);
+        //m_log.LogDebug("[HGFRIENDS SERVICE]: Status notification: user has {0} local friends", usersToBeNotified.Count);
 
         // First, let's send notifications to local users who are online in the home grid
         PresenceInfo[] friendSessions = m_PresenceService.GetAgents(usersToBeNotified.ToArray());
@@ -284,7 +284,7 @@ public class HGFriendsService : IHGFriendsService
 //                //    string url = m_TravelingAgents[id].GridExternalName;
 //                //    // forward
 //                //}
-//                //m_log.WarnFormat("[HGFRIENDS SERVICE]: User {0} is visiting another grid. HG Status notifications still not implemented.", user);
+//                //m_log.LogWarning("[HGFRIENDS SERVICE]: User {0} is visiting another grid. HG Status notifications still not implemented.", user);
 //            }
 
         // and finally, let's send the online friends
@@ -331,7 +331,7 @@ public class HGFriendsService : IHGFriendsService
         HGFriendsServicesConnector friendsConn = new HGFriendsServicesConnector(servers["FriendsServerURI"].ToString());
         if (!friendsConn.ValidateFriendshipOffered(fromID, toID))
         {
-            m_log.WarnFormat("[HGFRIENDS SERVICE]: Friendship request from {0} to {1} is invalid. Impersonations?", fromID, toID);
+            m_log.LogWarning("[HGFRIENDS SERVICE]: Friendship request from {0} to {1} is invalid. Impersonations?", fromID, toID);
             return;
         }
 
@@ -385,7 +385,7 @@ public class HGFriendsService : IHGFriendsService
         {
             if (m_FriendsLocalSimConnector != null)
             {
-                m_log.DebugFormat("[HGFRIENDS SERVICE]: Local Notify, user {0} is {1}", foreignUserID, (online ? "online" : "offline"));
+                m_log.LogDebug("[HGFRIENDS SERVICE]: Local Notify, user {0} is {1}", foreignUserID, (online ? "online" : "offline"));
                 m_FriendsLocalSimConnector.StatusNotify(foreignUserID, userID, online);
             }
             else
@@ -393,7 +393,7 @@ public class HGFriendsService : IHGFriendsService
                 GridRegion region = m_GridService.GetRegionByUUID(UUID.Zero /* !!! */, regionID);
                 if (region != null)
                 {
-                    m_log.DebugFormat("[HGFRIENDS SERVICE]: Remote Notify to region {0}, user {1} is {2}", region.RegionName, foreignUserID, (online ? "online" : "offline"));
+                    m_log.LogDebug("[HGFRIENDS SERVICE]: Remote Notify to region {0}, user {1} is {2}", region.RegionName, foreignUserID, (online ? "online" : "offline"));
                     m_FriendsSimConnector.StatusNotify(region, foreignUserID, userID.ToString(), online);
                 }
             }

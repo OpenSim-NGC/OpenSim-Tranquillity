@@ -32,7 +32,6 @@
 //	2021/05/04	Permit HG visitors to transact. Ensure The money symbol is sent to the viewer.
 //  2022/09/29  Send the helper URI to the viewer only when the EconomyHelper setting in OpenSim.ini
 
-using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;
@@ -50,6 +49,8 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules.World.Currency;
 
@@ -184,7 +185,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     private const int MONEYMODULE_REQUEST_TIMEOUT = 10000;
 
     // Private data members.
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
 #pragma warning disable CS0649 // Unassigned members should be removed
     private Dictionary<string, XmlRpcMethod> m_rpcHandlers;
@@ -271,7 +272,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void Initialise(IConfigSource source)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: Initialise:");
+        if (m_debug) m_log.LogInformation("[MONEY]: Initialise:");
 
         m_enable_server = false;
         m_sellEnabled = false;
@@ -293,12 +294,12 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
             if (economyConfig.GetString("EconomyModule") != EconomyModule)
             {
                 m_enable_server = false;
-                m_log.InfoFormat("[MONEY]: The DTL/NSL MoneyModule is disabled (not selected in OpenSim.ini)");
+                m_log.LogInformation("[MONEY]: The DTL/NSL MoneyModule is disabled (not selected in OpenSim.ini)");
                 return;
             }
             else
             {
-                m_log.InfoFormat("[MONEY]: Initialise: The DTL/NSL MoneyModule is selected");
+                m_log.LogInformation("[MONEY]: Initialise: The DTL/NSL MoneyModule is selected");
             }
 
             // An optional URI pointing to the economy helpers. If missing, the Robust 'economy'
@@ -306,11 +307,11 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
             m_moneyHelperURI = economyConfig.GetString("EconomyHelper", m_moneyHelperURI);
             if (string.IsNullOrEmpty(m_moneyHelperURI))
             {
-                m_log.WarnFormat("[MONEY]: EconomyHelper missing; the robust specified economy helper URL is used.");
+                m_log.LogWarning("[MONEY]: EconomyHelper missing; the robust specified economy helper URL is used.");
             }
             else
             {
-                m_log.InfoFormat("[MONEY]: The economy helper URL is {0}", m_moneyHelperURI);
+                m_log.LogInformation("[MONEY]: The economy helper URL is {0}", m_moneyHelperURI);
             }
 
             // A URL pointing to the money server is required. If missing,
@@ -318,7 +319,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
             m_moneyServURL = economyConfig.GetString("CurrencyServer", m_moneyServURL);
             if (string.IsNullOrEmpty(m_moneyServURL))
             {
-                m_log.InfoFormat("[MONEY]: The required server URL is missing");
+                m_log.LogInformation("[MONEY]: The required server URL is missing");
                 m_enable_server = false;
                 return;
             }
@@ -328,11 +329,11 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
             if (string.IsNullOrEmpty(m_moneySymbol))
             {
                 m_moneySymbol = "$";
-                m_log.WarnFormat("[MONEY]: The currency symbol is missing, defaulting to '{0}' ", m_moneySymbol);
+                m_log.LogWarning("[MONEY]: The currency symbol is missing, defaulting to '{0}' ", m_moneySymbol);
             }
             else
             {
-                m_log.InfoFormat("[MONEY]: The currency symbol is set to '{0}' ", m_moneySymbol);
+                m_log.LogInformation("[MONEY]: The currency symbol is set to '{0}' ", m_moneySymbol);
             }
 
             // Check for send alert on region arrival
@@ -376,7 +377,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
         // config errors are caught here.
         catch
         {
-            m_log.ErrorFormat("[MONEY]: Initialise: Failed to read configuration file");
+            m_log.LogError("[MONEY]: Initialise: Failed to read configuration file");
             m_enable_server = false;
             m_sellEnabled = false;
         }
@@ -384,11 +385,11 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void AddRegion(Scene scene)
     {
-        m_log.InfoFormat("[MONEY]: AddRegion:");
+        m_log.LogInformation("[MONEY]: AddRegion:");
 
         if ((scene == null) || (m_enable_server == false))
         {
-            m_log.ErrorFormat("[MONEY]: AddRegion ignored; module is disabled");
+            m_log.LogError("[MONEY]: AddRegion ignored; module is disabled");
             return;
         }
         scene.RegisterModuleInterface<IMoneyModule>(this);  // 競合するモジュールの排除
@@ -412,14 +413,14 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                     IHttpServer httpServer = MainServer.Instance.DefaultServer;
                     if (httpServer == null)
                     {
-                        m_log.ErrorFormat(
+                        m_log.LogError(
                             "[MONEY]: AddRegion: MainServer.Instance.DefaultServer is null; moduleAsm={0} mainServerAsm={1}",
                             typeof(DTLNSLMoneyModule).Assembly.FullName,
                             typeof(MainServer).Assembly.FullName);
                         return;
                     }
 
-                    m_log.InfoFormat(
+                    m_log.LogInformation(
                         "[MONEY]: MainServer binding: moduleAsm={0} mainServerAsm={1} defaultPort={2}",
                         typeof(DTLNSLMoneyModule).Assembly.FullName,
                         typeof(MainServer).Assembly.FullName,
@@ -496,7 +497,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     {
         if ((scene == null) || (m_enable_server == false))
         {
-            m_log.ErrorFormat("[MONEY]: RemoveRegion ignored; module is disabled");
+            m_log.LogError("[MONEY]: RemoveRegion ignored; module is disabled");
             return;
         }
 
@@ -638,10 +639,10 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void RegionLoaded(Scene scene)
     {
-        m_log.InfoFormat("[MONEY]: RegionLoaded:");
+        m_log.LogInformation("[MONEY]: RegionLoaded:");
         if ((scene == null) || (m_enable_server == false))
         {
-            m_log.ErrorFormat("[MONEY]: RegionLoaded ignored; module is disabled");
+            m_log.LogError("[MONEY]: RegionLoaded ignored; module is disabled");
             return;
         }
 
@@ -706,12 +707,12 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void PostInitialise()
     {
-        m_log.InfoFormat("[MONEY]: PostInitialise:");
+        m_log.LogInformation("[MONEY]: PostInitialise:");
     }
 
     public void Close()
     {
-        m_log.InfoFormat("[MONEY]: Close:");
+        m_log.LogInformation("[MONEY]: Close:");
     }
 
     #endregion ISharedRegionModule interface
@@ -727,8 +728,8 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
         UUID sessionId = UUID.Parse(requestData["secureSessionId"] as string);
         int amount = (int)requestData["currencyBuy"];
 
-        m_log.InfoFormat("[MONEYMODULE] quote_func agentId: {0} sessionId: {1} currencyBuy: {2}", agentId, sessionId, amount);
-        // foreach(DictionaryEntry e in requestData) { m_log.InfoFormat("{0}: {1}", e.Key, e.Value); }
+        m_log.LogInformation("[MONEYMODULE] quote_func agentId: {0} sessionId: {1} currencyBuy: {2}", agentId, sessionId, amount);
+        // foreach(DictionaryEntry e in requestData) { m_log.LogInformation("{0}: {1}", e.Key, e.Value); }
 
         XmlRpcResponse returnval = new XmlRpcResponse();
         Hashtable quoteResponse = new Hashtable();
@@ -757,8 +758,8 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
         string secureSessionId = requestData["secureSessionId"] as string;
 
         // currencyBuy:viewerMinorVersion:secureSessionId:viewerBuildVersion:estimatedCost:confirm:agentId:viewerPatchVersion:viewerMajorVersion:viewerChannel:language
-        // m_log.InfoFormat("[MONEYMODULE] buy_func params {0}", String.Join(":", requestData.Keys.Cast<String>()));
-        m_log.InfoFormat("[MONEYMODULE] buy_func agentId {0} confirm {1} currencyBuy {2} estimatedCost {3} secureSessionId {4}",
+        // m_log.LogInformation("[MONEYMODULE] buy_func params {0}", String.Join(":", requestData.Keys.Cast<String>()));
+        m_log.LogInformation("[MONEYMODULE] buy_func agentId {0} confirm {1} currencyBuy {2} estimatedCost {3} secureSessionId {4}",
             agentId, confirm, currencyBuy, estimatedCost, secureSessionId);
 
         XmlRpcResponse returnval = new XmlRpcResponse();
@@ -770,7 +771,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     private XmlRpcResponse preflightBuyLandPrep_func(XmlRpcRequest request, IPEndPoint remoteClient)
     {
-        m_log.InfoFormat("[MONEYMODULE] preflightBuyLandPrep_func");
+        m_log.LogInformation("[MONEYMODULE] preflightBuyLandPrep_func");
         XmlRpcResponse ret = new XmlRpcResponse();
         Hashtable retparam = new Hashtable();
         Hashtable membershiplevels = new Hashtable();
@@ -806,7 +807,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     private XmlRpcResponse landBuy_func(XmlRpcRequest request, IPEndPoint remoteClient)
     {
-        m_log.InfoFormat("[MONEYMODULE] landBuy_func");
+        m_log.LogInformation("[MONEYMODULE] landBuy_func");
         XmlRpcResponse ret = new XmlRpcResponse();
         Hashtable retparam = new Hashtable();
         // Hashtable requestData = (Hashtable) request.Params[0];
@@ -823,7 +824,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     // for LSL llGiveMoney() function
     public bool ObjectGiveMoney(UUID objectID, UUID fromID, UUID toID, int amount, UUID txn, out string result)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: ObjectGiveMoney: LSL ObjectGiveMoney. UUID = {0}", objectID.ToString());
+        if (m_debug) m_log.LogInformation("[MONEY]: ObjectGiveMoney: LSL ObjectGiveMoney. UUID = {0}", objectID.ToString());
 
         result = string.Empty;
         if (!m_sellEnabled)
@@ -1023,7 +1024,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     //
     private void OnNewClient(IClientAPI client)
     {
-        m_log.InfoFormat("[MONEY]: OnNewClient");
+        m_log.LogInformation("[MONEY]: OnNewClient");
 
         client.OnEconomyDataRequest += OnEconomyDataRequest;
         client.OnLogout += ClientClosed;
@@ -1035,7 +1036,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void OnMakeRootAgent(ScenePresence agent)
     {
-        m_log.InfoFormat("[MONEY]: OnMakeRootAgent:");
+        m_log.LogInformation("[MONEY]: OnMakeRootAgent:");
 
         int balance = 0;
         IClientAPI client = agent.ControllingClient;
@@ -1058,7 +1059,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     // for OnClientClosed event
     private void ClientClosed(IClientAPI client)
     {
-        m_log.InfoFormat("[MONEY]: ClientClosed:");
+        m_log.LogInformation("[MONEY]: ClientClosed:");
 
         if (m_enable_server && client != null)
         {
@@ -1083,13 +1084,13 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     // for OnMakeChildAgent event
     private void MakeChildAgent(ScenePresence avatar)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: MakeChildAgent:");
+        if (m_debug) m_log.LogInformation("[MONEY]: MakeChildAgent:");
     }
 
     // for OnMoneyTransfer event
     private void MoneyTransferAction(Object sender, EventManager.MoneyTransferArgs moneyEvent)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: MoneyTransferAction: type = {0}", moneyEvent.transactiontype);
+        if (m_debug) m_log.LogInformation("[MONEY]: MoneyTransferAction: type = {0}", moneyEvent.transactiontype);
 
         if (!m_sellEnabled) return;
 
@@ -1138,7 +1139,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     // for OnValidateLandBuy event
     private void ValidateLandBuy(Object sender, EventManager.LandBuyArgs landBuyEvent)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: ValidateLandBuy:");
+        if (m_debug) m_log.LogInformation("[MONEY]: ValidateLandBuy:");
 
         IClientAPI senderClient = GetLocateClient(landBuyEvent.agentId);
         if (senderClient != null)
@@ -1158,7 +1159,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     // for LandBuy even
     private void processLandBuy(Object sender, EventManager.LandBuyArgs landBuyEvent)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: processLandBuy:");
+        if (m_debug) m_log.LogInformation("[MONEY]: processLandBuy:");
 
         if (!m_sellEnabled) return;
 
@@ -1186,7 +1187,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     public void OnObjectBuy(IClientAPI remoteClient, UUID agentID, UUID sessionID,
                             UUID groupID, UUID categoryID, uint localID, byte saleType, int salePrice)
     {
-        m_log.InfoFormat("[MONEY]: OnObjectBuy: agent = {0}, {1}", agentID, remoteClient.AgentId);
+        m_log.LogInformation("[MONEY]: OnObjectBuy: agent = {0}, {1}", agentID, remoteClient.AgentId);
 
         // Handle the parameters error.
         if (!m_sellEnabled) return;
@@ -1250,7 +1251,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     /// <param name="TransactionID"></param>
     private void OnMoneyBalanceRequest(IClientAPI client, UUID agentID, UUID SessionID, UUID TransactionID)
     {
-        m_log.InfoFormat("[MONEY]: OnMoneyBalanceRequest:");
+        m_log.LogInformation("[MONEY]: OnMoneyBalanceRequest:");
 
         if (client.AgentId == agentID && client.SessionId == SessionID)
         {
@@ -1271,7 +1272,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     private void OnRequestPayPrice(IClientAPI client, UUID objectID)
     {
-        m_log.InfoFormat("[MONEY]: OnRequestPayPrice:");
+        m_log.LogInformation("[MONEY]: OnRequestPayPrice:");
 
         Scene scene = GetLocateScene(client.AgentId);
         if (scene == null) return;
@@ -1287,7 +1288,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     //private void OnEconomyDataRequest(UUID agentId)
     private void OnEconomyDataRequest(IClientAPI user)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: OnEconomyDataRequest:");
+        if (m_debug) m_log.LogInformation("[MONEY]: OnEconomyDataRequest:");
         //IClientAPI user = GetLocateClient(agentId);
 
         if (user != null)
@@ -1311,7 +1312,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     // "OnMoneyTransfered" RPC from MoneyServer
     public XmlRpcResponse OnMoneyTransferedHandler(XmlRpcRequest request, IPEndPoint remoteClient)
     {
-        m_log.InfoFormat("[MONEY]: OnMoneyTransferedHandler:");
+        m_log.LogInformation("[MONEY]: OnMoneyTransferedHandler:");
 
         bool ret = false;
 
@@ -1332,7 +1333,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                     {
                         if (requestParam.Contains("transactionType") && requestParam.Contains("objectID") && requestParam.Contains("amount"))
                         {
-                            if (m_debug) m_log.InfoFormat("[MONEY]: OnMoneyTransferedHandler: type = {0}", requestParam["transactionType"]);
+                            if (m_debug) m_log.LogInformation("[MONEY]: OnMoneyTransferedHandler: type = {0}", requestParam["transactionType"]);
 
                             // Pay for the object.
                             if ((int)requestParam["transactionType"] == (int)TransactionType.PayObject)
@@ -1360,7 +1361,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
         if (!ret)
         {
-            m_log.ErrorFormat("[MONEY]: OnMoneyTransferedHandler: Transaction is failed. MoneyServer will rollback");
+            m_log.LogError("[MONEY]: OnMoneyTransferedHandler: Transaction is failed. MoneyServer will rollback");
         }
         resp.Value = paramTable;
 
@@ -1370,7 +1371,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     // "UpdateBalance" RPC from MoneyServer or Script
     public XmlRpcResponse BalanceUpdateHandler(XmlRpcRequest request, IPEndPoint remoteClient)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: BalanceUpdateHandler:");
+        if (m_debug) m_log.LogInformation("[MONEY]: BalanceUpdateHandler:");
 
         bool ret = false;
 
@@ -1422,7 +1423,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
         if (!ret)
         {
-            m_log.ErrorFormat("[MONEY]: BalanceUpdateHandler: Cannot update client balance from MoneyServer");
+            m_log.LogError("[MONEY]: BalanceUpdateHandler: Cannot update client balance from MoneyServer");
         }
         resp.Value = paramTable;
 
@@ -1432,7 +1433,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     // "UserAlert" RPC from Script
     public XmlRpcResponse UserAlertHandler(XmlRpcRequest request, IPEndPoint remoteClient)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: UserAlertHandler:");
+        if (m_debug) m_log.LogInformation("[MONEY]: UserAlertHandler:");
 
         bool ret = false;
 
@@ -1482,7 +1483,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     // "GetBalance" RPC from Script
     public XmlRpcResponse GetBalanceHandler(XmlRpcRequest request, IPEndPoint remoteClient)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: GetBalanceHandler:");
+        if (m_debug) m_log.LogInformation("[MONEY]: GetBalanceHandler:");
 
         bool ret = false;
         int balance = -1;
@@ -1511,7 +1512,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
         // Send the response to caller.
         if (balance < 0)
         {
-            m_log.ErrorFormat("[MONEY]: GetBalanceHandler: GetBalance transaction is failed");
+            m_log.LogError("[MONEY]: GetBalanceHandler: GetBalance transaction is failed");
             ret = false;
         }
 
@@ -1527,7 +1528,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     // "AddBankerMoney" RPC from Script
     public XmlRpcResponse AddBankerMoneyHandler(XmlRpcRequest request, IPEndPoint remoteClient)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: AddBankerMoneyHandler:");
+        if (m_debug) m_log.LogInformation("[MONEY]: AddBankerMoneyHandler:");
 
         bool ret = false;
 
@@ -1570,7 +1571,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
             }
         }
 
-        if (!ret) m_log.ErrorFormat("[MONEY]: AddBankerMoneyHandler: Add Banker Money transaction is failed");
+        if (!ret) m_log.LogError("[MONEY]: AddBankerMoneyHandler: Add Banker Money transaction is failed");
 
         // Send the response to caller.
         XmlRpcResponse resp = new XmlRpcResponse();
@@ -1587,7 +1588,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     // "SendMoney" RPC from Script
     public XmlRpcResponse SendMoneyHandler(XmlRpcRequest request, IPEndPoint remoteClient)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: SendMoneyHandler:");
+        if (m_debug) m_log.LogInformation("[MONEY]: SendMoneyHandler:");
 
         bool ret = false;
 
@@ -1612,33 +1613,33 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                         MD5 md5 = MD5.Create();
                         byte[] code = md5.ComputeHash(ASCIIEncoding.Default.GetBytes(secretCode + "_" + scriptIP));
                         string hash = BitConverter.ToString(code).ToLower().Replace("-", "");
-                        if (m_debug) m_log.InfoFormat("[MONEY]: SendMoneyHandler: SecretCode: {0} + {1} = {2}", secretCode, scriptIP, hash);
+                        if (m_debug) m_log.LogInformation("[MONEY]: SendMoneyHandler: SecretCode: {0} + {1} = {2}", secretCode, scriptIP, hash);
                         ret = SendMoneyTo(agentUUID, amount, type, hash);
                     }
                 }
                 else
                 {
-                    m_log.ErrorFormat("[MONEY]: SendMoneyHandler: amount is missed");
+                    m_log.LogError("[MONEY]: SendMoneyHandler: amount is missed");
                 }
             }
             else
             {
                 if (!requestParam.Contains("agentUUID"))
                 {
-                    m_log.ErrorFormat("[MONEY]: SendMoneyHandler: agentUUID is missed");
+                    m_log.LogError("[MONEY]: SendMoneyHandler: agentUUID is missed");
                 }
                 if (!requestParam.Contains("secretAccessCode"))
                 {
-                    m_log.ErrorFormat("[MONEY]: SendMoneyHandler: secretAccessCode is missed");
+                    m_log.LogError("[MONEY]: SendMoneyHandler: secretAccessCode is missed");
                 }
             }
         }
         else
         {
-            m_log.ErrorFormat("[MONEY]: SendMoneyHandler: Params count is under 0");
+            m_log.LogError("[MONEY]: SendMoneyHandler: Params count is under 0");
         }
 
-        if (!ret) m_log.ErrorFormat("[MONEY]: SendMoneyHandler: Send Money transaction is failed");
+        if (!ret) m_log.LogError("[MONEY]: SendMoneyHandler: Send Money transaction is failed");
 
         // Send the response to caller.
         XmlRpcResponse resp = new XmlRpcResponse();
@@ -1653,7 +1654,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     // "MoveMoney" RPC from Script
     public XmlRpcResponse MoveMoneyHandler(XmlRpcRequest request, IPEndPoint remoteClient)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: MoveMoneyHandler:");
+        if (m_debug) m_log.LogInformation("[MONEY]: MoveMoneyHandler:");
 
         bool ret = false;
 
@@ -1676,32 +1677,32 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                     MD5 md5 = MD5.Create();
                     byte[] code = md5.ComputeHash(ASCIIEncoding.Default.GetBytes(secretCode + "_" + scriptIP));
                     string hash = BitConverter.ToString(code).ToLower().Replace("-", "");
-                    if (m_debug) m_log.InfoFormat("[MONEY]: MoveMoneyHandler: SecretCode: {0} + {1} = {2}", secretCode, scriptIP, hash);
+                    if (m_debug) m_log.LogInformation("[MONEY]: MoveMoneyHandler: SecretCode: {0} + {1} = {2}", secretCode, scriptIP, hash);
                     ret = MoveMoneyFromTo(fromUUID, toUUID, amount, hash);
                 }
                 else
                 {
-                    m_log.ErrorFormat("[MONEY]: MoveMoneyHandler: amount is missed");
+                    m_log.LogError("[MONEY]: MoveMoneyHandler: amount is missed");
                 }
             }
             else
             {
                 if (!requestParam.Contains("fromUUID") && !requestParam.Contains("toUUID"))
                 {
-                    m_log.ErrorFormat("[MONEY]: MoveMoneyHandler: fromUUID and toUUID are missed");
+                    m_log.LogError("[MONEY]: MoveMoneyHandler: fromUUID and toUUID are missed");
                 }
                 if (!requestParam.Contains("secretAccessCode"))
                 {
-                    m_log.ErrorFormat("[MONEY]: MoveMoneyHandler: secretAccessCode is missed");
+                    m_log.LogError("[MONEY]: MoveMoneyHandler: secretAccessCode is missed");
                 }
             }
         }
         else
         {
-            m_log.ErrorFormat("[MONEY]: MoveMoneyHandler: Params count is under 0");
+            m_log.LogError("[MONEY]: MoveMoneyHandler: Params count is under 0");
         }
 
-        if (!ret) m_log.ErrorFormat("[MONEY]: MoveMoneyHandler: Move Money transaction is failed");
+        if (!ret) m_log.LogError("[MONEY]: MoveMoneyHandler: Move Money transaction is failed");
 
         // Send the response to caller.
         XmlRpcResponse resp = new XmlRpcResponse();
@@ -1728,7 +1729,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     /// </returns>
     private bool TransferMoney(UUID sender, UUID receiver, int amount, int type, UUID objectID, ulong regionHandle, UUID regionUUID, string description)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: TransferMoney:");
+        if (m_debug) m_log.LogInformation("[MONEY]: TransferMoney:");
 
         bool ret = false;
         IClientAPI senderClient = GetLocateClient(sender);
@@ -1737,13 +1738,13 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
         // receiverClient could be null.
         if (senderClient == null)
         {
-            m_log.InfoFormat("[MONEY]: TransferMoney: Client {0} not found", sender.ToString());
+            m_log.LogInformation("[MONEY]: TransferMoney: Client {0} not found", sender.ToString());
             return false;
         }
 
         if (QueryBalanceFromMoneyServer(senderClient) < amount)
         {
-            m_log.InfoFormat("[MONEY]: TransferMoney: No insufficient balance in client [{0}]", sender.ToString());
+            m_log.LogInformation("[MONEY]: TransferMoney: No insufficient balance in client [{0}]", sender.ToString());
             return false;
         }
 
@@ -1780,9 +1781,9 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                     ret = true;
                 }
             }
-            else m_log.ErrorFormat("[MONEY]: TransferMoney: Can not money transfer request from [{0}] to [{1}]", sender.ToString(), receiver.ToString());
+            else m_log.LogError("[MONEY]: TransferMoney: Can not money transfer request from [{0}] to [{1}]", sender.ToString(), receiver.ToString());
         }
-        else if (m_debug) m_log.ErrorFormat("[MONEY]: TransferMoney: Money Server is not available!!");
+        else if (m_debug) m_log.LogError("[MONEY]: TransferMoney: Money Server is not available!!");
 
         #endregion Send transaction request to money server and parse the resultes.
 
@@ -1802,7 +1803,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     /// </returns>
     private bool ForceTransferMoney(UUID sender, UUID receiver, int amount, int type, UUID objectID, ulong regionHandle, UUID regionUUID, string description)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: ForceTransferMoney:");
+        if (m_debug) m_log.LogInformation("[MONEY]: ForceTransferMoney:");
 
         bool ret = false;
 
@@ -1837,9 +1838,9 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                     ret = true;
                 }
             }
-            else m_log.ErrorFormat("[MONEY]: ForceTransferMoney: Can not money force transfer request from [{0}] to [{1}]", sender.ToString(), receiver.ToString());
+            else m_log.LogError("[MONEY]: ForceTransferMoney: Can not money force transfer request from [{0}] to [{1}]", sender.ToString(), receiver.ToString());
         }
-        else if (m_debug) m_log.ErrorFormat("[MONEY]: ForceTransferMoney: Money Server is not available!!");
+        else if (m_debug) m_log.LogError("[MONEY]: ForceTransferMoney: Money Server is not available!!");
 
         #endregion Force send transaction request to money server and parse the resultes.
 
@@ -1857,7 +1858,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     /// </returns>
     private bool SendMoneyTo(UUID avatarID, int amount, int type, string secretCode)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: SendMoneyTo:");
+        if (m_debug) m_log.LogInformation("[MONEY]: SendMoneyTo:");
 
         bool ret = false;
 
@@ -1882,11 +1883,11 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                 {
                     ret = true;
                 }
-                else m_log.ErrorFormat("[MONEY]: SendMoneyTo: Fail Message is {0}", resultTable["message"]);
+                else m_log.LogError("[MONEY]: SendMoneyTo: Fail Message is {0}", resultTable["message"]);
             }
-            else m_log.ErrorFormat("[MONEY]: SendMoneyTo: Money Server is not responce");
+            else m_log.LogError("[MONEY]: SendMoneyTo: Money Server is not responce");
         }
-        else if (m_debug) m_log.ErrorFormat("[MONEY]: SendMoneyTo: Money Server is not available!!");
+        else if (m_debug) m_log.LogError("[MONEY]: SendMoneyTo: Money Server is not available!!");
 
         return ret;
     }
@@ -1902,7 +1903,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     /// </returns>
     private bool MoveMoneyFromTo(UUID senderID, UUID receiverID, int amount, string secretCode)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: MoveMoneyFromTo:");
+        if (m_debug) m_log.LogInformation("[MONEY]: MoveMoneyFromTo:");
 
         bool ret = false;
 
@@ -1927,11 +1928,11 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                 {
                     ret = true;
                 }
-                else m_log.ErrorFormat("[MONEY]: MoveMoneyFromTo: Fail Message is {0}", resultTable["message"]);
+                else m_log.LogError("[MONEY]: MoveMoneyFromTo: Fail Message is {0}", resultTable["message"]);
             }
-            else m_log.ErrorFormat("[MONEY]: MoveMoneyFromTo: Money Server is not responce");
+            else m_log.LogError("[MONEY]: MoveMoneyFromTo: Money Server is not responce");
         }
-        else if (m_debug) m_log.ErrorFormat("[MONEY]: MoveMoneyFromTo: Money Server is not available!!");
+        else if (m_debug) m_log.LogError("[MONEY]: MoveMoneyFromTo: Money Server is not available!!");
 
         return ret;
     }
@@ -1947,7 +1948,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     /// </returns>
     private bool AddBankerMoney(UUID bankerID, int amount, ulong regionHandle, UUID regionUUID)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: AddBankerMoney:");
+        if (m_debug) m_log.LogInformation("[MONEY]: AddBankerMoney:");
 
         bool ret = false;
         m_settle_user = false;
@@ -1978,14 +1979,14 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                     if (resultTable.Contains("banker"))
                     {
                         m_settle_user = !(bool)resultTable["banker"]; // If avatar is not banker, Web Settlement is used.
-                        if (m_settle_user && m_use_web_settle) m_log.ErrorFormat("[MONEY]: AddBankerMoney: Avatar is not Banker. Web Settlemrnt is used.");
+                        if (m_settle_user && m_use_web_settle) m_log.LogError("[MONEY]: AddBankerMoney: Avatar is not Banker. Web Settlemrnt is used.");
                     }
-                    else m_log.ErrorFormat("[MONEY]: AddBankerMoney: Fail Message {0}", resultTable["message"]);
+                    else m_log.LogError("[MONEY]: AddBankerMoney: Fail Message {0}", resultTable["message"]);
                 }
             }
-            else m_log.ErrorFormat("[MONEY]: AddBankerMoney: Money Server is not responding");
+            else m_log.LogError("[MONEY]: AddBankerMoney: Money Server is not responding");
         }
-        else if (m_debug) m_log.ErrorFormat("[MONEY]: AddBankerMoney: Money Server is not available!!");
+        else if (m_debug) m_log.LogError("[MONEY]: AddBankerMoney: Money Server is not available!!");
 
         return ret;
     }
@@ -2001,7 +2002,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     /// </returns>
     private bool PayMoneyCharge(UUID sender, int amount, int type, ulong regionHandle, UUID regionUUID, string description)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: PayMoneyCharge:");
+        if (m_debug) m_log.LogInformation("[MONEY]: PayMoneyCharge:");
 
         bool ret = false;
         IClientAPI senderClient = GetLocateClient(sender);
@@ -2010,13 +2011,13 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
         // receiverClient could be null.
         if (senderClient == null)
         {
-            m_log.InfoFormat("[MONEY]: PayMoneyCharge: Client {0} is not found", sender.ToString());
+            m_log.LogInformation("[MONEY]: PayMoneyCharge: Client {0} is not found", sender.ToString());
             return false;
         }
 
         if (QueryBalanceFromMoneyServer(senderClient) < amount)
         {
-            m_log.InfoFormat("[MONEY]: PayMoneyCharge: No insufficient balance in client [{0}]", sender.ToString());
+            m_log.LogInformation("[MONEY]: PayMoneyCharge: No insufficient balance in client [{0}]", sender.ToString());
             return false;
         }
 
@@ -2046,9 +2047,9 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                     ret = true;
                 }
             }
-            else m_log.ErrorFormat("[MONEY]: PayMoneyCharge: Can not pay money of charge request from [{0}]", sender.ToString());
+            else m_log.LogError("[MONEY]: PayMoneyCharge: Can not pay money of charge request from [{0}]", sender.ToString());
         }
-        else if (m_debug) m_log.ErrorFormat("[MONEY]: PayMoneyCharge: Money Server is not available!!");
+        else if (m_debug) m_log.LogError("[MONEY]: PayMoneyCharge: Money Server is not available!!");
 
         #endregion Send transaction request to money server and parse the resultes.
 
@@ -2057,7 +2058,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     private int QueryBalanceFromMoneyServer(IClientAPI client)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: QueryBalanceFromMoneyServer:");
+        if (m_debug) m_log.LogInformation("[MONEY]: QueryBalanceFromMoneyServer:");
 
         int balance = 0;
 
@@ -2109,7 +2110,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     /// </returns>
     private bool LoginMoneyServer(ScenePresence avatar, out int balance)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: LoginMoneyServer:");
+        if (m_debug) m_log.LogInformation("[MONEY]: LoginMoneyServer:");
 
         balance = 0;
         bool ret = false;
@@ -2200,13 +2201,13 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                 if ((bool)resultTable["success"] == true)
                 {
                     balance = (int)resultTable["clientBalance"];
-                    m_log.InfoFormat("[MONEY]: LoginMoneyServer: Client [{0}] login Money Server {1}", client.AgentId.ToString(), m_moneyServURL);
+                    m_log.LogInformation("[MONEY]: LoginMoneyServer: Client [{0}] login Money Server {1}", client.AgentId.ToString(), m_moneyServURL);
                     ret = true;
                 }
             }
-            else m_log.ErrorFormat("[MONEY]: LoginMoneyServer: Unable to login Money Server {0} for client [{1}]", m_moneyServURL, client.AgentId.ToString());
+            else m_log.LogError("[MONEY]: LoginMoneyServer: Unable to login Money Server {0} for client [{1}]", m_moneyServURL, client.AgentId.ToString());
         }
-        else m_log.ErrorFormat("[MONEY]: LoginMoneyServer: Money Server is not available!!");
+        else m_log.LogError("[MONEY]: LoginMoneyServer: Money Server is not available!!");
 
         #endregion Send money server the client info for login.
 
@@ -2230,7 +2231,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     /// </returns>
     private bool LogoffMoneyServer(IClientAPI client)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: LogoffMoneyServer:");
+        if (m_debug) m_log.LogInformation("[MONEY]: LogoffMoneyServer:");
 
         bool ret = false;
 
@@ -2260,7 +2261,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     //
     private EventManager.MoneyTransferArgs GetTransactionInfo(IClientAPI client, string transactionID)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: GetTransactionInfo:");
+        if (m_debug) m_log.LogInformation("[MONEY]: GetTransactionInfo:");
 
         EventManager.MoneyTransferArgs args = null;
 
@@ -2291,17 +2292,17 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                 }
                 else
                 {
-                    m_log.ErrorFormat("[MONEY]: GetTransactionInfo: GetTransactionInfo: Fail to Request. {0}", (string)resultTable["description"]);
+                    m_log.LogError("[MONEY]: GetTransactionInfo: GetTransactionInfo: Fail to Request. {0}", (string)resultTable["description"]);
                 }
             }
             else
             {
-                m_log.ErrorFormat("[MONEY]: GetTransactionInfo: Invalid Response");
+                m_log.LogError("[MONEY]: GetTransactionInfo: Invalid Response");
             }
         }
         else
         {
-            m_log.ErrorFormat("[MONEY]: GetTransactionInfo: Invalid Money Server URL");
+            m_log.LogError("[MONEY]: GetTransactionInfo: Invalid Money Server URL");
         }
 
         return args;
@@ -2315,7 +2316,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     /// <returns>Hashtable with success=>bool and other values</returns>
     private Hashtable genericCurrencyXMLRPCRequest(Hashtable reqParams, string method)
     {
-        if (m_debug) m_log.InfoFormat("[MONEY]: genericCurrencyXMLRPCRequest:");
+        if (m_debug) m_log.LogInformation("[MONEY]: genericCurrencyXMLRPCRequest:");
 
         if (reqParams.Count <= 0 || string.IsNullOrEmpty(method)) return null;
 
@@ -2323,7 +2324,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
         {
             if (!m_moneyServURL.StartsWith("https://"))
             {
-                m_log.InfoFormat("[MONEY]: genericCurrencyXMLRPCRequest: CheckServerCert is true, but protocol is not HTTPS. Please check INI file");
+                m_log.LogInformation("[MONEY]: genericCurrencyXMLRPCRequest: CheckServerCert is true, but protocol is not HTTPS. Please check INI file");
                 //return null;
             }
         }
@@ -2331,7 +2332,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
         {
             if (!m_moneyServURL.StartsWith("https://") && !m_moneyServURL.StartsWith("http://"))
             {
-                m_log.ErrorFormat("[MONEY]: genericCurrencyXMLRPCRequest: Invalid Money Server URL: {0}", m_moneyServURL);
+                m_log.LogError("[MONEY]: genericCurrencyXMLRPCRequest: Invalid Money Server URL: {0}", m_moneyServURL);
                 return null;
             }
         }
@@ -2347,8 +2348,8 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
         }
         catch (Exception ex)
         {
-            m_log.ErrorFormat("[MONEY]: genericCurrencyXMLRPCRequest: Unable to connect to Money Server {0}", m_moneyServURL);
-            m_log.ErrorFormat("[MONEY]: genericCurrencyXMLRPCRequest: {0}", ex);
+            m_log.LogError("[MONEY]: genericCurrencyXMLRPCRequest: Unable to connect to Money Server {0}", m_moneyServURL);
+            m_log.LogError("[MONEY]: genericCurrencyXMLRPCRequest: {0}", ex);
 
             Hashtable ErrorHash = new Hashtable();
             ErrorHash["success"] = false;
@@ -2419,7 +2420,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                     if (m_debug && tPresence != null)
                     {
                         pname = tPresence.Firstname + ' ' + tPresence.Lastname;
-                        m_log.InfoFormat("[MONEY]: GetLocateScene (iterating), agentID={0} child={2} name={1}", AgentId.ToString(), pname, tPresence.IsChildAgent);
+                        m_log.LogInformation("[MONEY]: GetLocateScene (iterating), agentID={0} child={2} name={1}", AgentId.ToString(), pname, tPresence.IsChildAgent);
                     }
                     if (tPresence != null && !tPresence.IsChildAgent)
                     {
@@ -2432,7 +2433,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
         pname = "not found";
         if (scene != null) pname = tPresence.Firstname + ' ' + tPresence.Lastname;
-        if (m_debug) m_log.InfoFormat("[MONEY]: GetLocateScene, agentID={0} name={1}", AgentId.ToString(), pname);
+        if (m_debug) m_log.LogInformation("[MONEY]: GetLocateScene, agentID={0} name={1}", AgentId.ToString(), pname);
 
         return scene;
     }

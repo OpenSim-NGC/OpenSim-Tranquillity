@@ -10,7 +10,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
@@ -19,11 +18,13 @@ using InWorldz.Phlox.Glue;
 using InWorldz.Phlox.Serialization;
 using ProtoBuf;
 
+using Microsoft.Extensions.Logging;
+
 namespace Phlox.ScriptEngine
 {
     internal class PhloxScriptLoader
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private const string CACHE_DIR = "ScriptEngines/Phlox/bytecode";
         private const string SCRIPT_EXT = ".plx";
@@ -105,7 +106,7 @@ namespace Phlox.ScriptEngine
 
             if (diskVersion < CACHE_SCHEMA_VERSION)
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[PhloxLoader]: Cache schema version on disk ({0}) is older than current ({1}). " +
                     "Purging stale bytecode cache so scripts recompile cleanly.",
                     diskVersion, CACHE_SCHEMA_VERSION);
@@ -117,11 +118,11 @@ namespace Phlox.ScriptEngine
                         File.Delete(plx);
 
                     File.WriteAllText(VERSION_FILE, CACHE_SCHEMA_VERSION.ToString());
-                    m_log.Info("[PhloxLoader]: Bytecode cache purged and version stamp updated.");
+                    m_log.LogInformation("[PhloxLoader]: Bytecode cache purged and version stamp updated.");
                 }
                 catch (Exception ex)
                 {
-                    m_log.ErrorFormat("[PhloxLoader]: Failed to purge cache: {0}", ex.Message);
+                    m_log.LogError("[PhloxLoader]: Failed to purge cache: {0}", ex.Message);
                 }
             }
         }
@@ -156,7 +157,7 @@ namespace Phlox.ScriptEngine
             }
             catch (Exception ex)
             {
-                m_log.Error("[PhloxLoader]: unhandled exception in DoWork — swallowed to keep the load worker alive", ex);
+                m_log.LogError(ex, "[PhloxLoader]: unhandled exception in DoWork — swallowed to keep the load worker alive");
             }
 
             return new WorkStatus
@@ -282,23 +283,23 @@ namespace Phlox.ScriptEngine
             }
             catch { /* diagnostics must not mask the original failure */ }
 
-            m_log.Error(string.Format(
+            m_log.LogError(ex, string.Format(
                 "[PhloxLoader]: Script load FAILED — item '{0}' ({1}) in prim '{2}' (localID {3}). This script did not start; the rest of the batch continues.",
-                itemName, itemId, primName, localId), ex);
+                itemName, itemId, primName, localId));
         }
 
         private UUID FindAssetId(PhloxLoadRequest req)
         {
             if (req.Prim == null)
             {
-                m_log.ErrorFormat("[PhloxLoader]: Prim is null for item {0}", req.ItemID);
+                m_log.LogError("[PhloxLoader]: Prim is null for item {0}", req.ItemID);
                 return UUID.Zero;
             }
 
             TaskInventoryItem item = req.Prim.Inventory.GetInventoryItem(req.ItemID);
             if (item == null)
             {
-                m_log.ErrorFormat("[PhloxLoader]: Inventory item {0} not found in prim {1}",
+                m_log.LogError("[PhloxLoader]: Inventory item {0} not found in prim {1}",
                     req.ItemID, req.Prim.Name);
                 return UUID.Zero;
             }
@@ -311,7 +312,7 @@ namespace Phlox.ScriptEngine
             if (!m_LoadedScripts.TryGetValue(assetId, out ls)) return false;
 
             ls.RefCount++;
-            m_log.InfoFormat("[PhloxLoader]: Starting shared script {0} item {1}", assetId, req.ItemID);
+            m_log.LogInformation("[PhloxLoader]: Starting shared script {0} item {1}", assetId, req.ItemID);
             BeginScriptRun(req, ls.Script);
             return true;
         }
@@ -324,7 +325,7 @@ namespace Phlox.ScriptEngine
             m_UnloadedCache.Remove(assetId);
             m_UnloadedCacheOrder.Remove(assetId);   // O(n) but cache is small
 
-            m_log.InfoFormat("[PhloxLoader]: Starting from unloaded cache {0} item {1}", assetId, req.ItemID);
+            m_log.LogInformation("[PhloxLoader]: Starting from unloaded cache {0} item {1}", assetId, req.ItemID);
             BeginScriptRun(req, script);
             m_LoadedScripts[assetId] = new LoadedScript { Script = script, RefCount = 1 };
             return true;
@@ -335,30 +336,30 @@ namespace Phlox.ScriptEngine
             string path = GetCachePath(assetId);
             if (!File.Exists(path)) return false;
 
-            m_log.DebugFormat("[PhloxLoader]: Attempting disk cache load for {0}", assetId);
+            m_log.LogDebug("[PhloxLoader]: Attempting disk cache load for {0}", assetId);
 
             try
             {
                 // ── Step 1: deserialize the protobuf blob ──────────────────────
                 SerializedScript ser;
-                m_log.DebugFormat("[PhloxLoader]: Opening cache file {0}", path);
+                m_log.LogDebug("[PhloxLoader]: Opening cache file {0}", path);
                 using (var f = File.OpenRead(path))
                     ser = Serializer.Deserialize<SerializedScript>(f);
 
                 if (ser == null)
                 {
-                    m_log.WarnFormat("[PhloxLoader]: Deserializer returned null for {0} — purging", assetId);
+                    m_log.LogWarning("[PhloxLoader]: Deserializer returned null for {0} — purging", assetId);
                     SafeDeleteCache(path);
                     return false;
                 }
 
                 // ── Step 2: convert to runtime types ──────────────────────────
-                m_log.DebugFormat("[PhloxLoader]: Converting SerializedScript to CompiledScript for {0}", assetId);
+                m_log.LogDebug("[PhloxLoader]: Converting SerializedScript to CompiledScript for {0}", assetId);
                 CompiledScript compiled = ser.ToCompiledScript();
 
                 if (compiled == null)
                 {
-                    m_log.WarnFormat("[PhloxLoader]: ToCompiledScript() returned null for {0} — purging", assetId);
+                    m_log.LogWarning("[PhloxLoader]: ToCompiledScript() returned null for {0} — purging", assetId);
                     SafeDeleteCache(path);
                     return false;
                 }
@@ -366,7 +367,7 @@ namespace Phlox.ScriptEngine
                 compiled.AssetId = assetId;
 
                 // ── Step 3: hand off to scheduler ─────────────────────────────
-                m_log.InfoFormat("[PhloxLoader]: Starting from disk cache {0} item {1}", assetId, req.ItemID);
+                m_log.LogInformation("[PhloxLoader]: Starting from disk cache {0} item {1}", assetId, req.ItemID);
                 BeginScriptRun(req, compiled);
                 m_LoadedScripts[assetId] = new LoadedScript { Script = compiled, RefCount = 1 };
                 return true;
@@ -374,7 +375,7 @@ namespace Phlox.ScriptEngine
             catch (Exception e)
             {
                 // Log the FULL exception (type + stack) so we can pinpoint the null-ref field
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[PhloxLoader]: Failed to load cached script {0}: [{1}] {2}\n{3}",
                     assetId, e.GetType().Name, e.Message, e.StackTrace);
 
@@ -403,20 +404,20 @@ namespace Phlox.ScriptEngine
 
                 if (compiled == null)
                 {
-                    m_log.ErrorFormat("[PhloxLoader]: Compilation failed for {0} item {1}", assetId, req.ItemID);
+                    m_log.LogError("[PhloxLoader]: Compilation failed for {0} item {1}", assetId, req.ItemID);
                     return;
                 }
 
                 compiled.AssetId = assetId;
                 SaveToDiskCache(compiled);
-                m_log.InfoFormat("[PhloxLoader]: Compiled {0} ({1}ms)", assetId, m_CompileTimer.ElapsedMilliseconds);
+                m_log.LogInformation("[PhloxLoader]: Compiled {0} ({1}ms)", assetId, m_CompileTimer.ElapsedMilliseconds);
 
                 BeginScriptRun(req, compiled);
                 m_LoadedScripts[assetId] = new LoadedScript { Script = compiled, RefCount = 1 };
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PhloxLoader]: Exception compiling {0} item {1}: {2}", assetId, req.ItemID, e);
+                m_log.LogError("[PhloxLoader]: Exception compiling {0} item {1}: {2}", assetId, req.ItemID, e);
             }
             finally
             {
@@ -444,13 +445,13 @@ namespace Phlox.ScriptEngine
 
                 if (compiled == null)
                 {
-                    m_log.ErrorFormat("[PhloxLoader]: Compilation failed (from asset server) for {0}", pending.AssetId);
+                    m_log.LogError("[PhloxLoader]: Compilation failed (from asset server) for {0}", pending.AssetId);
                     return true;
                 }
 
                 compiled.AssetId = pending.AssetId;
                 SaveToDiskCache(compiled);
-                m_log.InfoFormat("[PhloxLoader]: Compiled (from asset) {0} ({1}ms)", pending.AssetId, m_CompileTimer.ElapsedMilliseconds);
+                m_log.LogInformation("[PhloxLoader]: Compiled (from asset) {0} ({1}ms)", pending.AssetId, m_CompileTimer.ElapsedMilliseconds);
 
                 foreach (var req in pending.Requests)
                     BeginScriptRun(req, compiled);
@@ -463,7 +464,7 @@ namespace Phlox.ScriptEngine
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PhloxLoader]: Exception compiling from asset {0}: {1}", pending.AssetId, e);
+                m_log.LogError("[PhloxLoader]: Exception compiling from asset {0}: {1}", pending.AssetId, e);
             }
             finally
             {
@@ -496,14 +497,14 @@ namespace Phlox.ScriptEngine
             {
                 if (!m_WaitingForAsset.TryGetValue(assetId, out var requests))
                 {
-                    m_log.WarnFormat("[PhloxLoader]: Received unexpected asset {0}", assetId);
+                    m_log.LogWarning("[PhloxLoader]: Received unexpected asset {0}", assetId);
                     return;
                 }
                 m_WaitingForAsset.Remove(assetId);
 
                 if (asset == null)
                 {
-                    m_log.ErrorFormat("[PhloxLoader]: Asset {0} not found", assetId);
+                    m_log.LogError("[PhloxLoader]: Asset {0} not found", assetId);
                     return;
                 }
 
@@ -536,7 +537,7 @@ namespace Phlox.ScriptEngine
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxLoader]: Failed to cache script {0}: {1}", compiled.AssetId, e.Message);
+                m_log.LogWarning("[PhloxLoader]: Failed to cache script {0}: {1}", compiled.AssetId, e.Message);
             }
         }
 
@@ -567,7 +568,7 @@ namespace Phlox.ScriptEngine
     /// </summary>
     internal class LogOutputListener : InWorldz.Phlox.Types.ILSLListener
     {
-        private static readonly ILog m_log = LogManager.GetLogger(typeof(LogOutputListener));
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(typeof(LogOutputListener));
         private readonly UUID m_ItemId;
         private int m_ErrorCount;
 
@@ -576,14 +577,14 @@ namespace Phlox.ScriptEngine
         public void Error(string message)
         {
             m_ErrorCount++;
-            m_log.ErrorFormat("[PhloxCompile]: {0}: {1}", m_ItemId, message);
+            m_log.LogError("[PhloxCompile]: {0}: {1}", m_ItemId, message);
         }
 
         public void Info(string message)
-            => m_log.InfoFormat("[PhloxCompile]: {0}: {1}", m_ItemId, message);
+            => m_log.LogInformation("[PhloxCompile]: {0}: {1}", m_ItemId, message);
 
         public void CompilationFinished()
-            => m_log.DebugFormat("[PhloxCompile]: Finished {0}", m_ItemId);
+            => m_log.LogDebug("[PhloxCompile]: Finished {0}", m_ItemId);
 
         public bool HasErrors() => m_ErrorCount > 0;
     }

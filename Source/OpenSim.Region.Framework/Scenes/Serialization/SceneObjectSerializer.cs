@@ -28,10 +28,11 @@
 using System.Collections.Frozen;
 using System.Reflection;
 using System.Xml;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization.External;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes.Serialization;
 
@@ -42,7 +43,7 @@ namespace OpenSim.Region.Framework.Scenes.Serialization;
 /// right now - hopefully this isn't forever.
 public class SceneObjectSerializer
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static IUserManagement m_UserManagement;
 
@@ -64,7 +65,7 @@ public class SceneObjectSerializer
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[SERIALIZER]: Deserialization of xml failed ", e);
+                    m_log.LogError(e, "[SERIALIZER]: Deserialization of xml failed ");
                     Util.LogFailedXML("[SERIALIZER]:", fixedData);
                     return null;
                 }
@@ -92,7 +93,7 @@ public class SceneObjectSerializer
             }
             catch (Exception e)
             {
-                m_log.Error("[SERIALIZER]: Deserialization of xml data failed ", e);
+                m_log.LogError(e, "[SERIALIZER]: Deserialization of xml data failed ");
                 return null;
             }
         }
@@ -106,7 +107,7 @@ public class SceneObjectSerializer
     /// <returns>The scene object deserialized.  Null on failure.</returns>
     public static SceneObjectGroup FromOriginalXmlFormat(XmlReader reader)
     {
-        //m_log.DebugFormat("[SOG]: Starting deserialization of SOG");
+        //m_log.LogDebug("[SOG]: Starting deserialization of SOG");
         //int time = System.Environment.TickCount;
 
         int linkNum;
@@ -221,7 +222,7 @@ public class SceneObjectSerializer
     public static void ToOriginalXmlFormat(
         SceneObjectGroup sceneObject, XmlTextWriter writer, bool doScriptStates, bool noRootElement)
     {
-//            m_log.DebugFormat("[SERIALIZER]: Starting serialization of {0}", sceneObject.Name);
+//            m_log.LogDebug("[SERIALIZER]: Starting serialization of {0}", sceneObject.Name);
 //            int time = System.Environment.TickCount;
 
         if (!noRootElement)
@@ -264,7 +265,7 @@ public class SceneObjectSerializer
         if (!noRootElement)
             writer.WriteEndElement(); // SceneObjectGroup
 
-//            m_log.DebugFormat("[SERIALIZER]: Finished serialization of SOG {0}, {1}ms", sceneObject.Name, System.Environment.TickCount - time);
+//            m_log.LogDebug("[SERIALIZER]: Finished serialization of SOG {0}, {1}ms", sceneObject.Name, System.Environment.TickCount - time);
     }
 
     protected static void ToXmlFormat(SceneObjectPart part, XmlTextWriter writer)
@@ -274,7 +275,7 @@ public class SceneObjectSerializer
 
     public static SceneObjectGroup FromXml2Format(string xmlData)
     {
-        //m_log.DebugFormat("[SOG]: Starting deserialization of SOG");
+        //m_log.LogDebug("[SOG]: Starting deserialization of SOG");
         //int time = System.Environment.TickCount;
 
         try
@@ -286,7 +287,7 @@ public class SceneObjectSerializer
 
             if (parts.Count == 0)
             {
-                m_log.Error("[SERIALIZER]: Deserialization of xml failed: No SceneObjectPart nodes");
+                m_log.LogError("[SERIALIZER]: Deserialization of xml failed: No SceneObjectPart nodes");
                 Util.LogFailedXML("[SERIALIZER]:", xmlData);
                 return null;
             }
@@ -340,7 +341,7 @@ public class SceneObjectSerializer
         }
         catch (Exception e)
         {
-            m_log.Error("[SERIALIZER]: Deserialization of xml failed ", e);
+            m_log.LogError(e, "[SERIALIZER]: Deserialization of xml failed ");
             Util.LogFailedXML("[SERIALIZER]:", xmlData);
             return null;
         }
@@ -385,11 +386,11 @@ public class SceneObjectSerializer
         string xmlData = ExternalRepresentationUtils.SanitizeXml(Utils.BytesToString(data));
         if (CoalescedSceneObjectsSerializer.TryFromXml(xmlData, out CoalescedSceneObjects coa))
         {
-            // m_log.DebugFormat("[SERIALIZER]: Loaded coalescence {0} has {1} objects", assetId, coa.Count);
+            // m_log.LogDebug("[SERIALIZER]: Loaded coalescence {0} has {1} objects", assetId, coa.Count);
 
             if (coa.Objects.Count == 0)
             {
-                m_log.WarnFormat("[SERIALIZER]: Aborting load of coalesced object from asset {0} as it has zero loaded components", assetId);
+                m_log.LogWarning("[SERIALIZER]: Aborting load of coalesced object from asset {0} as it has zero loaded components", assetId);
                 return null;
             }
 
@@ -405,7 +406,7 @@ public class SceneObjectSerializer
             }
             else
             {
-                m_log.WarnFormat("[SERIALIZER]: Aborting load of object from asset {0} as deserialization failed", assetId);
+                m_log.LogWarning("[SERIALIZER]: Aborting load of object from asset {0} as deserialization failed", assetId);
                 return null;
             }
         }
@@ -843,7 +844,7 @@ public class SceneObjectSerializer
         }
         catch 
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                "[SceneObjectSerializer]: Exception while processing linksetdata for object part {0} {1}.",
                obj.Name, obj.UUID);
         }
@@ -855,7 +856,7 @@ public class SceneObjectSerializer
         if (vehicle == null)
         {
             obj.VehicleParams = null;
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[SceneObjectSerializer]: Parsing Vehicle for object part {0} {1} encountered errors.  Please see earlier log entries.",
                 obj.Name, obj.UUID);
         }
@@ -872,7 +873,7 @@ public class SceneObjectSerializer
         if (pdata == null)
         {
             obj.PhysicsInertia = null;
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[SceneObjectSerializer]: Parsing PhysicsInertiaData for object part {0} {1} encountered errors.  Please see earlier log entries.",
                 obj.Name, obj.UUID);
         }
@@ -897,7 +898,7 @@ public class SceneObjectSerializer
         }
         catch {}
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
                 "[SceneObjectSerializer]: Parsing ProcessSOPAnims for object part {0} {1} encountered errors",
                 obj.Name, obj.UUID);
     }
@@ -908,7 +909,7 @@ public class SceneObjectSerializer
 
         if (errorNodeNames != null)
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[SceneObjectSerializer]: Parsing PrimitiveBaseShape for object part {0} {1} encountered errors in properties {2}.",
                 obj.Name, obj.UUID, string.Join(", ", errorNodeNames.ToArray()));
         }
@@ -1491,7 +1492,7 @@ public class SceneObjectSerializer
             }
             catch
             {
-                m_log.ErrorFormat("[SERIALIZER] Failed parsing halcyon MOAP information");
+                m_log.LogError("[SERIALIZER] Failed parsing halcyon MOAP information");
             }
         }
     }
@@ -1928,8 +1929,8 @@ public class SceneObjectSerializer
             m_SOPXmlProcessors,
             reader,
             (o, nodeName, e) => {
-                m_log.Debug(string.Format("[SceneObjectSerializer]: Error while parsing element {0} in object {1} {2} ",
-                    nodeName, ((SceneObjectPart)o).Name, ((SceneObjectPart)o).UUID), e);
+                m_log.LogDebug(e, string.Format("[SceneObjectSerializer]: Error while parsing element {0} in object {1} {2} ",
+                    nodeName, ((SceneObjectPart)o).Name, ((SceneObjectPart)o).UUID));
             });
 
         if (errors)
@@ -1938,7 +1939,7 @@ public class SceneObjectSerializer
         reader.ReadEndElement(); // SceneObjectPart
 
         obj.AggregateInnerPerms();
-        // m_log.DebugFormat("[SceneObjectSerializer]: parsed SOP {0} {1}", obj.Name, obj.UUID);
+        // m_log.LogDebug("[SceneObjectSerializer]: parsed SOP {0} {1}", obj.Name, obj.UUID);
         return obj;
     }
 
@@ -1997,8 +1998,8 @@ public class SceneObjectSerializer
             m_ShapeXmlProcessors,
             reader,
             (o, nodeName, e) => {
-                m_log.Debug(string.Format("[SceneObjectSerializer]: Error while parsing element {0} in Shape property of object {1} {2} ",
-                    nodeName, obj.Name, obj.UUID), e);
+                m_log.LogDebug(e, string.Format("[SceneObjectSerializer]: Error while parsing element {0} in Shape property of object {1} {2} ",
+                    nodeName, obj.Name, obj.UUID));
 
                 internalErrorNodeNames ??= new List<string>();
                 internalErrorNodeNames.Add(nodeName);

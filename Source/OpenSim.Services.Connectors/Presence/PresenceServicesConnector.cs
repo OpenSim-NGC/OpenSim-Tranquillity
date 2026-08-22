@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
@@ -33,11 +32,13 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = String.Empty;
 
@@ -60,7 +61,7 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
         IConfig gridConfig = source.Configs["PresenceService"];
         if (gridConfig == null)
         {
-            m_log.Error("[PRESENCE CONNECTOR]: PresenceService missing from OpenSim.ini");
+            m_log.LogError("[PRESENCE CONNECTOR]: PresenceService missing from OpenSim.ini");
             throw new Exception("Presence connector init error");
         }
 
@@ -69,7 +70,7 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
 
         if (serviceURI.Length == 0)
         {
-            m_log.Error("[PRESENCE CONNECTOR]: No Server URI named in section PresenceService");
+            m_log.LogError("[PRESENCE CONNECTOR]: No Server URI named in section PresenceService");
             throw new Exception("Presence connector init error");
         }
         m_ServerURI = serviceURI;
@@ -94,7 +95,7 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
 
         string reqString = ServerUtils.BuildQueryString(sendData);
         string uri = m_ServerURI + "/presence";
-        // m_log.DebugFormat("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+        // m_log.LogDebug("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
         try
         {
             string reply = SynchronousRestFormsRequester.MakeRequest("POST",
@@ -109,11 +110,11 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
                 return false;
             }
             else
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: LoginAgent received empty reply");
+                m_log.LogDebug("[PRESENCE CONNECTOR]: LoginAgent received empty reply");
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
         }
 
         return false;
@@ -132,7 +133,7 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
 
         string reqString = ServerUtils.BuildQueryString(sendData);
         string uri = m_ServerURI + "/presence";
-        // m_log.DebugFormat("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+        // m_log.LogDebug("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
         try
         {
             string reply = SynchronousRestFormsRequester.MakeRequest("POST",
@@ -148,11 +149,11 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
                 return false;
             }
             else
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: LogoutAgent received empty reply");
+                m_log.LogDebug("[PRESENCE CONNECTOR]: LogoutAgent received empty reply");
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
         }
 
         return false;
@@ -170,7 +171,7 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
 
         string reqString = ServerUtils.BuildQueryString(sendData);
         string uri = m_ServerURI + "/presence";
-        // m_log.DebugFormat("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+        // m_log.LogDebug("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
         try
         {
             string reply = SynchronousRestFormsRequester.MakeRequest("POST",
@@ -185,11 +186,11 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
                 return false;
             }
             else
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: LogoutRegionAgents received empty reply");
+                m_log.LogDebug("[PRESENCE CONNECTOR]: LogoutRegionAgents received empty reply");
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
         }
 
         return false;
@@ -208,7 +209,7 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
 
         string reqString = ServerUtils.BuildQueryString(sendData);
         string uri = m_ServerURI + "/presence";
-        // m_log.DebugFormat("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+        // m_log.LogDebug("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
         try
         {
             string reply = SynchronousRestFormsRequester.MakeRequest("POST",
@@ -227,15 +228,15 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
                         return false;
                 }
                 else
-                    m_log.DebugFormat("[PRESENCE CONNECTOR]: ReportAgent reply data does not contain result field");
+                    m_log.LogDebug("[PRESENCE CONNECTOR]: ReportAgent reply data does not contain result field");
 
             }
             else
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: ReportAgent received empty reply");
+                m_log.LogDebug("[PRESENCE CONNECTOR]: ReportAgent received empty reply");
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
         }
 
         return false;
@@ -254,7 +255,7 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
         string reply = string.Empty;
         string reqString = ServerUtils.BuildQueryString(sendData);
         string uri = m_ServerURI + "/presence";
-        // m_log.DebugFormat("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+        // m_log.LogDebug("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
         try
         {
             reply = SynchronousRestFormsRequester.MakeRequest("POST",
@@ -263,13 +264,13 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
                     m_Auth);
             if (string.IsNullOrEmpty(reply))
             {
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: GetAgent received null or empty reply");
+                m_log.LogDebug("[PRESENCE CONNECTOR]: GetAgent received null or empty reply");
                 return null;
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
             return null;
         }
 
@@ -287,12 +288,12 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
                 if (replyData["result"].ToString() == "null")
                     return null;
 
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: Invalid reply (result not dictionary) received from presence server when querying for sessionID {0}", sessionID.ToString());
+                m_log.LogDebug("[PRESENCE CONNECTOR]: Invalid reply (result not dictionary) received from presence server when querying for sessionID {0}", sessionID.ToString());
             }
         }
         else
         {
-            m_log.DebugFormat("[PRESENCE CONNECTOR]: Invalid reply received from presence server when querying for sessionID {0}", sessionID.ToString());
+            m_log.LogDebug("[PRESENCE CONNECTOR]: Invalid reply received from presence server when querying for sessionID {0}", sessionID.ToString());
         }
 
         return pinfo;
@@ -311,7 +312,7 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
         string reply = string.Empty;
         string reqString = ServerUtils.BuildQueryString(sendData);
         string uri = m_ServerURI + "/presence";
-        //m_log.DebugFormat("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
+        //m_log.LogDebug("[PRESENCE CONNECTOR]: queryString = {0}", reqString);
         try
         {
             reply = SynchronousRestFormsRequester.MakeRequest("POST",
@@ -320,13 +321,13 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
                     m_Auth);
             if (string.IsNullOrEmpty(reply))
             {
-                m_log.DebugFormat("[PRESENCE CONNECTOR]: GetAgents received null or empty reply");
+                m_log.LogDebug("[PRESENCE CONNECTOR]: GetAgents received null or empty reply");
                 return null;
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[PRESENCE CONNECTOR]: Exception when contacting presence server at {0}: {1}", uri, e.Message);
         }
 
         List<PresenceInfo> rinfos = new List<PresenceInfo>();
@@ -342,7 +343,7 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
             }
 
             Dictionary<string, object>.ValueCollection pinfosList = replyData.Values;
-            //m_log.DebugFormat("[PRESENCE CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
+            //m_log.LogDebug("[PRESENCE CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
             foreach (object presence in pinfosList)
             {
                 if (presence is Dictionary<string, object>)
@@ -351,12 +352,12 @@ public class PresenceServicesConnector : BaseServiceConnector, IPresenceService
                     rinfos.Add(pinfo);
                 }
                 else
-                    m_log.DebugFormat("[PRESENCE CONNECTOR]: GetAgents received invalid response type {0}",
+                    m_log.LogDebug("[PRESENCE CONNECTOR]: GetAgents received invalid response type {0}",
                         presence.GetType());
             }
         }
         else
-            m_log.DebugFormat("[PRESENCE CONNECTOR]: GetAgents received null response");
+            m_log.LogDebug("[PRESENCE CONNECTOR]: GetAgents received null response");
 
         return rinfos.ToArray();
     }

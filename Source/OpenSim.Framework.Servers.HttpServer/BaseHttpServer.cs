@@ -39,16 +39,18 @@ using System.Text;
 using System.Xml;
 using OSHttpServer;
 using tinyHTTPListener = OSHttpServer.OSHttpListener;
-using log4net;
 using Nwc.XmlRpc;
 using OpenSim.Framework.Monitoring;
 using OpenMetaverse.StructuredData;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Servers.HttpServer;
 
 public class BaseHttpServer : IHttpServer
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private readonly HttpServerLogWriter httpserverlog = new HttpServerLogWriter();
     private static readonly Encoding UTF8NoBOM = new System.Text.UTF8Encoding(false);
     public static PollServiceRequestManager m_pollServiceManager;
@@ -180,7 +182,7 @@ public class BaseHttpServer : IHttpServer
             m_SSLCommonName = CN;
 
             if (m_cert.Issuer == m_cert.Subject)
-                m_log.Warn("Self signed certificate. Clients need to allow this (some viewers debug option NoVerifySSLcert must be set to true");
+                m_log.LogWarning("Self signed certificate. Clients need to allow this (some viewers debug option NoVerifySSLcert must be set to true");
         }
         else
             m_ssl = false;
@@ -195,7 +197,7 @@ public class BaseHttpServer : IHttpServer
         {
             load_cert(CPath, CPass);
             if (m_cert.Issuer == m_cert.Subject)
-                m_log.Warn("Self signed certificate. Http clients need to allow this");
+                m_log.LogWarning("Self signed certificate. Http clients need to allow this");
             m_ssl = true;
         }
         else
@@ -340,7 +342,7 @@ public class BaseHttpServer : IHttpServer
         }
 
         string handlerKey = GetHandlerKey(handler.HttpMethod, handler.Path);
-        // m_log.DebugFormat("[BASE HTTP SERVER]: Adding handler key {0}", handlerKey);
+        // m_log.LogDebug("[BASE HTTP SERVER]: Adding handler key {0}", handlerKey);
         m_streamHandlers.TryAdd(handlerKey, handler);
     }
 
@@ -349,7 +351,7 @@ public class BaseHttpServer : IHttpServer
         if(string.IsNullOrWhiteSpace(handler.Path))
             return;
 
-        // m_log.DebugFormat("[BASE HTTP SERVER]: Adding handler key {0}", handlerKey);
+        // m_log.LogDebug("[BASE HTTP SERVER]: Adding handler key {0}", handlerKey);
         m_streamHandlers.TryAdd(handler.Path, handler);
     }
 
@@ -460,7 +462,7 @@ public class BaseHttpServer : IHttpServer
 
     public bool AddHTTPHandler(string methodName, GenericHTTPMethod handler)
     {
-        //m_log.DebugFormat("[BASE HTTP SERVER]: Registering {0}", methodName);
+        //m_log.LogDebug("[BASE HTTP SERVER]: Registering {0}", methodName);
         lock (m_HTTPHandlers)
         {
             return m_HTTPHandlers.TryAdd(methodName, handler);
@@ -589,7 +591,7 @@ public class BaseHttpServer : IHttpServer
         }
         catch (Exception e)
         {
-            m_log.Error($"[BASE HTTP SERVER]: OnRequest() failed: {e.Message}");
+            m_log.LogError($"[BASE HTTP SERVER]: OnRequest() failed: {e.Message}");
         }
     }
 
@@ -611,7 +613,7 @@ public class BaseHttpServer : IHttpServer
             // OpenSim.Framework.WebUtil.OSHeaderRequestID
             // if (request.Headers["opensim-request-id"] != null)
             //  reqnum = String.Format("{0}:{1}",request.RemoteIPEndPoint,request.Headers["opensim-request-id"]);
-            // m_log.DebugFormat("[BASE HTTP SERVER]: <{0}> handle request for {1}",reqnum,request.RawUrl);
+            // m_log.LogDebug("[BASE HTTP SERVER]: <{0}> handle request for {1}",reqnum,request.RawUrl);
 
             Culture.SetCurrentCulture();
 
@@ -730,7 +732,7 @@ public class BaseHttpServer : IHttpServer
                 }
                 else if (requestHandler is IGenericHTTPHandler HTTPRequestHandler)
                 {
-                    //m_log.Debug("[BASE HTTP SERVER]: Found Caps based HTTP Handler");
+                    //m_log.LogDebug("[BASE HTTP SERVER]: Found Caps based HTTP Handler");
 
                     string requestBody;
                     Encoding encoding = Encoding.UTF8;
@@ -751,7 +753,7 @@ public class BaseHttpServer : IHttpServer
 
                     foreach (string headername in rHeaders)
                     {
-                        //m_log.Warn("[HEADER]: " + headername + "=" + request.Headers[headername]);
+                        //m_log.LogWarning("[HEADER]: " + headername + "=" + request.Headers[headername]);
                         headervals[headername] = request.Headers[headername];
                     }
 
@@ -759,9 +761,9 @@ public class BaseHttpServer : IHttpServer
                     keysvals.Add("headers",headervals);
                     //if (keysvals.Contains("method"))
                     //{
-                        //m_log.Warn("[HTTP]: Contains Method");
+                        //m_log.LogWarning("[HTTP]: Contains Method");
                         //string method = (string)keysvals["method"];
-                        //m_log.Warn("[HTTP]: " + requestBody);
+                        //m_log.LogWarning("[HTTP]: " + requestBody);
                     //}
 
                     buffer = DoHTTPGruntWork(HTTPRequestHandler.Handle(path, keysvals), response);
@@ -857,15 +859,15 @@ public class BaseHttpServer : IHttpServer
             //
             // An alternative may be to turn off all response write exceptions on the HttpListener, but let's go
             // with the minimum first
-            m_log.Warn($"[BASE HTTP SERVER]: HandleRequest threw {e.Message}.\nNOTE: this may be spurious on Linux");
+            m_log.LogWarning($"[BASE HTTP SERVER]: HandleRequest threw {e.Message}.\nNOTE: this may be spurious on Linux");
         }
         catch (IOException e)
         {
-            m_log.Error("[BASE HTTP SERVER]: HandleRequest() threw exception ", e);
+            m_log.LogError(e, "[BASE HTTP SERVER]: HandleRequest() threw exception ");
         }
         catch (Exception e)
         {
-            m_log.Error("[BASE HTTP SERVER]: HandleRequest() threw exception ", e);
+            m_log.LogError(e, "[BASE HTTP SERVER]: HandleRequest() threw exception ");
             try
             {
                 response.StatusCode =(int)HttpStatusCode.InternalServerError;
@@ -882,7 +884,7 @@ public class BaseHttpServer : IHttpServer
             int tickdiff = requestEndTick - requestStartTick;
             if (tickdiff > 3000)
             {
-                m_log.InfoFormat(
+                m_log.LogInformation(
                     "[LOGHTTP] Slow handling of {0} {1} {2} {3} {4} from {5} took {6}ms",
                     RequestNumber,
                     request.HttpMethod,
@@ -894,7 +896,7 @@ public class BaseHttpServer : IHttpServer
             }
             else if (DebugLevel >= 4)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[LOGHTTP] HTTP IN {0} :{1} took {2}ms",
                     RequestNumber,
                     Port,
@@ -909,14 +911,14 @@ public class BaseHttpServer : IHttpServer
                     if (output.Length > WebUtil.MaxRequestDiagLength)
                         output = string.Concat(output.AsSpan(0, WebUtil.MaxRequestDiagLength), "...");
                 }
-                m_log.DebugFormat("[LOGHTTP] RESPONSE {0}: {1}", RequestNumber, output);
+                m_log.LogDebug("[LOGHTTP] RESPONSE {0}: {1}", RequestNumber, output);
             }
         }
     }
 
     private void LogIncomingToStreamHandler(OSHttpRequest request, IRequestHandler requestHandler)
     {
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[LOGHTTP] HTTP IN {0} :{1} stream handler {2} {3} {4} {5} from {6}",
             RequestNumber,
             Port,
@@ -932,7 +934,7 @@ public class BaseHttpServer : IHttpServer
 
     private void LogIncomingToStreamHandler(OSHttpRequest request, ISimpleStreamHandler requestHandler)
     {
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[LOGHTTP] HTTP IN {0} :{1} stream handler {2} {3} {4} from {5}",
             RequestNumber,
             Port,
@@ -947,7 +949,7 @@ public class BaseHttpServer : IHttpServer
 
     private void LogIncomingToContentTypeHandler(OSHttpRequest request)
     {
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[LOGHTTP] HTTP IN {0} :{1} {2} content type handler {3} {4} from {5}",
             RequestNumber,
             Port,
@@ -962,7 +964,7 @@ public class BaseHttpServer : IHttpServer
 
     private void LogIncomingToXmlRpcHandler(OSHttpRequest request)
     {
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[LOGHTTP] HTTP IN {0} :{1} assumed generic XMLRPC request {2} {3} from {4}",
             RequestNumber,
             Port,
@@ -1006,7 +1008,7 @@ public class BaseHttpServer : IHttpServer
                     output = reader.ReadToEnd();
                 }
 
-                m_log.DebugFormat("[LOGHTTP] {0}", Util.BinaryToASCII(output));
+                m_log.LogDebug("[LOGHTTP] {0}", Util.BinaryToASCII(output));
             }
         }
         finally
@@ -1072,7 +1074,7 @@ public class BaseHttpServer : IHttpServer
 
     private bool TryGetHTTPHandler(string handlerKey, out GenericHTTPMethod HTTPHandler)
     {
-//            m_log.DebugFormat("[BASE HTTP HANDLER]: Looking for HTTP handler for {0}", handlerKey);
+//            m_log.LogDebug("[BASE HTTP HANDLER]: Looking for HTTP handler for {0}", handlerKey);
 
         if(m_HTTPHandlers.TryGetValue(handlerKey, out HTTPHandler))
             return true;
@@ -1179,7 +1181,7 @@ public class BaseHttpServer : IHttpServer
         }
         catch (Exception e)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[BASE HTTP SERVER]: Fail to decode XMLRPC request {0}: {1}",
                     request.RemoteIPEndPoint, e.Message);
         }
@@ -1244,7 +1246,7 @@ public class BaseHttpServer : IHttpServer
             catch(Exception e)
             {
                 string errorMessage = $"Requested method [{methodName}] from {request.RemoteIPEndPoint.Address} threw exception: {e.Message}";
-                m_log.Error($"[BASE HTTP SERVER]: {errorMessage}");
+                m_log.LogError($"[BASE HTTP SERVER]: {errorMessage}");
 
                 // if the registered XmlRpc method threw an exception, we pass a fault-code along
                 xmlRpcResponse = new XmlRpcResponse();
@@ -1316,7 +1318,7 @@ public class BaseHttpServer : IHttpServer
         }
         catch (Exception e)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[BASE HTTP SERVER]: Fail to decode XMLRPC request {0}: {1}",
                     request.RemoteIPEndPoint, e.Message);
         }
@@ -1378,7 +1380,7 @@ public class BaseHttpServer : IHttpServer
                         "Requested method [{0}] from {1} threw exception: {2}",
                         methodName, request.RemoteIPEndPoint.Address, e.Message);
 
-                m_log.ErrorFormat("[BASE HTTP SERVER]: {0}", errorMessage);
+                m_log.LogError("[BASE HTTP SERVER]: {0}", errorMessage);
 
                 // if the registered XmlRpc method threw an exception, we pass a fault-code along
                 xmlRpcResponse = new XmlRpcResponse();
@@ -1462,7 +1464,7 @@ public class BaseHttpServer : IHttpServer
                     catch (Exception e)
                     {
                         string ErrorMessage = string.Format("[BASE HTTP SERVER]: Json-Rpc Handler Error method {0} - {1}", methodname, e.Message);
-                        m_log.Error(ErrorMessage);
+                        m_log.LogError(ErrorMessage);
                         jsonRpcResponse.Error.Code = ErrorCode.InternalError;
                         jsonRpcResponse.Error.Message = ErrorMessage;
                     }
@@ -1513,7 +1515,7 @@ public class BaseHttpServer : IHttpServer
 
     private byte[] HandleLLSDRequests(OSHttpRequest request, OSHttpResponse response)
     {
-        //m_log.Warn("[BASE HTTP SERVER]: We've figured out it's a LLSD Request");
+        //m_log.LogWarning("[BASE HTTP SERVER]: We've figured out it's a LLSD Request");
         if (!TryGetLLSDHandler(request.RawUrl, out LLSDMethod llsdhandler))
         {
             response.StatusCode = (int)HttpStatusCode.NotFound;
@@ -1521,7 +1523,7 @@ public class BaseHttpServer : IHttpServer
             return null;
         }
 
-        //m_log.DebugFormat("[OGP]: {0}:{1}", request.RawUrl, requestBody);
+        //m_log.LogDebug("[OGP]: {0}:{1}", request.RawUrl, requestBody);
 
         OSD llsdRequest = null;
         try
@@ -1530,7 +1532,7 @@ public class BaseHttpServer : IHttpServer
         }
         catch (Exception ex)
         {
-            m_log.Warn("[BASE HTTP SERVER]: Error - " + ex.Message);
+            m_log.LogWarning("[BASE HTTP SERVER]: Error - " + ex.Message);
         }
 
         if (llsdRequest is null)
@@ -1659,7 +1661,7 @@ public class BaseHttpServer : IHttpServer
     {
         var searchquery = CleanSearchPath(path.AsSpan());
 
-        //m_log.DebugFormat("[BASE HTTP HANDLER]: Checking if we have an HTTP handler for {0}", searchquery);
+        //m_log.LogDebug("[BASE HTTP HANDLER]: Checking if we have an HTTP handler for {0}", searchquery);
         lock (m_HTTPHandlers)
         {
             foreach (string pattern in m_HTTPHandlers.Keys)
@@ -1729,7 +1731,7 @@ public class BaseHttpServer : IHttpServer
     // legacy should go
     public byte[] HandleHTTPRequest(OSHttpRequest request, OSHttpResponse response)
     {
-        //            m_log.DebugFormat(
+        //            m_log.LogDebug(
         //                "[BASE HTTP SERVER]: HandleHTTPRequest for request to {0}, method {1}",
         //                request.RawUrl, request.HttpMethod);
         if (!TryGetHTTPHandlerPathBased(request.RawUrl, out GenericHTTPMethod requestprocessor))
@@ -1737,7 +1739,7 @@ public class BaseHttpServer : IHttpServer
             return SendHTML404(response);
         }
 
-        //  m_log.DebugFormat("[BASE HTTP SERVER]: HandleContentVerbs for request to {0}", request.RawUrl);
+        //  m_log.LogDebug("[BASE HTTP SERVER]: HandleContentVerbs for request to {0}", request.RawUrl);
 
         // This is a test.  There's a workable alternative..  as this way sucks.
         // We'd like to put this into a text file parhaps that's easily editable.
@@ -1772,7 +1774,7 @@ public class BaseHttpServer : IHttpServer
 
         foreach (string queryname in querystringkeys)
         {
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[BASE HTTP SERVER]: Got query paremeter {0}={1}", queryname, request.QueryString[queryname]);
             if(!string.IsNullOrEmpty(queryname))
             {
@@ -1783,7 +1785,7 @@ public class BaseHttpServer : IHttpServer
 
         foreach (string headername in rHeaders)
         {
-            //m_log.Debug("[BASE HTTP SERVER]: " + headername + "=" + request.Headers[headername]);
+            //m_log.LogDebug("[BASE HTTP SERVER]: " + headername + "=" + request.Headers[headername]);
             headervals[headername] = request.Headers[headername];
         }
 
@@ -1808,7 +1810,7 @@ public class BaseHttpServer : IHttpServer
         string bestMatch = null;
         bool nomatch = true;
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[BASE HTTP HANDLER]: TryGetHTTPHandlerPathBased() looking for HTTP handler to match {0}", searchquery);
 
         lock (m_HTTPHandlers)
@@ -1860,7 +1862,7 @@ public class BaseHttpServer : IHttpServer
         {
             try
             {
-                //m_log.Info("[BASE HTTP SERVER]: Doing HTTP Grunt work with response");
+                //m_log.LogInformation("[BASE HTTP SERVER]: Doing HTTP Grunt work with response");
                 responsecode = (int)responsedata["int_response_code"];
                 contentType = (string)responsedata["content_type"];
                 if (responsedata["bin_response_data"] is byte[] b)
@@ -1977,7 +1979,7 @@ public class BaseHttpServer : IHttpServer
     /// </param>
     public void Start(bool performPollResponsesAsync, bool runPool)
     {
-        m_log.Info($"[BASE HTTP SERVER]: Starting HTTP{(UseSSL ? "S" : "")} server on port {Port}");
+        m_log.LogInformation($"[BASE HTTP SERVER]: Starting HTTP{(UseSSL ? "S" : "")} server on port {Port}");
 
         try
         {
@@ -2024,8 +2026,8 @@ public class BaseHttpServer : IHttpServer
         }
         catch (Exception e)
         {
-            m_log.Error("[BASE HTTP SERVER]: Error - " + e.Message);
-            m_log.Error("[BASE HTTP SERVER]: Tip: Do you have permission to listen on port " + m_port + "?");
+            m_log.LogError("[BASE HTTP SERVER]: Error - " + e.Message);
+            m_log.LogError("[BASE HTTP SERVER]: Tip: Do you have permission to listen on port " + m_port + "?");
 
             // We want this exception to halt the entire server since in current configurations we aren't too
             // useful without inbound HTTP.
@@ -2051,7 +2053,7 @@ public class BaseHttpServer : IHttpServer
     {
         if (source.ToString().Equals("HttpServer.HttpListener") && exception.ToString().StartsWith("Mono.Security.Protocol.Tls.TlsException"))
             return;
-        m_log.ErrorFormat("[BASE HTTP SERVER]: {0} had an exception {1}", source.ToString(), exception.ToString());
+        m_log.LogError("[BASE HTTP SERVER]: {0} had an exception {1}", source.ToString(), exception.ToString());
     }
 
     public void Stop()
@@ -2082,7 +2084,7 @@ public class BaseHttpServer : IHttpServer
         }
         catch (NullReferenceException)
         {
-            m_log.Warn("[BASE HTTP SERVER]: Null Reference when stopping HttpServer.");
+            m_log.LogWarning("[BASE HTTP SERVER]: Null Reference when stopping HttpServer.");
         }
     }
 
@@ -2093,7 +2095,7 @@ public class BaseHttpServer : IHttpServer
 
         string handlerKey = GetHandlerKey(httpMethod, path);
 
-        //m_log.DebugFormat("[BASE HTTP SERVER]: Removing handler key {0}", handlerKey);
+        //m_log.LogDebug("[BASE HTTP SERVER]: Removing handler key {0}", handlerKey);
 
         m_streamHandlers.TryRemove(handlerKey, out _);
     }
@@ -2239,7 +2241,7 @@ public class HttpServerContextObj
 /// 
 public class HttpServerLogWriter : ILogWriter
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     public int DebugLevel {get; set;} = (int)LogPrio.Error;
 
     public void Write(object source, LogPrio priority, string message)
@@ -2250,22 +2252,22 @@ public class HttpServerLogWriter : ILogWriter
         switch (priority)
         {
             case LogPrio.Trace:
-                m_log.DebugFormat("[{0}]: {1}", source, message);
+                m_log.LogDebug("[{0}]: {1}", source, message);
                 break;
             case LogPrio.Debug:
-                m_log.DebugFormat("[{0}]: {1}", source, message);
+                m_log.LogDebug("[{0}]: {1}", source, message);
                 break;
             case LogPrio.Error:
-                m_log.ErrorFormat("[{0}]: {1}", source, message);
+                m_log.LogError("[{0}]: {1}", source, message);
                 break;
             case LogPrio.Info:
-                m_log.InfoFormat("[{0}]: {1}", source, message);
+                m_log.LogInformation("[{0}]: {1}", source, message);
                 break;
             case LogPrio.Warning:
-                m_log.WarnFormat("[{0}]: {1}", source, message);
+                m_log.LogWarning("[{0}]: {1}", source, message);
                 break;
             case LogPrio.Fatal:
-                m_log.ErrorFormat("[{0}]: FATAL! - {1}", source, message);
+                m_log.LogError("[{0}]: FATAL! - {1}", source, message);
                 break;
             default:
                 break;

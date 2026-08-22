@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using System.Xml;
 using OpenSim.Server.Base;
@@ -35,11 +34,13 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Hypergrid;
 
 public class HGFriendsServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IUserAgentService m_UserAgentService;
     private IFriendsSimConnector m_FriendsLocalSimConnector;
@@ -52,11 +53,11 @@ public class HGFriendsServerPostHandler : BaseStreamHandler
         m_UserAgentService = uas;
         m_FriendsLocalSimConnector = friendsConn;
 
-        m_log.DebugFormat("[HGFRIENDS HANDLER]: HGFriendsServerPostHandler is On ({0})",
+        m_log.LogDebug("[HGFRIENDS HANDLER]: HGFriendsServerPostHandler is On ({0})",
             (m_FriendsLocalSimConnector == null ? "robust" : "standalone"));
 
         if (m_TheService == null)
-            m_log.ErrorFormat("[HGFRIENDS HANDLER]: TheService is null!");
+            m_log.LogError("[HGFRIENDS HANDLER]: TheService is null!");
     }
 
     protected override byte[] ProcessRequest(string path, Stream requestData,
@@ -67,7 +68,7 @@ public class HGFriendsServerPostHandler : BaseStreamHandler
             body = sr.ReadToEnd();
         body = body.Trim();
 
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
 
         try
         {
@@ -114,11 +115,11 @@ public class HGFriendsServerPostHandler : BaseStreamHandler
                     */
             }
 
-            m_log.DebugFormat("[HGFRIENDS HANDLER]: unknown method {0}", method);
+            m_log.LogDebug("[HGFRIENDS HANDLER]: unknown method {0}", method);
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[HGFRIENDS HANDLER]: Exception {0}", e);
+            m_log.LogDebug("[HGFRIENDS HANDLER]: Exception {0}", e);
         }
 
         return FailureResult();
@@ -136,7 +137,7 @@ public class HGFriendsServerPostHandler : BaseStreamHandler
             UUID.TryParse(request["PRINCIPALID"].ToString(), out principalID);
         else
         {
-            m_log.WarnFormat("[HGFRIENDS HANDLER]: no principalID in request to get friend perms");
+            m_log.LogWarning("[HGFRIENDS HANDLER]: no principalID in request to get friend perms");
             return FailureResult();
         }
 
@@ -145,7 +146,7 @@ public class HGFriendsServerPostHandler : BaseStreamHandler
             UUID.TryParse(request["FRIENDID"].ToString(), out friendID);
         else
         {
-            m_log.WarnFormat("[HGFRIENDS HANDLER]: no friendID in request to get friend perms");
+            m_log.LogWarning("[HGFRIENDS HANDLER]: no friendID in request to get friend perms");
             return FailureResult();
         }
 
@@ -230,7 +231,7 @@ public class HGFriendsServerPostHandler : BaseStreamHandler
             UUID.TryParse(request["userID"].ToString(), out principalID);
         else
         {
-            m_log.WarnFormat("[HGFRIENDS HANDLER]: no userID in request to notify");
+            m_log.LogWarning("[HGFRIENDS HANDLER]: no userID in request to notify");
             return FailureResult();
         }
 
@@ -239,7 +240,7 @@ public class HGFriendsServerPostHandler : BaseStreamHandler
             Boolean.TryParse(request["online"].ToString(), out online);
         else
         {
-            m_log.WarnFormat("[HGFRIENDS HANDLER]: no online in request to notify");
+            m_log.LogWarning("[HGFRIENDS HANDLER]: no online in request to notify");
             return FailureResult();
         }
 
@@ -271,7 +272,7 @@ public class HGFriendsServerPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[GRID HANDLER]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[GRID HANDLER]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -283,7 +284,7 @@ public class HGFriendsServerPostHandler : BaseStreamHandler
     {
         if (!request.ContainsKey("KEY") || !request.ContainsKey("SESSIONID"))
         {
-            m_log.WarnFormat("[HGFRIENDS HANDLER]: ignoring request without Key or SessionID");
+            m_log.LogWarning("[HGFRIENDS HANDLER]: ignoring request without Key or SessionID");
             return false;
         }
 
@@ -299,11 +300,11 @@ public class HGFriendsServerPostHandler : BaseStreamHandler
 
         if (!m_UserAgentService.VerifyAgent(sessionID, serviceKey))
         {
-            m_log.WarnFormat("[HGFRIENDS HANDLER]: Key {0} for session {1} did not match existing key. Ignoring request", serviceKey, sessionID);
+            m_log.LogWarning("[HGFRIENDS HANDLER]: Key {0} for session {1} did not match existing key. Ignoring request", serviceKey, sessionID);
             return false;
         }
 
-        m_log.DebugFormat("[HGFRIENDS HANDLER]: Verification ok");
+        m_log.LogDebug("[HGFRIENDS HANDLER]: Verification ok");
         return true;
     }
 

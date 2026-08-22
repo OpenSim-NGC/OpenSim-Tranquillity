@@ -27,24 +27,24 @@
 
 using System.Reflection;
 using Nini.Config;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Data;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.AvatarService;
 
 public class AvatarService : AvatarServiceBase, IAvatarService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     public AvatarService(IConfigSource config)
         : base(config)
     {
-        m_log.Debug("[AVATAR SERVICE]: Starting avatar service");
+        m_log.LogDebug("[AVATAR SERVICE]: Starting avatar service");
     }
 
     public AvatarAppearance GetAppearance(UUID principalID)
@@ -89,7 +89,7 @@ public class AvatarService : AvatarServiceBase, IAvatarService
             if (kvp.Key.StartsWith("_"))
                 count++;
 
-//            m_log.DebugFormat("[AVATAR SERVICE]: SetAvatar for {0}, attachs={1}", principalID, count);
+//            m_log.LogDebug("[AVATAR SERVICE]: SetAvatar for {0}, attachs={1}", principalID, count);
         m_Database.Delete("PrincipalID", principalID.ToString());
 
         AvatarBaseData av = new AvatarBaseData();
@@ -121,7 +121,7 @@ public class AvatarService : AvatarServiceBase, IAvatarService
                     if (!float.TryParse(rawHeight, out height) || height < 0 || height > 10)
                         height = 1.771488f;
 
-                    m_log.DebugFormat(
+                    m_log.LogDebug(
                         "[AVATAR SERVICE]: Rectifying height of avatar {0} from {1} to {2}",
                         principalID, kvp.Value, height);
                 }

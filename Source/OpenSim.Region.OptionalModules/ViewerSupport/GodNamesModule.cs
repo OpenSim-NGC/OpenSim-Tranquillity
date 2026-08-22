@@ -26,19 +26,21 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.OptionalModules.ViewerSupport;
 
 public class GodNamesModule : ISharedRegionModule
 {
     // Infrastructure
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // Configuration
     private static bool m_enabled = false;
@@ -54,18 +56,18 @@ public class GodNamesModule : ISharedRegionModule
         }
 
         if (!moduleConfig.GetBoolean("Enabled", false)) {
-            m_log.Info("[GODNAMES]: Addon is disabled");
+            m_log.LogInformation("[GODNAMES]: Addon is disabled");
             return;
         }
 
-        m_log.Info("[GODNAMES]: Enabled");
+        m_log.LogInformation("[GODNAMES]: Enabled");
         m_enabled = true;
         string conf_str = moduleConfig.GetString("FullNames", String.Empty);
         if (conf_str != String.Empty)
         {
             foreach (string strl in conf_str.Split(',')) {
                 string strlan = strl.Trim(" \t".ToCharArray());
-                m_log.DebugFormat("[GODNAMES]: Adding {0} as a God name", strlan);
+                m_log.LogDebug("[GODNAMES]: Adding {0} as a God name", strlan);
                 m_fullNames.Add(strlan);
             }
         }
@@ -75,7 +77,7 @@ public class GodNamesModule : ISharedRegionModule
         {
             foreach (string strl in conf_str.Split(',')) {
                 string strlan = strl.Trim(" \t".ToCharArray());
-                m_log.DebugFormat("[GODNAMES]: Adding {0} as a God last name", strlan);
+                m_log.LogDebug("[GODNAMES]: Adding {0} as a God last name", strlan);
                 m_lastNames.Add(strlan);
             }
         }

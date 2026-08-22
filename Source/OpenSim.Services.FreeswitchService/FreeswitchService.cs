@@ -27,16 +27,18 @@
 
 using System.Reflection;
 using Nini.Config;
-using log4net;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse.StructuredData;
 using System.Collections;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Services.FreeswitchService;
 
 public class FreeswitchService : FreeswitchServiceBase, IFreeswitchService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public FreeswitchService(IConfigSource config) : base(config)
     {
@@ -45,13 +47,13 @@ public class FreeswitchService : FreeswitchServiceBase, IFreeswitchService
 
     public Hashtable HandleDialplanRequest(Hashtable request)
     {
-        m_log.DebugFormat("[FreeSwitchVoice]: HandleDialplanRequest called with {0}",request.ToString());
+        m_log.LogDebug("[FreeSwitchVoice]: HandleDialplanRequest called with {0}",request.ToString());
 
         Hashtable response = new Hashtable();
 
 //            foreach (DictionaryEntry item in request)
 //            {
-////               m_log.InfoFormat("[FreeSwitchDirectory]: requestBody item {0} {1}",item.Key, item.Value);
+////               m_log.LogInformation("[FreeSwitchDirectory]: requestBody item {0} {1}",item.Key, item.Value);
 //            }
 
         string requestcontext = (string) request["Hunt-Context"];
@@ -61,7 +63,7 @@ public class FreeswitchService : FreeswitchServiceBase, IFreeswitchService
 
         if (m_freeSwitchContext != String.Empty && m_freeSwitchContext != requestcontext)
         {
-            m_log.Debug("[FreeSwitchDirectory]: returning empty as it's for another context");
+            m_log.LogDebug("[FreeSwitchDirectory]: returning empty as it's for another context");
             response["str_response_string"] = "";
         }
         else
@@ -120,7 +122,7 @@ public class FreeswitchService : FreeswitchServiceBase, IFreeswitchService
         }
         else
         {
-//                 m_log.DebugFormat("[FreeSwitchDirectory]: HandleDirectoryRequest called with {0}",request.ToString());
+//                 m_log.LogDebug("[FreeSwitchDirectory]: HandleDirectoryRequest called with {0}",request.ToString());
 
              // information in the request we might be interested in
 
@@ -142,7 +144,7 @@ public class FreeswitchService : FreeswitchServiceBase, IFreeswitchService
              //ip=9.167.220.137    // this is the correct IP rather than sip_contact_host above when through a vpn or NAT setup
 
 //                 foreach (DictionaryEntry item in request)
-//                    m_log.DebugFormat("[FreeSwitchDirectory]: requestBody item {0} {1}", item.Key, item.Value);
+//                    m_log.LogDebug("[FreeSwitchDirectory]: requestBody item {0} {1}", item.Key, item.Value);
 
              string eventCallingFunction = (string) request["Event-Calling-Function"];
              if (eventCallingFunction == null)
@@ -169,7 +171,7 @@ public class FreeswitchService : FreeswitchServiceBase, IFreeswitchService
                  }
                  else
                  {
-                     m_log.ErrorFormat("[FreeSwitchVoice]: HandleDirectoryRequest unknown sip_auth_method {0}",sipAuthMethod);
+                     m_log.LogError("[FreeSwitchVoice]: HandleDirectoryRequest unknown sip_auth_method {0}",sipAuthMethod);
                      response["int_response_code"] = 404;
                      response["content_type"] = "text/xml";
                      response["str_response_string"] = "";
@@ -201,7 +203,7 @@ public class FreeswitchService : FreeswitchServiceBase, IFreeswitchService
              }
              else
              {
-                 m_log.ErrorFormat("[FreeSwitchVoice]: HandleDirectoryRequest unknown Event-Calling-Function {0}",eventCallingFunction);
+                 m_log.LogError("[FreeSwitchVoice]: HandleDirectoryRequest unknown Event-Calling-Function {0}",eventCallingFunction);
                  response["int_response_code"] = 404;
                  response["keepalive"] = false;
                  response["content_type"] = "text/xml";
@@ -213,7 +215,7 @@ public class FreeswitchService : FreeswitchServiceBase, IFreeswitchService
 
     private Hashtable HandleRegister(string Context, string Realm, Hashtable request)
     {
-        m_log.Info("[FreeSwitchDirectory]: HandleRegister called");
+        m_log.LogInformation("[FreeSwitchDirectory]: HandleRegister called");
 
         // TODO the password we return needs to match that sent in the request, this is hard coded for now
         string password = "1234";
@@ -250,7 +252,7 @@ public class FreeswitchService : FreeswitchServiceBase, IFreeswitchService
 
     private Hashtable HandleInvite(string Context, string Realm, Hashtable request)
     {
-        m_log.Info("[FreeSwitchDirectory]: HandleInvite called");
+        m_log.LogInformation("[FreeSwitchDirectory]: HandleInvite called");
 
         // TODO the password we return needs to match that sent in the request, this is hard coded for now
         string password = "1234";
@@ -297,7 +299,7 @@ public class FreeswitchService : FreeswitchServiceBase, IFreeswitchService
 
     private Hashtable HandleLocateUser(String Realm, Hashtable request)
     {
-        m_log.Info("[FreeSwitchDirectory]: HandleLocateUser called");
+        m_log.LogInformation("[FreeSwitchDirectory]: HandleLocateUser called");
 
         // TODO the password we return needs to match that sent in the request, this is hard coded for now
         string domain = (string) request["domain"];
@@ -331,7 +333,7 @@ public class FreeswitchService : FreeswitchServiceBase, IFreeswitchService
 
     private Hashtable HandleConfigSofia(string Context, string Realm, Hashtable request)
     {
-        m_log.Info("[FreeSwitchDirectory]: HandleConfigSofia called.");
+        m_log.LogInformation("[FreeSwitchDirectory]: HandleConfigSofia called.");
 
         // TODO the password we return needs to match that sent in the request, this is hard coded for now
         string domain = (string) request["domain"];

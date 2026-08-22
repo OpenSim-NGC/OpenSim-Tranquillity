@@ -27,9 +27,10 @@
 
 using System.Reflection;
 using System.Text;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.World.Estate;
 
@@ -38,7 +39,7 @@ namespace OpenSim.Region.CoreModules.World.Estate;
 /// </summary>
 public class EstateManagementCommands
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected EstateManagementModule m_module;
 
@@ -49,7 +50,7 @@ public class EstateManagementCommands
 
     public void Initialise()
     {
-//            m_log.DebugFormat("[ESTATE MODULE]: Setting up estate commands for region {0}", m_module.Scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[ESTATE MODULE]: Setting up estate commands for region {0}", m_module.Scene.RegionInfo.RegionName);
 
         m_module.Scene.AddCommand("Regions", m_module, "set terrain texture",
                            "set terrain texture <number> <uuid> [<x>] [<y>]",
@@ -99,7 +100,7 @@ public class EstateManagementCommands
                 int corner = int.Parse(num);
                 UUID texture = UUID.Parse(uuid);
 
-                m_log.Debug("[ESTATEMODULE]: Setting terrain textures for " + m_module.Scene.RegionInfo.RegionName +
+                m_log.LogDebug("[ESTATEMODULE]: Setting terrain textures for " + m_module.Scene.RegionInfo.RegionName +
                             string.Format(" (C#{0} = {1})", corner, texture));
 
                 switch (corner)
@@ -138,7 +139,7 @@ public class EstateManagementCommands
                 int corner = int.Parse(num);
                 UUID texture = UUID.Parse(uuid);
 
-                m_log.Debug($"[ESTATEMODULE]: Setting terrain PBR asset for {m_module.Scene.RegionInfo.RegionName} to {texture}");
+                m_log.LogDebug($"[ESTATEMODULE]: Setting terrain PBR asset for {m_module.Scene.RegionInfo.RegionName} to {texture}");
 
                 switch (corner)
                 {
@@ -175,7 +176,7 @@ public class EstateManagementCommands
             {
                 double selectedheight = double.Parse(heightstring);
 
-                m_log.Debug("[ESTATEMODULE]: Setting water height in " + m_module.Scene.RegionInfo.RegionName + " to " +
+                m_log.LogDebug("[ESTATEMODULE]: Setting water height in " + m_module.Scene.RegionInfo.RegionName + " to " +
                             string.Format(" {0}", selectedheight));
                 m_module.Scene.RegionInfo.RegionSettings.WaterHeight = selectedheight;
 
@@ -201,7 +202,7 @@ public class EstateManagementCommands
                 float lowValue = float.Parse(min, Culture.NumberFormatInfo);
                 float highValue = float.Parse(max, Culture.NumberFormatInfo);
 
-                m_log.Debug("[ESTATEMODULE]: Setting terrain heights " + m_module.Scene.RegionInfo.RegionName +
+                m_log.LogDebug("[ESTATEMODULE]: Setting terrain heights " + m_module.Scene.RegionInfo.RegionName +
                             string.Format(" (C{0}, {1}-{2}", corner, lowValue, highValue));
 
                 switch (corner)

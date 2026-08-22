@@ -25,16 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 using System.Reflection;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.World.Terrain;
 
 public abstract class TerrainModifier : ITerrainModifier
 {
     protected ITerrainModule m_module;
-    protected static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    protected static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected TerrainModifier(ITerrainModule module)
     {
@@ -189,7 +190,7 @@ public abstract class TerrainModifier : ITerrainModifier
             xMid = 0;
             yMid = 0;
         }
-//            m_log.DebugFormat("Apply {0} mask {1}x{2} @ {3},{4}", data.shape, xMax, yMax, xMid, yMid);
+//            m_log.LogDebug("Apply {0} mask {1}x{2} @ {3},{4}", data.shape, xMax, yMax, xMid, yMid);
 
         float[,] buffer = new float[map.Width, map.Height];
         for (int x = data.x0; x < xMax; ++x)

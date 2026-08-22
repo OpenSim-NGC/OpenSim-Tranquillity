@@ -38,6 +38,8 @@ using OpenSim.Framework.Capabilities;
 
 using Nini.Config;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
@@ -46,7 +48,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public class ModelCost
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // upload fee defaults
     // fees are normalized to 1.0
@@ -243,7 +245,7 @@ public class ModelCost
 
             if (scale.X < PrimScaleMin || scale.Y < PrimScaleMin || scale.Z < PrimScaleMin)
             {
-                //m_log.WarnFormat("[MESHUPLOADER]: Mesh {0} below min scale", inst["mesh_name"].ToString());
+                //m_log.LogWarning("[MESHUPLOADER]: Mesh {0} below min scale", inst["mesh_name"].ToString());
                 skipedSmall.Add(inst["mesh_name"].ToString());
                 continue;
             }

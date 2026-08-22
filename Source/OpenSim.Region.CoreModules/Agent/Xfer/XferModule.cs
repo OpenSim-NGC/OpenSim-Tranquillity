@@ -27,11 +27,12 @@
 
 using System.Reflection;
 using Nini.Config;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Agent.Xfer;
 
@@ -40,7 +41,7 @@ public class XferModule : INonSharedRegionModule, IXfer
     private Scene m_scene;
     private Dictionary<string, FileData> NewFiles = new Dictionary<string, FileData>();
     private Dictionary<ulong, XferDownLoad> Transfers = new Dictionary<ulong, XferDownLoad>();
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private object  timeTickLock = new object();
     private int  lastTimeTick = 0;
@@ -282,7 +283,7 @@ public class XferModule : INonSharedRegionModule, IXfer
                 }
             }
             else
-                m_log.WarnFormat("[Xfer]: {0} not found", fileName);
+                m_log.LogWarning("[Xfer]: {0} not found", fileName);
         }
     }
 

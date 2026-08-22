@@ -25,16 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Net;
 using System.Reflection;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Services.Connectors;
 
 public class HeloServicesConnector
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = String.Empty;
@@ -74,7 +75,7 @@ public class HeloServicesConnector
         }
         catch (UriFormatException)
         {
-            m_log.WarnFormat("[HELO SERVICE]: Malformed URL {0}", serverURI);
+            m_log.LogWarning("[HELO SERVICE]: Malformed URL {0}", serverURI);
         }
     }
 
@@ -82,7 +83,7 @@ public class HeloServicesConnector
     {
         if (String.IsNullOrEmpty(m_ServerURI))
         {
-            m_log.WarnFormat("[HELO SERVICE]: Unable to invoke HELO due to empty URL");
+            m_log.LogWarning("[HELO SERVICE]: Unable to invoke HELO due to empty URL");
             return String.Empty;
         }
 
@@ -101,7 +102,7 @@ public class HeloServicesConnector
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[HELO SERVICE]: Unable to perform HELO request to {0}: {1}", m_ServerURI, e.Message);
+            m_log.LogDebug("[HELO SERVICE]: Unable to perform HELO request to {0}: {1}", m_ServerURI, e.Message);
         }
 
         // fail

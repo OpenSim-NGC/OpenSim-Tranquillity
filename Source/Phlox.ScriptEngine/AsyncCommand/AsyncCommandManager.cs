@@ -42,6 +42,8 @@ using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.ScriptEngine.Shared.Api
 {
     /// <summary>
@@ -53,7 +55,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
     /// </summary>
     public class AsyncCommandManager
     {
-        private static readonly log4net.ILog m_log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         private static Thread cmdHandlerThread;
         private static int cmdHandlerThreadCycleSleepms = 100;
@@ -161,7 +163,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     if (now - m_lastPumpErrorLog > 10000)
                     {
                         m_lastPumpErrorLog = now;
-                        m_log.Error("[PhloxAsyncCmd]: async command pump pass failed (pump continues): ", e);
+                        m_log.LogError(e, "[PhloxAsyncCmd]: async command pump pass failed (pump continues): ");
                     }
                 }
             }

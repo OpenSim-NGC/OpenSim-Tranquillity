@@ -29,9 +29,11 @@ using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
-using log4net;
 using OpenSim.Region.DataSnapshot.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.DataSnapshot;
 
@@ -41,7 +43,7 @@ public class SnapshotStore
     private String m_directory = "unyuu"; //not an attempt at adding RM references to core SVN, honest
     private Dictionary<Scene, bool> m_scenes = null;
     private List<IDataSnapshotProvider> m_providers = null;
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private Dictionary<String, String> m_gridinfo = null;
     private bool m_cacheEnabled = true;
     #endregion
@@ -54,23 +56,23 @@ public class SnapshotStore
 
         if (Directory.Exists(m_directory))
         {
-            m_log.Info("[DATASNAPSHOT]: Response and fragment cache directory already exists.");
+            m_log.LogInformation("[DATASNAPSHOT]: Response and fragment cache directory already exists.");
         }
         else
         {
             // Try to create the directory.
-            m_log.Info("[DATASNAPSHOT]: Creating directory " + m_directory);
+            m_log.LogInformation("[DATASNAPSHOT]: Creating directory " + m_directory);
             try
             {
                 Directory.CreateDirectory(m_directory);
             }
             catch (Exception e)
             {
-                m_log.Error("[DATASNAPSHOT]: Failed to create directory " + m_directory, e);
+                m_log.LogError(e, "[DATASNAPSHOT]: Failed to create directory " + m_directory);
 
                 //This isn't a horrible problem, just disable cacheing.
                 m_cacheEnabled = false;
-                m_log.Error("[DATASNAPSHOT]: Could not create directory, response cache has been disabled.");
+                m_log.LogError("[DATASNAPSHOT]: Could not create directory, response cache has been disabled.");
             }
         }
     }
@@ -111,7 +113,7 @@ public class SnapshotStore
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("[DATASNAPSHOT]: Exception on writing to file {0}: {1}", path, e.Message);
+                    m_log.LogWarning("[DATASNAPSHOT]: Exception on writing to file {0}: {1}", path, e.Message);
                 }
 
             }
@@ -120,7 +122,7 @@ public class SnapshotStore
             provider.Stale = false;
             m_scenes[provider.GetParentScene] = true;
 
-            m_log.Debug("[DATASNAPSHOT]: Generated fragment response for provider type " + provider.Name);
+            m_log.LogDebug("[DATASNAPSHOT]: Generated fragment response for provider type " + provider.Name);
         }
         else
         {
@@ -134,7 +136,7 @@ public class SnapshotStore
                 data = factory.ImportNode(node, true);
             }
 
-            m_log.Debug("[DATASNAPSHOT]: Retrieved fragment response for provider type " + provider.Name);
+            m_log.LogDebug("[DATASNAPSHOT]: Retrieved fragment response for provider type " + provider.Name);
         }
 
         return data;
@@ -144,7 +146,7 @@ public class SnapshotStore
     #region Response storage
     public XmlNode GetScene(Scene scene, XmlDocument factory)
     {
-        m_log.Debug("[DATASNAPSHOT]: Data requested for scene " + scene.RegionInfo.RegionName);
+        m_log.LogDebug("[DATASNAPSHOT]: Data requested for scene " + scene.RegionInfo.RegionName);
 
         if (!m_scenes.ContainsKey(scene)) {
             m_scenes.Add(scene, true); //stale by default
@@ -154,7 +156,7 @@ public class SnapshotStore
 
         if (!m_scenes[scene])
         {
-            m_log.Debug("[DATASNAPSHOT]: Attempting to retrieve snapshot from cache.");
+            m_log.LogDebug("[DATASNAPSHOT]: Attempting to retrieve snapshot from cache.");
             //get snapshot from cache
             String path = DataFileNameScene(scene);
 
@@ -168,11 +170,11 @@ public class SnapshotStore
                 regionElement = factory.ImportNode(node, true);
             }
 
-            m_log.Debug("[DATASNAPSHOT]: Obtained snapshot from cache for " + scene.RegionInfo.RegionName);
+            m_log.LogDebug("[DATASNAPSHOT]: Obtained snapshot from cache for " + scene.RegionInfo.RegionName);
         }
         else
         {
-            m_log.Debug("[DATASNAPSHOT]: Attempting to generate snapshot.");
+            m_log.LogDebug("[DATASNAPSHOT]: Attempting to generate snapshot.");
             //make snapshot
             regionElement = MakeRegionNode(scene, factory);
 
@@ -206,12 +208,12 @@ public class SnapshotStore
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[DATASNAPSHOT]: Exception on writing to file {0}: {1}", path, e.Message);
+                m_log.LogWarning("[DATASNAPSHOT]: Exception on writing to file {0}: {1}", path, e.Message);
             }
 
             m_scenes[scene] = false;
 
-            m_log.Debug("[DATASNAPSHOT]: Generated new snapshot for " + scene.RegionInfo.RegionName);
+            m_log.LogDebug("[DATASNAPSHOT]: Generated new snapshot for " + scene.RegionInfo.RegionName);
         }
 
         return regionElement;
@@ -276,7 +278,7 @@ public class SnapshotStore
 
         docElement.AppendChild(infoblock);
 
-        m_log.Debug("[DATASNAPSHOT]: Generated region node");
+        m_log.LogDebug("[DATASNAPSHOT]: Generated region node");
         return docElement;
     }
 
@@ -306,7 +308,7 @@ public class SnapshotStore
             griddata.AppendChild(childnode);
         }
 
-        m_log.Debug("[DATASNAPSHOT]: Got grid snapshot data");
+        m_log.LogDebug("[DATASNAPSHOT]: Got grid snapshot data");
 
         return griddata;
     }

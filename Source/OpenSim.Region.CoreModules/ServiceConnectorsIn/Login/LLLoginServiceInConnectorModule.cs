@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
@@ -34,11 +33,14 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Handlers.Login;
 
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Login;
 
 public class LLLoginServiceInConnectorModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static bool m_Enabled = false;
     private static bool m_Registered = false;
 
@@ -57,7 +59,7 @@ public class LLLoginServiceInConnectorModule : ISharedRegionModule
             m_Enabled = moduleConfig.GetBoolean("LLLoginServiceInConnector", false);
             if (m_Enabled)
             {
-                m_log.Info("[LLLOGIN IN CONNECTOR]: LLLoginerviceInConnector enabled");
+                m_log.LogInformation("[LLLOGIN IN CONNECTOR]: LLLoginerviceInConnector enabled");
             }
 
         }
@@ -69,7 +71,7 @@ public class LLLoginServiceInConnectorModule : ISharedRegionModule
         if (!m_Enabled)
             return;
 
-        m_log.Info("[LLLOGIN IN CONNECTOR]: Starting...");
+        m_log.LogInformation("[LLLOGIN IN CONNECTOR]: Starting...");
     }
 
     public void Close()

@@ -27,7 +27,8 @@
 
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.CoreModules.Framework.EntityTransfer;
 
@@ -63,7 +64,7 @@ enum AgentTransferState
 /// </summary>
 public class EntityTransferStateMachine
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[ENTITY TRANSFER STATE MACHINE]";
 
     /// <summary>
@@ -88,7 +89,7 @@ public class EntityTransferStateMachine
     /// <returns>true if the agent was not already in transit, false if it was</returns>
     internal bool SetInTransit(UUID id)
     {
-//            m_log.DebugFormat("{0} SetInTransit. agent={1}, newState=Preparing", LogHeader, id);
+//            m_log.LogDebug("{0} SetInTransit. agent={1}, newState=Preparing", LogHeader, id);
         lock (m_agentsInTransit)
         {
             if (!m_agentsInTransit.ContainsKey(id))
@@ -110,7 +111,7 @@ public class EntityTransferStateMachine
     /// <exception cref='Exception'>Illegal transitions will throw an Exception</exception>
     internal bool UpdateInTransit(UUID id, AgentTransferState newState)
     {
-//           m_log.DebugFormat("{0} UpdateInTransit. agent={1}, newState={2}", LogHeader, id, newState);
+//           m_log.LogDebug("{0} UpdateInTransit. agent={1}, newState={2}", LogHeader, id, newState);
 
         bool transitionOkay = false;
 
@@ -178,23 +179,23 @@ public class EntityTransferStateMachine
             {
                 m_agentsInTransit[id] = newState;
 
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[ENTITY TRANSFER STATE MACHINE]: Changed agent with id {0} from state {1} to {2} in {3}",
 //                        id, oldState, newState, m_mod.Scene.Name);
             }
             else if (failIfNotOkay)
             {
-                m_log.DebugFormat("{0} UpdateInTransit. Throwing transition failure = {1}", LogHeader, failureMessage);
+                m_log.LogDebug("{0} UpdateInTransit. Throwing transition failure = {1}", LogHeader, failureMessage);
                 throw new Exception(failureMessage);
             }
 //                else
 //                {
 //                    if (oldState != null)
-//                        m_log.DebugFormat(
+//                        m_log.LogDebug(
 //                            "[ENTITY TRANSFER STATE MACHINE]: Ignored change of agent with id {0} from state {1} to {2} in {3}",
 //                            id, oldState, newState, m_mod.Scene.Name);
 //                    else
-//                        m_log.DebugFormat(
+//                        m_log.LogDebug(
 //                            "[ENTITY TRANSFER STATE MACHINE]: Ignored change of agent with id {0} to state {1} in {2} since agent not in transit",
 //                            id, newState, m_mod.Scene.Name);
 //                }
@@ -238,7 +239,7 @@ public class EntityTransferStateMachine
 //                    {
                     // FIXME: For now, we allow exit from any state since a thrown exception in teleport is now guranteed
                     // to be handled properly - ResetFromTransit() could be invoked at any step along the process
-//                        m_log.WarnFormat(
+//                        m_log.LogWarning(
 //                            "[ENTITY TRANSFER STATE MACHINE]: Agent with ID {0} should not exit directly from state {1}, should go to {2} state first in {3}",
 //                            id, state, AgentTransferState.CleaningUp, m_mod.Scene.RegionInfo.RegionName);
 
@@ -249,7 +250,7 @@ public class EntityTransferStateMachine
 
                 m_agentsInTransit.Remove(id);
 
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[ENTITY TRANSFER STATE MACHINE]: Agent {0} cleared from transit in {1}",
 //                        id, m_mod.Scene.RegionInfo.RegionName);
 
@@ -257,7 +258,7 @@ public class EntityTransferStateMachine
             }
         }
 
-//            m_log.WarnFormat(
+//            m_log.LogWarning(
 //                "[ENTITY TRANSFER STATE MACHINE]: Agent {0} requested to clear from transit in {1} but was already cleared",
 //                id, m_mod.Scene.RegionInfo.RegionName);
 
@@ -299,7 +300,7 @@ public class EntityTransferStateMachine
                     break;
             }
 
-//                m_log.Debug("  >>> Waiting... " + count);
+//                m_log.LogDebug("  >>> Waiting... " + count);
             Thread.Sleep(100);
         }
 
@@ -312,7 +313,7 @@ public class EntityTransferStateMachine
         {
             if (!m_agentsInTransit.ContainsKey(id))
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[ENTITY TRANSFER STATE MACHINE]: Region {0} received notification of arrival in destination of agent {1} but no teleport request is active",
                     m_mod.Scene.RegionInfo.RegionName, id);
 
@@ -324,13 +325,13 @@ public class EntityTransferStateMachine
             if (currentState == AgentTransferState.ReceivedAtDestination)
             {
                 // An anomoly but don't make this an outright failure - destination region could be overzealous in sending notification.
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[ENTITY TRANSFER STATE MACHINE]: Region {0} received notification of arrival in destination of agent {1} but notification has already previously been received",
                     m_mod.Scene.RegionInfo.RegionName, id);
             }
             else if (currentState != AgentTransferState.Transferring)
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[ENTITY TRANSFER STATE MACHINE]: Region {0} received notification of arrival in destination of agent {1} but agent is in state {2}",
                     m_mod.Scene.RegionInfo.RegionName, id, currentState);
 

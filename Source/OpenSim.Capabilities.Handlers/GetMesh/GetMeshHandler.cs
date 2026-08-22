@@ -27,18 +27,17 @@
 
 using System.Collections;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Capabilities.Handlers;
 
 public class GetMeshHandler
 {
-    private static readonly ILog m_log =
-               LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAssetService m_assetService;
 
@@ -125,7 +124,7 @@ public class GetMeshHandler
             start = Utils.Clamp(start, 0, end);
             int len = end - start + 1;
 
-            //m_log.Debug("Serving " + start + " to " + end + " of " + texture.Data.Length + " bytes for texture " + texture.ID);
+            //m_log.LogDebug("Serving " + start + " to " + end + " of " + texture.Data.Length + " bytes for texture " + texture.ID);
             Hashtable headers = new Hashtable();
             headers["Content-Range"] = String.Format("bytes {0}-{1}/{2}", start, end, mesh.Data.Length);
             responsedata["headers"] = headers;
@@ -138,7 +137,7 @@ public class GetMeshHandler
             return responsedata;
         }
 
-        m_log.Warn("[GETMESH]: Failed to parse a range from GetMesh request, sending full asset: " + (string)request["uri"]);
+        m_log.LogWarning("[GETMESH]: Failed to parse a range from GetMesh request, sending full asset: " + (string)request["uri"]);
         responsedata["str_response_string"] = Convert.ToBase64String(mesh.Data);
         responsedata["int_response_code"] = (int)System.Net.HttpStatusCode.OK;
         return responsedata;

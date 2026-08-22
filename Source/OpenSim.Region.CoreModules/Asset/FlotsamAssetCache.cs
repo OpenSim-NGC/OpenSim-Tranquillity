@@ -29,7 +29,6 @@ using System.Reflection;
 using System.Xml.Serialization;
 using System.Text;
 using System.Timers;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -39,6 +38,8 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using System.Runtime.InteropServices;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Asset;
 
@@ -51,7 +52,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
         public bool replace;
     }
 
-    private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger( MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled;
     private bool m_timerRunning;
@@ -145,12 +146,12 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
                 m_negativeCache = new ExpiringKey<string>(2000);
                 m_Enabled = true;
 
-                m_log.Info($"[FLOTSAM ASSET CACHE]: {this.Name} enabled");
+                m_log.LogInformation($"[FLOTSAM ASSET CACHE]: {this.Name} enabled");
 
                 IConfig assetConfig = source.Configs["AssetCache"];
                 if (assetConfig is null)
                 {
-                    m_log.Debug(
+                    m_log.LogDebug(
                        "[FLOTSAM ASSET CACHE]: AssetCache section missing from config (not copied config-include/FlotsamCache.ini.example?  Using defaults.");
                 }
                 else
@@ -194,7 +195,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
                 if(m_MemoryCacheEnabled)
                     m_MemoryCache = new ExpiringCacheOS<string, AssetBase>((int)m_MemoryExpiration * 500);
 
-                m_log.Info($"[FLOTSAM ASSET CACHE]: Cache Directory {m_CacheDirectory}");
+                m_log.LogInformation($"[FLOTSAM ASSET CACHE]: Cache Directory {m_CacheDirectory}");
 
                 if (m_CacheDirectoryTiers < 1)
                     m_CacheDirectoryTiers = 1;
@@ -402,7 +403,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
         }
         catch (Exception e)
         {
-            m_log.Warn($"[FLOTSAM ASSET CACHE]: Failed to update cache for asset {asset.ID}: {e.Message}");
+            m_log.LogWarning($"[FLOTSAM ASSET CACHE]: Failed to update cache for asset {asset.ID}: {e.Message}");
         }
     }
 
@@ -410,7 +411,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
     {
         if (asset is not null)
         {
-            //m_log.DebugFormat("[FLOTSAM ASSET CACHE]: Caching asset with id {0}", asset.ID);
+            //m_log.LogDebug("[FLOTSAM ASSET CACHE]: Caching asset with id {0}", asset.ID);
             UpdateWeakReference(asset.ID, asset);
 
             if (m_MemoryCacheEnabled)
@@ -545,7 +546,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
         }
         catch (System.Runtime.Serialization.SerializationException e)
         {
-            m_log.Warn($"[FLOTSAM ASSET CACHE]: Failed to get file {filename} for asset {id}: {e.Message}");
+            m_log.LogWarning($"[FLOTSAM ASSET CACHE]: Failed to get file {filename} for asset {id}: {e.Message}");
 
             // If there was a problem deserializing the asset, the asset may
             // either be corrupted OR was serialized under an old format
@@ -555,7 +556,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
         }
         catch (Exception e)
         {
-            m_log.Warn($"[FLOTSAM ASSET CACHE]: Failed to get file {filename} for asset {id}: {e.Message}");
+            m_log.LogWarning($"[FLOTSAM ASSET CACHE]: Failed to get file {filename} for asset {id}: {e.Message}");
         }
 
     return asset;
@@ -734,7 +735,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
     public void Expire(string id)
     {
         if (m_LogLevel >= 2)
-            m_log.Debug($"[FLOTSAM ASSET CACHE]: Expiring Asset {id}");
+            m_log.LogDebug($"[FLOTSAM ASSET CACHE]: Expiring Asset {id}");
 
         try
         {
@@ -753,14 +754,14 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
         catch (Exception e)
         {
             if (m_LogLevel >= 2)
-                m_log.Warn($"[FLOTSAM ASSET CACHE]: Failed to expire cached file {id}: {e.Message}");
+                m_log.LogWarning($"[FLOTSAM ASSET CACHE]: Failed to expire cached file {id}: {e.Message}");
         }
     }
 
     public void Clear()
     {
         if (m_LogLevel >= 2)
-            m_log.Debug("[FLOTSAM ASSET CACHE]: Clearing caches.");
+            m_log.LogDebug("[FLOTSAM ASSET CACHE]: Clearing caches.");
 
         if (m_FileCacheEnabled && Directory.Exists(m_CacheDirectory))
         {
@@ -807,7 +808,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
         //long heap = 0;
         //if (m_LogLevel >= 2)
         //{
-            m_log.Info($"[FLOTSAM ASSET CACHE]: Start background expiring files older than {purgeLine}");
+            m_log.LogInformation($"[FLOTSAM ASSET CACHE]: Start background expiring files older than {purgeLine}");
             long heap = GC.GetTotalMemory(false);
         //}
 
@@ -817,7 +818,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
         Dictionary<UUID,sbyte> gids = GatherSceneAssets();
 
         int cooldown = 0;
-        m_log.Info("[FLOTSAM ASSET CACHE] start asset files expire");
+        m_log.LogInformation("[FLOTSAM ASSET CACHE] start asset files expire");
         foreach (string subdir in Directory.GetDirectories(m_CacheDirectory))
         {
             if(!m_cleanupRunning)
@@ -846,7 +847,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
         {
             heap = GC.GetTotalMemory(false) - heap;
             double fheap = Math.Round((double)(heap / (1024 * 1024)), 3);
-            m_log.Info($"[FLOTSAM ASSET CACHE]: Finished expiring files, heap delta: {fheap}MB.");
+            m_log.LogInformation($"[FLOTSAM ASSET CACHE]: Finished expiring files, heap delta: {fheap}MB.");
         }
     }
 
@@ -935,7 +936,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
             }
             else if (dirSize >= m_CacheWarnAt)
             {
-                m_log.Warn(
+                m_log.LogWarning(
                     $"[FLOTSAM ASSET CACHE]: Cache folder exceeded CacheWarnAt limit {dir} {dirSize}. Suggest increasing tiers, tier length, or reducing cache expiration");
             }
         }
@@ -946,7 +947,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
         }
         catch (Exception e)
         {
-            m_log.Warn($"[FLOTSAM ASSET CACHE]: Could not complete clean of expired files in {dir}: {e.Message}");
+            m_log.LogWarning($"[FLOTSAM ASSET CACHE]: Could not complete clean of expired files in {dir}: {e.Message}");
         }
         return cooldown;
     }
@@ -1025,7 +1026,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
             }
             catch (IOException e)
             {
-                m_log.Warn(
+                m_log.LogWarning(
                     $"[FLOTSAM ASSET CACHE]: Failed to write asset {asset.ID} to temporary location {tempname} (final {filename}) on cache in {directory}: {e.Message}");
 
                 return;
@@ -1116,7 +1117,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
         }
         catch (Exception e)
         {
-            m_log.Warn($"[FLOTSAM ASSET CACHE]: Could not stamp region status file for region {regionID}: {e. Message}");
+            m_log.LogWarning($"[FLOTSAM ASSET CACHE]: Could not stamp region status file for region {regionID}: {e. Message}");
         }
     }
 
@@ -1131,7 +1132,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
     /// <returns>Number of distinct asset references found in the scene.</returns>
     private int TouchAllSceneAssets(bool tryGetUncached)
     {
-        m_log.Info("[FLOTSAM ASSET CACHE] start touch files of assets in use");
+        m_log.LogInformation("[FLOTSAM ASSET CACHE] start touch files of assets in use");
 
         Dictionary<UUID,sbyte> gatheredids = GatherSceneAssets();
 
@@ -1158,7 +1159,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
 
     private Dictionary<UUID, sbyte> GatherSceneAssets()
     {
-        m_log.Info("[FLOTSAM ASSET CACHE] gather assets in use");
+        m_log.LogInformation("[FLOTSAM ASSET CACHE] gather assets in use");
 
         Dictionary<UUID, sbyte> gatheredids = new();
         UuidGatherer gatherer = new(m_AssetService, gatheredids);
@@ -1256,7 +1257,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
         gatherer.FailedUUIDs.Clear();
         gatherer.UncertainAssetsUUIDs.Clear();
 
-        m_log.Info($"[FLOTSAM ASSET CACHE]     found {gatheredids.Count} possible assets in use)");
+        m_log.LogInformation($"[FLOTSAM ASSET CACHE]     found {gatheredids.Count} possible assets in use)");
         return gatheredids;
     }
 
@@ -1276,7 +1277,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
             }
             catch (Exception e)
             {
-                m_log.Warn($"[FLOTSAM ASSET CACHE]: Couldn't clear asset cache directory {dir} from {m_CacheDirectory}: {e.Message}");
+                m_log.LogWarning($"[FLOTSAM ASSET CACHE]: Couldn't clear asset cache directory {dir} from {m_CacheDirectory}: {e.Message}");
             }
         }
 
@@ -1288,7 +1289,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
             }
             catch (Exception e)
             {
-                m_log.Warn($"[FLOTSAM ASSET CACHE]: Couldn't clear asset cache file {file} from {m_CacheDirectory}: {e.Message}");
+                m_log.LogWarning($"[FLOTSAM ASSET CACHE]: Couldn't clear asset cache file {file} from {m_CacheDirectory}: {e.Message}");
             }
         }
     }
@@ -1682,18 +1683,18 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
     {
         if (string.IsNullOrWhiteSpace(m_assetLoader))
         {
-            m_log.Info("[FLOTSAM ASSET CACHE] default assets loader not defined");
+            m_log.LogInformation("[FLOTSAM ASSET CACHE] default assets loader not defined");
             return;
         }
 
         IAssetLoader assetLoader = ServerUtils.LoadPlugin<IAssetLoader>(m_assetLoader, Array.Empty<object>());
         if (assetLoader == null)
         {
-            m_log.Info("[FLOTSAM ASSET CACHE] default assets loader not found");
+            m_log.LogInformation("[FLOTSAM ASSET CACHE] default assets loader not found");
             return;
         }
 
-        m_log.Info("[FLOTSAM ASSET CACHE] start loading local default assets");
+        m_log.LogInformation("[FLOTSAM ASSET CACHE] start loading local default assets");
 
         int count = 0;
         HashSet<string> ids = new();
@@ -1706,25 +1707,25 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
                     ++count;
                 });
         m_defaultAssets = ids;
-        m_log.Info($"[FLOTSAM ASSET CACHE] loaded {count} local default assets");
+        m_log.LogInformation($"[FLOTSAM ASSET CACHE] loaded {count} local default assets");
     }
 
     private void HandleDeleteDefaultAssets()
     {
         if (string.IsNullOrWhiteSpace(m_assetLoader))
         {
-            m_log.Info("[FLOTSAM ASSET CACHE] default assets loader not defined");
+            m_log.LogInformation("[FLOTSAM ASSET CACHE] default assets loader not defined");
             return;
         }
 
         IAssetLoader assetLoader = ServerUtils.LoadPlugin<IAssetLoader>(m_assetLoader, Array.Empty<object>());
         if (assetLoader is null)
         {
-            m_log.Info("[FLOTSAM ASSET CACHE] default assets loader not found");
+            m_log.LogInformation("[FLOTSAM ASSET CACHE] default assets loader not found");
             return;
         }
 
-        m_log.Info("[FLOTSAM ASSET CACHE] started deleting local default assets");
+        m_log.LogInformation("[FLOTSAM ASSET CACHE] started deleting local default assets");
         int count = 0;
         assetLoader.ForEachDefaultXmlAsset(
                 m_assetLoaderArgs,
@@ -1734,7 +1735,7 @@ public class FlotsamAssetCache : ISharedRegionModule, IAssetCache, IAssetService
                     ++count;
                 });
         m_defaultAssets = new HashSet<string>();
-        m_log.Info($"[FLOTSAM ASSET CACHE] deleted {count} local default assets");
+        m_log.LogInformation($"[FLOTSAM ASSET CACHE] deleted {count} local default assets");
     }
     #endregion
 }

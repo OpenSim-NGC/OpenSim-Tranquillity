@@ -26,6 +26,8 @@
  */
 using OMV = OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 public sealed class BSLinksetConstraints : BSLinkset
@@ -338,7 +340,7 @@ public sealed class BSLinksetConstraints : BSLinkset
         else
         {
             // Non-fatal occurance.
-            // PhysicsScene.Logger.ErrorFormat("{0}: Asked to remove child from linkset that was not in linkset", LogHeader);
+            // PhysicsScene.Logger.LogError("{0}: Asked to remove child from linkset that was not in linkset", LogHeader);
         }
         return;
     }
@@ -796,12 +798,12 @@ public sealed class BSLinksetConstraints : BSLinkset
                                 }
                                 catch (InvalidCastException e)
                                 {
-                                    m_physicsScene.Logger.WarnFormat("{0} value of wrong type in physSetLinksetParams: {1}, err={2}",
+                                    m_physicsScene.Logger.LogWarning("{0} value of wrong type in physSetLinksetParams: {1}, err={2}",
                                                         LogHeader, errMsg, e);
                                 }
                                 catch (Exception e)
                                 {
-                                    m_physicsScene.Logger.WarnFormat("{0} bad parameters in physSetLinksetParams: {1}", LogHeader, e);
+                                    m_physicsScene.Logger.LogWarning("{0} bad parameters in physSetLinksetParams: {1}", LogHeader, e);
                                 }
                             }
                         }

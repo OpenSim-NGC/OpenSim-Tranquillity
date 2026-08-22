@@ -28,12 +28,14 @@
 using OpenMetaverse;
 using OpenSim.Framework;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.World.Estate;
 
 
 public class EstateTerrainXferHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private AssetBase m_asset;
 

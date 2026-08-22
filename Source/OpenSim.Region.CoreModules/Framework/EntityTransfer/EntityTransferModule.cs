@@ -36,14 +36,15 @@ using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Framework.EntityTransfer;
 
 public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModule, IDisposable
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[ENTITY TRANSFER MODULE]";
     private static readonly string OutfitTPError = "destination region does not support the Outfit you are wearing. Please retry with a simpler one";
 
@@ -245,7 +246,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
             if (name == Name)
             {
                 InitialiseCommon(source);
-                m_log.DebugFormat("[ENTITY TRANSFER MODULE]: {0} enabled.", Name);
+                m_log.LogDebug("[ENTITY TRANSFER MODULE]: {0} enabled.", Name);
             }
         }
     }
@@ -389,7 +390,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
     {
         if (client.IsLoggingOut && m_entityTransferStateMachine.UpdateInTransit(client.AgentId, AgentTransferState.Aborting))
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Aborted teleport request from {0} in {1} due to simultaneous logout",
                 client.Name, m_sceneName);
         }
@@ -399,7 +400,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
     {
         m_entityTransferStateMachine.UpdateInTransit(client.AgentId, AgentTransferState.Cancelling);
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[ENTITY TRANSFER MODULE]: Received teleport cancel request from {0} in {1}", client.Name, m_sceneName);
     }
 
@@ -422,7 +423,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         // of whether the destination region completes the teleport.
         if (!m_entityTransferStateMachine.SetInTransit(spUUID))
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Ignoring teleport request of {0} {1} to {2}@{3} - agent is already in transit.",
                 sp.Name, spUUID, position, regionHandle);
 
@@ -462,7 +463,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         catch (Exception e)
         {
             
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[ENTITY TRANSFER MODULE]: Exception on teleport of {0} from {1}@{2} to {3}@{4}: {5}{6}",
                 sp.Name, sp.AbsolutePosition, m_sceneName, position, destinationRegionName,
                 e.Message, e.StackTrace);
@@ -484,7 +485,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
     /// <param name="teleportFlags"></param>
     private void TeleportAgentWithinRegion(ScenePresence sp, Vector3 position, Vector3 lookAt, uint teleportFlags)
     {
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[ENTITY TRANSFER MODULE]: Teleport for {0} to {1} within {2}",
             sp.Name, position, m_sceneName);
 
@@ -493,7 +494,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             Vector3 emergencyPos = new(128, 128, 128);
 
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[ENTITY TRANSFER MODULE]: RequestTeleportToLocation() was given an illegal position of {0} for avatar {1}, {2} in {3}.  Substituting {4}",
                 position, sp.Name, sp.UUID, m_sceneName, emergencyPos);
 
@@ -604,7 +605,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
 
         if (finalDestination == null)
         {
-            m_log.WarnFormat( "{0} Unable to teleport {1} {2}: {3}",
+            m_log.LogWarning( "{0} Unable to teleport {1} {2}: {3}",
                                     LogHeader, sp.Name, sp.UUID, reason);
 
             sp.ControllingClient.SendTeleportFailed(reason);
@@ -675,7 +676,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         // of whether the destination region completes the teleport.
         if (!m_entityTransferStateMachine.SetInTransit(sp.UUID))
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Ignoring teleport request of {0} {1} to {2} ({3}) {4}/{5} - agent is already in transit.",
                 sp.Name, sp.UUID, reg.ServerURI, finalDestination.ServerURI, finalDestination.RegionName, position);
             sp.ControllingClient.SendTeleportFailed("Agent is already in transit.");
@@ -688,7 +689,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[ENTITY TRANSFER MODULE]: Exception on teleport of {0} from {1}@{2} to {3}@{4}: {5}{6}",
                 sp.Name, sp.AbsolutePosition, m_sceneName, position, finalDestination.RegionName,
                 e.Message, e.StackTrace);
@@ -717,7 +718,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
 
         string homeURI = m_scene.GetAgentHomeURI(sp.ControllingClient.AgentId);
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[ENTITY TRANSFER MODULE]: Teleporting {0} {1} from {2} to {3} ({4}) {5}/{6}",
             sp.Name, sp.UUID, m_sceneName,
             reg.ServerURI, finalDestination.ServerURI, finalDestination.RegionName, position);
@@ -741,7 +742,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         }
 
         if (!sp.ValidateAttachments())
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Failed validation of all attachments for teleport of {0} from {1} to {2}.  Continuing.",
                 sp.Name, sp.Scene.Name, finalDestination.RegionName);
 
@@ -751,7 +752,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             sp.ControllingClient.SendTeleportFailed(reason);
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: {0} was stopped from teleporting from {1} to {2} because: {3}",
                 sp.Name, sp.Scene.Name, finalDestination.RegionName, reason);
 
@@ -762,7 +763,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             sp.ControllingClient.SendTeleportFailed(OutfitTPError);
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: {0} was stopped from teleporting from {1} to {2} because: {3}",
                 sp.Name, sp.Scene.Name, finalDestination.RegionName, "incompatible wearable");
 
@@ -774,7 +775,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         // as server attempts.
         m_interRegionTeleportAttempts.Value++;
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[ENTITY TRANSFER MODULE]: {0} transfer protocol version to {1} is {2} / {3}",
             sp.Scene.Name, finalDestination.RegionName, ctx.OutboundVersion, ctx.InboundVersion);
 
@@ -825,7 +826,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
 
         if (OutSideViewRange)
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Determined that region {0} at {1},{2} size {3},{4} needs new child agent for agent {5} from {6}",
                 finalDestination.RegionName, newRegionX, newRegionY,newSizeX, newSizeY, sp.Name, m_sceneName);
 
@@ -851,7 +852,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         ulong destinationHandle = finalDestination.RegionHandle;
         AgentCircuitData currentAgentCircuit = sp.Scene.AuthenticateHandler.GetAgentCircuitData(sp.ControllingClient.CircuitCode);
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[ENTITY TRANSFER MODULE]: Using TP V1 for {0} going from {1} to {2}",
             sp.Name, m_sceneName, finalDestination.RegionName);
 
@@ -871,7 +872,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             m_interRegionTeleportFailures.Value++;
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Teleport of {0} from {1} to {2} was refused because {3}",
                 sp.Name, sp.Scene.RegionInfo.RegionName, finalDestination.RegionName, reason);
 
@@ -885,7 +886,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             m_interRegionTeleportCancels.Value++;
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Cancelled teleport of {0} to {1} from {2} after CreateAgent on client request",
                 sp.Name, finalDestination.RegionName, m_sceneName);
             sp.IsInTransit = false;
@@ -895,7 +896,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             m_interRegionTeleportAborts.Value++;
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Aborted teleport of {0} to {1} from {2} after CreateAgent due to previous client close.",
                 sp.Name, finalDestination.RegionName, m_sceneName);
             sp.IsInTransit = false;
@@ -916,7 +917,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                 // correct circuit code.
                 m_eqModule.EnableSimulator(destinationHandle, endPoint, spUUID,
                                     finalDestination.RegionSizeX, finalDestination.RegionSizeY);
-                m_log.DebugFormat("{0} Sent EnableSimulator. regName={1}, size=<{2},{3}>", LogHeader,
+                m_log.LogDebug("{0} Sent EnableSimulator. regName={1}, size=<{2},{3}>", LogHeader,
                     finalDestination.RegionName, finalDestination.RegionSizeX, finalDestination.RegionSizeY);
 
                 // XXX: Is this wait necessary?  We will always end up waiting on UpdateAgent for the destination
@@ -956,7 +957,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             m_interRegionTeleportAborts.Value++;
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Aborted teleport of {0} to {1} from {2} before UpdateAgent",
                 sp.Name, finalDestination.RegionName, m_sceneName);
             sp.IsInTransit = false;
@@ -973,14 +974,14 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
             {
                 m_interRegionTeleportAborts.Value++;
 
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[ENTITY TRANSFER MODULE]: Aborted teleport of {0} to {1} from {2} after UpdateAgent due to previous client close.",
                     sp.Name, finalDestination.RegionName, m_sceneName);
                 sp.IsInTransit = false;
                 return;
             }
 
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[ENTITY TRANSFER MODULE]: UpdateAgent failed on teleport of {0} to {1}.  Keeping avatar in {2}",
                 sp.Name, finalDestination.RegionName, m_sceneName);
 
@@ -993,7 +994,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             m_interRegionTeleportCancels.Value++;
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Cancelled teleport of {0} to {1} from {2} after UpdateAgent on client request",
                 sp.Name, finalDestination.RegionName, m_sceneName);
 
@@ -1002,7 +1003,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
             return;
         }
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[ENTITY TRANSFER MODULE]: Sending new CAPS seed url {0} from {1} to {2}",
             capsPath, m_sceneName, sp.Name);
 
@@ -1032,14 +1033,14 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
             {
                 m_interRegionTeleportAborts.Value++;
 
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[ENTITY TRANSFER MODULE]: Aborted teleport of {0} to {1} from {2} after WaitForAgentArrivedAtDestination due to previous client close.",
                     sp.Name, finalDestination.RegionName, m_sceneName);
                 sp.IsInTransit = false;
                 return;
             }
 
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[ENTITY TRANSFER MODULE]: Teleport of {0} to {1} from {2} failed due to no callback from destination region.  Returning avatar to source region.",
                 sp.Name, finalDestination.RegionName, m_sceneName);
 
@@ -1114,7 +1115,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             m_interRegionTeleportFailures.Value++;
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Teleport of {0} from {1} to {2} was refused because {3}",
                 sp.Name, sp.Scene.RegionInfo.RegionName, finalDestination.RegionName, reason);
 
@@ -1128,7 +1129,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             m_interRegionTeleportCancels.Value++;
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Cancelled teleport of {0} to {1} from {2} after CreateAgent on client request",
                 sp.Name, finalDestination.RegionName, m_sceneName);
 
@@ -1139,7 +1140,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             m_interRegionTeleportAborts.Value++;
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Aborted teleport of {0} to {1} from {2} after CreateAgent due to previous client close.",
                 sp.Name, finalDestination.RegionName, m_sceneName);
 
@@ -1163,7 +1164,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
             sp.ControllingClient.SendRegionTeleport(destinationHandle, 13, endPoint, 4,
                                                         teleportFlags, capsPath);
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[ENTITY TRANSFER MODULE]: Sending new CAPS seed url {0} from {1} to {2}",
             capsPath, m_sceneName, sp.Name);
 
@@ -1201,14 +1202,14 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
             {
                 m_interRegionTeleportAborts.Value++;
 
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[ENTITY TRANSFER MODULE]: Aborted teleport of {0} to {1} from {2} after UpdateAgent due to previous client close.",
                     sp.Name, finalDestination.RegionName, m_sceneName);
                 sp.IsInTransit = false;
                 return;
             }
 
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[ENTITY TRANSFER MODULE]: UpdateAgent failed on teleport of {0} to {1}.  Keeping avatar in {2}",
                 sp.Name, finalDestination.RegionName, m_sceneName);
 
@@ -1254,7 +1255,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
 
             if (!sp.IsDeleted)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[ENTITY TRANSFER MODULE]: Closing agent {0} in {1} after teleport {2}", sp.Name, m_sceneName, sp.IsInTransit?"timeout":"");
                 m_scene.CloseAgent(spUUID, false);
             }
@@ -1334,7 +1335,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
     {
         agent.CallbackURI = m_sceneRegionInfo.ServerURI + "agent/" + agent.AgentID.ToString() + "/" + m_sceneRegionInfo.RegionID.ToString() + "/release/";
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[ENTITY TRANSFER MODULE]: Set release callback URL to {0} in {1}",
         //    agent.CallbackURI, region.RegionName);
     }
@@ -1343,7 +1344,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
     {
         agent.NewCallbackURI = m_sceneRegionInfo.ServerURI + "agent/" + agent.AgentID.ToString() + "/" + m_sceneRegionInfo.RegionID.ToString() + "/release/";
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[ENTITY TRANSFER MODULE]: Set release callback URL to {0} in {1}",
             agent.NewCallbackURI, m_sceneName);
     }
@@ -1446,20 +1447,20 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         bool notsame = false;
         if (client == null)
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Request to teleport {0} home", id);
         }
         else
         {
             if (id.Equals(client.AgentId))
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[ENTITY TRANSFER MODULE]: Request to teleport {0} {1} home", client.Name, id);
             }
             else
             {
                 notsame = true;
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[ENTITY TRANSFER MODULE]: Request to teleport {0} home by {1} {2}", id, client.Name, client.AgentId);
             }
         }
@@ -1469,7 +1470,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             if (notsame)
                 client.SendAlertMessage("TeleportHome: Agent not found in the scene");
-            m_log.DebugFormat("[ENTITY TRANSFER MODULE]: Agent not found in the scene where it is supposed to be");
+            m_log.LogDebug("[ENTITY TRANSFER MODULE]: Agent not found in the scene where it is supposed to be");
             return false;
         }
 
@@ -1479,7 +1480,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
             if (notsame)
                 client.SendAlertMessage("TeleportHome: Agent already processing a teleport");
             targetClient.SendTeleportFailed("Already processing a teleport");
-            m_log.DebugFormat("[ENTITY TRANSFER MODULE]: Agent still in teleport");
+            m_log.LogDebug("[ENTITY TRANSFER MODULE]: Agent still in teleport");
             return false;
         }
 
@@ -1487,7 +1488,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         GridUserInfo uinfo = m_scene.GridUserService.GetGridUserInfo(id.ToString());
         if(uinfo == null)
         {
-            m_log.ErrorFormat("[ENTITY TRANSFER MODULE] Griduser info not found for {1}. Cannot send home.", id);
+            m_log.LogError("[ENTITY TRANSFER MODULE] Griduser info not found for {1}. Cannot send home.", id);
             if (notsame)
                 client.SendAlertMessage("TeleportHome: Agent home region not found");
             targetClient.SendTeleportFailed("Your home region not found");
@@ -1497,7 +1498,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         if (uinfo.HomeRegionID.IsZero())
         {
             // can't find the Home region: Tell viewer and abort
-            m_log.ErrorFormat("[ENTITY TRANSFER MODULE] no home set {0}", id);
+            m_log.LogError("[ENTITY TRANSFER MODULE] no home set {0}", id);
             if (notsame)
                 client.SendAlertMessage("TeleportHome: Agent home not set");
             targetClient.SendTeleportFailed("Home set not");
@@ -1508,7 +1509,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         if (regionInfo == null)
         {
             // can't find the Home region: Tell viewer and abort
-            m_log.ErrorFormat("[ENTITY TRANSFER MODULE] {0} home region {1} not found", id, uinfo.HomeRegionID);
+            m_log.LogError("[ENTITY TRANSFER MODULE] {0} home region {1} not found", id, uinfo.HomeRegionID);
             if (notsame)
                 client.SendAlertMessage("TeleportHome: Agent home region not found");
             targetClient.SendTeleportFailed("Home region not found");
@@ -1567,7 +1568,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         newpos = pos;
         failureReason = string.Empty;
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[ENTITY TRANSFER MODULE]: Crossing agent {0} at pos {1} in {2}", agent.Name, pos, scene.Name);
 
         // Compute world location of the agent's position
@@ -1626,7 +1627,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                 ag.CrossToNewRegionFail();
             }
             else
-                m_log.DebugFormat("[ENTITY TRANSFER MODULE]: Crossing agent {0} {1} completed.", ag.Firstname, ag.Lastname);
+                m_log.LogDebug("[ENTITY TRANSFER MODULE]: Crossing agent {0} {1} completed.", ag.Firstname, ag.Lastname);
 
             ag.IsInTransit = false;
         }, null,"AgentRegionCross-"+ag.UUID.ToString());
@@ -1697,7 +1698,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         IPEndPoint endPoint = neighbourRegion.ExternalEndPoint;
         if(endPoint is null)
         {
-            m_log.DebugFormat("CrossAgentCreateFarChild failed to resolve neighbour address {0}", neighbourRegion.ExternalHostName);
+            m_log.LogDebug("CrossAgentCreateFarChild failed to resolve neighbour address {0}", neighbourRegion.ExternalHostName);
             return false;
         }
         if (!m_scene.SimulationService.CreateAgent(source, neighbourRegion, agentCircuit, (int)TeleportFlags.Default, ctx, out string _ ))
@@ -1712,7 +1713,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
 
         if (m_eqModule != null)
         {
-            m_log.DebugFormat("{0} {1} is sending {2} EnableSimulator for neighbour region {3}(loc=<{4},{5}>,siz=<{6},{7}>) " +
+            m_log.LogDebug("{0} {1} is sending {2} EnableSimulator for neighbour region {3}(loc=<{4},{5}>,siz=<{6},{7}>) " +
                 "and EstablishAgentCommunication with seed cap {8}", LogHeader,
                 source.RegionName, agent.Name,
                 neighbourRegion.RegionName, neighbourRegion.RegionLocX, neighbourRegion.RegionLocY, newSizeX, newSizeY , capsPath);
@@ -1739,19 +1740,19 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
     {
         try
         {
-            m_log.DebugFormat("{0}: CrossAgentToNewRegionAsync: new region={1} at <{2},{3}>. newpos={4}",
+            m_log.LogDebug("{0}: CrossAgentToNewRegionAsync: new region={1} at <{2},{3}>. newpos={4}",
                         LogHeader, neighbourRegion.RegionName, neighbourRegion.RegionLocX, neighbourRegion.RegionLocY, pos);
 
             if (neighbourRegion == null)
             {
-                m_log.DebugFormat("{0}: CrossAgentToNewRegionAsync: invalid destiny", LogHeader);
+                m_log.LogDebug("{0}: CrossAgentToNewRegionAsync: invalid destiny", LogHeader);
                 return agent;
             }
 
             IPEndPoint endpoint = neighbourRegion.ExternalEndPoint;
             if(endpoint == null)
             {
-                m_log.DebugFormat("{0}: CrossAgentToNewRegionAsync: failed to resolve neighbour address {0} ",neighbourRegion.ExternalHostName);
+                m_log.LogDebug("{0}: CrossAgentToNewRegionAsync: failed to resolve neighbour address {0} ",neighbourRegion.ExternalHostName);
                 return agent;
             }
 
@@ -1760,13 +1761,13 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
 
             if (!CrossAgentIntoNewRegionMain(agent, pos, neighbourRegion, endpoint, isFlying, ctx))
             {
-                m_log.DebugFormat("{0}: CrossAgentToNewRegionAsync: cross main failed. Resetting transfer state", LogHeader);
+                m_log.LogDebug("{0}: CrossAgentToNewRegionAsync: cross main failed. Resetting transfer state", LogHeader);
                 m_entityTransferStateMachine.ResetFromTransit(agent.UUID);
             }
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("{0}: CrossAgentToNewRegionAsync: failed with exception  ", LogHeader), e);
+            m_log.LogError(e, string.Format("{0}: CrossAgentToNewRegionAsync: failed with exception  ", LogHeader));
         }
         return agent;
     }
@@ -1817,7 +1818,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                 // region doesn't take it
                 m_entityTransferStateMachine.UpdateInTransit(agentUUID, AgentTransferState.CleaningUp);
 
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[ENTITY TRANSFER MODULE]: agent {0} crossing to {1} failed: {2}",
                     agent.Name, neighbourRegion.RegionName, reason);
 
@@ -1830,11 +1831,11 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                 return false;
             }
 
-        m_log.DebugFormat("[CrossAgentIntoNewRegionMain] ok, time {0}ms",Util.EnvironmentTickCountSubtract(ts));
+        m_log.LogDebug("[CrossAgentIntoNewRegionMain] ok, time {0}ms",Util.EnvironmentTickCountSubtract(ts));
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[ENTITY TRANSFER MODULE]: Problem crossing user {0} to new region {1} from {2}.  Exception {3}{4}",
                 agent.Name, neighbourRegion.RegionName, m_sceneName, e.Message, e.StackTrace);
 
@@ -1844,7 +1845,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
 
         if (!agent.KnownRegions.TryGetValue(neighbourRegion.RegionHandle, out string agentcaps))
         {
-            m_log.ErrorFormat("[ENTITY TRANSFER MODULE]: No ENTITY TRANSFER MODULE information for region handle {0}, exiting CrossToNewRegion.",
+            m_log.LogError("[ENTITY TRANSFER MODULE]: No ENTITY TRANSFER MODULE information for region handle {0}, exiting CrossToNewRegion.",
                              neighbourRegion.RegionHandle);
             return false;
         }
@@ -1855,7 +1856,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
 
         string capsPath = neighbourRegion.ServerURI + CapsUtil.GetCapsSeedPath(agentcaps);
 
-        m_log.DebugFormat("[ENTITY TRANSFER MODULE]: Sending new CAPS seed url {0} to client {1}", capsPath, agent.UUID);
+        m_log.LogDebug("[ENTITY TRANSFER MODULE]: Sending new CAPS seed url {0} to client {1}", capsPath, agent.UUID);
 
         Vector3 vel2 = Vector3.Zero;
         if((agent.m_crossingFlags & 2) != 0)
@@ -1870,7 +1871,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         }
         else
         {
-            m_log.ErrorFormat("{0} Using old CrossRegion packet. Varregion will not work!!", LogHeader);
+            m_log.LogError("{0} Using old CrossRegion packet. Varregion will not work!!", LogHeader);
             agent.ControllingClient.CrossRegion(neighbourRegion.RegionHandle, pos, agent.Velocity,
                     endpoint,capsPath);
         }
@@ -1912,7 +1913,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         // In any case
         agent.IsInTransit = false;
 
-//            m_log.DebugFormat("[ENTITY TRANSFER MODULE]: Crossing agent {0} {1} completed.", agent.Firstname, agent.Lastname);
+//            m_log.LogDebug("[ENTITY TRANSFER MODULE]: Crossing agent {0} {1} completed.", agent.Firstname, agent.Lastname);
     }
 
     #endregion
@@ -1944,7 +1945,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         if (rtmp > viewrange || rtmp < -(viewrange + region.RegionSizeY))
             return;
 
-        m_log.DebugFormat("[ENTITY TRANSFER]: Enabling child agent in new neighbour {0}", region.RegionName);
+        m_log.LogDebug("[ENTITY TRANSFER]: Enabling child agent in new neighbour {0}", region.RegionName);
 
         ulong regionhandler = region.RegionHandle;
 
@@ -2224,7 +2225,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                                 InformClientOfNeighbourAsync(sp, cagents[count], neighbour, ipe, true);
                             else
                             {
-                                m_log.DebugFormat("[ENTITY TRANSFER MODULE]:  lost DNS resolution for neighbour {0}", neighbour.ExternalHostName);
+                                m_log.LogDebug("[ENTITY TRANSFER MODULE]:  lost DNS resolution for neighbour {0}", neighbour.ExternalHostName);
                             }
                             count++;
                         }
@@ -2237,7 +2238,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                     }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat(
+                        m_log.LogError(
                             "[ENTITY TRANSFER MODULE]: Error creating child agent at {0} ({1} ({2}, {3}).  {4}",
                             neighbour.ExternalHostName,
                             neighbour.RegionHandle,
@@ -2326,7 +2327,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                         InformClientOfNeighbourAsync(sp, cagents[count], neighbour, ipe, true);
                     else
                     {
-                        m_log.DebugFormat("[ENTITY TRANSFER MODULE]:  lost DNS resolution for neighbour {0}", neighbour.ExternalHostName);
+                        m_log.LogDebug("[ENTITY TRANSFER MODULE]:  lost DNS resolution for neighbour {0}", neighbour.ExternalHostName);
                     }
                     count++;
                     if (sp.IsDeleted)
@@ -2334,7 +2335,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[ENTITY TRANSFER MODULE]: Error creating child agent at {0} ({1} ({2}, {3}).  {4}",
                         neighbour.ExternalHostName,
                         neighbour.RegionHandle,
@@ -2514,7 +2515,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
 
             Scene scene = sp.Scene;
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Informing {0} {1} about neighbour {2} {3} at ({4},{5})",
                 sp.Name, sp.UUID, reg.RegionName, endPoint, reg.RegionCoordX, reg.RegionCoordY);
 
@@ -2532,7 +2533,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                     if(sp == null || sp.IsDeleted || sp.ControllingClient == null) // something bad already happened
                         return;
 
-                    m_log.DebugFormat("{0} {1} is sending {2} EnableSimulator for neighbour region {3}(loc=<{4},{5}>,siz=<{6},{7}>) " +
+                    m_log.LogDebug("{0} {1} is sending {2} EnableSimulator for neighbour region {3}(loc=<{4},{5}>,siz=<{6},{7}>) " +
                         "and EstablishAgentCommunication with seed cap {8}", LogHeader,
                         scene.RegionInfo.RegionName, sp.Name,
                         reg.RegionName, reg.RegionLocX, reg.RegionLocY, reg.RegionSizeX, reg.RegionSizeY, capsPath);
@@ -2546,13 +2547,13 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                     // TODO: make Event Queue disablable!
                 }
 
-                m_log.DebugFormat("[ENTITY TRANSFER MODULE]: Completed inform {0} {1} about neighbour {2}", sp.Name, sp.UUID, endPoint);
+                m_log.LogDebug("[ENTITY TRANSFER MODULE]: Completed inform {0} {1} about neighbour {2}", sp.Name, sp.UUID, endPoint);
             }
 
             else
             {
                 sp.RemoveNeighbourRegion(reg.RegionHandle);
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[ENTITY TRANSFER MODULE]: Region {0} did not accept {1} {2}: {3}",
                     reg.RegionName, sp.Name, sp.UUID, reason);
             }
@@ -2678,7 +2679,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
     /// </returns>
     public bool CrossPrimGroupIntoNewRegion(GridRegion destination, Vector3 newPosition, SceneObjectGroup grp, bool silent, bool removeScripts)
     {
-        //m_log.Debug("  >>> CrossPrimGroupIntoNewRegion <<<");
+        //m_log.LogDebug("  >>> CrossPrimGroupIntoNewRegion <<<");
 
         Culture.SetCurrentCulture();
 
@@ -2700,7 +2701,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[ENTITY TRANSFER MODULE]: Exception deleting the old object left behind on a border crossing for {0}, {1}",
                         grp, e);
                 }
@@ -2708,7 +2709,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         }
         else
         {
-            m_log.Error("[ENTITY TRANSFER MODULE]: destination was unexpectedly null in Scene.CrossPrimGroupIntoNewRegion()");
+            m_log.LogError("[ENTITY TRANSFER MODULE]: destination was unexpectedly null in Scene.CrossPrimGroupIntoNewRegion()");
         }
 
         return successYN;
@@ -2739,7 +2740,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                     sog.ResumeScripts();
                 }
                 else
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[ENTITY TRANSFER MODULE]: InTransitScriptStates.Count={0} smaller than Attachments.Count={1}",
                         sp.InTransitScriptStates.Count, attachments.Count);
             }
@@ -2753,7 +2754,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
     {
         if (so.OwnerID.IsZero())
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Denied object {0}({1}) entry into {2} because ownerID is zero",
                     so.Name, so.UUID, m_sceneName);
             return false;
@@ -2763,7 +2764,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         // enter. Period.
         if (!m_scene.Permissions.IsAdministrator(so.OwnerID) && m_sceneRegionInfo.EstateSettings.IsBanned(so.OwnerID))
         {
-            m_log.Debug(
+            m_log.LogDebug(
                 $"[ENTITY TRANSFER MODULE]: Denied {so.Name} {so.UUID} into { m_sceneName} of banned owner {so.OwnerID}");
             return false;
         }
@@ -2772,7 +2773,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             if(m_scene.GetScenePresence(so.OwnerID) == null)
             {
-                m_log.Debug(
+                m_log.LogDebug(
                     $"[ENTITY TRANSFER MODULE]: Denied attachment {so.Name}({so.UUID}) owner {so.OwnerID} not in region {m_sceneName}");
                 return false;
             }
@@ -2783,7 +2784,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
 
         if (!m_scene.AddSceneObject(so))
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Problem adding scene object {0} {1} into {2} ",
                 so.Name, so.UUID, m_sceneName);
 
@@ -2798,7 +2799,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
             {
                 // Deny non attachments based on parcel settings
                 //
-                m_log.Info("[ENTITY TRANSFER MODULE]: Denied prim crossing because of parcel settings");
+                m_log.LogInformation("[ENTITY TRANSFER MODULE]: Denied prim crossing because of parcel settings");
 
                 m_scene.DeleteSceneObject(so, false);
 
@@ -2826,7 +2827,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
 
         if (m_sceneRegionInfo.EstateSettings.IsBanned(sp.UUID))
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Denied Attachments for banned avatar {0}", sp.Name);
             return false;
         }
@@ -2835,7 +2836,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         {
             if (!m_scene.AddSceneObject(so))
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[ENTITY TRANSFER MODULE]: Problem adding attachment {0} {1} into {2} ",
                     so.Name, so.UUID, m_sceneName);
                 continue;

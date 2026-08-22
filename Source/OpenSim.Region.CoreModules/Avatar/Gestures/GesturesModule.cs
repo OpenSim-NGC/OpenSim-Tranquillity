@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -35,11 +34,13 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.Gestures;
 
 public class GesturesModule : INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected Scene m_scene;
 
@@ -89,7 +90,7 @@ public class GesturesModule : INonSharedRegionModule
             invService.UpdateItem(item);
         }
         else
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[GESTURES]: Unable to find gesture {0} to activate for {1}", gestureId, client.Name);
     }
 
@@ -104,7 +105,7 @@ public class GesturesModule : INonSharedRegionModule
             invService.UpdateItem(item);
         }
         else
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[GESTURES]: Unable to find gesture to deactivate {0} for {1}", gestureId, client.Name);
     }
 }

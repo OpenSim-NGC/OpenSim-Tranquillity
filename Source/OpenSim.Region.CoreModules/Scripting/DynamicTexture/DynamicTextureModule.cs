@@ -31,14 +31,15 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using log4net;
 using System.Reflection;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Scripting.DynamicTexture;
 
 public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private const int ALL_SIDES = -1;
 
@@ -154,7 +155,7 @@ public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
 //            Console.WriteLine("{0} {1}", texture.Size.Width, texture.Size.Height);
         int discardLevel2DataThreshold = (int)Math.Ceiling((texture.Size.Width >> 2) * (texture.Size.Height >> 2) * 0.5);
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[DYNAMIC TEXTURE MODULE]: Discard level 2 threshold {0}, texture data length {1}",
 //                discardLevel2DataThreshold, texture.Data.Length);
 
@@ -285,7 +286,7 @@ public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
                 }
             }
 
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[DYNAMIC TEXTURE MODULE]: Requesting generation of new dynamic texture for {0} in {1}",
 //                    part.Name, part.ParentGroup.Scene.Name);
 
@@ -293,7 +294,7 @@ public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
         }
         else
         {
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[DYNAMIC TEXTURE MODULE]: Reusing cached texture {0} for {1} in {2}",
 //                    objReusableTextureUUID, part.Name, part.ParentGroup.Scene.Name);
 
@@ -384,7 +385,7 @@ public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
 
     public class DynamicTextureUpdater
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         public bool BlendWithOldTexture = false;
         public string BodyData;
@@ -568,7 +569,7 @@ public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                     "[DYNAMICTEXTUREMODULE]: SkiaSharp Encode Failed.  Exception {0}{1}",
                         e.Message, e.StackTrace);
                 }
@@ -601,7 +602,7 @@ public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                     "[DYNAMICTEXTUREMODULE]: SkiaSharp Encode Failed.  Exception {0}{1}",
                         e.Message, e.StackTrace);
                 }

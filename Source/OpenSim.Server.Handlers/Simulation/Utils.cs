@@ -32,13 +32,14 @@ using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework.Servers.HttpServer;
 
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.Handlers.Simulation;
 
 public class Utils
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public static byte[] falseStrBytes = osUTF8.GetASCIIBytes("false");
 

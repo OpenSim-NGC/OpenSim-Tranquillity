@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;
@@ -41,6 +40,7 @@ using System.Net;
 using System.Reflection;
 using System.Timers;
 using System.Xml;
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using RegionInfo = OpenSim.Framework.RegionInfo;
 
@@ -48,7 +48,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController;
 
 public class RemoteAdminPlugin : IApplicationPlugin
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static bool m_defaultAvatarsLoaded = false;
     private static Object   m_requestLock = new Object();
@@ -77,7 +77,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
     public void Initialise()
     {
-        m_log.Error("[RADMIN]: " + Name + " cannot be default-initialized!");
+        m_log.LogError("[RADMIN]: " + Name + " cannot be default-initialized!");
         throw new PluginNotInitialisedException(Name);
     }
 
@@ -96,7 +96,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             else
             {
                 m_config = m_configSource.Configs["RemoteAdmin"];
-                m_log.Debug("[RADMIN]: Remote Admin Plugin Enabled");
+                m_log.LogDebug("[RADMIN]: Remote Admin Plugin Enabled");
                 m_requiredPassword = m_config.GetString("access_password", String.Empty);
                 int port = m_config.GetInt("port", 0);
 
@@ -203,7 +203,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
     {
         if (!CreateDefaultAvatars())
         {
-            m_log.Info("[RADMIN]: Default avatars not loaded");
+            m_log.LogInformation("[RADMIN]: Default avatars not loaded");
         }
     }
 
@@ -230,7 +230,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[RADMIN]: Method {0} failed.  Exception {1}{2}", request.MethodName, e.Message, e.StackTrace);
 
             responseData["success"] = false;
@@ -244,14 +244,14 @@ public class RemoteAdminPlugin : IApplicationPlugin
     {
         if (m_accessIP.Count > 0 && !m_accessIP.Contains(check_ip_address))
         {
-            m_log.WarnFormat("[RADMIN]: Unauthorized access blocked from IP {0}", check_ip_address);
+            m_log.LogWarning("[RADMIN]: Unauthorized access blocked from IP {0}", check_ip_address);
             responseData["accepted"] = false;
             throw new Exception("not authorized");
         }
 
         if (m_requiredPassword != String.Empty && password != m_requiredPassword)
         {
-            m_log.WarnFormat("[RADMIN]: Wrong password, blocked access from IP {0}", check_ip_address);
+            m_log.LogWarning("[RADMIN]: Wrong password, blocked access from IP {0}", check_ip_address);
             responseData["accepted"] = false;
             throw new Exception("wrong password");
         }
@@ -298,7 +298,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 string[] alertTimes = requestData["alerts"].ToString().Split(Util.SplitCommaArray);
                 if (alertTimes.Length == 1 && Convert.ToInt32(alertTimes[0]) == -1)
                 {
-                    m_log.Info("[RADMIN]: Request to cancel restart.");
+                    m_log.LogInformation("[RADMIN]: Request to cancel restart.");
 
                     if (restartModule != null)
                     {
@@ -335,7 +335,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 }
             }
 
-            m_log.Info("[RADMIN]: Request to restart Region.");
+            m_log.LogInformation("[RADMIN]: Request to restart Region.");
 
             message = "Region is restarting in {0}. Please save what you are doing and log out.";
 
@@ -351,7 +351,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
             if (startupConfig.GetBoolean("SkipDelayOnEmptyRegion", false))
             {
-                m_log.Info("[RADMIN]: Counting affected avatars");
+                m_log.LogInformation("[RADMIN]: Counting affected avatars");
                 int agents = 0;
 
                 if (restartAll)
@@ -374,11 +374,11 @@ public class RemoteAdminPlugin : IApplicationPlugin
                     }
                 }
 
-                m_log.InfoFormat("[RADMIN]: Avatars in region: {0}", agents);
+                m_log.LogInformation("[RADMIN]: Avatars in region: {0}", agents);
 
                 if (agents == 0)
                 {
-                    m_log.Info("[RADMIN]: No avatars detected, shutting down without delay");
+                    m_log.LogInformation("[RADMIN]: No avatars detected, shutting down without delay");
 
                     times.Clear();
                     times.Add(0);
@@ -402,18 +402,18 @@ public class RemoteAdminPlugin : IApplicationPlugin
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[RADMIN]: Restart region: failed: {0} {1}", e.Message, e.StackTrace);
+            m_log.LogError("[RADMIN]: Restart region: failed: {0} {1}", e.Message, e.StackTrace);
             responseData["rebooting"] = false;
 
             throw;
         }
 
-        m_log.Info("[RADMIN]: Restart Region request complete");
+        m_log.LogInformation("[RADMIN]: Restart Region request complete");
     }
 
     private void XmlRpcAlertUserMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        //m_log.Info("[RADMIN]: AlertUser request started");
+        //m_log.LogInformation("[RADMIN]: AlertUser request started");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -427,32 +427,32 @@ public class RemoteAdminPlugin : IApplicationPlugin
         {
             responseData["success"] = false;
             responseData["error"] = "Invalid agent_id";
-            m_log.Info($"[RADMIN]: alert to agent got invalid uuid: {agentIdStr}: {message}");
+            m_log.LogInformation($"[RADMIN]: alert to agent got invalid uuid: {agentIdStr}: {message}");
             return;
         }
 
         if(m_application.SceneManager.TryGetRootScenePresence(agentId, out ScenePresence sp ))
         {
             sp.ControllingClient.SendAlertMessage(message);
-            m_log.Info($"[RADMIN]: Sent alert to agent {agentIdStr}: {message}");
+            m_log.LogInformation($"[RADMIN]: Sent alert to agent {agentIdStr}: {message}");
             responseData["success"] = true;
             return;
         }
 
         responseData["success"] = false;
         responseData["error"] = "User not found or not online";
-        m_log.Info($"[RADMIN]: Fail to send alert to not found agent {agentIdStr}: {message}");
+        m_log.LogInformation($"[RADMIN]: Fail to send alert to not found agent {agentIdStr}: {message}");
     }
 
     private void XmlRpcAlertMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Alert request started");
+        m_log.LogInformation("[RADMIN]: Alert request started");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
 
         string message = (string) requestData["message"];
-        m_log.InfoFormat("[RADMIN]: Broadcasting: {0}", message);
+        m_log.LogInformation("[RADMIN]: Broadcasting: {0}", message);
 
         responseData["accepted"] = true;
         responseData["success"] = true;
@@ -465,20 +465,20 @@ public class RemoteAdminPlugin : IApplicationPlugin
                         dialogModule.SendGeneralAlert(message);
                 });
 
-        m_log.Info("[RADMIN]: Alert request complete");
+        m_log.LogInformation("[RADMIN]: Alert request complete");
     }
 
     public void XmlRpcDialogMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
         Hashtable responseData = (Hashtable)response.Value;
 
-        m_log.Info("[RADMIN]: Dialog request started");
+        m_log.LogInformation("[RADMIN]: Dialog request started");
 
         Hashtable requestData = (Hashtable)request.Params[0];
 
         string message = (string)requestData["message"];
         string fromuuid = (string)requestData["from"];
-        m_log.Info($"[RADMIN]: Broadcasting: {message}");
+        m_log.LogInformation($"[RADMIN]: Broadcasting: {message}");
 
         responseData["accepted"] = true;
         responseData["success"] = true;
@@ -490,20 +490,20 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 dialogModule?.SendNotificationToUsersInRegion(UUID.Zero, fromuuid, message);
             });
 
-        m_log.Info("[RADMIN]: Dialog request complete");
+        m_log.LogInformation("[RADMIN]: Dialog request complete");
     }
 
     private void XmlRpcLoadHeightmapMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Load height maps request started");
+        m_log.LogInformation("[RADMIN]: Load height maps request started");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
 
-//                m_log.DebugFormat("[RADMIN]: Load Terrain: XmlRpc {0}", request);
+//                m_log.LogDebug("[RADMIN]: Load Terrain: XmlRpc {0}", request);
         // foreach (string k in requestData.Keys)
         // {
-        //     m_log.DebugFormat("[RADMIN]: Load Terrain: XmlRpc {0}: >{1}< {2}",
+        //     m_log.LogDebug("[RADMIN]: Load Terrain: XmlRpc {0}: >{1}< {2}",
         //                       k, (string)requestData[k], ((string)requestData[k]).Length);
         // }
 
@@ -528,17 +528,17 @@ public class RemoteAdminPlugin : IApplicationPlugin
             responseData["success"] = false;
         }
 
-        m_log.Info("[RADMIN]: Load height maps request complete");
+        m_log.LogInformation("[RADMIN]: Load height maps request complete");
     }
 
     private void XmlRpcSaveHeightmapMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Save height maps request started");
+        m_log.LogInformation("[RADMIN]: Save height maps request started");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
 
-//                m_log.DebugFormat("[RADMIN]: Save Terrain: XmlRpc {0}", request.ToString());
+//                m_log.LogDebug("[RADMIN]: Save Terrain: XmlRpc {0}", request.ToString());
 
         CheckStringParameters(requestData, responseData, new string[] { "filename" });
         CheckRegionParams(requestData, responseData);
@@ -549,7 +549,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
         if (scene != null)
         {
             string file = (string)requestData["filename"];
-            m_log.InfoFormat("[RADMIN]: Terrain Saving: {0}", file);
+            m_log.LogInformation("[RADMIN]: Terrain Saving: {0}", file);
 
             responseData["accepted"] = true;
 
@@ -565,12 +565,12 @@ public class RemoteAdminPlugin : IApplicationPlugin
             responseData["success"] = false;
         }
 
-        m_log.Info("[RADMIN]: Save height maps request complete");
+        m_log.LogInformation("[RADMIN]: Save height maps request complete");
     }
 
     private void XmlRpcShutdownMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Shutdown Administrator Request");
+        m_log.LogInformation("[RADMIN]: Received Shutdown Administrator Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -634,7 +634,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
         responseData["success"] = true;
 
-        m_log.Info("[RADMIN]: Shutdown Administrator Request complete");
+        m_log.LogInformation("[RADMIN]: Shutdown Administrator Request complete");
     }
 
     private void shutdownTimer_Elapsed(object sender, ElapsedEventArgs e)
@@ -708,7 +708,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
     /// </remarks>
     private void XmlRpcCreateRegionMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: CreateRegion: new request");
+        m_log.LogInformation("[RADMIN]: CreateRegion: new request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -747,7 +747,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             else
             {
                 regionID = UUID.Random();
-                m_log.DebugFormat("[RADMIN] CreateRegion: new region UUID {0}", regionID);
+                m_log.LogDebug("[RADMIN] CreateRegion: new region UUID {0}", regionID);
             }
 
             // create volatile or persistent region info
@@ -833,7 +833,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                                                             Replace("/", "_")));
                 }
 
-                m_log.DebugFormat("[RADMIN] CreateRegion: persisting region {0} to {1}",
+                m_log.LogDebug("[RADMIN] CreateRegion: persisting region {0} to {1}",
                                   region.RegionID, regionIniPath);
                 region.SaveRegionToFile("dynamic region", regionIniPath);
             }
@@ -947,7 +947,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             responseData["region_name"] = region.RegionName;
             responseData["region_id"] = region.RegionID.ToString();
 
-            m_log.Info("[RADMIN]: CreateRegion: request complete");
+            m_log.LogInformation("[RADMIN]: CreateRegion: request complete");
         }
     }
 
@@ -979,7 +979,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
     /// </remarks>
     private void XmlRpcDeleteRegionMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: DeleteRegion: new request");
+        m_log.LogInformation("[RADMIN]: DeleteRegion: new request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -998,7 +998,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             responseData["region_name"] = scene.RegionInfo.RegionName;
             responseData["region_id"] = scene.RegionInfo.RegionID;
 
-            m_log.Info("[RADMIN]: DeleteRegion: request complete");
+            m_log.LogInformation("[RADMIN]: DeleteRegion: request complete");
         }
     }
 
@@ -1032,7 +1032,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
     /// </remarks>
     private void XmlRpcCloseRegionMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: CloseRegion: new request");
+        m_log.LogInformation("[RADMIN]: CloseRegion: new request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -1052,7 +1052,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
             response.Value = responseData;
 
-            m_log.Info("[RADMIN]: CloseRegion: request complete");
+            m_log.LogInformation("[RADMIN]: CloseRegion: request complete");
         }
     }
 
@@ -1090,7 +1090,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
     /// </remarks>
     private void XmlRpcModifyRegionMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: ModifyRegion: new request");
+        m_log.LogInformation("[RADMIN]: ModifyRegion: new request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -1133,7 +1133,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             responseData["region_name"] = scene.RegionInfo.RegionName;
             responseData["region_id"] = scene.RegionInfo.RegionID;
 
-            m_log.Info("[RADMIN]: ModifyRegion: request complete");
+            m_log.LogInformation("[RADMIN]: ModifyRegion: request complete");
         }
     }
 
@@ -1177,7 +1177,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
     /// </remarks>
     private void XmlRpcCreateUserMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: CreateUser: new request");
+        m_log.LogInformation("[RADMIN]: CreateUser: new request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -1221,12 +1221,12 @@ public class RemoteAdminPlugin : IApplicationPlugin
                                     (int)Util.RegionToWorldLoc(regionXLocation), (int)Util.RegionToWorldLoc(regionYLocation));
                 if (null == home)
                 {
-                    m_log.WarnFormat("[RADMIN]: Unable to set home region for newly created user account {0} {1}", firstName, lastName);
+                    m_log.LogWarning("[RADMIN]: Unable to set home region for newly created user account {0} {1}", firstName, lastName);
                 }
                 else
                 {
                     scene.GridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0));
-                    m_log.DebugFormat("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, firstName, lastName);
+                    m_log.LogDebug("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, firstName, lastName);
                 }
 
                 // Establish the avatar's initial appearance
@@ -1236,7 +1236,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 responseData["success"] = true;
                 responseData["avatar_uuid"] = account.PrincipalID.ToString();
 
-                m_log.InfoFormat("[RADMIN]: CreateUser: User {0} {1} created, UUID {2}", firstName, lastName, account.PrincipalID);
+                m_log.LogInformation("[RADMIN]: CreateUser: User {0} {1} created, UUID {2}", firstName, lastName, account.PrincipalID);
             }
             catch
             {
@@ -1244,7 +1244,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 throw;
             }
 
-            m_log.Info("[RADMIN]: CreateUser: request complete");
+            m_log.LogInformation("[RADMIN]: CreateUser: request complete");
         }
     }
 
@@ -1282,7 +1282,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
     /// </remarks>
     private void XmlRpcUserExistsMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: UserExists: new request");
+        m_log.LogInformation("[RADMIN]: UserExists: new request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -1316,7 +1316,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             responseData["success"] = true;
         }
 
-        m_log.Info("[RADMIN]: UserExists: request complete");
+        m_log.LogInformation("[RADMIN]: UserExists: request complete");
     }
 
     /// <summary>
@@ -1363,8 +1363,8 @@ public class RemoteAdminPlugin : IApplicationPlugin
     /// </remarks>
     private void XmlRpcUpdateUserAccountMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: UpdateUserAccount: new request");
-        m_log.Warn("[RADMIN]: This method needs update for 0.7");
+        m_log.LogInformation("[RADMIN]: UpdateUserAccount: new request");
+        m_log.LogWarning("[RADMIN]: This method needs update for 0.7");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -1427,7 +1427,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
                 if (!String.IsNullOrEmpty(password))
                 {
-                    m_log.DebugFormat("[RADMIN]: UpdateUserAccount: updating password for avatar {0} {1}", firstName, lastName);
+                    m_log.LogDebug("[RADMIN]: UpdateUserAccount: updating password for avatar {0} {1}", firstName, lastName);
                     ChangeUserPassword(firstName, lastName, password);
                 }
 
@@ -1449,10 +1449,10 @@ public class RemoteAdminPlugin : IApplicationPlugin
                     GridRegion home = scene.GridService.GetRegionByPosition(scopeID,
                                     (int)Util.RegionToWorldLoc((uint)regionXLocation), (int)Util.RegionToWorldLoc((uint)regionYLocation));
                     if (null == home) {
-                        m_log.WarnFormat("[RADMIN]: Unable to set home region for updated user account {0} {1}", firstName, lastName);
+                        m_log.LogWarning("[RADMIN]: Unable to set home region for updated user account {0} {1}", firstName, lastName);
                     } else {
                         scene.GridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0));
-                        m_log.DebugFormat("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, firstName, lastName);
+                        m_log.LogDebug("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, firstName, lastName);
                     }
                 }
 
@@ -1463,7 +1463,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 responseData["success"] = true;
                 responseData["avatar_uuid"] = account.PrincipalID.ToString();
 
-                m_log.InfoFormat("[RADMIN]: UpdateUserAccount: account for user {0} {1} updated, UUID {2}",
+                m_log.LogInformation("[RADMIN]: UpdateUserAccount: account for user {0} {1} updated, UUID {2}",
                                  firstName, lastName,
                                  account.PrincipalID);
             }
@@ -1473,7 +1473,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 throw;
             }
 
-            m_log.Info("[RADMIN]: UpdateUserAccount: request complete");
+            m_log.LogInformation("[RADMIN]: UpdateUserAccount: request complete");
         }
     }
 
@@ -1512,7 +1512,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
     private void XmlRpcAuthenticateUserMethod(XmlRpcRequest request, XmlRpcResponse response,
                                                IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: AuthenticateUser: new request");
+        m_log.LogInformation("[RADMIN]: AuthenticateUser: new request");
 
         var responseData = (Hashtable)response.Value;
         var requestData = (Hashtable)request.Params[0];
@@ -1537,7 +1537,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
                 if (scene.Equals(null))
                 {
-                    m_log.Debug("scene does not exist");
+                    m_log.LogDebug("scene does not exist");
                     throw new Exception("Scene does not exist.");
                 }
 
@@ -1546,13 +1546,13 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
                 if (account.Equals(null) || account.PrincipalID.Equals(UUID.Zero))
                 {
-                    m_log.DebugFormat("avatar {0} {1} does not exist", firstName, lastName);
+                    m_log.LogDebug("avatar {0} {1} does not exist", firstName, lastName);
                     throw new Exception(String.Format("avatar {0} {1} does not exist", firstName, lastName));
                 }
 
                 if (String.IsNullOrEmpty(password))
                 {
-                    m_log.DebugFormat("[RADMIN]: AuthenticateUser: no password provided for {0} {1}", firstName,
+                    m_log.LogDebug("[RADMIN]: AuthenticateUser: no password provided for {0} {1}", firstName,
                                       lastName);
                     throw new Exception(String.Format("no password provided for {0} {1}", firstName,
                                       lastName));
@@ -1561,7 +1561,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 int lifetime;
                 if (int.TryParse((string)requestData["token_lifetime"], NumberStyles.Integer, CultureInfo.InvariantCulture, out lifetime) == false)
                 {
-                    m_log.DebugFormat("[RADMIN]: AuthenticateUser: no token lifetime provided for {0} {1}", firstName,
+                    m_log.LogDebug("[RADMIN]: AuthenticateUser: no token lifetime provided for {0} {1}", firstName,
                                       lastName);
                     throw new Exception(String.Format("no token lifetime provided for {0} {1}", firstName,
                                       lastName));
@@ -1570,7 +1570,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 // Upper bound on lifetime set to 30s.
                 if (lifetime > 30)
                 {
-                    m_log.DebugFormat("[RADMIN]: AuthenticateUser: token lifetime longer than 30s for {0} {1}", firstName,
+                    m_log.LogDebug("[RADMIN]: AuthenticateUser: token lifetime longer than 30s for {0} {1}", firstName,
                                       lastName);
                     throw new Exception(String.Format("token lifetime longer than 30s for {0} {1}", firstName,
                                       lastName));
@@ -1579,20 +1579,20 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 var authModule = scene.RequestModuleInterface<IAuthenticationService>();
                 if (authModule == null)
                 {
-                    m_log.Debug("[RADMIN]: AuthenticateUser: no authentication module loded");
+                    m_log.LogDebug("[RADMIN]: AuthenticateUser: no authentication module loded");
                     throw new Exception("no authentication module loaded");
                 }
 
                 var token = authModule.Authenticate(account.PrincipalID, password, lifetime);
                 if (String.IsNullOrEmpty(token))
                 {
-                    m_log.DebugFormat("[RADMIN]: AuthenticateUser: authentication failed for {0} {1}", firstName,
+                    m_log.LogDebug("[RADMIN]: AuthenticateUser: authentication failed for {0} {1}", firstName,
                         lastName);
                     throw new Exception(String.Format("authentication failed for {0} {1}", firstName,
                         lastName));
                 }
 
-                m_log.DebugFormat("[RADMIN]: AuthenticateUser: account for user {0} {1} identified with token {2}",
+                m_log.LogDebug("[RADMIN]: AuthenticateUser: account for user {0} {1} identified with token {2}",
                     firstName, lastName, token);
 
                 responseData["token"] = token;
@@ -1606,7 +1606,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 throw;
             }
 
-            m_log.Info("[RADMIN]: AuthenticateUser: request complete");
+            m_log.LogInformation("[RADMIN]: AuthenticateUser: request complete");
         }
     }
 
@@ -1648,7 +1648,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
     /// </remarks>
     private void XmlRpcLoadOARMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Load OAR Administrator Request");
+        m_log.LogInformation("[RADMIN]: Received Load OAR Administrator Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -1708,7 +1708,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 throw;
             }
 
-            m_log.Info("[RADMIN]: Load OAR Administrator Request complete");
+            m_log.LogInformation("[RADMIN]: Load OAR Administrator Request complete");
         }
     }
 
@@ -1754,7 +1754,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
     /// </remarks>
     private void XmlRpcSaveOARMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Save OAR Request");
+        m_log.LogInformation("[RADMIN]: Received Save OAR Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -1807,7 +1807,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 Guid requestId = Guid.NewGuid();
                 scene.EventManager.OnOarFileSaved += RemoteAdminOarSaveCompleted;
 
-                m_log.InfoFormat(
+                m_log.LogInformation(
                     "[RADMIN]: Submitting save OAR request for {0} to file {1}, request ID {2}",
                     scene.Name, filename, requestId);
 
@@ -1831,15 +1831,15 @@ public class RemoteAdminPlugin : IApplicationPlugin
             throw;
         }
 
-        m_log.Info("[RADMIN]: Save OAR Request complete");
+        m_log.LogInformation("[RADMIN]: Save OAR Request complete");
     }
 
     private void RemoteAdminOarSaveCompleted(Guid uuid, string name)
     {
         if (name != "")
-            m_log.ErrorFormat("[RADMIN]: Saving of OAR file with request ID {0} failed with message {1}", uuid, name);
+            m_log.LogError("[RADMIN]: Saving of OAR file with request ID {0} failed with message {1}", uuid, name);
         else
-            m_log.DebugFormat("[RADMIN]: Saved OAR file for request {0}", uuid);
+            m_log.LogDebug("[RADMIN]: Saved OAR file for request {0}", uuid);
 
         lock (m_saveOarLock)
             Monitor.Pulse(m_saveOarLock);
@@ -1847,7 +1847,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
     private void XmlRpcLoadXMLMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Load XML Administrator Request");
+        m_log.LogInformation("[RADMIN]: Received Load XML Administrator Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -1895,13 +1895,13 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 throw;
             }
 
-            m_log.Info("[RADMIN]: Load XML Administrator Request complete");
+            m_log.LogInformation("[RADMIN]: Load XML Administrator Request complete");
         }
     }
 
     private void XmlRpcSaveXMLMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Save XML Administrator Request");
+        m_log.LogInformation("[RADMIN]: Received Save XML Administrator Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -1947,7 +1947,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             throw;
         }
 
-        m_log.Info("[RADMIN]: Save XML Administrator Request complete");
+        m_log.LogInformation("[RADMIN]: Save XML Administrator Request complete");
     }
 
     private void XmlRpcRegionQueryMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
@@ -1981,7 +1981,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
     private void XmlRpcConsoleCommandMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Command XML Administrator Request");
+        m_log.LogInformation("[RADMIN]: Received Command XML Administrator Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -1990,12 +1990,12 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
         MainConsole.Instance.RunCommand(requestData["command"].ToString());
 
-        m_log.Info("[RADMIN]: Command XML Administrator Request complete");
+        m_log.LogInformation("[RADMIN]: Command XML Administrator Request complete");
     }
 
     private void XmlRpcAccessListClear(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Access List Clear Request");
+        m_log.LogInformation("[RADMIN]: Received Access List Clear Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -2012,12 +2012,12 @@ public class RemoteAdminPlugin : IApplicationPlugin
         if (scene.RegionInfo.Persistent)
             m_application.EstateDataService.StoreEstateSettings(scene.RegionInfo.EstateSettings);
 
-        m_log.Info("[RADMIN]: Access List Clear Request complete");
+        m_log.LogInformation("[RADMIN]: Access List Clear Request complete");
     }
 
     private void XmlRpcAccessListAdd(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Access List Add Request");
+        m_log.LogInformation("[RADMIN]: Received Access List Add Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -2042,7 +2042,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 if (account != null)
                 {
                     uuids.Add(account.PrincipalID);
-                    m_log.DebugFormat("[RADMIN]: adding \"{0}\" to ACL for \"{1}\"", name, scene.RegionInfo.RegionName);
+                    m_log.LogDebug("[RADMIN]: adding \"{0}\" to ACL for \"{1}\"", name, scene.RegionInfo.RegionName);
                 }
             }
             List<UUID> accessControlList = new List<UUID>(scene.RegionInfo.EstateSettings.EstateAccess);
@@ -2061,12 +2061,12 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
         responseData["added"] = addedUsers;
 
-        m_log.Info("[RADMIN]: Access List Add Request complete");
+        m_log.LogInformation("[RADMIN]: Access List Add Request complete");
     }
 
     private void XmlRpcAccessListRemove(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Access List Remove Request");
+        m_log.LogInformation("[RADMIN]: Received Access List Remove Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -2111,12 +2111,12 @@ public class RemoteAdminPlugin : IApplicationPlugin
         responseData["removed"] = removedUsers;
         responseData["success"] = true;
 
-        m_log.Info("[RADMIN]: Access List Remove Request complete");
+        m_log.LogInformation("[RADMIN]: Access List Remove Request complete");
     }
 
     private void XmlRpcAccessListList(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Access List List Request");
+        m_log.LogInformation("[RADMIN]: Received Access List List Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -2142,12 +2142,12 @@ public class RemoteAdminPlugin : IApplicationPlugin
         responseData["users"] = users;
         responseData["success"] = true;
 
-        m_log.Info("[RADMIN]: Access List List Request complete");
+        m_log.LogInformation("[RADMIN]: Access List List Request complete");
     }
 
     private void XmlRpcEstateReload(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Estate Reload Request");
+        m_log.LogInformation("[RADMIN]: Received Estate Reload Request");
 
         Hashtable responseData = (Hashtable)response.Value;
 //            Hashtable requestData = (Hashtable)request.Params[0];
@@ -2158,7 +2158,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
         responseData["success"] = true;
 
-        m_log.Info("[RADMIN]: Estate Reload Request complete");
+        m_log.LogInformation("[RADMIN]: Estate Reload Request complete");
     }
 
     private void XmlRpcGetAgentsMethod(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
@@ -2219,7 +2219,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             xmlrpcAgents.Add(xmlRpcAgent);
         }
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[REMOTE ADMIN]: XmlRpcGetAgents found {0} agents in {1}", xmlrpcAgents.Count, scene.Name);
 
         xmlRpcRegion["agents"] = xmlrpcAgents;
@@ -2302,7 +2302,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
         if (requestData.Contains("flags") && requestData["flags"] != null)
             set_flags = UInt32.TryParse(requestData["flags"].ToString(), out flags);
 
-        m_log.InfoFormat("[RADMIN]: Received Reset Land Request group={0} musicURL={1} flags={2}",
+        m_log.LogInformation("[RADMIN]: Received Reset Land Request group={0} musicURL={1} flags={2}",
             (set_group ? groupID.ToString() : "unchanged"),
             (set_music ? musicURL : "unchanged"),
             (set_flags ? flags.ToString() : "unchanged"));
@@ -2323,12 +2323,12 @@ public class RemoteAdminPlugin : IApplicationPlugin
         }
         );
         responseData["success"] = true;
-        m_log.Info("[RADMIN]: Reset Land Request complete");
+        m_log.LogInformation("[RADMIN]: Reset Land Request complete");
     }
 
     private void XmlRpcRefreshSearch(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Refresh Search Request");
+        m_log.LogInformation("[RADMIN]: Received Refresh Search Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -2349,12 +2349,12 @@ public class RemoteAdminPlugin : IApplicationPlugin
             responseData["success"] = false;
         }
 
-        m_log.Info("[RADMIN]: Refresh Search Request complete");
+        m_log.LogInformation("[RADMIN]: Refresh Search Request complete");
     }
 
     private void XmlRpcRefreshMap(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Refresh Map Request");
+        m_log.LogInformation("[RADMIN]: Received Refresh Map Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -2378,24 +2378,24 @@ public class RemoteAdminPlugin : IApplicationPlugin
             responseData["success"] = false;
         }
 
-        m_log.Info("[RADMIN]: Refresh Map Request complete");
+        m_log.LogInformation("[RADMIN]: Refresh Map Request complete");
     }
 
     private void XmlRpcGetOpenSimVersion(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Get OpenSim Version Request");
+        m_log.LogInformation("[RADMIN]: Received Get OpenSim Version Request");
 
         Hashtable responseData = (Hashtable)response.Value;
 
         responseData["version"] = m_openSimVersion;
         responseData["success"] = true;
 
-        m_log.Info("[RADMIN]: Get OpenSim Version Request complete");
+        m_log.LogInformation("[RADMIN]: Get OpenSim Version Request complete");
     }
 
     private void XmlRpcGetAgentCount(XmlRpcRequest request, XmlRpcResponse response, IPEndPoint remoteClient)
     {
-        m_log.Info("[RADMIN]: Received Get Agent Count Request");
+        m_log.LogInformation("[RADMIN]: Received Get Agent Count Request");
 
         Hashtable responseData = (Hashtable)response.Value;
         Hashtable requestData = (Hashtable)request.Params[0];
@@ -2415,7 +2415,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             responseData["success"] = true;
         }
 
-        m_log.Info("[RADMIN]: Get Agent Count Request complete");
+        m_log.LogInformation("[RADMIN]: Get Agent Count Request complete");
     }
 
     /// <summary>
@@ -2604,7 +2604,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 {
                     success = authenticationService.SetPassword(account.PrincipalID, password);
                     if (!success)
-                        m_log.WarnFormat("[RADMIN]: Unable to set password for account {0} {1}.",
+                        m_log.LogWarning("[RADMIN]: Unable to set password for account {0} {1}.",
                             firstName, lastName);
                 }
 
@@ -2618,30 +2618,30 @@ public class RemoteAdminPlugin : IApplicationPlugin
                     if (gridUserService != null && home != null)
                         gridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0));
                     else
-                        m_log.WarnFormat("[RADMIN]: Unable to set home for account {0} {1}.",
+                        m_log.LogWarning("[RADMIN]: Unable to set home for account {0} {1}.",
                            firstName, lastName);
                 }
                 else
-                    m_log.WarnFormat("[RADMIN]: Unable to retrieve home region for account {0} {1}.",
+                    m_log.LogWarning("[RADMIN]: Unable to retrieve home region for account {0} {1}.",
                        firstName, lastName);
 
                 if (inventoryService != null)
                 {
                     success = inventoryService.CreateUserInventory(account.PrincipalID);
                     if (!success)
-                        m_log.WarnFormat("[RADMIN]: Unable to create inventory for account {0} {1}.",
+                        m_log.LogWarning("[RADMIN]: Unable to create inventory for account {0} {1}.",
                             firstName, lastName);
                 }
 
-                m_log.InfoFormat("[RADMIN]: Account {0} {1} created successfully", firstName, lastName);
+                m_log.LogInformation("[RADMIN]: Account {0} {1} created successfully", firstName, lastName);
                 return account;
              } else {
-                m_log.ErrorFormat("[RADMIN]: Account creation failed for account {0} {1}", firstName, lastName);
+                m_log.LogError("[RADMIN]: Account creation failed for account {0} {1}", firstName, lastName);
             }
         }
         else
         {
-            m_log.ErrorFormat("[RADMIN]: A user with the name {0} {1} already exists!", firstName, lastName);
+            m_log.LogError("[RADMIN]: A user with the name {0} {1} already exists!", firstName, lastName);
         }
         return null;
     }
@@ -2667,7 +2667,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
             if (!success)
             {
-                m_log.WarnFormat("[RADMIN]: Unable to set password for account {0} {1}.",
+                m_log.LogWarning("[RADMIN]: Unable to set password for account {0} {1}.",
                    firstName, lastName);
                 return false;
             }
@@ -2675,20 +2675,20 @@ public class RemoteAdminPlugin : IApplicationPlugin
         }
         else
         {
-            m_log.ErrorFormat("[RADMIN]: No such user");
+            m_log.LogError("[RADMIN]: No such user");
             return false;
         }
     }
 
     private bool LoadHeightmap(string file, UUID regionID)
     {
-        m_log.InfoFormat("[RADMIN]: Terrain Loading: {0}", file);
+        m_log.LogInformation("[RADMIN]: Terrain Loading: {0}", file);
 
         Scene region = null;
 
         if (!m_application.SceneManager.TryGetScene(regionID, out region))
         {
-            m_log.InfoFormat("[RADMIN]: unable to get a scene with that name: {0}", regionID.ToString());
+            m_log.LogInformation("[RADMIN]: unable to get a scene with that name: {0}", regionID.ToString());
             return false;
         }
 
@@ -2696,7 +2696,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
         if (null == terrainModule) throw new Exception("terrain module not available");
         if (Uri.IsWellFormedUriString(file, UriKind.Absolute))
         {
-            m_log.Info("[RADMIN]: Terrain path is URL");
+            m_log.LogInformation("[RADMIN]: Terrain path is URL");
             Uri result;
             if (Uri.TryCreate(file, UriKind.RelativeOrAbsolute, out result))
             {
@@ -2710,7 +2710,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             terrainModule.LoadFromFile(file);
         }
 
-        m_log.Info("[RADMIN]: Load height maps request complete");
+        m_log.LogInformation("[RADMIN]: Load height maps request complete");
 
         return true;
     }
@@ -2725,7 +2725,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
     /// </summary>
     private void UpdateUserAppearance(Hashtable responseData, Hashtable requestData, UUID userid)
     {
-        m_log.DebugFormat("[RADMIN]: updateUserAppearance");
+        m_log.LogDebug("[RADMIN]: updateUserAppearance");
 
         string defaultMale   = m_config.GetString("default_male", "Default Male");
         string defaultFemale = m_config.GetString("default_female", "Default Female");
@@ -2765,16 +2765,16 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
         if (String.IsNullOrEmpty(model))
         {
-            m_log.DebugFormat("[RADMIN]: Appearance update not requested");
+            m_log.LogDebug("[RADMIN]: Appearance update not requested");
             return;
         }
 
-        m_log.DebugFormat("[RADMIN]: Setting appearance for avatar {0}, using model <{1}>", userid, model);
+        m_log.LogDebug("[RADMIN]: Setting appearance for avatar {0}, using model <{1}>", userid, model);
 
         string[] modelSpecifiers = model.Split();
         if (modelSpecifiers.Length != 2)
         {
-            m_log.WarnFormat("[RADMIN]: User appearance not set for {0}. Invalid model name : <{1}>", userid, model);
+            m_log.LogWarning("[RADMIN]: User appearance not set for {0}. Invalid model name : <{1}>", userid, model);
             // modelSpecifiers = dmodel.Split();
             return;
         }
@@ -2785,7 +2785,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
         if (modelProfile == null)
         {
-            m_log.WarnFormat("[RADMIN]: Requested model ({0}) not found. Appearance unchanged", model);
+            m_log.LogWarning("[RADMIN]: Requested model ({0}) not found. Appearance unchanged", model);
             return;
         }
 
@@ -2795,7 +2795,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
         EstablishAppearance(userid, modelProfile.PrincipalID);
 
-        m_log.DebugFormat("[RADMIN]: Finished setting appearance for avatar {0}, using model {1}",
+        m_log.LogDebug("[RADMIN]: Finished setting appearance for avatar {0}, using model {1}",
                           userid, model);
     }
 
@@ -2806,7 +2806,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
     /// </summary>
     private void EstablishAppearance(UUID destination, UUID source)
     {
-        m_log.DebugFormat("[RADMIN]: Initializing inventory for {0} from {1}", destination, source);
+        m_log.LogDebug("[RADMIN]: Initializing inventory for {0} from {1}", destination, source);
         Scene scene = m_application.SceneManager.CurrentOrFirstScene;
 
         // If the model has no associated appearance we're done.
@@ -2828,7 +2828,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[RADMIN]: Error transferring appearance for {0} : {1}",
+                m_log.LogWarning("[RADMIN]: Error transferring appearance for {0} : {1}",
                                   destination, e.Message);
             }
 
@@ -2859,7 +2859,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
         }
         catch (Exception e)
         {
-           m_log.WarnFormat("[RADMIN]: Error transferring appearance for {0} : {1}",
+           m_log.LogWarning("[RADMIN]: Error transferring appearance for {0} : {1}",
                               destination, e.Message);
         }
 
@@ -2893,7 +2893,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             destinationFolder.ParentID = inventoryService.GetRootFolder(destination).ID;
             destinationFolder.Version  = 1;
             inventoryService.AddFolder(destinationFolder);     // store base record
-            m_log.ErrorFormat("[RADMIN]: Created folder for destination {0}", source);
+            m_log.LogError("[RADMIN]: Created folder for destination {0}", source);
         }
 
         // Wearables
@@ -2934,7 +2934,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                     ApplyNextOwnerPermissions(destinationItem);
 
                     m_application.SceneManager.CurrentOrFirstScene.AddInventoryItem(destinationItem);
-                    m_log.DebugFormat("[RADMIN]: Added item {0} to folder {1}", destinationItem.ID, destinationFolder.ID);
+                    m_log.LogDebug("[RADMIN]: Added item {0} to folder {1}", destinationItem.ID, destinationFolder.ID);
 
                     // Wear item
                     AvatarWearable newWearable = new AvatarWearable();
@@ -2943,7 +2943,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 }
                 else
                 {
-                    m_log.WarnFormat("[RADMIN]: Error transferring {0} to folder {1}", wearable[0].ItemID, destinationFolder.ID);
+                    m_log.LogWarning("[RADMIN]: Error transferring {0} to folder {1}", wearable[0].ItemID, destinationFolder.ID);
                 }
             }
         }
@@ -2987,15 +2987,15 @@ public class RemoteAdminPlugin : IApplicationPlugin
                     ApplyNextOwnerPermissions(destinationItem);
 
                     m_application.SceneManager.CurrentOrFirstScene.AddInventoryItem(destinationItem);
-                    m_log.DebugFormat("[RADMIN]: Added item {0} to folder {1}", destinationItem.ID, destinationFolder.ID);
+                    m_log.LogDebug("[RADMIN]: Added item {0} to folder {1}", destinationItem.ID, destinationFolder.ID);
 
                     // Attach item
                     avatarAppearance.SetAttachment(attachpoint, destinationItem.ID, destinationItem.AssetID);
-                    m_log.DebugFormat("[RADMIN]: Attached {0}", destinationItem.ID);
+                    m_log.LogDebug("[RADMIN]: Attached {0}", destinationItem.ID);
                 }
                 else
                 {
-                    m_log.WarnFormat("[RADMIN]: Error transferring {0} to folder {1}", itemID, destinationFolder.ID);
+                    m_log.LogWarning("[RADMIN]: Error transferring {0} to folder {1}", itemID, destinationFolder.ID);
                 }
             }
         }
@@ -3034,7 +3034,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             sourceFolder.ParentID = inventoryService.GetRootFolder(source).ID;
             sourceFolder.Version  = 1;
             inventoryService.AddFolder(sourceFolder);     // store base record
-            m_log.ErrorFormat("[RADMIN] Created folder for source {0}", source);
+            m_log.LogError("[RADMIN] Created folder for source {0}", source);
         }
 
         // Missing destination folder? This should *never* be the case
@@ -3055,7 +3055,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             destinationFolder.ParentID = inventoryService.GetRootFolder(destination).ID;
             destinationFolder.Version  = 1;
             inventoryService.AddFolder(destinationFolder);     // store base record
-            m_log.ErrorFormat("[RADMIN]: Created folder for destination {0}", source);
+            m_log.LogError("[RADMIN]: Created folder for destination {0}", source);
         }
 
         InventoryFolderBase extraFolder;
@@ -3072,7 +3072,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             extraFolder.ParentID = destinationFolder.ID;
             inventoryService.AddFolder(extraFolder);
 
-            m_log.DebugFormat("[RADMIN]: Added folder {0} to folder {1}", extraFolder.ID, sourceFolder.ID);
+            m_log.LogDebug("[RADMIN]: Added folder {0} to folder {1}", extraFolder.ID, sourceFolder.ID);
 
             List<InventoryItemBase> items = inventoryService.GetFolderContent(source, folder.ID).Items;
 
@@ -3103,14 +3103,14 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
                 m_application.SceneManager.CurrentOrFirstScene.AddInventoryItem(destinationItem);
                 inventoryMap.Add(item.ID, destinationItem.ID);
-                m_log.DebugFormat("[RADMIN]: Added item {0} to folder {1}", destinationItem.ID, extraFolder.ID);
+                m_log.LogDebug("[RADMIN]: Added item {0} to folder {1}", destinationItem.ID, extraFolder.ID);
 
                 // Attach item, if original is attached
                 int attachpoint = avatarAppearance.GetAttachpoint(item.ID);
                 if (attachpoint != 0)
                 {
                     avatarAppearance.SetAttachment(attachpoint, destinationItem.ID, destinationItem.AssetID);
-                    m_log.DebugFormat("[RADMIN]: Attached {0}", destinationItem.ID);
+                    m_log.LogDebug("[RADMIN]: Attached {0}", destinationItem.ID);
                 }
             }
         }
@@ -3153,7 +3153,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             return false;
         }
 
-        m_log.DebugFormat("[RADMIN]: Creating default avatar entries");
+        m_log.LogDebug("[RADMIN]: Creating default avatar entries");
 
         m_defaultAvatarsLoaded = true;
 
@@ -3209,7 +3209,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
                 foreach (XmlElement avatar in avatars)
                 {
-                    m_log.DebugFormat("[RADMIN]: Loading appearance for {0}, gender = {1}",
+                    m_log.LogDebug("[RADMIN]: Loading appearance for {0}, gender = {1}",
                         GetStringAttribute(avatar,"name","?"), GetStringAttribute(avatar,"gender","?"));
 
                     // Create the user identified by the avatar entry
@@ -3231,7 +3231,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                             account = CreateUser(scopeID, names[0], names[1], password, email);
                             if (null == account)
                             {
-                                m_log.ErrorFormat("[RADMIN]: Avatar {0} {1} was not created", names[0], names[1]);
+                                m_log.LogError("[RADMIN]: Avatar {0} {1} was not created", names[0], names[1]);
                                 return false;
                             }
                         }
@@ -3241,20 +3241,20 @@ public class RemoteAdminPlugin : IApplicationPlugin
                         GridRegion home = scene.GridService.GetRegionByPosition(scopeID,
                                     (int)Util.RegionToWorldLoc(regionXLocation), (int)Util.RegionToWorldLoc(regionYLocation));
                         if (null == home) {
-                            m_log.WarnFormat("[RADMIN]: Unable to set home region for newly created user account {0} {1}", names[0], names[1]);
+                            m_log.LogWarning("[RADMIN]: Unable to set home region for newly created user account {0} {1}", names[0], names[1]);
                         } else {
                             scene.GridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0));
-                            m_log.DebugFormat("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, names[0], names[1]);
+                            m_log.LogDebug("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, names[0], names[1]);
                         }
 
                         ID = account.PrincipalID;
 
-                        m_log.DebugFormat("[RADMIN]: User {0}[{1}] created or retrieved", name, ID);
+                        m_log.LogDebug("[RADMIN]: User {0}[{1}] created or retrieved", name, ID);
                         include = true;
                     }
                     catch (Exception e)
                     {
-                        m_log.DebugFormat("[RADMIN]: Error creating user {0} : {1}", name, e.Message);
+                        m_log.LogDebug("[RADMIN]: Error creating user {0} : {1}", name, e.Message);
                         include = false;
                     }
 
@@ -3278,7 +3278,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
                         try
                         {
-                            // m_log.DebugFormat("[RADMIN] {0} folders, {1} items in inventory",
+                            // m_log.LogDebug("[RADMIN] {0} folders, {1} items in inventory",
                             //   uic.folders.Count, uic.items.Count);
 
                             InventoryFolderBase clothingFolder = inventoryService.GetFolderForType(ID, FolderType.Clothing);
@@ -3294,7 +3294,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                                 clothingFolder.ParentID = inventoryService.GetRootFolder(ID).ID;
                                 clothingFolder.Version  = 1;
                                 inventoryService.AddFolder(clothingFolder);     // store base record
-                                m_log.ErrorFormat("[RADMIN]: Created clothing folder for {0}/{1}", name, ID);
+                                m_log.LogError("[RADMIN]: Created clothing folder for {0}/{1}", name, ID);
                             }
 
                             // OK, now we have an inventory for the user, read in the outfits from the
@@ -3307,7 +3307,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
 
                             foreach (XmlElement outfit in outfits)
                             {
-                                m_log.DebugFormat("[RADMIN]: Loading outfit {0} for {1}",
+                                m_log.LogDebug("[RADMIN]: Loading outfit {0} for {1}",
                                     GetStringAttribute(outfit,"name","?"), GetStringAttribute(avatar,"name","?"));
 
                                 outfitName   = GetStringAttribute(outfit,"name","");
@@ -3331,7 +3331,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                                 // Otherwise, we must create the folder.
                                 if (extraFolder == null)
                                 {
-                                    m_log.DebugFormat("[RADMIN]: Creating outfit folder {0} for {1}", outfitName, name);
+                                    m_log.LogDebug("[RADMIN]: Creating outfit folder {0} for {1}", outfitName, name);
                                     extraFolder          = new InventoryFolderBase();
                                     extraFolder.ID       = UUID.Random();
                                     extraFolder.Name     = outfitName;
@@ -3340,7 +3340,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                                     extraFolder.Version  = 1;
                                     extraFolder.ParentID = clothingFolder.ID;
                                     inventoryService.AddFolder(extraFolder);
-                                    m_log.DebugFormat("[RADMIN]: Adding outfile folder {0} to folder {1}", extraFolder.ID, clothingFolder.ID);
+                                    m_log.LogDebug("[RADMIN]: Adding outfile folder {0} to folder {1}", extraFolder.ID, clothingFolder.ID);
                                 }
 
                                 // Now get the pieces that make up the outfit
@@ -3355,7 +3355,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                                         switch (child.Name)
                                         {
                                             case "Permissions" :
-                                                m_log.DebugFormat("[RADMIN]: Permissions specified");
+                                                m_log.LogDebug("[RADMIN]: Permissions specified");
                                                 perms = child;
                                                 break;
                                             case "Asset" :
@@ -3404,7 +3404,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                                         inventoryItem.Folder = extraFolder.ID; // Parent folder
 
                                         m_application.SceneManager.CurrentOrFirstScene.AddInventoryItem(inventoryItem);
-                                        m_log.DebugFormat("[RADMIN]: Added item {0} to folder {1}", inventoryItem.ID, extraFolder.ID);
+                                        m_log.LogDebug("[RADMIN]: Added item {0} to folder {1}", inventoryItem.ID, extraFolder.ID);
                                     }
 
                                     // Attach item, if attachpoint is specified
@@ -3412,7 +3412,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                                     if (attachpoint != 0)
                                     {
                                         avatarAppearance.SetAttachment(attachpoint, inventoryItem.ID, inventoryItem.AssetID);
-                                        m_log.DebugFormat("[RADMIN]: Attached {0}", inventoryItem.ID);
+                                        m_log.LogDebug("[RADMIN]: Attached {0}", inventoryItem.ID);
                                     }
 
                                     // Record whether or not the item is to be initially worn
@@ -3425,32 +3425,32 @@ public class RemoteAdminPlugin : IApplicationPlugin
                                     }
                                     catch (Exception e)
                                     {
-                                        m_log.WarnFormat("[RADMIN]: Error wearing item {0} : {1}", inventoryItem.ID, e.Message);
+                                        m_log.LogWarning("[RADMIN]: Error wearing item {0} : {1}", inventoryItem.ID, e.Message);
                                     }
                                 } // foreach item in outfit
-                                m_log.DebugFormat("[RADMIN]: Outfit {0} load completed", outfitName);
+                                m_log.LogDebug("[RADMIN]: Outfit {0} load completed", outfitName);
                             } // foreach outfit
-                            m_log.DebugFormat("[RADMIN]: Inventory update complete for {0}", name);
+                            m_log.LogDebug("[RADMIN]: Inventory update complete for {0}", name);
                             scene.AvatarService.SetAppearance(ID, avatarAppearance);
                         }
                         catch (Exception e)
                         {
-                            m_log.WarnFormat("[RADMIN]: Inventory processing incomplete for user {0} : {1}",
+                            m_log.LogWarning("[RADMIN]: Inventory processing incomplete for user {0} : {1}",
                                 name, e.Message);
                         }
                     } // End of include
                 }
-                m_log.DebugFormat("[RADMIN]: Default avatar loading complete");
+                m_log.LogDebug("[RADMIN]: Default avatar loading complete");
             }
             else
             {
-                m_log.DebugFormat("[RADMIN]: No default avatar information available");
+                m_log.LogDebug("[RADMIN]: No default avatar information available");
                 return false;
             }
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[RADMIN]: Exception whilst loading default avatars ; {0}", e.Message);
+            m_log.LogWarning("[RADMIN]: Exception whilst loading default avatars ; {0}", e.Message);
             return false;
         }
 

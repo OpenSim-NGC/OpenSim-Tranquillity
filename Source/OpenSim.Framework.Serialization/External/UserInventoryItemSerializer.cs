@@ -31,6 +31,9 @@ using System.Xml;
 using OpenMetaverse;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Framework.Serialization.External;
 
 /// <summary>
@@ -38,7 +41,7 @@ namespace OpenSim.Framework.Serialization.External;
 /// </summary>
 public class UserInventoryItemSerializer
 {
-     // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+     // private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static FrozenDictionary<string, Action<InventoryItemBase, XmlReader>> m_InventoryItemXmlProcessors
         = new Dictionary<string, Action<InventoryItemBase, XmlReader>>()
@@ -207,7 +210,7 @@ public class UserInventoryItemSerializer
             reader.ReadEndElement(); // InventoryItem
         }
 
-        //m_log.DebugFormat("[XXX]: parsed InventoryItemBase {0} - {1}", obj.Name, obj.UUID);
+        //m_log.LogDebug("[XXX]: parsed InventoryItemBase {0} - {1}", obj.Name, obj.UUID);
         return item;
     }
 

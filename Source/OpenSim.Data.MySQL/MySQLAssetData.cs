@@ -27,10 +27,11 @@
 
 using System.Data;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using MySqlConnector;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.MySQL;
 
@@ -39,7 +40,7 @@ namespace OpenSim.Data.MySQL;
 /// </summary>
 public class MySQLAssetData : AssetDataBase
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_connectionString;
 
@@ -138,8 +139,7 @@ public class MySQLAssetData : AssetDataBase
                 }
                 catch (Exception e)
                 {
-                    m_log.Error(
-                        string.Format("[ASSETS DB]: MySql failure fetching asset {0}.  Exception  ", assetID), e);
+                    m_log.LogError(e, string.Format("[ASSETS DB]: MySql failure fetching asset {0}.  Exception  ", assetID));
                 }
             }
             dbcon.Close();
@@ -159,7 +159,7 @@ public class MySQLAssetData : AssetDataBase
         if (asset.Name.Length > AssetBase.MAX_ASSET_NAME)
         {
             assetName = asset.Name.Substring(0, AssetBase.MAX_ASSET_NAME);
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[ASSET DB]: Name '{0}' for asset {1} truncated from {2} to {3} characters on add",
                 asset.Name, asset.ID, asset.Name.Length, assetName.Length);
         }
@@ -168,7 +168,7 @@ public class MySQLAssetData : AssetDataBase
         if (asset.Description.Length > AssetBase.MAX_ASSET_DESC)
         {
             assetDescription = asset.Description.Substring(0, AssetBase.MAX_ASSET_DESC);
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[ASSET DB]: Description '{0}' for asset {1} truncated from {2} to {3} characters on add",
                 asset.Description, asset.ID, asset.Description.Length, assetDescription.Length);
         }
@@ -203,7 +203,7 @@ public class MySQLAssetData : AssetDataBase
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[ASSET DB]: MySQL failure creating asset {0} with name \"{1}\". Error: {2}",
+                    m_log.LogError("[ASSET DB]: MySQL failure creating asset {0} with name \"{1}\". Error: {2}",
                         asset.FullID, asset.Name, e.Message);
                     dbcon.Close();
                     return false;
@@ -231,11 +231,9 @@ public class MySQLAssetData : AssetDataBase
                 }
                 catch (Exception e)
                 {
-                    m_log.Error(
-                        string.Format(
+                    m_log.LogError(e, string.Format(
                             "[ASSETS DB]: Failure updating access_time for asset {0} with name {1}.  Exception  ",
-                            asset.FullID, asset.Name),
-                        e);
+                            asset.FullID, asset.Name));
                 }
             }
             dbcon.Close();
@@ -329,11 +327,9 @@ public class MySQLAssetData : AssetDataBase
                 }
                 catch (Exception e)
                 {
-                    m_log.Error(
-                        string.Format(
+                    m_log.LogError(e, string.Format(
                             "[ASSETS DB]: MySql failure fetching asset set from {0}, count {1}.  Exception  ",
-                            start, count),
-                        e);
+                            start, count));
                 }
             }
             dbcon.Close();

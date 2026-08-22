@@ -27,11 +27,12 @@
 
 using System.Reflection;
 using System.Xml;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.DataSnapshot.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.DataSnapshot.Providers;
 
@@ -39,7 +40,7 @@ public class ObjectSnapshot : IDataSnapshotProvider
 {
     private Scene m_scene = null;
     // private DataSnapshotManager m_parent = null;
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private bool m_stale = true;
 
     private static UUID m_DefaultImage = new UUID("89556747-24cb-43ed-920b-47caed15465f");
@@ -94,7 +95,7 @@ public class ObjectSnapshot : IDataSnapshotProvider
 
     public XmlNode RequestSnapshotData(XmlDocument nodeFactory)
     {
-        m_log.Debug("[DATASNAPSHOT]: Generating object data for scene " + m_scene.RegionInfo.RegionName);
+        m_log.LogDebug("[DATASNAPSHOT]: Generating object data for scene " + m_scene.RegionInfo.RegionName);
 
         XmlNode parent = nodeFactory.CreateNode(XmlNodeType.Element, "objectdata", "");
         XmlNode node;
@@ -107,7 +108,7 @@ public class ObjectSnapshot : IDataSnapshotProvider
             {
                 SceneObjectGroup obj = (SceneObjectGroup)entity;
 
-//                    m_log.Debug("[DATASNAPSHOT]: Found object " + obj.Name + " in scene");
+//                    m_log.LogDebug("[DATASNAPSHOT]: Found object " + obj.Name + " in scene");
 
                 // libomv will complain about PrimFlags.JointWheel
                 // being obsolete, so we...
@@ -148,7 +149,7 @@ public class ObjectSnapshot : IDataSnapshotProvider
                     else
                     {
                         // Something is wrong with this object. Let's not list it.
-                        m_log.WarnFormat("[DATASNAPSHOT]: Bad data for object {0} ({1}) in region {2}", obj.Name, obj.UUID, m_scene.RegionInfo.RegionName);
+                        m_log.LogWarning("[DATASNAPSHOT]: Bad data for object {0} ({1}) in region {2}", obj.Name, obj.UUID, m_scene.RegionInfo.RegionName);
                         continue;
                     }
 

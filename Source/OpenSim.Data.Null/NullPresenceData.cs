@@ -27,11 +27,14 @@
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.Null;
 
 public class NullPresenceData : IPresenceData
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public static NullPresenceData Instance;
 
@@ -52,7 +55,7 @@ public class NullPresenceData : IPresenceData
         if (Instance != this)
             return Instance.Store(data);
 
-//            m_log.DebugFormat("[NULL PRESENCE DATA]: Storing presence {0}", data.UserID);
+//            m_log.LogDebug("[NULL PRESENCE DATA]: Storing presence {0}", data.UserID);
 //            Console.WriteLine("HOME for " + data.UserID + " is " + (data.Data.ContainsKey("HomeRegionID") ? data.Data["HomeRegionID"] : "Not found"));
 
         m_presenceData[data.SessionID] = data;
@@ -103,7 +106,7 @@ public class NullPresenceData : IPresenceData
         if (Instance != this)
             return Instance.Get(field, data);
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[NULL PRESENCE DATA]: Getting presence data for field {0} with parameter {1}", field, data);
 
         List<PresenceData> presences = new List<PresenceData>();
@@ -157,7 +160,7 @@ public class NullPresenceData : IPresenceData
 
     public bool Delete(string field, string data)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[NULL PRESENCE DATA]: Deleting presence data for field {0} with parameter {1}", field, data);
 
         if (Instance != this)

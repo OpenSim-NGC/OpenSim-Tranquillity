@@ -31,14 +31,15 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using Nini.Config;
-using log4net;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegionModule
 {
-    internal static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    internal static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
     internal static readonly string LogHeader = "[BULLETS SCENE]";
 
     private bool m_Enabled = false;
@@ -74,7 +75,7 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
     private Object AvatarsInSceneLock = new Object();
 
     // let my minuions use my logger
-    public ILog Logger { get { return m_log; } }
+    public ILogger Logger { get { return m_log; } }
 
     public IMesher mesher;
     public uint WorldID { get; private set; }
@@ -220,7 +221,7 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
                 string mesher = config.GetString("meshing", string.Empty);
                 if (string.IsNullOrEmpty(mesher) || !mesher.Equals("Meshmerizer"))
                 {
-                    m_log.Error("[BulletSim] Opensim.ini meshing option must be set to \"Meshmerizer\"");
+                    m_log.LogError("[BulletSim] Opensim.ini meshing option must be set to \"Meshmerizer\"");
                     throw new Exception("Invalid physics meshing option");
                 }
 
@@ -275,7 +276,7 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
 
         mesher = scene.RequestModuleInterface<IMesher>();
         if (mesher == null)
-            m_log.WarnFormat("{0} No mesher. Things will not work well.", LogHeader);
+            m_log.LogWarning("{0} No mesher. Things will not work well.", LogHeader);
 
         scene.PhysicsEnabled = true;
     }
@@ -304,7 +305,7 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
         // Only use heightmap terrain implementation if terrain larger than legacy size
         if ((uint)regionExtent.X > Constants.RegionSize || (uint)regionExtent.Y > Constants.RegionSize)
         {
-            m_log.WarnFormat("{0} Forcing terrain implementation to heightmap for large region", LogHeader);
+            m_log.LogWarning("{0} Forcing terrain implementation to heightmap for large region", LogHeader);
             BSParam.TerrainImplementation = (float)BSTerrainPhys.TerrainImplementation.Heightmap;
         }
 
@@ -342,7 +343,7 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
         TerrainManager.CreateInitialGroundPlaneAndTerrain();
 
         // Put some informational messages into the log file.
-        m_log.InfoFormat("{0} Linksets implemented with {1}", LogHeader, (BSLinkset.LinksetImplementation)BSParam.LinksetImplementation);
+        m_log.LogInformation("{0} Linksets implemented with {1}", LogHeader, (BSLinkset.LinksetImplementation)BSParam.LinksetImplementation);
 
         InSimulationTime = false;
         m_initialized = true;
@@ -449,25 +450,25 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
             case "bulletxna":
                 ret = new BSAPIXNA(engineName, this);
                 // Disable some features that are not implemented in BulletXNA
-                m_log.InfoFormat("{0} Disabling some physics features not implemented by BulletXNA", LogHeader);
-                m_log.InfoFormat("{0}    Disabling ShouldUseBulletHACD", LogHeader);
+                m_log.LogInformation("{0} Disabling some physics features not implemented by BulletXNA", LogHeader);
+                m_log.LogInformation("{0}    Disabling ShouldUseBulletHACD", LogHeader);
                 BSParam.ShouldUseBulletHACD = false;
-                m_log.InfoFormat("{0}    Disabling ShouldUseSingleConvexHullForPrims", LogHeader);
+                m_log.LogInformation("{0}    Disabling ShouldUseSingleConvexHullForPrims", LogHeader);
                 BSParam.ShouldUseSingleConvexHullForPrims = false;
-                m_log.InfoFormat("{0}    Disabling ShouldUseGImpactShapeForPrims", LogHeader);
+                m_log.LogInformation("{0}    Disabling ShouldUseGImpactShapeForPrims", LogHeader);
                 BSParam.ShouldUseGImpactShapeForPrims = false;
-                m_log.InfoFormat("{0}    Setting terrain implimentation to Heightmap", LogHeader);
+                m_log.LogInformation("{0}    Setting terrain implimentation to Heightmap", LogHeader);
                 BSParam.TerrainImplementation = (float)BSTerrainPhys.TerrainImplementation.Heightmap;
                 break;
         }
 
         if (ret == null)
         {
-            m_log.ErrorFormat("{0} COULD NOT SELECT BULLET ENGINE: '[BulletSim]PhysicsEngine' must be either 'BulletUnmanaged-*' or 'BulletXNA-*'", LogHeader);
+            m_log.LogError("{0} COULD NOT SELECT BULLET ENGINE: '[BulletSim]PhysicsEngine' must be either 'BulletUnmanaged-*' or 'BulletXNA-*'", LogHeader);
         }
         else
         {
-            m_log.InfoFormat("{0} Selected bullet engine {1} -> {2}/{3}", LogHeader, engineName, ret.BulletEngineName, ret.BulletEngineVersion);
+            m_log.LogInformation("{0} Selected bullet engine {1} -> {2}/{3}", LogHeader, engineName, ret.BulletEngineName, ret.BulletEngineVersion);
         }
 
         return ret;
@@ -475,7 +476,7 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
 
     public override void Dispose()
     {
-        // m_log.DebugFormat("{0}: Dispose()", LogHeader);
+        // m_log.LogDebug("{0}: Dispose()", LogHeader);
 
         // make sure no stepping happens while we're deleting stuff
         m_initialized = false;
@@ -521,13 +522,13 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
 
     public override PhysicsActor AddAvatar(string avName, Vector3 position, Vector3 velocity, Vector3 size, bool isFlying)
     {
-        m_log.ErrorFormat("{0}: CALL TO AddAvatar in BSScene. NOT IMPLEMENTED", LogHeader);
+        m_log.LogError("{0}: CALL TO AddAvatar in BSScene. NOT IMPLEMENTED", LogHeader);
         return null;
     }
 
     public override PhysicsActor AddAvatar(uint localID, string avName, Vector3 position, Vector3 size, float footOffset, bool isFlying)
     {
-        // m_log.DebugFormat("{0}: AddAvatar: {1}", LogHeader, avName);
+        // m_log.LogDebug("{0}: AddAvatar: {1}", LogHeader, avName);
 
         if (!m_initialized) return null;
 
@@ -546,7 +547,7 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
 
     public override void RemoveAvatar(PhysicsActor actor)
     {
-        // m_log.DebugFormat("{0}: RemoveAvatar", LogHeader);
+        // m_log.LogDebug("{0}: RemoveAvatar", LogHeader);
 
         if (!m_initialized) return;
 
@@ -563,14 +564,14 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("{0}: Attempt to remove avatar that is not in physics scene: {1}", LogHeader, e);
+                m_log.LogWarning("{0}: Attempt to remove avatar that is not in physics scene: {1}", LogHeader, e);
             }
             bsactor.Destroy();
             // bsactor.dispose();
         }
         else
         {
-            m_log.ErrorFormat("{0}: Requested to remove avatar that is not a BSCharacter. ID={1}, type={2}",
+            m_log.LogError("{0}: Requested to remove avatar that is not a BSCharacter. ID={1}, type={2}",
                                         LogHeader, actor.LocalID, actor.GetType().Name);
         }
     }
@@ -583,28 +584,28 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
         if (bsprim != null)
         {
             DetailLog("{0},RemovePrim,call", bsprim.LocalID);
-            // m_log.DebugFormat("{0}: RemovePrim. id={1}/{2}", LogHeader, bsprim.Name, bsprim.LocalID);
+            // m_log.LogDebug("{0}: RemovePrim. id={1}/{2}", LogHeader, bsprim.Name, bsprim.LocalID);
             try
             {
                 lock (PhysObjects) PhysObjects.Remove(bsprim.LocalID);
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("{0}: Attempt to remove prim that is not in physics scene: {1}", LogHeader, e);
+                m_log.LogError("{0}: Attempt to remove prim that is not in physics scene: {1}", LogHeader, e);
             }
             bsprim.Destroy();
             // bsprim.dispose();
         }
         else
         {
-            m_log.ErrorFormat("{0}: Attempt to remove prim that is not a BSPrim type.", LogHeader);
+            m_log.LogError("{0}: Attempt to remove prim that is not a BSPrim type.", LogHeader);
         }
     }
 
     public override PhysicsActor AddPrimShape(string primName, PrimitiveBaseShape pbs, Vector3 position,
                                               Vector3 size, Quaternion rotation, bool isPhysical, uint localID)
     {
-        // m_log.DebugFormat("{0}: AddPrimShape2: {1}", LogHeader, primName);
+        // m_log.LogDebug("{0}: AddPrimShape2: {1}", LogHeader, primName);
 
         if (!m_initialized) return null;
 
@@ -677,7 +678,7 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("{0},PhysicsStep Exception: nTaints={1}, substeps={2}, updates={3}, colliders={4}, e={5}",
+                m_log.LogWarning("{0},PhysicsStep Exception: nTaints={1}, substeps={2}, updates={3}, colliders={4}, e={5}",
                             LogHeader, numTaints, numSubSteps, updatedEntityCount, collidersCount, e);
                 DetailLog("{0},PhysicsStepException,call, nTaints={1}, substeps={2}, updates={3}, colliders={4}",
                             DetailLogZero, numTaints, numSubSteps, updatedEntityCount, collidersCount);
@@ -947,7 +948,7 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
 
     public override void DeleteTerrain()
     {
-        // m_log.DebugFormat("{0}: DeleteTerrain()", LogHeader);
+        // m_log.LogDebug("{0}: DeleteTerrain()", LogHeader);
     }
 
     #endregion // Terrain
@@ -1300,7 +1301,7 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("{0}: ProcessTaints: {1}: Exception: {2}", LogHeader, tcbe.ident, e);
+                    m_log.LogError("{0}: ProcessTaints: {1}: Exception: {2}", LogHeader, tcbe.ident, e);
                 }
             }
             oldList.Clear();
@@ -1348,7 +1349,7 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("{0}: ProcessPostTaintTaints: {1}: Exception: {2}", LogHeader, kvp.Key, e);
+                    m_log.LogError("{0}: ProcessPostTaintTaints: {1}: Exception: {2}", LogHeader, kvp.Key, e);
                 }
             }
             oldList.Clear();
